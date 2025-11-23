@@ -320,50 +320,6 @@ spec:
                           kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$patch_json"
                         }
 
-                        advance_stage_if_needed() {
-                          local workflow_name="$1"
-                          local task_id="$2"
-                          local repo_label="$3"
-
-                          local workflow_json resource_version patch_json
-                          workflow_json=$(kubectl get workflow "$workflow_name" -n agent-platform -o json 2>/dev/null)
-                          if [ -z "$workflow_json" ]; then
-                            echo "⚠️ Unable to fetch workflow $workflow_name for stage update"
-                            return 1
-                          fi
-
-                          local current_stage
-                          current_stage=$(echo "$workflow_json" | jq -r '.metadata.labels["current-stage"] // ""')
-                          if [ "$current_stage" != "waiting-pr-created" ]; then
-                            echo "ℹ️ Workflow $workflow_name no longer at waiting-pr-created (found '$current_stage')"
-                            return 0
-                          fi
-
-                          resource_version=$(echo "$workflow_json" | jq -r '.metadata.resourceVersion // ""')
-                          if [ -z "$resource_version" ]; then
-                            echo "⚠️ Missing resourceVersion for $workflow_name"
-                            return 1
-                          fi
-
-                          patch_json=$(jq -n \
-                            --arg rv "$resource_version" \
-                            --arg task "$task_id" \
-                            --arg repo "$repo_label" \
-                            '{
-                              metadata: {
-                                resourceVersion: $rv,
-                                labels: {
-                                  "previous-stage": "waiting-pr-created",
-                                  "current-stage": "waiting-quality-complete",
-                                  "task-id": $task,
-                                  repository: $repo
-                                }
-                              }
-                            }')
-
-                          kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$patch_json"
-                        }
-
                         ensure_jq
                         ensure_openssl
 
@@ -495,13 +451,14 @@ spec:
                         # Note: No longer waiting for status labels (needs-cleo, etc.)
                         # System now uses GitHub PR reviews for stage transitions
                         # PR creation event itself triggers the resume
+                        # NOTE: wait-for-pr-created suspend node was removed - workflows now poll for PR in implementation-cycle
 
-                        echo "Polling for workflow reaching wait-for-pr-created suspend point..."
-                        MAX_WORKFLOW_ATTEMPTS=90
-                        WORKFLOW_WAIT_SECONDS=10
+                        echo "Looking for active workflow for task $TASK_ID..."
+                        MAX_WORKFLOW_ATTEMPTS=30
+                        WORKFLOW_WAIT_SECONDS=2
                         WORKFLOW_ATTEMPT=1
                         WORKFLOW_NAME=""
-                        SUSPEND_READY=false
+                        WORKFLOW_FOUND=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
                           WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
@@ -517,20 +474,25 @@ spec:
                           if [ -n "$WORKFLOW_NAME" ]; then
                             CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | \
                               jq -r '.items[0].metadata.labels["current-stage"] // ""' 2>/dev/null || echo "")
-                            SUSPEND_PHASE=$(echo "$WORKFLOW_JSON" | \
-                              jq -r '(.items[0].status.nodes // {})
-                                | to_entries[]?
-                                | select(.value.displayName == "wait-for-pr-created")
-                                | .value.phase' 2>/dev/null || echo "")
+                            WORKFLOW_PHASE=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '.items[0].status.phase // ""' 2>/dev/null || echo "")
 
-                            if [ "$CURRENT_STAGE" = "waiting-pr-created" ] && [ "$SUSPEND_PHASE" = "Running" ]; then
-                              SUSPEND_READY=true
-                              echo "✅ Workflow $WORKFLOW_NAME is waiting for PR-created event"
+                            echo "✅ Found workflow $WORKFLOW_NAME (stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE)"
+
+                            # Check if workflow is in implementation stage and running
+                            # This means Rex just created the PR and workflow is polling for it
+                            if [ "$CURRENT_STAGE" = "implementation-in-progress" ] && [ "$WORKFLOW_PHASE" = "Running" ]; then
+                              WORKFLOW_FOUND=true
+                              echo "✅ Workflow in implementation - PR creation allows proceed"
                               break
+                            elif [ "$CURRENT_STAGE" = "quality-in-progress" ] || \
+                                 [ "$CURRENT_STAGE" = "security-in-progress" ] || \
+                                 [ "$CURRENT_STAGE" = "testing-in-progress" ]; then
+                              echo "ℹ️ Workflow past implementation (stage=$CURRENT_STAGE)"
+                              exit 0
+                            else
+                              echo "⏳ Workflow stage=$CURRENT_STAGE phase=$WORKFLOW_PHASE - waiting ${WORKFLOW_WAIT_SECONDS}s"
                             fi
-
-                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE suspend-phase=${SUSPEND_PHASE:-none};"
-                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           else
                             echo "⏳ No workflow discovered for task-id=$TASK_ID yet; waiting ${WORKFLOW_WAIT_SECONDS}s"
                           fi
@@ -539,27 +501,22 @@ spec:
                           WORKFLOW_ATTEMPT=$((WORKFLOW_ATTEMPT + 1))
                         done
 
-                        if [ "$SUSPEND_READY" != true ]; then
-                          echo "⚠️ Workflow did not reach wait-for-pr-created suspend point in time; skipping resume"
+                        if [ "$WORKFLOW_FOUND" != true ]; then
+                          echo "ℹ️ No workflow in implementation stage"
+                          echo "   PR may have been created manually or workflow progressed"
                           exit 0
                         fi
 
                         echo "Updating workflow metadata with PR details"
                         if ! update_workflow_pr_metadata "$WORKFLOW_NAME" "$PR_URL" "$PR_NUMBER"; then
                           echo "⚠️ Failed to update workflow with PR metadata"
+                        else
+                          echo "✅ PR metadata updated - workflow will detect PR and proceed"
                         fi
 
-                        REPO_LABEL=$(echo "$REPO" | tr '/' '-')
-                        if ! advance_stage_if_needed "$WORKFLOW_NAME" "$TASK_ID" "$REPO_LABEL"; then
-                          echo "⚠️ Failed to advance workflow stage"
-                          exit 0
-                        fi
-
-                        echo "Resuming workflow $WORKFLOW_NAME"
-                        if ! resume_workflow; then
-                          echo "⚠️ Resume attempt failed"
-                          exit 0
-                        fi
+                        # NOTE: No longer calling advance_stage_if_needed or resume_workflow
+                        # Workflow template polls for PR internally via check-or-wait-for-pr
+                        # and handles stage transitions automatically.
 
                         echo "Finished processing PR-created event"
           parameters:

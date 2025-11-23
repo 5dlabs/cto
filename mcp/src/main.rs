@@ -311,12 +311,11 @@ fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
                             eprintln!("✅ Repository configuration loaded successfully");
                             eprintln!("   Agents defined: {}", config.agents.len());
                             return Some(config);
-                        } else {
-                            eprintln!(
-                                "⚠️  Repository config version mismatch: {} (expected 1.0)",
-                                config.version
-                            );
                         }
+                        eprintln!(
+                            "⚠️  Repository config version mismatch: {} (expected 1.0)",
+                            config.version
+                        );
                     }
                     Err(e) => {
                         eprintln!("⚠️  Failed to parse repository config: {e}");
@@ -1829,7 +1828,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .get("implementation_agent")
         .and_then(|v| v.as_str())
         .map_or_else(
-            || config.defaults.play.implementation_agent.clone(),
+            || effective_config.defaults.play.implementation_agent.clone(),
             String::from,
         );
 
@@ -1923,9 +1922,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .get("frontend_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
-        .or_else(|| config.defaults.play.frontend_agent.clone())
+        .or_else(|| effective_config.defaults.play.frontend_agent.clone())
         .unwrap_or_else(|| {
-            let fallback = config.defaults.play.implementation_agent.clone();
+            let fallback = effective_config.defaults.play.implementation_agent.clone();
             eprintln!(
                 "⚠️ WARNING: No frontend-agent specified and no defaults.play.frontendAgent in config!"
             );
@@ -2022,7 +2021,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let quality_agent_input = arguments
         .get("quality_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.play.quality_agent.clone(), String::from);
+        .map_or_else(
+            || effective_config.defaults.play.quality_agent.clone(),
+            String::from,
+        );
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let quality_agent_cfg = effective_config
@@ -2106,7 +2108,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let security_agent_input = arguments
         .get("security_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.play.security_agent.clone(), String::from);
+        .map_or_else(
+            || effective_config.defaults.play.security_agent.clone(),
+            String::from,
+        );
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let security_agent_cfg = effective_config
@@ -2190,7 +2195,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let testing_agent_input = arguments
         .get("testing_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.play.testing_agent.clone(), String::from);
+        .map_or_else(
+            || effective_config.defaults.play.testing_agent.clone(),
+            String::from,
+        );
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let testing_agent_cfg = effective_config
@@ -2293,37 +2301,37 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 "opencode_max_retries",
             ))
             .or(implementation_agent_max_retries)
-            .or(config.defaults.play.implementation_max_retries)
-            .or(config.defaults.play.max_retries)
-            .or(config.defaults.code.max_retries)
+            .or(effective_config.defaults.play.implementation_max_retries)
+            .or(effective_config.defaults.play.max_retries)
+            .or(effective_config.defaults.code.max_retries)
             .unwrap_or(10);
 
     let frontend_max_retries = parse_max_retries_argument(arguments, "frontend_max_retries")
         .or(frontend_agent_max_retries)
-        .or(config.defaults.play.frontend_max_retries)
-        .or(config.defaults.play.max_retries)
-        .or(config.defaults.code.max_retries)
+        .or(effective_config.defaults.play.frontend_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let quality_max_retries = parse_max_retries_argument(arguments, "quality_max_retries")
         .or(quality_agent_max_retries)
-        .or(config.defaults.play.quality_max_retries)
-        .or(config.defaults.play.max_retries)
-        .or(config.defaults.code.max_retries)
+        .or(effective_config.defaults.play.quality_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let security_max_retries = parse_max_retries_argument(arguments, "security_max_retries")
         .or(security_agent_max_retries)
-        .or(config.defaults.play.security_max_retries)
-        .or(config.defaults.play.max_retries)
-        .or(config.defaults.code.max_retries)
+        .or(effective_config.defaults.play.security_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let testing_max_retries = parse_max_retries_argument(arguments, "testing_max_retries")
         .or(testing_agent_max_retries)
-        .or(config.defaults.play.testing_max_retries)
-        .or(config.defaults.play.max_retries)
-        .or(config.defaults.code.max_retries)
+        .or(effective_config.defaults.play.testing_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let opencode_max_retries_override =
@@ -2406,13 +2414,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Auto-merge parameter
     let auto_merge = parse_bool_argument(arguments, "auto_merge")
-        .or(config.defaults.play.auto_merge)
+        .or(effective_config.defaults.play.auto_merge)
         .unwrap_or(false);
     params.push(format!("auto-merge={auto_merge}"));
 
     // Parallel execution parameter - determines which workflow template to use
     let parallel_execution = parse_bool_argument(arguments, "parallel_execution")
-        .or(config.defaults.play.parallel_execution)
+        .or(effective_config.defaults.play.parallel_execution)
         .unwrap_or(false);
 
     // Select workflow template based on parallel_execution flag
