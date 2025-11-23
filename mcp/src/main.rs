@@ -1474,40 +1474,61 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             }
         }
 
-        // 3. Query TaskMaster for next task
+        // 3. Query TaskMaster for next task (only works if repository is in local workspace)
         eprintln!("🔍 Querying TaskMaster for next available task...");
-        if let Some(task) = get_next_taskmaster_task(docs_dir)? {
-            eprintln!("✅ Found next task: {} - {}", task.id, task.title);
-            Some(task.id)
-        } else {
-            // Check for blocked tasks to provide helpful feedback
-            let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
+        match get_next_taskmaster_task(docs_dir) {
+            Ok(Some(task)) => {
+                eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                Some(task.id)
+            }
+            Ok(None) => {
+                // Check for blocked tasks to provide helpful feedback
+                let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
 
-            let message = if blocked_tasks.is_empty() {
-                "No tasks available - all tasks are completed".to_string()
-            } else {
-                let blocked_ids: Vec<String> = blocked_tasks
-                    .iter()
-                    .map(|t| format!("Task {} ({})", t.id, t.title))
-                    .collect();
+                let message = if blocked_tasks.is_empty() {
+                    "No tasks available - all tasks are completed".to_string()
+                } else {
+                    let blocked_ids: Vec<String> = blocked_tasks
+                        .iter()
+                        .map(|t| format!("Task {} ({})", t.id, t.title))
+                        .collect();
 
-                format!(
-                    "No tasks available. {} task(s) blocked by dependencies:\n{}",
-                    blocked_tasks.len(),
-                    blocked_ids.join("\n")
-                )
-            };
+                    format!(
+                        "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                        blocked_tasks.len(),
+                        blocked_ids.join("\n")
+                    )
+                };
 
-            return Ok(json!({
-                "success": false,
-                "message": message,
-                "repository": repository,
-                "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
-                    "id": t.id,
-                    "title": t.title,
-                    "dependencies": t.dependencies
-                })).collect::<Vec<_>>(),
-            }));
+                return Ok(json!({
+                    "success": false,
+                    "message": message,
+                    "repository": repository,
+                    "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                        "id": t.id,
+                        "title": t.title,
+                        "dependencies": t.dependencies
+                    })).collect::<Vec<_>>(),
+                }));
+            }
+            Err(_) => {
+                // tasks.json not found locally - this is expected for remote repositories
+                eprintln!("⚠️  tasks.json not found in local workspace");
+                eprintln!("   Repository '{}' is not in the current workspace", repository);
+                eprintln!("   Please specify task_id explicitly, e.g., {{ task_id: 1 }}");
+                
+                return Ok(json!({
+                    "success": false,
+                    "message": format!(
+                        "Auto-detection requires tasks.json in local workspace.\n\
+                         Repository '{}' is not in the current workspace.\n\
+                         Please provide task_id explicitly (e.g., task_id: 1)",
+                        repository
+                    ),
+                    "repository": repository,
+                    "hint": "Specify task_id parameter to start a specific task",
+                }));
+            }
         }
     };
 
