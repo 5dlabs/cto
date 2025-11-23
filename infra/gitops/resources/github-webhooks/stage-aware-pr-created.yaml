@@ -163,7 +163,7 @@ spec:
                         fi
 
                         echo "Found workflow: $WORKFLOW_NAME"
-                        echo "Looking for stage: waiting-pr-created"
+                        echo "Checking workflow stage..."
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
@@ -171,27 +171,36 @@ spec:
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
-                        if [ "$CURRENT_STAGE" = "waiting-pr-created" ]; then
-                          echo "Found workflow at correct stage, resuming..."
+                        WORKFLOW_PHASE=$(kubectl get workflow $WORKFLOW_NAME \
+                          -n agent-platform \
+                          -o jsonpath='{.status.phase}' \
+                          2>/dev/null || echo "")
+
+                        echo "Workflow stage: $CURRENT_STAGE, phase: $WORKFLOW_PHASE"
+
+                        # NOTE: wait-for-pr-created suspend node was removed
+                        # Workflows now poll for PR in implementation-cycle
+                        # We just need to update PR metadata - the workflow will detect it
+                        if [ "$CURRENT_STAGE" = "implementation-in-progress" ] && [ "$WORKFLOW_PHASE" = "Running" ]; then
+                          echo "✅ Workflow is in implementation stage - updating PR metadata..."
 
                           # Update workflow parameters with PR details
                           if ! update_workflow_pr_metadata "$WORKFLOW_NAME" \
                               "{{ .Input.body.pull_request.html_url }}" \
                               "{{ .Input.body.pull_request.number }}"; then
-                            echo "ERROR: Failed to update PR metadata on $WORKFLOW_NAME"
-                            exit 1
+                            echo "⚠️ Failed to update PR metadata on $WORKFLOW_NAME"
+                            echo "   Workflow will continue polling GitHub API for PR"
+                          else
+                            echo "✅ PR metadata updated - workflow proceeds to quality"
                           fi
-
-                          # Resume the workflow
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='merge' \
-                            -p '{"spec":{"suspend":false}}'
-
-                          echo "✅ Workflow resumed successfully"
+                        elif [ "$CURRENT_STAGE" = "quality-in-progress" ] || \
+                             [ "$CURRENT_STAGE" = "security-in-progress" ] || \
+                             [ "$CURRENT_STAGE" = "testing-in-progress" ]; then
+                          echo "ℹ️ Workflow past implementation (stage: $CURRENT_STAGE)"
+                          echo "   No action needed"
                         else
-                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
-                          echo "Skipping resume to prevent incorrect stage progression"
+                          echo "ℹ️ Workflow not in expected stage (current: $CURRENT_STAGE, phase: $WORKFLOW_PHASE)"
+                          echo "   Skipping to prevent incorrect stage progression"
                         fi
       retryStrategy:
         steps: 3
