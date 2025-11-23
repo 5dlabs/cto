@@ -227,8 +227,19 @@ spec:
     - name: main
       dag:
         tasks:
-          # Stage 0: Initialize workflow stage tracking
+          # Stage 0: Determine resume point (must run first)
+          - name: check-main-resume
+            template: determine-resume-point
+            arguments:
+              parameters:
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+
+          # Stage 1: Initialize workflow stage tracking
           - name: initialize-stage
+            dependencies: [check-main-resume]
             template: update-workflow-stage
             arguments:
               parameters:
@@ -237,7 +248,7 @@ spec:
                 - name: verify-update
                   value: "true"
 
-          # Stage 1: Update to implementation stage before Rex starts
+          # Stage 2: Update to implementation stage before Rex starts
           - name: update-to-implementation
             dependencies: [initialize-stage]
             template: update-workflow-stage
@@ -249,18 +260,24 @@ spec:
                   value: "false"
 
           # Agent execution sequence: Rex → Cleo → Cipher → Tess
+          # Skip if resuming at or after waiting-atlas
           - name: agent-sequence
-            dependencies: [update-to-implementation]
+            dependencies: [update-to-implementation, check-main-resume]
             template: agent-sequence
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
           # Atlas integration gate (pause workflow until Atlas finishes)
+          # Run if: (1) agent-sequence completed OR (2) resuming at waiting-atlas
+          # Skip if resuming at or after waiting-merge
           - name: update-to-waiting-atlas
-            dependencies: [agent-sequence]
+            dependencies: [agent-sequence, check-main-resume]
+            depends: "(agent-sequence.Succeeded || agent-sequence.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -269,8 +286,10 @@ spec:
                   value: "true"
 
           - name: wait-for-atlas-integration
-            dependencies: [update-to-waiting-atlas]
+            dependencies: [update-to-waiting-atlas, check-main-resume]
+            depends: "(update-to-waiting-atlas.Succeeded || update-to-waiting-atlas.Skipped) && check-main-resume.Succeeded"
             template: suspend-for-event
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: event-type
@@ -281,6 +300,7 @@ spec:
           # Update stage after Atlas completes integration checks
           - name: update-to-waiting-merge
             dependencies: [wait-for-atlas-integration]
+            depends: "wait-for-atlas-integration.Succeeded || wait-for-atlas-integration.Skipped"
             template: update-workflow-stage
             arguments:
               parameters:
@@ -2252,6 +2272,10 @@ spec:
               RESUME_STAGE="testing"
               echo "✅ Resuming at: Testing (Tess)"
               ;;
+            "waiting-atlas-integration"|"atlas-integration-in-progress")
+              RESUME_STAGE="waiting-atlas"
+              echo "✅ Resuming at: Atlas Integration"
+              ;;
             "waiting-pr-merged")
               RESUME_STAGE="waiting-merge"
               echo "✅ Resuming at: Waiting for Merge"
@@ -2299,8 +2323,8 @@ spec:
           echo "Current stage: $CURRENT_STAGE"
 
           # Stage order (must match workflow progression)
-          # implementation → quality → security → testing → waiting-merge → completed
-          STAGES=("implementation" "quality" "security" "testing" "waiting-merge" "completed")
+          # implementation → quality → security → testing → waiting-atlas → waiting-merge → completed
+          STAGES=("implementation" "quality" "security" "testing" "waiting-atlas" "waiting-merge" "completed")
 
           # Find indices
           RESUME_IDX=-1
