@@ -201,6 +201,7 @@ struct PlayDefaults {
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
     #[serde(rename = "workingDirectory")]
+    #[allow(dead_code)] // Still in config for backward compatibility, but we use docs_project_directory for tasks
     working_directory: Option<String>,
     #[serde(rename = "maxRetries")]
     max_retries: Option<u32>,
@@ -1300,13 +1301,14 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| config.defaults.play.repository.clone())
         .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
 
-    // Get working directory from config
-    let working_dir = config
+    // Get docs project directory for finding tasks.json
+    // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
+    let docs_dir = config
         .defaults
         .play
-        .working_directory
+        .docs_project_directory
         .as_ref()
-        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+        .and_then(|dd| if dd == "." { None } else { Some(dd.as_str()) });
 
     // Read progress from ConfigMap
     let progress = read_play_progress(&repository)?;
@@ -1315,7 +1317,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let active_workflow = find_active_play_workflow(&repository)?;
 
     // Check for blocked tasks
-    let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
+    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
 
     // Build comprehensive status response
     match (progress, active_workflow) {
@@ -1362,7 +1364,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
             // No active workflow
 
             // Try to get next task
-            let next_task = get_next_taskmaster_task(working_dir)?;
+            let next_task = get_next_taskmaster_task(docs_dir)?;
 
             if let Some(task) = next_task {
                 Ok(json!({
@@ -1417,13 +1419,14 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Validate repository URL
     validate_repository_url(&repository)?;
 
-    // Get working directory from config
-    let working_dir = config
+    // Get docs project directory for finding tasks.json
+    // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
+    let docs_dir = config
         .defaults
         .play
-        .working_directory
+        .docs_project_directory
         .as_ref()
-        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+        .and_then(|dd| if dd == "." { None } else { Some(dd.as_str()) });
 
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
@@ -1473,12 +1476,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
         // 3. Query TaskMaster for next task
         eprintln!("🔍 Querying TaskMaster for next available task...");
-        if let Some(task) = get_next_taskmaster_task(working_dir)? {
+        if let Some(task) = get_next_taskmaster_task(docs_dir)? {
             eprintln!("✅ Found next task: {} - {}", task.id, task.title);
             Some(task.id)
         } else {
             // Check for blocked tasks to provide helpful feedback
-            let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
+            let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
 
             let message = if blocked_tasks.is_empty() {
                 "No tasks available - all tasks are completed".to_string()
