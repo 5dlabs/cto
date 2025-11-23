@@ -32,6 +32,18 @@ spec:
             value: "/config"
           - name: RUST_LOG
             value: "trace,kube=debug,toolman=trace"
+          - name: CONTEXT7_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: toolman-context7-secrets
+                key: CONTEXT7_API_KEY
+                optional: true
+          - name: GITHUB_PERSONAL_ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: toolman-github-secrets
+                key: GITHUB_PERSONAL_ACCESS_TOKEN
+                optional: true
 
         # Set working directory to writable location (not read-only config mount)
         workingDir: "/tmp"
