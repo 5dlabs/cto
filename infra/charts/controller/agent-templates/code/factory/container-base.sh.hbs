@@ -1061,6 +1061,17 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
         git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
         echo "✅ Created fresh branch $FEATURE_BRANCH from $REMOTE_BASE"
         echo "ℹ️ Previous PR was closed - starting with clean slate"
+        
+        # Clean stale completion markers from workspace
+        echo "🧹 Cleaning stale completion markers after branch recreation..."
+        find "$WORKSPACE_ROOT" -type f \( \
+          -name ".implementation_complete" -o \
+          -name ".agent_done" -o \
+          -name ".quality_complete" -o \
+          -name ".testing_complete" -o \
+          -name ".security_complete" \
+        \) -delete 2>/dev/null || true
+        echo "✅ Workspace markers cleaned for fresh implementation"
       else
         echo "ℹ️ No closed PRs found - will unset upstream and continue"
         git branch --unset-upstream 2>/dev/null || true
@@ -1095,6 +1106,17 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
           git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
           git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
           echo "✅ Recreated $FEATURE_BRANCH from $REMOTE_BASE"
+          
+          # Clean stale completion markers from workspace
+          echo "🧹 Cleaning stale completion markers after branch recreation..."
+          find "$WORKSPACE_ROOT" -type f \( \
+            -name ".implementation_complete" -o \
+            -name ".agent_done" -o \
+            -name ".quality_complete" -o \
+            -name ".testing_complete" -o \
+            -name ".security_complete" \
+          \) -delete 2>/dev/null || true
+          echo "✅ Workspace markers cleaned for fresh implementation"
         fi
       fi
     fi
