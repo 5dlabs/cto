@@ -1898,6 +1898,34 @@ if command -v codex >/dev/null 2>&1; then
     fi
   done
   
+  # List available tools through Codex CLI
+  echo ""
+  echo "📦 Listing tools available through Codex CLI..."
+  
+  # Try different methods to list tools
+  # Method 1: codex tool list
+  CODEX_TOOLS=$(codex tool list 2>&1 || echo "")
+  
+  if [ -z "$CODEX_TOOLS" ] || echo "$CODEX_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 2: codex mcp list-tools
+    CODEX_TOOLS=$(codex mcp list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -z "$CODEX_TOOLS" ] || echo "$CODEX_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 3: codex --list-tools
+    CODEX_TOOLS=$(codex --list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -n "$CODEX_TOOLS" ] && ! echo "$CODEX_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    echo "  ✓ Retrieved tool list from Codex CLI:"
+    TOOL_COUNT=$(echo "$CODEX_TOOLS" | grep -v "^$" | wc -l | tr -d ' ')
+    echo "  📊 Total: $TOOL_COUNT tools available"
+    echo "$CODEX_TOOLS" | sed 's/^/    - /'
+  else
+    echo "  ℹ️ Codex CLI may not support direct tool listing"
+    echo "  ℹ️ Tools will be discovered at runtime"
+  fi
+  
   echo ""
 else
   echo "  ⚠️ codex CLI not available for tool verification"

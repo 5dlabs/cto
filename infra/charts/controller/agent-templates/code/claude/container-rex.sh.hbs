@@ -1263,6 +1263,31 @@ echo "════════════════════════�
 echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
+echo "📖 How MCP Tool Validation Works:"
+echo "  1. Load cto-config.json from repository root"
+echo "  2. Extract agent's configured tools (agents.rex.tools)"
+echo "  3. Check if claude CLI and MCP servers are available"
+echo "  4. Query actual available tools from MCP servers"
+echo "  5. Compare configured vs available tools"
+echo ""
+
+# Load expected tools from cto-config.json
+EXPECTED_TOOLS=""
+if [ -f "$REPO_ROOT/cto-config.json" ]; then
+  echo "📋 Loading tool configuration from cto-config.json..."
+  EXPECTED_TOOLS=$(jq -r '.agents.rex.tools.remote[]?' "$REPO_ROOT/cto-config.json" 2>/dev/null || echo "")
+  if [ -n "$EXPECTED_TOOLS" ]; then
+    TOOL_COUNT=$(echo "$EXPECTED_TOOLS" | wc -l | tr -d ' ')
+    echo "  ✓ Found $TOOL_COUNT configured tools for Rex"
+    echo "$EXPECTED_TOOLS" | sed 's/^/    - /'
+  else
+    echo "  ⚠️ No tools configured in cto-config.json for Rex"
+  fi
+else
+  echo "  ⚠️ cto-config.json not found at $REPO_ROOT"
+fi
+
+echo ""
 echo "🔍 Verifying Claude MCP tools..."
 
 TOOL_VERIFICATION_FAILED=false
@@ -1280,6 +1305,44 @@ if command -v claude >/dev/null 2>&1; then
     TOOL_VERIFICATION_FAILED=true
   fi
   
+  # List available tools through Claude CLI
+  echo ""
+  echo "📦 Listing tools available through Claude CLI..."
+  
+  # Try different methods to list tools
+  # Method 1: Try claude mcp list-tools (if supported)
+  CLAUDE_TOOLS=$(claude mcp list-tools 2>&1 || echo "")
+  
+  if [ -z "$CLAUDE_TOOLS" ] || echo "$CLAUDE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 2: Try claude tool list
+    CLAUDE_TOOLS=$(claude tool list 2>&1 || echo "")
+  fi
+  
+  if [ -z "$CLAUDE_TOOLS" ] || echo "$CLAUDE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 3: Try claude --list-tools
+    CLAUDE_TOOLS=$(claude --list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -z "$CLAUDE_TOOLS" ] || echo "$CLAUDE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 4: Try to extract from help output
+    echo "  ℹ️ Claude CLI may not support direct tool listing"
+    echo "  ℹ️ Attempting to query MCP servers directly..."
+    CLAUDE_TOOLS=""
+  else
+    # Successfully got tool list
+    echo "  ✓ Retrieved tool list from Claude CLI"
+    AVAILABLE_TOOLS="$CLAUDE_TOOLS"
+    
+    # Count and display tools
+    if [ -n "$AVAILABLE_TOOLS" ]; then
+      TOOL_COUNT=$(echo "$AVAILABLE_TOOLS" | grep -v "^$" | wc -l | tr -d ' ')
+      echo "  📊 Total: $TOOL_COUNT tools available"
+      echo ""
+      echo "  Available tools:"
+      echo "$AVAILABLE_TOOLS" | sed 's/^/    - /'
+    fi
+  fi
+  
   # Rex needs: Context7, GitHub, Brave Search
   REQUIRED_SERVERS=("toolman")
   
@@ -1293,6 +1356,90 @@ if command -v claude >/dev/null 2>&1; then
       TOOL_VERIFICATION_FAILED=true
     fi
   done
+  
+  # Only query MCP server directly if Claude CLI didn't provide tools
+  if [ -z "$AVAILABLE_TOOLS" ]; then
+    echo ""
+    echo "📦 Querying MCP servers directly for tool list..."
+    
+    # Try to list tools from the toolman server
+    if echo "$MCP_LIST" | grep -q "toolman.*Connected"; then
+      # Extract toolman URL from MCP list
+      TOOLMAN_URL=$(echo "$MCP_LIST" | grep "toolman" | sed -n 's/.*--url \([^ ]*\).*/\1/p' | head -1)
+      if [ -z "$TOOLMAN_URL" ]; then
+        # Fallback to known URL if extraction fails
+        TOOLMAN_URL="http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+      fi
+      
+      echo "  🔧 Querying Toolman server ($TOOLMAN_URL)..."
+      
+      # Try to get tool list via direct MCP query
+      TOOLS_RESPONSE=$(curl -s -X POST "$TOOLMAN_URL" \
+        -H "Content-Type: application/json" \
+        -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' 2>/dev/null || echo "")
+      
+      if [ -n "$TOOLS_RESPONSE" ] && echo "$TOOLS_RESPONSE" | grep -q "result"; then
+        # Parse available tools
+        AVAILABLE_TOOLS=$(echo "$TOOLS_RESPONSE" | jq -r '.result.tools[]?.name // empty' 2>/dev/null || echo "")
+        
+        if [ -n "$AVAILABLE_TOOLS" ]; then
+          AVAIL_COUNT=$(echo "$AVAILABLE_TOOLS" | wc -l | tr -d ' ')
+          echo "  ✓ Found $AVAIL_COUNT available tools from MCP server"
+          echo "$AVAILABLE_TOOLS" | sed 's/^/    - /'
+        else
+          echo "  ⚠️ No tools returned from MCP server"
+        fi
+      else
+        echo "  ℹ️ Unable to query tool list (server may not support listing)"
+        echo "  ℹ️ Tools will be discovered at runtime by Claude"
+      fi
+    else
+      echo "  ❌ Toolman server not connected - cannot query available tools"
+      TOOL_VERIFICATION_FAILED=true
+    fi
+  fi
+  
+  # Compare configured vs available tools
+  if [ -n "$EXPECTED_TOOLS" ] && [ -n "$AVAILABLE_TOOLS" ]; then
+    echo ""
+    echo "🔍 Comparing configured vs available tools..."
+    
+    MISSING_TOOLS=""
+    while IFS= read -r tool; do
+      if ! echo "$AVAILABLE_TOOLS" | grep -q "^$tool$"; then
+        MISSING_TOOLS="$MISSING_TOOLS$tool\n"
+      fi
+    done <<< "$EXPECTED_TOOLS"
+    
+    if [ -z "$MISSING_TOOLS" ]; then
+      echo "  ✅ All configured tools are available!"
+    else
+      echo "  ⚠️ Some configured tools are missing:"
+      echo -e "$MISSING_TOOLS" | sed 's/^/    ❌ /'
+      echo ""
+      echo "  This may be OK if:"
+      echo "    - Tools are provided by other MCP servers"
+      echo "    - Tools are discovered at runtime"
+      echo "    - Configuration is intentionally different"
+    fi
+    
+    # Check for extra tools not in config
+    EXTRA_TOOLS=""
+    while IFS= read -r tool; do
+      if [ -n "$tool" ] && ! echo "$EXPECTED_TOOLS" | grep -q "^$tool$"; then
+        EXTRA_TOOLS="$EXTRA_TOOLS$tool\n"
+      fi
+    done <<< "$AVAILABLE_TOOLS"
+    
+    if [ -n "$EXTRA_TOOLS" ]; then
+      echo ""
+      echo "  ℹ️ Additional tools available (not in config):"
+      echo -e "$EXTRA_TOOLS" | sed 's/^/    + /'
+    fi
+  elif [ -n "$EXPECTED_TOOLS" ]; then
+    echo ""
+    echo "  ⚠️ Cannot compare tools - MCP server query failed"
+  fi
   
   echo ""
 else

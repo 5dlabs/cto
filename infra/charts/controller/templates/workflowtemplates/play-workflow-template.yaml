@@ -1525,7 +1525,7 @@ spec:
 
           REPO="{{`{{workflow.parameters.repository}}`}}"
           TASK_ID="{{`{{workflow.parameters.task-id}}`}}"
-          CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')"
+          CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')-task-${TASK_ID}"
           CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           # Check if ConfigMap exists
@@ -2230,7 +2230,7 @@ spec:
 
           REPO="{{`{{inputs.parameters.repository}}`}}"
           TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
-          CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')"
+          CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')-task-${TASK_ID}"
 
           echo "=== Checking for Existing Progress ==="
           echo "Repository: $REPO"
@@ -2245,24 +2245,14 @@ spec:
           fi
 
           # Extract progress data
-          STORED_TASK_ID=$(echo "$PROGRESS" | jq -r '.data["current-task-id"] // ""')
           STORED_STAGE=$(echo "$PROGRESS" | jq -r '.data["stage"] // "implementation"')
           STORED_STATUS=$(echo "$PROGRESS" | jq -r '.data["status"] // "in-progress"')
           WORKFLOW_NAME=$(echo "$PROGRESS" | jq -r '.data["workflow-name"] // ""')
 
-          echo "Found existing progress:"
-          echo "  Task ID: $STORED_TASK_ID"
+          echo "Found existing progress for task ${TASK_ID}:"
           echo "  Stage: $STORED_STAGE"
           echo "  Status: $STORED_STATUS"
           echo "  Workflow: $WORKFLOW_NAME"
-
-          # Validate task ID matches
-          if [ "$STORED_TASK_ID" != "$TASK_ID" ]; then
-            echo "⚠️  ConfigMap has different task ($STORED_TASK_ID vs $TASK_ID)"
-            echo "Starting from beginning for new task"
-            echo "implementation" > /tmp/resume-stage.txt
-            exit 0
-          fi
 
           # Check if workflow still exists (prevent concurrent execution)
           if [ -n "$WORKFLOW_NAME" ]; then

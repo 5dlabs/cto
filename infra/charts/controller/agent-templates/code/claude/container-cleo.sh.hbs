@@ -1547,6 +1547,13 @@ echo "════════════════════════�
 echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
+echo "📖 How MCP Tool Validation Works:"
+echo "  1. Check if claude CLI is available"
+echo "  2. List all configured MCP servers (claude mcp list)"
+echo "  3. Verify required servers are connected (toolman for Cleo)"
+echo "  4. Attempt to list available tools from each server"
+echo "  5. Ensure critical tools are accessible"
+echo ""
 echo "🔍 Verifying Claude MCP tools..."
 
 TOOL_VERIFICATION_FAILED=false
@@ -1577,6 +1584,39 @@ if command -v claude >/dev/null 2>&1; then
       TOOL_VERIFICATION_FAILED=true
     fi
   done
+  
+  echo ""
+  echo "📦 Listing available MCP tools from connected servers..."
+  
+  # Try to list tools from the toolman server
+  if echo "$MCP_LIST" | grep -q "toolman.*Connected"; then
+    # Extract toolman URL from MCP list
+    TOOLMAN_URL=$(echo "$MCP_LIST" | grep "toolman" | sed -n 's/.*--url \([^ ]*\).*/\1/p' | head -1)
+    if [ -z "$TOOLMAN_URL" ]; then
+      # Fallback to known URL if extraction fails
+      TOOLMAN_URL="http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+    fi
+    
+    echo "  🔧 Toolman server tools (from $TOOLMAN_URL):"
+    
+    # Try to get tool list via direct MCP query
+    # Note: This assumes toolman MCP server supports a tools/list endpoint
+    TOOLS_RESPONSE=$(curl -s -X POST "$TOOLMAN_URL" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' 2>/dev/null || echo "")
+    
+    if [ -n "$TOOLS_RESPONSE" ] && echo "$TOOLS_RESPONSE" | grep -q "result"; then
+      # Parse and display tools if we got a valid response
+      echo "$TOOLS_RESPONSE" | jq -r '.result.tools[]?.name // empty' 2>/dev/null | sed 's/^/    - /' || echo "    ⚠️ Unable to parse tool list"
+      
+      # Count tools
+      TOOL_COUNT=$(echo "$TOOLS_RESPONSE" | jq -r '.result.tools | length' 2>/dev/null || echo "0")
+      echo "    📊 Total: $TOOL_COUNT tools available"
+    else
+      echo "    ℹ️ Unable to fetch tool list (server may not support listing)"
+      echo "    ℹ️ Tools will be discovered at runtime by Claude"
+    fi
+  fi
   
   echo ""
 else
