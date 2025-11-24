@@ -73,6 +73,7 @@ Chart.lock
 controller/target/
 mcp/target/
 mcp/dist/
+dist/
 sidecar/target/
 
 # Agent files
