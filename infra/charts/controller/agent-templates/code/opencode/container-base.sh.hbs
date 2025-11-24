@@ -1831,6 +1831,34 @@ if command -v opencode >/dev/null 2>&1; then
     TOOL_VERIFICATION_FAILED=true
   fi
   
+  # List available tools through OpenCode CLI
+  echo ""
+  echo "📦 Listing tools available through OpenCode CLI..."
+  
+  # Try different methods to list tools
+  # Method 1: opencode tool list
+  OPENCODE_TOOLS=$(opencode tool list 2>&1 || echo "")
+  
+  if [ -z "$OPENCODE_TOOLS" ] || echo "$OPENCODE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 2: opencode mcp list-tools
+    OPENCODE_TOOLS=$(opencode mcp list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -z "$OPENCODE_TOOLS" ] || echo "$OPENCODE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 3: opencode --list-tools
+    OPENCODE_TOOLS=$(opencode --list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -n "$OPENCODE_TOOLS" ] && ! echo "$OPENCODE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    echo "  ✓ Retrieved tool list from OpenCode CLI:"
+    TOOL_COUNT=$(echo "$OPENCODE_TOOLS" | grep -v "^$" | wc -l | tr -d ' ')
+    echo "  📊 Total: $TOOL_COUNT tools available"
+    echo "$OPENCODE_TOOLS" | sed 's/^/    - /'
+  else
+    echo "  ℹ️ OpenCode CLI may not support direct tool listing"
+    echo "  ℹ️ Tools will be discovered at runtime"
+  fi
+  
   echo ""
 else
   echo "  ⚠️ opencode CLI not available for tool verification"
