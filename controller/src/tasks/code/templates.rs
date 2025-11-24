@@ -1075,7 +1075,7 @@ impl CodeTemplateGenerator {
                 ))
             })?;
 
-        // Get CLI config to extract toolman URL
+        // Get CLI config to extract toolman URL and tools
         let cli_config_value = code_run
             .spec
             .cli_config

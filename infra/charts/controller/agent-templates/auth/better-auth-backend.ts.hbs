@@ -1,0 +1,467 @@
+// auth.ts - BetterAuth Backend Configuration
+// Agent: Rex (Implementation)
+// Generated for: {{project_name}}
+
+import { betterAuth } from "better-auth"
+{{#if use_prisma}}
+import { prismaAdapter } from "better-auth/adapters/prisma"
+import { prisma } from "@/lib/prisma"
+{{/if}}
+{{#if use_drizzle}}
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { db } from "@/lib/db"
+{{/if}}
+{{#if email_auth}}
+import { sendEmail } from "@/lib/email"
+{{/if}}
+{{#if use_2fa}}
+import { twoFactor } from "better-auth/plugins"
+{{/if}}
+{{#if use_magic_link}}
+import { magicLink } from "better-auth/plugins"
+{{/if}}
+{{#if use_passkey}}
+import { passkey } from "better-auth/plugins"
+{{/if}}
+{{#if use_organization}}
+import { organization } from "better-auth/plugins"
+{{/if}}
+{{#if use_mcp}}
+import { mcp } from "better-auth/plugins"
+{{/if}}
+{{#if use_oidc_provider}}
+import { oidcProvider } from "better-auth/plugins"
+{{/if}}
+{{#if use_jwt}}
+import { jwt } from "better-auth/plugins"
+{{/if}}
+{{#if use_admin}}
+import { admin } from "better-auth/plugins"
+{{/if}}
+{{#if use_multi_session}}
+import { multiSession } from "better-auth/plugins"
+{{/if}}
+{{#if use_anonymous}}
+import { anonymous } from "better-auth/plugins"
+{{/if}}
+
+export const auth = betterAuth({
+  // Database Configuration
+  database: {{#if use_prisma}}prismaAdapter(prisma, {
+    provider: "{{database_provider}}" // postgresql, mysql, sqlite
+  }){{else if use_drizzle}}drizzleAdapter(db, {
+    provider: "{{database_provider}}"
+  }){{else}}{
+    // Configure your database adapter
+  }{{/if}},
+
+  // Base URL Configuration
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  secret: process.env.BETTER_AUTH_SECRET!,
+
+  // Email/Password Authentication
+  {{#if email_auth}}
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: {{require_email_verification}},
+    sendResetPasswordEmail: async ({ email, url }) => {
+      await sendEmail({
+        to: email,
+        subject: "Reset your password",
+        html: `
+          <div>
+            <h1>Reset your password</h1>
+            <p>Click the link below to reset your password:</p>
+            <a href="${url}">Reset Password</a>
+          </div>
+        `
+      })
+    },
+    sendVerificationEmail: async ({ email, url }) => {
+      await sendEmail({
+        to: email,
+        subject: "Verify your email",
+        html: `
+          <div>
+            <h1>Verify your email</h1>
+            <p>Click the link below to verify your email:</p>
+            <a href="${url}">Verify Email</a>
+          </div>
+        `
+      })
+    }
+  },
+  {{/if}}
+
+  // Social Providers
+  {{#if social_providers}}
+  socialProviders: {
+    {{#if github_auth}}
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      {{#if github_scopes}}
+      scopes: ["{{github_scopes}}"]
+      {{/if}}
+    },
+    {{/if}}
+    {{#if google_auth}}
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      {{#if google_scopes}}
+      scopes: ["{{google_scopes}}"]
+      {{/if}}
+    },
+    {{/if}}
+    {{#if discord_auth}}
+    discord: {
+      clientId: process.env.DISCORD_CLIENT_ID!,
+      clientSecret: process.env.DISCORD_CLIENT_SECRET!
+    },
+    {{/if}}
+    {{#if microsoft_auth}}
+    microsoft: {
+      clientId: process.env.MICROSOFT_CLIENT_ID!,
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+      tenant: process.env.MICROSOFT_TENANT_ID || "common"
+    },
+    {{/if}}
+    {{#if custom_oauth}}
+    // Add custom OAuth providers as needed
+    {{/if}}
+  },
+  {{/if}}
+
+  // Session Configuration
+  session: {
+    expiresIn: {{session_expiry_seconds}}, // Default: 7 days
+    updateAgeOnGet: true,
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 5 // 5 minutes
+    }
+  },
+
+  // Advanced Security
+  advanced: {
+    generateId: false, // Use default ID generation
+    cookiePrefix: "{{project_slug}}",
+    {{#if custom_user_fields}}
+    defaultCookieAttributes: {
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true
+    }
+    {{/if}}
+  },
+
+  // User Configuration
+  user: {
+    {{#if custom_user_fields}}
+    additionalFields: {
+      {{#each custom_user_fields}}
+      {{this.name}}: {
+        type: "{{this.type}}",
+        required: {{this.required}},
+        defaultValue: {{this.defaultValue}}
+      },
+      {{/each}}
+    },
+    {{/if}}
+    changeEmail: {
+      enabled: {{allow_email_change}},
+      sendVerificationEmail: true
+    }
+  },
+
+  // Rate Limiting
+  rateLimit: {
+    enabled: true,
+    window: 60, // seconds
+    max: 10, // requests per window
+    {{#if custom_rate_limits}}
+    custom: {
+      "/api/auth/sign-in": {
+        window: 60,
+        max: 5
+      },
+      "/api/auth/sign-up": {
+        window: 3600,
+        max: 3
+      }
+    }
+    {{/if}}
+  },
+
+  // Plugins
+  plugins: [
+    {{#if use_2fa}}
+    twoFactor({
+      issuer: "{{project_name}}",
+      backupCodeCount: 10,
+      {{#if totp_enabled}}
+      totpEnabled: true,
+      {{/if}}
+      {{#if sms_enabled}}
+      smsEnabled: true,
+      sendSMS: async ({ phoneNumber, code }) => {
+        // Implement SMS sending
+      }
+      {{/if}}
+    }),
+    {{/if}}
+    
+    {{#if use_magic_link}}
+    magicLink({
+      expiresIn: 60 * 10, // 10 minutes
+      sendMagicLink: async ({ email, url }) => {
+        await sendEmail({
+          to: email,
+          subject: "Sign in to {{project_name}}",
+          html: `
+            <div>
+              <h1>Sign in to {{project_name}}</h1>
+              <p>Click the link below to sign in:</p>
+              <a href="${url}">Sign In</a>
+              <p>This link will expire in 10 minutes.</p>
+            </div>
+          `
+        })
+      }
+    }),
+    {{/if}}
+    
+    {{#if use_passkey}}
+    passkey({
+      rpName: "{{project_name}}",
+      rpID: process.env.PASSKEY_RP_ID || "localhost",
+      origin: process.env.BETTER_AUTH_URL || "http://localhost:3000"
+    }),
+    {{/if}}
+    
+    {{#if use_organization}}
+    organization({
+      allowUserToCreateOrganization: {{allow_org_creation}},
+      organizationLimit: {{org_limit}},
+      {{#if custom_org_roles}}
+      roles: {
+        {{#each custom_org_roles}}
+        {{this.id}}: {
+          name: "{{this.name}}",
+          description: "{{this.description}}",
+          permissions: [{{#each this.permissions}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+        },
+        {{/each}}
+      },
+      {{else}}
+      roles: {
+        admin: {
+          name: "Admin",
+          description: "Full access to organization",
+          permissions: ["*"]
+        },
+        member: {
+          name: "Member",
+          description: "Basic member access",
+          permissions: ["read"]
+        }
+      },
+      {{/if}}
+      sendInvitationEmail: async ({ email, invitationUrl, organizationName }) => {
+        await sendEmail({
+          to: email,
+          subject: `You've been invited to join ${organizationName}`,
+          html: `
+            <div>
+              <h1>Organization Invitation</h1>
+              <p>You've been invited to join ${organizationName}.</p>
+              <a href="${invitationUrl}">Accept Invitation</a>
+            </div>
+          `
+        })
+      }
+    }),
+    {{/if}}
+    
+    {{#if use_mcp}}
+    mcp({
+      loginPage: "/sign-in",
+      resource: "{{project_name}}-api",
+      {{#if mcp_oidc_config}}
+      oidcConfig: {
+        codeExpiresIn: {{mcp_code_expires}},
+        accessTokenExpiresIn: {{mcp_access_token_expires}},
+        refreshTokenExpiresIn: {{mcp_refresh_token_expires}},
+        defaultScope: "{{mcp_default_scope}}",
+        scopes: [{{#each mcp_scopes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+      }
+      {{/if}}
+    }),
+    {{/if}}
+    
+    {{#if use_oidc_provider}}
+    oidcProvider({
+      loginPage: "/sign-in",
+      consentPage: "/consent",
+      allowDynamicClientRegistration: {{allow_dynamic_client_registration}},
+      {{#if trusted_clients}}
+      trustedClients: [
+        {{#each trusted_clients}}
+        {
+          clientId: "{{this.clientId}}",
+          clientSecret: process.env.{{this.envVarName}}!,
+          name: "{{this.name}}",
+          type: "{{this.type}}",
+          redirectURLs: [{{#each this.redirectURLs}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}],
+          disabled: false,
+          skipConsent: {{this.skipConsent}},
+          metadata: {{{json this.metadata}}}
+        },
+        {{/each}}
+      ],
+      {{/if}}
+      getAdditionalUserInfoClaim: async (user, scopes, client) => {
+        const claims: Record<string, any> = {}
+        
+        {{#if custom_claims}}
+        // Add custom claims based on scopes
+        if (scopes.includes("profile")) {
+          {{#each profile_claims}}
+          claims.{{this}} = user.{{this}}
+          {{/each}}
+        }
+        
+        if (scopes.includes("custom")) {
+          // Add your custom claims here
+        }
+        {{/if}}
+        
+        return claims
+      },
+      {{#if use_jwt_signing}}
+      useJWTPlugin: true
+      {{/if}}
+    }),
+    {{/if}}
+    
+    {{#if use_jwt}}
+    jwt({
+      jwksEndpoint: "/api/auth/.well-known/jwks.json",
+      issuer: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+      expiresIn: {{jwt_expiry_seconds}},
+      {{#if jwt_custom_claims}}
+      customClaims: async (user) => ({
+        {{#each jwt_custom_claims}}
+        {{this.key}}: user.{{this.field}},
+        {{/each}}
+      })
+      {{/if}}
+    }),
+    {{/if}}
+    
+    {{#if use_admin}}
+    admin({
+      impersonationSessionDuration: 60 * 60, // 1 hour
+      {{#if admin_users}}
+      defaultAdminEmails: [{{#each admin_users}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+      {{/if}}
+    }),
+    {{/if}}
+    
+    {{#if use_multi_session}}
+    multiSession({
+      maximumSessions: {{max_sessions}},
+      maximumSessionsPerDevice: {{max_sessions_per_device}}
+    }),
+    {{/if}}
+    
+    {{#if use_anonymous}}
+    anonymous({
+      // Allow anonymous users with limitations
+      allowAnonymousSignUp: true,
+      linkAnonymousToUser: true
+    }),
+    {{/if}}
+  ],
+
+  // Account Linking
+  account: {
+    accountLinking: {
+      enabled: {{enable_account_linking}},
+      trustedProviders: [{{#each trusted_providers}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+    }
+  },
+
+  // Callbacks
+  callbacks: {
+    onRequest: async ({ request, context }) => {
+      // Log authentication requests
+      console.log(`Auth request: ${request.method} ${request.url}`)
+    },
+    onResponse: async ({ response, context }) => {
+      // Log authentication responses
+      console.log(`Auth response: ${response.status}`)
+    },
+    onError: async ({ error, request }) => {
+      // Log authentication errors
+      console.error(`Auth error: ${error.message}`)
+      
+      {{#if error_reporting}}
+      // Report to error tracking service
+      // await reportError(error, request)
+      {{/if}}
+    }
+  }
+})
+
+// Export type-safe auth client
+export type Auth = typeof auth
+
+// Helper functions
+export async function getSession(request: Request) {
+  return await auth.api.getSession({
+    headers: request.headers
+  })
+}
+
+export async function requireAuth(request: Request) {
+  const session = await getSession(request)
+  if (!session) {
+    throw new Error("Unauthorized")
+  }
+  return session
+}
+
+{{#if use_organization}}
+export async function requireOrgMember(
+  request: Request,
+  organizationId: string,
+  requiredRole?: string
+) {
+  const session = await requireAuth(request)
+  const member = await auth.api.getOrganizationMember({
+    organizationId,
+    userId: session.user.id
+  })
+  
+  if (!member) {
+    throw new Error("Not a member of this organization")
+  }
+  
+  if (requiredRole && member.role !== requiredRole) {
+    throw new Error(`Requires ${requiredRole} role`)
+  }
+  
+  return { session, member }
+}
+{{/if}}
+
+{{#if use_mcp}}
+// MCP Session Helper
+export async function getMCPSession(request: Request) {
+  return await auth.api.getMcpSession({
+    headers: request.headers
+  })
+}
+{{/if}}

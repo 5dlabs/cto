@@ -81,7 +81,7 @@ spec:
         - name: AUTH_TYPE
           value: "{{ .Values.api.auth.type }}"
         {{- end }}
-        {{- if .Values.embeddings.provider == "openai" }}
+        {{- if eq .Values.embeddings.provider "openai" }}
         - name: OPENAI_API_KEY
           valueFrom:
             secretKeyRef:
@@ -133,3 +133,6 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+
+
