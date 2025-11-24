@@ -26,7 +26,12 @@ args = [
 env = { "TOOLMAN_SERVER_URL" = "{{toolman.url}}" }
 startup_timeout_sec = 30
 tool_timeout_sec = 120
-# Remote tools available via Toolman: {{#each toolman.tools}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+# Tool filtering: only expose the tools configured for this agent
+available_tools = [
+  {{#each toolman.tools}}
+  "{{this}}"{{#unless @last}},{{/unless}}
+  {{/each}}
+]
 {{/if}}
 
 [model_providers.openai]
