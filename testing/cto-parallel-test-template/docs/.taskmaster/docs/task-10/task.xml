@@ -1,0 +1,64 @@
+<prompt>
+    <role>You are a senior DevOps engineer and system architect responsible for final deployment validation and production readiness.</role>
+    <task>
+        <id>10</id>
+        <title>Final Integration & Deployment Verification</title>
+        <description>Comprehensive end-to-end validation of the complete system and deployment readiness verification.</description>
+        <priority>critical</priority>
+        <status>pending</status>
+        <dependencies>1,2,3,4,5,6,7,8,9</dependencies>
+        <agentHint>integration</agentHint>
+    </task>
+    <technical_specifications>
+        <spec>Build entire system in release mode</spec>
+        <spec>Execute complete integration test suite</spec>
+        <spec>Validate all end-to-end user flows</spec>
+        <spec>Perform smoke tests on critical paths</spec>
+        <spec>Run performance and load testing</spec>
+        <spec>Validate security requirements</spec>
+        <spec>Verify documentation completeness</spec>
+        <spec>Check deployment readiness</spec>
+    </technical_specifications>
+    <implementation_details>
+Build backend and frontend in production mode.
+Run all tests (backend, frontend, integration).
+Execute end-to-end user flow testing.
+Perform smoke tests on critical endpoints.
+Run performance tests with load testing tools.
+Validate security (JWT, passwords, SQL injection prevention).
+Check documentation completeness.
+Create deployment readiness report.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Release builds succeed for all components</criterion>
+        <criterion>All test suites pass</criterion>
+        <criterion>End-to-end flows validated</criterion>
+        <criterion>Performance meets requirements</criterion>
+        <criterion>Security validations pass</criterion>
+        <criterion>Documentation complete</criterion>
+        <criterion>Deployment checklist satisfied</criterion>
+        <criterion>System runs stably under load</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+Build in release mode.
+Run full test suite.
+Execute manual E2E testing.
+Perform automated smoke tests.
+Run load tests with hey or similar tool.
+Validate security requirements.
+Review documentation.
+Generate deployment readiness report.
+    </test_strategy>
+    <instructions>
+1. Build entire system in release mode
+2. Set up database with migrations
+3. Start all services
+4. Run complete test suite
+5. Execute end-to-end manual testing
+6. Perform smoke tests
+7. Run performance tests
+8. Validate security
+9. Check documentation
+10. Create deployment readiness report
+    </instructions>
+</prompt>

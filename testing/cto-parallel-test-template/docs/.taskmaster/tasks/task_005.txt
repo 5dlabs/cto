@@ -1,0 +1,341 @@
+# Task ID: 5
+# Title: Shopping Cart API
+# Status: pending
+# Dependencies: 3, 4
+# Priority: medium
+# Description: Create shopping cart functionality and API endpoints.
+# Details:
+Implement the shopping cart functionality and API endpoints:
+
+1. Create `src/cart/mod.rs` to export the cart module components:
+```rust
+pub mod service;
+
+pub use self::service::CartService;
+```
+
+2. Create `src/cart/service.rs` for cart service logic:
+```rust
+use crate::auth::models::User;
+use crate::catalog::models::Product;
+use serde::{Serialize, Deserialize};
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CartItem {
+    pub product_id: i32,
+    pub quantity: i32,
+    pub product_name: String,
+    pub unit_price: rust_decimal::Decimal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cart {
+    pub id: i32,
+    pub user_id: i32,
+    pub items: Vec<CartItem>,
+}
+
+pub struct CartService {
+    carts: Arc<Mutex<HashMap<i32, Cart>>>,
+    next_id: Arc<Mutex<i32>>,
+}
+
+impl CartService {
+    pub fn new() -> Self {
+        CartService {
+            carts: Arc::new(Mutex::new(HashMap::new())),
+            next_id: Arc::new(Mutex::new(1)),
+        }
+    }
+    
+    pub fn get_or_create_cart(&self, user_id: i32) -> Cart {
+        let mut carts = self.carts.lock().unwrap();
+        
+        // Find existing cart for user
+        for (_, cart) in carts.iter() {
+            if cart.user_id == user_id {
+                return cart.clone();
+            }
+        }
+        
+        // Create new cart if none exists
+        let mut next_id = self.next_id.lock().unwrap();
+        let cart = Cart {
+            id: *next_id,
+            user_id,
+            items: Vec::new(),
+        };
+        
+        *next_id += 1;
+        carts.insert(cart.id, cart.clone());
+        cart
+    }
+    
+    pub fn add_item(&self, user_id: i32, product: &Product, quantity: i32) -> Cart {
+        let mut carts = self.carts.lock().unwrap();
+        
+        // Find or create cart
+        let cart_id = self.get_or_create_cart(user_id).id;
+        let cart = carts.get_mut(&cart_id).unwrap();
+        
+        // Check if product already in cart
+        if let Some(item) = cart.items.iter_mut().find(|i| i.product_id == product.id) {
+            item.quantity += quantity;
+        } else {
+            // Add new item
+            cart.items.push(CartItem {
+                product_id: product.id,
+                quantity,
+                product_name: product.name.clone(),
+                unit_price: product.price,
+            });
+        }
+        
+        cart.clone()
+    }
+    
+    pub fn remove_item(&self, user_id: i32, product_id: i32) -> Option<Cart> {
+        let mut carts = self.carts.lock().unwrap();
+        
+        // Find cart for user
+        for (_, cart) in carts.iter_mut() {
+            if cart.user_id == user_id {
+                cart.items.retain(|item| item.product_id != product_id);
+                return Some(cart.clone());
+            }
+        }
+        
+        None
+    }
+    
+    pub fn get_cart(&self, user_id: i32) -> Option<Cart> {
+        let carts = self.carts.lock().unwrap();
+        
+        for (_, cart) in carts.iter() {
+            if cart.user_id == user_id {
+                return Some(cart.clone());
+            }
+        }
+        
+        None
+    }
+    
+    pub fn clear_cart(&self, user_id: i32) -> Option<Cart> {
+        let mut carts = self.carts.lock().unwrap();
+        
+        for (_, cart) in carts.iter_mut() {
+            if cart.user_id == user_id {
+                cart.items.clear();
+                return Some(cart.clone());
+            }
+        }
+        
+        None
+    }
+}
+```
+
+3. Create `src/api/cart_routes.rs` for cart API endpoints:
+```rust
+use actix_web::{web, HttpResponse, Responder};
+use serde::{Serialize, Deserialize};
+use crate::cart::CartService;
+use crate::catalog::ProductService;
+use crate::auth::jwt::validate_token;
+
+#[derive(Deserialize)]
+pub struct AddItemRequest {
+    pub product_id: i32,
+    pub quantity: i32,
+}
+
+pub fn configure_cart_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/cart")
+            .route("", web::get().to(get_cart))
+            .route("/add", web::post().to(add_item))
+            .route("/remove/{product_id}", web::delete().to(remove_item))
+            .route("/clear", web::post().to(clear_cart))
+    );
+}
+
+async fn get_cart(
+    cart_service: web::Data<CartService>,
+    req: web::HttpRequest,
+) -> impl Responder {
+    // Extract user_id from JWT token in header
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Bearer ") {
+                let token = &auth_str[7..]; // Skip "Bearer " prefix
+                if let Ok(claims) = validate_token(token) {
+                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);
+                    if let Some(cart) = cart_service.get_cart(user_id) {
+                        return HttpResponse::Ok().json(cart);
+                    }
+                    return HttpResponse::Ok().json(cart_service.get_or_create_cart(user_id));
+                }
+            }
+        }
+    }
+    
+    HttpResponse::Unauthorized().finish()
+}
+
+async fn add_item(
+    cart_service: web::Data<CartService>,
+    product_service: web::Data<ProductService>,
+    req: web::HttpRequest,
+    item: web::Json<AddItemRequest>,
+) -> impl Responder {
+    // Extract user_id from JWT token in header
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Bearer ") {
+                let token = &auth_str[7..]; // Skip "Bearer " prefix
+                if let Ok(claims) = validate_token(token) {
+                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);
+                    
+                    // Get product
+                    if let Some(product) = product_service.get_by_id(item.product_id) {
+                        // Check inventory
+                        if product.inventory_count >= item.quantity {
+                            let cart = cart_service.add_item(user_id, &product, item.quantity);
+                            return HttpResponse::Ok().json(cart);
+                        }
+                        return HttpResponse::BadRequest().json(serde_json::json!({
+                            "error": "Not enough inventory"
+                        }));
+                    }
+                    return HttpResponse::NotFound().json(serde_json::json!({
+                        "error": "Product not found"
+                    }));
+                }
+            }
+        }
+    }
+    
+    HttpResponse::Unauthorized().finish()
+}
+
+async fn remove_item(
+    cart_service: web::Data<CartService>,
+    req: web::HttpRequest,
+    path: web::Path<i32>,
+) -> impl Responder {
+    let product_id = path.into_inner();
+    
+    // Extract user_id from JWT token in header
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Bearer ") {
+                let token = &auth_str[7..]; // Skip "Bearer " prefix
+                if let Ok(claims) = validate_token(token) {
+                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);
+                    
+                    if let Some(cart) = cart_service.remove_item(user_id, product_id) {
+                        return HttpResponse::Ok().json(cart);
+                    }
+                    return HttpResponse::NotFound().json(serde_json::json!({
+                        "error": "Item not found in cart"
+                    }));
+                }
+            }
+        }
+    }
+    
+    HttpResponse::Unauthorized().finish()
+}
+
+async fn clear_cart(
+    cart_service: web::Data<CartService>,
+    req: web::HttpRequest,
+) -> impl Responder {
+    // Extract user_id from JWT token in header
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Bearer ") {
+                let token = &auth_str[7..]; // Skip "Bearer " prefix
+                if let Ok(claims) = validate_token(token) {
+                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);
+                    
+                    if let Some(cart) = cart_service.clear_cart(user_id) {
+                        return HttpResponse::Ok().json(cart);
+                    }
+                    return HttpResponse::NotFound().json(serde_json::json!({
+                        "error": "Cart not found"
+                    }));
+                }
+            }
+        }
+    }
+    
+    HttpResponse::Unauthorized().finish()
+}
+```
+
+4. Update `src/api/mod.rs` to include cart routes:
+```rust
+pub mod routes;
+pub mod cart_routes;
+```
+
+5. Update `src/api/routes.rs` to include cart routes configuration:
+```rust
+// Add to existing imports
+use crate::api::cart_routes::configure_cart_routes;
+
+// Update configure_routes function
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api")
+            .service(health_check)
+            .service(web::scope("/users").configure(user_routes))
+            .service(web::scope("/products").configure(product_routes))
+            .service(web::scope("/cart").configure(configure_cart_routes))
+    );
+}
+```
+
+# Test Strategy:
+1. Verify that all required files are created: `src/cart/mod.rs`, `src/cart/service.rs`, and `src/api/cart_routes.rs`
+2. Compile the code to ensure there are no syntax errors
+3. Write unit tests for the CartService to verify cart creation, item addition/removal, and cart clearing
+4. Test the cart API endpoints with mock requests including JWT authentication
+5. Verify integration with the Product Catalog module when adding items to the cart
+6. Test authentication requirements for all cart operations
+7. Verify proper error handling for invalid requests or unauthorized access
+
+# Subtasks:
+## 1. Create cart module structure [pending]
+### Dependencies: None
+### Description: Set up the basic cart module structure by creating the module file and implementing the cart service with data structures for Cart and CartItem.
+### Details:
+Create `src/cart/mod.rs` to export the cart module components and `src/cart/service.rs` to implement the CartService struct with its core data structures (Cart, CartItem) and basic methods for cart management. This includes implementing the new(), get_or_create_cart(), add_item(), remove_item(), get_cart(), and clear_cart() methods.
+
+## 2. Implement cart API route configuration [pending]
+### Dependencies: 5.1
+### Description: Create the cart routes configuration function to set up the API endpoints for cart operations.
+### Details:
+Create `src/api/cart_routes.rs` and implement the configure_cart_routes function that sets up the routes for getting the cart, adding items, removing items, and clearing the cart. Define the AddItemRequest struct for handling item addition requests.
+
+## 3. Implement cart retrieval and clearing endpoints [pending]
+### Dependencies: 5.2
+### Description: Implement the API handlers for retrieving and clearing the shopping cart.
+### Details:
+In `src/api/cart_routes.rs`, implement the get_cart and clear_cart handler functions. Both should extract the user ID from the JWT token in the Authorization header, then call the appropriate CartService methods and return the results as JSON responses. Include proper error handling for unauthorized requests.
+
+## 4. Implement cart item management endpoints [pending]
+### Dependencies: 5.3
+### Description: Implement the API handlers for adding and removing items from the shopping cart.
+### Details:
+In `src/api/cart_routes.rs`, implement the add_item and remove_item handler functions. The add_item handler should validate product existence and inventory availability before adding to the cart. The remove_item handler should handle product removal by ID. Both should extract the user ID from JWT tokens and include proper error handling.
+
+## 5. Integrate cart routes with main application [pending]
+### Dependencies: 5.4
+### Description: Update the application's route configuration to include the cart routes.
+### Details:
+Update `src/api/mod.rs` to include the cart_routes module. Then modify `src/api/routes.rs` to import the configure_cart_routes function and update the configure_routes function to include the cart routes in the API scope. Finally, ensure the CartService is properly registered as application data in the main.rs file.
+

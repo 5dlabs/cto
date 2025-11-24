@@ -1,0 +1,130 @@
+# Task ID: 2
+# Title: API Endpoints
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Create REST API endpoints for core operations of the application.
+# Details:
+Implement the core API endpoints structure that will serve as the backbone for the application:
+
+1. Create `src/api/mod.rs` to export the API module components
+```rust
+pub mod routes;
+```
+
+2. Create `src/api/routes.rs` with route definitions:
+```rust
+use actix_web::{web, HttpResponse, Scope};
+use crate::schema;
+
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api")
+            .service(health_check)
+            .service(web::scope("/users").configure(user_routes))
+            .service(web::scope("/products").configure(product_routes))
+    );
+}
+
+#[actix_web::get("/health")]
+async fn health_check() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
+}
+
+fn user_routes(cfg: &mut web::ServiceConfig) {
+    // User routes will be implemented in Task 3
+    cfg.service(web::resource("").route(web::get().to(|| HttpResponse::NotImplemented())));
+}
+
+fn product_routes(cfg: &mut web::ServiceConfig) {
+    // Product routes will be implemented in Task 4
+    cfg.service(web::resource("").route(web::get().to(|| HttpResponse::NotImplemented())));
+}
+```
+
+3. Update `src/main.rs` to set up the API server:
+```rust
+use actix_web::{App, HttpServer};
+mod api;
+mod schema;
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    println!("Starting API server");
+    
+    HttpServer::new(|| {
+        App::new()
+            .configure(api::routes::configure_routes)
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
+}
+```
+
+4. Update `Cargo.toml` to add API dependencies:
+```toml
+[dependencies]
+actix-web = "4.3.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+```
+
+# Test Strategy:
+1. Verify that all required files are created: `src/api/mod.rs`, `src/api/routes.rs`, and updates to `src/main.rs`
+2. Compile the code to ensure there are no syntax errors
+3. Run the server locally and test the health check endpoint with a tool like curl or Postman
+4. Verify that the route structure is set up correctly with placeholders for user and product routes
+5. Check that the API dependencies in `Cargo.toml` are correctly specified and can be resolved
+
+# Subtasks:
+## 1. Create API Module Structure [pending]
+### Dependencies: None
+### Description: Set up the basic API module structure with mod.rs and routes.rs files to establish the foundation for API endpoints.
+### Details:
+1. Create `src/api/mod.rs` to export the API module components
+2. Create `src/api/routes.rs` with the basic route configuration function
+3. Ensure proper imports and module exports
+4. Implement the health check endpoint as a simple test endpoint
+
+## 2. Implement Route Configuration [pending]
+### Dependencies: 2.1
+### Description: Implement the main route configuration function that sets up the API structure with appropriate scopes for different resource types.
+### Details:
+1. Complete the `configure_routes` function in `src/api/routes.rs`
+2. Set up the main API scope with `/api` prefix
+3. Configure nested scopes for users and products
+4. Implement placeholder functions for user_routes and product_routes
+5. Ensure all routes are properly registered with the service configuration
+
+## 3. Update Main Application Entry Point [pending]
+### Dependencies: 2.2
+### Description: Modify the main.rs file to integrate the API routes and set up the HTTP server with proper configuration.
+### Details:
+1. Update `src/main.rs` to include necessary imports
+2. Set up the actix_web main function with proper error handling
+3. Configure the HTTP server with the API routes
+4. Bind the server to the specified address and port
+5. Add appropriate logging for server startup
+
+## 4. Add API Dependencies to Cargo.toml [pending]
+### Dependencies: None
+### Description: Update the project's Cargo.toml file to include all necessary dependencies for the API implementation.
+### Details:
+1. Add actix-web dependency with version 4.3.1
+2. Add serde with derive features
+3. Add serde_json for JSON serialization/deserialization
+4. Run cargo build to verify dependencies resolve correctly
+5. Update any other dependencies that might be needed for the API functionality
+
+## 5. Implement Error Handling for API Endpoints [pending]
+### Dependencies: 2.2, 2.3
+### Description: Create a standardized error handling mechanism for API endpoints to ensure consistent error responses across the application.
+### Details:
+1. Create `src/api/errors.rs` to define API error types
+2. Implement error conversion traits for common error types
+3. Create a standardized error response format
+4. Update the route handlers to use the error handling mechanism
+5. Ensure all endpoints return errors in a consistent format
+6. Update `src/api/mod.rs` to export the errors module
+

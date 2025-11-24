@@ -75,11 +75,11 @@ spec:
         # Resource limits
         resources:
           limits:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 500m
+            memory: 2Gi
           requests:
-            cpu: 50m
-            memory: 64Mi
+            cpu: 100m
+            memory: 512Mi
 
         # Security context
         securityContext:
@@ -107,9 +107,6 @@ spec:
         logLevel: info
         dryRun: false
         once: false
-
-        # Annotations to watch for
-        annotationFilter: external-dns.alpha.kubernetes.io/hostname
 
         # Extra arguments
         extraArgs:
