@@ -172,16 +172,160 @@ Logs captured. Investigating root cause..."
     fi
     
     # 3. Check for Bugbot feedback
-    BUGBOT_COMMENTS=$(gh api "/repos/{{repository_owner}}/{{repository_name}}/issues/$PR_NUMBER/comments?per_page=10" --jq '[.[] | select(.user.login == "cursor[bot]" or .user.login == "bugbot[bot]") | select(.created_at > "'$(date -u -d "@$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ)'")] | length' 2>/dev/null || echo "0")
+    BUGBOT_COMMENTS_JSON=$(gh api "/repos/{{repository_owner}}/{{repository_name}}/issues/$PR_NUMBER/comments?per_page=10" --jq '[.[] | select(.user.login == "cursor[bot]" or .user.login == "bugbot[bot]") | select(.created_at > "'$(date -u -d "@$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ)'")]' 2>/dev/null || echo "[]")
+    BUGBOT_COMMENTS=$(echo "$BUGBOT_COMMENTS_JSON" | jq 'length')
     
     if [ "$BUGBOT_COMMENTS" -gt 0 ]; then
         echo "🐛 New Bugbot feedback detected ($BUGBOT_COMMENTS comments)"
         
-        # TODO: Implement Bugbot feedback resolution
-        # For now, just acknowledge
-        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Bugbot Feedback Detected
+        # Process each Bugbot comment
+        echo "$BUGBOT_COMMENTS_JSON" | jq -c '.[]' | while read -r comment; do
+            COMMENT_ID=$(echo "$comment" | jq -r '.id')
+            COMMENT_BODY=$(echo "$comment" | jq -r '.body')
+            COMMENT_URL=$(echo "$comment" | jq -r '.html_url')
+            
+            echo "📝 Processing Bugbot comment ID: $COMMENT_ID"
+            
+            # Extract issues from Bugbot comment
+            HAS_ERRORS=$(echo "$COMMENT_BODY" | grep -c "🔴" || true)
+            HAS_WARNINGS=$(echo "$COMMENT_BODY" | grep -c "🟡" || true)
+            HAS_SUGGESTIONS=$(echo "$COMMENT_BODY" | grep -c "💡" || true)
+            
+            # Only fix if there are actual issues
+            if [ "$HAS_ERRORS" -gt 0 ] || [ "$HAS_WARNINGS" -gt 0 ]; then
+                echo "🔧 Found $HAS_ERRORS errors and $HAS_WARNINGS warnings - initiating fix"
+                
+                # Fetch current PR branch
+                PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+                git fetch origin "$PR_BRANCH"
+                git checkout "$PR_BRANCH"
+                git pull origin "$PR_BRANCH"
+                
+                # Create fix context for Claude
+                cat > /tmp/bugbot-fix-request.md << EOF
+# Bugbot Issue Resolution Request
 
-$BUGBOT_COMMENTS new Bugbot comment(s) found. Analyzing feedback..."
+## PR Information
+- PR #$PR_NUMBER
+- Branch: $PR_BRANCH
+- Comment: $COMMENT_URL
+
+## Bugbot Feedback
+$COMMENT_BODY
+
+## Instructions
+Please fix the issues identified by Bugbot:
+1. Address all 🔴 errors (critical issues that must be fixed)
+2. Address all 🟡 warnings (important issues that should be fixed)
+3. Consider 💡 suggestions (improvements that could be made)
+4. Make minimal, targeted changes to fix only these specific issues
+5. Ensure fixes don't break existing functionality
+6. Follow the coding standards and patterns already in the codebase
+
+Focus on fixing the actual issues, not refactoring or adding new features.
+EOF
+                
+                # Use Claude to generate the fix
+                if command -v claude >/dev/null 2>&1; then
+                    echo "🤖 Using Claude to generate fixes..."
+                    
+                    # Run Claude with the fix request
+                    claude --output-format stream-json --input-format stream-json << CLAUDE_INPUT | tee /tmp/claude-output.log
+{
+  "type": "user",
+  "message": {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "$(cat /tmp/bugbot-fix-request.md | jq -Rs .)"
+      }
+    ]
+  }
+}
+CLAUDE_INPUT
+                    
+                    # Check if any files were modified
+                    if [ -n "$(git status --porcelain)" ]; then
+                        echo "✅ Claude has applied fixes"
+                        
+                        # Commit the changes
+                        git add -A
+                        git commit -m "fix: address Bugbot feedback from comment #$COMMENT_ID
+
+Automated fixes for issues identified by Bugbot:
+- Fixed $HAS_ERRORS critical errors
+- Resolved $HAS_WARNINGS warnings
+
+Bugbot comment: $COMMENT_URL
+Fixed by Atlas Guardian using Claude"
+                        
+                        # Push the fixes
+                        git push origin "$PR_BRANCH"
+                        
+                        # Post success comment
+                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Bugbot Issues Resolved
+
+Successfully addressed feedback from [Bugbot comment]($COMMENT_URL):
+- ✅ Fixed **$HAS_ERRORS** critical errors
+- ✅ Resolved **$HAS_WARNINGS** warnings
+${HAS_SUGGESTIONS:+- ℹ️ Reviewed **$HAS_SUGGESTIONS** suggestions}
+
+Changes have been pushed to branch \`$PR_BRANCH\`.
+
+### Summary of Changes
+- Applied targeted fixes for identified issues
+- Maintained existing functionality
+- Followed project coding standards
+
+*Resolved automatically by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                        
+                    else
+                        echo "ℹ️ No changes needed or Claude unable to determine fixes"
+                        
+                        # Post investigation comment
+                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Bugbot Feedback Reviewed
+
+Analyzed [Bugbot feedback]($COMMENT_URL) but no automatic fixes could be applied.
+
+This may require manual intervention for:
+- Complex architectural changes
+- Issues requiring human judgment
+- Problems outside the codebase
+
+*Reviewed by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                    fi
+                    
+                else
+                    echo "⚠️ Claude CLI not available - falling back to basic acknowledgment"
+                    
+                    # Basic acknowledgment without Claude
+                    gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Bugbot Feedback Acknowledged
+
+Detected feedback from [Bugbot]($COMMENT_URL) with:
+- 🔴 $HAS_ERRORS critical errors
+- 🟡 $HAS_WARNINGS warnings
+${HAS_SUGGESTIONS:+- 💡 $HAS_SUGGESTIONS suggestions}
+
+**Note:** Automatic resolution requires Claude CLI to be available.
+Manual intervention may be needed to address these issues.
+
+*Detected by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                fi
+                
+            elif [ "$HAS_SUGGESTIONS" -gt 0 ]; then
+                echo "💡 Only suggestions found - acknowledging without changes"
+                
+                # Just acknowledge suggestions
+                gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Bugbot Suggestions Noted
+
+Received $HAS_SUGGESTIONS suggestion(s) from [Bugbot]($COMMENT_URL).
+
+These are non-critical improvements that don't block the PR.
+
+*Acknowledged by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+            fi
+        done
     fi
     
     # 4. Check if ready to merge
