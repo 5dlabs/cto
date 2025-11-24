@@ -1217,6 +1217,52 @@ update_coderun_status() {
   fi
 }
 
+
+# Generate client-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating client-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$CLAUDE_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$CLAUDE_WORK_DIR/client-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Cleo" -> "cleo")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate client-config.json
+  if command -v jq >/dev/null 2>&1; then
+    jq -n \
+      --arg agent "$AGENT_NAME" \
+      --slurpfile cto "$CTO_CONFIG_PATH" \
+      '{
+        remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+        localServers: ($cto[0].agents[$agent].tools.localServers // {})
+      }' > "$CLIENT_CONFIG_PATH"
+    
+    if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ]; then
+      echo "✅ Generated client-config.json from cto-config.json"
+      echo "🔍 DEBUG: Generated client-config.json contents:"
+      jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+    else
+      echo "❌ Failed to generate client-config.json - file is empty or missing"
+      rm -f "$CLIENT_CONFIG_PATH"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files if generation failed or cto-config.json not found
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
