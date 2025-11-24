@@ -902,13 +902,18 @@ else
   echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
 fi
 
-# Fallback: copy from task-files if generation failed or cto-config.json not found
-if [ -f "/task-files/client-config.json" ]; then
-  cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-  cp /task-files/client-config.json "/workspace/client-config.json"
-  echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
+# Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
+if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
+  echo "📋 client-config.json not generated, using ConfigMap fallback..."
+  if [ -f "/task-files/client-config.json" ]; then
+    cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
+    cp /task-files/client-config.json "/workspace/client-config.json"
+    echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
+  else
+    echo "⚠️ client-config.json not found in task-files"
+  fi
 else
-  echo "⚠️ client-config.json not found in task-files"
+  echo "✓ Using dynamically generated client-config.json from cto-config.json"
 fi
 
 SRC_OK=false
