@@ -360,7 +360,7 @@ EOF
 # Main repository recreation logic
 recreate_repository() {
     local repo_path="${TEST_REPO_PATH:-/Users/jonathonfritz/code/work-projects/5dlabs/cto-parallel-test}"
-    local template_path="${TEMPLATE_REPO_PATH:-${repo_path}-template}"
+    local template_path="${TEMPLATE_REPO_PATH:-${PROJECT_ROOT}/testing/cto-parallel-test}"
     
     print_step "Recreating repository with strategy: $REPO_STRATEGY"
     
@@ -380,8 +380,9 @@ recreate_repository() {
         fi
         
         # Create new repository
+        local visibility="${REPO_VISIBILITY:-private}"
         gh repo create "${TEST_REPO_ORG}/${TEST_REPO}" \
-            --${REPO_VISIBILITY:-private} \
+            "--${visibility}" \
             --description "E2E test repository for CTO platform" \
             --clone=false
         

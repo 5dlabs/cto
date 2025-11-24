@@ -1355,7 +1355,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
   
   # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
   GITHUB_APP="{{github_app}}"
-  AGENT_NAME=$(echo "$GITHUB_APP" | awk -F'- ' '{print $2}' | tr '[:upper:]' '[:lower:]')
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
   echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
   
   # Debug: Show what we're reading

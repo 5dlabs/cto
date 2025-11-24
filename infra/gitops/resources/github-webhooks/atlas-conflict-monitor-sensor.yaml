@@ -130,6 +130,7 @@ spec:
                           echo "ℹ️ PR is mergeable and clean, no conflict handling required"
                           exit 0
                         fi
+
                         # If mergeable is null/false OR state is dirty/unstable, proceed
                         if [ "$MERGEABLE" = "null" ] || [ -z "$MERGEABLE" ]; then
                           echo "⚠️ Mergeable status is null - will create guardian to monitor"
