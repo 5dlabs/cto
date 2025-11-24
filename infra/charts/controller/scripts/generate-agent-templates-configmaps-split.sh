@@ -51,16 +51,9 @@ HEADER_EOF
       files_list+=$(find "agent-templates" -type f -path "*/${pattern}*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null || true)$'\n'
     done
   else
-    # CLI-specific: collect files under that CLI directory PLUS shared agent partials
+    # CLI-specific: collect files under that CLI directory only
     files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     
-    # Also include shared agent partials so templates can resolve {{> agents/...}} references
-    agent_partials=$(find "agent-templates/agents" -type f -name "*.hbs" 2>/dev/null | LC_ALL=C sort || true)
-    if [ -n "$agent_partials" ]; then
-      files_list+=$'\n'
-      files_list+="$agent_partials"
-    fi
-
     # Include shared code templates (e.g., hooks prefixed with code_shared_)
     code_shared=$(find "agent-templates" -maxdepth 1 -type f -name "code_shared_*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     if [ -n "$code_shared" ]; then
