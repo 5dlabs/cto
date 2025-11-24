@@ -1,0 +1,60 @@
+<prompt>
+    <role>You are a senior QA engineer and Rust developer specializing in integration testing, test automation, and quality assurance.</role>
+    <task>
+        <id>7</id>
+        <title>Integration Tests</title>
+        <description>Create comprehensive integration tests covering all APIs, authentication flows, and end-to-end user scenarios.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>2,5,6</dependencies>
+        <estimated_time>60 minutes</estimated_time>
+        <level>2</level>
+    </task>
+    <technical_specifications>
+        <spec>Use Actix-web test utilities for HTTP testing</spec>
+        <spec>Test all API endpoints (health, products, cart, auth)</spec>
+        <spec>Verify JWT authentication and authorization</spec>
+        <spec>Test complete user flows end-to-end</spec>
+        <spec>Independent tests with no shared state</spec>
+        <spec>Mock services for isolated testing</spec>
+    </technical_specifications>
+    <implementation_details>
+Create tests/ directory with integration_tests.rs, api_tests.rs, auth_tests.rs.
+
+Build test utilities for initializing test app and services.
+
+Test API endpoints with actix_web::test module.
+
+Verify JWT token creation, validation, and expiration.
+
+Test password hashing and verification.
+
+Create end-to-end flow tests: register → login → browse → add to cart → checkout.
+
+Ensure all tests are independent and repeatable.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>All test files created in tests/ directory</criterion>
+        <criterion>API endpoint tests cover all routes</criterion>
+        <criterion>Auth tests verify JWT and passwords</criterion>
+        <criterion>Integration tests cover full user flows</criterion>
+        <criterion>cargo test passes all tests</criterion>
+        <criterion>Tests are independent</criterion>
+        <criterion>No flaky tests</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+Run cargo test to execute all tests.
+Verify health check, product, cart, and auth endpoints.
+Test success and error scenarios.
+Verify authentication requirements enforced.
+Test complete shopping flow integration.
+    </test_strategy>
+    <instructions>
+1. Create test directory structure
+2. Build test utilities for app initialization
+3. Write API tests for all endpoints
+4. Write authentication tests
+5. Create end-to-end integration tests
+6. Run cargo test and verify all pass
+    </instructions>
+</prompt>

@@ -1,0 +1,364 @@
+<prompt>
+    <role>You are a senior Rust backend developer specializing in database design, Diesel ORM, and PostgreSQL. You have extensive experience building production-grade data layers for e-commerce applications.</role>
+
+    <task>
+        <id>1</id>
+        <title>Database Schema Setup</title>
+        <description>Create the foundational database schema and configuration for an e-commerce Rust API using Diesel ORM and PostgreSQL. Establish the data persistence layer with proper migrations, ORM models, and connection pooling.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies></dependencies>
+        <estimated_time>30 minutes</estimated_time>
+        <level>0</level>
+    </task>
+
+    <technical_specifications>
+        <spec>Use Diesel ORM version 2.1.0 with postgres, r2d2, and chrono features</spec>
+        <spec>Implement connection pooling using r2d2 version 0.8.10</spec>
+        <spec>Support PostgreSQL as the database backend</spec>
+        <spec>Create 4 core tables: users, products, carts, cart_items</spec>
+        <spec>Implement proper foreign key relationships with ON DELETE CASCADE</spec>
+        <spec>Use NUMERIC type for monetary values (price field)</spec>
+        <spec>Include UNIQUE constraints on username and email fields</spec>
+        <spec>Auto-generate timestamps for created_at fields</spec>
+        <spec>Use SERIAL for auto-incrementing primary keys</spec>
+        <spec>Implement both up and down migrations for version control</spec>
+    </technical_specifications>
+
+    <implementation_details>
+## Database Schema Structure
+
+### Users Table
+- Primary key: id (SERIAL)
+- Unique fields: username, email
+- Password storage: password_hash (never plaintext)
+- Audit: created_at timestamp
+
+### Products Table
+- Primary key: id (SERIAL)
+- Fields: name, description, price (NUMERIC), inventory_count
+- No foreign keys (independent entity)
+
+### Carts Table
+- Primary key: id (SERIAL)
+- Foreign key: user_id → users(id) ON DELETE CASCADE
+- Audit: created_at timestamp
+- One cart per user
+
+### Cart Items Table
+- Primary key: id (SERIAL)
+- Foreign key: cart_id → carts(id) ON DELETE CASCADE
+- Foreign key: product_id → products(id) ON DELETE CASCADE
+- Field: quantity (INTEGER)
+
+## Implementation Steps
+
+1. **Update Cargo.toml**
+   - Add diesel with postgres, r2d2, and chrono features
+   - Add r2d2 for connection pooling
+   - Add dotenv for environment configuration
+   - Add chrono for timestamp handling
+   - Add serde for serialization support
+
+2. **Create Environment Configuration**
+   - Create .env file with DATABASE_URL
+   - Ensure .env is in .gitignore for security
+
+3. **Initialize Diesel**
+   - Run `diesel setup` to initialize
+   - Generate migrations for each table in order:
+     1. create_users (no dependencies)
+     2. create_products (no dependencies)
+     3. create_carts (depends on users)
+     4. create_cart_items (depends on carts and products)
+
+4. **Write Migration Files**
+   - For each migration, create both up.sql and down.sql
+   - up.sql: CREATE TABLE with all constraints
+   - down.sql: DROP TABLE
+   - Respect dependency order for foreign keys
+
+5. **Run Migrations**
+   - Execute `diesel migration run`
+   - This auto-generates src/schema.rs
+   - Verify schema.rs contains all table definitions and joinable! macros
+
+6. **Create Connection Pool Configuration**
+   - Implement src/config/db.rs with Pool and DbConnection types
+   - Create establish_connection_pool() function
+   - Use dotenv to load DATABASE_URL
+   - Configure r2d2 pool with sensible defaults
+
+7. **Create ORM Models**
+   - Define structs for each table in src/models.rs
+   - Implement Queryable for read operations
+   - Implement Insertable for write operations
+   - Add Serialize/Deserialize for API integration
+   - Use Associations for foreign key relationships
+   - Create both full models and "New" models for inserts
+
+8. **Register Modules**
+   - Export config, models, and schema modules
+   - Ensure proper module visibility
+
+## File Structure
+```
+├── Cargo.toml (dependencies)
+├── .env (DATABASE_URL)
+├── src/
+│   ├── config/
+│   │   ├── mod.rs
+│   │   └── db.rs (connection pooling)
+│   ├── models.rs (ORM structs)
+│   ├── schema.rs (auto-generated)
+│   ├── main.rs (module declarations)
+├── migrations/
+│   ├── 001_create_users/
+│   │   ├── up.sql
+│   │   └── down.sql
+│   ├── 002_create_products/
+│   │   ├── up.sql
+│   │   └── down.sql
+│   ├── 003_create_carts/
+│   │   ├── up.sql
+│   │   └── down.sql
+│   └── 004_create_cart_items/
+│       ├── up.sql
+│       └── down.sql
+```
+
+## Key Implementation Notes
+
+### Diesel Macros
+- Use `table!` macro in schema.rs (auto-generated)
+- Use `joinable!` for foreign key relationships
+- Use `allow_tables_to_appear_in_same_query!` for joins
+- Use `#[diesel(table_name = ...)]` attribute on structs
+- Use `#[diesel(belongs_to(...))]` for associations
+
+### Type Mappings
+- Rust i32 ↔ SQL INTEGER/SERIAL
+- Rust String ↔ SQL VARCHAR/TEXT
+- Rust f64 ↔ SQL NUMERIC (price field)
+- Rust NaiveDateTime ↔ SQL TIMESTAMP
+- Use chrono::NaiveDateTime for timestamps
+
+### Error Handling
+- Use .expect() with descriptive messages for initialization
+- Connection pool creation should panic on failure (critical)
+- Migration errors should be surfaced clearly
+
+### Security Considerations
+- Never store plaintext passwords (use password_hash field)
+- Keep .env out of version control
+- Use parameterized queries (handled by Diesel)
+- Implement proper foreign key constraints
+
+## Reference Resources
+- Architecture document: .taskmaster/docs/architecture.md (lines 108-176)
+- PRD document: .taskmaster/docs/prd.txt (lines 17-22)
+- Diesel documentation: https://diesel.rs
+    </implementation_details>
+
+    <acceptance_criteria>
+        <criterion>All database dependencies correctly added to Cargo.toml</criterion>
+        <criterion>src/schema.rs auto-generated by Diesel with all 4 tables</criterion>
+        <criterion>src/models.rs contains all model structs with appropriate traits</criterion>
+        <criterion>src/config/db.rs implements connection pooling</criterion>
+        <criterion>4 migration pairs (up/down) created for all tables</criterion>
+        <criterion>Users table has UNIQUE constraints on username and email</criterion>
+        <criterion>Foreign keys implemented with ON DELETE CASCADE</criterion>
+        <criterion>Price field uses NUMERIC type for decimal precision</criterion>
+        <criterion>cargo check compiles without errors or warnings</criterion>
+        <criterion>diesel migration run successfully creates all tables</criterion>
+        <criterion>diesel migration redo works for all migrations</criterion>
+        <criterion>Connection pool can be successfully established</criterion>
+        <criterion>All tables visible in PostgreSQL database</criterion>
+        <criterion>Schema matches architecture specification</criterion>
+    </acceptance_criteria>
+
+    <test_strategy>
+## Validation Commands
+
+### 1. Dependency Verification
+```bash
+cargo check
+# Expected: Compilation succeeds with no errors
+```
+
+### 2. Migration Testing
+```bash
+# Apply all migrations
+diesel migration run
+# Expected: All 4 tables created successfully
+
+# Test rollback capability
+diesel migration revert
+# Expected: Tables dropped in reverse order
+
+# Test full cycle
+diesel migration redo
+# Expected: Tables dropped and recreated
+```
+
+### 3. Database Schema Verification
+```bash
+# Connect to database and verify tables
+psql $DATABASE_URL -c "\dt"
+# Expected: users, products, carts, cart_items listed
+
+# Verify users table structure
+psql $DATABASE_URL -c "\d users"
+# Expected: id, username, email, password_hash, created_at columns
+# Expected: username and email have UNIQUE constraints
+
+# Verify foreign keys
+psql $DATABASE_URL -c "\d carts"
+# Expected: Foreign key constraint to users table
+
+psql $DATABASE_URL -c "\d cart_items"
+# Expected: Foreign key constraints to carts and products tables
+```
+
+### 4. Code Generation Verification
+```bash
+# Verify schema.rs was generated
+cat src/schema.rs | grep "table!"
+# Expected: 4 table! macro invocations
+
+# Verify joinable macros
+cat src/schema.rs | grep "joinable!"
+# Expected: 3 joinable! macros (cart_items→carts, cart_items→products, carts→users)
+```
+
+### 5. Model Verification
+```bash
+# Check models compile
+cargo check --lib
+# Expected: No errors
+
+# Verify model structs exist
+grep -c "pub struct" src/models.rs
+# Expected: At least 8 structs (4 main models + 4 New* models)
+```
+
+### 6. Connection Pool Testing
+Create a simple test file `tests/db_connection_test.rs`:
+```rust
+#[test]
+fn test_connection_pool() {
+    use your_crate::config::db::establish_connection_pool;
+    let pool = establish_connection_pool();
+    assert!(pool.get().is_ok());
+}
+```
+
+Run: `cargo test test_connection_pool`
+
+### 7. Integration Verification
+```bash
+# Full build check
+cargo build
+# Expected: Build succeeds with no warnings
+
+# Run all tests
+cargo test
+# Expected: All tests pass
+```
+
+## Manual Testing Steps
+
+1. **Environment Setup Test**
+   - Remove .env file temporarily
+   - Run `cargo run`
+   - Expected: Clear error message about missing DATABASE_URL
+   - Restore .env file
+
+2. **Migration Order Test**
+   - Revert all migrations: `diesel migration revert --all`
+   - Try to run only cart_items migration (should fail due to missing dependencies)
+   - Run migrations in correct order (should succeed)
+
+3. **Data Type Test**
+   - Insert a test product with decimal price via psql
+   - Verify NUMERIC type preserves decimal precision
+   - Query via Diesel to ensure type mapping works
+
+4. **Foreign Key Constraint Test**
+   ```sql
+   -- Insert test user
+   INSERT INTO users (username, email, password_hash)
+   VALUES ('test', 'test@example.com', 'hash');
+
+   -- Insert cart for user
+   INSERT INTO carts (user_id) VALUES (1);
+
+   -- Delete user (should cascade delete cart)
+   DELETE FROM users WHERE id = 1;
+
+   -- Verify cart was also deleted
+   SELECT * FROM carts; -- Should be empty
+   ```
+
+5. **Unique Constraint Test**
+   ```sql
+   -- Insert user
+   INSERT INTO users (username, email, password_hash)
+   VALUES ('testuser', 'test@example.com', 'hash');
+
+   -- Try duplicate username (should fail)
+   INSERT INTO users (username, email, password_hash)
+   VALUES ('testuser', 'other@example.com', 'hash');
+   -- Expected: Error due to UNIQUE constraint
+
+   -- Try duplicate email (should fail)
+   INSERT INTO users (username, email, password_hash)
+   VALUES ('otheruser', 'test@example.com', 'hash');
+   -- Expected: Error due to UNIQUE constraint
+   ```
+
+## Success Criteria Checklist
+
+- [ ] All validation commands pass
+- [ ] Database tables exist and match schema
+- [ ] Migrations run without errors
+- [ ] Models compile and are properly typed
+- [ ] Connection pool can be established
+- [ ] Foreign key constraints work correctly
+- [ ] Unique constraints are enforced
+- [ ] No compilation warnings
+- [ ] Schema matches architecture document
+- [ ] Ready for integration with Task 2 (API Endpoints)
+    </test_strategy>
+
+    <instructions>
+Think step-by-step when implementing this task:
+
+1. **Start with dependencies**: Update Cargo.toml first and verify with `cargo check`
+2. **Environment setup**: Create .env with valid DATABASE_URL before running Diesel
+3. **Follow migration order**: Create migrations respecting foreign key dependencies (users/products first, then carts, then cart_items)
+4. **Let Diesel generate schema**: Run migrations to auto-generate schema.rs, don't create it manually
+5. **Match Diesel version syntax**: Use modern Diesel 2.x attribute syntax (#[diesel(table_name = ...)])
+6. **Test incrementally**: Verify each step works before moving to the next
+7. **Use provided code examples**: Follow the exact structure from the implementation details
+8. **Validate thoroughly**: Run all test commands before considering the task complete
+
+Key patterns to follow:
+- Always use `dotenv().ok()` before accessing environment variables
+- Use `SERIAL PRIMARY KEY` for all id columns
+- Add `ON DELETE CASCADE` to all foreign key constraints
+- Use `DEFAULT CURRENT_TIMESTAMP` for created_at fields
+- Implement both Queryable (for reads) and Insertable (for writes) traits
+- Use `#[serde(skip_serializing)]` if password_hash should never be in JSON responses
+
+Common pitfalls to avoid:
+- Don't manually create schema.rs (let Diesel generate it)
+- Don't forget to create src/config/mod.rs
+- Don't skip the down.sql migrations
+- Don't use incorrect Diesel 1.x syntax
+- Don't forget to add tables to allow_tables_to_appear_in_same_query! macro
+- Don't commit .env to version control
+
+The database schema is critical infrastructure that all other tasks depend on. Take time to ensure correctness, as errors here will cascade to dependent tasks.
+    </instructions>
+</prompt>
