@@ -2255,12 +2255,16 @@ spec:
           echo "  Workflow: $WORKFLOW_NAME"
 
           # Check if workflow still exists (prevent concurrent execution)
-          if [ -n "$WORKFLOW_NAME" ]; then
+          # IMPORTANT: Exclude current workflow from this check!
+          CURRENT_WORKFLOW="{{`{{workflow.name}}`}}"
+          if [ -n "$WORKFLOW_NAME" ] && [ "$WORKFLOW_NAME" != "$CURRENT_WORKFLOW" ]; then
             if kubectl get workflow "$WORKFLOW_NAME" -n {{ .Release.Namespace }} >/dev/null 2>&1; then
               echo "⚠️  Workflow $WORKFLOW_NAME still exists!"
               echo "This indicates concurrent execution attempt"
               exit 1  # Prevent duplicate workflows
             fi
+          elif [ "$WORKFLOW_NAME" = "$CURRENT_WORKFLOW" ]; then
+            echo "ℹ️  ConfigMap references current workflow - this is normal during execution"
           fi
 
           # Determine resume stage based on stored stage
