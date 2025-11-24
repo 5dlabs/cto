@@ -192,7 +192,10 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
 
-        # Ingress configuration for OTLP endpoints
+        # Ingress configuration for OTLP gRPC endpoint
+        # Note: HTTP endpoint (port 4318) is excluded as nginx ingress annotations
+        # apply to the entire Ingress resource. If HTTP ingress is needed, create
+        # a separate Ingress resource without gRPC annotations.
         ingress:
           enabled: true
           ingressClassName: nginx
@@ -205,11 +208,6 @@ spec:
                 - path: /
                   pathType: Prefix
                   port: 4317
-            - host: otel-http.local
-              paths:
-                - path: /
-                  pathType: Prefix
-                  port: 4318
   destination:
     server: https://kubernetes.default.svc
     namespace: telemetry
