@@ -1443,6 +1443,43 @@ echo "🔄 Cleo will retry up to $MAX_RETRIES times until quality standards are 
 echo ""
 
 # =========================================================================
+# OpenMemory Integration for Cleo
+# =========================================================================
+echo "🧠 Initializing OpenMemory for code quality review..."
+if [ -f "/agent-templates/memory-functions.sh" ]; then
+  source /agent-templates/memory-functions.sh
+  
+  # Set agent context
+  export AGENT_NAME="cleo"
+  export TASK_ID="{{task_id}}"
+  export SERVICE_NAME="{{service}}"
+  export MEMORY_API="${MEMORY_API:-http://openmemory.cto-system:3000}"
+  
+  # Initialize memory connection
+  if init_memory; then
+    echo "✅ OpenMemory connected - loading quality patterns..."
+    
+    # Query for common quality issues in this service
+    QUALITY_ISSUES=$(query_memory "linting errors code quality issues ${SERVICE_NAME}" 15 || echo "[]")
+    echo "🔍 Found $(echo "$QUALITY_ISSUES" | jq 'length' 2>/dev/null || echo 0) known quality patterns"
+    
+    # Query for Rex's implementation patterns to understand context
+    REX_PATTERNS=$(query_memory "rex implementation task-{{task_id}}" 5 || echo "[]")
+    echo "📚 Found $(echo "$REX_PATTERNS" | jq 'length' 2>/dev/null || echo 0) implementation context entries"
+    
+    # Store findings for potential use in prompts
+    if [ -n "$QUALITY_ISSUES" ] && [ "$QUALITY_ISSUES" != "[]" ]; then
+      echo "$QUALITY_ISSUES" > "$TASK_WORKSPACE/memory-quality-patterns.json"
+    fi
+  else
+    echo "⚠️ OpenMemory not available - continuing without memory augmentation"
+  fi
+else
+  echo "⚠️ Memory functions not found - continuing without OpenMemory"
+fi
+echo ""
+
+# =========================================================================
 # Model rotation configuration
 # =========================================================================
 DEFAULT_MODEL="{{model}}"
@@ -2301,6 +2338,31 @@ EOF
     
     echo "✅ Attempt $ATTEMPT: Quality checks passed"
     SUCCESS=1
+    
+    # Store quality review patterns in memory
+    if command -v add_memory >/dev/null 2>&1; then
+      echo "💾 Storing quality review patterns..."
+      
+      # Store successful quality review
+      store_success_pattern \
+        "task-{{task_id}}-quality-review" \
+        "Passed all quality checks: fmt, clippy, tests" \
+        "Service: {{service}}, Attempts: $ATTEMPT" || true
+      
+      # Store any recurring issues found for future reference
+      if [ -f "$TASK_WORKSPACE/quality-issues.txt" ]; then
+        ISSUES=$(cat "$TASK_WORKSPACE/quality-issues.txt" 2>/dev/null | head -5)
+        if [ -n "$ISSUES" ]; then
+          store_error_pattern \
+            "Common quality issues in {{service}}" \
+            "Task {{task_id}} review" \
+            "$ISSUES" || true
+        fi
+      fi
+      
+      echo "✅ Quality patterns stored in memory"
+    fi
+    
     break
   else
     # Save incomplete state
