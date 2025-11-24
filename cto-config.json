@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "gpt-4o",
+      "model": "gpt-5-codex",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -17,8 +17,7 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
       "service": "cto",
-      "cli": "codex",
-      "maxRetries": 10
+      "cli": "codex"
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
@@ -36,26 +35,16 @@
       }
     },
     "play": {
-      "model": "gemini-3-pro-preview",
-      "cli": "gemini",
+      "model": "claude-sonnet-4-20250514",
+      "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
-      "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
-      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
-      "repository": "5dlabs/cto-parallel-test",
-      "service": "cto-parallel-test",
-      "docsRepository": "5dlabs/cto-parallel-test",
-      "docsProjectDirectory": "docs",
-      "workingDirectory": ".",
-      "maxRetries": 10,
-      "implementationMaxRetries": 10,
-      "frontendMaxRetries": 10,
-      "qualityMaxRetries": 5,
-      "securityMaxRetries": 2,
-      "testingMaxRetries": 5,
-      "autoMerge": true,
-      "parallelExecution": false
+      "repository": "5dlabs/cto",
+      "service": "cli-agnostic-platform",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "cli-agnostic-platform",
+      "workingDirectory": "cli-agnostic-platform"
     },
     "docs_ingest": {
       "model": "claude-sonnet-4-20250514",
@@ -71,6 +60,11 @@
         "remote": [
           "brave_search_brave_web_search",
           "context7_get_library_docs",
+          "openmemory_query",
+          "openmemory_store",
+          "openmemory_list",
+          "openmemory_get",
+          "openmemory_reinforce",
           "agent_docs_rust_query",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -85,20 +79,17 @@
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "factory",
-      "model": "claude-sonnet-4-5-20250929",
-      "modelRotation": {
-        "enabled": true,
-        "models": [
-          "claude-sonnet-4-5-20250929",
-          "gpt-4o",
-          "claude-opus-4-1-20250805"
-        ]
-      },
+      "cli": "codex",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
           "context7_get_library_docs",
+          "openmemory_query",
+          "openmemory_store",
+          "openmemory_list",
+          "openmemory_get",
+          "openmemory_reinforce",
           "agent_docs_rust_query",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -115,18 +106,15 @@
       "githubApp": "5DLabs-Cleo",
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
-      "modelRotation": {
-        "enabled": true,
-        "models": [
-          "claude-sonnet-4-20250514",
-          "claude-opus-4-1-20250805",
-          "claude-haiku-4-20250514"
-        ]
-      },
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
           "context7_get_library_docs",
+          "openmemory_query",
+          "openmemory_store",
+          "openmemory_list",
+          "openmemory_get",
+          "openmemory_reinforce",
           "agent_docs_rust_query",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -143,17 +131,15 @@
       "githubApp": "5DLabs-Tess",
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
-      "modelRotation": {
-        "enabled": true,
-        "models": [
-          "claude-sonnet-4-20250514",
-          "claude-opus-4-1-20250805"
-        ]
-      },
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
           "context7_get_library_docs",
+          "openmemory_query",
+          "openmemory_store",
+          "openmemory_list",
+          "openmemory_get",
+          "openmemory_reinforce",
           "agent_docs_rust_query",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -169,11 +155,16 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-4o",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
           "context7_get_library_docs",
+          "openmemory_query",
+          "openmemory_store",
+          "openmemory_list",
+          "openmemory_get",
+          "openmemory_reinforce",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
           "agent_docs_opencode_query",
@@ -182,115 +173,22 @@
           "agent_docs_qwen_query",
           "agent_docs_openhands_query"
         ],
-        "localServers": {
-          "shadcn": {
-            "enabled": true,
-            "command": "npx",
-            "args": [
-              "shadcn@latest",
-              "mcp"
-            ],
-            "tools": [
-              "list_components",
-              "search_components",
-              "add_component",
-              "init_project"
-            ]
-          },
-          "filesystem": {
-            "enabled": true,
-            "command": "npx",
-            "args": [
-              "-y",
-              "@modelcontextprotocol/server-filesystem",
-              "/workspace"
-            ],
-            "tools": [
-              "read_file",
-              "write_file",
-              "list_directory",
-              "search_files",
-              "directory_tree"
-            ]
-          },
-          "git": {
-            "enabled": true,
-            "command": "mcp-server-git",
-            "args": [],
-            "tools": [
-              "git_status",
-              "git_diff",
-              "git_log",
-              "git_show"
-            ]
-          }
-        }
+        "localServers": {}
       }
     },
     "cipher": {
       "githubApp": "5DLabs-Cipher",
-      "cli": "cursor",
-      "model": "sonnet-4.5",
-      "maxTokens": 200000,
-      "temperature": 0.6,
-      "reasoningEffort": "high",
-      "modelRotation": {
-        "enabled": true,
-        "models": [
-          "sonnet-4.5",
-          "sonnet-4.5-thinking",
-          "opus-4.1",
-          "gpt-5",
-          "gpt-5-codex",
-          "cheetah",
-          "grok",
-          "auto"
-        ]
-      },
+      "cli": "codex",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
           "context7_get_library_docs",
-          "agent_docs_rust_query",
-          "agent_docs_codex_query",
-          "agent_docs_cursor_query",
-          "agent_docs_opencode_query",
-          "agent_docs_gemini_query",
-          "agent_docs_grok_query",
-          "agent_docs_qwen_query",
-          "agent_docs_openhands_query"
-        ],
-        "localServers": {}
-      }
-    },
-    "atlas": {
-      "githubApp": "5DLabs-Atlas",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": [
-          "brave_search_brave_web_search",
-          "context7_get_library_docs",
-          "agent_docs_rust_query",
-          "agent_docs_codex_query",
-          "agent_docs_cursor_query",
-          "agent_docs_opencode_query",
-          "agent_docs_gemini_query",
-          "agent_docs_grok_query",
-          "agent_docs_qwen_query",
-          "agent_docs_openhands_query"
-        ],
-        "localServers": {}
-      }
-    },
-    "bolt": {
-      "githubApp": "5DLabs-Bolt",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": [
-          "brave_search_brave_web_search",
-          "context7_get_library_docs",
+          "openmemory_query",
+          "openmemory_store",
+          "openmemory_list",
+          "openmemory_get",
+          "openmemory_reinforce",
           "agent_docs_rust_query",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",

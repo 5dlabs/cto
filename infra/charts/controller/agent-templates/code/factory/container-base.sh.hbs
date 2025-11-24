@@ -1344,9 +1344,68 @@ if [ -f /task-files/github-guidelines.md ]; then
   echo "✓ Copied github-guidelines.md to working directory"
 fi
 
-if [ -f /task-files/client-config.json ]; then
-  cp /task-files/client-config.json "$FACTORY_WORK_DIR/"
-  echo "✓ Copied client-config.json to working directory"
+
+# Generate client-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating client-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$FACTORY_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$FACTORY_WORK_DIR/client-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | awk -F'- ' '{print $2}' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate client-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated client-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated client-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
+if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
+  echo "📋 client-config.json not generated, using ConfigMap fallback..."
+  if [ -f /task-files/client-config.json ]; then
+    cp /task-files/client-config.json "FACTORY_WORK_DIR/"
+    echo "✓ Copied client-config.json to working directory"
+  fi
+else
+  echo "✓ Using dynamically generated client-config.json from cto-config.json"
 fi
 
 if declare -F ensure_default_client_config >/dev/null 2>&1; then

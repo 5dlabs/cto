@@ -1,0 +1,725 @@
+<prompt>
+    <role>You are a senior Rust backend developer specializing in authentication systems, JWT tokens, and cryptographic security. You have extensive experience implementing secure authentication for production e-commerce applications.</role>
+
+    <task>
+        <id>3</id>
+        <title>User Authentication Module</title>
+        <description>Implement a secure user authentication system with JWT token handling and Argon2 password hashing. Provide stateless authentication foundation for the e-commerce API with industry-standard security practices.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies></dependencies>
+        <estimated_time>45 minutes</estimated_time>
+        <level>0</level>
+    </task>
+
+    <technical_specifications>
+        <spec>Use jsonwebtoken crate version 8.3.0 for JWT handling</spec>
+        <spec>Use argon2 crate version 0.5.0 for password hashing</spec>
+        <spec>Generate random 32-byte salt for each password using rand crate</spec>
+        <spec>Set JWT token expiration to 24 hours</spec>
+        <spec>Implement stateless authentication (no session storage)</spec>
+        <spec>Use standard JWT claims: sub (user ID), exp (expiration), iat (issued at)</spec>
+        <spec>Load JWT secret from environment variable with development fallback</spec>
+        <spec>Exclude password hash from JSON serialization using serde attributes</spec>
+        <spec>Return Result types for error handling (no panics in normal flow)</spec>
+        <spec>Implement both token creation and validation functions</spec>
+    </technical_specifications>
+
+    <implementation_details>
+## Authentication Module Structure
+
+### Module Organization
+```
+src/auth/
+├── mod.rs      - Module exports and public interface
+├── jwt.rs      - JWT token creation and validation
+└── models.rs   - User model and auth DTOs
+```
+
+### JWT Token Implementation (jwt.rs)
+
+**Claims Structure:**
+- `sub`: String - Subject (user ID as string)
+- `exp`: usize - Expiration timestamp (Unix epoch)
+- `iat`: usize - Issued at timestamp (Unix epoch)
+
+**Token Creation:**
+1. Get current timestamp using SystemTime
+2. Calculate expiration: now + 24 hours (86400 seconds)
+3. Create Claims with user_id, expiration, issued_at
+4. Load JWT_SECRET from environment (with fallback for dev)
+5. Encode claims using HS256 algorithm
+6. Return JWT string or error
+
+**Token Validation:**
+1. Load JWT_SECRET from environment
+2. Create Validation config (default checks expiration)
+3. Decode token and extract claims
+4. Return claims or error
+
+**Security Considerations:**
+- Always check token expiration
+- Use environment variable for secret in production
+- Return errors for invalid/expired tokens (don't panic)
+
+### User Model Implementation (models.rs)
+
+**User Struct:**
+- id: i32 - User identifier
+- username: String - Unique username
+- email: String - User email address
+- password_hash: String - Argon2 hash (marked skip_serializing)
+
+**Password Hashing:**
+1. Generate random 32-byte salt
+2. Configure Argon2 with default parameters
+3. Hash password bytes with salt
+4. Return encoded hash string (includes salt and config)
+
+**Password Verification:**
+1. Use argon2::verify_encoded function
+2. Compare password bytes against stored hash
+3. Return true if match, false otherwise
+4. Never panic - wrap in unwrap_or(false)
+
+**DTOs (Data Transfer Objects):**
+- `LoginRequest`: username, password
+- `RegisterRequest`: username, email, password
+- `AuthResponse`: token, user_id, username
+
+## Implementation Steps
+
+### 1. Update Cargo.toml
+Add authentication dependencies:
+```toml
+[dependencies]
+jsonwebtoken = "8.3.0"
+argon2 = "0.5.0"
+rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+```
+
+### 2. Create Module Structure
+Create `src/auth/mod.rs`:
+```rust
+pub mod jwt;
+pub mod models;
+
+pub use self::jwt::{create_token, validate_token, Claims};
+pub use self::models::User;
+```
+
+### 3. Implement JWT Functions
+Create `src/auth/jwt.rs` with:
+- Claims struct (with Debug, Serialize, Deserialize, Clone)
+- create_token function (user_id: &str) -> Result<String, Error>
+- validate_token function (token: &str) -> Result<Claims, Error>
+
+Key implementation details:
+- Use SystemTime::now().duration_since(UNIX_EPOCH) for timestamps
+- Set expiration to now + 86400 seconds (24 hours)
+- Use std::env::var("JWT_SECRET") with fallback
+- Use Header::default() for HS256 algorithm
+- Use EncodingKey::from_secret() and DecodingKey::from_secret()
+
+### 4. Implement User Model
+Create `src/auth/models.rs` with:
+- User struct (with Debug, Clone, Serialize, Deserialize)
+- User::hash_password(password: &str) -> String
+- User::verify_password(&self, password: &str) -> bool
+- LoginRequest, RegisterRequest, AuthResponse structs
+
+Key implementation details:
+- Add #[serde(skip_serializing)] to password_hash field
+- Use rand::thread_rng().gen::<[u8; 32]>() for salt
+- Use Config::default() for Argon2 configuration
+- Use argon2::hash_encoded() for hashing
+- Use argon2::verify_encoded() for verification
+- Use unwrap_or(false) pattern for verification errors
+
+### 5. Register Module
+Update `src/main.rs` or `src/lib.rs`:
+```rust
+pub mod auth;
+```
+
+### 6. Write Unit Tests
+Add tests to verify:
+- Token creation succeeds
+- Token validation works with valid token
+- Invalid tokens are rejected
+- Password hashing produces unique hashes
+- Password verification works correctly
+- Wrong passwords fail verification
+- Password hash not in serialized JSON
+
+## Code Examples
+
+### Complete jwt.rs Implementation
+```rust
+use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
+use serde::{Serialize, Deserialize};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Claims {
+    pub sub: String,  // Subject (user id)
+    pub exp: usize,   // Expiration time
+    pub iat: usize,   // Issued at
+}
+
+pub fn create_token(user_id: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    let expiration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() + 24 * 3600;
+
+    let claims = Claims {
+        sub: user_id.to_owned(),
+        exp: expiration as usize,
+        iat: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as usize,
+    };
+
+    let secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "test_secret_key_change_in_production".to_string());
+
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes()))
+}
+
+pub fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+    let secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "test_secret_key_change_in_production".to_string());
+
+    let validation = Validation::default();
+    let token_data = decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation
+    )?;
+
+    Ok(token_data.claims)
+}
+```
+
+### Complete models.rs Implementation
+```rust
+use serde::{Serialize, Deserialize};
+use argon2::{self, Config};
+use rand::Rng;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: i32,
+    pub username: String,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+}
+
+impl User {
+    pub fn verify_password(&self, password: &str) -> bool {
+        argon2::verify_encoded(&self.password_hash, password.as_bytes())
+            .unwrap_or(false)
+    }
+
+    pub fn hash_password(password: &str) -> String {
+        let salt: [u8; 32] = rand::thread_rng().gen();
+        let config = Config::default();
+        argon2::hash_encoded(password.as_bytes(), &salt, &config)
+            .expect("Failed to hash password")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuthResponse {
+    pub token: String,
+    pub user_id: i32,
+    pub username: String,
+}
+```
+
+## Security Best Practices
+
+### Password Security
+1. **Never store plaintext passwords**
+   - Always hash before storage
+   - Use User::hash_password() function
+
+2. **Use strong hashing algorithm**
+   - Argon2 is recommended by OWASP
+   - Intentionally slow to resist brute force
+   - Memory-hard algorithm
+
+3. **Generate unique salt**
+   - Random 32-byte salt for each password
+   - Salt is stored in hash string
+   - Prevents rainbow table attacks
+
+4. **Prevent timing attacks**
+   - Use constant-time comparison
+   - Argon2 provides this protection
+   - unwrap_or(false) pattern for errors
+
+5. **Never expose hashes**
+   - Use #[serde(skip_serializing)]
+   - Don't log password hashes
+   - Don't include in API responses
+
+### JWT Security
+1. **Set token expiration**
+   - 24 hours for balance of security/UX
+   - Always validate expiration
+   - Shorter for sensitive operations
+
+2. **Secure secret key**
+   - Load from environment variable
+   - Minimum 32 characters
+   - Rotate periodically
+   - Never commit to version control
+
+3. **Validate tokens properly**
+   - Check signature
+   - Check expiration
+   - Return errors for invalid tokens
+
+4. **Use standard claims**
+   - sub: user identifier
+   - exp: expiration time
+   - iat: issued at time
+
+5. **Stateless design**
+   - No server-side session storage
+   - Scales horizontally
+   - Token contains all needed info
+
+## Error Handling Patterns
+
+### JWT Errors
+- Invalid token format → return Err
+- Expired token → return Err
+- Wrong signature → return Err
+- Missing claims → return Err
+
+### Password Errors
+- Hash failure → panic with expect (shouldn't happen)
+- Verify failure → return false (don't panic)
+- Invalid hash format → return false
+
+### Environment Errors
+- Missing JWT_SECRET → use fallback (dev only)
+- In production → require environment variable
+
+## Testing Strategy
+
+### Unit Tests to Implement
+1. test_password_hashing_unique
+2. test_password_verification_success
+3. test_password_verification_failure
+4. test_jwt_creation
+5. test_jwt_validation
+6. test_invalid_token_rejected
+7. test_token_expiration_set
+8. test_user_serialization_excludes_hash
+
+### Test Patterns
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_password_hashing_unique() {
+        let hash1 = User::hash_password("password");
+        let hash2 = User::hash_password("password");
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_jwt_roundtrip() {
+        let token = create_token("123").unwrap();
+        let claims = validate_token(&token).unwrap();
+        assert_eq!(claims.sub, "123");
+    }
+}
+```
+
+## Reference Resources
+- Architecture document: .taskmaster/docs/architecture.md (lines 203-230)
+- JWT RFC 7519: https://datatracker.ietf.org/doc/html/rfc7519
+- Argon2 specification: https://en.wikipedia.org/wiki/Argon2
+- OWASP Password Storage: https://cheatsheetseries.owasp.org/
+    </implementation_details>
+
+    <acceptance_criteria>
+        <criterion>All authentication dependencies added to Cargo.toml</criterion>
+        <criterion>src/auth/mod.rs created with proper exports</criterion>
+        <criterion>src/auth/jwt.rs implements create_token and validate_token</criterion>
+        <criterion>src/auth/models.rs implements User with password methods</criterion>
+        <criterion>JWT tokens include sub, exp, and iat claims</criterion>
+        <criterion>JWT tokens expire after 24 hours</criterion>
+        <criterion>Password hashing uses Argon2 with random salt</criterion>
+        <criterion>Each password produces unique hash (random salt)</criterion>
+        <criterion>Password hash excluded from JSON serialization</criterion>
+        <criterion>Password verification returns true for correct password</criterion>
+        <criterion>Password verification returns false for incorrect password</criterion>
+        <criterion>Invalid tokens are rejected with error</criterion>
+        <criterion>cargo check compiles without errors or warnings</criterion>
+        <criterion>cargo test runs and all tests pass</criterion>
+        <criterion>Unit tests verify JWT creation and validation</criterion>
+        <criterion>Unit tests verify password hashing and verification</criterion>
+        <criterion>Unit tests verify serialization excludes password_hash</criterion>
+        <criterion>Code follows Rust security best practices</criterion>
+    </acceptance_criteria>
+
+    <test_strategy>
+## Validation Commands
+
+### 1. Dependency and Compilation Check
+```bash
+cargo check
+# Expected: Compiles successfully with no errors
+
+cargo clippy
+# Expected: No warnings about security issues or bad practices
+
+cargo fmt --check
+# Expected: Code is properly formatted
+```
+
+### 2. Unit Tests Execution
+```bash
+# Run all auth module tests
+cargo test auth
+
+# Run specific tests with output
+cargo test auth -- --nocapture
+
+# Check test coverage
+cargo tarpaulin --lib
+```
+
+### 3. JWT Functionality Tests
+```bash
+# Test token creation
+cargo test test_jwt_creation -- --exact
+
+# Test token validation
+cargo test test_jwt_validation -- --exact
+
+# Test invalid token rejection
+cargo test test_invalid_token -- --exact
+```
+
+### 4. Password Security Tests
+```bash
+# Test password hashing uniqueness
+cargo test test_password_hashing -- --exact
+
+# Test password verification
+cargo test test_password_verification -- --exact
+
+# Test wrong password rejection
+cargo test test_wrong_password -- --exact
+```
+
+### 5. Serialization Security Tests
+```bash
+# Test password hash not in JSON
+cargo test test_user_serialization -- --exact
+```
+
+## Manual Testing Procedures
+
+### Test 1: JWT Token Creation and Validation
+```rust
+use your_crate::auth::jwt::{create_token, validate_token};
+
+// Create token
+let token = create_token("user_123").expect("Token creation failed");
+println!("Generated token: {}", token);
+
+// Validate token
+let claims = validate_token(&token).expect("Token validation failed");
+println!("User ID: {}", claims.sub);
+println!("Expires at: {}", claims.exp);
+println!("Issued at: {}", claims.iat);
+
+// Verify claims
+assert_eq!(claims.sub, "user_123");
+assert!(claims.exp > claims.iat);
+assert!(claims.exp - claims.iat == 86400); // 24 hours
+```
+
+### Test 2: Password Hashing and Verification
+```rust
+use your_crate::auth::models::User;
+
+// Hash password
+let password = "SecureP@ssw0rd123";
+let hash = User::hash_password(password);
+println!("Password hash: {}", hash);
+
+// Create user
+let user = User {
+    id: 1,
+    username: "testuser".to_string(),
+    email: "test@example.com".to_string(),
+    password_hash: hash,
+};
+
+// Verify correct password
+assert!(user.verify_password(password), "Correct password should verify");
+
+// Verify wrong password fails
+assert!(!user.verify_password("WrongPassword"), "Wrong password should fail");
+
+// Verify empty password fails
+assert!(!user.verify_password(""), "Empty password should fail");
+```
+
+### Test 3: Serialization Safety
+```rust
+use your_crate::auth::models::User;
+use serde_json;
+
+let user = User {
+    id: 1,
+    username: "testuser".to_string(),
+    email: "test@example.com".to_string(),
+    password_hash: "sensitive_argon2_hash_value".to_string(),
+};
+
+// Serialize to JSON
+let json = serde_json::to_string(&user).expect("Serialization failed");
+println!("Serialized user: {}", json);
+
+// Verify password_hash is NOT in JSON
+assert!(!json.contains("password_hash"), "password_hash field should not be in JSON");
+assert!(!json.contains("sensitive"), "Hash value should not be in JSON");
+assert!(!json.contains("argon2"), "Hash content should not be in JSON");
+
+// Verify other fields ARE in JSON
+assert!(json.contains("username"), "username should be in JSON");
+assert!(json.contains("email"), "email should be in JSON");
+assert!(json.contains("testuser"), "username value should be in JSON");
+```
+
+### Test 4: Token Expiration
+```rust
+use your_crate::auth::jwt::{create_token, validate_token};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+// Create token
+let token = create_token("user_123").unwrap();
+let claims = validate_token(&token).unwrap();
+
+// Get current timestamp
+let now = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap()
+    .as_secs();
+
+// Verify expiration is ~24 hours from now
+let expected_exp = now + 86400;
+let exp_diff = (claims.exp as i64 - expected_exp as i64).abs();
+assert!(exp_diff < 10, "Expiration should be 24 hours from now");
+
+// Verify issued_at is ~now
+let iat_diff = (claims.iat as i64 - now as i64).abs();
+assert!(iat_diff < 10, "Issued at should be current time");
+```
+
+### Test 5: Invalid Token Handling
+```rust
+use your_crate::auth::jwt::validate_token;
+
+// Test completely invalid token
+let result = validate_token("invalid.token.here");
+assert!(result.is_err(), "Invalid token should return error");
+
+// Test empty token
+let result = validate_token("");
+assert!(result.is_err(), "Empty token should return error");
+
+// Test malformed token
+let result = validate_token("not-even-close-to-jwt");
+assert!(result.is_err(), "Malformed token should return error");
+```
+
+### Test 6: Password Edge Cases
+```rust
+use your_crate::auth::models::User;
+
+// Test empty password
+let hash = User::hash_password("");
+let user = User {
+    id: 1,
+    username: "test".to_string(),
+    email: "test@example.com".to_string(),
+    password_hash: hash,
+};
+assert!(user.verify_password(""), "Empty password should work");
+
+// Test unicode password
+let unicode_password = "密码🔐";
+let hash = User::hash_password(unicode_password);
+let user = User {
+    password_hash: hash,
+    ..user
+};
+assert!(user.verify_password(unicode_password), "Unicode password should work");
+
+// Test long password
+let long_password = "a".repeat(1000);
+let hash = User::hash_password(&long_password);
+let user = User {
+    password_hash: hash,
+    ..user
+};
+assert!(user.verify_password(&long_password), "Long password should work");
+```
+
+## Integration Test Examples
+
+### Complete Authentication Flow
+```rust
+#[test]
+fn test_complete_auth_flow() {
+    use your_crate::auth::{jwt, models::User};
+
+    // 1. User registration: hash password
+    let password = "user_password_123";
+    let password_hash = User::hash_password(password);
+
+    // 2. Create user (simulated database insert)
+    let user = User {
+        id: 42,
+        username: "newuser".to_string(),
+        email: "new@example.com".to_string(),
+        password_hash: password_hash,
+    };
+
+    // 3. User login: verify password
+    assert!(user.verify_password(password), "Password verification should succeed");
+
+    // 4. Generate JWT token
+    let token = jwt::create_token(&user.id.to_string())
+        .expect("Token creation should succeed");
+
+    // 5. Validate token (simulate API request with token)
+    let claims = jwt::validate_token(&token)
+        .expect("Token validation should succeed");
+
+    // 6. Extract user ID from token
+    assert_eq!(claims.sub, "42", "Token should contain correct user ID");
+
+    // 7. Serialize user for API response (password should be hidden)
+    let json = serde_json::to_string(&user).unwrap();
+    assert!(!json.contains(&user.password_hash), "Password hash should not be exposed");
+}
+```
+
+## Success Criteria Checklist
+
+### Code Implementation
+- [ ] src/auth/mod.rs created with exports
+- [ ] src/auth/jwt.rs implements JWT functions
+- [ ] src/auth/models.rs implements User model
+- [ ] All dependencies added to Cargo.toml
+- [ ] Module registered in main.rs or lib.rs
+
+### JWT Functionality
+- [ ] Tokens created successfully
+- [ ] Tokens validated successfully
+- [ ] Invalid tokens rejected
+- [ ] Tokens expire after 24 hours
+- [ ] Claims include sub, exp, iat
+
+### Password Security
+- [ ] Argon2 algorithm used
+- [ ] Random salt generated for each password
+- [ ] Same password produces different hashes
+- [ ] Correct password verifies successfully
+- [ ] Wrong password fails verification
+- [ ] Hash excluded from JSON serialization
+
+### Code Quality
+- [ ] cargo check passes
+- [ ] cargo test passes
+- [ ] cargo clippy has no warnings
+- [ ] Code is formatted
+- [ ] No security vulnerabilities
+
+### Testing
+- [ ] Unit tests for JWT implemented
+- [ ] Unit tests for password hashing implemented
+- [ ] Integration tests work
+- [ ] Manual testing scenarios verified
+
+### Documentation
+- [ ] Public functions documented
+- [ ] Security considerations noted
+- [ ] Usage examples provided
+- [ ] Module purpose clear
+    </test_strategy>
+
+    <instructions>
+Think step-by-step when implementing this authentication module:
+
+1. **Start with dependencies**: Add all required crates to Cargo.toml first
+2. **Create module structure**: Set up mod.rs before implementing functionality
+3. **Implement JWT first**: Start with jwt.rs as it's simpler and has no crypto
+4. **Then implement password hashing**: Add models.rs with User and password methods
+5. **Add DTOs**: Include LoginRequest, RegisterRequest, AuthResponse
+6. **Write tests incrementally**: Test each function as you implement it
+7. **Verify security**: Check password hash is never serialized
+8. **Test edge cases**: Empty passwords, invalid tokens, etc.
+
+Key security patterns to follow:
+- **Never store plaintext passwords** - always use hash_password()
+- **Random salt for each password** - use rand::thread_rng().gen()
+- **Skip serializing hash** - use #[serde(skip_serializing)] attribute
+- **Don't panic on errors** - use unwrap_or(false) for verification
+- **Load secret from env** - use std::env::var() with fallback
+- **Set token expiration** - always include exp claim (24 hours)
+- **Validate tokens properly** - check signature and expiration
+
+Common pitfalls to avoid:
+- Don't hardcode JWT secret in code (use environment variable)
+- Don't use MD5 or SHA for passwords (use Argon2)
+- Don't reuse salt across passwords (generate new random salt)
+- Don't panic on verification failure (return false)
+- Don't serialize password_hash (use skip_serializing)
+- Don't forget token expiration (set exp claim)
+- Don't use bcrypt (Argon2 is more secure)
+
+Security checklist before marking complete:
+- [ ] Password hashing uses Argon2 (not bcrypt, MD5, SHA)
+- [ ] Each password gets unique random salt (32 bytes)
+- [ ] JWT secret loaded from environment (with dev fallback)
+- [ ] JWT tokens have expiration (24 hours)
+- [ ] Password hash never appears in JSON (skip_serializing)
+- [ ] Verification errors return false (not panic)
+- [ ] Token validation checks expiration
+- [ ] No sensitive data in error messages
+
+This is a security-critical module. Take time to implement correctly, as vulnerabilities here affect the entire application. All authentication and authorization depend on this foundation being secure and correct.
+    </instructions>
+</prompt>

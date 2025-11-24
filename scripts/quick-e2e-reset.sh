@@ -1,6 +1,8 @@
 #!/bin/bash
 # Quick E2E Reset - Minimal script for fast iteration
 #
+# Template workflow: init in template dir -> push to GitHub -> delete template -> clone to test location
+#
 # IMPORTANT: This script requires the GitHub account to have:
 # 1. Admin permissions on the organization repository
 # 2. The 'delete_repo' scope for the GitHub CLI
@@ -68,26 +70,39 @@ if [[ "${1:-}" == "--github" ]]; then
     exit 1
   fi
   
-  # Reset local repo
-  rm -rf $LOCAL
-  mkdir -p $LOCAL
-  
-  # Use submodule template if available, otherwise create minimal structure
+  # Use template if available, otherwise create minimal structure
   if [ -d "$TEMPLATE" ] && [ -f "$TEMPLATE/cto-config.json" ]; then
-    echo "  Using submodule template..."
-    # Ensure submodule is up to date
+    echo "  Using template from ${TEMPLATE}..."
+    
+    # Step 1: Initialize git in the template directory
+    cd "$TEMPLATE"
+    rm -rf .git
+    git init
+    git add .
+    git commit -m "Reset" || git commit --allow-empty -m "Reset"
+    git branch -M main
+    git remote add origin git@github.com:${REPO}.git 2>/dev/null || \
+      git remote set-url origin git@github.com:${REPO}.git
+    
+    # Step 2: Push to GitHub
+    echo "  Pushing template to GitHub..."
+    git push -u origin main --force
+    
+    # Step 3: Delete the template directory (ephemeral)
+    echo "  Cleaning up template directory..."
     cd "$PROJECT_ROOT"
-    git submodule update --init --recursive testing/cto-parallel-test 2>/dev/null || true
+    rm -rf "$TEMPLATE"
     
-    # Copy from submodule (excluding .git)
-    rsync -av --exclude='.git' "$TEMPLATE/" "$LOCAL/" || \
-      cp -r "$TEMPLATE"/* "$LOCAL/" 2>/dev/null || true
+    # Step 4: Clone from GitHub to test location
+    echo "  Cloning from GitHub to test location..."
+    rm -rf "$LOCAL"
+    git clone git@github.com:${REPO}.git "$LOCAL"
     
-    # Copy hidden files except .git
-    find "$TEMPLATE" -maxdepth 1 -name ".*" ! -name ".git" ! -name "." ! -name ".." -exec cp -r {} "$LOCAL/" \; 2>/dev/null || true
   else
     echo "  Creating minimal structure..."
-    cd $LOCAL
+    rm -rf "$LOCAL"
+    mkdir -p "$LOCAL"
+    cd "$LOCAL"
     
     # Minimal setup
     cat > cto-config.json <<'EOF'
@@ -103,17 +118,16 @@ EOF
 
 Build a simple test application.
 EOF
+    
+    # Initialize git and push
+    git init
+    git add .
+    git commit -m "Reset" || git commit --allow-empty -m "Reset"
+    git branch -M main
+    git remote add origin git@github.com:${REPO}.git 2>/dev/null || \
+      git remote set-url origin git@github.com:${REPO}.git
+    git push -u origin main --force
   fi
-  
-  # Initialize git and push
-  cd $LOCAL
-  git init
-  git add .
-  git commit -m "Reset" || git commit --allow-empty -m "Reset"
-  git branch -M main
-  git remote add origin git@github.com:${REPO}.git 2>/dev/null || \
-    git remote set-url origin git@github.com:${REPO}.git
-  git push -u origin main --force
   
   echo "✓ GitHub repository reset"
 fi
@@ -123,5 +137,4 @@ echo "✅ Reset complete!"
 echo ""
 echo "Run test: cto play --task-id <id>"
 echo "Monitor: kubectl logs -f -l workflow -n agent-platform"
-
 

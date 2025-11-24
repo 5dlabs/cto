@@ -13,7 +13,7 @@ cd "$CHART_DIR"
 echo "Generating split ConfigMaps from agent templates..."
 
 # Define CLI types and shared resources
-CLI_TYPES=("claude" "codex" "cursor" "factory" "opencode" "integration")
+CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration")
 SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/" "shared/")
 
 generate_configmap() {
@@ -52,7 +52,14 @@ HEADER_EOF
     done
   else
     # CLI-specific: collect files under that CLI directory PLUS shared agent partials
-    files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    # Handle split claude ConfigMaps (claude-code and claude-docs)
+    if [ "$filter" = "claude-code" ]; then
+      files_list=$(find "agent-templates/code/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    elif [ "$filter" = "claude-docs" ]; then
+      files_list=$(find "agent-templates/docs/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    else
+      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    fi
     
     # Also include shared agent partials so templates can resolve {{> agents/...}} references
     agent_partials=$(find "agent-templates/agents" -type f -name "*.hbs" 2>/dev/null | LC_ALL=C sort || true)
