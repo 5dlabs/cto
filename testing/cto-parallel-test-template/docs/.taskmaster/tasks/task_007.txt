@@ -1,0 +1,599 @@
+# Task ID: 7
+# Title: Integration Tests
+# Status: pending
+# Dependencies: 2, 5, 6
+# Priority: high
+# Description: Create comprehensive integration tests for the application.
+# Details:
+Implement integration tests to verify the functionality of the entire application:
+
+1. Create `tests/integration_tests.rs` for general integration tests:
+```rust
+#[cfg(test)]
+mod integration_tests {
+    use actix_web::{test, web, App};
+    use actix_web::http::StatusCode;
+    use serde_json::json;
+    
+    use crate::api::routes::configure_routes;
+    use crate::auth::jwt::create_token;
+    use crate::catalog::ProductService;
+    use crate::cart::CartService;
+    
+    #[actix_web::test]
+    async fn test_health_check() {
+        let app = test::init_service(
+            App::new()
+                .configure(configure_routes)
+        ).await;
+        
+        let req = test::TestRequest::get()
+            .uri("/api/health")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(json["status"], "ok");
+    }
+    
+    #[actix_web::test]
+    async fn test_full_user_flow() {
+        // Setup services
+        let product_service = web::Data::new(ProductService::new());
+        let cart_service = web::Data::new(CartService::new());
+        
+        let app = test::init_service(
+            App::new()
+                .app_data(product_service.clone())
+                .app_data(cart_service.clone())
+                .configure(configure_routes)
+        ).await;
+        
+        // 1. Create a test product
+        let test_product = product_service.create(crate::catalog::models::NewProduct {
+            name: "Test Product".to_string(),
+            description: "A test product".to_string(),
+            price: rust_decimal::Decimal::new(1999, 2), // $19.99
+            inventory_count: 10,
+        });
+        
+        // 2. Create a test user token
+        let token = create_token("1").unwrap(); // User ID 1
+        
+        // 3. Add product to cart
+        let req = test::TestRequest::post()
+            .uri("/api/cart/add")
+            .header("Authorization", format!("Bearer {}", token))
+            .set_json(json!({
+                "product_id": test_product.id,
+                "quantity": 2
+            }))
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        // 4. Get cart and verify product was added
+        let req = test::TestRequest::get()
+            .uri("/api/cart")
+            .header("Authorization", format!("Bearer {}", token))
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let cart: crate::cart::service::Cart = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(cart.items.len(), 1);
+        assert_eq!(cart.items[0].product_id, test_product.id);
+        assert_eq!(cart.items[0].quantity, 2);
+    }
+}
+```
+
+2. Create `tests/api_tests.rs` for API-specific tests:
+```rust
+#[cfg(test)]
+mod api_tests {
+    use actix_web::{test, web, App};
+    use actix_web::http::StatusCode;
+    
+    use crate::api::routes::configure_routes;
+    use crate::catalog::ProductService;
+    
+    #[actix_web::test]
+    async fn test_product_routes() {
+        // Setup product service with test data
+        let product_service = web::Data::new(ProductService::new());
+        
+        // Add test products
+        product_service.create(crate::catalog::models::NewProduct {
+            name: "Product 1".to_string(),
+            description: "Description 1".to_string(),
+            price: rust_decimal::Decimal::new(1999, 2), // $19.99
+            inventory_count: 10,
+        });
+        
+        product_service.create(crate::catalog::models::NewProduct {
+            name: "Product 2".to_string(),
+            description: "Description 2".to_string(),
+            price: rust_decimal::Decimal::new(2999, 2), // $29.99
+            inventory_count: 5,
+        });
+        
+        let app = test::init_service(
+            App::new()
+                .app_data(product_service.clone())
+                .configure(configure_routes)
+        ).await;
+        
+        // Test get all products
+        let req = test::TestRequest::get()
+            .uri("/api/products")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let products: Vec<crate::catalog::models::Product> = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(products.len(), 2);
+        
+        // Test get product by ID
+        let req = test::TestRequest::get()
+            .uri("/api/products/1")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let product: crate::catalog::models::Product = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(product.id, 1);
+        assert_eq!(product.name, "Product 1");
+    }
+}
+```
+
+3. Create `tests/auth_tests.rs` for authentication tests:
+```rust
+#[cfg(test)]
+mod auth_tests {
+    use crate::auth::jwt::{create_token, validate_token};
+    use crate::auth::models::User;
+    
+    #[test]
+    fn test_jwt_creation_and_validation() {
+        // Create a token
+        let user_id = "123";
+        let token = create_token(user_id).unwrap();
+        
+        // Validate the token
+        let claims = validate_token(&token).unwrap();
+        
+        assert_eq!(claims.sub, user_id);
+    }
+    
+    #[test]
+    fn test_password_hashing_and_verification() {
+        // Create a test user with hashed password
+        let password = "secure_password";
+        let hashed = User::hash_password(password);
+        
+        let user = User {
+            id: 1,
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password_hash: hashed,
+        };
+        
+        // Verify password
+        assert!(user.verify_password(password));
+        assert!(!user.verify_password("wrong_password"));
+    }
+}
+```
+
+4. Update `src/main.rs` to make it testable:
+```rust
+use actix_web::{App, HttpServer, web};
+mod api;
+mod schema;
+mod auth;
+mod catalog;
+mod cart;
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    println!("Starting API server");
+    
+    // Initialize services
+    let product_service = web::Data::new(catalog::ProductService::new());
+    let cart_service = web::Data::new(cart::CartService::new());
+    
+    HttpServer::new(move || {
+        App::new()
+            .app_data(product_service.clone())
+            .app_data(cart_service.clone())
+            .configure(api::routes::configure_routes)
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
+}
+```
+
+# Test Strategy:
+1. Verify that all test files are created: `tests/integration_tests.rs`, `tests/api_tests.rs`, and `tests/auth_tests.rs`
+2. Run the tests using `cargo test` to ensure they pass
+3. Check test coverage to ensure all major components are tested
+4. Verify that the integration tests properly test the full user flow from authentication to cart management
+5. Test API endpoints with various inputs including edge cases and error conditions
+6. Verify authentication tests for token creation, validation, and password handling
+7. Check that the tests are independent and don't rely on global state
+8. Verify that the tests properly clean up any resources they create
+
+# Subtasks:
+## 1. Set up integration test infrastructure [pending]
+### Dependencies: None
+### Description: Create the basic infrastructure for integration tests, including the test directory structure and helper functions for initializing test services and applications.
+### Details:
+Create a `tests` directory at the project root if it doesn't exist. Inside this directory, create a `common` module (`tests/common/mod.rs`) that will contain shared test utilities:
+
+```rust
+// tests/common/mod.rs
+pub mod test_utils {
+    use actix_web::{test, web, App};
+    use crate::api::routes::configure_routes;
+    use crate::catalog::ProductService;
+    use crate::cart::CartService;
+    
+    pub async fn get_test_app() -> impl actix_web::dev::Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    > {
+        let product_service = web::Data::new(ProductService::new());
+        let cart_service = web::Data::new(CartService::new());
+        
+        test::init_service(
+            App::new()
+                .app_data(product_service.clone())
+                .app_data(cart_service.clone())
+                .configure(configure_routes)
+        ).await
+    }
+    
+    pub fn get_test_services() -> (web::Data<ProductService>, web::Data<CartService>) {
+        let product_service = web::Data::new(ProductService::new());
+        let cart_service = web::Data::new(CartService::new());
+        (product_service, cart_service)
+    }
+}
+```
+
+Also update `src/main.rs` to make it testable by ensuring all modules are properly exported and the application structure supports testing.
+
+## 2. Implement API health check and basic route tests [pending]
+### Dependencies: None
+### Description: Create integration tests for the API health check endpoint and basic route functionality to verify the API server is working correctly.
+### Details:
+Create `tests/integration_tests.rs` file with tests for the health check endpoint and basic API routes:
+
+```rust
+#[cfg(test)]
+mod integration_tests {
+    use actix_web::{test, http::StatusCode};
+    use serde_json::json;
+    
+    use crate::common::test_utils::get_test_app;
+    
+    #[actix_web::test]
+    async fn test_health_check() {
+        let app = get_test_app().await;
+        
+        let req = test::TestRequest::get()
+            .uri("/api/health")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(json["status"], "ok");
+    }
+    
+    #[actix_web::test]
+    async fn test_not_found() {
+        let app = get_test_app().await;
+        
+        let req = test::TestRequest::get()
+            .uri("/api/nonexistent")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+}
+```
+
+Ensure the tests verify that the API server responds correctly to both valid and invalid requests.
+
+## 3. Implement product catalog integration tests [pending]
+### Dependencies: None
+### Description: Create comprehensive integration tests for the product catalog functionality, including listing products, getting product details, and product creation.
+### Details:
+Create `tests/api_tests.rs` file with tests for the product catalog API endpoints:
+
+```rust
+#[cfg(test)]
+mod api_tests {
+    use actix_web::{test, web, http::StatusCode};
+    use serde_json::json;
+    
+    use crate::catalog::models::{Product, NewProduct};
+    use crate::catalog::ProductService;
+    use crate::common::test_utils::{get_test_app, get_test_services};
+    
+    #[actix_web::test]
+    async fn test_product_routes() {
+        // Get services and initialize test data
+        let (product_service, _) = get_test_services();
+        
+        // Add test products
+        product_service.create(NewProduct {
+            name: "Product 1".to_string(),
+            description: "Description 1".to_string(),
+            price: rust_decimal::Decimal::new(1999, 2), // $19.99
+            inventory_count: 10,
+        });
+        
+        product_service.create(NewProduct {
+            name: "Product 2".to_string(),
+            description: "Description 2".to_string(),
+            price: rust_decimal::Decimal::new(2999, 2), // $29.99
+            inventory_count: 5,
+        });
+        
+        let app = get_test_app().await;
+        
+        // Test get all products
+        let req = test::TestRequest::get()
+            .uri("/api/products")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let products: Vec<Product> = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(products.len(), 2);
+        
+        // Test get product by ID
+        let req = test::TestRequest::get()
+            .uri("/api/products/1")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::OK);
+        
+        let body = test::read_body(resp).await;
+        let product: Product = serde_json::from_slice(&body).unwrap();
+        
+        assert_eq!(product.id, 1);
+        assert_eq!(product.name, "Product 1");
+        
+        // Test create product (with auth)
+        // This would require auth token setup
+    }
+}
+```
+
+Ensure the tests cover all product-related functionality including error cases and edge conditions.
+
+## 4. Implement authentication and user integration tests [pending]
+### Dependencies: None
+### Description: Create integration tests for the authentication system, including token creation, validation, and protected route access.
+### Details:
+Create `tests/auth_tests.rs` file with tests for the authentication functionality:
+
+```rust
+#[cfg(test)]
+mod auth_tests {
+    use actix_web::{test, http::StatusCode};
+    use serde_json::json;
+    
+    use crate::auth::jwt::{create_token, validate_token};
+    use crate::auth::models::User;
+    use crate::common::test_utils::get_test_app;
+    
+    #[test]
+    fn test_jwt_creation_and_validation() {
+        // Create a token
+        let user_id = "123";
+        let token = create_token(user_id).unwrap();
+        
+        // Validate the token
+        let claims = validate_token(&token).unwrap();
+        
+        assert_eq!(claims.sub, user_id);
+    }
+    
+    #[test]
+    fn test_password_hashing_and_verification() {
+        // Create a test user with hashed password
+        let password = "secure_password";
+        let hashed = User::hash_password(password);
+        
+        let user = User {
+            id: 1,
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password_hash: hashed,
+        };
+        
+        // Verify password
+        assert!(user.verify_password(password));
+        assert!(!user.verify_password("wrong_password"));
+    }
+    
+    #[actix_web::test]
+    async fn test_protected_routes() {
+        let app = get_test_app().await;
+        
+        // Try accessing protected route without token
+        let req = test::TestRequest::get()
+            .uri("/api/user/profile")
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        
+        // Create valid token and try again
+        let token = create_token("1").unwrap();
+        
+        let req = test::TestRequest::get()
+            .uri("/api/user/profile")
+            .header("Authorization", format!("Bearer {}", token))
+            .to_request();
+            
+        let resp = test::call_service(&app, req).await;
+        
+        // This should now succeed (assuming the endpoint exists)
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+}
+```
+
+Ensure the tests verify both the token functionality and the authentication middleware that protects routes.
+
+## 5. Implement end-to-end shopping cart flow tests [pending]
+### Dependencies: None
+### Description: Create integration tests that simulate a complete user shopping flow, from browsing products to adding items to cart and checking out.
+### Details:
+Create a comprehensive end-to-end test in `tests/integration_tests.rs` that tests the full user shopping flow:
+
+```rust
+#[actix_web::test]
+async fn test_full_user_flow() {
+    // Get services and initialize test data
+    let (product_service, cart_service) = get_test_services();
+    
+    // 1. Create a test product
+    let test_product = product_service.create(NewProduct {
+        name: "Test Product".to_string(),
+        description: "A test product".to_string(),
+        price: rust_decimal::Decimal::new(1999, 2), // $19.99
+        inventory_count: 10,
+    });
+    
+    let app = get_test_app().await;
+    
+    // 2. Create a test user token
+    let token = create_token("1").unwrap(); // User ID 1
+    
+    // 3. Add product to cart
+    let req = test::TestRequest::post()
+        .uri("/api/cart/add")
+        .header("Authorization", format!("Bearer {}", token))
+        .set_json(json!({
+            "product_id": test_product.id,
+            "quantity": 2
+        }))
+        .to_request();
+        
+    let resp = test::call_service(&app, req).await;
+    
+    assert_eq!(resp.status(), StatusCode::OK);
+    
+    // 4. Get cart and verify product was added
+    let req = test::TestRequest::get()
+        .uri("/api/cart")
+        .header("Authorization", format!("Bearer {}", token))
+        .to_request();
+        
+    let resp = test::call_service(&app, req).await;
+    
+    assert_eq!(resp.status(), StatusCode::OK);
+    
+    let body = test::read_body(resp).await;
+    let cart: Cart = serde_json::from_slice(&body).unwrap();
+    
+    assert_eq!(cart.items.len(), 1);
+    assert_eq!(cart.items[0].product_id, test_product.id);
+    assert_eq!(cart.items[0].quantity, 2);
+    
+    // 5. Update cart quantity
+    let req = test::TestRequest::put()
+        .uri("/api/cart/update")
+        .header("Authorization", format!("Bearer {}", token))
+        .set_json(json!({
+            "product_id": test_product.id,
+            "quantity": 3
+        }))
+        .to_request();
+        
+    let resp = test::call_service(&app, req).await;
+    
+    assert_eq!(resp.status(), StatusCode::OK);
+    
+    // 6. Verify cart was updated
+    let req = test::TestRequest::get()
+        .uri("/api/cart")
+        .header("Authorization", format!("Bearer {}", token))
+        .to_request();
+        
+    let resp = test::call_service(&app, req).await;
+    
+    let body = test::read_body(resp).await;
+    let cart: Cart = serde_json::from_slice(&body).unwrap();
+    
+    assert_eq!(cart.items[0].quantity, 3);
+    
+    // 7. Checkout (if implemented)
+    let req = test::TestRequest::post()
+        .uri("/api/orders/checkout")
+        .header("Authorization", format!("Bearer {}", token))
+        .to_request();
+        
+    let resp = test::call_service(&app, req).await;
+    
+    assert_eq!(resp.status(), StatusCode::OK);
+    
+    // 8. Verify cart is empty after checkout
+    let req = test::TestRequest::get()
+        .uri("/api/cart")
+        .header("Authorization", format!("Bearer {}", token))
+        .to_request();
+        
+    let resp = test::call_service(&app, req).await;
+    
+    let body = test::read_body(resp).await;
+    let cart: Cart = serde_json::from_slice(&body).unwrap();
+    
+    assert_eq!(cart.items.len(), 0);
+}
+```
+
+This test should verify the entire user flow from product browsing to checkout, ensuring all components work together correctly.
+
