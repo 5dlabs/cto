@@ -1605,11 +1605,6 @@ $PREV_FINDINGS
     fi
   fi
   
-  if [ -n "$PREVIOUS_CONTEXT" ]; then
-    PROMPT_CONTENT="${PROMPT_CONTENT}${PREVIOUS_CONTEXT}"
-    echo "📝 Enhanced prompt with previous iteration context"
-  fi
-
   # Calculate which model to use for this attempt
   CURRENT_MODEL="$DEFAULT_MODEL"
   if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
@@ -2124,6 +2119,15 @@ If CI jobs won't start (showing \"Waiting\" or \"Pending\" indefinitely):
 - The PR checks page on GitHub is your source of truth
 
 Begin your code quality review now."
+
+# Append previous iteration context if available
+if [ -n "$PREVIOUS_CONTEXT" ]; then
+  CLEO_PROMPT="$CLEO_PROMPT
+
+## Previous Iteration Context
+$PREVIOUS_CONTEXT"
+  echo "📝 Enhanced prompt with previous iteration context"
+fi
 
 # Debug: Print the actual prompt and CLAUDE.md content
 echo "════════════════════════════════════════════════════════════════"

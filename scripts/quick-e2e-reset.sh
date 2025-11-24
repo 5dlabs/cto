@@ -30,15 +30,8 @@ TEMPLATE="${PROJECT_ROOT}/testing/cto-parallel-test"
 echo "→ Cleaning Kubernetes resources..."
 kubectl delete workflows --all -n $NS --force --grace-period=0 2>/dev/null || true
 kubectl delete pods --all -n $NS --force --grace-period=0 2>/dev/null || true
-<<<<<<< HEAD
 kubectl delete configmaps -n $NS --force --grace-period=0 \
     $(kubectl get cm -n $NS -o name | grep -E "play-|test-|coderun-|docsrun-" || true) 2>/dev/null || true
-=======
-# shellcheck disable=SC2046
-kubectl delete configmaps -n $NS --force --grace-period=0 \
-    $(kubectl get cm -n $NS -o name | grep -E "play-|test-|coderun-|docsrun-" || true) 2>/dev/null || true
-# shellcheck disable=SC2046
->>>>>>> dc3c56da (fix: implement ephemeral E2E template workflow to prevent submodule crosstalk)
 kubectl delete pvc -n $NS --force --grace-period=0 \
     $(kubectl get pvc -n $NS -o name | grep -E "workspace-play-|workspace-test-" || true) 2>/dev/null || true
 
@@ -50,55 +43,6 @@ if [[ "${1:-}" == "--github" ]]; then
   if gh repo view $REPO >/dev/null 2>&1; then
     echo "  Deleting existing repository..."
     if ! gh repo delete $REPO --yes 2>&1; then
-<<<<<<< HEAD
-      echo ""
-      echo "  ⚠️  Failed to delete repository!"
-      echo ""
-      echo "  This usually means you need one of:"
-      echo "    1. The 'delete_repo' scope: gh auth refresh -h github.com -s delete_repo"
-      echo "    2. Admin permissions on organization repos (contact organization owner)"
-      echo ""
-      echo "  Manual deletion: https://github.com/$REPO/settings"
-      echo ""
-      echo "  NOTE: When you recreate this repo, make sure your GitHub account has"
-      echo "        admin/delete permissions to avoid this issue in the future."
-      echo ""
-      exit 1
-    fi
-    echo "  ✓ Repository deleted"
-  fi
-  
-  # Create new repository
-  # NOTE: The account creating this repo should have admin rights to delete it later
-  echo "  Creating fresh repository..."
-  if gh repo create $REPO --private --clone=false; then
-    echo "  ✓ Repository created"
-  else
-    echo "  ✗ Failed to create repository"
-    exit 1
-  fi
-  
-  # Reset local repo
-  rm -rf $LOCAL
-  mkdir -p $LOCAL
-  
-  # Use submodule template if available, otherwise create minimal structure
-  if [ -d "$TEMPLATE" ] && [ -f "$TEMPLATE/cto-config.json" ]; then
-    echo "  Using submodule template..."
-    # Ensure submodule is up to date
-    cd "$PROJECT_ROOT"
-    git submodule update --init --recursive testing/cto-parallel-test 2>/dev/null || true
-    
-    # Copy from submodule (excluding .git)
-    rsync -av --exclude='.git' "$TEMPLATE/" "$LOCAL/" || \
-      cp -r "$TEMPLATE"/* "$LOCAL/" 2>/dev/null || true
-    
-    # Copy hidden files except .git
-    find "$TEMPLATE" -maxdepth 1 -name ".*" ! -name ".git" ! -name "." ! -name ".." -exec cp -r {} "$LOCAL/" \; 2>/dev/null || true
-  else
-    echo "  Creating minimal structure..."
-    cd $LOCAL
-=======
       echo "  ⚠️  Failed to delete repository. You may need to grant delete_repo permission:"
       echo "     Run: gh auth refresh -h github.com -s delete_repo"
       echo "  Or delete it manually at: https://github.com/$REPO/settings"
@@ -143,7 +87,6 @@ if [[ "${1:-}" == "--github" ]]; then
     rm -rf "$LOCAL"
     mkdir -p "$LOCAL"
     cd "$LOCAL"
->>>>>>> dc3c56da (fix: implement ephemeral E2E template workflow to prevent submodule crosstalk)
     
     # Minimal setup
     cat > cto-config.json <<'EOF'
@@ -159,20 +102,6 @@ EOF
 
 Build a simple test application.
 EOF
-<<<<<<< HEAD
-  fi
-  
-  # Initialize git and push
-  cd $LOCAL
-  git init
-  git add .
-  git commit -m "Reset" || git commit --allow-empty -m "Reset"
-  git branch -M main
-  git remote add origin git@github.com:${REPO}.git 2>/dev/null || \
-    git remote set-url origin git@github.com:${REPO}.git
-  git push -u origin main --force
-  
-=======
     
     # Initialize git and push
     git init
@@ -184,7 +113,6 @@ EOF
     git push -u origin main --force
   fi
   
->>>>>>> dc3c56da (fix: implement ephemeral E2E template workflow to prevent submodule crosstalk)
   echo "✓ GitHub repository reset"
 fi
 
@@ -193,8 +121,3 @@ echo "✅ Reset complete!"
 echo ""
 echo "Run test: cto play --task-id <id>"
 echo "Monitor: kubectl logs -f -l workflow -n agent-platform"
-
-<<<<<<< HEAD
-
-=======
->>>>>>> dc3c56da (fix: implement ephemeral E2E template workflow to prevent submodule crosstalk)
