@@ -61,7 +61,7 @@ jobs:
           echo "Auto-healed drift by committing regenerated ConfigMap."
       - name: Fail if drift remains
         run: |
-          if git diff --quiet -- infra/charts/controller/templates/agent-templates-static.yaml; then
+          if git diff --quiet -- infra/charts/controller/templates/agent-templates-*.yaml; then
             echo "Templates validated successfully."
           else
             echo '::error::Generated ConfigMap is out of sync. Run scripts/update-templates.sh locally to refresh before committing.'
