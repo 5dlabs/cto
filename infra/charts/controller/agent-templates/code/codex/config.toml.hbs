@@ -13,6 +13,8 @@ approval_policy = "{{approval_policy}}"
 sandbox_mode = "{{sandbox_mode}}"
 project_doc_max_bytes = {{project_doc_max_bytes}}
 
+{{#if toolman.tools}}
+# Toolman MCP server for remote tools
 [mcp_servers.toolman]
 command = "toolman"
 args = [
@@ -24,8 +26,12 @@ args = [
 env = { "TOOLMAN_SERVER_URL" = "{{toolman.url}}" }
 startup_timeout_sec = 30
 tool_timeout_sec = 120
-{{#if toolman.tools}}
-# Remote tools available via Toolman: {{#each toolman.tools}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+# Tool filtering: only expose the tools configured for this agent
+available_tools = [
+  {{#each toolman.tools}}
+  "{{this}}"{{#unless @last}},{{/unless}}
+  {{/each}}
+]
 {{/if}}
 
 [model_providers.openai]

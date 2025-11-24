@@ -55,7 +55,7 @@ impl AgentClassifier {
                 let agent_name = agent_match.as_str().to_lowercase();
 
                 // Validate Kubernetes naming constraints
-                self.validate_k8s_name(&agent_name)?;
+                Self::validate_k8s_name(&agent_name)?;
 
                 Ok(agent_name)
             } else {
@@ -121,7 +121,7 @@ impl AgentClassifier {
     }
 
     /// Validate that a name meets Kubernetes naming constraints
-    fn validate_k8s_name(&self, name: &str) -> Result<(), String> {
+    fn validate_k8s_name(name: &str) -> Result<(), String> {
         if name.is_empty() {
             return Err("Name cannot be empty".to_string());
         }
@@ -150,7 +150,7 @@ impl AgentClassifier {
 
     /// Add a new implementation agent to the classifier
     /// This allows runtime configuration of implementation agents
-    pub fn add_implementation_agent(&mut self, agent_name: String) {
+    pub fn add_implementation_agent(&mut self, agent_name: &str) {
         self.implementation_agents.insert(agent_name.to_lowercase());
     }
 
@@ -319,24 +319,24 @@ mod tests {
 
     #[test]
     fn test_k8s_name_validation() {
-        let classifier = AgentClassifier::new();
+        let _classifier = AgentClassifier::new();
 
         // Valid names
-        assert!(classifier.validate_k8s_name("rex").is_ok());
-        assert!(classifier.validate_k8s_name("cleo-bot").is_ok());
-        assert!(classifier.validate_k8s_name("agent-123").is_ok());
+        assert!(AgentClassifier::validate_k8s_name("rex").is_ok());
+        assert!(AgentClassifier::validate_k8s_name("cleo-bot").is_ok());
+        assert!(AgentClassifier::validate_k8s_name("agent-123").is_ok());
 
         // Invalid names
-        assert!(classifier.validate_k8s_name("").is_err());
-        assert!(classifier.validate_k8s_name("-rex").is_err());
-        assert!(classifier.validate_k8s_name("rex-").is_err());
-        assert!(classifier.validate_k8s_name("Rex").is_err()); // Uppercase
-        assert!(classifier.validate_k8s_name("rex_bot").is_err()); // Underscore
-        assert!(classifier.validate_k8s_name("rex.bot").is_err()); // Dot
+        assert!(AgentClassifier::validate_k8s_name("").is_err());
+        assert!(AgentClassifier::validate_k8s_name("-rex").is_err());
+        assert!(AgentClassifier::validate_k8s_name("rex-").is_err());
+        assert!(AgentClassifier::validate_k8s_name("Rex").is_err()); // Uppercase
+        assert!(AgentClassifier::validate_k8s_name("rex_bot").is_err()); // Underscore
+        assert!(AgentClassifier::validate_k8s_name("rex.bot").is_err()); // Dot
 
         // Too long
         let long_name = "a".repeat(64);
-        assert!(classifier.validate_k8s_name(&long_name).is_err());
+        assert!(AgentClassifier::validate_k8s_name(&long_name).is_err());
     }
 
     #[test]
@@ -347,7 +347,7 @@ mod tests {
         assert!(!classifier.is_implementation_agent("morgan"));
 
         // Add as implementation agent
-        classifier.add_implementation_agent("morgan".to_string());
+        classifier.add_implementation_agent("morgan");
 
         // Now it should be classified as implementation agent
         assert!(classifier.is_implementation_agent("morgan"));

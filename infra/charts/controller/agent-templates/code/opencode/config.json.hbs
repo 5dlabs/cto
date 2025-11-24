@@ -1,26 +1,43 @@
 {
-  "$schema": "https://opencode.ai/config.json",
-  "metadata": {
-    "generatedAt": "{{metadata.timestamp}}",
-    "correlationId": "{{metadata.correlation_id}}",
-    "githubApp": "{{metadata.github_app}}",
-    "cli": "{{metadata.cli}}"
+  "mode": "exec",
+  "exec": {
+    "command": "/usr/local/bin/opencode",
+    "args": [
+      "--task-repo-dir", "/workspace",
+      "--model", "{{agent.model}}"{{#if agent.debug}},
+      "--debug"{{/if}}
+    ],
+    "env": {
+      "OPENCODE_API_KEY": "{{agent.api_key}}",
+      "OPENCODE_BASE_URL": "{{agent.base_url}}"{{#if agent.temperature}},
+      "OPENCODE_TEMPERATURE": "{{agent.temperature}}"{{/if}}{{#if agent.max_tokens}},
+      "OPENCODE_MAX_TOKENS": "{{agent.max_tokens}}"{{/if}}{{#if agent.debug}},
+      "OPENCODE_DEBUG": "true"{{/if}}{{#if agent.continue_task}},
+      "OPENCODE_CONTINUE": "true"{{/if}}
+    }
   },
-  "model": "{{agent.provider.name}}/{{agent.model}}"{{#if agent.temperature}},
-  "temperature": {{agent.temperature}}{{/if}}{{#if agent.max_output_tokens}},
-  "max_tokens": {{agent.max_output_tokens}}{{/if}},
-  "provider": {
-    "name": "{{agent.provider.name}}"{{#if agent.provider.base_url}},
-    "base_url": "{{agent.provider.base_url}}"{{/if}},
-    "envKey": "{{agent.provider.envKey}}"
-  },
-  "agent": {
-    "githubApp": "{{metadata.github_app}}"{{#if agent.instructions}},
-    "instructions": "{{agent.instructions}}"{{/if}}{{#if agent.remote_tools}},
-    "remote_tools": [{{#each agent.remote_tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{/if}}{{#if agent.local_servers}},
-    "local_servers": {{{agent.local_servers}}}{{/if}}
-  }{{#if agent.remote_tools}},
   "tools": {
-    "remote": [{{#each agent.remote_tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
-  }{{/if}}
+    "filesystem": {
+      "enabled": true,
+      "sandbox": {
+        "root": "/workspace",
+        "allow_symlinks": false
+      }
+    },
+    "shell": {
+      "enabled": true,
+      "sandbox": {
+        "working_dir": "/workspace",
+        "allowed_commands": ["git", "npm", "cargo", "docker", "kubectl"]
+      }
+    },
+    "remote": {
+      "enabled": true,
+      "env": {
+        "TOOLMAN_SERVER_URL": "{{agent.toolman_url}}"
+      }{{#if agent.remote_tools}},
+      "availableTools": [{{#each agent.remote_tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+      {{/if}}
+    }
+  }
 }

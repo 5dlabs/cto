@@ -19,6 +19,7 @@ spec:
   # Source repositories that applications in this project can deploy from
   sourceRepos:
     - 'https://github.com/5dlabs/cto'
+    - 'https://github.com/5dlabs/cto-apps'  # GitOps repo for Bolt-managed applications
     - 'https://github.com/5dlabs/docs'
     - 'https://github.com/5dlabs/toolman'
     - 'https://5dlabs.github.io/cto'
@@ -36,6 +37,7 @@ spec:
     - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://kubernetes-sigs.github.io/external-dns/'
+    - 'https://kubernetes-sigs.github.io/metrics-server/'
     # Removed Mailu Helm chart repository
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
@@ -44,7 +46,13 @@ spec:
 
   # Destinations that applications in this project can deploy to
   destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
     - namespace: agent-platform
+      server: https://kubernetes.default.svc
+    - namespace: 'agent-platform-preview-*'  # Preview deployments (Bolt)
+      server: https://kubernetes.default.svc
+    - namespace: 'agent-platform-prod-*'     # Production deployments (Bolt)
       server: https://kubernetes.default.svc
     - namespace: trader
       server: https://kubernetes.default.svc
@@ -69,8 +77,6 @@ spec:
     - namespace: external-dns
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
-      server: https://kubernetes.default.svc
-    - namespace: test-db
       server: https://kubernetes.default.svc
     # Removed Jupiter namespace
     - namespace: kube-system
@@ -113,6 +119,8 @@ spec:
       kind: MutatingWebhookConfiguration
     - group: 'admissionregistration.k8s.io'
       kind: ValidatingWebhookConfiguration
+    - group: 'apiregistration.k8s.io'
+      kind: APIService
     - group: 'networking.k8s.io'
       kind: IngressClass
     - group: 'gateway.networking.k8s.io'

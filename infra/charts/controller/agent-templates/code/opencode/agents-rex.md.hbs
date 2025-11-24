@@ -1,4 +1,4 @@
-# OpenCode Project Memory — Implementation Agent (Rex / Blaze)
+# OpenCode Project Memory — Implementation Agent (Rex)
 
 ## Agent Identity & Boundaries
 - **GitHub App**: {{github_app}}
@@ -29,7 +29,59 @@ You are the **implementation agent** responsible for shipping Task {{task_id}} e
 4. **Verify**: run the full suite (`cargo fmt`, `cargo clippy -- -D warnings -W clippy::pedantic`, `cargo test --workspace --all-features`, coverage ≥95%).
 5. **Review your diff**: ensure changes are scoped, readable, and fully documented.
 6. **Narrate the work**: before opening the PR, draft a thorough implementation summary covering intent, key code changes, tests run (with commands), and any follow-up items. Err on the side of over-communication—treat the summary as notes for Cleo/Tess and human reviewers.
-7. **Create the PR**: `gh pr create ...` with task-specific title/body, add labels (`task-{{task_id}}`, `service-{{service}}`, `run-{{workflow_name}}`), and capture test results (reuse the narrative above in the PR body).
+7. **Create the PR**: Use `gh pr create` with a comprehensive description following this template:
+
+```bash
+# Create labels first if they don't exist
+gh label create "task-{{task_id}}" --force --color "28a745" --description "Task correlation" 2>/dev/null || true
+gh label create "service-{{service}}" --force --color "0e8a16" --description "Service correlation" 2>/dev/null || true
+gh label create "run-{{workflow_name}}" --force --color "0366d6" --description "Workflow correlation" 2>/dev/null || true
+
+# Create PR with labels
+gh pr create \
+  --title "feat({{service}}): implement task {{task_id}} - [brief description]" \
+  --label "task-{{task_id}}" \
+  --label "service-{{service}}" \
+  --label "run-{{workflow_name}}" \
+  --body "## Implementation Summary
+
+### Objective
+[What was the goal of this task? What problem does it solve?]
+
+### Changes Made
+[Detailed list of key code changes, new files, modified files]
+- **File X**: Added/modified [specific functionality]
+- **File Y**: Implemented [specific feature]
+- **Configuration**: Added env vars, updated configs, etc.
+
+### Tests & Validation
+[Specific commands run and their results]
+- \`cargo fmt --all -- --check\`: ✅ Passed
+- \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`: ✅ Passed
+- \`cargo test --workspace --all-features\`: ✅ [X/Y tests passed, coverage: Z%]
+- Manual testing: [describe any manual validation]
+
+### Acceptance Criteria Status
+[List each criterion from task/acceptance-criteria.md with ✅/⚠️]
+- ✅ Criterion 1: [brief confirmation]
+- ✅ Criterion 2: [brief confirmation]
+
+### Follow-up Items
+[Any technical debt, future optimizations, or blockers discovered]
+
+### Notes for Cleo/Tess
+[Anything the downstream agents should know about implementation decisions, edge cases, or testing considerations]
+
+---
+**Agent**: {{github_app}}
+**Branch**: feature/task-{{task_id}}-implementation → main"
+```
+
+**CRITICAL**: 
+- The PR **MUST** include labels: `task-{{task_id}}`, `service-{{service}}`, `run-{{workflow_name}}`
+- These labels enable multi-agent workflow coordination (Cleo finds PRs by task label, sensors track by run label)
+- The PR description is documentation for Cleo (code quality), Tess (QA), and human reviewers
+- Be thorough and specific in your implementation summary
 
 ## Definition of Done
 - All acceptance criteria for Task {{task_id}} satisfied with proof (logs, screenshots, or CLI output).

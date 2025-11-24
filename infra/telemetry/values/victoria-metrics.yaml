@@ -84,6 +84,24 @@ server:
               regex: 'claude_code.*'
               action: keep
 
+        # Scrape Kubernetes metrics-server
+        - job_name: metrics-server
+          kubernetes_sd_configs:
+            - role: endpoints
+              namespaces:
+                names:
+                  - kube-system
+          scheme: https
+          tls_config:
+            insecure_skip_verify: true  # metrics-server uses self-signed certs
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_service_name]
+              action: keep
+              regex: metrics-server
+            - source_labels: [__meta_kubernetes_endpoint_port_name]
+              action: keep
+              regex: https
+
   # Security context
   securityContext:
     runAsNonRoot: true

@@ -60,7 +60,7 @@ impl LabelCleanupManager {
     /// Returns `CleanupError::StateError` if the task state cannot be determined
     /// Returns `CleanupError::OperationFailed` if label operations fail
     #[allow(unused)]
-    pub async fn cleanup_completed_task(
+    pub fn cleanup_completed_task(
         &mut self,
         pr_number: i32,
         task_id: &str,
@@ -82,7 +82,7 @@ impl LabelCleanupManager {
     /// Returns `CleanupError::StateError` if the task state cannot be retrieved
     /// Returns `CleanupError::OperationFailed` if label operations fail
     #[allow(unused)]
-    pub async fn cleanup_abandoned_task(
+    pub fn cleanup_abandoned_task(
         &mut self,
         pr_number: i32,
         task_id: &str,
@@ -105,7 +105,7 @@ impl LabelCleanupManager {
     /// Returns `CleanupError::StateError` if active tasks cannot be retrieved
     /// Returns `CleanupError::OperationFailed` if any cleanup operation fails
     #[allow(unused)]
-    pub async fn perform_scheduled_cleanup(&mut self) -> Result<CleanupResult, CleanupError> {
+    pub fn perform_scheduled_cleanup(&mut self) -> Result<CleanupResult, CleanupError> {
         info!("Starting scheduled cleanup operation");
 
         // TODO: Implement comprehensive cleanup logic

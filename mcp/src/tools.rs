@@ -7,6 +7,7 @@ pub fn get_tool_schemas() -> Value {
         "tools": [
             get_docs_schema(),
             get_play_schema(&HashMap::new()),
+            get_play_status_schema(),
             get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
@@ -22,6 +23,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
         "tools": [
             get_docs_schema(),
             get_play_schema(agents),
+            get_play_status_schema(),
             get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
@@ -63,18 +65,22 @@ fn get_docs_schema() -> Value {
 fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "play",
-        "description": "Submit a Play workflow for multi-agent orchestration (Rex/Blaze → Cleo → Tess) with event-driven coordination",
+        "description": "Submit a Play workflow for multi-agent orchestration (Rex/Blaze → Cleo → Tess → Atlas → Bolt) with event-driven coordination",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "task_id": {
                     "type": "integer",
-                    "description": "Task ID to implement from task files",
+                    "description": "Task ID to implement from task files. Optional - if not provided, will auto-detect next available task from TaskMaster based on dependencies and priority.",
                     "minimum": 1
                 },
                 "repository": {
                     "type": "string",
                     "description": "Target repository URL (e.g., 5dlabs/cto). Optional if defaults.play.repository is set in config."
+                },
+                "repository_path": {
+                    "type": "string",
+                    "description": "Absolute path to the repository on disk (e.g., /Users/name/code/cto-parallel-test). Use this when the target repository is not in the current workspace. Optional - if not provided, will use workspace detection."
                 },
                 "service": {
                     "type": "string",
@@ -92,10 +98,19 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                 "implementation_agent": {
                     "type": "string",
                     "description": if agents.is_empty() {
-                        "Agent for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)".to_string()
+                        "Agent for backend/general implementation work (e.g., 5DLabs-Rex)".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                        format!("Agent for implementation work. Available agents: {agent_list}")
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
+                        format!("Agent for backend/general implementation work. Available agents: {agent_list}")
+                    }
+                },
+                "frontend_agent": {
+                    "type": "string",
+                    "description": if agents.is_empty() {
+                        "Agent for frontend tasks (React, UI components) (e.g., 5DLabs-Blaze). Optional if defaults.play.frontendAgent is set in config.".to_string()
+                    } else {
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
+                        format!("Agent for frontend tasks (React, UI components). Available agents: {agent_list}")
                     }
                 },
                 "quality_agent": {
@@ -103,7 +118,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": if agents.is_empty() {
                         "Agent for quality assurance (e.g., 5DLabs-Cleo)".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
                         format!("Agent for quality assurance. Available agents: {agent_list}")
                     }
                 },
@@ -112,20 +127,46 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": if agents.is_empty() {
                         "Agent for testing and validation (e.g., 5DLabs-Tess)".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
                         format!("Agent for testing and validation. Available agents: {agent_list}")
                     }
+                },
+                "parallel_execution": {
+                    "type": "boolean",
+                    "description": "Enable parallel execution of independent tasks. When true, analyzes TaskMaster dependencies and runs tasks in parallel execution levels. When false (default), runs tasks sequentially one at a time. Requires TaskMaster tasks.json with proper dependencies.",
+                    "default": false
                 },
                 "model": {
                     "type": "string",
                     "description": "Claude model to use for all agents (optional, defaults to configuration)"
+                },
+                "opencode_max_retries": {
+                    "type": "integer",
+                    "description": "Override maximum retry attempts for OpenCode runs (defaults to configuration)"
                 },
                 "cli": {
                     "type": "string",
                     "description": "CLI tool to use for all agents (optional, defaults to configuration)"
                 }
             },
-            "required": ["task_id"]
+            "required": []
+        }
+    })
+}
+
+fn get_play_status_schema() -> Value {
+    json!({
+        "name": "play_status",
+        "description": "Query current play workflow status and progress. Shows active workflows, next available tasks, and blocked tasks.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repository": {
+                    "type": "string",
+                    "description": "Target repository URL (e.g., 5dlabs/cto). Optional if defaults.play.repository is set in config."
+                }
+            },
+            "required": []
         }
     })
 }

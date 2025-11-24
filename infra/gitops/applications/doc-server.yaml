@@ -12,61 +12,41 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform
-  source:
-    repoURL: https://github.com/5dlabs/charts
-    targetRevision: main
-    path: agent-docs
-    helm:
-      values: |
-        serviceAccount:
-          create: false
-          name: default
-        imagePullSecrets:
-          - name: ghcr-secret
-        image:
-          repository: ghcr.io/5dlabs/agent-docs/server
-          tag: latest
-        # Global Redis configuration
-        redis:
-          url: "redis://redis.databases.svc.cluster.local:6379"
-        # Try extraEnv for worker
-        extraEnv:
-          - name: REDIS_URL
-            value: "redis://redis.databases.svc.cluster.local:6379"
-        env:
-          # Keep chart defaults for non-secret settings
-          RUST_LOG: "info,doc_server=debug,mcp=debug"
-          PORT: "3001"
-          MCP_HOST: "0.0.0.0"
-          MCP_PORT: "3001"
-          # MCP configuration
-          MCP_LOCALHOST_ONLY: "false"
-          MCP_STRICT_ORIGIN_VALIDATION: "false"
-          MCP_REQUIRE_ORIGIN_HEADER: "false"
-          MCP_ENABLE_SSE: "true"
-          MCP_ENABLE_SSE_MIRROR: "false"
-          MCP_SSE_KEEPALIVE_SECS: "10"
-          # Redis configuration - point to Redis master, not Sentinel
-          REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
-          # Explicitly disable Sentinel usage in any client code
-          REDIS_USE_SENTINEL: "false"
-          USE_SENTINEL: "false"
-          REDIS_SENTINEL_ENABLED: "false"
-          SENTINEL_ENABLED: "false"
-          REDIS_SENTINEL_SERVICE: ""
-          REDIS_HOST: "redis.databases.svc.cluster.local"
-          REDIS_PORT: "6379"
-          # Embeddings configuration (env-based)
-          OPENAI_BASE_URL: "https://api.openai.com/v1"
-          OPENAI_EMBEDDING_MODEL: "text-embedding-3-large"
-          OPENAI_EMBEDDING_DIMS: "3072"
-          OPENAI_EMBEDDING_DIMS_OPTIMIZED: "1024"
-          # Discovery / Claude configuration
-          CLAUDE_MODEL: "claude-sonnet-4-20250514"
-        # Worker configuration
-        worker:
-          enabled: true
+  sources:
+    - repoURL: https://github.com/5dlabs/charts
+      targetRevision: main
+      path: agent-docs
+      helm:
+        values: |
+          serviceAccount:
+            create: false
+            name: default
+          imagePullSecrets:
+            - name: ghcr-secret
+          image:
+            repository: ghcr.io/5dlabs/agent-docs/server
+            tag: latest
+          # Global Redis configuration
+          redis:
+            url: "redis://redis.databases.svc.cluster.local:6379"
+          # Try extraEnv for worker
+          extraEnv:
+            - name: REDIS_URL
+              value: "redis://redis.databases.svc.cluster.local:6379"
           env:
+            # Keep chart defaults for non-secret settings
+            RUST_LOG: "info,doc_server=debug,mcp=debug"
+            PORT: "3001"
+            MCP_HOST: "0.0.0.0"
+            MCP_PORT: "3001"
+            # MCP configuration
+            MCP_LOCALHOST_ONLY: "false"
+            MCP_STRICT_ORIGIN_VALIDATION: "false"
+            MCP_REQUIRE_ORIGIN_HEADER: "false"
+            MCP_ENABLE_SSE: "true"
+            MCP_ENABLE_SSE_MIRROR: "false"
+            MCP_SSE_KEEPALIVE_SECS: "10"
+            # Redis configuration - point to Redis master, not Sentinel
             REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
             # Explicitly disable Sentinel usage in any client code
             REDIS_USE_SENTINEL: "false"
@@ -76,601 +56,598 @@ spec:
             REDIS_SENTINEL_SERVICE: ""
             REDIS_HOST: "redis.databases.svc.cluster.local"
             REDIS_PORT: "6379"
-            RUST_LOG: "info,mcp=info"
-            WORKER_JOB_TYPES: "ingest,crate_add"
-          # Provide extraEnv for charts that consume env as arrays
-          extraEnv:
-            - name: REDIS_URL
-              value: "redis://redis.databases.svc.cluster.local:6379"
-            - name: REDIS_USE_SENTINEL
-              value: "false"
-            - name: USE_SENTINEL
-              value: "false"
-            - name: REDIS_SENTINEL_ENABLED
-              value: "false"
-            - name: SENTINEL_ENABLED
-              value: "false"
-            - name: REDIS_SENTINEL_SERVICE
-              value: ""
-            - name: REDIS_HOST
-              value: "redis.databases.svc.cluster.local"
-            - name: REDIS_PORT
-              value: "6379"
-        secret:
-          existingSecret: doc-server-secrets
-          # Explicitly mount API keys for documentation processing
-          env:
-            ANTHROPIC_API_KEY:
-              secretKeyRef:
-                name: doc-server-secrets
-                key: ANTHROPIC_API_KEY
-            OPENAI_API_KEY:
-              secretKeyRef:
-                name: doc-server-secrets
-                key: OPENAI_API_KEY
-        migrations:
-          serviceAccountName: default
-          # Ensure chart uses correct binary path and migrate-only args
-          command: ["/app/http_server"]
-          args: ["--migrate-only"]
-        # Service configuration - exclude worker pods from service endpoints
-        service:
-          type: ClusterIP
-          port: 80
-          targetPort: 3001
-          # Override selector to only include server pods (exclude worker pods)
-          selector:
-            app.kubernetes.io/name: agent-docs-server
-            app.kubernetes.io/instance: doc-server
+            # Embeddings configuration (env-based)
+            OPENAI_BASE_URL: "https://api.openai.com/v1"
+            OPENAI_EMBEDDING_MODEL: "text-embedding-3-large"
+            OPENAI_EMBEDDING_DIMS: "3072"
+            OPENAI_EMBEDDING_DIMS_OPTIMIZED: "1024"
+            # Discovery / Claude configuration
+            CLAUDE_MODEL: "claude-sonnet-4-20250514"
+          # Worker configuration
+          worker:
+            enabled: true
+            env:
+              REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
+              # Explicitly disable Sentinel usage in any client code
+              REDIS_USE_SENTINEL: "false"
+              USE_SENTINEL: "false"
+              REDIS_SENTINEL_ENABLED: "false"
+              SENTINEL_ENABLED: "false"
+              REDIS_SENTINEL_SERVICE: ""
+              REDIS_HOST: "redis.databases.svc.cluster.local"
+              REDIS_PORT: "6379"
+              RUST_LOG: "info,mcp=info"
+              WORKER_JOB_TYPES: "ingest,crate_add"
+            # Provide extraEnv for charts that consume env as arrays
+            extraEnv:
+              - name: REDIS_URL
+                value: "redis://redis.databases.svc.cluster.local:6379"
+              - name: REDIS_USE_SENTINEL
+                value: "false"
+              - name: USE_SENTINEL
+                value: "false"
+              - name: REDIS_SENTINEL_ENABLED
+                value: "false"
+              - name: SENTINEL_ENABLED
+                value: "false"
+              - name: REDIS_SENTINEL_SERVICE
+                value: ""
+              - name: REDIS_HOST
+                value: "redis.databases.svc.cluster.local"
+              - name: REDIS_PORT
+                value: "6379"
+          secret:
+            existingSecret: doc-server-secrets
+            keys:
+              DATABASE_URL: DATABASE_URL
+              VECTOR_DATABASE_URL: VECTOR_DATABASE_URL
+            # Explicitly mount API keys for documentation processing
+            env:
+              ANTHROPIC_API_KEY:
+                secretKeyRef:
+                  name: doc-server-secrets
+                  key: ANTHROPIC_API_KEY
+              OPENAI_API_KEY:
+                secretKeyRef:
+                  name: doc-server-secrets
+                  key: OPENAI_API_KEY
+          migrations:
+            serviceAccountName: default
+            # Ensure chart uses correct binary path and migrate-only args
+            command: ["/app/http_server"]
+            args: ["--migrate-only"]
+          # Service configuration - disabled, managed by doc-server-networking app
+          service:
+            enabled: false
+          # Add component label to main server pods to distinguish from worker
+          podLabels:
             app.kubernetes.io/component: server
-        # Add component label to main server pods to distinguish from worker
-        podLabels:
-          app.kubernetes.io/component: server
-        # Ingress configuration for SSE-optimized MCP access
-        ingress:
-          enabled: true
-          className: "nginx"
-          annotations:
-            kubernetes.io/ingress.class: nginx
-            nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-            nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-            nginx.ingress.kubernetes.io/proxy-buffering: "off"
-            nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
-            nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-            nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-            nginx.ingress.kubernetes.io/configuration-snippet: |
-              proxy_set_header Connection keep-alive;
-              # helpful for SSE; app already sets Cache-Control: no-transform
-              add_header X-Accel-Buffering no always;
-            nginx.ingress.kubernetes.io/ssl-redirect: "false"
-          hosts:
-            - host: mcp.simple-cluster.local
-              paths:
-                - path: /mcp
-                  pathType: Prefix
-                - path: /health
-                  pathType: Prefix
-          tls: []
-        # Tools configuration - managed by CTO
-        # This will be mounted as /app/tools.json via ConfigMap
-        # Single source of truth - edit this inline configuration directly
-        # Note: This is plain JSON in an ArgoCD YAML, not a Helm template
-        toolsConfig: |
-          {
-            "tools": [
-              {
-                "name": "birdeye_query",
-                "docType": "birdeye",
-                "title": "BirdEye API Documentation Query",
-                "description": "Search BirdEye blockchain API documentation. Query 600+ endpoints with version, method, and parameter filtering.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["json", "yaml"],
-                  "supported_complexity_levels": [],
-                  "supported_categories": ["defi", "pricing", "token", "portfolio"],
-                  "supported_topics": ["api", "endpoints", "parameters", "responses"],
-                  "supports_api_version": true,
-                  "topic_keywords": {
-                    "api": ["api", "endpoint", "request", "response", "rest"],
-                    "endpoints": ["endpoint", "route", "path", "url"],
-                    "parameters": ["parameter", "param", "arg", "input"],
-                    "responses": ["response", "output", "result", "data"]
-                  },
-                  "category_keywords": {
-                    "defi": ["defi", "decentralized", "finance", "yield"],
-                    "pricing": ["price", "pricing", "rate", "cost"],
-                    "token": ["token", "asset", "mint", "coin"],
-                    "portfolio": ["portfolio", "balance", "holding", "asset"]
+          # Ingress configuration - disabled, managed by doc-server-networking app
+          ingress:
+            enabled: false
+          # Tools configuration - managed by CTO
+          # This will be mounted as /app/tools.json via ConfigMap
+          # Single source of truth - edit this inline configuration directly
+          # Note: This is plain JSON in an ArgoCD YAML, not a Helm template
+          toolsConfig: |
+            {
+              "tools": [
+                {
+                  "name": "birdeye_query",
+                  "docType": "birdeye",
+                  "title": "BirdEye API Documentation Query",
+                  "description": "Search BirdEye blockchain API documentation. Query 600+ endpoints with version, method, and parameter filtering.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["json", "yaml"],
+                    "supported_complexity_levels": [],
+                    "supported_categories": ["defi", "pricing", "token", "portfolio"],
+                    "supported_topics": ["api", "endpoints", "parameters", "responses"],
+                    "supports_api_version": true,
+                    "topic_keywords": {
+                      "api": ["api", "endpoint", "request", "response", "rest"],
+                      "endpoints": ["endpoint", "route", "path", "url"],
+                      "parameters": ["parameter", "param", "arg", "input"],
+                      "responses": ["response", "output", "result", "data"]
+                    },
+                    "category_keywords": {
+                      "defi": ["defi", "decentralized", "finance", "yield"],
+                      "pricing": ["price", "pricing", "rate", "cost"],
+                      "token": ["token", "asset", "mint", "coin"],
+                      "portfolio": ["portfolio", "balance", "holding", "asset"]
+                    }
+                  }
+                },
+                {
+                  "name": "solana_query",
+                  "docType": "solana",
+                  "title": "Solana Documentation Query",
+                  "description": "Search Solana core documentation, architecture diagrams, ZK cryptography specifications, and development guides.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "pdf", "bob", "msc"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["core", "architecture-diagrams", "sequence-diagrams", "zk-cryptography"],
+                    "supported_topics": ["consensus", "networking", "validators", "cryptography", "development"],
+                    "supports_api_version": false,
+                    "topic_keywords": {
+                      "consensus": ["consensus", "proof of stake", "validator", "block", "epoch"],
+                      "networking": ["network", "rpc", "peer", "connection", "protocol", "gossip"],
+                      "validators": ["validator", "staking", "delegation", "rewards", "slashing"],
+                      "cryptography": ["crypto", "hash", "signature", "encrypt", "key", "ed25519"],
+                      "development": ["development", "dev", "build", "setup", "sdk", "client"]
+                    },
+                    "category_keywords": {
+                      "core": ["core", "fundamental", "basic", "overview", "architecture"],
+                      "architecture-diagrams": ["diagram", "architecture", "flow", "design", "structure"],
+                      "sequence-diagrams": ["sequence", "flow", "step", "process", "workflow"],
+                      "zk-cryptography": ["zk", "zero", "knowledge", "proof", "snark", "stark"]
+                    }
+                  }
+                },
+                {
+                  "name": "jupiter_query",
+                  "docType": "jupiter",
+                  "title": "Jupiter Protocol Documentation Query",
+                  "description": "Search Jupiter DeFi docs for DEX aggregation, swap APIs, and Solana trading.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "json", "typescript"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["swap-api", "token-api", "price-api", "dex-integration", "wallet-integration"],
+                    "supported_topics": ["trading", "liquidity", "apis", "integration", "development"],
+                    "supports_api_version": true,
+                    "topic_keywords": {
+                      "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                      "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                      "apis": ["api", "endpoint", "request", "response", "rest"],
+                      "integration": ["integration", "connect", "setup", "config", "webhook"],
+                      "development": ["development", "dev", "build", "sdk", "client"]
+                    },
+                    "category_keywords": {
+                      "swap-api": ["swap", "trade", "exchange", "dex", "amm"],
+                      "token-api": ["token", "asset", "mint", "coin", "currency"],
+                      "price-api": ["price", "pricing", "rate", "cost", "value"],
+                      "dex-integration": ["dex", "integration", "connect", "setup", "config"],
+                      "wallet-integration": ["wallet", "connect", "sign", "transaction", "web3"]
+                    }
+                  }
+                },
+                {
+                  "name": "cilium_query",
+                  "docType": "cilium",
+                  "title": "Cilium Documentation Query",
+                  "description": "Search Cilium networking and security documentation for Kubernetes and cloud-native environments.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "yaml"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["networking", "security", "observability", "performance", "integration"],
+                    "supported_topics": ["networking", "security", "kubernetes", "observability", "ebpf"],
+                    "topic_keywords": {
+                      "networking": ["network", "networking", "connectivity", "routing", "policy"],
+                      "security": ["security", "policy", "access", "firewall", "encryption"],
+                      "kubernetes": ["kubernetes", "k8s", "pod", "service", "deployment"],
+                      "observability": ["observability", "monitoring", "metrics", "tracing", "logs"],
+                      "ebpf": ["ebpf", "bpf", "kernel", "performance", "filtering"]
+                    },
+                    "category_keywords": {
+                      "networking": ["network", "networking", "connectivity", "routing", "policy"],
+                      "security": ["security", "policy", "access", "firewall", "encryption"],
+                      "observability": ["observability", "monitoring", "metrics", "tracing", "logs"],
+                      "performance": ["performance", "optimization", "scaling", "efficiency"],
+                      "integration": ["integration", "kubernetes", "istio", "service mesh"]
+                    }
+                  }
+                },
+                {
+                  "name": "talos_query",
+                  "docType": "talos",
+                  "title": "Talos OS Documentation Query",
+                  "description": "Search Talos OS documentation for minimal, secure, and immutable Linux distribution designed for Kubernetes.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "yaml"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["installation", "configuration", "operations", "security", "troubleshooting"],
+                    "supported_topics": ["kubernetes", "security", "boot", "configuration", "maintenance"],
+                    "topic_keywords": {
+                      "kubernetes": ["kubernetes", "k8s", "cluster", "node", "control plane"],
+                      "security": ["security", "immutable", "minimal", "secure", "hardening"],
+                      "boot": ["boot", "bootloader", "pxe", "iso", "installation"],
+                      "configuration": ["configuration", "config", "patch", "machine config"],
+                      "maintenance": ["maintenance", "upgrade", "backup", "recovery"]
+                    },
+                    "category_keywords": {
+                      "installation": ["installation", "install", "setup", "deploy", "bootstrap"],
+                      "configuration": ["configuration", "config", "patch", "machine config"],
+                      "operations": ["operations", "maintenance", "upgrade", "backup", "recovery"],
+                      "security": ["security", "hardening", "compliance", "audit"],
+                      "troubleshooting": ["troubleshooting", "debug", "logs", "diagnostics"]
+                    }
+                  }
+                },
+                {
+                  "name": "meteora_query",
+                  "docType": "meteora",
+                  "title": "Meteora Protocol Documentation Query",
+                  "description": "Search Meteora DeFi protocol documentation including liquidity pools, farming, and yield strategies.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "json"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["defi", "liquidity_pools", "yield_farming", "trading", "vaults"],
+                    "supported_topics": ["liquidity", "farming", "trading", "vaults", "governance"],
+                    "topic_keywords": {
+                      "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                      "farming": ["farming", "yield", "staking", "reward", "incentive"],
+                      "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                      "vaults": ["vault", "strategy", "yield", "auto-compound"],
+                      "governance": ["governance", "vote", "proposal", "dao", "token"]
+                    },
+                    "category_keywords": {
+                      "defi": ["defi", "decentralized", "finance", "yield", "liquidity"],
+                      "liquidity-pools": ["pool", "liquidity", "amm", "market", "depth"],
+                      "yield-farming": ["yield", "farming", "staking", "reward", "incentive"],
+                      "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                      "vaults": ["vault", "strategy", "auto-compound", "yield"]
+                    }
+                  }
+                },
+                {
+                  "name": "raydium_query",
+                  "docType": "raydium",
+                  "title": "Raydium Protocol Documentation Query",
+                  "description": "Search Raydium DEX and AMM documentation for Solana-based trading and liquidity provision.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "json"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["dex", "liquidity", "yield", "defi", "solana"],
+                    "supported_topics": ["trading", "liquidity", "farming", "amm", "solana"],
+                    "topic_keywords": {
+                      "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                      "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                      "farming": ["farming", "yield", "staking", "reward", "incentive"],
+                      "amm": ["amm", "automated", "market", "maker", "liquidity"],
+                      "solana": ["solana", "blockchain", "program", "instruction", "account"]
+                    },
+                    "category_keywords": {
+                      "dex": ["dex", "exchange", "trading", "swap", "amm"],
+                      "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                      "yield": ["yield", "farming", "staking", "reward", "incentive"],
+                      "defi": ["defi", "decentralized", "finance", "yield", "liquidity"],
+                      "solana": ["solana", "blockchain", "program", "instruction", "account"]
+                    }
+                  }
+                },
+                {
+                  "name": "ebpf_query",
+                  "docType": "ebpf",
+                  "title": "eBPF Documentation Query",
+                  "description": "Search eBPF (extended Berkeley Packet Filter) documentation for kernel programming and observability.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "c"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["kernel_programming", "observability", "networking", "security", "performance"],
+                    "supported_topics": ["kernel", "programming", "observability", "networking", "security"],
+                    "topic_keywords": {
+                      "kernel": ["kernel", "linux", "system", "syscall", "module"],
+                      "programming": ["programming", "code", "development", "c", "clang"],
+                      "observability": ["observability", "monitoring", "tracing", "metrics", "debug"],
+                      "networking": ["network", "packet", "socket", "firewall", "filter"],
+                      "security": ["security", "seccomp", "lsm", "access", "audit"]
+                    },
+                    "category_keywords": {
+                      "kernel-programming": ["kernel", "programming", "c", "clang", "bcc"],
+                      "observability": ["observability", "monitoring", "tracing", "metrics", "debug"],
+                      "networking": ["network", "packet", "socket", "firewall", "filter"],
+                      "security": ["security", "seccomp", "lsm", "access", "audit"],
+                      "performance": ["performance", "optimization", "profiling", "tracing"]
+                    }
+                  }
+                },
+                {
+                  "name": "rust_best_practices_query",
+                  "docType": "rust_best_practices",
+                  "title": "Rust Best Practices Query",
+                  "description": "Search curated Rust best practices, patterns, and guidelines for idiomatic and performant code.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "rust"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["idiomatic_rust", "performance", "safety", "concurrency", "error_handling"],
+                    "supported_topics": ["ownership", "async", "error_handling", "performance", "patterns"],
+                    "topic_keywords": {
+                      "ownership": ["ownership", "borrow", "lifetime", "move", "reference"],
+                      "async": ["async", "await", "future", "tokio", "concurrency"],
+                      "error-handling": ["error", "result", "option", "panic", "unwrap"],
+                      "performance": ["performance", "optimization", "memory", "zero-cost", "allocation"],
+                      "patterns": ["pattern", "trait", "generic", "macro", "idiom"]
+                    },
+                    "category_keywords": {
+                      "idiomatic-rust": ["idiomatic", "pattern", "best practice", "convention", "style"],
+                      "performance": ["performance", "optimization", "memory", "speed", "efficient"],
+                      "safety": ["safety", "memory safety", "borrow checker", "lifetime"],
+                      "concurrency": ["concurrency", "async", "parallel", "thread", "mutex"],
+                      "error-handling": ["error", "error handling", "result", "option", "panic"]
+                    }
+                  }
+                },
+                {
+                  "name": "rust_query",
+                  "docType": "rust",
+                  "title": "Rust Documentation Query",
+                  "description": "Search and retrieve information from Rust crate documentation. Query across 40+ popular Rust crates.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["rust", "markdown", "toml"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["web-frameworks", "async-runtime", "data-processing", "cryptography", "command-line"],
+                    "supported_topics": ["web", "async", "data", "crypto", "cli"],
+                    "supports_api_version": true,
+                    "topic_keywords": {
+                      "web": ["web", "http", "server", "client", "api", "rest"],
+                      "async": ["async", "await", "future", "tokio", "runtime"],
+                      "data": ["data", "database", "sql", "orm", "serde", "json"],
+                      "crypto": ["crypto", "encryption", "hash", "signature", "security"],
+                      "cli": ["cli", "command", "args", "clap", "terminal", "shell"]
+                    },
+                    "category_keywords": {
+                      "web-frameworks": ["web", "framework", "server", "http", "axum", "warp"],
+                      "async-runtime": ["async", "runtime", "tokio", "async-std", "smol"],
+                      "data-processing": ["data", "database", "sql", "postgres", "mongodb"],
+                      "cryptography": ["crypto", "encryption", "security", "tls", "ssl"],
+                      "command-line": ["cli", "command", "terminal", "shell", "tool"]
+                    }
+                  }
+                },
+                {
+                  "name": "add_rust_crate",
+                  "docType": "rust",
+                  "title": "Add Rust Crate",
+                  "description": "Add a new Rust crate to the documentation system with automatic docs.rs ingestion.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supports_version_selection": true,
+                    "supports_feature_selection": true,
+                    "supports_rollback": true,
+                    "batch_processing": true
+                  }
+                },
+                {
+                  "name": "remove_rust_crate",
+                  "docType": "rust",
+                  "title": "Remove Rust Crate",
+                  "description": "Remove a Rust crate from the documentation system with cascade deletion and cleanup verification.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supports_soft_delete": true,
+                    "supports_cascade_delete": true,
+                    "cleanup_verification": true
+                  }
+                },
+                {
+                  "name": "list_rust_crates",
+                  "docType": "rust",
+                  "title": "List Rust Crates",
+                  "description": "List all Rust crates in the documentation system with pagination, filtering, and statistics.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supports_pagination": true,
+                    "supports_filtering": true,
+                    "supports_statistics": true,
+                    "status_filtering": ["active", "inactive", "updating", "failed"]
+                  }
+                },
+                {
+                  "name": "check_rust_status",
+                  "docType": "rust",
+                  "title": "Check Rust System Status",
+                  "description": "Check system health and get comprehensive statistics about Rust crate management.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "health_monitoring": true,
+                    "job_tracking": true,
+                    "performance_metrics": true,
+                    "storage_analysis": true
+                  }
+                },
+                {
+                  "name": "codex_query",
+                  "docType": "codex",
+                  "title": "OpenAI Codex CLI Documentation Query",
+                  "description": "Search OpenAI Codex CLI documentation for AI-powered coding assistance and development tools.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "rust", "toml"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "mcp-integration"],
+                    "supported_topics": ["installation", "configuration", "usage", "api", "mcp-tools"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "configure", "build", "compile"],
+                      "configuration": ["config", "settings", "toml", "preferences", "options"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "api": ["api", "endpoint", "interface", "protocol", "mcp"],
+                      "mcp-tools": ["mcp", "tool", "protocol", "model", "context"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "code-generation": ["generate", "code", "create", "write", "produce"],
+                      "cli": ["cli", "command", "terminal", "console", "shell"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "mcp-integration": ["mcp", "model", "context", "protocol", "integration"]
+                    }
+                  }
+                },
+                {
+                  "name": "opencode_query",
+                  "docType": "opencode",
+                  "title": "OpenCode CLI Documentation Query",
+                  "description": "Search OpenCode CLI documentation for AI-assisted development with MCP support.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "typescript", "json"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "mcp-servers"],
+                    "supported_topics": ["installation", "configuration", "usage", "api", "agents"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "configure", "npm", "node"],
+                      "configuration": ["config", "settings", "json", "jsonc", "options"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "api": ["api", "endpoint", "interface", "protocol", "rest"],
+                      "agents": ["agent", "assistant", "bot", "automation", "workflow"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "code-generation": ["generate", "code", "create", "write", "produce"],
+                      "cli": ["cli", "command", "terminal", "console", "shell"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "mcp-servers": ["mcp", "server", "protocol", "model", "context"]
+                    }
+                  }
+                },
+                {
+                  "name": "openhands_query",
+                  "docType": "openhands",
+                  "title": "OpenHands CLI Documentation Query",
+                  "description": "Search OpenHands CLI documentation for AI-assisted software development and automation tools.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "python", "yaml"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "automation", "development", "python-cli", "integration"],
+                    "supported_topics": ["installation", "configuration", "usage", "api", "troubleshooting"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "pip", "python", "virtualenv"],
+                      "configuration": ["config", "settings", "yaml", "env", "options"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "api": ["api", "endpoint", "interface", "protocol", "rest"],
+                      "troubleshooting": ["error", "debug", "fix", "issue", "problem"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "automation": ["automate", "script", "workflow", "task", "process"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "python-cli": ["python", "pip", "cli", "command", "script"],
+                      "integration": ["integrate", "connect", "api", "webhook", "plugin"]
+                    }
+                  }
+                },
+                {
+                  "name": "gemini_query",
+                  "docType": "gemini",
+                  "title": "Google Gemini CLI Documentation Query",
+                  "description": "Search Google Gemini CLI documentation for AI-powered development assistance and code generation tools.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "typescript", "json"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "google-ai"],
+                    "supported_topics": ["installation", "authentication", "usage", "api", "examples"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "configure", "npm", "node"],
+                      "authentication": ["auth", "authenticate", "login", "key", "token"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "api": ["api", "endpoint", "interface", "protocol", "rest"],
+                      "examples": ["example", "demo", "sample", "tutorial", "guide"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "code-generation": ["generate", "code", "create", "write", "produce"],
+                      "cli": ["cli", "command", "terminal", "console", "shell"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "google-ai": ["google", "gemini", "ai", "model", "llm"]
+                    }
+                  }
+                },
+                {
+                  "name": "qwen_query",
+                  "docType": "qwen",
+                  "title": "Qwen Code CLI Documentation Query",
+                  "description": "Search Qwen Code CLI documentation for AI-powered coding assistance and development tools.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "typescript", "json"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "qwen-ai"],
+                    "supported_topics": ["installation", "configuration", "usage", "api", "models"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "configure", "npm", "node"],
+                      "configuration": ["config", "settings", "json", "env", "options"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "api": ["api", "endpoint", "interface", "protocol", "rest"],
+                      "models": ["model", "llm", "ai", "qwen", "version"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "code-generation": ["generate", "code", "create", "write", "produce"],
+                      "cli": ["cli", "command", "terminal", "console", "shell"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "qwen-ai": ["qwen", "alibaba", "ai", "model", "llm"]
+                    }
+                  }
+                },
+                {
+                  "name": "grok_query",
+                  "docType": "grok",
+                  "title": "Grok CLI Documentation Query",
+                  "description": "Search Grok CLI documentation for AI-powered development assistance with X.AI integration.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "typescript", "json"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "xai-integration"],
+                    "supported_topics": ["installation", "authentication", "usage", "api", "mcp-tools"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "configure", "bun", "npm"],
+                      "authentication": ["auth", "authenticate", "login", "key", "token"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "api": ["api", "endpoint", "interface", "protocol", "rest"],
+                      "mcp-tools": ["mcp", "tool", "protocol", "model", "context"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "code-generation": ["generate", "code", "create", "write", "produce"],
+                      "cli": ["cli", "command", "terminal", "console", "shell"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "xai-integration": ["xai", "grok", "x", "ai", "integration"]
+                    }
+                  }
+                },
+                {
+                  "name": "cursor_query",
+                  "docType": "cursor",
+                  "title": "Cursor CLI Documentation Query",
+                  "description": "Search Cursor CLI documentation for AI-powered IDE and development assistance.",
+                  "enabled": true,
+                  "metadataHints": {
+                    "supported_formats": ["markdown", "json", "python"],
+                    "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                    "supported_categories": ["ai-assistance", "ide", "cli", "development", "editor"],
+                    "supported_topics": ["installation", "configuration", "usage", "commands", "extensions"],
+                    "topic_keywords": {
+                      "installation": ["install", "setup", "configure", "download", "init"],
+                      "configuration": ["config", "settings", "preferences", "options", "customize"],
+                      "usage": ["use", "command", "cli", "terminal", "shell"],
+                      "commands": ["command", "shortcut", "keybinding", "action", "operation"],
+                      "extensions": ["extension", "plugin", "addon", "integration", "tool"]
+                    },
+                    "category_keywords": {
+                      "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
+                      "ide": ["ide", "editor", "development", "environment", "workspace"],
+                      "cli": ["cli", "command", "terminal", "console", "shell"],
+                      "development": ["dev", "develop", "build", "create", "program"],
+                      "editor": ["editor", "ide", "cursor", "vscode", "coding"]
+                    }
                   }
                 }
-              },
-              {
-                "name": "solana_query",
-                "docType": "solana",
-                "title": "Solana Documentation Query",
-                "description": "Search Solana core documentation, architecture diagrams, ZK cryptography specifications, and development guides.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "pdf", "bob", "msc"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["core", "architecture-diagrams", "sequence-diagrams", "zk-cryptography"],
-                  "supported_topics": ["consensus", "networking", "validators", "cryptography", "development"],
-                  "supports_api_version": false,
-                  "topic_keywords": {
-                    "consensus": ["consensus", "proof of stake", "validator", "block", "epoch"],
-                    "networking": ["network", "rpc", "peer", "connection", "protocol", "gossip"],
-                    "validators": ["validator", "staking", "delegation", "rewards", "slashing"],
-                    "cryptography": ["crypto", "hash", "signature", "encrypt", "key", "ed25519"],
-                    "development": ["development", "dev", "build", "setup", "sdk", "client"]
-                  },
-                  "category_keywords": {
-                    "core": ["core", "fundamental", "basic", "overview", "architecture"],
-                    "architecture-diagrams": ["diagram", "architecture", "flow", "design", "structure"],
-                    "sequence-diagrams": ["sequence", "flow", "step", "process", "workflow"],
-                    "zk-cryptography": ["zk", "zero", "knowledge", "proof", "snark", "stark"]
-                  }
-                }
-              },
-              {
-                "name": "jupiter_query",
-                "docType": "jupiter",
-                "title": "Jupiter Protocol Documentation Query",
-                "description": "Search Jupiter DeFi protocol documentation for DEX aggregation, swap APIs, and Solana-based trading infrastructure.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "json", "typescript"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["swap-api", "token-api", "price-api", "dex-integration", "wallet-integration"],
-                  "supported_topics": ["trading", "liquidity", "apis", "integration", "development"],
-                  "supports_api_version": true,
-                  "topic_keywords": {
-                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
-                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
-                    "apis": ["api", "endpoint", "request", "response", "rest"],
-                    "integration": ["integration", "connect", "setup", "config", "webhook"],
-                    "development": ["development", "dev", "build", "sdk", "client"]
-                  },
-                  "category_keywords": {
-                    "swap-api": ["swap", "trade", "exchange", "dex", "amm"],
-                    "token-api": ["token", "asset", "mint", "coin", "currency"],
-                    "price-api": ["price", "pricing", "rate", "cost", "value"],
-                    "dex-integration": ["dex", "integration", "connect", "setup", "config"],
-                    "wallet-integration": ["wallet", "connect", "sign", "transaction", "web3"]
-                  }
-                }
-              },
-              {
-                "name": "cilium_query",
-                "docType": "cilium",
-                "title": "Cilium Documentation Query",
-                "description": "Search Cilium networking and security documentation for Kubernetes and cloud-native environments.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "yaml"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["networking", "security", "observability", "performance", "integration"],
-                  "supported_topics": ["networking", "security", "kubernetes", "observability", "ebpf"],
-                  "topic_keywords": {
-                    "networking": ["network", "networking", "connectivity", "routing", "policy"],
-                    "security": ["security", "policy", "access", "firewall", "encryption"],
-                    "kubernetes": ["kubernetes", "k8s", "pod", "service", "deployment"],
-                    "observability": ["observability", "monitoring", "metrics", "tracing", "logs"],
-                    "ebpf": ["ebpf", "bpf", "kernel", "performance", "filtering"]
-                  },
-                  "category_keywords": {
-                    "networking": ["network", "networking", "connectivity", "routing", "policy"],
-                    "security": ["security", "policy", "access", "firewall", "encryption"],
-                    "observability": ["observability", "monitoring", "metrics", "tracing", "logs"],
-                    "performance": ["performance", "optimization", "scaling", "efficiency"],
-                    "integration": ["integration", "kubernetes", "istio", "service mesh"]
-                  }
-                }
-              },
-              {
-                "name": "talos_query",
-                "docType": "talos",
-                "title": "Talos OS Documentation Query",
-                "description": "Search Talos OS documentation for minimal, secure, and immutable Linux distribution designed for Kubernetes.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "yaml"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["installation", "configuration", "operations", "security", "troubleshooting"],
-                  "supported_topics": ["kubernetes", "security", "boot", "configuration", "maintenance"],
-                  "topic_keywords": {
-                    "kubernetes": ["kubernetes", "k8s", "cluster", "node", "control plane"],
-                    "security": ["security", "immutable", "minimal", "secure", "hardening"],
-                    "boot": ["boot", "bootloader", "pxe", "iso", "installation"],
-                    "configuration": ["configuration", "config", "patch", "machine config"],
-                    "maintenance": ["maintenance", "upgrade", "backup", "recovery"]
-                  },
-                  "category_keywords": {
-                    "installation": ["installation", "install", "setup", "deploy", "bootstrap"],
-                    "configuration": ["configuration", "config", "patch", "machine config"],
-                    "operations": ["operations", "maintenance", "upgrade", "backup", "recovery"],
-                    "security": ["security", "hardening", "compliance", "audit"],
-                    "troubleshooting": ["troubleshooting", "debug", "logs", "diagnostics"]
-                  }
-                }
-              },
-              {
-                "name": "meteora_query",
-                "docType": "meteora",
-                "title": "Meteora Protocol Documentation Query",
-                "description": "Search Meteora DeFi protocol documentation including liquidity pools, farming, and yield strategies.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["defi", "liquidity_pools", "yield_farming", "trading", "vaults"],
-                  "supported_topics": ["liquidity", "farming", "trading", "vaults", "governance"],
-                  "topic_keywords": {
-                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
-                    "farming": ["farming", "yield", "staking", "reward", "incentive"],
-                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
-                    "vaults": ["vault", "strategy", "yield", "auto-compound"],
-                    "governance": ["governance", "vote", "proposal", "dao", "token"]
-                  },
-                  "category_keywords": {
-                    "defi": ["defi", "decentralized", "finance", "yield", "liquidity"],
-                    "liquidity-pools": ["pool", "liquidity", "amm", "market", "depth"],
-                    "yield-farming": ["yield", "farming", "staking", "reward", "incentive"],
-                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
-                    "vaults": ["vault", "strategy", "auto-compound", "yield"]
-                  }
-                }
-              },
-              {
-                "name": "raydium_query",
-                "docType": "raydium",
-                "title": "Raydium Protocol Documentation Query",
-                "description": "Search Raydium DEX and AMM documentation for Solana-based trading and liquidity provision.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["dex", "liquidity", "yield", "defi", "solana"],
-                  "supported_topics": ["trading", "liquidity", "farming", "amm", "solana"],
-                  "topic_keywords": {
-                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
-                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
-                    "farming": ["farming", "yield", "staking", "reward", "incentive"],
-                    "amm": ["amm", "automated", "market", "maker", "liquidity"],
-                    "solana": ["solana", "blockchain", "program", "instruction", "account"]
-                  },
-                  "category_keywords": {
-                    "dex": ["dex", "exchange", "trading", "swap", "amm"],
-                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
-                    "yield": ["yield", "farming", "staking", "reward", "incentive"],
-                    "defi": ["defi", "decentralized", "finance", "yield", "liquidity"],
-                    "solana": ["solana", "blockchain", "program", "instruction", "account"]
-                  }
-                }
-              },
-              {
-                "name": "ebpf_query",
-                "docType": "ebpf",
-                "title": "eBPF Documentation Query",
-                "description": "Search eBPF (extended Berkeley Packet Filter) documentation for kernel programming and observability.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "c"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["kernel_programming", "observability", "networking", "security", "performance"],
-                  "supported_topics": ["kernel", "programming", "observability", "networking", "security"],
-                  "topic_keywords": {
-                    "kernel": ["kernel", "linux", "system", "syscall", "module"],
-                    "programming": ["programming", "code", "development", "c", "clang"],
-                    "observability": ["observability", "monitoring", "tracing", "metrics", "debug"],
-                    "networking": ["network", "packet", "socket", "firewall", "filter"],
-                    "security": ["security", "seccomp", "lsm", "access", "audit"]
-                  },
-                  "category_keywords": {
-                    "kernel-programming": ["kernel", "programming", "c", "clang", "bcc"],
-                    "observability": ["observability", "monitoring", "tracing", "metrics", "debug"],
-                    "networking": ["network", "packet", "socket", "firewall", "filter"],
-                    "security": ["security", "seccomp", "lsm", "access", "audit"],
-                    "performance": ["performance", "optimization", "profiling", "tracing"]
-                  }
-                }
-              },
-              {
-                "name": "rust_best_practices_query",
-                "docType": "rust_best_practices",
-                "title": "Rust Best Practices Query",
-                "description": "Search curated Rust best practices, patterns, and guidelines for idiomatic and performant code.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "rust"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["idiomatic_rust", "performance", "safety", "concurrency", "error_handling"],
-                  "supported_topics": ["ownership", "async", "error_handling", "performance", "patterns"],
-                  "topic_keywords": {
-                    "ownership": ["ownership", "borrow", "lifetime", "move", "reference"],
-                    "async": ["async", "await", "future", "tokio", "concurrency"],
-                    "error-handling": ["error", "result", "option", "panic", "unwrap"],
-                    "performance": ["performance", "optimization", "memory", "zero-cost", "allocation"],
-                    "patterns": ["pattern", "trait", "generic", "macro", "idiom"]
-                  },
-                  "category_keywords": {
-                    "idiomatic-rust": ["idiomatic", "pattern", "best practice", "convention", "style"],
-                    "performance": ["performance", "optimization", "memory", "speed", "efficient"],
-                    "safety": ["safety", "memory safety", "borrow checker", "lifetime"],
-                    "concurrency": ["concurrency", "async", "parallel", "thread", "mutex"],
-                    "error-handling": ["error", "error handling", "result", "option", "panic"]
-                  }
-                }
-              },
-              {
-                "name": "rust_query",
-                "docType": "rust",
-                "title": "Rust Documentation Query",
-                "description": "Search and retrieve information from Rust crate documentation. Query across 40+ popular Rust crates.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["rust", "markdown", "toml"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["web-frameworks", "async-runtime", "data-processing", "cryptography", "command-line"],
-                  "supported_topics": ["web", "async", "data", "crypto", "cli"],
-                  "supports_api_version": true,
-                  "topic_keywords": {
-                    "web": ["web", "http", "server", "client", "api", "rest"],
-                    "async": ["async", "await", "future", "tokio", "runtime"],
-                    "data": ["data", "database", "sql", "orm", "serde", "json"],
-                    "crypto": ["crypto", "encryption", "hash", "signature", "security"],
-                    "cli": ["cli", "command", "args", "clap", "terminal", "shell"]
-                  },
-                  "category_keywords": {
-                    "web-frameworks": ["web", "framework", "server", "http", "axum", "warp"],
-                    "async-runtime": ["async", "runtime", "tokio", "async-std", "smol"],
-                    "data-processing": ["data", "database", "sql", "postgres", "mongodb"],
-                    "cryptography": ["crypto", "encryption", "security", "tls", "ssl"],
-                    "command-line": ["cli", "command", "terminal", "shell", "tool"]
-                  }
-                }
-              },
-              {
-                "name": "add_rust_crate",
-                "docType": "rust",
-                "title": "Add Rust Crate",
-                "description": "Add a new Rust crate to the documentation system with automatic docs.rs ingestion.",
-                "enabled": true,
-                "metadataHints": {
-                  "supports_version_selection": true,
-                  "supports_feature_selection": true,
-                  "supports_rollback": true,
-                  "batch_processing": true
-                }
-              },
-              {
-                "name": "remove_rust_crate",
-                "docType": "rust",
-                "title": "Remove Rust Crate",
-                "description": "Remove a Rust crate from the documentation system with cascade deletion and cleanup verification.",
-                "enabled": true,
-                "metadataHints": {
-                  "supports_soft_delete": true,
-                  "supports_cascade_delete": true,
-                  "cleanup_verification": true
-                }
-              },
-              {
-                "name": "list_rust_crates",
-                "docType": "rust",
-                "title": "List Rust Crates",
-                "description": "List all Rust crates in the documentation system with pagination, filtering, and statistics.",
-                "enabled": true,
-                "metadataHints": {
-                  "supports_pagination": true,
-                  "supports_filtering": true,
-                  "supports_statistics": true,
-                  "status_filtering": ["active", "inactive", "updating", "failed"]
-                }
-              },
-              {
-                "name": "check_rust_status",
-                "docType": "rust",
-                "title": "Check Rust System Status",
-                "description": "Check system health and get comprehensive statistics about Rust crate management.",
-                "enabled": true,
-                "metadataHints": {
-                  "health_monitoring": true,
-                  "job_tracking": true,
-                  "performance_metrics": true,
-                  "storage_analysis": true
-                }
-              },
-              {
-                "name": "codex_query",
-                "docType": "codex",
-                "title": "OpenAI Codex CLI Documentation Query",
-                "description": "Search OpenAI Codex CLI documentation for AI-powered coding assistance and development tools.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "rust", "toml"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "mcp-integration"],
-                  "supported_topics": ["installation", "configuration", "usage", "api", "mcp-tools"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "build", "compile"],
-                    "configuration": ["config", "settings", "toml", "preferences", "options"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "mcp"],
-                    "mcp-tools": ["mcp", "tool", "protocol", "model", "context"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "mcp-integration": ["mcp", "model", "context", "protocol", "integration"]
-                  }
-                }
-              },
-              {
-                "name": "opencode_query",
-                "docType": "opencode",
-                "title": "OpenCode CLI Documentation Query",
-                "description": "Search OpenCode CLI documentation for AI-assisted development with MCP support.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "typescript", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "mcp-servers"],
-                  "supported_topics": ["installation", "configuration", "usage", "api", "agents"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "npm", "node"],
-                    "configuration": ["config", "settings", "json", "jsonc", "options"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "agents": ["agent", "assistant", "bot", "automation", "workflow"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "mcp-servers": ["mcp", "server", "protocol", "model", "context"]
-                  }
-                }
-              },
-              {
-                "name": "openhands_query",
-                "docType": "openhands",
-                "title": "OpenHands CLI Documentation Query",
-                "description": "Search OpenHands CLI documentation for AI-assisted software development and automation tools.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "python", "yaml"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "automation", "development", "python-cli", "integration"],
-                  "supported_topics": ["installation", "configuration", "usage", "api", "troubleshooting"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "pip", "python", "virtualenv"],
-                    "configuration": ["config", "settings", "yaml", "env", "options"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "troubleshooting": ["error", "debug", "fix", "issue", "problem"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "automation": ["automate", "script", "workflow", "task", "process"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "python-cli": ["python", "pip", "cli", "command", "script"],
-                    "integration": ["integrate", "connect", "api", "webhook", "plugin"]
-                  }
-                }
-              },
-              {
-                "name": "gemini_query",
-                "docType": "gemini",
-                "title": "Google Gemini CLI Documentation Query",
-                "description": "Search Google Gemini CLI documentation for AI-powered development assistance and code generation tools.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "typescript", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "google-ai"],
-                  "supported_topics": ["installation", "authentication", "usage", "api", "examples"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "npm", "node"],
-                    "authentication": ["auth", "authenticate", "login", "key", "token"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "examples": ["example", "demo", "sample", "tutorial", "guide"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "google-ai": ["google", "gemini", "ai", "model", "llm"]
-                  }
-                }
-              },
-              {
-                "name": "qwen_query",
-                "docType": "qwen",
-                "title": "Qwen Code CLI Documentation Query",
-                "description": "Search Qwen Code CLI documentation for AI-powered coding assistance and development tools.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "typescript", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "qwen-ai"],
-                  "supported_topics": ["installation", "configuration", "usage", "api", "models"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "npm", "node"],
-                    "configuration": ["config", "settings", "json", "env", "options"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "models": ["model", "llm", "ai", "qwen", "version"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "qwen-ai": ["qwen", "alibaba", "ai", "model", "llm"]
-                  }
-                }
-              },
-              {
-                "name": "grok_query",
-                "docType": "grok",
-                "title": "Grok CLI Documentation Query",
-                "description": "Search Grok CLI documentation for AI-powered development assistance with X.AI integration.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "typescript", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "xai-integration"],
-                  "supported_topics": ["installation", "authentication", "usage", "api", "mcp-tools"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "bun", "npm"],
-                    "authentication": ["auth", "authenticate", "login", "key", "token"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "mcp-tools": ["mcp", "tool", "protocol", "model", "context"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "xai-integration": ["xai", "grok", "x", "ai", "integration"]
-                  }
-                }
-              },
-              {
-                "name": "cursor_query",
-                "docType": "cursor",
-                "title": "Cursor CLI Documentation Query",
-                "description": "Search Cursor CLI documentation for AI-powered IDE and development assistance.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "json", "python"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "ide", "cli", "development", "editor"],
-                  "supported_topics": ["installation", "configuration", "usage", "commands", "extensions"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "download", "init"],
-                    "configuration": ["config", "settings", "preferences", "options", "customize"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "commands": ["command", "shortcut", "keybinding", "action", "operation"],
-                    "extensions": ["extension", "plugin", "addon", "integration", "tool"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "ide": ["ide", "editor", "development", "environment", "workspace"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "editor": ["editor", "ide", "cursor", "vscode", "coding"]
-                  }
-                }
-              }
-            ]
-          }
+              ]
+            }
+    - repoURL: https://github.com/5dlabs/cto
+      targetRevision: main
+      path: infra/gitops/resources/doc-server
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp

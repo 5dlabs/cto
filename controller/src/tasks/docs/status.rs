@@ -11,7 +11,7 @@ pub struct DocsStatusManager;
 
 #[allow(dead_code)]
 impl DocsStatusManager {
-    /// Monitor Job status and update DocsRun CRD accordingly
+    /// Monitor Job status and update `DocsRun` CRD accordingly
     pub async fn monitor_job_status(
         docs_run: &Arc<DocsRun>,
         jobs: &Api<Job>,
@@ -133,7 +133,7 @@ impl DocsStatusManager {
         Ok(())
     }
 
-    /// Update the DocsRun CRD status
+    /// Update the `DocsRun` CRD status
     async fn update_status(
         docs_run: &Arc<DocsRun>,
         ctx: &Arc<Context>,
@@ -259,7 +259,7 @@ impl DocsStatusManager {
         )
     }
 
-    /// Build DocsRun conditions
+    /// Build `DocsRun` conditions
     fn build_conditions(phase: &str, message: &str, timestamp: &str) -> Vec<DocsRunCondition> {
         vec![DocsRunCondition {
             condition_type: phase.to_string(),

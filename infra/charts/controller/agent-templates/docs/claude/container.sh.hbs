@@ -180,13 +180,45 @@ fi
 
 
 # Git configuration with proper GitHub App attribution
-git config --global --add safe.directory /workspace
+git config --global --add safe.directory "$TASK_WORKSPACE"
 
 # Set GitHub App attribution - use generic format for all agents
+derive_bot_identity() {
+    local app_name="$1"
+
+    if [ -z "$app_name" ] || [ "$app_name" = "null" ]; then
+        GIT_AUTHOR_NAME="automation[bot]"
+        GIT_AUTHOR_EMAIL="automation[bot]@users.noreply.github.com"
+        return
+    fi
+
+    local slug
+    slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+    if [ -z "$slug" ]; then
+        slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]')
+    fi
+
+    local bot_login="${slug}[bot]"
+    local bot_email="${bot_login}@users.noreply.github.com"
+
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        local encoded_login
+        encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/%5B/g; s/\]/%5D/g')
+        local bot_response
+        bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
+        local bot_id
+        bot_id=$(printf '%s' "$bot_response" | jq -r '.id // empty' 2>/dev/null || echo '')
+        if [ -n "$bot_id" ]; then
+            bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
+        fi
+    fi
+
+    GIT_AUTHOR_NAME="$bot_login"
+    GIT_AUTHOR_EMAIL="$bot_email"
+}
+
 GITHUB_APP="{{github_app}}"
-# Generic attribution that works for any agent
-GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
-GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+derive_bot_identity "$GITHUB_APP"
 
 # Configure git with proper GitHub App attribution
 git config --global user.name "$GIT_AUTHOR_NAME"
@@ -207,7 +239,7 @@ echo "Branch: $REPO_BRANCH"
 
 if [ -d "/workspace/.git" ]; then
   echo "Repository exists, updating..."
-  cd /workspace
+  cd "$TASK_WORKSPACE"
   git remote set-url origin "$REPO_URL"
   git fetch origin
   git checkout "$REPO_BRANCH"
@@ -227,7 +259,7 @@ else
   mv "$TEMP_CLONE_DIR"/* /workspace/ 2>/dev/null || true
   mv "$TEMP_CLONE_DIR"/.[^.]* /workspace/ 2>/dev/null || true
   rm -rf "$TEMP_CLONE_DIR"
-  cd /workspace
+  cd "$TASK_WORKSPACE"
 fi
 
 echo "✓ Repository ready"
@@ -296,10 +328,14 @@ for file in $REQUIRED_FILES; do
   fi
 done
 
-# Check for .taskmaster directory
+# Check for .taskmaster directory - create if missing for resilient setup
 if [ ! -d "$CLAUDE_WORK_DIR/.taskmaster" ]; then
-  echo "❌ .taskmaster directory not found"
-  exit 1
+  echo "⚠️  .taskmaster directory not found, initializing structure..."
+  mkdir -p "$CLAUDE_WORK_DIR/.taskmaster/tasks"
+  mkdir -p "$CLAUDE_WORK_DIR/.taskmaster/docs"
+  echo "✓ Created .taskmaster structure"
+else
+  echo "✓ .taskmaster directory exists"
 fi
 
 # Ensure docs directory exists and clean old data to prevent contamination
@@ -527,7 +563,7 @@ if [ -f "/task-files/client-config.json" ]; then
   cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" \
     && echo "✓ client-config.json copied to Claude working directory" \
     || echo "❌ client-config.json copy failed"
-  cp "/task-files/client-config.json" "/workspace/client-config.json" \
+  cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true \
     && echo "✓ client-config.json copied to workspace root" \
     || echo "❌ client-config.json copy to workspace failed"
 
@@ -578,7 +614,7 @@ for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
        append_only_merge($base; $extra)
       )' "$CLAUDE_WORK_DIR/client-config.json" "$CFG_PATH" > "$TMP_MERGE"; then
       mv "$TMP_MERGE" "$CLAUDE_WORK_DIR/client-config.json"
-      cp "$CLAUDE_WORK_DIR/client-config.json" "/workspace/client-config.json" 2>/dev/null || true
+      cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true 2>/dev/null || true
       echo "✓ Appended repo clientConfig for agent: $AGENT_KEY"
       echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/client-config.json summary (post-merge):"
       (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
@@ -798,8 +834,32 @@ fi
 
 echo "✓ All required files present. Workspace is valid."
 
+# Create PR branch BEFORE Claude runs (like code jobs)
+# This ensures all commits go to the PR branch, not the base branch
+# Note: SOURCE_BRANCH is already set from template at line 551
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+RANDOM_ID=$(date +%s | tail -c 6)
+PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
+
+echo "Creating PR branch: $PR_BRANCH"
+echo "Target base branch: $SOURCE_BRANCH"
+# Create branch from the correct source branch (not current HEAD)
+if ! git checkout -b "$PR_BRANCH" "origin/$SOURCE_BRANCH" 2>/dev/null; then
+    echo "❌ Failed to create PR branch from origin/$SOURCE_BRANCH"
+    exit 1
+fi
+echo "✓ Created PR branch: $PR_BRANCH (from origin/$SOURCE_BRANCH)"
+
+# Export for use by auto-save hook and later PR creation
+export DOCS_AUTO_SAVE_BRANCH="$PR_BRANCH"
+export SOURCE_BRANCH
+
 # Claude execution
-echo "Starting Claude execution (stream-json via FIFO)..."
+echo "Starting Claude execution (stream-json)..."
+
+# Ensure Claude runs from workspace root for proper MCP scope resolution
+cd "$TASK_WORKSPACE"
+echo "🔍 DEBUG: Launching Claude from directory: $(pwd)"
 
 # Check if system prompt file exists and add to command if available
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
@@ -808,12 +868,25 @@ CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --v
 if [ -f "/workspace/.mcp.json" ]; then
     echo "✓ Adding MCP configuration from /workspace/.mcp.json to Claude command"
     CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/.mcp.json"
+    echo "🔍 DEBUG: MCP file check: FOUND at $(pwd)/.mcp.json"
 elif [ -f "/workspace/docs/.mcp.json" ]; then
     echo "✓ Adding MCP configuration from /workspace/docs/.mcp.json to Claude command"
     CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/docs/.mcp.json"
 else
     echo "⚠️ No MCP configuration file found, MCP servers will not be available"
+    echo "🔍 DEBUG: MCP file check: MISSING at $(pwd)/.mcp.json"
 fi
+
+# DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
+echo "🔍 DEBUG: MCP_CLIENT_CONFIG is set to: '$MCP_CLIENT_CONFIG'"
+if [ -f "$MCP_CLIENT_CONFIG" ]; then
+    echo "🔍 DEBUG: MCP_CLIENT_CONFIG file exists and is readable"
+    echo "🔍 DEBUG: First few lines of client config:"
+    head -10 "$MCP_CLIENT_CONFIG" 2>/dev/null || echo "Could not read client config file"
+else
+    echo "🔍 DEBUG: MCP_CLIENT_CONFIG file does NOT exist or is not readable"
+fi
+echo ""
 
 # Look for agent-specific system prompt file from agents ConfigMap
 # The system prompt should be in the agents ConfigMap if configured
@@ -840,67 +913,16 @@ fi
 
 # Model is set via settings.json template, not CLI flag
 
-# Safe mode toggle for debugging (prevents token consumption)
-SAFE_MODE="false"  # Set to "false" for full docs generation
+# Change to CLAUDE_WORK_DIR to find prompt.md
+cd "$CLAUDE_WORK_DIR"
 
-  if [ "$SAFE_MODE" = "true" ]; then
-      echo "🛡️ SAFE MODE ENABLED - Running simple test instead of full docs generation"
-      FIFO_PATH="/workspace/agent-input.jsonl"
-      rm -f "$FIFO_PATH" 2>/dev/null || true
-      mkfifo "$FIFO_PATH"
-      chmod 666 "$FIFO_PATH" || true
-      # Start Claude (reader) first to avoid blocking on writer open
-      $CLAUDE_CMD < "$FIFO_PATH" &
-      CLAUDE_PID=$!
-      # Now open persistent writer and send one message
-      exec 9>"$FIFO_PATH"
-      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
-      # Close writer so reader gets EOF and exits
-      exec 9>&-
-      wait $CLAUDE_PID
-      CLAUDE_EXIT_CODE=$?
-    echo "Safe mode test completed with exit code: $CLAUDE_EXIT_CODE"
-
-    # Exit successfully to prevent PR creation in safe mode
-    echo "✅ Safe mode test complete, exiting without changes"
-    exit 0
-  else
-      FIFO_PATH="/workspace/agent-input.jsonl"
-      rm -f "$FIFO_PATH" 2>/dev/null || true
-      mkfifo "$FIFO_PATH"
-      chmod 666 "$FIFO_PATH" || true
-      
-      # Ensure Claude runs from workspace root for proper MCP scope resolution
-      cd /workspace
-      echo "🔍 DEBUG: Launching Claude from directory: $(pwd)"
-      echo "🔍 DEBUG: MCP file check: $([ -f '.mcp.json' ] && echo 'FOUND' || echo 'MISSING') at $(pwd)/.mcp.json"
-      
-      # Start Claude (reader) first to avoid blocking on writer open
-      $CLAUDE_CMD < "$FIFO_PATH" &
-      CLAUDE_PID=$!
-      # Send initial prompt via sidecar HTTP when possible; fallback to FIFO
-
-        # DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
-        echo "🔍 DEBUG: MCP_CLIENT_CONFIG is set to: '$MCP_CLIENT_CONFIG'"
-        if [ -f "$MCP_CLIENT_CONFIG" ]; then
-            echo "🔍 DEBUG: MCP_CLIENT_CONFIG file exists and is readable"
-            echo "🔍 DEBUG: First few lines of client config:"
-            head -10 "$MCP_CLIENT_CONFIG" 2>/dev/null || echo "Could not read client config file"
-        else
-            echo "🔍 DEBUG: MCP_CLIENT_CONFIG file does NOT exist or is not readable"
-        fi
-        echo ""
-
-      # Change back to CLAUDE_WORK_DIR to find prompt.md
-      cd "$CLAUDE_WORK_DIR"
-      
-      # Get the initial prompt text (from prompt.md if available, fallback to default)
-      if [ -f "prompt.md" ]; then
-          echo "✓ Found prompt.md, using as initial prompt"
-          INITIAL_TEXT=$(jq -Rs . < "prompt.md")
-      else
-          echo "ℹ️ No prompt.md found, using default documentation generation prompt"
-          INITIAL_TEXT=$(jq -Rs . << 'DEFAULT_PROMPT_EOF'
+# Get the initial prompt text (from prompt.md if available, fallback to default)
+if [ -f "prompt.md" ]; then
+    echo "✓ Found prompt.md, using as initial prompt"
+    INITIAL_TEXT=$(jq -Rs . < "prompt.md")
+else
+    echo "ℹ️ No prompt.md found, using default documentation generation prompt"
+    INITIAL_TEXT=$(jq -Rs . << 'DEFAULT_PROMPT_EOF'
 # CRITICAL: Complete Documentation Generation Task
 
 **🚨 MANDATORY COMPLETION REQUIREMENT 🚨**
@@ -948,42 +970,48 @@ For each task that needs documentation (process ALL incomplete tasks, no excepti
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook
 ```
 DEFAULT_PROMPT_EOF
-      )
-      fi
-      
-      # Send initial prompt to Claude
-      if printf '{"text":%s}\n' "$INITIAL_TEXT" | \
-           curl -fsS -X POST http://127.0.0.1:8080/input \
-             -H 'Content-Type: application/json' \
-             --data-binary @- >/dev/null 2>&1; then
-        echo "✓ Initial prompt sent via sidecar /input"
-        
-        # Wait for Claude to complete, then request sidecar shutdown
-        wait $CLAUDE_PID
-        CLAUDE_EXIT_CODE=$?
-        echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
-        
-        if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
-          echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
-        else
-          if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-            echo "✓ Requested sidecar shutdown"
-          else
-            echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
-          fi
+    )
+fi
+
+# Return to workspace root for proper MCP resolution
+cd "$TASK_WORKSPACE"
+
+# Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
+# Use a subshell to ensure stdin closes after the prompt is sent
+echo "✓ Starting Claude with docs prompt..."
+(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT"; exec 0<&-) | $CLAUDE_CMD &
+CLAUDE_PID=$!
+echo "✓ Started Claude (PID: $CLAUDE_PID), stdin will close after prompt"
+
+# Start background token refresh for long-running jobs
+(
+    while kill -0 $CLAUDE_PID 2>/dev/null; do
+        sleep 2700  # Check every 45 minutes
+
+        if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
+            NOW=$(date +%s)
+            TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+            if [ $TOKEN_AGE -gt 2700 ]; then
+                echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+                generate_github_token
+            fi
         fi
-      else
-        echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-        exec 9>"$FIFO_PATH"
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
-        exec 9>&- 2>/dev/null || true
-        
-        # Wait for Claude to complete
-        wait $CLAUDE_PID
-        CLAUDE_EXIT_CODE=$?
-        echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
-      fi
-  fi
+    done
+) &
+TOKEN_REFRESH_PID=$!
+echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
+
+# Wait for Claude process to complete
+wait "$CLAUDE_PID"
+CLAUDE_EXIT_CODE=$?
+echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
+
+# Stop token refresh background process
+if [ -n "$TOKEN_REFRESH_PID" ]; then
+    kill $TOKEN_REFRESH_PID 2>/dev/null || true
+    echo "✓ Stopped token refresh process"
+fi
 
 # PR creation
 echo "Creating pull request..."
@@ -1013,25 +1041,17 @@ fi
 
 echo "✓ Documentation changes detected, proceeding with PR creation..."
 
-# Check if we're already on an auto-save branch from the hook
+# Verify we're on the PR branch created at the start
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [[ "$CURRENT_BRANCH" == docs/auto-save-* ]]; then
-    echo "✓ Already on auto-save branch from hook: $CURRENT_BRANCH"
-    PR_BRANCH="$CURRENT_BRANCH"
-    SOURCE_BRANCH="main"  # Assume we branched from main originally
-else
-    # Create new PR branch if not already on one
-    SOURCE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    RANDOM_ID=$(date +%s | tail -c 6)
-    PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
-
-    echo "Creating branch: $PR_BRANCH"
-    if ! git checkout -b "$PR_BRANCH"; then
-        echo "❌ Failed to create branch"
+if [ "$CURRENT_BRANCH" != "$PR_BRANCH" ]; then
+    echo "⚠️ Warning: Current branch ($CURRENT_BRANCH) differs from expected PR branch ($PR_BRANCH)"
+    echo "Switching back to PR branch..."
+    if ! git checkout "$PR_BRANCH"; then
+        echo "❌ Failed to checkout PR branch"
         exit 1
     fi
 fi
+echo "✓ On PR branch: $PR_BRANCH (target: $SOURCE_BRANCH)"
 
 echo "Staging all .taskmaster changes..."
 git add .taskmaster/

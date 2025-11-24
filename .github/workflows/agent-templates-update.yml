@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'infra/charts/controller/agent-templates/**'
-      - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
+      - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'
 
 permissions:
   contents: write
@@ -23,18 +23,18 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Generate static ConfigMap
-        run: bash infra/charts/controller/scripts/generate-agent-templates-configmap.sh
+      - name: Generate split ConfigMaps
+        run: bash infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh
       
       - name: Check for changes
         id: check_changes
         run: |
-          if git diff --quiet -- infra/charts/controller/templates/agent-templates-static.yaml; then
+          if git diff --quiet -- infra/charts/controller/templates/agent-templates-*.yaml; then
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes to commit."
           else
             echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Changes detected in generated ConfigMap."
+            echo "Changes detected in generated ConfigMaps."
           fi
       
       - name: Create Pull Request
@@ -42,20 +42,26 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore(chart): regenerate agent templates static ConfigMap'
-          title: 'chore: update agent templates static ConfigMap'
+          commit-message: 'chore(chart): regenerate agent templates ConfigMaps'
+          title: 'chore: update agent templates ConfigMaps'
           body: |
             ## Automated Update
 
-            This PR was automatically generated to update the agent templates static ConfigMap after changes were made to the template files.
+            This PR was automatically generated to update the agent templates ConfigMaps after changes were made to the template files.
 
             ### Changes
-            - Regenerated `infra/charts/controller/templates/agent-templates-static.yaml` from source templates
+            - Regenerated split ConfigMaps from source templates:
+              - `agent-templates-shared.yaml` (shared resources)
+              - `agent-templates-claude.yaml` (Claude CLI)
+              - `agent-templates-codex.yaml` (Codex CLI)
+              - `agent-templates-cursor.yaml` (Cursor CLI)
+              - `agent-templates-factory.yaml` (Factory CLI)
+              - `agent-templates-opencode.yaml` (OpenCode CLI)
 
             ### Files Changed
             - Template files in `infra/charts/controller/agent-templates/`
             
-            This is a routine update that ensures the ConfigMap stays in sync with the template files.
+            This is a routine update that ensures the ConfigMaps stay in sync with the template files.
           branch: auto-update-agent-templates
           delete-branch: true
           base: main

@@ -15,6 +15,7 @@ impl Default for RecoveryManager {
 }
 
 impl RecoveryManager {
+    #[must_use]
     pub fn new() -> Self {
         // Placeholder implementation
         Self {}

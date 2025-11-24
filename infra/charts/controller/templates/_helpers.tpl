@@ -113,3 +113,69 @@ Define volume mounts for agent prompts
   mountPath: /etc/agents
   readOnly: true
 {{- end }}
+
+{{/*
+Define volume mounts for agent templates (all mounted to /agent-templates)
+Note: Kubernetes projected volumes allow merging multiple ConfigMaps into one directory
+*/}}
+{{- define "platform.agentTemplateVolumeMounts" -}}
+- name: agent-templates
+  mountPath: /agent-templates
+  readOnly: true
+{{- end }}
+
+{{/*
+Define projected volume for agent templates (merges all ConfigMaps)
+*/}}
+{{- define "platform.agentTemplateProjectedVolume" -}}
+- name: agent-templates
+  projected:
+    sources:
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-shared
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-claude
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-codex
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-cursor
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-factory
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-opencode
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-code-shared
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-docs
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-intake
+        optional: true
+{{- end }}
+
+{{/*
+Define volume mounts for Blaze agent scripts
+*/}}
+{{- define "platform.blazeScriptsVolumeMounts" -}}
+- name: blaze-scripts
+  mountPath: /workspace/scripts/blaze
+  readOnly: true
+{{- end }}
+
+{{/*
+Define volume for Blaze agent scripts ConfigMap
+*/}}
+{{- define "platform.blazeScriptsVolume" -}}
+- name: blaze-scripts
+  configMap:
+    name: {{ include "controller.fullname" . }}-agent-scripts-blaze
+    defaultMode: 0755
+    optional: true
+{{- end }}

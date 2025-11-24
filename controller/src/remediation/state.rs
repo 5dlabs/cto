@@ -16,7 +16,7 @@ use crate::tasks::types::{Context, Result};
 use anyhow;
 use chrono::{DateTime, Utc};
 use k8s_openapi::api::core::v1::ConfigMap;
-use kube::api::{Api, DeleteParams, Patch, PatchParams};
+use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -134,7 +134,7 @@ pub enum FeedbackStatus {
 /// Information about currently active agent run
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveRun {
-    /// Type of run (CodeRun or DocsRun)
+    /// Type of run (`CodeRun` or `DocsRun`)
     pub run_type: RunType,
 
     /// Name of the Kubernetes resource
@@ -162,6 +162,7 @@ pub struct RemediationStateManager {
 
 impl RemediationStateManager {
     /// Create a new state manager
+    #[must_use]
     pub fn new(context: &Context) -> Self {
         Self {
             configmaps: Api::namespaced(context.client.clone(), &context.namespace),
@@ -169,7 +170,7 @@ impl RemediationStateManager {
         }
     }
 
-    /// Generate ConfigMap name for a remediation workflow
+    /// Generate `ConfigMap` name for a remediation workflow
     fn configmap_name(pr_number: u32, task_id: &str) -> String {
         format!("remediation-state-pr-{pr_number}-task-{task_id}")
     }
@@ -252,7 +253,7 @@ impl RemediationStateManager {
         }
     }
 
-    /// Save remediation state to ConfigMap
+    /// Save remediation state to `ConfigMap`
     pub async fn save_state(&self, state: &RemediationState) -> Result<()> {
         let cm_name = Self::configmap_name(state.pr_number, &state.task_id);
 
@@ -285,7 +286,7 @@ impl RemediationStateManager {
         };
 
         // Try to create first, then patch if it exists
-        match self.configmaps.create(&Default::default(), &cm).await {
+        match self.configmaps.create(&PostParams::default(), &cm).await {
             Ok(_) => {
                 debug!("Created new ConfigMap {}", cm_name);
             }
@@ -319,9 +320,10 @@ impl RemediationStateManager {
         author: String,
         feedback: crate::remediation::StructuredFeedback,
     ) -> Result<RemediationState> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         // Increment iteration for new feedback
         state.iteration += 1;
@@ -361,9 +363,10 @@ impl RemediationStateManager {
         status: FeedbackStatus,
         actions_taken: Option<Vec<String>>,
     ) -> Result<()> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         if let Some(entry) = state
             .feedback_history
@@ -392,9 +395,10 @@ impl RemediationStateManager {
         run_name: String,
         run_namespace: String,
     ) -> Result<()> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         state.active_run = Some(ActiveRun {
             run_type,
@@ -417,9 +421,10 @@ impl RemediationStateManager {
 
     /// Clear active run (when agent completes)
     pub async fn clear_active_run(&self, pr_number: u32, task_id: &str) -> Result<()> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         state.active_run = None;
         state.status = RemediationStatus::InProgress;
@@ -433,9 +438,10 @@ impl RemediationStateManager {
 
     /// Complete remediation workflow
     pub async fn complete_remediation(&self, pr_number: u32, task_id: &str) -> Result<()> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         state.status = RemediationStatus::Completed;
         state.updated_at = Utc::now();
@@ -456,9 +462,10 @@ impl RemediationStateManager {
         task_id: &str,
         reason: &str,
     ) -> Result<()> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         state.status = RemediationStatus::Terminated;
         state.updated_at = Utc::now();
@@ -487,9 +494,10 @@ impl RemediationStateManager {
         task_id: &str,
         error_message: &str,
     ) -> Result<()> {
-        let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
-        })?;
+        let mut state = self
+            .load_state(pr_number, task_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}"))?;
 
         state.status = RemediationStatus::Failed;
         state.updated_at = Utc::now();
@@ -513,11 +521,11 @@ impl RemediationStateManager {
 
     /// Clean up old remediation states (for maintenance)
     pub async fn cleanup_old_states(&self, max_age_days: u32) -> Result<usize> {
-        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let cutoff = Utc::now() - chrono::Duration::days(i64::from(max_age_days));
         let mut cleaned_count = 0;
 
         // List all remediation state ConfigMaps
-        let configmaps = self.configmaps.list(&Default::default()).await?;
+        let configmaps = self.configmaps.list(&ListParams::default()).await?;
 
         for cm in configmaps.items {
             if let Some(labels) = &cm.metadata.labels {
@@ -557,7 +565,7 @@ impl RemediationStateManager {
 
     /// Get statistics about current remediation workflows
     pub async fn get_statistics(&self) -> Result<RemediationStatistics> {
-        let configmaps = self.configmaps.list(&Default::default()).await?;
+        let configmaps = self.configmaps.list(&ListParams::default()).await?;
         let mut stats = RemediationStatistics::default();
 
         for cm in configmaps.items {
@@ -605,14 +613,18 @@ pub struct RemediationStatistics {
 }
 
 impl RemediationStatistics {
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn average_iterations(&self) -> f64 {
         if self.total_workflows == 0 {
             0.0
         } else {
-            self.total_iterations as f64 / self.total_workflows as f64
+            f64::from(self.total_iterations) / self.total_workflows as f64
         }
     }
 
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn success_rate(&self) -> f64 {
         let total_completed = self.completed + self.failed + self.terminated;
         if total_completed == 0 {

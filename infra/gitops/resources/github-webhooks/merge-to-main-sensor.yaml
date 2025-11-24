@@ -21,7 +21,7 @@ spec:
       filters:
         data:
           # Filter for pull_request closed events with merged=true
-          - path: headers.X-Github-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["pull_request"]
           - path: body.action
@@ -55,6 +55,12 @@ spec:
                 entrypoint: handle-task-completion
                 serviceAccountName: argo-workflow
                 activeDeadlineSeconds: 7200  # 2 hour timeout for finding suspend node
+                # Auto-cleanup after completion
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pr-title
@@ -248,10 +254,24 @@ spec:
                         PR_TITLE="{{workflow.parameters.pr-title}}"
                         TASK_ID=$(echo "$PR_TITLE" | grep -oE '[Tt]ask[- ]?([0-9]+)' | sed -E 's/[Tt]ask[- ]?//')
 
+                        # Fallback: Extract from PR labels if not in title
                         if [ -z "$TASK_ID" ]; then
-                          echo "⚠️ No task ID found in PR title, checking PR body and branch..."
-                          # Could also check branch name or PR body for task ID
-                          exit 0
+                          echo "⚠️ No task ID found in PR title, checking labels..."
+                          PR_URL="{{workflow.parameters.pr-url}}"
+                          REPO_PATH=$(echo "$PR_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)/pull/.*|\1|')
+                          PR_NUMBER="{{workflow.parameters.pr-number}}"
+
+                          PR_JSON=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                            "https://api.github.com/repos/$REPO_PATH/issues/$PR_NUMBER")
+
+                          TASK_ID=$(echo "$PR_JSON" | jq -r '.labels[].name' | grep -oE '^task-([0-9]+)$' | sed 's/task-//' | head -1)
+
+                          if [ -n "$TASK_ID" ]; then
+                            echo "✅ Found task ID from labels: $TASK_ID"
+                          else
+                            echo "⚠️ No task ID found in PR title or labels"
+                            exit 0
+                          fi
                         fi
 
                         echo "✅ Task $TASK_ID completed via merge to main"
@@ -712,16 +732,36 @@ spec:
                           fi
                         fi
 
+                        # Extract retry configuration with proper defaults
+                        # Always set these variables, even if INITIAL_PARAMS is empty
+                        if [ -n "$INITIAL_PARAMS" ] && [ "$INITIAL_PARAMS" != "null" ]; then
+                          IMPL_MAX_RETRIES=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-max-retries" // "10"')
+                          QUALITY_MAX_RETRIES=$(echo "$INITIAL_PARAMS" | jq -r '."quality-max-retries" // "10"')
+                          TESTING_MAX_RETRIES=$(echo "$INITIAL_PARAMS" | jq -r '."testing-max-retries" // "10"')
+                        else
+                          IMPL_MAX_RETRIES="10"
+                          QUALITY_MAX_RETRIES="10"
+                          TESTING_MAX_RETRIES="10"
+                        fi
+
+                        # Final safeguard: ensure variables are never empty
+                        IMPL_MAX_RETRIES="${IMPL_MAX_RETRIES:-10}"
+                        QUALITY_MAX_RETRIES="${QUALITY_MAX_RETRIES:-10}"
+                        TESTING_MAX_RETRIES="${TESTING_MAX_RETRIES:-10}"
+
                         echo "📝 Using parameters:"
                         echo "  Implementation CLI: $IMPL_CLI"
                         echo "  Implementation Model: $IMPL_MODEL"
                         echo "  Implementation Agent: $IMPL_AGENT"
+                        echo "  Implementation Max Retries: $IMPL_MAX_RETRIES"
                         echo "  Quality CLI: $QUALITY_CLI"
                         echo "  Quality Model: $QUALITY_MODEL"
                         echo "  Quality Agent: $QUALITY_AGENT"
+                        echo "  Quality Max Retries: $QUALITY_MAX_RETRIES"
                         echo "  Testing CLI: $TESTING_CLI"
                         echo "  Testing Model: $TESTING_MODEL"
                         echo "  Testing Agent: $TESTING_AGENT"
+                        echo "  Testing Max Retries: $TESTING_MAX_RETRIES"
                         echo "  Repository: $REPO_PATH"
                         echo "  Service: $SERVICE_NAME"
                         echo "  Docs Repository: $DOCS_REPO"
@@ -755,7 +795,10 @@ spec:
                                 "repository": "$REPO_PATH",
                                 "service": "$SERVICE_NAME",
                                 "docs-repository": "$DOCS_REPO",
-                                "docs-project-directory": "$DOCS_DIR"
+                                "docs-project-directory": "$DOCS_DIR",
+                                "implementation-max-retries": "$IMPL_MAX_RETRIES",
+                                "quality-max-retries": "$QUALITY_MAX_RETRIES",
+                                "testing-max-retries": "$TESTING_MAX_RETRIES"
                               }
                         spec:
                           workflowTemplateRef:
@@ -790,6 +833,12 @@ spec:
                                 value: "$DOCS_REPO"
                               - name: docs-project-directory
                                 value: "$DOCS_DIR"
+                              - name: implementation-max-retries
+                                value: "$IMPL_MAX_RETRIES"
+                              - name: quality-max-retries
+                                value: "$QUALITY_MAX_RETRIES"
+                              - name: testing-max-retries
+                                value: "$TESTING_MAX_RETRIES"
                         EOF
 
                         if [ $? -eq 0 ]; then

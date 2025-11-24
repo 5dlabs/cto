@@ -33,7 +33,7 @@ spec:
       filters:
         data:
           # Filter for issue_comment events with created action
-          - path: headers.X-Github-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["issue_comment"]
           - path: body.action
@@ -56,7 +56,7 @@ spec:
       eventName: org
       filters:
         data:
-          - path: headers.X-Github-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["pull_request_review"]
           - path: body.action
@@ -76,7 +76,7 @@ spec:
       eventName: org
       filters:
         data:
-          - path: headers.X-Github-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["check_run"]
           - path: body.action
@@ -95,7 +95,7 @@ spec:
       eventName: org
       filters:
         data:
-          - path: headers.X-Github-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["issue_comment", "pull_request_review_comment"]
           - path: body.action
@@ -127,6 +127,13 @@ spec:
               spec:
                 entrypoint: handle-feedback-remediation
                 serviceAccountName: argo-workflow
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pr-number

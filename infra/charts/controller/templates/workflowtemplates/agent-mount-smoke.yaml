@@ -44,6 +44,8 @@ spec:
             echo "OK"
         volumeMounts:
 {{ include "platform.agentVolumeMounts" . | nindent 10 }}
+{{ include "platform.agentTemplateVolumeMounts" . | nindent 10 }}
   volumes:
 {{ include "platform.agentVolumes" . | nindent 4 }}
+{{ include "platform.agentTemplateProjectedVolume" . | nindent 4 }}
 {{- end }}

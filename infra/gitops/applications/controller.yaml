@@ -45,11 +45,11 @@ spec:
         - name: resources.limits.cpu
           value: 1000m
         - name: resources.limits.memory
-          value: 1Gi
+          value: 8Gi  # Increased from 4Gi to handle controller workload on worker node
         - name: resources.requests.cpu
           value: 500m
         - name: resources.requests.memory
-          value: 512Mi
+          value: 1Gi
 
         # Monitoring
         - name: metrics.enabled
@@ -100,6 +100,13 @@ spec:
       kind: Secret
       jsonPointers:
         - /data
+    # Ignore last-applied-configuration annotation on large ConfigMaps to prevent 262KB limit errors
+    - group: ""
+      kind: ConfigMap
+      name: controller-agent-templates-claude
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
 
   # Revision history
   revisionHistoryLimit: 10
+

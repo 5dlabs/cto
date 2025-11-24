@@ -2,12 +2,12 @@ name: Sync Agent Templates ConfigMap
 
 on:
   push:
-    branches: [main]
+    branches: ['**']  # Run on all branches for faster testing iteration
     paths:
       - 'infra/charts/controller/agent-templates/**'
-      - 'infra/charts/controller/templates/agent-templates-static.yaml'
+      - 'infra/charts/controller/templates/agent-templates-*.yaml'
       - 'scripts/generate-templates-configmap.sh'
-      - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
+      - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'
       - 'scripts/apply-agent-templates-configmap.sh'
 
 jobs:
@@ -22,12 +22,12 @@ jobs:
           fetch-depth: 0
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
         with:
           version: v3.15.0
 
-      - name: Regenerate agent templates ConfigMap
-        run: ./scripts/generate-templates-configmap.sh
+      - name: Regenerate agent templates ConfigMaps
+        run: cd infra/charts/controller && ./scripts/generate-agent-templates-configmaps-split.sh
 
       - name: Render and apply ConfigMap to cluster
         run: ./scripts/apply-agent-templates-configmap.sh
@@ -36,3 +36,45 @@ jobs:
         run: |
           kubectl rollout restart deployment/controller -n agent-platform
           kubectl rollout status deployment/controller -n agent-platform --timeout=120s
+      
+      - name: Verify ConfigMaps updated
+        run: |
+          echo "=== Verifying ConfigMap Updates ==="
+          EXPECTED_REVISION="${GITHUB_SHA:0:8}"
+          echo "Expected revision: $EXPECTED_REVISION"
+          
+          # Skip verification on feature branches - ArgoCD only syncs from main
+          # Manual kubectl applies on feature branches get reverted by ArgoCD
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "ℹ️  Skipping verification on feature branch (ArgoCD only syncs from main)"
+            echo "✅ ConfigMaps applied successfully - verification will run after merge to main"
+            exit 0
+          fi
+          
+          # Wait for ConfigMaps to propagate and ArgoCD to sync
+          echo "⏳ Waiting 10 seconds for ArgoCD sync..."
+          sleep 10
+          
+          # Verify ConfigMaps exist (don't check specific content as it varies by PR)
+          echo "Checking ConfigMaps exist..."
+          
+          for cm in shared claude codex cursor factory opencode; do
+            if kubectl get configmap "controller-agent-templates-$cm" -n agent-platform >/dev/null 2>&1; then
+              echo "✅ ConfigMap controller-agent-templates-$cm exists"
+            else
+              echo "❌ ConfigMap controller-agent-templates-$cm NOT FOUND"
+              exit 1
+            fi
+          done
+          
+          # Verify ConfigMaps have content
+          echo "Verifying ConfigMaps have content..."
+          CURSOR_SIZE=$(kubectl get configmap controller-agent-templates-cursor -n agent-platform -o jsonpath='{.binaryData}' | wc -c)
+          if [ "$CURSOR_SIZE" -gt 1000 ]; then
+            echo "✅ Cursor ConfigMap has content ($CURSOR_SIZE bytes)"
+          else
+            echo "❌ Cursor ConfigMap is empty or too small ($CURSOR_SIZE bytes)"
+            exit 1
+          fi
+          
+          echo "✅ All ConfigMaps verified successfully"

@@ -23,6 +23,7 @@ pub struct FeedbackParser {
 
 impl FeedbackParser {
     /// Create a new feedback parser with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self {
             author_validator: AuthorValidator::new(),
@@ -32,6 +33,7 @@ impl FeedbackParser {
     }
 
     /// Create parser with custom author validator
+    #[must_use]
     pub fn with_validator(validator: AuthorValidator) -> Self {
         Self {
             author_validator: validator,
@@ -41,6 +43,7 @@ impl FeedbackParser {
     }
 
     /// Create parser with custom settings
+    #[must_use]
     pub fn with_config(
         validator: AuthorValidator,
         detailed_logging: bool,
@@ -108,9 +111,9 @@ impl FeedbackParser {
             self.extract_criteria(comment_body, comment_id, pr_number, author)?;
 
         // Step 5: Extract optional sections
-        let reproduction_steps = self.extract_reproduction_steps_optional(comment_body);
+        let reproduction_steps = Self::extract_reproduction_steps_optional(comment_body);
         let (expected_behavior, actual_behavior) =
-            self.extract_expected_actual_optional(comment_body);
+            Self::extract_expected_actual_optional(comment_body);
 
         // Step 6: Build metadata
         let metadata = FeedbackMetadata {
@@ -304,12 +307,12 @@ impl FeedbackParser {
     }
 
     /// Extract reproduction steps (optional)
-    fn extract_reproduction_steps_optional(&self, body: &str) -> Option<Vec<String>> {
+    fn extract_reproduction_steps_optional(body: &str) -> Option<Vec<String>> {
         PatternExtractor::extract_reproduction_steps_optional(body)
     }
 
     /// Extract expected/actual behavior (optional)
-    fn extract_expected_actual_optional(&self, body: &str) -> (Option<String>, Option<String>) {
+    fn extract_expected_actual_optional(body: &str) -> (Option<String>, Option<String>) {
         PatternExtractor::extract_expected_actual(body)
     }
 
@@ -336,6 +339,7 @@ impl FeedbackParser {
     }
 
     /// Get author validator for configuration
+    #[must_use]
     pub fn author_validator(&self) -> &AuthorValidator {
         &self.author_validator
     }
@@ -356,6 +360,7 @@ impl FeedbackParser {
     }
 
     /// Get current configuration
+    #[must_use]
     pub fn config(&self) -> ParserConfig {
         ParserConfig {
             detailed_logging: self.detailed_logging,
@@ -379,7 +384,7 @@ impl Default for FeedbackParser {
     }
 }
 
-/// Convenience function for parsing feedback (equivalent to parse_feedback_comment from mod.rs)
+/// Convenience function for parsing feedback (equivalent to `parse_feedback_comment` from mod.rs)
 pub fn parse_feedback_comment(
     comment_body: &str,
     author: &str,

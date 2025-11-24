@@ -1,0 +1,228 @@
+---
+# Morgan Issue Comment Sensor
+# Triggers Morgan to process human feedback from GitHub issue comments
+# Enables bidirectional sync between GitHub Issues and TaskMaster docs
+
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: morgan-issue-comment
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: morgan-issue-comment-sensor
+    app.kubernetes.io/part-of: argo-events
+    agent: morgan
+    event-type: github-issue-comment
+spec:
+  dependencies:
+    - name: issue-comment-created
+      eventSourceName: github-webhook
+      eventName: issue-comment
+      filters:
+        data:
+          # Only trigger on comment creation
+          - path: body.action
+            type: string
+            value:
+              - "created"
+          # Only process comments on TaskMaster-managed issues
+          - path: body.issue.labels[].name
+            type: string
+            value:
+              - "taskmaster-task"
+          # Ignore bot comments (prevent loops)
+          - path: body.comment.user.type
+            type: string
+            value:
+              - "User"  # Human users only
+
+  triggers:
+    - template:
+        name: process-issue-comment
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: "morgan-process-comment-"
+                namespace: agent-platform
+                labels:
+                  agent: morgan
+                  workflow-type: issue-comment-processing
+                  issue-number: "{{ .Input.body.issue.number }}"
+              spec:
+                serviceAccountName: argo-workflow
+                entrypoint: process-comment
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
+
+                arguments:
+                  parameters:
+                    - name: issue-number
+                      value: "{{ .Input.body.issue.number }}"
+                    - name: comment-body
+                      value: "{{ .Input.body.comment.body }}"
+                    - name: comment-author
+                      value: "{{ .Input.body.comment.user.login }}"
+                    - name: repository
+                      value: "{{ .Input.body.repository.full_name }}"
+                    - name: repository-url
+                      value: "{{ .Input.body.repository.clone_url }}"
+
+                templates:
+                  # Main comment processing template
+                  - name: process-comment
+                    steps:
+                      # Step 1: Extract task ID from issue labels
+                      - - name: extract-task-info
+                          template: extract-task-id
+
+                      # Step 2: Determine comment intent (scope change, clarification, etc.)
+                      - - name: analyze-comment
+                          template: analyze-comment-intent
+
+                      # Step 3: Trigger Morgan to process and update docs
+                      - - name: trigger-morgan-update
+                          template: morgan-doc-update
+                          when: "{{`{{steps.analyze-comment.outputs.parameters.requires-action}}`}} == true"
+
+                  # Extract task ID from issue labels
+                  - name: extract-task-id
+                    outputs:
+                      parameters:
+                        - name: task-id
+                          valueFrom:
+                            path: /tmp/task-id.txt
+                    script:
+                      image: alpine:latest
+                      command: [sh]
+                      source: |
+                        #!/bin/sh
+                        set -e
+
+                        # Extract task ID from labels
+                        # Labels format: "task-1", "task-2", etc.
+                        ISSUE_LABELS='{{ .Input.body.issue.labels }}'
+
+                        # Use basic string parsing (jq not available in alpine)
+                        TASK_ID=$(echo "$ISSUE_LABELS" | grep -o 'task-[0-9]*' | head -1 | sed 's/task-//')
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "⚠️  Could not extract task ID from issue labels"
+                          echo "0" > /tmp/task-id.txt
+                        else
+                          echo "✅ Extracted task ID: $TASK_ID"
+                          echo "$TASK_ID" > /tmp/task-id.txt
+                        fi
+
+                  # Analyze comment intent using basic pattern matching
+                  - name: analyze-comment-intent
+                    inputs:
+                      parameters:
+                        - name: comment-body
+                          value: "{{`{{workflow.parameters.comment-body}}`}}"
+                    outputs:
+                      parameters:
+                        - name: requires-action
+                          valueFrom:
+                            path: /tmp/requires-action.txt
+                        - name: intent-type
+                          valueFrom:
+                            path: /tmp/intent-type.txt
+                    script:
+                      image: alpine:latest
+                      command: [sh]
+                      source: |
+                        #!/bin/sh
+                        set -e
+
+                        COMMENT='{{`{{inputs.parameters.comment-body}}`}}'
+
+                        # Check for action keywords
+                        REQUIRES_ACTION="false"
+                        INTENT_TYPE="comment"
+
+                        # Scope change indicators
+                        if echo "$COMMENT" | grep -iE '@morgan|scope|add requirement|update criteria|modify' >/dev/null; then
+                          REQUIRES_ACTION="true"
+                          INTENT_TYPE="scope-change"
+                        fi
+
+                        # Clarification requests
+                        if echo "$COMMENT" | grep -iE 'clarify|explain|unclear|what does|define' >/dev/null; then
+                          REQUIRES_ACTION="true"
+                          INTENT_TYPE="clarification"
+                        fi
+
+                        # Priority changes
+                        if echo "$COMMENT" | grep -iE 'priority|urgent|critical|high priority' >/dev/null; then
+                          REQUIRES_ACTION="true"
+                          INTENT_TYPE="priority-change"
+                        fi
+
+                        echo "$REQUIRES_ACTION" > /tmp/requires-action.txt
+                        echo "$INTENT_TYPE" > /tmp/intent-type.txt
+
+                        echo "📊 Comment analysis:"
+                        echo "   Requires action: $REQUIRES_ACTION"
+                        echo "   Intent type: $INTENT_TYPE"
+
+                  # Trigger Morgan to update documentation
+                  - name: morgan-doc-update
+                    container:
+                      image: ghcr.io/5dlabs/claude:latest
+                      command: ["/bin/bash"]
+                      args: ["/workspace/process-issue-comment.sh"]
+                      env:
+                        # GitHub App credentials
+                        - name: GITHUB_APP_ID
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-app-5dlabs-morgan
+                              key: app-id
+                        - name: GITHUB_APP_PRIVATE_KEY
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-app-5dlabs-morgan
+                              key: private-key
+                        # Comment context
+                        - name: ISSUE_NUMBER
+                          value: "{{`{{workflow.parameters.issue-number}}`}}"
+                        - name: COMMENT_BODY
+                          value: "{{`{{workflow.parameters.comment-body}}`}}"
+                        - name: COMMENT_AUTHOR
+                          value: "{{`{{workflow.parameters.comment-author}}`}}"
+                        - name: TASK_ID
+                          value: "{{`{{steps.extract-task-info.outputs.parameters.task-id}}`}}"
+                        - name: INTENT_TYPE
+                          value: "{{`{{steps.analyze-comment.outputs.parameters.intent-type}}`}}"
+                        # Repository info
+                        - name: REPOSITORY
+                          value: "{{`{{workflow.parameters.repository}}`}}"
+                        - name: REPOSITORY_URL
+                          value: "{{`{{workflow.parameters.repository-url}}`}}"
+                      volumeMounts:
+                        - name: agent-templates
+                          mountPath: /workspace
+                          readOnly: true
+                      resources:
+                        requests:
+                          cpu: 100m
+                          memory: 256Mi
+                        limits:
+                          cpu: 500m
+                          memory: 1Gi
+
+                volumes:
+                  - name: agent-templates
+                    configMap:
+                      name: controller-agent-templates-pm
+                      defaultMode: 0755
+

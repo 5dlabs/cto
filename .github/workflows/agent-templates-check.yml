@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - 'infra/charts/controller/agent-templates/**'
-      - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
-      - 'infra/charts/controller/templates/agent-templates-static.yaml'
+      - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'
+      - 'infra/charts/controller/templates/agent-templates-*.yaml'
 
 jobs:
   validate:
@@ -28,18 +28,18 @@ jobs:
         env:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
-      - name: Generate static ConfigMap
-        run: bash infra/charts/controller/scripts/generate-agent-templates-configmap.sh
+      - name: Generate split ConfigMaps
+        run: bash infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh
       - name: Detect drift
         id: detect
         run: |
-          if git diff --quiet -- infra/charts/controller/templates/agent-templates-static.yaml; then
+          if git diff --quiet -- infra/charts/controller/templates/agent-templates-*.yaml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No drift detected."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Drift detected in agent-templates-static.yaml"
-            git --no-pager diff -- infra/charts/controller/templates/agent-templates-static.yaml || true
+            echo "Drift detected in agent templates ConfigMaps"
+            git --no-pager diff -- infra/charts/controller/templates/agent-templates-*.yaml || true
           fi
       - name: Auto-heal generated artifact
         if: steps.detect.outputs.changed == 'true' && steps.context.outputs.same_repo == 'true'
@@ -49,12 +49,14 @@ jobs:
           set -euo pipefail
           git config user.name "5DLabs Automation"
           git config user.email "automation@5dlabs.ai"
-          git add infra/charts/controller/templates/agent-templates-static.yaml
+          git fetch origin "$BRANCH"
+          git add infra/charts/controller/templates/agent-templates-*.yaml
           if git diff --cached --quiet; then
             echo "No staged changes to commit after regeneration."
             exit 0
           fi
-          git commit -m 'chore(chart): regenerate agent templates static ConfigMap'
+          git commit -m 'chore(chart): regenerate agent templates ConfigMaps'
+          git pull --rebase origin "$BRANCH"
           git push origin HEAD:"$BRANCH"
           echo "Auto-healed drift by committing regenerated ConfigMap."
       - name: Fail if drift remains

@@ -73,11 +73,7 @@ impl MarkdownParser {
                     continue;
                 }
 
-                let completed = match checkbox_state {
-                    "x" | "X" => true,
-                    " " | "" => false,
-                    _ => false, // Treat unknown states as uncompleted
-                };
+                let completed = matches!(checkbox_state, "x" | "X");
 
                 criteria.push(CriteriaStatus {
                     description,
@@ -131,6 +127,7 @@ impl MarkdownParser {
     }
 
     /// Check if all criteria are completed
+    #[must_use]
     pub fn are_all_criteria_met(body: &str) -> bool {
         Self::extract_unmet_criteria(body).is_err() // Returns error if all are met
     }
@@ -146,6 +143,7 @@ impl MarkdownParser {
     }
 
     /// Handle various markdown checkbox formats
+    #[must_use]
     pub fn normalize_checkbox_syntax(line: &str) -> Option<(bool, String)> {
         let line = line.trim();
 

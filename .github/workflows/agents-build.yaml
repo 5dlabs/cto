@@ -25,6 +25,11 @@ on:
         required: false
         default: false
         type: boolean
+      factory_version_override:
+        description: 'Override Factory CLI version (e.g., "1.2.3"). If not provided, auto-detection will be used.'
+        required: false
+        default: ''
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -43,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
@@ -62,7 +67,7 @@ jobs:
           echo "tag=$HASH" >> $GITHUB_OUTPUT
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -79,11 +84,11 @@ jobs:
 
       - name: Set up Docker Buildx
         if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
       - name: Build and push base image
         if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./infra/images/runtime
           file: ./infra/images/runtime/Dockerfile
@@ -124,38 +129,11 @@ jobs:
             version_type: npm
             version_pkg: "@anthropic-ai/claude-code"
             version_arg: CLAUDE_CODE_VERSION
-          - id: grok
-            image: grok
-            context: ./infra/images/grok
-            file: ./infra/images/grok/Dockerfile
-            version_type: npm
-            version_pkg: "@vibe-kit/grok-cli"
           - id: cursor
             image: cursor
             context: ./infra/images/cursor
             file: ./infra/images/cursor/Dockerfile
-            version_type: script_hash
-            script_url: https://cursor.com/install
-          - id: openhands
-            image: openhands
-            context: ./infra/images/openhands
-            file: ./infra/images/openhands/Dockerfile
-            version_type: pypi
-            pypi_pkg: openhands-ai
-          - id: gemini
-            image: gemini
-            context: ./infra/images/gemini
-            file: ./infra/images/gemini/Dockerfile
-            version_type: npm
-            version_pkg: "@google/gemini-cli"
-            version_arg: CLI_VERSION
-          - id: qwen
-            image: qwen
-            context: ./infra/images/qwen
-            file: ./infra/images/qwen/Dockerfile
-            version_type: npm
-            version_pkg: "@qwen-code/qwen-code"
-            version_arg: QWEN_CODE_VERSION
+            version_type: dir_hash
           - id: opencode
             image: opencode
             context: ./infra/images/opencode
@@ -168,21 +146,22 @@ jobs:
             file: ./infra/images/codex/Dockerfile
             version_type: npm
             version_pkg: "@openai/codex"
-          - id: cursor
-            image: cursor
-            context: ./infra/images/cursor
-            file: ./infra/images/cursor/Dockerfile
-            version_type: dir_hash
           - id: factory
             image: factory
             context: ./infra/images/factory
             file: ./infra/images/factory/Dockerfile
+            version_type: script_hash
+            script_url: https://app.factory.ai/cli
+          - id: gemini
+            image: gemini
+            context: ./infra/images/gemini
+            file: ./infra/images/gemini/Dockerfile
             version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
@@ -198,13 +177,13 @@ jobs:
           npm -v
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version (npm for npm agents, PyPI for pypi/pip agents, dir-hash otherwise)
+      - name: Determine version (npm for npm agents, PyPI for pypi/pip agents, script-hash for remote installers, dir-hash otherwise)
         id: version
         run: |
           set -euo pipefail
@@ -231,12 +210,56 @@ jobs:
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} PyPI version: $VERSION"
-          else
+          elif [ "${{ matrix.version_type }}" = "script_hash" ]; then
+            # For Factory CLI, we need to install it and extract the actual version
+            # because the CLI has its own auto-update mechanism that checks against real versions
+            if [ "${{ matrix.id }}" = "factory" ]; then
+              # Check if version override is provided
+              if [ -n "${{ inputs.factory_version_override }}" ]; then
+                VERSION="${{ inputs.factory_version_override }}"
+                echo "📦 Using Factory CLI version override: $VERSION"
+              else
+                # Install Factory CLI temporarily to get the version
+                echo "📦 Installing Factory CLI to extract version..."
+                curl -fsSL "${{ matrix.script_url }}" | sh
+                if [ -f "$HOME/.local/bin/droid" ]; then
+                  # Extract version from droid --version output (format: "droid version X.Y.Z")
+                  VERSION=$(FACTORY_DISABLE_TELEMETRY=1 "$HOME/.local/bin/droid" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+                  if [ -z "$VERSION" ]; then
+                    # Fallback to script hash if version extraction fails
+                    SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
+                    VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
+                    echo "⚠️ Failed to extract version, using script hash: $VERSION"
+                  else
+                    echo "📦 Extracted Factory CLI version: $VERSION"
+                  fi
+                else
+                  # Fallback to script hash if installation fails
+                  SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
+                  VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
+                  echo "⚠️ Installation failed, using script hash: $VERSION"
+                fi
+              fi
+            else
+              # For other script_hash types, use the old hash method
+              SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
+              VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
+              echo "📦 ${{ matrix.id }} version (script hash from ${{ matrix.script_url }}): $VERSION"
+            fi
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "arg_line=" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.version_type }}" = "dir_hash" ]; then
             # Use latest commit hash touching the image context directory as image version (stable, offline)
             VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} version (dir hash): $VERSION"
+          else
+            # Fallback to dir_hash for unknown types
+            VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "arg_line=" >> $GITHUB_OUTPUT
+            echo "📦 ${{ matrix.id }} version (dir hash fallback): $VERSION"
           fi
 
       - name: Debug resolved version and args
@@ -248,10 +271,10 @@ jobs:
       # QEMU disabled on self-hosted runners; building amd64 only for speed/stability
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
       - name: Build and push image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}

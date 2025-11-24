@@ -30,14 +30,14 @@ pub struct CursorAdapter {
 
 impl CursorAdapter {
     /// Create a new Cursor adapter using default configuration.
-    pub async fn new() -> AdapterResult<Self> {
-        Self::with_config(AdapterConfig::new(CLIType::Cursor)).await
+    pub fn new() -> AdapterResult<Self> {
+        Self::with_config(AdapterConfig::new(CLIType::Cursor))
     }
 
     /// Create a new Cursor adapter with a custom base configuration.
-    pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing Cursor adapter (skeleton)");
-        let base = Arc::new(BaseAdapter::new(config).await?);
+        let base = Arc::new(BaseAdapter::new(config)?);
         Ok(Self { base })
     }
 
@@ -75,11 +75,11 @@ impl CliAdapter for CursorAdapter {
         Err(Self::unsupported("response parsing").into())
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "AGENTS.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "cursor-agent"
     }
 

@@ -15,14 +15,13 @@ spec:
   template:
     metadata:
       annotations:
-        # Force pod restart when agent-templates ConfigMap changes
-        agent-templates/checksum: {{ include (print $.Template.BasePath "/agent-templates-static.yaml") . | sha256sum }}
-        # Force pod restart when controller config changes
-        controller-config/checksum: {{ include (print $.Template.BasePath "/task-controller-config.yaml") . | sha256sum }}
         # Force pod restart when main config changes
         config/checksum: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         # Force pod restart when toolman catalog changes
         toolman-catalog/checksum: {{ include "controller.toolmanCatalogChecksum" . }}
+        # Template checksums using file hashes to avoid annotation size limits
+        # This triggers pod restart when agent templates change
+        templates/version: "{{ .Values.templatesVersion | default "v1" }}"
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -81,7 +80,7 @@ spec:
           livenessProbe:
             httpGet:
               path: {{ .Values.healthCheck.path }}
-              port: {{ .Values.service.name }}
+              port: {{ .Values.service.targetPort }}
             initialDelaySeconds: {{ .Values.healthCheck.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.healthCheck.livenessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.healthCheck.livenessProbe.timeoutSeconds }}
@@ -90,7 +89,7 @@ spec:
           readinessProbe:
             httpGet:
               path: {{ .Values.healthCheck.path }}
-              port: {{ .Values.service.name }}
+              port: {{ .Values.service.targetPort }}
             initialDelaySeconds: {{ .Values.healthCheck.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.healthCheck.readinessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.healthCheck.readinessProbe.timeoutSeconds }}
@@ -100,10 +99,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        # Mount agent templates ConfigMap
-        - name: agent-templates
-          configMap:
-            name: {{ include "controller.fullname" . }}-agent-templates
+        # Mount agent templates (projected from multiple ConfigMaps)
+{{ include "platform.agentTemplateProjectedVolume" . | nindent 8 }}
         # Mount controller configuration ConfigMap
         - name: controller-config
           configMap:

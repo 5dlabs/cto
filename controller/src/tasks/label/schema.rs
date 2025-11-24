@@ -132,6 +132,7 @@ pub struct OverrideBehavior {
 }
 
 impl Default for LabelSchema {
+    #[allow(clippy::too_many_lines)]
     fn default() -> Self {
         let mut type_schemas = HashMap::new();
 
@@ -380,6 +381,7 @@ impl Default for LabelSchema {
 
 impl LabelSchema {
     /// Validate that a label matches the expected pattern for its type
+    #[must_use]
     pub fn validate_label(&self, label: &str, label_type: &LabelType) -> bool {
         if let Some(schema) = self.type_schemas.get(label_type) {
             let regex_pattern = format!("^{}$", schema.pattern);
@@ -392,6 +394,7 @@ impl LabelSchema {
     }
 
     /// Determine the type of a label based on its pattern
+    #[must_use]
     pub fn classify_label(&self, label: &str) -> Option<LabelType> {
         for label_type in self.type_schemas.keys() {
             if self.validate_label(label, label_type) {
@@ -413,6 +416,7 @@ impl LabelSchema {
     }
 
     /// Get the current workflow state from a set of labels
+    #[must_use]
     pub fn determine_workflow_state(&self, labels: &[String]) -> WorkflowState {
         if labels.contains(&"approved".to_string()) {
             WorkflowState::Approved
@@ -432,6 +436,7 @@ impl LabelSchema {
     }
 
     /// Check if a state transition is valid
+    #[must_use]
     pub fn is_valid_transition(
         &self,
         from: &WorkflowState,
@@ -444,6 +449,7 @@ impl LabelSchema {
     }
 
     /// Get the transition definition for a specific transition
+    #[must_use]
     pub fn get_transition(
         &self,
         from: &WorkflowState,
@@ -456,6 +462,7 @@ impl LabelSchema {
     }
 
     /// Check if a workflow state is terminal (end state)
+    #[must_use]
     pub fn is_terminal_state(&self, state: &WorkflowState) -> bool {
         matches!(state, WorkflowState::Approved | WorkflowState::Failed)
     }

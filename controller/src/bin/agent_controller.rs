@@ -16,10 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Controller Service - Kubernetes Controller for CodeRun and DocsRun CRDs
+//! Controller Service - Kubernetes Controller for `CodeRun` and `DocsRun` CRDs
 //!
 //! This service manages the lifecycle of AI agent jobs by:
-//! - Watching for CodeRun and DocsRun custom resources
+//! - Watching for `CodeRun` and `DocsRun` custom resources
 //! - Creating and managing Kubernetes Jobs for agent execution
 //! - Handling resource cleanup and status updates
 //! - Providing health and metrics endpoints
@@ -40,7 +40,10 @@ use controller::tasks::{
     run_task_controller,
     types::Context as TaskContext,
 };
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::Api;
 use serde_json::{json, Value};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
@@ -54,10 +57,119 @@ use tracing::{error, info, warn, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Clone)]
+#[allow(dead_code)] // Fields are read via axum State extractor
 struct AppState {
     client: kube::Client,
     namespace: String,
     config: Arc<ControllerConfig>,
+    remediation_state_manager: Arc<RemediationStateManager>,
+}
+
+/// Verify that all required agent template `ConfigMaps` exist and are healthy
+///
+/// This health check runs at controller startup to fail-fast if `ConfigMaps` are missing.
+/// Prevents 8-hour silent retry loops when template generation cannot succeed.
+async fn verify_required_configmaps(
+    client: &kube::Client,
+    namespace: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
+
+    let required_configmaps = vec![
+        (
+            "controller-agent-templates-claude",
+            "Claude agent templates",
+        ),
+        ("controller-agent-templates-codex", "Codex agent templates"),
+        (
+            "controller-agent-templates-cursor",
+            "Cursor agent templates",
+        ),
+        (
+            "controller-agent-templates-factory",
+            "Factory agent templates",
+        ),
+        (
+            "controller-agent-templates-integration",
+            "Integration agent templates",
+        ),
+        (
+            "controller-agent-templates-shared",
+            "Shared agent utilities",
+        ),
+    ];
+
+    let mut missing = Vec::new();
+    let mut empty = Vec::new();
+
+    for (cm_name, description) in &required_configmaps {
+        match configmaps.get(cm_name).await {
+            Ok(cm) => {
+                // Check if ConfigMap has data (could be in .data or .binaryData fields)
+                let data_count = cm.data.as_ref().map_or(0, std::collections::BTreeMap::len);
+                let binary_count = cm
+                    .binary_data
+                    .as_ref()
+                    .map_or(0, std::collections::BTreeMap::len);
+                let total_files = data_count + binary_count;
+
+                if total_files == 0 {
+                    empty.push(format!("{cm_name} ({description})"));
+                    error!("❌ ConfigMap {} exists but is EMPTY", cm_name);
+                } else {
+                    info!("  ✓ {} - {} files", description, total_files);
+                }
+            }
+            Err(e) => {
+                missing.push(format!("{cm_name} ({description})"));
+                error!("❌ ConfigMap {} NOT FOUND: {}", cm_name, e);
+            }
+        }
+    }
+
+    if !missing.is_empty() || !empty.is_empty() {
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        error!("❌ CRITICAL: Required ConfigMaps are unavailable");
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        if !missing.is_empty() {
+            error!("Missing ConfigMaps:");
+            for cm in &missing {
+                error!("  - {}", cm);
+            }
+        }
+
+        if !empty.is_empty() {
+            error!("Empty ConfigMaps:");
+            for cm in &empty {
+                error!("  - {}", cm);
+            }
+        }
+
+        error!("");
+        error!("Controller cannot start without these ConfigMaps.");
+        error!("They contain agent templates required for job creation.");
+        error!("");
+        error!("Possible causes:");
+        error!("  1. ArgoCD hasn't synced yet (check: kubectl get app controller -n argocd)");
+        error!("  2. Helm chart not deployed properly");
+        error!("  3. ConfigMaps were manually deleted");
+        error!("");
+        error!("To fix:");
+        error!("  1. Check ArgoCD sync status");
+        error!("  2. Verify Helm values.yaml has agent templates enabled");
+        error!("  3. Re-run: helm upgrade controller ./charts/controller");
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        return Err(format!(
+            "Missing {} ConfigMaps, {} empty ConfigMaps",
+            missing.len(),
+            empty.len()
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
@@ -83,10 +195,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = "agent-platform".to_string();
     let controller_config = Arc::new(load_controller_config());
 
+    // Verify required ConfigMaps exist before starting controller
+    // This prevents 8-hour silent retry loops when ConfigMaps are broken
+    info!("Verifying required ConfigMaps are available...");
+    verify_required_configmaps(&client, &namespace).await?;
+    info!("✅ All required ConfigMaps verified");
+
+    // Create shared remediation state manager for webhook reuse
+    let task_context = TaskContext {
+        client: client.clone(),
+        namespace: namespace.clone(),
+        config: controller_config.clone(),
+    };
+    let remediation_state_manager = Arc::new(RemediationStateManager::new(&task_context));
+
     let state = AppState {
         client: client.clone(),
         namespace: namespace.clone(),
         config: controller_config.clone(),
+        remediation_state_manager,
     };
 
     // Start the controller in the background
@@ -163,26 +290,40 @@ async fn metrics() -> Json<Value> {
 }
 
 fn load_controller_config() -> ControllerConfig {
-    match ControllerConfig::from_mounted_file("/config/config.yaml") {
+    let override_path = std::env::var("CONTROLLER_CONFIG_PATH").ok();
+    let config_path = override_path
+        .as_deref()
+        .filter(|path| Path::new(path).exists())
+        .unwrap_or("/config/config.yaml");
+
+    match ControllerConfig::from_mounted_file(config_path) {
         Ok(cfg) => {
-            info!("Loaded controller configuration from mounted file");
+            info!("Loaded controller configuration from {}", config_path);
             cfg
         }
         Err(err) => {
             warn!(
-                "Failed to load configuration from file: {}. Using defaults.",
-                err
+                "Failed to load configuration from {}: {}. Using defaults.",
+                config_path, err
             );
             ControllerConfig::default()
         }
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn webhook_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
+    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
+    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
+    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
+    const LABEL_NEEDS_TESS: &str = "needs-tess";
+    const LABEL_APPROVED: &str = "approved";
+    const LABEL_FAILED: &str = "failed-remediation";
+
     let event = headers
         .get("X-GitHub-Event")
         .and_then(|value| value.to_str().ok())
@@ -215,7 +356,7 @@ async fn webhook_handler(
     let pr_number = payload
         .get("pull_request")
         .and_then(|pr| pr.get("number"))
-        .and_then(|num| num.as_i64())
+        .and_then(serde_json::Value::as_i64)
         .ok_or(StatusCode::BAD_REQUEST)?;
 
     let repo_owner = payload
@@ -230,13 +371,6 @@ async fn webhook_handler(
         .and_then(|repo| repo.get("name"))
         .and_then(|name| name.as_str())
         .ok_or(StatusCode::BAD_REQUEST)?;
-
-    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
-    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
-    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
-    const LABEL_NEEDS_TESS: &str = "needs-tess";
-    const LABEL_APPROVED: &str = "approved";
-    const LABEL_FAILED: &str = "failed-remediation";
 
     let target_state = match label_name {
         LABEL_NEEDS_FIXES => Some(WorkflowState::NeedsFixes),
@@ -271,39 +405,37 @@ async fn webhook_handler(
 
     let task_id = task_label.to_string();
 
-    let token = match std::env::var("GITHUB_TOKEN") {
-        Ok(value) => value,
-        Err(_) => {
-            warn!(
-                "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
-                label_name
-            );
-            return Ok(Json(json!({
-                "status": "skipped",
-                "reason": "missing_token"
-            })));
-        }
+    let Ok(token) = std::env::var("GITHUB_TOKEN") else {
+        warn!(
+            "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
+            label_name
+        );
+        return Ok(Json(json!({
+            "status": "skipped",
+            "reason": "missing_token"
+        })));
     };
 
     let label_client =
         GitHubLabelClient::with_token(token, repo_owner.to_string(), repo_name.to_string());
 
-    let context = TaskContext {
-        client: state.client.clone(),
-        namespace: state.namespace.clone(),
-        config: state.config.clone(),
-    };
-
-    let state_manager = Arc::new(RemediationStateManager::new(&context));
-
+    // Reuse the shared state manager from AppState instead of creating new one per webhook
     let override_detector = OverrideDetector::new(label_client.clone());
-    let mut orchestrator =
-        LabelOrchestrator::new(label_client, state_manager.clone(), override_detector);
+    let mut orchestrator = LabelOrchestrator::new(
+        label_client,
+        state.remediation_state_manager.clone(),
+        override_detector,
+    );
 
-    match state_manager.load_state(pr_number as u32, &task_id).await {
+    match state
+        .remediation_state_manager
+        .load_state(u32::try_from(pr_number).unwrap_or(0), &task_id)
+        .await
+    {
         Ok(None) => {
-            if let Err(err) = state_manager
-                .initialize_state(pr_number as u32, task_id.clone(), None)
+            if let Err(err) = state
+                .remediation_state_manager
+                .initialize_state(u32::try_from(pr_number).unwrap_or(0), task_id.clone(), None)
                 .await
             {
                 warn!(
@@ -322,7 +454,11 @@ async fn webhook_handler(
     }
 
     if let Err(err) = orchestrator
-        .force_state(pr_number as i32, &task_id, target_state.unwrap())
+        .force_state(
+            i32::try_from(pr_number).unwrap_or(0),
+            &task_id,
+            target_state.unwrap(),
+        )
         .await
     {
         error!(
@@ -359,10 +495,10 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
+        () = ctrl_c => {
             info!("Received Ctrl+C, shutting down gracefully");
         },
-        _ = terminate => {
+        () = terminate => {
             info!("Received SIGTERM, shutting down gracefully");
         },
     }

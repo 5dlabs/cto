@@ -1,0 +1,284 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: bolt-preview-deployment
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    # Trigger on PR opened or updated (synchronize)
+    - name: pr-opened
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - synchronize
+              - reopened
+
+  triggers:
+    - template:
+        name: bolt-preview-deployment
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-bolt-preview-
+                namespace: agent-platform
+                labels:
+                  agent: bolt
+                  mode: preview
+                  trigger: pr-event
+              spec:
+                githubApp: "5DLabs-Bolt"
+                cli: "Claude"
+                model: "claude-sonnet-4-5-20250929"
+                maxTokens: 4096
+                temperature: 0.3
+                repositoryUrl: ""
+                env:
+                  - name: BOLT_MODE
+                    value: "preview"
+                  - name: PR_NUMBER
+                    value: ""
+                  - name: PR_BRANCH
+                    value: ""
+                  - name: PR_ACTION
+                    value: ""
+                  - name: TASK_ID
+                    value: ""
+                  - name: SERVICE_NAME
+                    value: ""
+
+        parameters:
+          # Extract PR number
+          - src:
+              dependencyName: pr-opened
+              dataKey: body.pull_request.number
+            dest: spec.env.1.value
+
+          # Extract PR branch name
+          - src:
+              dependencyName: pr-opened
+              dataKey: body.pull_request.head.ref
+            dest: spec.env.2.value
+
+          # Extract PR action
+          - src:
+              dependencyName: pr-opened
+              dataKey: body.action
+            dest: spec.env.3.value
+
+          # Extract repository URL
+          - src:
+              dependencyName: pr-opened
+              dataKey: body.repository.clone_url
+            dest: spec.repositoryUrl
+
+          # Extract service name from repo
+          - src:
+              dependencyName: pr-opened
+              dataKey: body.pull_request.head.repo.name
+            dest: spec.env.5.value
+
+---
+# Cleanup sensor - triggers when PR is closed
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: bolt-preview-cleanup
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    - name: pr-closed
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - closed
+
+  triggers:
+    - template:
+        name: bolt-preview-cleanup
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-bolt-cleanup-
+                namespace: agent-platform
+                labels:
+                  agent: bolt
+                  mode: cleanup
+                  trigger: pr-closed
+              spec:
+                githubApp: "5DLabs-Bolt"
+                cli: "Claude"
+                model: "claude-sonnet-4-5-20250929"
+                maxTokens: 2048
+                temperature: 0.3
+                repositoryUrl: ""
+                env:
+                  - name: BOLT_MODE
+                    value: "cleanup"
+                  - name: PR_NUMBER
+                    value: ""
+                  - name: PR_MERGED
+                    value: ""
+                  - name: TASK_ID
+                    value: ""
+
+        parameters:
+          # Extract PR number
+          - src:
+              dependencyName: pr-closed
+              dataKey: body.pull_request.number
+            dest: spec.env.1.value
+
+          # Extract whether PR was merged
+          - src:
+              dependencyName: pr-closed
+              dataKey: body.pull_request.merged
+            dest: spec.env.2.value
+
+          # Extract repository URL
+          - src:
+              dependencyName: pr-closed
+              dataKey: body.repository.clone_url
+            dest: spec.repositoryUrl
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bolt-preview-strategy
+  namespace: argo
+data:
+  strategy.md: |
+    # Bolt Preview Deployment Strategy
+
+    ## Purpose: Preview Deployments for Active Development
+
+    Bolt-Preview creates **live preview deployments** whenever a PR is opened or updated,
+    providing immediate feedback and enabling testing before merge.
+
+    ### Trigger Conditions
+    - PR opened (action: opened)
+    - PR updated with new commits (action: synchronize)
+    - PR reopened (action: reopened)
+
+    ### Deployment Workflow
+
+    ```
+    Developer opens PR
+      ↓
+    Bolt-Preview sensor triggers
+      ↓
+    Extract task ID from PR labels (task-{id}) or branch name
+      ↓
+    Create preview namespace: agent-platform-preview-task-{id}
+      ↓
+    Create ArgoCD Application:
+      - Name: task-{id}-preview
+      - Source: PR branch (NOT main)
+      - Namespace: preview namespace
+      - Auto-sync: enabled
+      ↓
+    Wait for ArgoCD sync (timeout: 5 minutes)
+      ↓
+    Create ngrok Tunnel:
+      - Name: task-{id}-preview
+      - Forwards to: service in preview namespace
+      ↓
+    Verify public accessibility (HTTP 200/301/302)
+      ↓
+    Post preview URL to PR ✅
+    ```
+
+    ### Preview Environment Details
+
+    **Namespace:**
+    - Format: `agent-platform-preview-task-{id}`
+    - Isolated from other previews and production
+    - Auto-created by ArgoCD syncPolicy
+
+    **ArgoCD Application:**
+    - Name: `task-{id}-preview`
+    - Source Branch: PR branch (live updates on new commits!)
+    - Destination: Preview namespace
+    - Labels: `task-id: "{id}"`, `environment: "preview"`, `managed-by: "bolt"`
+
+    **Ngrok Tunnel:**
+    - Name: `task-{id}-preview`
+    - Public URL: `https://{random}.ngrok.io`
+    - TLS: Enabled by default
+
+    ### Cleanup Strategy
+
+    **Automatic Cleanup Triggers:**
+    1. PR closed (merged or not) - immediate cleanup
+    2. Preview older than 7 days - scheduled cleanup
+
+    **Cleanup Actions:**
+    - Delete ArgoCD application (`task-{id}-preview`)
+    - Delete ngrok Tunnel (`task-{id}-preview`)
+    - Delete namespace (`agent-platform-preview-task-{id}`)
+    - Post cleanup confirmation to PR
+
+    ### Integration with Other Agents
+
+    - **Rex** creates PR → **Bolt-Preview** deploys preview
+    - **Cleo** reviews code → can view preview URL for context
+    - **Tess** runs QA tests → **tests against preview URL**
+    - **Atlas** merges PR → **Bolt-Production** takes over
+
+    ### Benefits
+
+    ✅ **Instant Feedback** - See your code live within minutes
+    ✅ **Real Testing** - Tess tests actual deployment, not local
+    ✅ **Stakeholder Review** - Share preview URL for feedback
+    ✅ **Automatic Updates** - New commits update preview automatically
+    ✅ **Clean Isolation** - Each task has its own environment
+
+    ### Task ID Extraction
+
+    Bolt extracts task ID using multiple methods (in order):
+    1. PR label: `task-5` → Task ID: `5`
+    2. Branch name: `task-5-implement-auth` → Task ID: `5`
+    3. .taskmaster-correlation file in repo
+
+    ### Resource Limits
+
+    Each preview namespace gets:
+    - CPU: 2 cores max
+    - Memory: 4 GiB max
+    - Storage: 10 GiB max
+    - Pods: 20 max
+
+    This prevents runaway preview deployments from impacting the cluster.
+

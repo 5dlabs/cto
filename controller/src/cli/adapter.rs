@@ -363,7 +363,7 @@ impl CLIExecutionAdapter {
     ///
     /// # Errors
     /// Returns an error if environment validation fails or if required variables are missing
-    pub async fn validate_environment(&self, required_vars: &[String]) -> Result<Vec<String>> {
+    pub fn validate_environment(&self, required_vars: &[String]) -> Result<Vec<String>> {
         let mut missing = Vec::new();
 
         for var in required_vars {
@@ -522,9 +522,6 @@ impl ResultProcessor {
             }
             CLIType::Codex => {
                 self.process_codex_output(result, &mut processed);
-            }
-            CLIType::Cursor => {
-                self.process_generic_output(result, &mut processed);
             }
             CLIType::OpenCode => {
                 self.process_opencode_output(result, &mut processed);
@@ -785,13 +782,11 @@ mod tests {
         let adapter = CLIExecutionAdapter::new(CLIType::Codex);
 
         // This will fail because NON_EXISTENT_TEST_VAR is definitely not set
-        let result = adapter
-            .validate_environment(&["NON_EXISTENT_TEST_VAR".to_string()])
-            .await;
+        let result = adapter.validate_environment(&["NON_EXISTENT_TEST_VAR".to_string()]);
         assert!(result.is_err());
 
         // This should pass
-        let result = adapter.validate_environment(&[]).await;
+        let result = adapter.validate_environment(&[]);
         assert!(result.is_ok());
     }
 
@@ -803,7 +798,7 @@ mod tests {
             success: true,
             exit_code: Some(0),
             stdout: "Created config.toml and AGENTS.md".to_string(),
-            stderr: "".to_string(),
+            stderr: String::new(),
             duration_ms: 1000,
             cli_type: CLIType::Codex,
         };

@@ -1,0 +1,86 @@
+[workspace]
+resolver = "2"
+members = [
+    "cli",
+    "controller",
+    "mcp",
+]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+authors = ["5D team"]
+license = "AGPL-3.0"
+repository = "https://github.com/5dlabs/cto"
+
+[workspace.dependencies]
+# Web framework
+axum = "0.8.4"
+tokio = { version = "1.40", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace", "cors", "limit", "timeout"] }
+
+# Kubernetes
+kube = { version = "0.93", features = ["runtime", "derive", "client", "ws"] }
+kube-derive = "0.93"
+k8s-openapi = { version = "0.22", features = ["v1_30"] }
+schemars = "0.8"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0.12"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# OpenTelemetry
+opentelemetry = "0.30.0"
+opentelemetry-otlp = { version = "0.17", features = ["tonic"] }
+opentelemetry_sdk = { version = "0.24", features = ["rt-tokio"] }
+tracing-opentelemetry = "0.31.0"
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env", "cargo"] }
+dialoguer = "0.11"
+indicatif = "0.17"
+colored = "3.0.0"
+
+# HTTP Client
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
+eventsource-client = "0.15.0"
+
+# Async utilities
+futures = "0.3"
+async-trait = "0.1"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Text processing
+regex = "1.10"
+handlebars = "6.3.2"
+
+# Testing
+mockall = "0.13"
+wiremock = "0.6"
+
+# UUID generation
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+

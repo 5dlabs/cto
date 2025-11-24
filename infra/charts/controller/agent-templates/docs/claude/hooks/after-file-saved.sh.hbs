@@ -160,7 +160,8 @@ refresh_github_token_if_needed() {
     if [ -n "$NEW_TOKEN" ] && [ "$NEW_TOKEN" != "null" ]; then
         export GITHUB_TOKEN="$NEW_TOKEN"
         export TOKEN_GENERATED_AT=$(date +%s)
-        echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+        CREDENTIALS_PATH="${CREDENTIALS_FILE:-/workspace/.git-credentials}"
+        echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_PATH"
         echo "[Auto-save] ✓ Token refreshed successfully"
         rm -f "$TEMP_KEY"
         return 0

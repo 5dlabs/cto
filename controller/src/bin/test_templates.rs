@@ -133,6 +133,7 @@ fn test_docs_templates(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 fn test_code_templates(
     handlebars: &mut Handlebars,
     template_dir: &Path,
@@ -395,7 +396,12 @@ fn test_code_templates(
                     "envKey": "FACTORY_API_KEY",
                     "wireApi": "chat"
                 },
-                "rawJson": "{\"extra\":\"value\"}"
+                "rawJson": "{\"extra\":\"value\"}",
+                "modelRotation": [
+                    "claude-sonnet-4-5-20250929",
+                    "gpt-5-codex"
+                ],
+                "listToolsOnStart": true
             }),
             "remote_tools": [
                 "memory_create_entities",
@@ -408,6 +414,11 @@ fn test_code_templates(
             "maxTokens": 64000,
             "temperature": 0.5,
             "reasoningEffort": "high",
+            "modelRotation": [
+                "claude-sonnet-4-5-20250929",
+                "gpt-5-codex"
+            ],
+            "listToolsOnStart": true,
             "settings": json!({
                 "approvalPolicy": "never",
                 "sandboxMode": "danger-full-access",
@@ -421,7 +432,12 @@ fn test_code_templates(
                     "envKey": "FACTORY_API_KEY",
                     "wireApi": "chat"
                 },
-                "rawJson": "{\"extra\":\"value\"}"
+                "rawJson": "{\"extra\":\"value\"}",
+                "modelRotation": [
+                    "claude-sonnet-4-5-20250929",
+                    "gpt-5-codex"
+                ],
+                "listToolsOnStart": true
             })
         },
         "temperature": 0.5,

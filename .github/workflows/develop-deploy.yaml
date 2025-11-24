@@ -159,71 +159,81 @@ jobs:
           echo "🔄 Validating and regenerating Helm templates before deployment..."
           cd infra/charts/controller
           
-          # Store original for comparison
-          cp templates/claude-templates-static.yaml templates/claude-templates-static.yaml.orig 2>/dev/null || true
+          # Store originals for comparison
+          for file in templates/agent-templates-*.yaml; do
+            [ -f "$file" ] && cp "$file" "$file.orig"
+          done
           
           # Regenerate the templates
-          ./scripts/generate-templates-configmap.sh
+          ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Check if templates were updated
-          if [ -f templates/claude-templates-static.yaml.orig ]; then
-            if ! diff -q templates/claude-templates-static.yaml.orig templates/claude-templates-static.yaml >/dev/null 2>&1; then
-              echo "⚠️ WARNING: Templates were out of sync and have been regenerated!"
-              echo "📄 Template changes detected:"
-              diff -u templates/claude-templates-static.yaml.orig templates/claude-templates-static.yaml | head -50 || true
-              echo ""
-              echo "🔧 Using regenerated templates for this deployment"
-              echo "📋 ACTION REQUIRED: Commit the template updates to avoid this in future deployments:"
-              echo "   cd infra/charts/controller"
-              echo "   ./scripts/generate-templates-configmap.sh"
-              echo "   git add templates/claude-templates-static.yaml"
-              echo "   git commit -m 'chore: update claude-templates ConfigMap'"
-              echo ""
-              
-              # For workflow_dispatch (manual deploys), this is critical
-              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                echo "⚠️ MANUAL DEPLOYMENT: Proceeding with regenerated templates"
+          TEMPLATES_CHANGED=false
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
+            ORIG="$file.orig"
+            if [ -f "$ORIG" ]; then
+              if ! diff -q "$ORIG" "$file" >/dev/null 2>&1; then
+                TEMPLATES_CHANGED=true
+                echo "⚠️ WARNING: $(basename $file) was out of sync and has been regenerated!"
               fi
-            else
-              echo "✅ Templates are up to date"
+              rm -f "$ORIG"
             fi
-            rm -f templates/claude-templates-static.yaml.orig
+          done
+          
+          if [ "$TEMPLATES_CHANGED" = "true" ]; then
+            echo "🔧 Using regenerated templates for this deployment"
+            echo "📋 ACTION REQUIRED: Commit the template updates to avoid this in future deployments:"
+            echo "   cd infra/charts/controller"
+            echo "   ./scripts/generate-agent-templates-configmaps-split.sh"
+            echo "   git add templates/agent-templates-*.yaml"
+            echo "   git commit -m 'chore: update agent templates ConfigMaps'"
+            echo ""
+            
+            # For workflow_dispatch (manual deploys), this is critical
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "⚠️ MANUAL DEPLOYMENT: Proceeding with regenerated templates"
+            fi
           else
-            echo "✅ Templates generated successfully (no previous version to compare)"
+            echo "✅ Templates are up to date"
           fi
           
-          # Verify the generated ConfigMap is valid YAML
+          # Verify the generated ConfigMaps are valid YAML
           echo "🔍 Validating generated ConfigMap YAML..."
-          if command -v yamllint >/dev/null 2>&1; then
-            yamllint -d relaxed templates/claude-templates-static.yaml || {
-              echo "❌ ERROR: Generated ConfigMap is not valid YAML!"
-              exit 1
-            }
-          else
-            # Basic validation without yamllint - check for valid YAML structure
-            if [ ! -f templates/claude-templates-static.yaml ]; then
-              echo "❌ ERROR: Generated ConfigMap file does not exist!"
-              exit 1
-            fi
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
             
-            # Check file is not empty and has reasonable size
-            if [ ! -s templates/claude-templates-static.yaml ]; then
-              echo "❌ ERROR: Generated ConfigMap is empty!"
-              exit 1
-            fi
-            
-            # Check for valid YAML start patterns (comment, document separator, or apiVersion)
-            if head -n 5 templates/claude-templates-static.yaml | grep -qE "^(#|---|apiVersion:|kind:)"; then
-              echo "✅ Basic YAML structure validation passed"
+            if command -v yamllint >/dev/null 2>&1; then
+              yamllint -d relaxed "$file" || {
+                echo "❌ ERROR: $(basename $file) is not valid YAML!"
+                exit 1
+              }
             else
-              echo "❌ ERROR: Generated ConfigMap doesn't appear to be valid YAML!"
-              echo "First 5 lines:"
-              head -n 5 templates/claude-templates-static.yaml
-              exit 1
+              # Basic validation without yamllint - check for valid YAML structure
+              if [ ! -f "$file" ]; then
+                echo "❌ ERROR: ConfigMap file $(basename $file) does not exist!"
+                exit 1
+              fi
+              
+              # Check file is not empty and has reasonable size
+              if [ ! -s "$file" ]; then
+                echo "❌ ERROR: ConfigMap $(basename $file) is empty!"
+                exit 1
+              fi
+              
+              # Check for valid YAML start patterns (comment, document separator, or apiVersion)
+              if head -n 5 "$file" | grep -qE "^(#|---|apiVersion:|kind:)"; then
+                echo "✅ $(basename $file): Basic YAML structure validation passed"
+              else
+                echo "❌ ERROR: $(basename $file) doesn't appear to be valid YAML!"
+                echo "First 5 lines:"
+                head -n 5 "$file"
+                exit 1
+              fi
             fi
-          fi
+          done
           
-          echo "✅ Template ConfigMap is valid and ready for deployment"
+          echo "✅ All template ConfigMaps are valid and ready for deployment"
 
       - name: Build release binary (ultra-fast)
         working-directory: ./controller
@@ -290,27 +300,27 @@ jobs:
 
       - name: Log in to Docker Hub (for builder images only)
         if: env.DOCKER_HUB_WORKING == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Set up Docker Buildx (full functionality)
         if: env.DOCKER_HUB_WORKING == 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
         with:
           driver: docker-container
           install: true
 
       - name: Set up Docker Buildx (outage workaround - limited functionality)
         if: env.DOCKER_HUB_WORKING == 'false'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
         with:
           driver: docker
           install: true
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -318,7 +328,7 @@ jobs:
 
       - name: Build and push Controller image (full functionality)
         if: env.DOCKER_HUB_WORKING == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./infra/images/controller/Dockerfile
@@ -333,7 +343,7 @@ jobs:
 
       - name: Build and push Controller image (outage workaround)
         if: env.DOCKER_HUB_WORKING == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./infra/images/controller/Dockerfile
@@ -351,102 +361,6 @@ jobs:
           echo "🔎 Latest GHCR tags for controller:"
           gh api -H "Accept: application/vnd.github+json" \
             "/orgs/5dlabs/packages/container/cto%2Fcontroller/versions?per_page=1" \
-            | jq -r '.[0].metadata.container.tags'
-
-  build-sidecar:
-    needs: [version]
-    runs-on: [k8s-runner]
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
-
-      - name: Build sidecar binary
-        working-directory: ./sidecar
-        run: |
-          echo "🏗️ Building sidecar binary"
-          # Use sccache if available
-          if command -v sccache >/dev/null 2>&1; then
-            echo "Using sccache"
-            export RUSTC_WRAPPER=sccache
-            sccache --start-server || true
-          else
-            echo "sccache not found; building without wrapper"
-          fi
-          # Use shared target directory for better cache hits
-          mkdir -p $HOME/cache/target
-          export CARGO_TARGET_DIR=$HOME/cache/target
-          cargo build --release
-          command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
-          cp $HOME/cache/target/release/sidecar ./sidecar
-          ls -lh ./sidecar
-
-      - name: Log in to Docker Hub (for builder images only)
-        if: env.DOCKER_HUB_WORKING == 'true'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Set up Docker Buildx (full functionality)
-        if: env.DOCKER_HUB_WORKING == 'true'
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          install: true
-
-      - name: Set up Docker Buildx (outage workaround - limited functionality)
-        if: env.DOCKER_HUB_WORKING == 'false'
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
-          install: true
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push sidecar image (full functionality)
-        if: env.DOCKER_HUB_WORKING == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./infra/images/sidecar/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.short-sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push sidecar image (outage workaround)
-        if: env.DOCKER_HUB_WORKING == 'false'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./infra/images/sidecar/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.short-sha }}
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-
-      - name: Show GHCR sidecar tags
-        run: |
-          echo "🔎 Latest GHCR tags for sidecar:"
-          gh api -H "Accept: application/vnd.github+json" \
-            "/orgs/5dlabs/packages/container/cto%2Fsidecar/versions?per_page=1" \
             | jq -r '.[0].metadata.container.tags'
 
   # Deploy immediately
@@ -480,24 +394,33 @@ jobs:
           cd infra/charts/controller
           
           # Regenerate templates again to ensure consistency
-          ./scripts/generate-templates-configmap.sh
+          ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Create a patch file if templates differ from Git
-          if ! git diff --quiet templates/claude-templates-static.yaml; then
+          TEMPLATES_CHANGED=false
+          for file in templates/agent-templates-*.yaml; do
+            if ! git diff --quiet "$file"; then
+              TEMPLATES_CHANGED=true
+              break
+            fi
+          done
+          
+          if [ "$TEMPLATES_CHANGED" = "true" ]; then
             echo "templates-changed=true" >> $GITHUB_OUTPUT
             echo "📝 Creating template update patch..."
-            git diff templates/claude-templates-static.yaml > /tmp/templates-update.patch
+            git diff templates/agent-templates-*.yaml > /tmp/templates-update.patch
             
-            # Also save the full updated file
-            cp templates/claude-templates-static.yaml /tmp/claude-templates-static.yaml
+            # Also save the full updated files
+            mkdir -p /tmp/templates-backup
+            cp templates/agent-templates-*.yaml /tmp/templates-backup/
             
             echo "⚠️ IMPORTANT: Templates have been updated!"
             echo "The regenerated templates will be used by ArgoCD for this deployment."
             echo ""
             echo "To make these changes permanent, apply this patch to your main branch:"
             echo "   git apply /tmp/templates-update.patch"
-            echo "   git add infra/charts/controller/templates/claude-templates-static.yaml"
-            echo "   git commit -m 'chore: update claude-templates ConfigMap'"
+            echo "   git add infra/charts/controller/templates/agent-templates-*.yaml"
+            echo "   git commit -m 'chore: update agent templates ConfigMaps'"
             echo "   git push"
           else
             echo "templates-changed=false" >> $GITHUB_OUTPUT
@@ -511,7 +434,7 @@ jobs:
           name: template-updates-${{ github.run_id }}
           path: |
             /tmp/templates-update.patch
-            /tmp/claude-templates-static.yaml
+            /tmp/templates-backup/
           retention-days: 7
 
       - name: GitOps Update (Skipped)

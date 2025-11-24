@@ -1,11 +1,10 @@
 use crate::crds::DocsRun;
-use crate::tasks::code::naming::ResourceNaming;
+use crate::tasks::cleanup::{
+    LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,
+};
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
-use k8s_openapi::api::{
-    batch::v1::Job,
-    core::v1::{ConfigMap, Service},
-};
+use k8s_openapi::api::{batch::v1::Job, core::v1::ConfigMap};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
@@ -23,6 +22,7 @@ pub struct DocsResourceManager<'a> {
 }
 
 impl<'a> DocsResourceManager<'a> {
+    #[must_use]
     pub fn new(
         jobs: &'a Api<Job>,
         configmaps: &'a Api<ConfigMap>,
@@ -37,6 +37,33 @@ impl<'a> DocsResourceManager<'a> {
         }
     }
 
+    /// Sanitize a directory name for use in Kubernetes resource names.
+    /// Returns "default" if the input is empty or becomes empty after sanitization.
+    fn sanitize_directory_name(directory: &str) -> String {
+        if directory.is_empty() {
+            return "default".to_string();
+        }
+
+        let sanitized = directory
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_lowercase();
+
+        if sanitized.is_empty() {
+            "default".to_string()
+        } else {
+            sanitized
+        }
+    }
+
     pub async fn reconcile_create_or_update(&self, docs_run: &Arc<DocsRun>) -> Result<Action> {
         let name = docs_run.name_any();
         info!(
@@ -48,7 +75,7 @@ impl<'a> DocsResourceManager<'a> {
         info!("🔄 RESOURCE_MANAGER: Using idempotent resource creation (no aggressive cleanup)");
 
         // Create ConfigMap FIRST (without owner reference) so Job can mount it
-        let cm_name = self.generate_configmap_name(docs_run);
+        let cm_name = Self::generate_configmap_name(docs_run);
         info!("📝 RESOURCE_MANAGER: Generated ConfigMap name: {}", cm_name);
 
         info!("🏗️ RESOURCE_MANAGER: Creating ConfigMap object");
@@ -151,99 +178,7 @@ impl<'a> DocsResourceManager<'a> {
                 .await?;
         }
 
-        // Ensure headless Service exists for input bridge discovery when enabled
-        if self.config.agent.input_bridge.enabled {
-            let job_name = self.generate_job_name(docs_run);
-            self.ensure_headless_service_exists(docs_run, &job_name)
-                .await?;
-        }
-
         Ok(Action::await_change())
-    }
-
-    async fn ensure_headless_service_exists(
-        &self,
-        docs_run: &DocsRun,
-        job_name: &str,
-    ) -> Result<()> {
-        let namespace = docs_run
-            .metadata
-            .namespace
-            .as_deref()
-            .unwrap_or(&self.ctx.namespace);
-        let services: Api<Service> = Api::namespaced(self.ctx.client.clone(), namespace);
-
-        let svc_name = ResourceNaming::headless_service_name(job_name);
-
-        let mut meta_labels = BTreeMap::new();
-        meta_labels.insert("agents.platform/jobType".to_string(), "docs".to_string());
-        meta_labels.insert("agents.platform/name".to_string(), docs_run.name_any());
-        meta_labels.insert("agents.platform/input".to_string(), "bridge".to_string());
-        meta_labels.insert("agents.platform/owner".to_string(), "DocsRun".to_string());
-
-        if let Some(user) = docs_run
-            .spec
-            .github_app
-            .as_deref()
-            .or(docs_run.spec.github_user.as_deref())
-        {
-            meta_labels.insert(
-                "agents.platform/user".to_string(),
-                self.sanitize_label_value(user),
-            );
-        }
-
-        // Respect configured input bridge port
-        let port = self.config.agent.input_bridge.port;
-        let svc_json = json!({
-            "apiVersion": "v1",
-            "kind": "Service",
-            "metadata": { "name": svc_name, "labels": meta_labels },
-            "spec": {
-                "clusterIP": "None",
-                "ports": [{ "name": "http", "port": port, "targetPort": port }],
-                "selector": { "job-name": job_name }
-            }
-        });
-
-        match services
-            .create(
-                &PostParams::default(),
-                &serde_json::from_value(svc_json.clone())?,
-            )
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(kube::Error::Api(ae)) if ae.code == 409 => {
-                // Fetch existing to preserve resourceVersion on replace
-                let mut existing = services.get(&svc_name).await?;
-                if let Some(spec) = existing.spec.as_mut() {
-                    spec.cluster_ip = Some("None".to_string());
-                    spec.selector = Some(std::collections::BTreeMap::from([(
-                        "job-name".to_string(),
-                        job_name.to_string(),
-                    )]));
-                    spec.ports = Some(vec![k8s_openapi::api::core::v1::ServicePort {
-                        name: Some("http".to_string()),
-                        port: port as i32,
-                        target_port: Some(
-                            k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(
-                                port as i32,
-                            ),
-                        ),
-                        ..Default::default()
-                    }]);
-                }
-                let mut updated: k8s_openapi::api::core::v1::Service =
-                    serde_json::from_value(svc_json)?;
-                updated.metadata.resource_version = existing.metadata.resource_version.take();
-                services
-                    .replace(&svc_name, &PostParams::default(), &updated)
-                    .await?;
-                Ok(())
-            }
-            Err(e) => Err(e.into()),
-        }
     }
 
     pub async fn cleanup_resources(&self, docs_run: &Arc<DocsRun>) -> Result<Action> {
@@ -257,7 +192,7 @@ impl<'a> DocsResourceManager<'a> {
         Ok(Action::await_change())
     }
 
-    fn generate_configmap_name(&self, docs_run: &DocsRun) -> String {
+    fn generate_configmap_name(docs_run: &DocsRun) -> String {
         // Generate unique ConfigMap name per DocsRun to prevent conflicts between sequential jobs
         let namespace = docs_run.metadata.namespace.as_deref().unwrap_or("default");
         let name = docs_run.metadata.name.as_deref().unwrap_or("unknown");
@@ -265,8 +200,7 @@ impl<'a> DocsResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
         let context_version = 1; // Docs don't have context versions, always 1
 
         // Use deterministic naming based on DocsRun UID for stable references
@@ -321,7 +255,7 @@ impl<'a> DocsResourceManager<'a> {
             "🏷️ RESOURCE_MANAGER: Creating labels for ConfigMap: {}",
             name
         );
-        let labels = self.create_task_labels(docs_run);
+        let labels = Self::create_task_labels(docs_run);
         error!("✅ RESOURCE_MANAGER: Created {} labels", labels.len());
 
         error!("📝 RESOURCE_MANAGER: Building ConfigMap metadata");
@@ -356,7 +290,7 @@ impl<'a> DocsResourceManager<'a> {
         docs_run: &DocsRun,
         cm_name: &str,
     ) -> Result<Option<OwnerReference>> {
-        let job_name = self.generate_job_name(docs_run);
+        let job_name = Self::generate_job_name(docs_run);
 
         // FIRST: Check if the job already exists
         match self.jobs.get(&job_name).await {
@@ -463,16 +397,46 @@ impl<'a> DocsResourceManager<'a> {
         docs_run: &DocsRun,
         cm_name: &str,
     ) -> Result<Option<OwnerReference>> {
-        let job_name = self.generate_job_name(docs_run);
+        let job_name = Self::generate_job_name(docs_run);
 
         // Ensure PVC exists before creating job
+        info!(
+            "🔧 DocsRun {}: Ensuring PVC exists for job {}",
+            docs_run.name_any(),
+            job_name
+        );
         self.ensure_workspace_pvc(docs_run).await?;
+        info!(
+            "✅ DocsRun {}: PVC ready for job {}",
+            docs_run.name_any(),
+            job_name
+        );
 
+        info!(
+            "🔧 DocsRun {}: Building job spec for {}",
+            docs_run.name_any(),
+            job_name
+        );
         let job = self.build_job_spec(docs_run, &job_name, cm_name)?;
+        info!(
+            "✅ DocsRun {}: Job spec built for {}",
+            docs_run.name_any(),
+            job_name
+        );
 
+        info!(
+            "🔧 DocsRun {}: Creating job {}",
+            docs_run.name_any(),
+            job_name
+        );
         let created_job = self.jobs.create(&PostParams::default(), &job).await?;
+        info!(
+            "✅ DocsRun {}: Job created successfully: {}",
+            docs_run.name_any(),
+            job_name
+        );
 
-        error!("✅ RESOURCE_MANAGER: Created docs job: {}", job_name);
+        info!("✅ RESOURCE_MANAGER: Created docs job: {}", job_name);
 
         // Update status using legacy status manager if needed
         if let Err(e) = super::status::DocsStatusManager::update_job_started(
@@ -506,7 +470,7 @@ impl<'a> DocsResourceManager<'a> {
         }
     }
 
-    fn generate_job_name(&self, docs_run: &DocsRun) -> String {
+    fn generate_job_name(docs_run: &DocsRun) -> String {
         // Use deterministic naming based on the DocsRun's actual name and UID
         // This ensures the same DocsRun always generates the same Job name
         let namespace = docs_run.metadata.namespace.as_deref().unwrap_or("default");
@@ -515,16 +479,16 @@ impl<'a> DocsResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
 
         format!("docs-{namespace}-{name}-{uid_suffix}")
             .replace(['_', '.'], "-")
             .to_lowercase()
     }
 
+    #[allow(clippy::too_many_lines)]
     fn build_job_spec(&self, docs_run: &DocsRun, job_name: &str, cm_name: &str) -> Result<Job> {
-        let labels = self.create_task_labels(docs_run);
+        let labels = Self::create_task_labels(docs_run);
 
         // Create owner reference to DocsRun for proper event handling
         let owner_ref = OwnerReference {
@@ -565,6 +529,19 @@ impl<'a> DocsResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
+        // Agent templates volume for integration task templates
+        let agent_templates_cm_name = "controller-agent-templates-docs".to_string();
+        volumes.push(json!({
+            "name": "agent-templates",
+            "configMap": {
+                "name": agent_templates_cm_name
+            }
+        }));
+        volume_mounts.push(json!({
+            "name": "agent-templates",
+            "mountPath": "/agent-templates"
+        }));
+
         // Mount settings.json as managed-settings.json for enterprise compatibility
         volume_mounts.push(json!({
             "name": "task-files",
@@ -593,18 +570,7 @@ impl<'a> DocsResourceManager<'a> {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_lowercase(),
-            docs_run
-                .spec
-                .working_directory
-                .chars()
-                .map(|c| if c.is_alphanumeric() || c == '-' {
-                    c
-                } else {
-                    '-'
-                })
-                .collect::<String>()
-                .trim_matches('-')
-                .to_lowercase()
+            Self::sanitize_directory_name(&docs_run.spec.working_directory)
         );
 
         volumes.push(json!({
@@ -619,7 +585,7 @@ impl<'a> DocsResourceManager<'a> {
         }));
 
         // SSH volumes
-        let ssh_volumes = self.generate_ssh_volumes(docs_run);
+        let ssh_volumes = Self::generate_ssh_volumes(docs_run);
         volumes.extend(ssh_volumes.volumes);
         volume_mounts.extend(ssh_volumes.volume_mounts);
 
@@ -629,7 +595,7 @@ impl<'a> DocsResourceManager<'a> {
         );
 
         // Build primary docs container spec
-        let mut containers = vec![json!({
+        let containers = vec![json!({
             "name": "claude-docs",
             "image": image,
             "env": [
@@ -651,35 +617,6 @@ impl<'a> DocsResourceManager<'a> {
             "workingDir": "/workspace",
             "volumeMounts": volume_mounts
         })];
-
-        // Optionally add sidecar when enabled (input bridge and future tools)
-        if self.config.agent.input_bridge.enabled {
-            let input_bridge_image = format!(
-                "{}:{}",
-                self.config.agent.input_bridge.image.repository,
-                self.config.agent.input_bridge.image.tag
-            );
-            containers.push(json!({
-                "name": "sidecar",
-                "image": input_bridge_image,
-                "imagePullPolicy": "Always",
-                "env": [
-                    {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
-                    {"name": "PORT", "value": self.config.agent.input_bridge.port.to_string()}
-                ],
-                "ports": [{"name": "http", "containerPort": self.config.agent.input_bridge.port}],
-                "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ],
-                "lifecycle": {
-                    "preStop": {
-                        "exec": {"command": ["/bin/sh", "-lc", "curl -fsS -X POST http://127.0.0.1:8080/shutdown || true"]}
-                    }
-                },
-                "resources": {
-                    "requests": { "cpu": "50m", "memory": "32Mi" },
-                    "limits":   { "cpu": "100m", "memory": "64Mi" }
-                }
-            }));
-        }
 
         let job_spec = json!({
             "apiVersion": "batch/v1",
@@ -732,12 +669,21 @@ impl<'a> DocsResourceManager<'a> {
         Ok(serde_json::from_value(job_spec)?)
     }
 
-    fn create_task_labels(&self, docs_run: &DocsRun) -> BTreeMap<String, String> {
+    fn create_task_labels(docs_run: &DocsRun) -> BTreeMap<String, String> {
         let mut labels = BTreeMap::new();
 
         // Update legacy orchestrator label to controller
         labels.insert("app".to_string(), "controller".to_string());
         labels.insert("component".to_string(), "docs-generator".to_string());
+
+        labels.insert(LABEL_CLEANUP_SCOPE.to_string(), SCOPE_RUN.to_string());
+        labels.insert(LABEL_CLEANUP_KIND.to_string(), "docsrun".to_string());
+        if let Some(name) = docs_run.metadata.name.as_deref() {
+            labels.insert(
+                LABEL_CLEANUP_RUN.to_string(),
+                Self::sanitize_label_value(name),
+            );
+        }
 
         // Project identification labels
         labels.insert("job-type".to_string(), "docs".to_string());
@@ -745,7 +691,7 @@ impl<'a> DocsResourceManager<'a> {
         // Use working_directory as project name (it's the most meaningful identifier)
         labels.insert(
             "project-name".to_string(),
-            self.sanitize_label_value(&docs_run.spec.working_directory),
+            Self::sanitize_label_value(&docs_run.spec.working_directory),
         );
 
         // Use github_app if available, fallback to github_user for backward compatibility
@@ -757,7 +703,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or("");
         labels.insert(
             "github-identity".to_string(),
-            self.sanitize_label_value(github_identity),
+            Self::sanitize_label_value(github_identity),
         );
         labels.insert("context-version".to_string(), "1".to_string()); // Docs always version 1
 
@@ -765,13 +711,13 @@ impl<'a> DocsResourceManager<'a> {
         labels.insert("task-type".to_string(), "docs".to_string());
         labels.insert(
             "repository".to_string(),
-            self.sanitize_label_value(&docs_run.spec.repository_url),
+            Self::sanitize_label_value(&docs_run.spec.repository_url),
         );
 
         labels
     }
 
-    fn generate_ssh_volumes(&self, docs_run: &DocsRun) -> SshVolumes {
+    fn generate_ssh_volumes(docs_run: &DocsRun) -> SshVolumes {
         // Only mount SSH keys when using github_user authentication (not GitHub Apps)
         if docs_run.spec.github_app.is_some() || docs_run.spec.github_user.is_none() {
             // GitHub App authentication doesn't need SSH keys
@@ -841,7 +787,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or("");
         let list_params = ListParams::default().labels(&format!(
             "app=orchestrator,component=docs-generator,github-identity={}",
-            self.sanitize_label_value(github_identity)
+            Self::sanitize_label_value(github_identity)
         ));
 
         let jobs = self.jobs.list(&list_params).await?;
@@ -858,7 +804,7 @@ impl<'a> DocsResourceManager<'a> {
 
     async fn cleanup_old_configmaps(&self, docs_run: &DocsRun) -> Result<()> {
         // Generate current ConfigMap name to avoid deleting it
-        let current_cm_name = self.generate_configmap_name(docs_run);
+        let current_cm_name = Self::generate_configmap_name(docs_run);
 
         let github_identity = docs_run
             .spec
@@ -868,7 +814,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or("");
         let list_params = ListParams::default().labels(&format!(
             "app=orchestrator,component=docs-generator,github-identity={}",
-            self.sanitize_label_value(github_identity)
+            Self::sanitize_label_value(github_identity)
         ));
 
         let configmaps = self.configmaps.list(&list_params).await?;
@@ -882,16 +828,11 @@ impl<'a> DocsResourceManager<'a> {
                 }
 
                 // Check if ConfigMap has an owner reference to a Job that's still running
-                let has_active_job = cm
-                    .metadata
-                    .owner_references
-                    .as_ref()
-                    .map(|owners| {
-                        owners.iter().any(|owner| {
-                            owner.kind == "Job" && owner.api_version.starts_with("batch/")
-                        })
-                    })
-                    .unwrap_or(false);
+                let has_active_job = cm.metadata.owner_references.as_ref().is_some_and(|owners| {
+                    owners
+                        .iter()
+                        .any(|owner| owner.kind == "Job" && owner.api_version.starts_with("batch/"))
+                });
 
                 if has_active_job {
                     // If ConfigMap is owned by a Job, let Kubernetes handle cleanup when Job completes
@@ -913,7 +854,7 @@ impl<'a> DocsResourceManager<'a> {
         Ok(())
     }
 
-    fn sanitize_label_value(&self, input: &str) -> String {
+    fn sanitize_label_value(input: &str) -> String {
         if input.is_empty() {
             return String::new();
         }
@@ -948,6 +889,7 @@ impl<'a> DocsResourceManager<'a> {
         sanitized
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn ensure_workspace_pvc(&self, docs_run: &DocsRun) -> Result<()> {
         // Create a project-specific PVC name to avoid cross-project data contamination
         let repo_slug = docs_run
@@ -969,34 +911,44 @@ impl<'a> DocsResourceManager<'a> {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_lowercase(),
-            docs_run
-                .spec
-                .working_directory
-                .chars()
-                .map(|c| if c.is_alphanumeric() || c == '-' {
-                    c
-                } else {
-                    '-'
-                })
-                .collect::<String>()
-                .trim_matches('-')
-                .to_lowercase()
+            Self::sanitize_directory_name(&docs_run.spec.working_directory)
         );
 
         // Check if PVC already exists
         let pvcs: Api<k8s_openapi::api::core::v1::PersistentVolumeClaim> =
             Api::namespaced(self.ctx.client.clone(), &self.ctx.namespace);
 
+        info!(
+            "🔍 DocsRun {}: Checking if PVC {} exists",
+            docs_run.name_any(),
+            pvc_name
+        );
         match pvcs.get(&pvc_name).await {
             Ok(_) => {
-                error!("✅ PVC {} already exists", pvc_name);
+                info!(
+                    "✅ DocsRun {}: PVC {} already exists",
+                    docs_run.name_any(),
+                    pvc_name
+                );
                 return Ok(());
             }
             Err(kube::Error::Api(ae)) if ae.code == 404 => {
                 // PVC doesn't exist, create it
-                error!("📦 Creating PVC: {}", pvc_name);
+                info!(
+                    "📦 DocsRun {}: Creating PVC: {}",
+                    docs_run.name_any(),
+                    pvc_name
+                );
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                error!(
+                    "❌ DocsRun {}: Failed to check PVC {}: {}",
+                    docs_run.name_any(),
+                    pvc_name,
+                    e
+                );
+                return Err(e.into());
+            }
         }
 
         // Create PVC
@@ -1010,7 +962,7 @@ impl<'a> DocsResourceManager<'a> {
                     labels.insert("component".to_string(), "docs-workspace".to_string());
                     labels.insert(
                         "working-directory".to_string(),
-                        self.sanitize_label_value(&docs_run.spec.working_directory),
+                        Self::sanitize_label_value(&docs_run.spec.working_directory),
                     );
                     labels
                 }),
@@ -1037,17 +989,35 @@ impl<'a> DocsResourceManager<'a> {
             ..Default::default()
         };
 
+        info!(
+            "🔧 DocsRun {}: Attempting to create PVC {}",
+            docs_run.name_any(),
+            pvc_name
+        );
         match pvcs.create(&kube::api::PostParams::default(), &pvc).await {
             Ok(_) => {
-                error!("✅ Created PVC: {}", pvc_name);
+                info!(
+                    "✅ DocsRun {}: Created PVC: {}",
+                    docs_run.name_any(),
+                    pvc_name
+                );
                 Ok(())
             }
             Err(kube::Error::Api(ae)) if ae.code == 409 => {
-                error!("✅ PVC {} already exists (created concurrently)", pvc_name);
+                info!(
+                    "✅ DocsRun {}: PVC {} already exists (created concurrently)",
+                    docs_run.name_any(),
+                    pvc_name
+                );
                 Ok(())
             }
             Err(e) => {
-                error!("❌ Failed to create PVC {}: {:?}", pvc_name, e);
+                error!(
+                    "❌ DocsRun {}: Failed to create PVC {}: {:?}",
+                    docs_run.name_any(),
+                    pvc_name,
+                    e
+                );
                 Err(e.into())
             }
         }
@@ -1057,4 +1027,86 @@ impl<'a> DocsResourceManager<'a> {
 struct SshVolumes {
     volumes: Vec<serde_json::Value>,
     volume_mounts: Vec<serde_json::Value>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_directory_name() {
+        // Test empty string
+        assert_eq!(DocsResourceManager::sanitize_directory_name(""), "default");
+
+        // Test normal directory name
+        assert_eq!(DocsResourceManager::sanitize_directory_name("docs"), "docs");
+
+        // Test directory with special characters
+        assert_eq!(
+            DocsResourceManager::sanitize_directory_name("my/project"),
+            "my-project"
+        );
+
+        // Test directory that becomes empty after sanitization
+        assert_eq!(
+            DocsResourceManager::sanitize_directory_name("///"),
+            "default"
+        );
+
+        // Test directory with mixed characters
+        assert_eq!(
+            DocsResourceManager::sanitize_directory_name("docs@2024!"),
+            "docs-2024"
+        );
+    }
+
+    #[test]
+    fn test_backward_compatibility_scenarios() {
+        // Test that new function returns "default" for empty string
+        assert_eq!(DocsResourceManager::sanitize_directory_name(""), "default");
+
+        // Simulate what the old function would have returned for empty string
+        let legacy_result = ""
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_lowercase();
+        assert_eq!(legacy_result, "");
+
+        // Test that both give same result for non-empty strings
+        assert_eq!(DocsResourceManager::sanitize_directory_name("docs"), "docs");
+
+        let legacy_result_docs = "docs"
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_lowercase();
+        assert_eq!(legacy_result_docs, "docs");
+
+        // Test that this demonstrates the backward compatibility issue
+        // Old: empty working_directory would result in PVC name ending with "-" (empty suffix)
+        // New: empty working_directory results in PVC name ending with "-default"
+        let old_pvc_name = format!("docs-workspace-repo-{legacy_result}");
+        let new_pvc_name = format!(
+            "docs-workspace-repo-{}",
+            DocsResourceManager::sanitize_directory_name("")
+        );
+        assert_eq!(old_pvc_name, "docs-workspace-repo-");
+        assert_eq!(new_pvc_name, "docs-workspace-repo-default");
+        assert_ne!(old_pvc_name, new_pvc_name);
+    }
 }

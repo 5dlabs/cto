@@ -899,6 +899,126 @@ if [ ! -f "$TASKS_FILE" ]; then
     fi
 fi
 
+# ========================================
+# Auto-Add Agent Hints
+# ========================================
+echo "🎯 Auto-detecting and adding agent routing hints..."
+
+# Post-process tasks.json to add agentHint based on task content
+jq '
+  # Function to check if task should use frontend agent
+  def is_frontend_task:
+    (.title + " " + (.description // "") + " " + (.details // "")) 
+    | test("frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|next\\.js|nuxt|page|layout|button|form|modal|navbar|header|footer|material-ui|mui|@mui|shadcn|component.*registry"; "i");
+  
+  # Function to check if task should use integration/testing agent
+  def is_integration_task:
+    (.title + " " + (.description // "") + " " + (.details // "")) 
+    | test("test|testing|integration|e2e|end[- ]to[- ]end|qa|quality|verify|validation|cypress|playwright|jest|vitest|spec"; "i");
+  
+  # Apply to all tasks (handle both tagged and non-tagged formats)
+  if .master.tasks then
+    .master.tasks |= map(
+      if .agentHint then
+        # Keep existing agentHint if present
+        .
+      elif is_frontend_task then
+        . + {"agentHint": "frontend"}
+      elif is_integration_task then
+        . + {"agentHint": "integration"}
+      else
+        # Backend/general tasks - no hint needed (defaults to Rex)
+        .
+      end
+    )
+  elif .tasks then
+    .tasks |= map(
+      if .agentHint then
+        .
+      elif is_frontend_task then
+        . + {"agentHint": "frontend"}
+      elif is_integration_task then
+        . + {"agentHint": "integration"}
+      else
+        .
+      end
+    )
+  else
+    .
+  end
+' "$TASKS_FILE" > "$TASKS_FILE.tmp" && mv "$TASKS_FILE.tmp" "$TASKS_FILE"
+
+echo "✅ Agent hints added based on task content"
+
+# ========================================
+# Append Integration Task
+# ========================================
+echo "📝 Appending integration & deployment verification task..."
+
+# Use jq to append integration AND publishing tasks
+jq '
+  # Calculate the new task IDs (max existing ID + 1, + 2)
+  ((.master.tasks // .tasks) | map(.id) | max + 1) as $integration_id |
+  ($integration_id + 1) as $publishing_id |
+  # Get all existing task IDs for dependencies
+  ((.master.tasks // .tasks) | map(.id)) as $all_deps |
+  # Append the integration task (depends on all tasks)
+  if .master.tasks then
+    .master.tasks += [{
+      "id": $integration_id,
+      "title": "Integration Tests & Validation",
+      "description": "Execute comprehensive integration tests to verify all components work together correctly",
+      "status": "pending",
+      "dependencies": $all_deps,
+      "priority": "high",
+      "agentHint": "integration",
+      "details": "## Integration Task Responsibilities\n\nThis task coordinates the final integration of all parallel development work.\n\n### 1. PR Merge Coordination\n- **Check PR Status**: Verify all dependent PRs are approved and passing checks\n  ```bash\n  gh pr list --state open --json number,title,mergeable,statusCheckRollup\n  ```\n- **Merge in Dependency Order**: Respect task dependencies when merging\n  - Example: If task 3 depends on task 1, merge PR for task 1 first\n  - Use: `gh pr merge <PR_NUMBER> --squash --delete-branch`\n- **Handle Conflicts**: If merge conflicts occur, document them and request manual intervention\n\n### 2. Integration Testing\n- **Backend Integration Tests**:\n  ```bash\n  # Run integration test suite\n  cargo test --test \"*\" -- --test-threads=1  # Rust\n  npm run test:integration                     # Node.js\n  pytest tests/integration/                    # Python\n  ```\n- **API Contract Testing**:\n  - Verify all API endpoints are accessible\n  - Check response schemas match expectations\n  - Test inter-service communication\n\n- **Frontend Integration** (if applicable):\n  - Run E2E tests with Playwright/Cypress\n  - Verify UI components render correctly\n  - Test user flows end-to-end\n  ```bash\n  npm run test:e2e  # If E2E tests exist\n  ```\n\n### 3. Deployment Verification\n- **Configuration Validation**:\n  - Check deployment manifests exist\n  - Verify environment variables are set\n  - Validate Kubernetes/Docker configs\n\n- **Service Health Checks**:\n  ```bash\n  # If deployed to Kubernetes\n  kubectl get pods -n <namespace>\n  kubectl get services -n <namespace>\n  \n  # Health endpoint checks\n  curl -f http://service:port/health\n  curl -f http://service:port/ready\n  ```\n\n- **Database Migrations** (if applicable):\n  - Verify migrations ran successfully\n  - Check schema is up to date\n\n### 4. Smoke Testing\n- Test critical user paths\n- Verify authentication/authorization\n- Check data persistence\n- Test error handling\n\n### 5. Reporting\n- **Generate Integration Summary**:\n  - List all merged PRs with links\n  - Show integration test results\n  - Document any issues found\n  - Confirm deployment readiness\n\n- **Create Deployment Checklist**:\n  - [ ] All PRs merged successfully\n  - [ ] Integration tests passing\n  - [ ] Health checks passing\n  - [ ] No critical issues found\n  - [ ] Ready for production deployment\n\n## Success Criteria\n✅ All dependent task PRs merged to main\n✅ Integration test suite passes\n✅ All services healthy and accessible\n✅ No critical bugs or conflicts detected\n✅ Deployment verification complete",
+      "testStrategy": "Execute full integration test suite, verify all service health endpoints, run smoke tests on critical paths, and confirm deployment readiness with zero critical issues"
+    }, {
+      "id": $publishing_id,
+      "title": "Publishing & Deployment",
+      "description": "Merge all PRs, deploy application to Kubernetes, configure Ngrok ingress, and provide public access URLs",
+      "status": "pending",
+      "dependencies": [$integration_id],
+      "priority": "critical",
+      "agentHint": "deployment",
+      "details": "See publishing task template for complete deployment instructions",
+      "testStrategy": "Merge all PRs, build and deploy to Kubernetes, configure Ngrok ingress, verify public URL accessibility, run smoke tests, and provide deployment report with access URLs"
+    }]
+  else
+    .tasks += [{
+      "id": $integration_id,
+      "title": "Integration Tests & Validation",
+      "description": "Execute comprehensive integration tests to verify all components work together correctly",
+      "status": "pending",
+      "dependencies": $all_deps,
+      "priority": "high",
+      "agentHint": "integration",
+      "details": "## Integration Task Responsibilities\n\nThis task coordinates the final integration of all parallel development work.\n\n### 1. PR Merge Coordination\n- **Check PR Status**: Verify all dependent PRs are approved and passing checks\n  ```bash\n  gh pr list --state open --json number,title,mergeable,statusCheckRollup\n  ```\n- **Merge in Dependency Order**: Respect task dependencies when merging\n  - Example: If task 3 depends on task 1, merge PR for task 1 first\n  - Use: `gh pr merge <PR_NUMBER> --squash --delete-branch`\n- **Handle Conflicts**: If merge conflicts occur, document them and request manual intervention\n\n### 2. Integration Testing\n- **Backend Integration Tests**:\n  ```bash\n  # Run integration test suite\n  cargo test --test \"*\" -- --test-threads=1  # Rust\n  npm run test:integration                     # Node.js\n  pytest tests/integration/                    # Python\n  ```\n- **API Contract Testing**:\n  - Verify all API endpoints are accessible\n  - Check response schemas match expectations\n  - Test inter-service communication\n\n- **Frontend Integration** (if applicable):\n  - Run E2E tests with Playwright/Cypress\n  - Verify UI components render correctly\n  - Test user flows end-to-end\n  ```bash\n  npm run test:e2e  # If E2E tests exist\n  ```\n\n### 3. Deployment Verification\n- **Configuration Validation**:\n  - Check deployment manifests exist\n  - Verify environment variables are set\n  - Validate Kubernetes/Docker configs\n\n- **Service Health Checks**:\n  ```bash\n  # If deployed to Kubernetes\n  kubectl get pods -n <namespace>\n  kubectl get services -n <namespace>\n  \n  # Health endpoint checks\n  curl -f http://service:port/health\n  curl -f http://service:port/ready\n  ```\n\n- **Database Migrations** (if applicable):\n  - Verify migrations ran successfully\n  - Check schema is up to date\n\n### 4. Smoke Testing\n- Test critical user paths\n- Verify authentication/authorization\n- Check data persistence\n- Test error handling\n\n### 5. Reporting\n- **Generate Integration Summary**:\n  - List all merged PRs with links\n  - Show integration test results\n  - Document any issues found\n  - Confirm deployment readiness\n\n- **Create Deployment Checklist**:\n  - [ ] All PRs merged successfully\n  - [ ] Integration tests passing\n  - [ ] Health checks passing\n  - [ ] No critical issues found\n  - [ ] Ready for production deployment\n\n## Success Criteria\n✅ All dependent task PRs merged to main\n✅ Integration test suite passes\n✅ All services healthy and accessible\n✅ No critical bugs or conflicts detected\n✅ Deployment verification complete",
+      "testStrategy": "Execute full integration test suite, verify all service health endpoints, run smoke tests on critical paths, and confirm deployment readiness with zero critical issues"
+    }, {
+      "id": $publishing_id,
+      "title": "Publishing & Deployment",
+      "description": "Merge all PRs, deploy application to Kubernetes, configure Ngrok ingress, and provide public access URLs",
+      "status": "pending",
+      "dependencies": [$integration_id],
+      "priority": "critical",
+      "agentHint": "deployment",
+      "details": "See publishing task template for complete deployment instructions",
+      "testStrategy": "Merge all PRs, build and deploy to Kubernetes, configure Ngrok ingress, verify public URL accessibility, run smoke tests, and provide deployment report with access URLs"
+    }]
+  end
+' "$TASKS_FILE" > "$TASKS_FILE.tmp" && mv "$TASKS_FILE.tmp" "$TASKS_FILE"
+
+FINAL_TASK_ID=$(jq '(.master.tasks // .tasks) | map(.id) | max' "$TASKS_FILE")
+INTEGRATION_ID=$((FINAL_TASK_ID - 1))
+echo "✅ Integration task appended (ID: $INTEGRATION_ID)"
+echo "   This task will run integration tests after all implementation tasks complete"
+echo "✅ Publishing task appended (ID: $FINAL_TASK_ID)"
+echo "   This task will merge all PRs, deploy to Kubernetes, and provide Ngrok URLs"
+
+# ========================================
+
 # Analyze complexity if requested
 if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
     echo "🔍 Analyzing task complexity..."

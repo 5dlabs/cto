@@ -43,3 +43,9 @@ pub const DOCS_CLAUDE_SETTINGS_TEMPLATE: &str = "docs/claude/settings.json.hbs";
 pub const DOCS_CLAUDE_PROMPT_TEMPLATE: &str = "docs/claude/prompt.md.hbs";
 pub const DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE: &str = "docs/claude/client-config.json.hbs";
 pub const DOCS_CLAUDE_TOOLMAN_TEMPLATE: &str = "docs/claude/toolman-catalog.md.hbs";
+
+// Gemini code templates
+pub const CODE_GEMINI_CONTAINER_BASE_TEMPLATE: &str = "code/gemini/container-base.sh.hbs";
+pub const CODE_GEMINI_CONTAINER_TEMPLATE: &str = "code/gemini/container.sh.hbs";
+pub const CODE_GEMINI_MEMORY_TEMPLATE: &str = "code/gemini/memory.md.hbs";
+pub const CODE_GEMINI_CONFIG_TEMPLATE: &str = "code/gemini/config.json.hbs";

@@ -5,10 +5,6 @@ metadata:
   name: github
   namespace: argo
 spec:
-  service:
-    ports:
-      - port: 12000
-        targetPort: 12000
   github:
     org:
       events:

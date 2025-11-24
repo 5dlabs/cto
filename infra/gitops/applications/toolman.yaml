@@ -32,6 +32,18 @@ spec:
             value: "/config"
           - name: RUST_LOG
             value: "trace,kube=debug,toolman=trace"
+          - name: CONTEXT7_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: toolman-context7-secrets
+                key: CONTEXT7_API_KEY
+                optional: true
+          - name: GITHUB_PERSONAL_ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: toolman-github-secrets
+                key: GITHUB_PERSONAL_ACCESS_TOKEN
+                optional: true
 
         # Set working directory to writable location (not read-only config mount)
         workingDir: "/tmp"
@@ -43,11 +55,11 @@ spec:
         # Resource configuration
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 1000m
+            memory: 2Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 200m
+            memory: 512Mi
 
         # Persistence configuration
         persistence:
@@ -103,6 +115,22 @@ spec:
               args: ["-y", "@upstash/context7-mcp"]
               workingDirectory: "/tmp"
 
+            shadcn:
+              name: "shadcn/ui"
+              description: "shadcn/ui component library with source code and demos"
+              transport: "stdio"
+              command: "npx"
+              args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
+              workingDirectory: "/tmp"
+
+            github:
+              name: "GitHub"
+              description: "GitHub API operations for repositories, issues, and pull requests"
+              transport: "stdio"
+              command: "npx"
+              args: ["-y", "@modelcontextprotocol/server-github"]
+              workingDirectory: "/tmp"
+
             agent-docs:
               name: "Agent Docs"
               description: "Agent documentation and knowledge base server"
@@ -121,10 +149,20 @@ spec:
               args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
               workingDirectory: "/tmp"
 
+            rust-tools:
+              name: "Rust Development Tools"
+              description: "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development"
+              transport: "stdio"
+              command: "/home/node/.cargo/bin/cursor-rust-tools"
+              args: ["--no-ui"]
+              workingDirectory: "/workspace"
+
         # Secret store integration (External Secrets will inject these)
         secretRefs:
           - name: toolman-brave-search-secrets
           - name: toolman-reddit-secrets
+          - name: toolman-context7-secrets
+          - name: toolman-github-secrets
 
         # Security context (explicit configuration)
         securityContext:

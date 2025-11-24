@@ -11,7 +11,7 @@
     },
     "_comment_code": "Default values for task() tool - code implementation workflows",
     "code": {
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -19,7 +19,7 @@
       "repository": "https://github.com/your-org/your-target-repo",
       "docsRepository": "https://github.com/your-org/your-docs-repo",
       "docsProjectDirectory": "projects/your-project",
-      "service": "your-service-name",
+      "service": "cto",
       "cli": "codex"
     },
     "_comment_intake": "Default values for intake() tool - project intake workflows",
@@ -43,13 +43,23 @@
       "model": "claude-sonnet-4-20250514",
       "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
+      "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
       "repository": "your-org/your-test-repo",
       "service": "your-test-service",
       "docsRepository": "your-org/your-test-repo",
       "docsProjectDirectory": "docs",
-      "workingDirectory": "/path/to/your/test/workspace"
+      "workingDirectory": "/path/to/your/test/workspace",
+      "maxRetries": 10,
+      "implementationMaxRetries": 10,
+      "frontendMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "securityMaxRetries": 2,
+      "testingMaxRetries": 5,
+      "autoMerge": false,
+      "parallelExecution": false
     },
     "_comment_docs_ingest": "Default values for docs ingest workflows",
     "docs_ingest": {
@@ -96,7 +106,7 @@
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -192,7 +202,7 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -221,7 +231,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -258,7 +268,7 @@
     "defaults.docs.githubApp": "Default GitHub App for docs workflows",
     "defaults.docs.includeCodebase": "Whether to include existing codebase as markdown context",
     "defaults.docs.sourceBranch": "Default source branch to work from",
-    "defaults.code.model": "Model for code implementation CLI (e.g., gpt-5-codex for Codex or claude-sonnet-4-20250514)",
+    "defaults.code.model": "Model for code implementation CLI (e.g., gpt-4o for Codex or claude-sonnet-4-20250514)",
     "defaults.code.githubApp": "Default GitHub App for code workflows",
     "defaults.code.continueSession": "Whether to continue a previous CLI session by default",
     "defaults.code.workingDirectory": "Default working directory within repository (. for root)",
@@ -272,10 +282,20 @@
     "defaults.intake.fallback": "Fallback model configuration for intake workflows",
     "defaults.play.model": "Default model for play workflows",
     "defaults.play.implementationAgent": "Default GitHub App for implementation in play workflows",
+    "defaults.play.frontendAgent": "Default GitHub App for frontend tasks in play workflows",
     "defaults.play.qualityAgent": "Default GitHub App for quality checks in play workflows",
+    "defaults.play.securityAgent": "Default GitHub App for security scanning in play workflows",
     "defaults.play.testingAgent": "Default GitHub App for testing in play workflows",
     "defaults.play.repository": "Default repository for play workspace",
     "defaults.play.service": "Default service name for play workspace isolation",
+    "defaults.play.maxRetries": "Default maximum retry attempts for all agents (can be overridden per agent)",
+    "defaults.play.implementationMaxRetries": "Maximum retry attempts for implementation agent (Rex/Blaze)",
+    "defaults.play.frontendMaxRetries": "Maximum retry attempts for frontend agent (Blaze)",
+    "defaults.play.qualityMaxRetries": "Maximum retry attempts for quality agent (Cleo)",
+    "defaults.play.securityMaxRetries": "Maximum retry attempts for security agent (Cipher)",
+    "defaults.play.testingMaxRetries": "Maximum retry attempts for testing agent (Tess)",
+    "defaults.play.autoMerge": "Whether Tess should automatically merge PRs after approval (true/false)",
+    "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
     "defaults.docs_ingest.model": "Model for docs ingestion workflows",
     "defaults.docs_ingest.docServerUrl": "URL of the documentation server for docs ingest",
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access"

@@ -1,0 +1,195 @@
+#!/bin/sh
+# Bolt-Cleanup - Preview Environment Cleanup
+# Removes preview deployments when PRs are closed
+
+echo "Bolt-Cleanup: Cleaning up preview deployment"
+
+# Source common setup
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
+
+# Setup authentication
+setup_github_auth
+
+# Environment context
+BOLT_MODE="${BOLT_MODE:-cleanup}"
+PR_NUMBER="${PR_NUMBER}"
+PR_MERGED="${PR_MERGED:-false}"
+TASK_ID="${TASK_ID}"
+
+echo "Mode: $BOLT_MODE"
+echo "PR: #$PR_NUMBER"
+echo "Merged: $PR_MERGED"
+
+# Extract task ID if not provided
+if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
+    echo "===== Extracting Task ID ====="
+    
+    # Try from PR labels
+    TASK_ID=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[] | select(.name | startswith("task-")) | .name' | sed 's/task-//' | head -n 1)
+    
+    if [ -z "$TASK_ID" ]; then
+        echo "⚠️  Could not extract task ID, attempting to find preview resources by PR number"
+        # Try to find ArgoCD app with PR label
+        APP_NAME=$(kubectl get applications -n argocd -l "pr-number=$PR_NUMBER" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        
+        if [ -n "$APP_NAME" ]; then
+            TASK_ID=$(echo "$APP_NAME" | sed 's/task-//' | sed 's/-preview//')
+            echo "✓ Found task ID from ArgoCD app: $TASK_ID"
+        else
+            echo "❌ Could not find task ID or associated resources"
+            exit 0  # Exit gracefully - nothing to clean up
+        fi
+    else
+        echo "✓ Extracted Task ID: $TASK_ID"
+    fi
+fi
+
+# Configuration
+PREVIEW_NAMESPACE="agent-platform-preview-task-$TASK_ID"
+APP_NAME="task-$TASK_ID-preview"
+
+echo "Preview Namespace: $PREVIEW_NAMESPACE"
+echo "ArgoCD App: $APP_NAME"
+
+# Cleanup function
+cleanup_preview_deployment() {
+    local cleanup_status="✅ Cleaned up:"
+    local items_cleaned=0
+    
+    echo "===== Cleaning Up Preview Resources ====="
+    
+    # 1. Delete ArgoCD Application (GitOps)
+    echo "Removing ArgoCD application from cto-apps repository..."
+    
+    local cto_apps_dir="/tmp/cto-apps-cleanup-$$"
+    rm -rf "$cto_apps_dir"
+    
+    git clone https://github.com/5dlabs/cto-apps.git "$cto_apps_dir" 2>&1 || {
+        echo "⚠️  Failed to clone cto-apps repository, trying direct kubectl delete as fallback"
+        if kubectl get application "$APP_NAME" -n argocd >/dev/null 2>&1; then
+            kubectl delete application "$APP_NAME" -n argocd --wait=false
+            cleanup_status="$cleanup_status\n- ✅ ArgoCD Application (fallback)"
+            items_cleaned=$((items_cleaned + 1))
+        fi
+        rm -rf "$cto_apps_dir"
+        return 0
+    }
+    
+    cd "$cto_apps_dir"
+    
+    local app_file="preview/task-$TASK_ID-preview.yaml"
+    
+    if [ -f "$app_file" ]; then
+        git config user.name "Bolt Cleanup"
+        git config user.email "bolt-cleanup@5dlabs.ai"
+        git rm "$app_file"
+        git commit -m "Remove preview deployment for task-$TASK_ID
+
+PR: #$PR_NUMBER
+Reason: PR closed
+
+Cleaned up by Bolt"
+        
+        git push origin main && {
+            cleanup_status="$cleanup_status\n- ✅ ArgoCD Application (GitOps)"
+            items_cleaned=$((items_cleaned + 1))
+        } || {
+            echo "⚠️  Failed to push cleanup, trying direct delete"
+            kubectl delete application "$APP_NAME" -n argocd --wait=false 2>/dev/null
+        }
+    else
+        echo "Application manifest not found in cto-apps (may have been manually deleted)"
+    fi
+    
+    cd - >/dev/null
+    rm -rf "$cto_apps_dir"
+    
+    # 2. Delete ngrok Tunnel
+    local tunnel_name="$APP_NAME"
+    if kubectl get tunnel "$tunnel_name" -n "$PREVIEW_NAMESPACE" >/dev/null 2>&1; then
+        echo "Deleting ngrok tunnel: $tunnel_name"
+        kubectl delete tunnel "$tunnel_name" -n "$PREVIEW_NAMESPACE"
+        cleanup_status="$cleanup_status\n- ✅ ngrok Tunnel"
+        items_cleaned=$((items_cleaned + 1))
+    else
+        echo "ngrok tunnel not found (already deleted or never created)"
+    fi
+    
+    # 3. Delete Namespace (this will cascade delete all resources)
+    if kubectl get namespace "$PREVIEW_NAMESPACE" >/dev/null 2>&1; then
+        echo "Deleting namespace: $PREVIEW_NAMESPACE"
+        kubectl delete namespace "$PREVIEW_NAMESPACE" --wait=false
+        cleanup_status="$cleanup_status\n- ✅ Namespace (and all pods/services)"
+        items_cleaned=$((items_cleaned + 1))
+    else
+        echo "Namespace not found (already deleted or never created)"
+    fi
+    
+    if [ $items_cleaned -eq 0 ]; then
+        echo "✓ No preview resources found to clean up"
+        return 0
+    fi
+    
+    echo "✅ Cleanup initiated for $items_cleaned resource(s)"
+    echo -e "$cleanup_status"
+}
+
+# Post cleanup confirmation to PR
+post_cleanup_confirmation() {
+    echo "===== Posting Cleanup Confirmation to PR ====="
+    
+    local action_text="closed"
+    if [ "$PR_MERGED" = "true" ]; then
+        action_text="merged"
+    fi
+    
+    local comment_body=$(cat <<EOF
+## 🧹 Bolt Cleanup: Task $TASK_ID
+
+✅ **Preview environment has been cleaned up!**
+
+### Removed Resources
+- ✅ ArgoCD Application: \`$APP_NAME\`
+- ✅ Preview Namespace: \`$PREVIEW_NAMESPACE\`
+- ✅ ngrok Tunnel
+- ✅ All pods, services, and volumes
+
+### Why?
+This PR was $action_text, so the preview deployment is no longer needed.
+
+EOF
+)
+    
+    # Add production info if merged
+    if [ "$PR_MERGED" = "true" ]; then
+        comment_body="$comment_body
+### What's Next?
+Your code has been merged to \`main\`. Bolt-Production will deploy to the production environment shortly.
+
+Watch for the production deployment comment with your live URL! 🚀
+"
+    fi
+    
+    comment_body="$comment_body
+---
+*Cleaned up by Bolt at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
+"
+    
+    # Post comment
+    gh pr comment "$PR_NUMBER" --body "$comment_body" 2>/dev/null || {
+        echo "⚠️  Could not post comment to PR (may be locked or deleted)"
+    }
+    
+    echo "✅ Posted cleanup confirmation to PR #$PR_NUMBER"
+}
+
+# Main execution
+echo "===== Starting Preview Cleanup ====="
+
+cleanup_preview_deployment
+post_cleanup_confirmation
+
+echo "===== Cleanup Complete ====="
+echo "Preview resources for Task $TASK_ID have been removed"
+
+

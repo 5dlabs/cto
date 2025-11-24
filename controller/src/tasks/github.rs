@@ -1,7 +1,7 @@
 //! GitHub API integration for fallback PR detection
 
 use anyhow::{Context as AnyhowContext, Result};
-use octocrab::Octocrab;
+use octocrab::{models::pulls::PullRequest, Octocrab};
 use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
@@ -12,11 +12,10 @@ pub async fn check_github_for_pr_by_branch(
     github_token: Option<&str>,
 ) -> Result<Option<String>> {
     let task_id = code_run.spec.task_id;
-    let expected_branch = format!("task-{task_id}");
 
     info!(
-        "Checking GitHub API for PR with branch: {}",
-        expected_branch
+        "Checking GitHub API for PR containing branch pattern: task-{}",
+        task_id
     );
 
     // Parse repository URL to extract owner/repo
@@ -34,29 +33,101 @@ pub async fn check_github_for_pr_by_branch(
         Octocrab::builder().build()?
     };
 
-    // Search for PRs with the expected branch
-    let pulls = octocrab
+    // Search for PRs whose head ref matches task-specific branch patterns
+    let mut page = octocrab
         .pulls(&owner, &repo)
         .list()
         .state(octocrab::params::State::Open)
-        .head(format!("{owner}:{expected_branch}"))
+        .per_page(50)
         .send()
         .await
         .with_context(|| format!("Failed to search for PRs in {owner}/{repo}"))?;
 
-    if let Some(pr) = pulls.items.first() {
-        let pr_url = pr.html_url.as_ref().map(|url| url.to_string());
-        info!("Found PR via GitHub API: {:?}", pr_url);
-        Ok(pr_url)
+    let expected_full_name = format!("{owner}/{repo}");
+
+    loop {
+        if let Some(pr) = page.items.iter().find(|pr| {
+            branch_matches(task_id, &pr.head.ref_field)
+                && pr_origin_matches(pr, &owner, &repo, &expected_full_name)
+        }) {
+            let pr_url = pr.html_url.as_ref().map_or_else(
+                || format!("https://github.com/{owner}/{repo}/pull/{}", pr.number),
+                std::string::ToString::to_string,
+            );
+            info!("Found PR via GitHub API for task {}: {}", task_id, pr_url);
+            return Ok(Some(pr_url));
+        }
+
+        if let Some(next) = next_page(&octocrab, &page).await? {
+            page = next;
+        } else {
+            info!("No PR found for task branch patterns: task-{}", task_id);
+            return Ok(None);
+        }
+    }
+}
+
+async fn next_page(
+    client: &Octocrab,
+    current: &octocrab::Page<PullRequest>,
+) -> Result<Option<octocrab::Page<PullRequest>>> {
+    client
+        .get_page(&current.next)
+        .await
+        .with_context(|| "Failed to fetch next page of pull requests".to_string())
+}
+
+fn branch_matches(task_id: u32, head_ref: &str) -> bool {
+    let base = format!("task-{task_id}");
+
+    head_ref == base
+        || head_ref == format!("feature/{base}")
+        || head_ref.starts_with(&format!("{base}-"))
+        || head_ref.starts_with(&format!("feature/{base}-"))
+}
+
+fn pr_origin_matches(
+    pr: &PullRequest,
+    expected_owner: &str,
+    expected_repo: &str,
+    expected_full_name: &str,
+) -> bool {
+    pr.head.repo.as_ref().is_some_and(|repo| {
+        repo_identity_matches(
+            repo.owner.as_ref().map(|owner| owner.login.as_str()),
+            repo.name.as_str(),
+            repo.full_name.as_deref(),
+            expected_owner,
+            expected_repo,
+            expected_full_name,
+        )
+    })
+}
+
+fn repo_identity_matches(
+    owner_login: Option<&str>,
+    repo_name: &str,
+    full_name: Option<&str>,
+    expected_owner: &str,
+    expected_repo: &str,
+    expected_full_name: &str,
+) -> bool {
+    let owner_matches = owner_login.is_some_and(|login| login.eq_ignore_ascii_case(expected_owner));
+
+    if !owner_matches {
+        return false;
+    }
+
+    if let Some(full) = full_name {
+        full.eq_ignore_ascii_case(expected_full_name)
     } else {
-        info!("No PR found for branch: {}", expected_branch);
-        Ok(None)
+        repo_name.eq_ignore_ascii_case(expected_repo)
     }
 }
 
 /// Parse repository URL to extract owner and repo name
 /// Supports formats like:
-/// - https://github.com/owner/repo
+/// - <https://github.com/owner/repo>
 /// - git@github.com:owner/repo.git
 /// - owner/repo
 fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
@@ -70,14 +141,11 @@ fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
     if parts.len() >= 2 {
         Ok((parts[0].to_string(), parts[1].to_string()))
     } else {
-        Err(anyhow::anyhow!(
-            "Invalid repository URL format: {}",
-            repo_url
-        ))
+        Err(anyhow::anyhow!("Invalid repository URL format: {repo_url}"))
     }
 }
 
-/// Update CodeRun status with found PR URL
+/// Update `CodeRun` status with found PR URL
 pub async fn update_code_run_pr_url(
     client: &kube::Client,
     namespace: &str,
@@ -149,5 +217,56 @@ mod tests {
 
         // Invalid format
         assert!(parse_repository_url("invalid").is_err());
+    }
+
+    #[test]
+    fn test_branch_matches() {
+        assert!(branch_matches(1, "task-1"));
+        assert!(branch_matches(1, "task-1-implementation"));
+        assert!(branch_matches(1, "feature/task-1"));
+        assert!(branch_matches(1, "feature/task-1-implementation"));
+        assert!(branch_matches(
+            1,
+            "feature/task-1-implementation-20250101121212"
+        ));
+        assert!(!branch_matches(1, "task-10"));
+        assert!(!branch_matches(1, "feature/task-10-implementation"));
+        assert!(!branch_matches(1, "main"));
+    }
+
+    #[test]
+    fn test_repo_identity_matches_full_name() {
+        assert!(repo_identity_matches(
+            Some("5dlabs"),
+            "rust-basic-api-2",
+            Some("5dlabs/rust-basic-api-2"),
+            "5dlabs",
+            "rust-basic-api-2",
+            "5dlabs/rust-basic-api-2"
+        ));
+    }
+
+    #[test]
+    fn test_repo_identity_matches_repo_name_only() {
+        assert!(repo_identity_matches(
+            Some("5dlabs"),
+            "rust-basic-api-2",
+            None,
+            "5dlabs",
+            "rust-basic-api-2",
+            "5dlabs/rust-basic-api-2"
+        ));
+    }
+
+    #[test]
+    fn test_repo_identity_matches_owner_mismatch() {
+        assert!(!repo_identity_matches(
+            Some("someone-else"),
+            "rust-basic-api-2",
+            Some("someone-else/rust-basic-api-2"),
+            "5dlabs",
+            "rust-basic-api-2",
+            "5dlabs/rust-basic-api-2"
+        ));
     }
 }

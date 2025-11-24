@@ -1,0 +1,28 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: doc-server-networking
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: "doc-server-networking"
+    app.kubernetes.io/part-of: "platform"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/gitops/resources/doc-server/networking
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp
+  serviceAccountName: doc-server-networking
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

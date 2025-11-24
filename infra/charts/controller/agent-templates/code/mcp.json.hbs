@@ -4,13 +4,18 @@
       "command": "toolman",
       "args": [
         "--url",
-        "http://toolman.agent-platform.svc.cluster.local:3000/mcp",
+        "{{toolman_url}}",
         "--working-dir",
         "/workspace"
       ],
       "env": {
-        "TOOLMAN_SERVER_URL": "http://toolman.agent-platform.svc.cluster.local:3000/mcp"
-      }
+        "TOOLMAN_SERVER_URL": "{{toolman_url}}"
+      }{{#if toolman_tools}},
+      "availableTools": [
+        {{#each toolman_tools}}
+        "{{this}}"{{#unless @last}},{{/unless}}
+        {{/each}}
+      ]{{/if}}
     }
   }
 }

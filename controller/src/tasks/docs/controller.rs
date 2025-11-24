@@ -1,6 +1,8 @@
 use super::resources::DocsResourceManager;
 use crate::crds::DocsRun;
+use crate::tasks::cleanup;
 use crate::tasks::types::{Context, Result, DOCS_FINALIZER_NAME};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use k8s_openapi::api::{batch::v1::Job, core::v1::ConfigMap};
 use kube::api::{Patch, PatchParams};
 use kube::runtime::controller::Action;
@@ -9,6 +11,12 @@ use kube::{Api, ResourceExt};
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
+
+enum DocsExpireUpdate {
+    Unchanged,
+    Set(DateTime<Utc>),
+    Clear,
+}
 
 #[instrument(skip(ctx), fields(docs_run_name = %docs_run.name_any(), namespace = %ctx.namespace))]
 pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Result<Action> {
@@ -19,6 +27,10 @@ pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Re
     let name = docs_run.name_any();
 
     debug!("Reconciling DocsRun: {}", name);
+
+    if let Some(action) = try_docs_cleanup_after_ttl(&docs_run, &ctx).await? {
+        return Ok(action);
+    }
 
     // Create APIs
     debug!("Creating Kubernetes API clients...");
@@ -39,12 +51,10 @@ pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Re
     )
     .await
     .map_err(|e| match e {
-        kube::runtime::finalizer::Error::ApplyFailed(err) => err,
-        kube::runtime::finalizer::Error::CleanupFailed(err) => err,
-        kube::runtime::finalizer::Error::AddFinalizer(e) => {
-            crate::tasks::types::Error::KubeError(e)
-        }
-        kube::runtime::finalizer::Error::RemoveFinalizer(e) => {
+        kube::runtime::finalizer::Error::ApplyFailed(err)
+        | kube::runtime::finalizer::Error::CleanupFailed(err) => err,
+        kube::runtime::finalizer::Error::AddFinalizer(e)
+        | kube::runtime::finalizer::Error::RemoveFinalizer(e) => {
             crate::tasks::types::Error::KubeError(e)
         }
         kube::runtime::finalizer::Error::UnnamedObject => {
@@ -61,6 +71,7 @@ pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Re
 }
 
 #[instrument(skip(ctx), fields(docs_run_name = %docs_run.name_any(), namespace = %ctx.namespace))]
+#[allow(clippy::too_many_lines)]
 async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) -> Result<Action> {
     let docs_run_name = docs_run.name_any();
     info!(
@@ -74,15 +85,14 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
         if status.work_completed == Some(true) {
             // Double-check with GitHub to ensure status hasn't changed
             if let Some(pr_url) = &status.pull_request_url {
-                if let Ok(is_still_complete) = verify_github_completion_status(pr_url).await {
-                    if !is_still_complete {
-                        warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
-                        clear_work_completed_status(&docs_run, ctx).await?;
-                        // Continue with reconciliation
-                    } else {
+                if let Ok(is_still_complete) = verify_github_completion_status(pr_url) {
+                    if is_still_complete {
                         info!("Work already completed (verified with GitHub), no further action needed");
                         return Ok(Action::await_change());
                     }
+                    warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
+                    clear_work_completed_status(&docs_run, ctx).await?;
+                    // Continue with reconciliation
                 } else {
                     warn!("Could not verify GitHub status, proceeding with caution");
                 }
@@ -96,12 +106,23 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
         match status.phase.as_str() {
             "Succeeded" => {
                 info!("Already succeeded, ensuring work_completed is set");
+                // Preserve existing finishedAt to avoid resetting TTL on every reconciliation
+                let finished_at = status
+                    .finished_at
+                    .as_ref()
+                    .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                    .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
+                let cleanup_deadline =
+                    compute_docs_cleanup_deadline(&docs_run, ctx, "Succeeded", finished_at);
+
                 update_docs_status_with_completion(
                     &docs_run,
                     ctx,
                     "Succeeded",
                     "Documentation generation completed successfully",
                     true,
+                    Some(finished_at),
+                    cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
                 )
                 .await?;
                 return Ok(Action::await_change());
@@ -130,7 +151,14 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
     debug!("Generated job name: {}", job_name);
 
     let job_state = check_job_state(&jobs, &job_name).await?;
-    debug!("Current job state: {:?}", job_state);
+    info!(
+        "🔍 DocsRun {}: Generated job name: {}",
+        docs_run_name, job_name
+    );
+    info!(
+        "🔍 DocsRun {}: Current job state: {:?}",
+        docs_run_name, job_state
+    );
 
     match job_state {
         JobState::NotFound => {
@@ -153,11 +181,14 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                 "Running",
                 "Documentation generation started",
                 false,
+                None,
+                DocsExpireUpdate::Clear,
             )
             .await?;
 
             // Requeue to check job progress
-            Ok(Action::requeue(std::time::Duration::from_secs(30)))
+            // Using 90s instead of 30s to reduce reconciliation load
+            Ok(Action::requeue(std::time::Duration::from_secs(90)))
         }
 
         JobState::Running => {
@@ -170,23 +201,31 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                 "Running",
                 "Documentation generation in progress",
                 false,
+                None,
+                DocsExpireUpdate::Clear,
             )
             .await?;
 
             // Continue monitoring
-            Ok(Action::requeue(std::time::Duration::from_secs(30)))
+            // Using 90s instead of 30s to reduce reconciliation load
+            Ok(Action::requeue(std::time::Duration::from_secs(90)))
         }
 
         JobState::Completed => {
             info!("Job completed successfully - marking work as complete");
 
             // Mark work as completed (TTL-safe)
+            let finished_at = Utc::now();
+            let cleanup_deadline =
+                compute_docs_cleanup_deadline(&docs_run, ctx, "Succeeded", finished_at);
             update_docs_status_with_completion(
                 &docs_run,
                 ctx,
                 "Succeeded",
                 "Documentation generation completed successfully",
                 true,
+                Some(finished_at),
+                cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
             )
             .await?;
 
@@ -198,12 +237,17 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
             info!("Job failed - final state reached");
 
             // Update to failed status (work_completed remains false for potential retry)
+            let finished_at = Utc::now();
+            let cleanup_deadline =
+                compute_docs_cleanup_deadline(&docs_run, ctx, "Failed", finished_at);
             update_docs_status_with_completion(
                 &docs_run,
                 ctx,
                 "Failed",
                 "Documentation generation failed",
                 false,
+                Some(finished_at),
+                cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
             )
             .await?;
 
@@ -244,8 +288,7 @@ fn generate_job_name(docs_run: &DocsRun) -> String {
         .metadata
         .uid
         .as_deref()
-        .map(|uid| &uid[..8])
-        .unwrap_or("nouid");
+        .map_or("nouid", |uid| &uid[..8]);
 
     format!("docs-{namespace}-{name}-{uid_suffix}")
         .replace(['_', '.'], "-")
@@ -301,13 +344,11 @@ async fn update_docs_status_with_completion(
     new_phase: &str,
     new_message: &str,
     work_completed: bool,
+    finished_at: Option<DateTime<Utc>>,
+    expire_update: DocsExpireUpdate,
 ) -> Result<()> {
     // Only update if status actually changed
-    let current_phase = docs_run
-        .status
-        .as_ref()
-        .map(|s| s.phase.as_str())
-        .unwrap_or("");
+    let current_phase = docs_run.status.as_ref().map_or("", |s| s.phase.as_str());
     let current_work_completed = docs_run
         .status
         .as_ref()
@@ -329,7 +370,7 @@ async fn update_docs_status_with_completion(
 
     let docsruns: Api<DocsRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
 
-    let status_patch = json!({
+    let mut status_patch = json!({
         "status": {
             "phase": new_phase,
             "message": new_message,
@@ -337,6 +378,20 @@ async fn update_docs_status_with_completion(
             "workCompleted": work_completed,
         }
     });
+
+    if let Some(done_at) = finished_at {
+        status_patch["status"]["finishedAt"] = json!(done_at.to_rfc3339());
+    }
+
+    match expire_update {
+        DocsExpireUpdate::Set(deadline) => {
+            status_patch["status"]["expireAt"] = json!(deadline.to_rfc3339());
+        }
+        DocsExpireUpdate::Clear => {
+            status_patch["status"]["expireAt"] = serde_json::Value::Null;
+        }
+        DocsExpireUpdate::Unchanged => {}
+    }
 
     // Use status subresource to avoid triggering spec reconciliation
     docsruns
@@ -355,7 +410,7 @@ async fn update_docs_status_with_completion(
 }
 
 /// Verify completion status with GitHub to prevent stale local state
-async fn verify_github_completion_status(pr_url: &str) -> Result<bool> {
+fn verify_github_completion_status(pr_url: &str) -> Result<bool> {
     // Extract PR number from GitHub URL
     // Format: https://github.com/owner/repo/pull/number
     let _pr_number = extract_pr_number_from_url(pr_url)?;
@@ -388,7 +443,7 @@ fn extract_pr_number_from_url(url: &str) -> Result<u32> {
     )))
 }
 
-/// Clear stale work_completed status
+/// Clear stale `work_completed` status
 async fn clear_work_completed_status(docs_run: &crate::crds::DocsRun, ctx: &Context) -> Result<()> {
     let docs_runs: Api<crate::crds::DocsRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
 
@@ -412,4 +467,124 @@ async fn clear_work_completed_status(docs_run: &crate::crds::DocsRun, ctx: &Cont
         docs_run.name_any()
     );
     Ok(())
+}
+
+async fn try_docs_cleanup_after_ttl(
+    docs_run: &Arc<DocsRun>,
+    ctx: &Arc<Context>,
+) -> Result<Option<Action>> {
+    if !ctx.config.cleanup.enabled {
+        return Ok(None);
+    }
+
+    if cleanup::is_preserved(&docs_run.metadata) {
+        return Ok(None);
+    }
+
+    let Some(status) = &docs_run.status else {
+        return Ok(None);
+    };
+
+    if status.cleanup_completed_at.is_some() {
+        return Ok(None);
+    }
+
+    if !matches!(status.phase.as_str(), "Succeeded" | "Failed") {
+        return Ok(None);
+    }
+
+    let expire_at = status
+        .expire_at
+        .as_deref()
+        .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
+        .map(|dt| dt.with_timezone(&Utc));
+
+    let Some(expire_at) = expire_at else {
+        return Ok(None);
+    };
+
+    let now = Utc::now();
+    if expire_at > now {
+        let delay = (expire_at - now)
+            .to_std()
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0));
+        return Ok(Some(Action::requeue(delay)));
+    }
+
+    info!(
+        docs_run = %docs_run.name_any(),
+        "TTL expired for DocsRun - performing cleanup"
+    );
+    perform_docs_ttl_cleanup(docs_run, ctx).await?;
+    mark_docs_cleanup_complete(docs_run, ctx).await?;
+    Ok(Some(Action::await_change()))
+}
+
+async fn perform_docs_ttl_cleanup(docs_run: &Arc<DocsRun>, ctx: &Arc<Context>) -> Result<()> {
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let configmaps: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let resource_manager = DocsResourceManager::new(&jobs, &configmaps, &ctx.config, ctx);
+    let _ = resource_manager.cleanup_resources(docs_run).await?;
+    Ok(())
+}
+
+async fn mark_docs_cleanup_complete(docs_run: &DocsRun, ctx: &Context) -> Result<()> {
+    let docsruns: Api<DocsRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let patch = json!({
+        "status": {
+            "cleanupCompletedAt": Utc::now().to_rfc3339(),
+            "expireAt": serde_json::Value::Null
+        }
+    });
+    docsruns
+        .patch_status(
+            &docs_run.name_any(),
+            &PatchParams::default(),
+            &Patch::Merge(&patch),
+        )
+        .await?;
+    Ok(())
+}
+
+fn compute_docs_cleanup_deadline(
+    docs_run: &DocsRun,
+    ctx: &Context,
+    phase: &str,
+    finished_at: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    if !ctx.config.cleanup.enabled {
+        return None;
+    }
+
+    if !matches!(phase, "Succeeded" | "Failed") {
+        return None;
+    }
+
+    if cleanup::is_preserved(&docs_run.metadata) {
+        return None;
+    }
+
+    if docs_run
+        .status
+        .as_ref()
+        .and_then(|status| status.expire_at.as_ref())
+        .is_some()
+    {
+        return None;
+    }
+
+    let ttl_seconds = cleanup::ttl_override_seconds(&docs_run.metadata).or_else(|| {
+        if phase == "Succeeded" {
+            Some(ctx.config.cleanup.success_ttl_seconds)
+        } else {
+            Some(ctx.config.cleanup.failure_ttl_seconds)
+        }
+    })?;
+
+    if ttl_seconds == 0 {
+        return None;
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }

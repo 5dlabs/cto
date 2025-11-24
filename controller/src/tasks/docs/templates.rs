@@ -20,7 +20,18 @@ pub struct DocsTemplateGenerator;
 
 impl DocsTemplateGenerator {
     /// Generate all template files for a docs task
+    ///
+    /// # Errors
+    /// Returns error if template generation fails
     pub fn generate_all_templates(
+        docs_run: &DocsRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        // All CLIs currently use Claude templates
+        Self::generate_claude_templates(docs_run, config)
+    }
+
+    fn generate_claude_templates(
         docs_run: &DocsRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
@@ -55,7 +66,7 @@ impl DocsTemplateGenerator {
         );
 
         // Generate hook scripts
-        let hook_scripts = Self::generate_hook_scripts(docs_run)?;
+        let hook_scripts = Self::generate_hook_scripts(docs_run);
         for (filename, content) in hook_scripts {
             // Use hooks- prefix to comply with ConfigMap key constraints
             templates.insert(format!("hooks-{filename}"), content);
@@ -195,11 +206,15 @@ impl DocsTemplateGenerator {
         Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
     }
 
-    /// Generate agent-centric client-config.json for DocsRun.
+    /// Generate agent-centric client-config.json for `DocsRun`.
     /// Precedence:
     /// 1) agents.<agent>.clientConfig (verbatim pass-through)
     /// 2) agents.<agent>.tools (convert to client-config.json structure generically)
     /// 3) fallback to empty object {}
+    ///
+    /// # Errors
+    /// Returns error if config generation fails
+    #[allow(clippy::too_many_lines)]
     fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
         debug!(
@@ -404,7 +419,9 @@ impl DocsTemplateGenerator {
         }
     }
 
-    fn generate_hook_scripts(docs_run: &DocsRun) -> Result<BTreeMap<String, String>> {
+    /// # Errors
+    /// Returns error if hook script generation fails
+    fn generate_hook_scripts(docs_run: &DocsRun) -> BTreeMap<String, String> {
         let mut hook_scripts = BTreeMap::new();
         let hooks_prefixes = vec![
             "docs_claude_hooks_".to_string(),
@@ -425,7 +442,7 @@ impl DocsTemplateGenerator {
                     if path.is_file() {
                         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
                             // Check if this is a hook template for docs
-                            if filename.ends_with(".hbs") {
+                            if path.extension().and_then(|e| e.to_str()) == Some("hbs") {
                                 if let Some(prefix) = hooks_prefixes
                                     .iter()
                                     .find(|prefix| filename.starts_with(prefix.as_str()))
@@ -499,10 +516,13 @@ impl DocsTemplateGenerator {
             }
         }
 
-        Ok(hook_scripts)
+        hook_scripts
     }
 
-    /// Load a template file from the mounted ConfigMap
+    /// Load a template file from the mounted `ConfigMap`
+    ///
+    /// # Errors
+    /// Returns error if template loading fails
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
         let configmap_key = relative_path.replace('/', "_");

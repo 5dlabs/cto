@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -38,13 +38,23 @@
       "model": "claude-sonnet-4-20250514",
       "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
+      "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
       "repository": "5dlabs/cto-play-test",
       "service": "cto-play-test",
       "docsRepository": "5dlabs/cto-play-test",
       "docsProjectDirectory": "docs",
-      "workingDirectory": "/Users/jonathonfritz/cto-play-test"
+      "workingDirectory": "/Users/jonathonfritz/cto-play-test",
+      "maxRetries": 10,
+      "implementationMaxRetries": 10,
+      "frontendMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "securityMaxRetries": 2,
+      "testingMaxRetries": 5,
+      "autoMerge": false,
+      "parallelExecution": false
     },
     "docs_ingest": {
       "model": "claude-sonnet-4-20250514",
@@ -89,7 +99,7 @@
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -185,20 +195,41 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
-          "memory_create_entities",
-          "memory_add_observations",
-          "brave-search_brave_web_search"
+          "brave_search_brave_web_search",
+          "context7_get_library_docs"
         ],
         "localServers": {
+          "shadcn": {
+            "enabled": true,
+            "command": "npx",
+            "args": [
+              "shadcn@latest",
+              "mcp"
+            ],
+            "tools": [
+              "list_components",
+              "search_components",
+              "add_component",
+              "init_project"
+            ]
+          },
           "filesystem": {
             "enabled": true,
+            "command": "npx",
+            "args": [
+              "-y",
+              "@modelcontextprotocol/server-filesystem",
+              "/workspace"
+            ],
             "tools": [
               "read_file",
               "write_file",
-              "list_directory"
+              "list_directory",
+              "search_files",
+              "directory_tree"
             ]
           },
           "git": {
@@ -214,7 +245,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",

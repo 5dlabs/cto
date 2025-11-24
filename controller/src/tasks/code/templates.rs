@@ -1,5 +1,6 @@
 use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
+use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
     CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
@@ -7,8 +8,9 @@ use crate::tasks::template_paths::{
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
-    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
-    CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
+    CODE_GEMINI_MEMORY_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+    CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -40,6 +42,8 @@ struct CliRenderSettings {
     model_provider: Value,
     raw_additional_toml: Option<String>,
     raw_additional_json: Option<String>,
+    model_rotation: Vec<String>,
+    list_tools_on_start: bool,
 }
 
 pub struct CodeTemplateGenerator;
@@ -55,6 +59,7 @@ impl CodeTemplateGenerator {
             CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
             CLIType::Factory => Self::generate_factory_templates(code_run, config),
             CLIType::OpenCode => Self::generate_opencode_templates(code_run, config),
+            CLIType::Gemini => Self::generate_gemini_templates(code_run, config),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -64,8 +69,7 @@ impl CodeTemplateGenerator {
             .spec
             .cli_config
             .as_ref()
-            .map(|cfg| cfg.cli_type)
-            .unwrap_or(CLIType::Claude)
+            .map_or(CLIType::Claude, |cfg| cfg.cli_type)
     }
 
     fn generate_claude_templates(
@@ -74,23 +78,37 @@ impl CodeTemplateGenerator {
     ) -> Result<BTreeMap<String, String>> {
         let mut templates = BTreeMap::new();
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_container_script(code_run)?,
+            Self::generate_container_script(code_run, &enriched_cli_config)?,
         );
         templates.insert(
             "CLAUDE.md".to_string(),
-            Self::generate_claude_memory(code_run)?,
+            Self::generate_claude_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
         templates.insert(
             "settings.json".to_string(),
-            Self::generate_claude_settings(code_run, config)?,
+            Self::generate_claude_settings(code_run, config, &enriched_cli_config)?,
         );
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
         );
-        let client_config = Self::generate_client_config(code_run, config)?;
         templates.insert("client-config.json".to_string(), client_config);
 
         templates.insert(
@@ -102,7 +120,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -122,6 +140,10 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -131,19 +153,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_cursor_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_cursor_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_cursor_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_cursor_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "cursor-cli-config.json".to_string(),
             Self::generate_cursor_global_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -155,6 +177,11 @@ impl CodeTemplateGenerator {
         );
 
         templates.insert(
+            "cursor-mcp.json".to_string(),
+            Self::generate_cursor_mcp_config(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
             "coding-guidelines.md".to_string(),
             Self::generate_coding_guidelines(code_run)?,
         );
@@ -163,7 +190,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -188,6 +215,10 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -197,19 +228,23 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_opencode_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_opencode_container_script(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+            )?,
         );
 
         templates.insert(
-            "OPENCODE.md".to_string(),
-            Self::generate_opencode_memory(code_run, &cli_config_value, &remote_tools)?,
+            "AGENTS.md".to_string(),
+            Self::generate_opencode_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "opencode-config.json".to_string(),
             Self::generate_opencode_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -224,7 +259,62 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    fn generate_gemini_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        // Enrich cli_config with agent-level settings
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_gemini_container_script(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
+            "GEMINI.md".to_string(),
+            Self::generate_gemini_memory(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -319,6 +409,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_cursor_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -337,6 +430,11 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -354,6 +452,12 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -426,6 +530,40 @@ impl CodeTemplateGenerator {
         Self::load_template(CODE_CURSOR_PROJECT_CONFIG_TEMPLATE)
     }
 
+    fn generate_cursor_mcp_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template("code/cursor/cursor-mcp.json")?;
+
+        handlebars
+            .register_template_string("cursor_mcp", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Cursor MCP config template: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let context = json!({
+            "toolman": {
+                "url": render_settings.toolman_url,
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars.render("cursor_mcp", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Cursor MCP config template: {e}"
+            ))
+        })
+    }
+
     fn generate_factory_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -439,6 +577,10 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -448,19 +590,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_factory_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_factory_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_factory_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_factory_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "factory-cli-config.json".to_string(),
             Self::generate_factory_global_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -480,7 +622,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -549,6 +691,8 @@ impl CodeTemplateGenerator {
             "model": render_settings.model,
             "auto_level": render_settings.auto_level,
             "output_format": render_settings.output_format,
+            "model_rotation": render_settings.model_rotation,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
                 "model": render_settings.model,
@@ -574,6 +718,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_factory_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -588,6 +735,11 @@ impl CodeTemplateGenerator {
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
 
         let context = json!({
             "cli_config": cli_config,
@@ -606,6 +758,12 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": Self::determine_cli_type(code_run).to_string(),
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": render_settings.model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -679,7 +837,7 @@ impl CodeTemplateGenerator {
         Self::load_template(CODE_FACTORY_PROJECT_CONFIG_TEMPLATE)
     }
 
-    fn generate_container_script(code_run: &CodeRun) -> Result<String> {
+    fn generate_container_script(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -708,6 +866,12 @@ impl CodeTemplateGenerator {
                 ))
             })?;
 
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -716,10 +880,12 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
             "continue_session": Self::get_continue_session(code_run),
+            "attempts": retry_count + 1,  // Current attempt number (1-indexed)
             "overwrite_memory": code_run.spec.overwrite_memory,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": code_run.spec.model,
+            "cli_config": cli_config,
         });
 
         handlebars
@@ -731,9 +897,17 @@ impl CodeTemplateGenerator {
             })
     }
 
-    fn generate_claude_memory(code_run: &CodeRun) -> Result<String> {
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
+    fn generate_claude_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
 
         let template = Self::load_template(CODE_CLAUDE_MEMORY_TEMPLATE)?;
 
@@ -811,6 +985,19 @@ impl CodeTemplateGenerator {
         let requirements_env_vars: Vec<_> = req_env_set.into_iter().collect();
         let requirements_secret_sources: Vec<_> = req_src_set.into_iter().collect();
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
+        // Extract model from cli_config like other templates do
+        let cli_model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -819,11 +1006,22 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "model": code_run.spec.model,
+            "model": cli_model.clone(), // Use cli_model for consistency
             "context_version": code_run.spec.context_version,
             "workflow_env_vars": workflow_env_vars,
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
+            "cli_config": cli_config,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": cli_model, // Use cli_model instead of code_run.spec.model
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+            "toolman": {
+                "tools": remote_tools,
+            },
         });
 
         handlebars.render("claude_memory", &context).map_err(|e| {
@@ -831,7 +1029,11 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_claude_settings(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
+    fn generate_claude_settings(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+        cli_config: &Value,
+    ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -850,7 +1052,8 @@ impl CodeTemplateGenerator {
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "api_key_secret_name": config.secrets.api_key_secret_name,
             "api_key_secret_key": config.secrets.api_key_secret_key,
-            "working_directory": code_run.spec.working_directory.as_deref().unwrap_or(".")
+            "working_directory": code_run.spec.working_directory.as_deref().unwrap_or("."),
+            "cli_config": cli_config,
         });
 
         handlebars.render("claude_settings", &context).map_err(|e| {
@@ -858,9 +1061,46 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_mcp_config(_code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
-        // MCP config is currently static, so just load and return the template content
-        Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
+    fn generate_mcp_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_MCP_CONFIG_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("mcp_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register MCP config template: {e}"
+                ))
+            })?;
+
+        // Get CLI config to extract toolman URL and tools
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+
+        // Generate client config and extract remote tools (same pattern as other functions)
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        let context = json!({
+            "toolman_url": render_settings.toolman_url,
+            "toolman_tools": remote_tools,
+        });
+
+        handlebars.render("mcp_config", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render MCP config template: {e}"
+            ))
+        })
     }
 
     fn generate_codex_container_script(
@@ -899,6 +1139,12 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -917,12 +1163,7 @@ impl CodeTemplateGenerator {
             "workflow_name": workflow_name,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
-                "model": code_run
-                    .spec
-                    .cli_config
-                    .as_ref()
-                    .map(|cfg| cfg.model.as_str())
-                    .unwrap_or(&code_run.spec.model),
+                "model": cli_model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
@@ -943,6 +1184,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_codex_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -957,15 +1201,23 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        // Extract model from cli_config like other templates do
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "model": code_run
-                .spec
-                .cli_config
-                .as_ref()
-                .map(|cfg| cfg.model.as_str())
-                .unwrap_or(&code_run.spec.model),
+            "model": model,
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -978,6 +1230,13 @@ impl CodeTemplateGenerator {
                 .unwrap_or(""),
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -990,6 +1249,40 @@ impl CodeTemplateGenerator {
         })
     }
 
+    /// Enrich `cli_config` with agent-level configuration from `ControllerConfig`
+    /// This allows agent-level settings (like modelRotation) to be used as defaults
+    fn enrich_cli_config_from_agent(
+        cli_config: Value,
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Value {
+        let mut enriched = cli_config;
+
+        // Extract agent name from github_app field using AgentClassifier
+        let classifier = AgentClassifier::new();
+        let agent_name = code_run
+            .spec
+            .github_app
+            .as_deref()
+            .and_then(|app| classifier.extract_agent_name(app).ok())
+            .unwrap_or_default();
+
+        if let Some(agent_config) = config.agents.get(&agent_name) {
+            // If agent has model rotation config, inject it into cli_config
+            if let Some(model_rotation) = &agent_config.model_rotation {
+                if model_rotation.enabled && !model_rotation.models.is_empty() {
+                    // Only inject if not already present in cli_config
+                    if enriched.get("modelRotation").is_none() {
+                        enriched["modelRotation"] = json!(model_rotation.models);
+                    }
+                }
+            }
+        }
+
+        enriched
+    }
+
+    #[allow(clippy::too_many_lines)]
     fn build_cli_render_settings(code_run: &CodeRun, cli_config: &Value) -> CliRenderSettings {
         let settings = cli_config
             .get("settings")
@@ -1010,7 +1303,7 @@ impl CodeTemplateGenerator {
                     .get("modelMaxOutputTokens")
                     .and_then(Value::as_u64)
             })
-            .map(|v| v as u32);
+            .and_then(|v| u32::try_from(v).ok());
 
         let temperature = cli_config
             .get("temperature")
@@ -1045,13 +1338,13 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_str)
             .or_else(|| settings.get("reasoningEffort").and_then(Value::as_str))
             .or_else(|| settings.get("modelReasoningEffort").and_then(Value::as_str))
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let auto_level = settings
             .get("autoLevel")
             .and_then(Value::as_str)
             .or_else(|| cli_config.get("autoLevel").and_then(Value::as_str))
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| reasoning_effort.clone());
 
         let output_format = settings
@@ -1059,7 +1352,7 @@ impl CodeTemplateGenerator {
             .or_else(|| settings.get("output_format"))
             .or_else(|| cli_config.get("outputFormat"))
             .and_then(Value::as_str)
-            .map(|value| value.to_string());
+            .map(std::string::ToString::to_string);
 
         let editor_vim_mode = settings
             .get("editor")
@@ -1070,68 +1363,113 @@ impl CodeTemplateGenerator {
         let mut toolman_url = settings
             .get("toolmanUrl")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
-                })
-            });
+            .map_or_else(
+                || {
+                    std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+                        "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                    })
+                },
+                std::string::ToString::to_string,
+            );
         toolman_url = toolman_url.trim_end_matches('/').to_string();
 
         let model_provider = settings
             .get("modelProvider")
             .and_then(Value::as_object)
-            .map(|provider| {
-                let get = |key: &str| provider.get(key).and_then(Value::as_str);
-                json!({
-                    "name": get("name").unwrap_or("OpenAI"),
-                    "base_url": get("base_url")
-                        .or_else(|| get("baseUrl"))
-                        .unwrap_or("https://api.openai.com/v1"),
-                    "env_key": get("env_key")
-                        .or_else(|| get("envKey"))
-                        .unwrap_or("OPENAI_API_KEY"),
-                    "wire_api": get("wire_api")
-                        .or_else(|| get("wireApi"))
-                        .unwrap_or("chat"),
-                    "request_max_retries": provider
-                        .get("request_max_retries")
-                        .and_then(Value::as_u64),
-                    "stream_max_retries": provider
-                        .get("stream_max_retries")
-                        .and_then(Value::as_u64),
-                })
-            })
-            .unwrap_or_else(|| {
-                json!({
-                    "name": "OpenAI",
-                    "base_url": "https://api.openai.com/v1",
-                    "env_key": "OPENAI_API_KEY",
-                    "wire_api": "chat"
-                })
-            });
+            .map_or_else(
+                || {
+                    json!({
+                        "name": "OpenAI",
+                        "base_url": "https://api.openai.com/v1",
+                        "env_key": "OPENAI_API_KEY",
+                        "wire_api": "chat"
+                    })
+                },
+                |provider| {
+                    let get = |key: &str| provider.get(key).and_then(Value::as_str);
+                    json!({
+                        "name": get("name").unwrap_or("OpenAI"),
+                        "base_url": get("base_url")
+                            .or_else(|| get("baseUrl"))
+                            .unwrap_or("https://api.openai.com/v1"),
+                        "env_key": get("env_key")
+                            .or_else(|| get("envKey"))
+                            .unwrap_or("OPENAI_API_KEY"),
+                        "wire_api": get("wire_api")
+                            .or_else(|| get("wireApi"))
+                            .unwrap_or("chat"),
+                        "request_max_retries": provider
+                            .get("request_max_retries")
+                            .and_then(Value::as_u64),
+                        "stream_max_retries": provider
+                            .get("stream_max_retries")
+                            .and_then(Value::as_u64),
+                    })
+                },
+            );
 
         let raw_additional_toml = settings
             .get("rawToml")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 settings
                     .get("raw_config")
                     .and_then(Value::as_str)
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             });
 
         let raw_additional_json = settings
             .get("rawJson")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 settings
                     .get("raw_json")
                     .and_then(Value::as_str)
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             });
+        let model_rotation = settings
+            .get("modelRotation")
+            .or_else(|| settings.get("modelCycle"))
+            .or_else(|| cli_config.get("modelRotation"))
+            .or_else(|| cli_config.get("modelCycle"))
+            .and_then(|value| {
+                // Handle both JSON array and JSON string representations
+                match value {
+                    Value::Array(arr) => Some(
+                        arr.iter()
+                            .filter_map(Value::as_str)
+                            .map(std::string::ToString::to_string)
+                            .collect::<Vec<_>>(),
+                    ),
+                    Value::String(s) => {
+                        // Try to parse as JSON array
+                        serde_json::from_str::<Vec<String>>(s).ok()
+                    }
+                    _ => None,
+                }
+            })
+            .unwrap_or_default();
+        let list_tools_on_start = settings
+            .get("listToolsOnStart")
+            .or_else(|| settings.get("listTools"))
+            .or_else(|| cli_config.get("listToolsOnStart"))
+            .or_else(|| cli_config.get("listTools"))
+            .and_then(|value| match value {
+                Value::Bool(flag) => Some(*flag),
+                Value::String(s) => {
+                    let normalized = s.trim().to_ascii_lowercase();
+                    match normalized.as_str() {
+                        "true" | "1" | "yes" | "on" => Some(true),
+                        "false" | "0" | "no" | "off" => Some(false),
+                        _ => None,
+                    }
+                }
+                Value::Number(num) => num.as_i64().map(|int_val| int_val != 0),
+                _ => None,
+            })
+            .unwrap_or(false);
 
         CliRenderSettings {
             model,
@@ -1148,6 +1486,8 @@ impl CodeTemplateGenerator {
             model_provider,
             raw_additional_toml,
             raw_additional_json,
+            model_rotation,
+            list_tools_on_start,
         }
     }
 
@@ -1157,7 +1497,7 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_array)
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                    .filter_map(|item| item.as_str().map(std::string::ToString::to_string))
                     .collect()
             })
             .unwrap_or_default()
@@ -1221,6 +1561,10 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -1230,19 +1574,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_codex_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_codex_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_codex_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_codex_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "codex-config.toml".to_string(),
             Self::generate_codex_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -1258,7 +1602,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -1271,6 +1615,7 @@ impl CodeTemplateGenerator {
         Ok(templates)
     }
 
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         use serde_json::to_string_pretty;
 
@@ -1298,7 +1643,7 @@ impl CodeTemplateGenerator {
             match v {
                 Value::Object(map) => {
                     let mut out = serde_json::Map::new();
-                    for (k, val) in map.iter() {
+                    for (k, val) in map {
                         if let Value::Object(obj) = val {
                             out.insert(k.clone(), Value::Object(obj.clone()));
                         }
@@ -1379,7 +1724,7 @@ impl CodeTemplateGenerator {
             v.as_array()
                 .map(|arr| {
                     arr.iter()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .filter_map(|x| x.as_str().map(std::string::ToString::to_string))
                         .collect::<Vec<String>>()
                 })
                 .unwrap_or_default()
@@ -1434,7 +1779,7 @@ impl CodeTemplateGenerator {
                             out.insert("tools".to_string(), json!(union));
                         }
                         // Overlay scalar/object fields from overlay
-                        for (ok, ov) in om.iter() {
+                        for (ok, ov) in om {
                             if ok == "tools" {
                                 continue;
                             }
@@ -1716,6 +2061,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_opencode_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -1730,14 +2078,22 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        // Extract model from cli_config like other templates do
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "model": code_run
-                .spec
-                .cli_config
-                .as_ref()
-                .map(|cfg| cfg.model.as_str())
-                .unwrap_or(&code_run.spec.model),
+            "model": model,
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -1749,6 +2105,13 @@ impl CodeTemplateGenerator {
                 "tools": remote_tools,
             },
             "cli_config": cli_config,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
         });
 
         handlebars.render("opencode_agents", &context).map_err(|e| {
@@ -1799,17 +2162,17 @@ impl CodeTemplateGenerator {
             .get("base_url")
             .or_else(|| provider_obj.get("baseUrl"))
             .and_then(Value::as_str)
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let instructions_plain = cli_config
             .get("instructions")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 cli_config
                     .get("memory")
                     .and_then(Value::as_str)
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             });
 
         let local_servers_value = client_config
@@ -1818,8 +2181,7 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
         let local_servers_serialized = if local_servers_value
             .as_object()
-            .map(|map| map.is_empty())
-            .unwrap_or(true)
+            .is_none_or(serde_json::Map::is_empty)
         {
             None
         } else {
@@ -1845,6 +2207,7 @@ impl CodeTemplateGenerator {
                 "instructions": instructions_plain,
                 "remote_tools": remote_tools,
                 "local_servers": local_servers_serialized,
+                "toolman_url": render_settings.toolman_url,
                 "provider": {
                     "name": provider_name,
                     "envKey": provider_env_key,
@@ -1856,6 +2219,220 @@ impl CodeTemplateGenerator {
         handlebars.render("opencode_config", &context).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
                 "Failed to render OpenCode config template: {e}"
+            ))
+        })
+    }
+
+    fn generate_gemini_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let base_template = Self::load_template(CODE_GEMINI_CONTAINER_BASE_TEMPLATE)?;
+        handlebars
+            .register_partial("gemini_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_gemini_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("gemini_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini container template {template_path}: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        // Parse continue_session from spec or env
+        let continue_session = code_run.spec.continue_session
+            || code_run
+                .spec
+                .env
+                .get("CONTINUE_SESSION")
+                .is_some_and(|v| v == "true");
+
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
+            "working_directory": Self::get_working_directory(code_run),
+            "docs_branch": code_run.spec.docs_branch,
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "remote_tools": remote_tools,
+            "settings": cli_settings,
+            "continue_session": continue_session,
+            "overwrite_memory": code_run.spec.overwrite_memory,
+            "attempts": retry_count + 1,
+        });
+
+        handlebars
+            .render("gemini_container", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Gemini container script: {e}"
+                ))
+            })
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn generate_gemini_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        use base64::{engine::general_purpose, Engine as _};
+        use std::collections::BTreeSet;
+
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
+        let template_path = Self::get_gemini_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("gemini_memory", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini memory template: {e}"
+                ))
+            })?;
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        // Derive allowed env var name lists for inclusion in memory
+        // 1) Workflow-provided env names (keys only)
+        let workflow_env_vars: Vec<String> = code_run.spec.env.keys().cloned().collect();
+
+        // 2) From requirements.yaml (environment keys and mapped secret key names)
+        let mut req_env_vars: Vec<String> = Vec::new();
+        let mut req_secret_sources: Vec<String> = Vec::new();
+
+        if let Some(req_b64) = &code_run.spec.task_requirements {
+            if !req_b64.trim().is_empty() {
+                if let Ok(decoded) = general_purpose::STANDARD.decode(req_b64) {
+                    if let Ok(req_yaml) = serde_yaml::from_slice::<serde_yaml::Value>(&decoded) {
+                        if let Some(env_map) =
+                            req_yaml.get("environment").and_then(|e| e.as_mapping())
+                        {
+                            for (k, _v) in env_map {
+                                if let Some(key) = k.as_str() {
+                                    req_env_vars.push(key.to_string());
+                                }
+                            }
+                        }
+                        if let Some(secrets) = req_yaml.get("secrets").and_then(|s| s.as_sequence())
+                        {
+                            for secret in secrets {
+                                if let Some(m) = secret.as_mapping() {
+                                    if let Some(name) = m
+                                        .get(serde_yaml::Value::from("name"))
+                                        .and_then(|n| n.as_str())
+                                    {
+                                        req_secret_sources.push(name.to_string());
+                                    }
+                                    // If there are key mappings, surface the env var names (right-hand side)
+                                    if let Some(keys) = m
+                                        .get(serde_yaml::Value::from("keys"))
+                                        .and_then(|k| k.as_sequence())
+                                    {
+                                        for entry in keys {
+                                            if let Some(map) = entry.as_mapping() {
+                                                for (_k8s_key, env_name) in map {
+                                                    if let Some(n) = env_name.as_str() {
+                                                        req_env_vars.push(n.to_string());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // De-duplicate and sort for stable output
+        let wf_set: BTreeSet<_> = workflow_env_vars.into_iter().collect();
+        let req_env_set: BTreeSet<_> = req_env_vars.into_iter().collect();
+        let req_src_set: BTreeSet<_> = req_secret_sources.into_iter().collect();
+        let workflow_env_vars: Vec<_> = wf_set.into_iter().collect();
+        let requirements_env_vars: Vec<_> = req_env_set.into_iter().collect();
+        let requirements_secret_sources: Vec<_> = req_src_set.into_iter().collect();
+
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
+        // Extract model from cli_config like other templates do
+        let cli_model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "remote_tools": remote_tools,
+            "settings": cli_settings,
+            "workflow_env_vars": workflow_env_vars,
+            "requirements_env_vars": requirements_env_vars,
+            "requirements_secret_sources": requirements_secret_sources,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": cli_model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+            "toolman": {
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars.render("gemini_memory", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Gemini memory template: {e}"
             ))
         })
     }
@@ -1917,14 +2494,12 @@ impl CodeTemplateGenerator {
             })
     }
 
-    fn generate_hook_scripts(code_run: &CodeRun) -> Result<BTreeMap<String, String>> {
+    fn generate_hook_scripts(code_run: &CodeRun) -> BTreeMap<String, String> {
         let mut hook_scripts = BTreeMap::new();
-        let cli_key = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .map(|cfg| cfg.cli_type.to_string())
-            .unwrap_or_else(|| CLIType::Claude.to_string());
+        let cli_key = code_run.spec.cli_config.as_ref().map_or_else(
+            || CLIType::Claude.to_string(),
+            |cfg| cfg.cli_type.to_string(),
+        );
 
         let hook_prefixes = vec![
             format!("code_{}_hooks_", cli_key),
@@ -1945,7 +2520,10 @@ impl CodeTemplateGenerator {
                     let path = entry.path();
                     if path.is_file() {
                         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                            if filename.ends_with(".hbs") {
+                            if std::path::Path::new(filename)
+                                .extension()
+                                .is_some_and(|ext| ext.eq_ignore_ascii_case("hbs"))
+                            {
                                 if let Some(prefix) = hook_prefixes
                                     .iter()
                                     .find(|prefix| filename.starts_with(prefix.as_str()))
@@ -2019,7 +2597,7 @@ impl CodeTemplateGenerator {
             }
         }
 
-        Ok(hook_scripts)
+        hook_scripts
     }
 
     /// Get working directory (defaults to service name if not specified)
@@ -2040,15 +2618,34 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
-    /// Select the appropriate container template based on the github_app field
+    /// Select the appropriate container template based on the `github_app` field
     fn get_agent_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
 
+        // Check if this is a remediation cycle (retry > 0)
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         // Map GitHub App to agent-specific container template
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "claude/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "claude/container-rex-remediation.sh.hbs"
+                } else {
+                    "claude/container-rex.sh.hbs"
+                }
+            }
+            "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "claude/container-tess.sh.hbs",
+            "5DLabs-Tess" => "claude/container.sh.hbs", // Use default container for Tess
+            "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
                 // Default to the generic container template for unknown agents
                 debug!(
@@ -2064,10 +2661,30 @@ impl CodeTemplateGenerator {
 
     fn get_codex_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/codex/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "code/codex/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/codex/container-rex.sh.hbs"
+                }
+            }
+            "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
         };
 
@@ -2077,9 +2694,13 @@ impl CodeTemplateGenerator {
     fn get_codex_memory_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/codex/agents-rex.md.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/agents-rex.md.hbs",
+            "5DLabs-Blaze" => "code/codex/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/codex/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/codex/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/codex/agents.md.hbs",
         };
 
@@ -2088,12 +2709,30 @@ impl CodeTemplateGenerator {
 
     fn get_opencode_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
-                "code/opencode/container-rex.sh.hbs"
+            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
+                if is_remediation {
+                    "code/opencode/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/opencode/container-rex.sh.hbs"
+                }
             }
+            "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
         };
 
@@ -2103,12 +2742,46 @@ impl CodeTemplateGenerator {
     fn get_opencode_memory_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
+            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
                 "code/opencode/agents-rex.md.hbs"
             }
+            "5DLabs-Blaze" => "code/opencode/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/opencode/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/opencode/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/opencode/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/opencode/agents.md.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_gemini_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "code/gemini/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/gemini/container-rex.sh.hbs"
+                }
+            }
+            "5DLabs-Blaze" => "code/gemini/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/gemini/container-cipher.sh.hbs",
+            "5DLabs-Cleo" => "code/gemini/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "code/gemini/container-tess.sh.hbs",
+            _ => "code/gemini/container.sh.hbs",
         };
 
         template_name.to_string()
@@ -2116,10 +2789,30 @@ impl CodeTemplateGenerator {
 
     fn get_cursor_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/cursor/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "code/cursor/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/cursor/container-rex.sh.hbs"
+                }
+            }
+            "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
         };
 
@@ -2129,22 +2822,51 @@ impl CodeTemplateGenerator {
     fn get_cursor_memory_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/cursor/agents-rex.md.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/agents-rex.md.hbs",
+            "5DLabs-Blaze" => "code/cursor/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/cursor/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/cursor/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/cursor/agents.md.hbs",
         };
 
         template_name.to_string()
     }
 
+    fn get_gemini_memory_template(_code_run: &CodeRun) -> String {
+        // Currently using single shared memory template for all Gemini agents
+        // Can be extended in the future for agent-specific templates similar to other CLIs
+        CODE_GEMINI_MEMORY_TEMPLATE.to_string()
+    }
+
     fn get_factory_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/factory/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
+                if is_remediation {
+                    "code/factory/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/factory/container-rex.sh.hbs"
+                }
+            }
+            "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
-            "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };
 
@@ -2154,9 +2876,13 @@ impl CodeTemplateGenerator {
     fn get_factory_memory_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
+            "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/factory/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/factory/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/factory/agents.md.hbs",
         };
 
@@ -2180,6 +2906,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "cipher",
             "5DLabs-Cleo" => "cleo",
             "5DLabs-Tess" => "tess",
+            "5DLabs-Atlas" => "atlas",
+            "5DLabs-Bolt" => "bolt",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
                     "Unknown GitHub app '{github_app}' - no corresponding agent found"
@@ -2195,16 +2923,16 @@ impl CodeTemplateGenerator {
     fn get_agent_tools(
         agent_name: &str,
         config: &ControllerConfig,
-    ) -> Result<crate::tasks::config::AgentTools> {
+    ) -> crate::tasks::config::AgentTools {
         use crate::tasks::config::AgentTools;
 
         // Try to get agent tools from controller config
         if let Some(agent_config) = config.agents.get(agent_name) {
             if let Some(tools) = &agent_config.tools {
-                return Ok(AgentTools {
+                return AgentTools {
                     remote: tools.remote.clone(),
                     local_servers: tools.local_servers.clone(),
-                });
+                };
             }
         }
 
@@ -2213,13 +2941,13 @@ impl CodeTemplateGenerator {
             "No agent-specific tools found for '{}', using defaults",
             agent_name
         );
-        Ok(AgentTools {
+        AgentTools {
             remote: vec![],
             local_servers: None,
-        })
+        }
     }
 
-    /// Load a template file from the mounted ConfigMap
+    /// Load a template file from the mounted `ConfigMap`
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
         let configmap_key = relative_path.replace('/', "_");
@@ -2235,6 +2963,60 @@ impl CodeTemplateGenerator {
                 "Failed to load code template {relative_path} (key: {configmap_key}): {e}"
             ))
         })
+    }
+
+    /// Register shared agent system prompt partials
+    /// These partials are used by agent-specific templates via {{> agents/partial-name}}
+    fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
+        // List of shared agent system prompt partials that need to be registered
+        let agent_partials = vec![
+            "agents/cipher-system-prompt",
+            "agents/cleo-system-prompt",
+            "agents/rex-system-prompt",
+            "agents/tess-system-prompt",
+            "agents/system-prompt",
+        ];
+
+        let mut failed_partials = Vec::new();
+
+        for partial_name in agent_partials {
+            // Load the partial template from ConfigMap
+            // The ConfigMap key uses underscores instead of slashes (e.g., agents_cipher-system-prompt.md.hbs)
+            let template_path = format!("{partial_name}.md.hbs");
+            match Self::load_template(&template_path) {
+                Ok(content) => {
+                    handlebars
+                        .register_partial(partial_name, content)
+                        .map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to register agent partial {partial_name}: {e}"
+                            ))
+                        })?;
+                    debug!("Successfully registered agent partial: {}", partial_name);
+                }
+                Err(e) => {
+                    // Warn but don't fail - the partial may not be needed for this specific agent
+                    warn!(
+                        "Failed to load agent partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Templates referencing this partial will fail to render."
+                    );
+                    failed_partials.push(partial_name);
+                }
+            }
+        }
+
+        // Log summary of partial registration
+        if !failed_partials.is_empty() {
+            warn!(
+                "Agent partial registration incomplete. {} partials failed to load: {:?}. \
+                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                failed_partials.len(),
+                failed_partials,
+                AGENT_TEMPLATES_PATH
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -2269,7 +3051,7 @@ mod tests {
                 docs_branch: "main".to_string(),
                 env: HashMap::new(),
                 env_from_secrets: Vec::new(),
-                enable_docker: None,
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
             },
@@ -2295,7 +3077,29 @@ mod tests {
     fn test_tess_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container-tess.sh.hbs");
+        // For CLIType::Claude (default), path is prefixed with "code/" in template loading
+        assert_eq!(template_path, "code/claude/container.sh.hbs");
+    }
+
+    #[test]
+    fn test_cipher_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
+    }
+
+    #[test]
+    fn test_atlas_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/integration/container-atlas.sh.hbs");
+    }
+
+    #[test]
+    fn test_bolt_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Bolt".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/integration/container-bolt.sh.hbs");
     }
 
     #[test]
@@ -2385,6 +3189,7 @@ mod tests {
                 reasoning_effort: None,
                 tools: Some(agent_tools.clone()),
                 client_config: None,
+                model_rotation: None,
             },
         );
 
@@ -2406,6 +3211,7 @@ mod tests {
                 temperature: None,
                 reasoning_effort: None,
                 tools: Some(agent_tools),
+                model_rotation: None,
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_search_brave_web_search"],
                     "localServers": {
@@ -2495,6 +3301,7 @@ mod tests {
                 reasoning_effort: None,
                 tools: Some(helm_tools),
                 client_config: None,
+                model_rotation: None,
             },
         );
 

@@ -33,14 +33,29 @@ spec:
           workflowDefaults:
             spec:
               parallelism: 10
+              # Global TTL for automatic cleanup of completed workflows
+              ttlStrategy:
+                secondsAfterCompletion: 3600   # Clean up after 1 hour by default
+                secondsAfterFailure: 10800     # Keep failed workflows for 3 hours
+              # Pod garbage collection to free up resources immediately
+              podGC:
+                strategy: OnPodCompletion
+                deleteDelayDuration: 60s
         server:
           image:
             tag: v3.7.1
           authModes:
             - server
-          service:
-            type: NodePort
-            nodePort: 30081
+          secure: false
+          env:
+            - name: ARGO_SERVER_SECURE
+              value: "false"
+          extraArgs:
+            - --secure=false
+          serviceType: NodePort
+          servicePort: 2746
+          serviceNodePort: 30081
+          servicePortName: http
         executor:
           image:
             tag: v3.7.1

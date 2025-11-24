@@ -1,6 +1,6 @@
 # Rust builder image for fast CI builds
 # Based on official GitHub Actions Runner Controller (ARC) image
-FROM ghcr.io/actions/actions-runner:2.327.1
+FROM ghcr.io/actions/actions-runner:2.328.0
 
 # Switch to root for installations
 USER root
@@ -19,11 +19,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && \
     # Add LLVM repository for modern clang/lld
     curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-15 main" | tee /etc/apt/sources.list.d/llvm.list > /dev/null \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-15 main" | tee /etc/apt/sources.list.d/llvm.list > /dev/null \
     && \
     # Add Docker's official GPG key and repository
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && \
     # Update package lists and install all packages
     apt-get update && apt-get install -y \
@@ -115,16 +117,63 @@ WORKDIR /home/runner
 
 # Install Rust as runner user
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
-    echo 'source ~/.cargo/env' >> ~/.bashrc
+    echo 'source ~/.cargo/env' >> /home/runner/.bashrc
 
 # Add Rust to PATH
 ENV PATH="/home/runner/.cargo/bin:${PATH}"
 
 # Install essential Rust tools only (no pre-warming)
-RUN ~/.cargo/bin/rustup component add clippy rustfmt && \
-    ~/.cargo/bin/cargo install \
-        sccache \
-        cargo-nextest
+RUN /home/runner/.cargo/bin/rustup component add clippy rustfmt
+
+# Install sccache with robust error handling
+RUN mkdir -p /home/runner/.cargo/bin && \
+    { \
+        cd /tmp && \
+        ARCH=$(dpkg --print-architecture) && \
+        case "$ARCH" in \
+            amd64) SCCACHE_ARCH=x86_64 ;; \
+            arm64) SCCACHE_ARCH=aarch64 ;; \
+            *) SCCACHE_ARCH=$ARCH ;; \
+        esac && \
+        SCCACHE_VERSION="0.8.2" && \
+        SCCACHE_TARGET="${SCCACHE_ARCH}-unknown-linux-musl" && \
+        echo "Attempting to download sccache v${SCCACHE_VERSION}..." && \
+        curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" | \
+        tar xz -C /home/runner/.cargo/bin --strip-components=1 "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" && \
+        chmod +x /home/runner/.cargo/bin/sccache && \
+        /home/runner/.cargo/bin/sccache --version && \
+        echo "✅ sccache installed from binary"; \
+    } || { \
+        echo "Binary install failed, falling back to cargo install..." && \
+        . /home/runner/.cargo/env && \
+        cargo install sccache --locked && \
+        echo "✅ sccache installed via cargo"; \
+    }
+
+# Install cargo-nextest with robust error handling
+RUN mkdir -p /home/runner/.cargo/bin && \
+    { \
+        cd /tmp && \
+        ARCH=$(dpkg --print-architecture) && \
+        case "$ARCH" in \
+            amd64) NEXTEST_ARCH=x86_64 ;; \
+            arm64) NEXTEST_ARCH=aarch64 ;; \
+            *) NEXTEST_ARCH=$ARCH ;; \
+        esac && \
+        NEXTEST_VERSION="0.9.82" && \
+        NEXTEST_TARGET="${NEXTEST_ARCH}-unknown-linux-gnu" && \
+        echo "Attempting to download cargo-nextest v${NEXTEST_VERSION}..." && \
+        curl -fsSL "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-${NEXTEST_TARGET}.tar.gz" | \
+        tar xz -C /home/runner/.cargo/bin && \
+        chmod +x /home/runner/.cargo/bin/cargo-nextest && \
+        /home/runner/.cargo/bin/cargo-nextest --version && \
+        echo "✅ cargo-nextest installed from binary"; \
+    } || { \
+        echo "Binary install failed, falling back to cargo install..." && \
+        . /home/runner/.cargo/env && \
+        cargo install cargo-nextest --locked && \
+        echo "✅ cargo-nextest installed via cargo"; \
+    }
 
 # Set up optimized Cargo config (stay as runner user)
 RUN mkdir -p /home/runner/.cargo && cat > /home/runner/.cargo/config.toml << 'EOF'

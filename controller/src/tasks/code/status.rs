@@ -11,7 +11,7 @@ pub struct CodeStatusManager;
 
 #[allow(dead_code)]
 impl CodeStatusManager {
-    /// Monitor Job status and update CodeRun CRD accordingly
+    /// Monitor Job status and update `CodeRun` CRD accordingly
     pub async fn monitor_job_status(
         code_run: &Arc<CodeRun>,
         jobs: &Api<Job>,
@@ -24,7 +24,7 @@ impl CodeStatusManager {
             match jobs.get(&job_name).await {
                 Ok(job) => {
                     let (phase, message) = Self::analyze_job_status(&job);
-                    Self::update_status(code_run, ctx, &phase, &message).await?;
+                    Self::update_status(code_run, ctx, &phase, &message, None).await?;
 
                     // Schedule cleanup if job is complete and cleanup is enabled
                     if ctx.config.cleanup.enabled && (phase == "Succeeded" || phase == "Failed") {
@@ -172,12 +172,13 @@ impl CodeStatusManager {
         Ok(())
     }
 
-    /// Update the CodeRun CRD status
+    /// Update the `CodeRun` CRD status
     async fn update_status(
         code_run: &Arc<CodeRun>,
         ctx: &Arc<Context>,
         phase: &str,
         message: &str,
+        retry_count_override: Option<u32>,
     ) -> Result<()> {
         let namespace = &ctx.namespace;
         let client = &ctx.client;
@@ -186,10 +187,12 @@ impl CodeStatusManager {
         let current_time = chrono::Utc::now().to_rfc3339();
         let code_api: Api<CodeRun> = Api::namespaced(client.clone(), namespace);
 
-        let current_retry_count = code_run
-            .status
-            .as_ref()
-            .map_or(0, |s| s.retry_count.unwrap_or(0));
+        let current_retry_count = retry_count_override.unwrap_or_else(|| {
+            code_run
+                .status
+                .as_ref()
+                .map_or(0, |s| s.retry_count.unwrap_or(0))
+        });
         let session_id = code_run
             .status
             .as_ref()
@@ -289,7 +292,7 @@ impl CodeStatusManager {
         )
     }
 
-    /// Build CodeRun conditions
+    /// Build `CodeRun` conditions
     fn build_conditions(phase: &str, message: &str, timestamp: &str) -> Vec<CodeRunCondition> {
         vec![CodeRunCondition {
             condition_type: phase.to_string(),

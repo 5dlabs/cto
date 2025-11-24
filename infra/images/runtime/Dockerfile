@@ -57,19 +57,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
 
-# Create non-root user 'node' with stable UID/GID 1000 to match cache mounts (robust if GID/UID exist)
-RUN if ! id -u node >/dev/null 2>&1; then \
-      if getent group 1000 >/dev/null; then \
-        GN=$(getent group 1000 | cut -d: -f1); \
-      else \
-        groupadd -g 1000 node; GN=node; \
-      fi; \
-      if getent passwd 1000 >/dev/null; then \
-        useradd --shell /bin/bash --create-home -g "$GN" node; \
-      else \
-        useradd --shell /bin/bash --create-home -u 1000 -g "$GN" node; \
-      fi; \
-    fi
+# Create non-root user 'node' with stable UID/GID 1000 to match cache mounts
+RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
+    useradd --shell /bin/bash --create-home -u 1000 -g 1000 node 2>/dev/null || \
+    useradd --shell /bin/bash --create-home -g 1000 node 2>/dev/null || \
+    useradd --shell /bin/bash --create-home node || true && \
+    id node && getent group node
 
 # Passwordless sudo for the non-root user (node)
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
@@ -82,8 +75,11 @@ RUN --mount=type=cache,target=/root/.cache \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
 
-# Enable corepack (pnpm only, skip yarn since we use system yarn)
-RUN if command -v corepack >/dev/null 2>&1; then corepack enable pnpm; fi
+# Enable corepack for pnpm only (skip yarn since we use system yarn)
+RUN if command -v corepack >/dev/null 2>&1; then \
+    corepack enable pnpm && \
+    corepack prepare pnpm@latest --activate; \
+  fi
 
 # Install latest stable Go (robust arch/version selection)
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -280,7 +276,8 @@ RUN --mount=type=cache,target=/root/.cache \
         concurrently \
         cross-env \
         dotenv-cli \
-        zx || true
+        zx \
+        shadcn@latest || true
 
 # Install Rust toolchain for root
 RUN --mount=type=cache,target=/root/.cache \
@@ -300,7 +297,7 @@ ENV CC=clang \
 # Note: RUSTC_WRAPPER intentionally not set to avoid sccache path issues
 
 # Prepare npm global and permissions
-RUN mkdir -p /usr/local/share/npm-global && chown -R 1000:1000 /usr/local/share
+RUN mkdir -p /usr/local/share/npm-global/lib && chown -R node:node /usr/local/share/npm-global
 
 # Persist bash history for convenience
 ARG USERNAME=node
@@ -332,9 +329,85 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
 
-# Global npm config and PATH
+# Install cursor-rust-tools MCP server for AI agent Rust analysis
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
+    . $HOME/.cargo/env \
+  && cargo install --git https://github.com/terhechte/cursor-rust-tools
+
+# Install Qlty for unified code quality across all languages
+RUN curl -fsSL https://qlty.sh | bash \
+  && echo 'export PATH="$HOME/.qlty/bin:$PATH"' >> ~/.bashrc \
+  && echo 'export PATH="$HOME/.qlty/bin:$PATH"' >> ~/.zshrc
+
+# Install security scanning tools for agent-generated code
+USER root
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    set -eux; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+        amd64) DL_ARCH=amd64; GITLEAKS_CANDIDATES="x64 amd64"; HADOLINT_CANDIDATES="x86_64 amd64" ;; \
+        arm64) DL_ARCH=arm64; GITLEAKS_CANDIDATES="arm64 aarch64"; HADOLINT_CANDIDATES="arm64 aarch64" ;; \
+        *) DL_ARCH="$ARCH"; GITLEAKS_CANDIDATES="$ARCH"; HADOLINT_CANDIDATES="$ARCH" ;; \
+    esac; \
+    # Install gitleaks (secret scanning)
+    GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r '.tag_name'); \
+    if [ -z "$GITLEAKS_VERSION" ] || [ "$GITLEAKS_VERSION" = "null" ]; then GITLEAKS_VERSION="v8.18.2"; fi; \
+    DOWNLOAD_SUCCESS=0; \
+    for candidate in $GITLEAKS_CANDIDATES; do \
+        if curl -fsSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_${candidate}.tar.gz"; then \
+            DOWNLOAD_SUCCESS=1; \
+            break; \
+        else \
+            rm -f /tmp/gitleaks.tar.gz; \
+        fi; \
+    done; \
+    if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then \
+        echo "Failed to download gitleaks for architecture $ARCH"; \
+        exit 1; \
+    fi; \
+    tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks; \
+    chmod +x /usr/local/bin/gitleaks; \
+    rm -f /tmp/gitleaks.tar.gz; \
+    # Install trivy (vulnerability scanning)
+    curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin; \
+    # Install hadolint (Dockerfile linting)
+    DOWNLOAD_SUCCESS=0; \
+    for candidate in $HADOLINT_CANDIDATES; do \
+        if curl -fsSL -o /usr/local/bin/hadolint "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${candidate}"; then \
+            DOWNLOAD_SUCCESS=1; \
+            break; \
+        fi; \
+    done; \
+    if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then \
+        echo "Failed to download hadolint for architecture $ARCH"; \
+        exit 1; \
+    fi; \
+    chmod +x /usr/local/bin/hadolint
+
+# Install Semgrep for comprehensive static analysis
+# Install rich separately with --ignore-installed to avoid conflicts with system package
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --break-system-packages --no-cache-dir --ignore-installed rich && \
+    pip3 install --break-system-packages --no-cache-dir semgrep
+
+# Configure npm globals before installing CLI tooling as non-root
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
+
+# Install mermaid-cli for diagram generation (docs/architecture work)
+USER node
+RUN sudo npm install -g @mermaid-js/mermaid-cli && \
+    sudo chown -R node:node /usr/local/share/npm-global
+
+# Install Playwright for frontend E2E testing (Blaze agent)
+USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::ForceIPv4=true update && \
+    npm install -g @playwright/test && \
+    npx playwright install --with-deps chromium && \
+    chown -R node:node /usr/local/share/npm-global
+USER node
 
 # Go environment for non-root user
 ENV GOPATH=/home/node/go
@@ -396,7 +469,9 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     cargo-outdated \
     cargo-watch \
     cargo-expand \
-    cargo-udeps || true
+    cargo-udeps \
+    cargo-audit \
+    cargo-geiger || true
 
 # Configure Rust build environment (without problematic sccache wrapper)
 ENV CC=clang \

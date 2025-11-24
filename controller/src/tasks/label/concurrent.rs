@@ -64,7 +64,7 @@ impl ConcurrentLabelManager {
     /// Returns `ConcurrentError::LockError` if the lock cannot be acquired
     /// Returns `ConcurrentError::OperationFailed` if the label operations fail
     #[allow(unused)]
-    pub async fn execute_with_lock(
+    pub fn execute_with_lock(
         &mut self,
         pr_number: i32,
         operations: &[LabelOperation],
@@ -86,7 +86,7 @@ impl ConcurrentLabelManager {
     /// # Errors
     /// Returns `ConcurrentError::OperationFailed` if any batch operation fails
     #[allow(unused)]
-    pub async fn execute_batch(
+    pub fn execute_batch(
         &mut self,
         operations: &[BatchOperation],
     ) -> Result<BatchResult, ConcurrentError> {
@@ -106,7 +106,7 @@ impl ConcurrentLabelManager {
     /// # Errors
     /// Returns `ConcurrentError::OperationFailed` if conflict detection fails
     #[allow(unused)]
-    pub async fn detect_conflicts(
+    pub fn detect_conflicts(
         &mut self,
         pr_number: i32,
         operations: &[LabelOperation],

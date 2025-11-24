@@ -1,10 +1,6 @@
 #!/bin/bash
 # Quick E2E Reset - Minimal script for fast iteration
 #
-# This script is fully portable - works for any developer checking out the repo.
-# The template is stored in testing/cto-parallel-test-template/ and the test
-# repo is created in a sibling directory to your workspace.
-#
 # IMPORTANT: This script requires the GitHub account to have:
 # 1. Admin permissions on the organization repository
 # 2. The 'delete_repo' scope for the GitHub CLI
@@ -40,20 +36,37 @@ kubectl delete pvc -n $NS --force --grace-period=0 \
 # 2. GitHub repo reset (only if --github flag is passed)
 if [[ "${1:-}" == "--github" ]]; then
   echo "→ Resetting GitHub repository..."
+  
   # Check if repo exists and delete it
   if gh repo view $REPO >/dev/null 2>&1; then
     echo "  Deleting existing repository..."
     if ! gh repo delete $REPO --yes 2>&1; then
-      echo "  ⚠️  Failed to delete repository. You may need to grant delete_repo permission:"
-      echo "     Run: gh auth refresh -h github.com -s delete_repo"
-      echo "  Or delete it manually at: https://github.com/$REPO/settings"
+      echo ""
+      echo "  ⚠️  Failed to delete repository!"
+      echo ""
+      echo "  This usually means you need one of:"
+      echo "    1. The 'delete_repo' scope: gh auth refresh -h github.com -s delete_repo"
+      echo "    2. Admin permissions on organization repos (contact organization owner)"
+      echo ""
+      echo "  Manual deletion: https://github.com/$REPO/settings"
+      echo ""
+      echo "  NOTE: When you recreate this repo, make sure your GitHub account has"
+      echo "        admin/delete permissions to avoid this issue in the future."
+      echo ""
       exit 1
     fi
+    echo "  ✓ Repository deleted"
   fi
   
   # Create new repository
+  # NOTE: The account creating this repo should have admin rights to delete it later
   echo "  Creating fresh repository..."
-  gh repo create $REPO --private --clone=false
+  if gh repo create $REPO --private --clone=false; then
+    echo "  ✓ Repository created"
+  else
+    echo "  ✗ Failed to create repository"
+    exit 1
+  fi
   
   # Reset local repo
   rm -rf $LOCAL

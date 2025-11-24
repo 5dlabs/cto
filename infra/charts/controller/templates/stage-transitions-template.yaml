@@ -19,6 +19,15 @@ spec:
         description: "Task ID for correlation"
       - name: repository
         description: "Repository context (e.g., 5dlabs/cto)"
+      - name: implementation-max-retries
+        description: "Maximum retry attempts for implementation agent"
+        value: "10"
+      - name: quality-max-retries
+        description: "Maximum retry attempts for quality agent"
+        value: "10"
+      - name: testing-max-retries
+        description: "Maximum retry attempts for testing agent"
+        value: "10"
 
   serviceAccountName: argo-workflow
 
@@ -91,6 +100,8 @@ spec:
             parameters:
             - name: github-app
               value: "5DLabs-Rex"
+            - name: max-retries
+              value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
         # Update stage after Rex completes
         - name: update-to-waiting-pr
@@ -118,6 +129,8 @@ spec:
             parameters:
             - name: github-app
               value: "5DLabs-Cleo"
+            - name: max-retries
+              value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
 
         # Update stage after Cleo completes
         - name: update-to-waiting-qa
@@ -145,6 +158,8 @@ spec:
             parameters:
             - name: github-app
               value: "5DLabs-Tess"
+            - name: max-retries
+              value: "{{`{{workflow.parameters.testing-max-retries}}`}}"
 
         # Update stage after Tess completes (skip approval)
         - name: update-to-waiting-merge

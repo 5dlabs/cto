@@ -73,11 +73,7 @@ pub struct AgentConfig {
     #[serde(default, rename = "imagePullSecrets")]
     pub image_pull_secrets: Vec<String>,
 
-    /// Optional sidecar configuration
-    #[serde(default, rename = "inputBridge")]
-    pub input_bridge: InputBridgeConfig,
-
-    /// Optional default ServiceAccount name to use for CodeRun jobs
+    /// Optional default `ServiceAccount` name to use for `CodeRun` jobs
     #[serde(default, rename = "serviceAccountName")]
     pub service_account_name: Option<String>,
 }
@@ -94,6 +90,7 @@ pub struct ImageConfig {
 
 impl ImageConfig {
     /// Returns `true` when both repository and tag are populated with real values.
+    #[must_use]
     pub fn is_configured(&self) -> bool {
         let repo = self.repository.trim();
         let tag = self.tag.trim();
@@ -124,28 +121,6 @@ fn default_agent_image() -> ImageConfig {
         repository: "MISSING_IMAGE_CONFIG".to_string(),
         tag: "MISSING_IMAGE_CONFIG".to_string(),
     }
-}
-
-/// Sidecar (auxiliary tools) configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct InputBridgeConfig {
-    /// Whether the sidecar is enabled
-    #[serde(default = "default_input_bridge_enabled")]
-    pub enabled: bool,
-
-    /// Sidecar image configuration
-    pub image: ImageConfig,
-
-    /// HTTP port for the sidecar
-    #[serde(default = "default_input_bridge_port")]
-    pub port: u16,
-}
-
-fn default_input_bridge_enabled() -> bool {
-    true
-}
-fn default_input_bridge_port() -> u16 {
-    8080
 }
 
 /// Secrets configuration - only what we actually use
@@ -194,6 +169,7 @@ pub struct ResolvedSecretBinding {
 
 impl SecretsConfig {
     /// Resolve the secret binding (env var + secret key/name) for a given CLI
+    #[must_use]
     pub fn resolve_cli_binding(
         &self,
         cli_type: &CLIType,
@@ -217,7 +193,7 @@ impl SecretsConfig {
             };
         }
 
-        if let Some(provider_key) = provider.map(|p| p.to_lowercase()) {
+        if let Some(provider_key) = provider.map(str::to_lowercase) {
             if let Some(provider_cfg) = self.provider_api_keys.get(&provider_key) {
                 let env_var = provider_cfg
                     .env_var
@@ -303,6 +279,14 @@ pub struct CleanupConfig {
     #[serde(default = "default_cleanup_enabled")]
     pub enabled: bool,
 
+    /// Seconds to wait before cleaning up successful runs
+    #[serde(rename = "successTTLSeconds", default = "default_success_ttl_seconds")]
+    pub success_ttl_seconds: u64,
+
+    /// Seconds to wait before cleaning up failed runs
+    #[serde(rename = "failureTTLSeconds", default = "default_failure_ttl_seconds")]
+    pub failure_ttl_seconds: u64,
+
     /// Minutes to wait before cleaning up completed (successful) jobs
     #[serde(
         rename = "completedJobDelayMinutes",
@@ -314,13 +298,21 @@ pub struct CleanupConfig {
     #[serde(rename = "failedJobDelayMinutes", default = "default_failed_delay")]
     pub failed_job_delay_minutes: u64,
 
-    /// Whether to delete the ConfigMap when cleaning up the job
+    /// Whether to delete the `ConfigMap` when cleaning up the job
     #[serde(rename = "deleteConfigMap", default = "default_delete_configmap")]
     pub delete_configmap: bool,
 }
 
 fn default_cleanup_enabled() -> bool {
     true
+}
+
+fn default_success_ttl_seconds() -> u64 {
+    3600 // 1 hour - allow time for multi-stage workflows
+}
+
+fn default_failure_ttl_seconds() -> u64 {
+    7200 // 2 hours - keep failures longer for debugging
 }
 
 fn default_completed_delay() -> u64 {
@@ -370,6 +362,23 @@ pub struct AgentDefinition {
     /// If provided, controller will embed it verbatim (no server/tool inference in code)
     #[serde(default, rename = "clientConfig")]
     pub client_config: Option<serde_json::Value>,
+
+    /// Optional model rotation configuration for this agent
+    /// Allows cycling through multiple models on retry attempts
+    #[serde(default, rename = "modelRotation")]
+    pub model_rotation: Option<ModelRotationConfig>,
+}
+
+/// Model rotation configuration for an agent
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelRotationConfig {
+    /// Whether model rotation is enabled
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Array of model identifiers to rotate through
+    #[serde(default)]
+    pub models: Vec<String>,
 }
 
 /// Tool configuration for an agent
@@ -412,6 +421,8 @@ impl Default for CleanupConfig {
     fn default() -> Self {
         CleanupConfig {
             enabled: default_cleanup_enabled(),
+            success_ttl_seconds: default_success_ttl_seconds(),
+            failure_ttl_seconds: default_failure_ttl_seconds(),
             completed_job_delay_minutes: default_completed_delay(),
             failed_job_delay_minutes: default_failed_delay(),
             delete_configmap: default_delete_configmap(),
@@ -452,6 +463,7 @@ impl ControllerConfig {
                         settings,
                         max_tokens: agent.max_tokens,
                         temperature: agent.temperature,
+                        model_rotation: None,
                     };
 
                     self.agent
@@ -510,22 +522,16 @@ impl ControllerConfig {
             )));
         }
 
-        // If input bridge is enabled, ensure its image is configured
-        if self.agent.input_bridge.enabled && !self.agent.input_bridge.image.is_configured() {
-            return Err(anyhow::anyhow!(
-                "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
-            ));
-        }
         Ok(())
     }
 
-    /// Load configuration from mounted ConfigMap file
+    /// Load configuration from mounted `ConfigMap` file
     pub fn from_mounted_file(config_path: &str) -> Result<Self, anyhow::Error> {
         let config_str = std::fs::read_to_string(config_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read config file {}: {}", config_path, e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to read config file {config_path}: {e}"))?;
 
         let mut config: ControllerConfig = serde_yaml::from_str(&config_str)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {e}"))?;
 
         config.merge_agent_cli_defaults();
         Ok(config)
@@ -565,14 +571,6 @@ impl Default for ControllerConfig {
                 cli_providers: HashMap::new(),
                 agent_cli_configs: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
-                input_bridge: InputBridgeConfig {
-                    enabled: true,
-                    image: ImageConfig {
-                        repository: "ghcr.io/5dlabs/input-bridge".to_string(),
-                        tag: "latest".to_string(),
-                    },
-                    port: 8080,
-                },
                 service_account_name: None,
             },
             agents: HashMap::new(),
@@ -629,6 +627,8 @@ impl Default for ControllerConfig {
             },
             cleanup: CleanupConfig {
                 enabled: true,
+                success_ttl_seconds: 60,
+                failure_ttl_seconds: 300,
                 completed_job_delay_minutes: 5,
                 failed_job_delay_minutes: 60,
                 delete_configmap: true,
@@ -717,6 +717,7 @@ cleanup:
                 settings: HashMap::new(),
                 max_tokens: None,
                 temperature: None,
+                model_rotation: None,
             },
         );
 
@@ -737,6 +738,7 @@ cleanup:
                 reasoning_effort: Some("high".to_string()),
                 tools: None,
                 client_config: None,
+                model_rotation: None,
             },
         );
         config.merge_agent_cli_defaults();

@@ -7,7 +7,7 @@ use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
 
-/// Extract workflow name from CodeRun labels
+/// Extract workflow name from `CodeRun` labels
 pub fn extract_workflow_name(code_run: &CodeRun) -> Result<String> {
     // Try to get workflow name from label if labels exist
     if let Some(labels) = code_run.metadata.labels.as_ref() {
@@ -30,7 +30,7 @@ pub fn extract_pr_number(pr_url: &str) -> Result<u32> {
             .parse::<u32>()
             .with_context(|| format!("Failed to parse PR number from URL: {pr_url}"))
     } else {
-        Err(anyhow::anyhow!("Invalid PR URL format: {}", pr_url))
+        Err(anyhow::anyhow!("Invalid PR URL format: {pr_url}"))
     }
 }
 
@@ -63,7 +63,7 @@ pub async fn resume_workflow_for_pr(
     .await
 }
 
-/// Resume workflow when CodeRun failed
+/// Resume workflow when `CodeRun` failed
 pub async fn resume_workflow_for_failure(
     client: &Client,
     namespace: &str,
@@ -112,6 +112,7 @@ pub async fn resume_workflow_for_no_pr(
 
 /// Resume workflow by forcing re-evaluation of stuck resource nodes
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 async fn resume_workflow_via_http(
     _client: &Client,
     namespace: &str,
@@ -163,10 +164,7 @@ async fn resume_workflow_via_http(
             .await
             .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(anyhow::anyhow!(
-            "Failed to get workflow {}: HTTP {} - {}",
-            workflow_name,
-            status,
-            error_text
+            "Failed to get workflow {workflow_name}: HTTP {status} - {error_text}"
         ));
     }
 
@@ -272,10 +270,7 @@ async fn resume_workflow_via_http(
             .await
             .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(anyhow::anyhow!(
-            "Failed to patch workflow {}: HTTP {} - {}",
-            workflow_name,
-            status,
-            error_text
+            "Failed to patch workflow {workflow_name}: HTTP {status} - {error_text}"
         ));
     }
 
@@ -357,7 +352,7 @@ mod tests {
                 overwrite_memory: false,
                 env: std::collections::HashMap::new(),
                 env_from_secrets: vec![],
-                enable_docker: None,
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
                 docs_project_directory: None,
@@ -393,7 +388,7 @@ mod tests {
                 overwrite_memory: false,
                 env: std::collections::HashMap::new(),
                 env_from_secrets: vec![],
-                enable_docker: None,
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
                 docs_project_directory: None,

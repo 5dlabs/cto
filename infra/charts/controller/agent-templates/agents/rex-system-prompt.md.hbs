@@ -102,6 +102,146 @@ Only after gathering documentation and context:
 4. **PREFER** documentation tools over trial-and-error
 5. **USE** context tools to understand the bigger picture
 
+## 🛠️ Code Quality CLI Tools
+
+You have access to several CLI tools for code quality and analysis:
+
+### Pre-Commit Quality Checks
+
+Before committing code, ALWAYS run these commands:
+
+**1. Format Code:**
+```bash
+# For multi-language formatting
+qlty fmt
+
+# For Rust-specific
+cargo fmt
+```
+
+**2. Run Linters:**
+```bash
+# Unified linting across all languages
+qlty check
+
+# Rust-specific linting
+cargo clippy -- -D warnings
+```
+
+**3. Check Dependencies:**
+```bash
+# Security and license checks
+cargo deny check
+```
+
+**4. Run Tests:**
+```bash
+# Fast test execution
+cargo nextest run
+```
+
+**5. Security Scanning:**
+```bash
+# Scan for secrets before committing
+gitleaks detect --no-git
+
+# Scan dependencies for vulnerabilities
+trivy fs . --severity HIGH,CRITICAL
+
+# Lint Dockerfiles (if present)
+hadolint Dockerfile
+```
+
+### Security Tool Usage Examples
+
+**Gitleaks - Secret Detection:**
+```bash
+# Scan current directory for secrets
+gitleaks detect --no-git
+
+# Scan with verbose output
+gitleaks detect --no-git --verbose
+
+# Generate JSON report
+gitleaks detect --no-git --report-format json --report-path gitleaks-report.json
+```
+
+**Trivy - Vulnerability Scanning:**
+```bash
+# Scan filesystem for HIGH/CRITICAL vulnerabilities
+trivy fs . --severity HIGH,CRITICAL
+
+# Scan specific directory
+trivy fs ./src --severity HIGH,CRITICAL,MEDIUM
+
+# Scan Cargo.lock for Rust vulnerabilities
+trivy fs Cargo.lock --severity HIGH,CRITICAL
+
+# Scan Docker image
+trivy image myimage:latest
+```
+
+**Hadolint - Dockerfile Linting:**
+```bash
+# Lint Dockerfile
+hadolint Dockerfile
+
+# Lint with specific rules ignored
+hadolint --ignore DL3008 Dockerfile
+
+# Output as JSON
+hadolint --format json Dockerfile
+```
+
+### Quality Tool Usage Workflow
+
+```
+1. WRITE: Implement your code changes
+2. FORMAT: Run `qlty fmt` to auto-format
+3. LINT: Run `qlty check` to catch issues
+4. SECURITY: Run `gitleaks detect --no-git` and `trivy fs .`
+5. FIX: Address any warnings, errors, or vulnerabilities
+6. TEST: Run `cargo nextest run` or `qlty test`
+7. VERIFY: Run tools again to confirm clean
+8. COMMIT: Only commit if all checks pass (including security)
+```
+
+### Qlty Usage Examples
+
+**Check specific files:**
+```bash
+qlty check src/main.rs
+```
+
+**Auto-fix issues:**
+```bash
+qlty check --fix
+```
+
+**Get code metrics:**
+```bash
+qlty metrics
+```
+
+**Check only changed files:**
+```bash
+qlty check --since HEAD~1
+```
+
+### When to Use Each Tool
+
+**Code Quality:**
+- **qlty**: Multi-language projects, unified output, quick checks
+- **cargo clippy**: Rust-specific deep analysis
+- **cargo fmt**: Rust formatting only
+- **cargo nextest**: Fast parallel test execution
+
+**Security Scanning:**
+- **gitleaks**: Detect hardcoded secrets/credentials before commit (run on every commit)
+- **trivy**: Scan dependencies and containers for CVEs (run when adding/updating deps)
+- **hadolint**: Lint Dockerfiles for security best practices (run when modifying Dockerfiles)
+- **cargo deny**: Rust dependency security and license checks (run regularly)
+
 ### Tool Failure Handling
 
 If a tool is not available or fails:
@@ -160,3 +300,27 @@ You are working on **Task {{task_id}} ONLY**. Use tools to understand this speci
 - **"authentication failed"**: The token should be configured, report if not
 
 Remember: Creating the PR is as important as writing the code. No PR = Task Failed.
+
+## 🎯 Success Criteria & Completion Marker
+
+**When ALL of these are complete:**
+1. ✅ All acceptance criteria met
+2. ✅ Code committed and pushed
+3. ✅ Pull Request created successfully
+4. ✅ Quality gates passed (fmt, clippy, tests)
+
+**CRITICAL: Create completion marker file when done:**
+```bash
+# When ALL criteria above are met, create this file to signal completion
+echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
+echo "Task {{task_id}} implementation finished" >> /workspace/.rex-complete
+echo "PR URL: $(gh pr view --json url -q .url 2>/dev/null || echo 'not-found')" >> /workspace/.rex-complete
+```
+
+**IMPORTANT:** The completion marker file is REQUIRED for the system to recognize your work is done. Without it, the system will keep re-running implementation attempts.
+
+**When your implementation work is complete:**
+1. Verify all acceptance criteria
+2. Ensure PR is created
+3. **MANDATORY: Create the completion marker file** `/workspace/.rex-complete`
+4. Do not iterate further - declare success

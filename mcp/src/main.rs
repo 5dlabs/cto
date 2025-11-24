@@ -1,3 +1,11 @@
+//! CTO MCP Server
+//!
+//! This module provides the Model Context Protocol (MCP) server for the CTO platform.
+
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::format_push_string)]
+#![allow(clippy::no_effect_underscore_binding)]
+
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -29,6 +37,18 @@ struct AgentConfig {
     #[serde(default)]
     #[allow(dead_code)]
     tools: Option<AgentTools>,
+    #[serde(default, rename = "maxRetries")]
+    max_retries: Option<u32>,
+    #[serde(default, rename = "modelRotation")]
+    model_rotation: Option<ModelRotationConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct ModelRotationConfig {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default)]
+    models: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -108,6 +128,9 @@ struct CodeDefaults {
     docs_project_directory: Option<String>,
     #[allow(dead_code)]
     service: Option<String>,
+    #[serde(rename = "maxRetries")]
+    #[allow(dead_code)]
+    max_retries: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -163,8 +186,12 @@ struct PlayDefaults {
     cli: String,
     #[serde(rename = "implementationAgent")]
     implementation_agent: String,
+    #[serde(rename = "frontendAgent")]
+    frontend_agent: Option<String>,
     #[serde(rename = "qualityAgent")]
     quality_agent: String,
+    #[serde(rename = "securityAgent")]
+    security_agent: String,
     #[serde(rename = "testingAgent")]
     testing_agent: String,
     repository: Option<String>,
@@ -173,6 +200,26 @@ struct PlayDefaults {
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
+    #[serde(rename = "workingDirectory")]
+    #[allow(dead_code)]
+    // Still in config for backward compatibility, but we use docs_project_directory for tasks
+    working_directory: Option<String>,
+    #[serde(rename = "maxRetries")]
+    max_retries: Option<u32>,
+    #[serde(rename = "implementationMaxRetries")]
+    implementation_max_retries: Option<u32>,
+    #[serde(rename = "qualityMaxRetries")]
+    quality_max_retries: Option<u32>,
+    #[serde(rename = "securityMaxRetries")]
+    security_max_retries: Option<u32>,
+    #[serde(rename = "testingMaxRetries")]
+    testing_max_retries: Option<u32>,
+    #[serde(rename = "frontendMaxRetries")]
+    frontend_max_retries: Option<u32>,
+    #[serde(rename = "autoMerge")]
+    auto_merge: Option<bool>,
+    #[serde(rename = "parallelExecution")]
+    parallel_execution: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -194,7 +241,7 @@ impl Default for DocsIngestDefaults {
 }
 
 /// Load configuration from cto-config.json file
-/// Looks in current directory, workspace root, or WORKSPACE_FOLDER_PATHS for cto-config.json
+/// Looks in current directory, workspace root, or `WORKSPACE_FOLDER_PATHS` for cto-config.json
 #[allow(clippy::disallowed_macros)]
 fn load_cto_config() -> Result<CtoConfig> {
     let mut config_paths = vec![
@@ -202,29 +249,12 @@ fn load_cto_config() -> Result<CtoConfig> {
         std::path::PathBuf::from("../cto-config.json"),
     ];
 
-    // TEMPORARY DEBUG: Print all environment variables
-    eprintln!("🐛 DEBUG: Environment variables:");
-    for (key, value) in std::env::vars() {
-        eprintln!("🐛   {key}: {value}");
-    }
-    eprintln!(
-        "🐛 DEBUG: Current working directory: {:?}",
-        std::env::current_dir().unwrap_or_else(|e| {
-            eprintln!("⚠️ Failed to get current directory: {e}");
-            std::path::PathBuf::from(".")
-        })
-    );
-
     // Add workspace folder paths if available (Cursor provides this)
     if let Ok(workspace_paths) = std::env::var("WORKSPACE_FOLDER_PATHS") {
-        eprintln!("🐛 DEBUG: WORKSPACE_FOLDER_PATHS found: {workspace_paths}");
         for workspace_path in workspace_paths.split(',') {
             let workspace_path = workspace_path.trim();
-            eprintln!("🐛 DEBUG: Adding config path: {workspace_path}");
             config_paths.push(std::path::PathBuf::from(workspace_path).join("cto-config.json"));
         }
-    } else {
-        eprintln!("🐛 DEBUG: WORKSPACE_FOLDER_PATHS not found in environment");
     }
 
     for config_path in config_paths {
@@ -257,7 +287,84 @@ fn load_cto_config() -> Result<CtoConfig> {
         " No WORKSPACE_FOLDER_PATHS environment variable found (Cursor-only feature).".to_string()
     };
 
-    Err(anyhow!("cto-config.json not found in current directory or parent directory.{} Please create a configuration file in your project root.", workspace_info))
+    Err(anyhow!("cto-config.json not found in current directory or parent directory.{workspace_info} Please create a configuration file in your project root."))
+}
+
+/// Load repository-specific configuration from cto-config.json
+/// Used during workflow creation to get repository's agent tool configurations
+#[allow(clippy::disallowed_macros)]
+fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
+    // Try to load from explicit repository path first
+    if let Some(repo_path) = repository_path {
+        let config_path = std::path::PathBuf::from(repo_path).join("cto-config.json");
+
+        if config_path.exists() {
+            eprintln!(
+                "📋 Loading repository config from: {}",
+                config_path.display()
+            );
+
+            match std::fs::read_to_string(&config_path) {
+                Ok(config_content) => match serde_json::from_str::<CtoConfig>(&config_content) {
+                    Ok(config) => {
+                        if config.version == "1.0" {
+                            eprintln!("✅ Repository configuration loaded successfully");
+                            eprintln!("   Agents defined: {}", config.agents.len());
+                            return Some(config);
+                        }
+                        eprintln!(
+                            "⚠️  Repository config version mismatch: {} (expected 1.0)",
+                            config.version
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse repository config: {e}");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read repository config: {e}");
+                }
+            }
+        } else {
+            eprintln!(
+                "ℹ️  No cto-config.json found in repository at: {}",
+                config_path.display()
+            );
+        }
+    }
+
+    // Try workspace detection as fallback
+    if let Some(workspace_path) = resolve_workspace_dir() {
+        let config_path = workspace_path.join("cto-config.json");
+
+        if config_path.exists() {
+            eprintln!(
+                "📋 Loading repository config from workspace: {}",
+                config_path.display()
+            );
+
+            match std::fs::read_to_string(&config_path) {
+                Ok(config_content) => match serde_json::from_str::<CtoConfig>(&config_content) {
+                    Ok(config) => {
+                        if config.version == "1.0" {
+                            eprintln!("✅ Repository configuration loaded from workspace");
+                            eprintln!("   Agents defined: {}", config.agents.len());
+                            return Some(config);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse workspace config: {e}");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read workspace config: {e}");
+                }
+            }
+        }
+    }
+
+    eprintln!("ℹ️  Using platform default configuration (no repository config found)");
+    None
 }
 
 #[derive(Deserialize)]
@@ -295,6 +402,65 @@ fn extract_params(params: Option<&Value>) -> HashMap<String, Value> {
         .unwrap_or_default()
 }
 
+#[allow(clippy::cast_possible_truncation)]
+fn parse_max_retries_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<u32> {
+    arguments.get(key).and_then(|value| match value {
+        Value::Number(num) => num.as_u64().map(|v| v as u32),
+        Value::String(s) => s.parse::<u32>().ok(),
+        _ => None,
+    })
+}
+
+fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<bool> {
+    arguments.get(key).and_then(|value| match value {
+        Value::Bool(b) => Some(*b),
+        Value::String(s) => match s.to_lowercase().as_str() {
+            "true" | "yes" | "1" => Some(true),
+            "false" | "no" | "0" => Some(false),
+            _ => None,
+        },
+        _ => None,
+    })
+}
+
+fn resolve_workspace_dir() -> Option<std::path::PathBuf> {
+    // 1. Try current directory first - this is most likely the intended workspace
+    if let Ok(cwd) = std::env::current_dir() {
+        // Verify it's a valid workspace (has .git or cto-config.json)
+        if cwd.join(".git").exists() || cwd.join("cto-config.json").exists() {
+            return Some(cwd);
+        }
+    }
+
+    // 2. Check WORKSPACE_FOLDER_PATHS as fallback (Cursor environment)
+    if let Ok(paths_str) = std::env::var("WORKSPACE_FOLDER_PATHS") {
+        let paths: Vec<&str> = paths_str
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        // If only one path, use it
+        if paths.len() == 1 {
+            return Some(std::path::PathBuf::from(paths[0]));
+        }
+
+        // Multiple paths - try to find one with cto-config.json
+        for path_str in &paths {
+            let path = std::path::PathBuf::from(path_str);
+            if path.join("cto-config.json").exists() {
+                return Some(path);
+            }
+        }
+
+        // No path has cto-config.json - return None to signal ambiguity
+        // Callers should handle this by requiring explicit configuration
+    }
+
+    // 3. No valid workspace found
+    None
+}
+
 fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
     match method {
         "initialize" => Some(Ok(json!({
@@ -307,7 +473,8 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
             "serverInfo": {
                 "name": "agent-platform-mcp",
                 "title": "Agent Platform MCP Server",
-                "version": "1.0.0"
+                "version": "1.0.0",
+                "buildTimestamp": env!("BUILD_TIMESTAMP")
             }
         }))),
         "tools/list" => {
@@ -321,8 +488,28 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
     }
 }
 
+fn find_command(name: &str) -> String {
+    // Check common installation locations in order
+    let common_paths = [
+        format!("/opt/homebrew/bin/{name}"), // Homebrew Apple Silicon
+        format!("/usr/local/bin/{name}"),    // Homebrew Intel / standard Linux
+        format!("/usr/bin/{name}"),          // System binaries
+        name.to_string(),                    // Fallback to PATH
+    ];
+
+    for path in &common_paths {
+        if std::path::Path::new(path).exists() {
+            return path.clone();
+        }
+    }
+
+    // If nothing found, return the name and let PATH resolution happen
+    name.to_string()
+}
+
 fn run_argo_cli(args: &[&str]) -> Result<String> {
-    let output = Command::new("argo")
+    let argo_cmd = find_command("argo");
+    let output = Command::new(&argo_cmd)
         .args(args)
         .output()
         .context("Failed to execute argo command")?;
@@ -331,7 +518,7 @@ fn run_argo_cli(args: &[&str]) -> Result<String> {
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     } else {
         let stderr = String::from_utf8(output.stderr)?;
-        Err(anyhow!("Argo command failed: {}", stderr))
+        Err(anyhow!("Argo command failed: {stderr}"))
     }
 }
 
@@ -355,7 +542,7 @@ fn get_git_remote_url() -> Result<String> {
         }
     } else {
         let stderr = String::from_utf8(output.stderr)?;
-        Err(anyhow!("Git command failed: {}", stderr))
+        Err(anyhow!("Git command failed: {stderr}"))
     }
 }
 
@@ -379,7 +566,7 @@ fn get_git_current_branch_in_dir(dir: Option<&Path>) -> Result<String> {
         }
     } else {
         let stderr = String::from_utf8(output.stderr)?;
-        Err(anyhow!("Git command failed: {}", stderr))
+        Err(anyhow!("Git command failed: {stderr}"))
     }
 }
 
@@ -398,7 +585,7 @@ fn get_git_repository_url_in_dir(dir: Option<&Path>) -> Result<String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8(output.stderr)?;
-        return Err(anyhow!("Failed to get git repository URL: {}", stderr));
+        return Err(anyhow!("Failed to get git repository URL: {stderr}"));
     }
 
     let url = String::from_utf8(output.stdout)?.trim().to_string();
@@ -421,7 +608,7 @@ fn get_git_repository_url_in_dir(dir: Option<&Path>) -> Result<String> {
         }
     }
 
-    Err(anyhow!("Could not parse repository URL: {}", url))
+    Err(anyhow!("Could not parse repository URL: {url}"))
 }
 
 /// Validate repository URL format
@@ -449,7 +636,7 @@ fn validate_repository_url(repo_url: &str) -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros, clippy::too_many_lines)]
 fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let working_directory = arguments
         .get("working_directory")
@@ -459,13 +646,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let config = CTO_CONFIG.get().unwrap();
 
     // Get workspace directory from Cursor environment, then navigate to working_directory
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            first_path.to_string()
-        })
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+    let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
 
     // Handle both absolute and relative paths
     let working_path = std::path::PathBuf::from(working_directory);
@@ -495,7 +676,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // If we didn't find a .git directory, fall back to the project directory
     if !found_git {
-        git_root = project_dir.clone();
+        git_root.clone_from(&project_dir);
     }
 
     eprintln!("🔍 Using project directory: {}", project_dir.display());
@@ -518,15 +699,10 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let source_branch = arguments
         .get("source_branch")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| config.defaults.docs.source_branch.clone());
+        .map_or_else(|| config.defaults.docs.source_branch.clone(), String::from);
 
     // Check for uncommitted changes and push them before starting docs generation
     eprintln!("🔍 Checking for uncommitted changes...");
-    eprintln!(
-        "🐛 DEBUG: Current directory for git: {:?}",
-        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-    );
     let status_output = Command::new("git")
         .args(["status", "--porcelain"])
         .output()
@@ -534,7 +710,9 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     if status_output.status.success() {
         let status_text = String::from_utf8(status_output.stdout)?;
-        if !status_text.trim().is_empty() {
+        if status_text.trim().is_empty() {
+            eprintln!("✅ No uncommitted changes found");
+        } else {
             eprintln!("📝 Found uncommitted changes, committing and pushing...");
 
             // Configure git user for commits (required for git commit to work)
@@ -589,15 +767,10 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
             if !commit_result.status.success() {
                 let stderr = String::from_utf8_lossy(&commit_result.stderr);
-                let stdout = String::from_utf8_lossy(&commit_result.stdout);
-                eprintln!("🐛 DEBUG: Git commit failed");
-                eprintln!("🐛 DEBUG: Stderr: {stderr}");
-                eprintln!("🐛 DEBUG: Stdout: {stdout}");
-                return Err(anyhow!("Failed to commit changes: {}", stderr));
+                return Err(anyhow!("Failed to commit changes: {stderr}"));
             }
 
             // Push to current branch
-            eprintln!("🐛 DEBUG: Pushing to branch: {source_branch}");
             let push_result = Command::new("git")
                 .args(["push", "origin", &source_branch])
                 .output()
@@ -605,14 +778,10 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
             if !push_result.status.success() {
                 let stderr = String::from_utf8_lossy(&push_result.stderr);
-                eprintln!("🐛 DEBUG: Git push failed");
-                eprintln!("🐛 DEBUG: Stderr: {stderr}");
-                return Err(anyhow!("Failed to push changes: {}", stderr));
+                return Err(anyhow!("Failed to push changes: {stderr}"));
             }
 
             eprintln!("✅ Changes committed and pushed successfully");
-        } else {
-            eprintln!("✅ No uncommitted changes found");
         }
     } else {
         return Err(anyhow!(
@@ -628,9 +797,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         if !config.agents.contains_key(agent) {
             let available_agents: Vec<&String> = config.agents.keys().collect();
             return Err(anyhow!(
-                "Unknown agent '{}'. Available agents: {:?}",
-                agent,
-                available_agents
+                "Unknown agent '{agent}'. Available agents: {available_agents:?}"
             ));
         }
         config.agents[agent].github_app.clone()
@@ -655,18 +822,16 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Handle model precedence: explicit arg > agent model > docs default model (deprecated)
     let model = if let Some(m) = arguments.get("model").and_then(|v| v.as_str()) {
-        eprintln!("🐛 DEBUG: Using model from arguments: {m}");
         m.to_string()
     } else if let Some(agent_key) = &selected_agent_key {
         let agent_model = &config.agents[agent_key].model;
-        if !agent_model.is_empty() {
-            eprintln!("🐛 DEBUG: Using agent-level model for {agent_key}: {agent_model}");
-            agent_model.clone()
-        } else {
+        if agent_model.is_empty() {
             eprintln!(
                 "⚠️ INFO: Agent '{agent_key}' has empty model; falling back to defaults.docs.model (deprecated)"
             );
             config.defaults.docs.model.clone()
+        } else {
+            agent_model.clone()
         }
     } else {
         eprintln!(
@@ -684,7 +849,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Handle include_codebase - use provided value or config default
     let include_codebase = arguments
         .get("include_codebase")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(config.defaults.docs.include_codebase);
 
     // Calculate relative working directory for container (relative to git root)
@@ -703,9 +868,6 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         // If it's already relative, use it as-is
         working_directory.to_string()
     };
-
-    eprintln!("🐛 DEBUG: Local working directory: {working_directory}");
-    eprintln!("🐛 DEBUG: Container working directory: {container_working_directory}");
 
     let workflow_model = model.clone();
 
@@ -749,9 +911,6 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         }
     }
 
-    eprintln!("🐛 DEBUG: Docs workflow submitting with model: {model}");
-    eprintln!("🐛 DEBUG: Full Argo parameters: {params:?}");
-
     let mut args = vec![
         "submit",
         "--from",
@@ -779,16 +938,588 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             "model": model,
             "parameters": params
         })),
-        Err(e) => Err(anyhow!("Failed to submit docs workflow: {}", e)),
+        Err(e) => Err(anyhow!("Failed to submit docs workflow: {e}")),
     }
 }
 
+// ========== Play Progress Tracking Helpers ==========
+
+/// Play workflow status
+#[derive(Debug, Clone, PartialEq)]
+enum PlayStatus {
+    InProgress,
+    Suspended,
+    Failed,
+    Completed,
+}
+
+impl std::fmt::Display for PlayStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InProgress => write!(f, "in-progress"),
+            Self::Suspended => write!(f, "suspended"),
+            Self::Failed => write!(f, "failed"),
+            Self::Completed => write!(f, "completed"),
+        }
+    }
+}
+
+/// Play progress data
+#[derive(Debug, Clone)]
+struct PlayProgress {
+    repository: String,
+    branch: String,
+    current_task_id: Option<u32>,
+    workflow_name: Option<String>,
+    status: PlayStatus,
+    stage: Option<String>,
+}
+
+/// Generate `ConfigMap` name from repository
+fn configmap_name(repo: &str) -> String {
+    format!("play-progress-{}", repo.replace('/', "-"))
+}
+
+/// Read play progress from `ConfigMap`
+fn read_play_progress(repo: &str) -> Result<Option<PlayProgress>> {
+    let name = configmap_name(repo);
+    let kubectl_cmd = find_command("kubectl");
+
+    let output = Command::new(&kubectl_cmd)
+        .args([
+            "get",
+            "configmap",
+            &name,
+            "-n",
+            "agent-platform",
+            "-o",
+            "json",
+        ])
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let cm: Value = serde_json::from_slice(&out.stdout)?;
+            let data = cm.get("data");
+
+            if let Some(data_obj) = data.and_then(|d| d.as_object()) {
+                let repository = data_obj
+                    .get("repository")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(repo)
+                    .to_string();
+
+                let branch = data_obj
+                    .get("branch")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("main")
+                    .to_string();
+
+                let current_task_id = data_obj
+                    .get("current-task-id")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u32>().ok());
+
+                let workflow_name = data_obj
+                    .get("workflow-name")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+
+                let status = data_obj
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "in-progress" => Some(PlayStatus::InProgress),
+                        "suspended" => Some(PlayStatus::Suspended),
+                        "failed" => Some(PlayStatus::Failed),
+                        "completed" => Some(PlayStatus::Completed),
+                        _ => None,
+                    })
+                    .unwrap_or(PlayStatus::InProgress);
+
+                let stage = data_obj
+                    .get("stage")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+
+                Ok(Some(PlayProgress {
+                    repository,
+                    branch,
+                    current_task_id,
+                    workflow_name,
+                    status,
+                    stage,
+                }))
+            } else {
+                Ok(None)
+            }
+        }
+        Ok(_) | Err(_) => Ok(None), // ConfigMap doesn't exist or error
+    }
+}
+
+/// Write play progress to `ConfigMap`
+fn write_play_progress(progress: &PlayProgress) -> Result<()> {
+    let name = configmap_name(&progress.repository);
+    let kubectl_cmd = find_command("kubectl");
+
+    // Build ConfigMap JSON
+    let mut data = serde_json::Map::new();
+    data.insert("repository".to_string(), json!(progress.repository));
+    data.insert("branch".to_string(), json!(progress.branch));
+
+    if let Some(task_id) = progress.current_task_id {
+        data.insert("current-task-id".to_string(), json!(task_id.to_string()));
+    }
+
+    if let Some(ref workflow_name) = progress.workflow_name {
+        data.insert("workflow-name".to_string(), json!(workflow_name));
+    }
+
+    data.insert("status".to_string(), json!(progress.status.to_string()));
+
+    if let Some(ref stage) = progress.stage {
+        data.insert("stage".to_string(), json!(stage));
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    data.insert("last-updated".to_string(), json!(now));
+
+    let cm = json!({
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {
+            "name": name,
+            "namespace": "agent-platform",
+            "labels": {
+                "play-tracking": "true"
+            }
+        },
+        "data": data
+    });
+
+    // Try to create or update
+    let cm_json = serde_json::to_string(&cm)?;
+    let mut temp_file = NamedTempFile::new()?;
+    temp_file.write_all(cm_json.as_bytes())?;
+    temp_file.flush()?;
+
+    let result = Command::new(&kubectl_cmd)
+        .args(["apply", "-f", temp_file.path().to_str().unwrap()])
+        .output();
+
+    match result {
+        Ok(out) if out.status.success() => Ok(()),
+        Ok(out) => Err(anyhow!(
+            "Failed to write ConfigMap: {}",
+            String::from_utf8_lossy(&out.stderr)
+        )),
+        Err(e) => Err(anyhow!("Failed to execute kubectl: {e}")),
+    }
+}
+
+/// Clear play progress `ConfigMap`
+fn clear_play_progress(repo: &str) {
+    let name = configmap_name(repo);
+    let kubectl_cmd = find_command("kubectl");
+
+    let _ = Command::new(&kubectl_cmd)
+        .args([
+            "delete",
+            "configmap",
+            &name,
+            "-n",
+            "agent-platform",
+            "--ignore-not-found=true",
+        ])
+        .output();
+}
+
+/// Query active play workflows for a repository
+fn find_active_play_workflow(repo: &str) -> Result<Option<(String, u32, String)>> {
+    let argo_cmd = find_command("argo");
+
+    // Query workflows with play labels
+    let output = Command::new(&argo_cmd)
+        .args([
+            "list",
+            "-n",
+            "agent-platform",
+            "-l",
+            &format!("repository={}", repo.replace('/', "-")),
+            "-l",
+            "workflow-type=play",
+            "-o",
+            "json",
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let workflows: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap_or_default();
+
+    // Find a running or suspended workflow
+    for wf in workflows {
+        if let Some(status) = wf
+            .get("status")
+            .and_then(|s| s.get("phase"))
+            .and_then(|p| p.as_str())
+        {
+            if status == "Running" || status == "Suspended" {
+                let workflow_name = wf
+                    .get("metadata")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                let task_id = wf
+                    .get("metadata")
+                    .and_then(|m| m.get("labels"))
+                    .and_then(|l| l.get("task-id"))
+                    .and_then(|t| t.as_str())
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(0);
+
+                let phase = status.to_string();
+
+                if !workflow_name.is_empty() && task_id > 0 {
+                    return Ok(Some((workflow_name, task_id, phase)));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+// ========== TaskMaster Integration Helpers ==========
+
+#[derive(Debug, Clone, Deserialize)]
+struct TaskMasterTask {
+    id: u32,
+    title: String,
+    status: String,
+    #[serde(default)]
+    priority: Option<String>,
+    #[serde(default)]
+    dependencies: Option<Vec<u32>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TaskTag {
+    tasks: Vec<TaskMasterTask>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum TasksFile {
+    /// New tagged format: { "master": { "tasks": [...] }, "other-tag": { "tasks": [...] } }
+    Tagged(HashMap<String, TaskTag>),
+    /// Legacy flat format: { "tasks": [...] }
+    Flat { tasks: Vec<TaskMasterTask> },
+}
+
+/// Find tasks.json in repository, optionally starting from a working directory
+fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
+    // If working_dir is an absolute path, use it directly
+    let (base_dir, workspace_dir) = if let Some(wd) = working_dir {
+        let wd_path = std::path::PathBuf::from(wd);
+        if wd_path.is_absolute() {
+            (wd_path, None)
+        } else {
+            // Try to get workspace directory for relative paths
+            let ws_dir = resolve_workspace_dir()?;
+            let base = ws_dir.join(wd);
+            (base, Some(ws_dir))
+        }
+    } else {
+        // Try to get workspace directory
+        let ws_dir = resolve_workspace_dir()?;
+        (ws_dir.clone(), Some(ws_dir))
+    };
+
+    let mut candidates = vec![
+        base_dir
+            .join(".taskmaster")
+            .join("tasks")
+            .join("tasks.json"),
+        base_dir.join(".taskmaster").join("tasks.json"),
+        base_dir.join("tasks.json"),
+    ];
+
+    // If working_dir was provided and we have a workspace, also try workspace root as fallback
+    if working_dir.is_some() {
+        if let Some(ws_dir) = workspace_dir {
+            candidates.push(ws_dir.join(".taskmaster").join("tasks").join("tasks.json"));
+            candidates.push(ws_dir.join(".taskmaster").join("tasks.json"));
+            candidates.push(ws_dir.join("tasks.json"));
+        }
+    }
+
+    candidates.into_iter().find(|p| p.exists())
+}
+
+/// Get next available task from `TaskMaster`
+fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMasterTask>> {
+    let tasks_file =
+        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+
+    let content = std::fs::read_to_string(&tasks_file)
+        .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
+
+    let tasks_data: TasksFile = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
+
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
+
+    // Build task map for dependency checking
+    let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
+
+    // Filter available tasks (not done, all deps satisfied)
+    let mut available_tasks: Vec<&TaskMasterTask> = tasks
+        .iter()
+        .filter(|task| {
+            // Skip done tasks
+            if task.status == "done" || task.status == "completed" {
+                return false;
+            }
+
+            // Check dependencies
+            if let Some(deps) = &task.dependencies {
+                for dep_id in deps {
+                    if let Some(dep_task) = task_map.get(dep_id) {
+                        if dep_task.status != "done" && dep_task.status != "completed" {
+                            return false;
+                        }
+                    } else {
+                        return false; // Non-existent dependency
+                    }
+                }
+            }
+
+            true
+        })
+        .collect();
+
+    if available_tasks.is_empty() {
+        return Ok(None);
+    }
+
+    // Sort by priority (high > medium > low), then by ID
+    available_tasks.sort_by(|a, b| {
+        let priority_order = |p: &Option<String>| match p.as_deref() {
+            Some("high") => 0,
+            Some("low") => 2,
+            _ => 1, // medium or unspecified
+        };
+
+        let a_priority = priority_order(&a.priority);
+        let b_priority = priority_order(&b.priority);
+
+        match a_priority.cmp(&b_priority) {
+            std::cmp::Ordering::Equal => a.id.cmp(&b.id),
+            other => other,
+        }
+    });
+
+    Ok(available_tasks.first().map(|&t| t.clone()))
+}
+
+/// Find blocked tasks (tasks with all pending dependencies)
+fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMasterTask>> {
+    let tasks_file =
+        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+
+    let content = std::fs::read_to_string(&tasks_file)
+        .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
+
+    let tasks_data: TasksFile = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
+
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
+    let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
+
+    let mut blocked = Vec::new();
+
+    for task in &tasks {
+        // Skip done tasks
+        if task.status == "done" || task.status == "completed" {
+            continue;
+        }
+
+        // Check if this task has dependencies
+        if let Some(deps) = &task.dependencies {
+            if deps.is_empty() {
+                continue;
+            }
+
+            // Check if ALL dependencies are still pending/in-progress
+            let all_deps_blocked = deps.iter().all(|dep_id| {
+                task_map
+                    .get(dep_id)
+                    .is_none_or(|dep| dep.status != "done" && dep.status != "completed")
+            });
+
+            if all_deps_blocked {
+                blocked.push(task.clone());
+            }
+        }
+    }
+
+    Ok(blocked)
+}
+
+/// Handle play status query
 #[allow(clippy::disallowed_macros)]
+fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
+    let config = CTO_CONFIG.get().unwrap();
+
+    // Handle repository - use provided value or config default
+    let repository = arguments
+        .get("repository")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| config.defaults.play.repository.clone())
+        .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
+
+    // Get docs project directory for finding tasks.json
+    // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
+    let docs_dir = config
+        .defaults
+        .play
+        .docs_project_directory
+        .as_ref()
+        .and_then(|dd| if dd == "." { None } else { Some(dd.as_str()) });
+
+    // Read progress from ConfigMap
+    let progress = read_play_progress(&repository)?;
+
+    // Check for active workflow in Argo
+    let active_workflow = find_active_play_workflow(&repository)?;
+
+    // Check for blocked tasks
+    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
+
+    // Build comprehensive status response
+    match (progress, active_workflow) {
+        (Some(prog), Some((wf_name, wf_task, wf_phase))) => {
+            // Active workflow found
+            Ok(json!({
+                "success": true,
+                "status": "active",
+                "repository": repository,
+                "current_task_id": wf_task,
+                "workflow_name": wf_name,
+                "workflow_phase": wf_phase,
+                "stage": prog.stage,
+                "configmap_status": prog.status.to_string(),
+                "argo_url": format!("https://argo.5dlabs.com/workflows/agent-platform/{}", wf_name),
+            }))
+        }
+        (Some(prog), None) => {
+            // ConfigMap exists but no active workflow - orphaned
+            eprintln!("⚠️  Orphaned ConfigMap detected for {repository}");
+            Ok(json!({
+                "success": true,
+                "status": "orphaned",
+                "repository": repository,
+                "last_task_id": prog.current_task_id,
+                "last_workflow_name": prog.workflow_name,
+                "message": "ConfigMap exists but workflow not found. ConfigMap will be cleared on next play submission.",
+            }))
+        }
+        (None, Some((wf_name, wf_task, wf_phase))) => {
+            // Workflow exists but no ConfigMap - legacy or external workflow
+            Ok(json!({
+                "success": true,
+                "status": "active_legacy",
+                "repository": repository,
+                "current_task_id": wf_task,
+                "workflow_name": wf_name,
+                "workflow_phase": wf_phase,
+                "message": "Workflow active but no progress tracking (legacy workflow)",
+                "argo_url": format!("https://argo.5dlabs.com/workflows/agent-platform/{}", wf_name),
+            }))
+        }
+        (None, None) => {
+            // No active workflow
+
+            // Try to get next task (only works if repository is in local workspace)
+            let (next_task, tasks_found) = match get_next_taskmaster_task(docs_dir) {
+                Ok(task) => (task, true),
+                Err(err) => {
+                    eprintln!("ℹ️  Unable to read TaskMaster tasks locally: {err}");
+                    (None, false)
+                }
+            };
+
+            if let Some(task) = next_task {
+                Ok(json!({
+                    "success": true,
+                    "status": "idle",
+                    "repository": repository,
+                    "message": "No active workflow",
+                    "next_available_task": {
+                        "id": task.id,
+                        "title": task.title,
+                        "priority": task.priority,
+                    },
+                }))
+            } else {
+                // Determine appropriate message based on whether tasks.json was found
+                let message = if !tasks_found {
+                    // tasks.json not found - repository likely not in workspace
+                    "No active workflow. Repository may not be in local workspace - use task_id to start a new workflow.".to_string()
+                } else if blocked_tasks.is_empty() {
+                    // tasks.json found but no tasks available
+                    "All tasks completed".to_string()
+                } else {
+                    // tasks.json found but tasks are blocked
+                    format!("{} task(s) blocked by dependencies", blocked_tasks.len())
+                };
+
+                Ok(json!({
+                    "success": true,
+                    "status": "idle",
+                    "repository": repository,
+                    "message": message,
+                    "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                        "id": t.id,
+                        "title": t.title,
+                        "dependencies": t.dependencies
+                    })).collect::<Vec<_>>(),
+                }))
+            }
+        }
+    }
+}
+
+#[allow(clippy::disallowed_macros, clippy::too_many_lines)]
 fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
-    let task_id = arguments
-        .get("task_id")
-        .and_then(|v| v.as_u64())
-        .ok_or(anyhow!("Missing required parameter: task_id"))?;
+    use base64::{engine::general_purpose, Engine as _};
 
     let config = CTO_CONFIG.get().unwrap();
 
@@ -803,6 +1534,237 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Validate repository URL
     validate_repository_url(&repository)?;
 
+    // Check for explicit repository_path parameter
+    let repository_path = arguments
+        .get("repository_path")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    // Get docs project directory for finding tasks.json
+    // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
+    let docs_dir = if let Some(repo_path) = &repository_path {
+        // If repository_path is provided, construct full path to docs directory
+        eprintln!("📁 Using explicit repository path: {repo_path}");
+        let docs_project_dir = config
+            .defaults
+            .play
+            .docs_project_directory
+            .as_deref()
+            .unwrap_or("docs");
+
+        let full_docs_path = if docs_project_dir == "." {
+            repo_path.clone()
+        } else {
+            format!("{repo_path}/{docs_project_dir}")
+        };
+
+        eprintln!("   Looking for tasks in: {full_docs_path}");
+        Some(full_docs_path)
+    } else {
+        // Otherwise use config with workspace detection
+        config
+            .defaults
+            .play
+            .docs_project_directory
+            .as_ref()
+            .and_then(|dd| if dd == "." { None } else { Some(dd.clone()) })
+    };
+
+    // Check if task_id is provided
+    let task_id = if let Some(id_value) = arguments.get("task_id") {
+        // Explicit task_id provided
+        #[allow(clippy::cast_possible_truncation)]
+        Some(
+            id_value
+                .as_u64()
+                .ok_or(anyhow!("Invalid task_id parameter"))? as u32,
+        )
+    } else {
+        // Auto-detection mode
+        eprintln!("🔍 Auto-detecting next task (no task_id provided)...");
+
+        // 1. Check ConfigMap for current progress
+        if let Some(progress) = read_play_progress(&repository)? {
+            eprintln!("📋 Found existing progress for {repository}");
+
+            // 2. Validate against Argo
+            if let Some(workflow_name) = &progress.workflow_name {
+                if let Some((active_wf, active_task, phase)) =
+                    find_active_play_workflow(&repository)?
+                {
+                    if active_wf == *workflow_name {
+                        // Workflow still active
+                        return Ok(json!({
+                            "success": false,
+                            "message": format!(
+                                "Play workflow already active for {}: task {} (phase: {})",
+                                repository, active_task, phase
+                            ),
+                            "workflow_name": active_wf,
+                            "task_id": active_task,
+                            "phase": phase,
+                            "status": progress.status.to_string(),
+                        }));
+                    }
+                }
+
+                // Workflow not found but ConfigMap exists - orphaned state
+                eprintln!(
+                    "⚠️  Orphaned progress detected: ConfigMap exists but workflow not found"
+                );
+                clear_play_progress(&repository);
+            }
+        }
+
+        // 3. If repository_path is provided, skip workspace detection and use it directly
+        if repository_path.is_some() {
+            eprintln!("🔍 Using explicit repository path - querying TaskMaster...");
+            match get_next_taskmaster_task(docs_dir.as_deref()) {
+                Ok(Some(task)) => {
+                    eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                    Some(task.id)
+                }
+                Ok(None) => {
+                    // Check for blocked tasks to provide helpful feedback
+                    let blocked_tasks =
+                        find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+
+                    let message = if blocked_tasks.is_empty() {
+                        "No tasks available - all tasks are completed".to_string()
+                    } else {
+                        let blocked_ids: Vec<String> = blocked_tasks
+                            .iter()
+                            .map(|t| format!("Task {} ({})", t.id, t.title))
+                            .collect();
+
+                        format!(
+                            "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                            blocked_tasks.len(),
+                            blocked_ids.join("\n")
+                        )
+                    };
+
+                    return Ok(json!({
+                        "success": false,
+                        "message": message,
+                        "repository": repository,
+                        "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                            "id": t.id,
+                            "title": t.title,
+                            "dependencies": t.dependencies
+                        })).collect::<Vec<_>>(),
+                    }));
+                }
+                Err(e) => {
+                    // Missing tasks.json is a serious error when repository_path is explicitly provided
+                    eprintln!("❌ Could not find tasks.json at repository_path: {e}");
+                    return Err(anyhow!(
+                        "tasks.json not found at specified repository_path: {}. Please ensure .taskmaster/tasks/tasks.json exists.",
+                        repository_path.as_ref().unwrap()
+                    ));
+                }
+            }
+        } else {
+            // Check if repository is in local workspace
+            // Get current workspace repository (if available)
+            let workspace_repo = resolve_workspace_dir().and_then(|workspace_path| {
+                let output = std::process::Command::new("git")
+                    .args(["remote", "get-url", "origin"])
+                    .current_dir(&workspace_path)
+                    .output()
+                    .ok()?;
+
+                if output.status.success() {
+                    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    url.strip_prefix("git@github.com:")
+                        .or_else(|| url.strip_prefix("https://github.com/"))
+                        .map(|repo_part| repo_part.trim_end_matches(".git").to_string())
+                } else {
+                    None
+                }
+            });
+
+            // Normalize repository to org/repo format for comparison
+            let normalized_repo = if repository.starts_with("https://github.com/") {
+                repository
+                    .strip_prefix("https://github.com/")
+                    .unwrap()
+                    .trim_end_matches(".git")
+                    .to_string()
+            } else {
+                repository.clone()
+            };
+
+            // Check if the requested repository matches the workspace
+            let is_local_repo = workspace_repo.as_ref() == Some(&normalized_repo);
+
+            if is_local_repo {
+                // Repository is local - try to auto-detect next task
+                eprintln!("🔍 Querying TaskMaster for next available task...");
+                match get_next_taskmaster_task(docs_dir.as_deref()) {
+                    Ok(Some(task)) => {
+                        eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                        Some(task.id)
+                    }
+                    Ok(None) => {
+                        // Check for blocked tasks to provide helpful feedback
+                        let blocked_tasks =
+                            find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+
+                        let message = if blocked_tasks.is_empty() {
+                            "No tasks available - all tasks are completed".to_string()
+                        } else {
+                            let blocked_ids: Vec<String> = blocked_tasks
+                                .iter()
+                                .map(|t| format!("Task {} ({})", t.id, t.title))
+                                .collect();
+
+                            format!(
+                                "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                                blocked_tasks.len(),
+                                blocked_ids.join("\n")
+                            )
+                        };
+
+                        return Ok(json!({
+                            "success": false,
+                            "message": message,
+                            "repository": repository,
+                            "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                                "id": t.id,
+                                "title": t.title,
+                                "dependencies": t.dependencies
+                            })).collect::<Vec<_>>(),
+                        }));
+                    }
+                    Err(e) => {
+                        // Unexpected error reading tasks.json
+                        eprintln!("❌ Error reading tasks.json: {e}");
+                        return Err(anyhow!("Failed to read tasks.json: {e}"));
+                    }
+                }
+            } else {
+                // Repository is not in local workspace
+                eprintln!("📦 Repository '{repository}' is not in local workspace");
+                eprintln!(
+                    "   Workspace repository: {}",
+                    workspace_repo.as_deref().unwrap_or("unknown")
+                );
+                eprintln!("⚠️  Cannot auto-detect tasks for remote repository");
+                eprintln!("   Please specify task_id explicitly or use repository_path parameter");
+
+                return Ok(json!({
+                    "success": false,
+                    "message": "Repository not in local workspace. Please specify task_id explicitly or use repository_path parameter to point to the local repository location.",
+                    "repository": repository,
+                    "hint": "Use cto_play({ task_id: 1 }) or cto_play({ repository_path: '/path/to/repo' })"
+                }));
+            }
+        }
+    };
+
+    let task_id = task_id.ok_or(anyhow!("Failed to determine task_id"))?;
+
     // Handle service - use provided value or config default
     let service = arguments
         .get("service")
@@ -816,8 +1778,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     {
         return Err(anyhow!(
-            "Invalid service name '{}'. Must contain only lowercase letters, numbers, and hyphens",
-            service
+            "Invalid service name '{service}'. Must contain only lowercase letters, numbers, and hyphens"
         ));
     }
 
@@ -841,42 +1802,238 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let cli = arguments
         .get("cli")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| {
-            eprintln!(
-                "🐛 DEBUG: Using play default CLI: {}",
-                config.defaults.play.cli
-            );
-            config.defaults.play.cli.clone()
-        });
+        .map_or_else(|| config.defaults.play.cli.clone(), String::from);
 
     // Handle model - use provided value or config default (needed for agent resolution)
     let model = arguments
         .get("model")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| {
-            eprintln!(
-                "🐛 DEBUG: Using play default model: {}",
-                config.defaults.play.model
-            );
-            config.defaults.play.model.clone()
-        });
+        .map_or_else(|| config.defaults.play.model.clone(), String::from);
+
+    // Try to load repository-specific configuration for agent tools
+    eprintln!("🔍 Checking for repository-specific configuration...");
+    let repo_config = load_repository_config(repository_path.as_deref());
+
+    // Use repository config if available, otherwise fall back to platform config
+    let effective_config = repo_config.as_ref().unwrap_or(config);
+
+    if repo_config.is_some() {
+        eprintln!("✅ Using repository configuration for agent tools");
+    } else {
+        eprintln!("ℹ️  Using platform configuration (no repository config)");
+    }
 
     // Handle implementation agent - use provided value or config default
     let implementation_agent_input = arguments
         .get("implementation_agent")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| config.defaults.play.implementation_agent.clone());
+        .map_or_else(
+            || effective_config.defaults.play.implementation_agent.clone(),
+            String::from,
+        );
 
-    // Resolve agent name and extract CLI/model/tools if it's a short alias
-    let (implementation_agent, implementation_cli, implementation_model, implementation_tools) =
-        if let Some(agent_config) = config
-            .agents
-            .values()
-            .find(|a| a.github_app == implementation_agent_input)
-        {
+    let implementation_agent_cfg = effective_config
+        .agents
+        .values()
+        .find(|a| a.github_app == implementation_agent_input);
+
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
+    let (
+        implementation_agent,
+        implementation_cli,
+        implementation_model,
+        implementation_tools,
+        implementation_model_rotation,
+    ) = if let Some(agent_config) = implementation_agent_cfg {
+        // Use the structured agent configuration
+        let agent_cli = if agent_config.cli.is_empty() {
+            cli.clone()
+        } else {
+            agent_config.cli.clone()
+        };
+        let agent_model = if agent_config.model.is_empty() {
+            model.clone()
+        } else {
+            agent_config.model.clone()
+        };
+        let agent_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|t| match serde_json::to_string(t) {
+                Ok(json) => {
+                    eprintln!("✅ Serialized implementation agent tools: {json}");
+                    json
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to serialize implementation agent tools: {e}");
+                    eprintln!("   Tools data: {t:?}");
+                    "{}".to_string()
+                }
+            })
+            .unwrap_or_else(|| {
+                eprintln!(
+                    "ℹ️ No tools configured for implementation agent {implementation_agent_input}"
+                );
+                "{}".to_string()
+            });
+        let agent_model_rotation = agent_config
+            .model_rotation
+            .as_ref()
+            .and_then(|mr| {
+                if mr.enabled && !mr.models.is_empty() {
+                    match serde_json::to_string(&mr.models) {
+                        Ok(json) => {
+                            eprintln!("✅ Model rotation enabled for implementation agent: {json}");
+                            Some(json)
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to serialize model rotation: {e}");
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "[]".to_string());
+        (
+            agent_config.github_app.clone(),
+            agent_cli,
+            agent_model,
+            agent_tools,
+            agent_model_rotation,
+        )
+    } else {
+        // Not a configured agent, use provided name with defaults
+        eprintln!("⚠️ Agent {implementation_agent_input} not found in config, using defaults");
+        (
+            implementation_agent_input.clone(),
+            cli.clone(),
+            model.clone(),
+            "{}".to_string(),
+            "[]".to_string(),
+        )
+    };
+
+    let implementation_agent_max_retries = implementation_agent_cfg.and_then(|cfg| cfg.max_retries);
+
+    // Handle frontend agent - use provided value or config default
+    let frontend_agent_input = arguments
+        .get("frontend_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.frontend_agent.clone())
+        .unwrap_or_else(|| {
+            let fallback = effective_config.defaults.play.implementation_agent.clone();
+            eprintln!(
+                "⚠️ WARNING: No frontend-agent specified and no defaults.play.frontendAgent in config!"
+            );
+            eprintln!(
+                "   Falling back to implementation-agent: {fallback}"
+            );
+            eprintln!(
+                "   ⚠️ This may cause frontend tasks to be routed incorrectly!"
+            );
+            eprintln!(
+                "   💡 Set defaults.play.frontendAgent in cto-config.json to avoid this"
+            );
+            fallback
+        });
+
+    let frontend_agent_cfg = effective_config
+        .agents
+        .values()
+        .find(|a| a.github_app == frontend_agent_input);
+
+    // Resolve frontend agent name and extract CLI/model/tools/modelRotation
+    let (frontend_agent, frontend_cli, frontend_model, frontend_tools, frontend_model_rotation) =
+        if let Some(agent_config) = frontend_agent_cfg {
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized frontend agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize frontend agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for frontend agent {frontend_agent_input}");
+                    "{}".to_string()
+                });
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for frontend agent: {json}");
+                                Some(json)
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!(
+                "⚠️ Frontend agent {frontend_agent_input} not found in config, using defaults"
+            );
+            (
+                frontend_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+
+    // Handle quality agent - use provided value or config default
+    let quality_agent_input = arguments
+        .get("quality_agent")
+        .and_then(|v| v.as_str())
+        .map_or_else(
+            || effective_config.defaults.play.quality_agent.clone(),
+            String::from,
+        );
+
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
+    let quality_agent_cfg = effective_config
+        .agents
+        .values()
+        .find(|a| a.github_app == quality_agent_input);
+
+    let (quality_agent, quality_cli, quality_model, quality_tools, quality_model_rotation) =
+        if let Some(agent_config) = quality_agent_cfg {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
                 cli.clone()
@@ -888,202 +2045,303 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.model.clone()
             };
-            let agent_tools = agent_config.tools.as_ref()
-                .map(|t| {
-                    match serde_json::to_string(t) {
-                        Ok(json) => {
-                            eprintln!("✅ Serialized implementation agent tools: {json}");
-                            json
-                        },
-                        Err(e) => {
-                            eprintln!("❌ Failed to serialize implementation agent tools: {e}");
-                            eprintln!("   Tools data: {t:?}");
-                            "{}".to_string()
-                        }
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized quality agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize quality agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
                     }
                 })
                 .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for implementation agent {implementation_agent_input}");
+                    eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
                     "{}".to_string()
                 });
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for quality agent: {json}");
+                                Some(json)
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
             (
                 agent_config.github_app.clone(),
                 agent_cli,
                 agent_model,
                 agent_tools,
+                agent_model_rotation,
             )
         } else {
             // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {implementation_agent_input} not found in config, using defaults");
+            eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
             (
-                implementation_agent_input.clone(),
+                quality_agent_input.clone(),
                 cli.clone(),
                 model.clone(),
                 "{}".to_string(),
+                "[]".to_string(),
             )
         };
 
-    // Handle quality agent - use provided value or config default
-    let quality_agent_input = arguments
-        .get("quality_agent")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
+    let quality_agent_max_retries = quality_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Resolve agent name and extract CLI/model/tools if it's a short alias
-    let (quality_agent, quality_cli, quality_model, quality_tools) = if let Some(agent_config) =
-        config
-            .agents
-            .values()
-            .find(|a| a.github_app == quality_agent_input)
-    {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() {
-            cli.clone()
-        } else {
-            agent_config.cli.clone()
-        };
-        let agent_model = if agent_config.model.is_empty() {
-            model.clone()
-        } else {
-            agent_config.model.clone()
-        };
-        let agent_tools = agent_config
-            .tools
-            .as_ref()
-            .map(|t| match serde_json::to_string(t) {
-                Ok(json) => {
-                    eprintln!("✅ Serialized quality agent tools: {json}");
-                    json
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to serialize quality agent tools: {e}");
-                    eprintln!("   Tools data: {t:?}");
+    // Handle security agent - use provided value or config default
+    let security_agent_input = arguments
+        .get("security_agent")
+        .and_then(|v| v.as_str())
+        .map_or_else(
+            || effective_config.defaults.play.security_agent.clone(),
+            String::from,
+        );
+
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
+    let security_agent_cfg = effective_config
+        .agents
+        .values()
+        .find(|a| a.github_app == security_agent_input);
+
+    let (security_agent, security_cli, security_model, security_tools, security_model_rotation) =
+        if let Some(agent_config) = security_agent_cfg {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized security agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize security agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for security agent {security_agent_input}");
                     "{}".to_string()
-                }
-            })
-            .unwrap_or_else(|| {
-                eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
-                "{}".to_string()
-            });
-        (
-            agent_config.github_app.clone(),
-            agent_cli,
-            agent_model,
-            agent_tools,
-        )
-    } else {
-        // Not a configured agent, use provided name with defaults
-        eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
-        (
-            quality_agent_input.clone(),
-            cli.clone(),
-            model.clone(),
-            "{}".to_string(),
-        )
-    };
+                });
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for security agent: {json}");
+                                Some(json)
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!("⚠️ Agent {security_agent_input} not found in config, using defaults");
+            (
+                security_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+
+    let security_agent_max_retries = security_agent_cfg.and_then(|cfg| cfg.max_retries);
 
     // Handle testing agent - use provided value or config default
     let testing_agent_input = arguments
         .get("testing_agent")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
+        .map_or_else(
+            || effective_config.defaults.play.testing_agent.clone(),
+            String::from,
+        );
 
-    // Resolve agent name and extract CLI/model/tools if it's a short alias
-    let (testing_agent, testing_cli, testing_model, testing_tools) = if let Some(agent_config) =
-        config
-            .agents
-            .values()
-            .find(|a| a.github_app == testing_agent_input)
-    {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() {
-            cli.clone()
-        } else {
-            agent_config.cli.clone()
-        };
-        let agent_model = if agent_config.model.is_empty() {
-            model.clone()
-        } else {
-            agent_config.model.clone()
-        };
-        let agent_tools = agent_config
-            .tools
-            .as_ref()
-            .map(|t| match serde_json::to_string(t) {
-                Ok(json) => {
-                    eprintln!("✅ Serialized testing agent tools: {json}");
-                    json
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to serialize testing agent tools: {e}");
-                    eprintln!("   Tools data: {t:?}");
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
+    let testing_agent_cfg = effective_config
+        .agents
+        .values()
+        .find(|a| a.github_app == testing_agent_input);
+
+    let (testing_agent, testing_cli, testing_model, testing_tools, testing_model_rotation) =
+        if let Some(agent_config) = testing_agent_cfg {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized testing agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize testing agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
                     "{}".to_string()
-                }
-            })
-            .unwrap_or_else(|| {
-                eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
-                "{}".to_string()
-            });
-        (
-            agent_config.github_app.clone(),
-            agent_cli,
-            agent_model,
-            agent_tools,
-        )
-    } else {
-        // Not a configured agent, use provided name with defaults
-        eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
-        (
-            testing_agent_input.clone(),
-            cli.clone(),
-            model.clone(),
-            "{}".to_string(),
-        )
-    };
+                });
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for testing agent: {json}");
+                                Some(json)
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
+            (
+                testing_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+
+    let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
+
+    let frontend_agent_max_retries = frontend_agent_cfg.and_then(|cfg| cfg.max_retries);
 
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
 
     // Validate agent-specific models
     validate_model_name(&implementation_model)
-        .map_err(|e| anyhow!("Invalid implementation agent model: {}", e))?;
-    validate_model_name(&quality_model)
-        .map_err(|e| anyhow!("Invalid quality agent model: {}", e))?;
-    validate_model_name(&testing_model)
-        .map_err(|e| anyhow!("Invalid testing agent model: {}", e))?;
+        .map_err(|e| anyhow!("Invalid implementation agent model: {e}"))?;
+    validate_model_name(&frontend_model)
+        .map_err(|e| anyhow!("Invalid frontend agent model: {e}"))?;
+    validate_model_name(&quality_model).map_err(|e| anyhow!("Invalid quality agent model: {e}"))?;
+    validate_model_name(&security_model)
+        .map_err(|e| anyhow!("Invalid security agent model: {e}"))?;
+    validate_model_name(&testing_model).map_err(|e| anyhow!("Invalid testing agent model: {e}"))?;
 
-    eprintln!("🐛 DEBUG: Play workflow submitting with task_id: {task_id}");
-    eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
-    eprintln!("🐛 DEBUG: Play workflow service: {service}");
-    eprintln!("🐛 DEBUG: Implementation agent: {implementation_agent} (CLI: {implementation_cli}, Model: {implementation_model})");
-    eprintln!("🐛 DEBUG: Implementation tools: {implementation_tools}");
-    eprintln!(
-        "🐛 DEBUG: Quality agent: {quality_agent} (CLI: {quality_cli}, Model: {quality_model})"
-    );
-    eprintln!("🐛 DEBUG: Quality tools: {quality_tools}");
-    eprintln!(
-        "🐛 DEBUG: Testing agent: {testing_agent} (CLI: {testing_cli}, Model: {testing_model})"
-    );
-    eprintln!("🐛 DEBUG: Testing tools: {testing_tools}");
+    let implementation_max_retries =
+        parse_max_retries_argument(arguments, "implementation_max_retries")
+            .or(parse_max_retries_argument(arguments, "factory_max_retries"))
+            .or(parse_max_retries_argument(
+                arguments,
+                "opencode_max_retries",
+            ))
+            .or(implementation_agent_max_retries)
+            .or(effective_config.defaults.play.implementation_max_retries)
+            .or(effective_config.defaults.play.max_retries)
+            .or(effective_config.defaults.code.max_retries)
+            .unwrap_or(10);
 
-    eprintln!(
-        "🐛 DEBUG: Available agents in config: {:?}",
-        config.agents.keys().collect::<Vec<_>>()
-    );
-    eprintln!("🐛 DEBUG: Implementation agent input: '{implementation_agent_input}'");
-    eprintln!("🐛 DEBUG: Quality agent input: '{quality_agent_input}'");
-    eprintln!("🐛 DEBUG: Testing agent input: '{testing_agent_input}'");
+    let frontend_max_retries = parse_max_retries_argument(arguments, "frontend_max_retries")
+        .or(frontend_agent_max_retries)
+        .or(effective_config.defaults.play.frontend_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
+        .unwrap_or(10);
+
+    let quality_max_retries = parse_max_retries_argument(arguments, "quality_max_retries")
+        .or(quality_agent_max_retries)
+        .or(effective_config.defaults.play.quality_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
+        .unwrap_or(10);
+
+    let security_max_retries = parse_max_retries_argument(arguments, "security_max_retries")
+        .or(security_agent_max_retries)
+        .or(effective_config.defaults.play.security_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
+        .unwrap_or(10);
+
+    let testing_max_retries = parse_max_retries_argument(arguments, "testing_max_retries")
+        .or(testing_agent_max_retries)
+        .or(effective_config.defaults.play.testing_max_retries)
+        .or(effective_config.defaults.play.max_retries)
+        .or(effective_config.defaults.code.max_retries)
+        .unwrap_or(10);
+
+    let opencode_max_retries_override =
+        parse_max_retries_argument(arguments, "opencode_max_retries");
+    let opencode_max_retries = opencode_max_retries_override.unwrap_or(implementation_max_retries);
 
     // Check for requirements.yaml file
     // Try to determine workspace directory, but don't fail if we can't
-    let workspace_dir_result = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            std::path::PathBuf::from(first_path)
-        })
-        .or_else(|_| std::env::current_dir());
+    let workspace_dir_result =
+        resolve_workspace_dir().ok_or_else(|| anyhow!("Workspace directory not found"));
 
     // Only check for requirements if we have a valid workspace directory
     let requirements_path = if let Ok(workspace_dir) = workspace_dir_result {
@@ -1122,15 +2380,64 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("implementation-cli={implementation_cli}"),
         format!("implementation-model={implementation_model}"),
         format!("implementation-tools={implementation_tools}"),
+        format!("implementation-model-rotation={implementation_model_rotation}"),
+        format!("frontend-agent={frontend_agent}"),
+        format!("frontend-cli={frontend_cli}"),
+        format!("frontend-model={frontend_model}"),
+        format!("frontend-tools={frontend_tools}"),
+        format!("frontend-model-rotation={frontend_model_rotation}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
         format!("quality-tools={quality_tools}"),
+        format!("quality-model-rotation={quality_model_rotation}"),
+        format!("security-agent={security_agent}"),
+        format!("security-cli={security_cli}"),
+        format!("security-model={security_model}"),
+        format!("security-tools={security_tools}"),
+        format!("security-model-rotation={security_model_rotation}"),
         format!("testing-agent={testing_agent}"),
         format!("testing-cli={testing_cli}"),
         format!("testing-model={testing_model}"),
         format!("testing-tools={testing_tools}"),
+        format!("testing-model-rotation={testing_model_rotation}"),
     ];
+
+    params.push(format!(
+        "implementation-max-retries={implementation_max_retries}"
+    ));
+    params.push(format!("frontend-max-retries={frontend_max_retries}"));
+    params.push(format!("quality-max-retries={quality_max_retries}"));
+    params.push(format!("security-max-retries={security_max_retries}"));
+    params.push(format!("testing-max-retries={testing_max_retries}"));
+    params.push(format!("opencode-max-retries={opencode_max_retries}"));
+
+    // Auto-merge parameter
+    let auto_merge = parse_bool_argument(arguments, "auto_merge")
+        .or(effective_config.defaults.play.auto_merge)
+        .unwrap_or(false);
+    params.push(format!("auto-merge={auto_merge}"));
+
+    // Parallel execution parameter - determines which workflow template to use
+    let parallel_execution = parse_bool_argument(arguments, "parallel_execution")
+        .or(effective_config.defaults.play.parallel_execution)
+        .unwrap_or(false);
+
+    // Select workflow template based on parallel_execution flag
+    let workflow_template = if parallel_execution {
+        eprintln!("🚀 Using parallel execution mode (play-project-workflow-template)");
+        "workflowtemplate/play-project-workflow-template"
+    } else {
+        eprintln!("🔄 Using sequential execution mode (play-workflow-template)");
+        "workflowtemplate/play-workflow-template"
+    };
+
+    // Add parallel-execution parameter for the workflow
+    params.push(format!("parallel-execution={parallel_execution}"));
+
+    // Final task parameter - indicates this is the last task requiring deployment verification
+    let final_task = parse_bool_argument(arguments, "final_task").unwrap_or(false);
+    params.push(format!("final-task={final_task}"));
 
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {
@@ -1140,7 +2447,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         ))?;
 
         // Base64 encode the requirements
-        use base64::{engine::general_purpose, Engine as _};
         let encoded = general_purpose::STANDARD.encode(requirements_content);
         params.push(format!("task-requirements={encoded}"));
         eprintln!("✅ Encoded requirements.yaml for workflow");
@@ -1149,13 +2455,118 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         params.push("task-requirements=".to_string());
     }
 
-    let mut args = vec![
+    // Build labels for workflow tracking
+    let repo_label = format!("repository={}", repository.replace('/', "-"));
+    let workflow_type_label = "workflow-type=play".to_string();
+    let task_id_label = format!("task-id={task_id}");
+
+    // CLEANUP: Delete old play workflows for this repository before starting new one
+    // This ensures old GitHub checks get cancelled properly
+    eprintln!("🧹 Checking for old play workflows to clean up...");
+    let cleanup_result = run_argo_cli(&[
+        "list",
+        "-n",
+        "agent-platform",
+        "-l",
+        &repo_label,
+        "-l",
+        &workflow_type_label,
+        "-o",
+        "json",
+    ]);
+
+    if let Ok(workflows_json) = cleanup_result {
+        if let Ok(workflows) = serde_json::from_str::<serde_json::Value>(&workflows_json) {
+            if let Some(items) = workflows.get("items").and_then(|v| v.as_array()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
+                for workflow in items {
+                    if let (Some(name), Some(created_at), phase) = (
+                        workflow["metadata"]["name"].as_str(),
+                        workflow["metadata"]["creationTimestamp"].as_str(),
+                        workflow["status"]["phase"].as_str(),
+                    ) {
+                        // Parse RFC3339 timestamp
+                        if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at) {
+                            let created_secs = created_time.timestamp();
+                            // Only process workflows with valid (non-negative) timestamps
+                            if created_secs >= 0 {
+                                #[allow(clippy::cast_sign_loss)]
+                                let created_secs_u64 = created_secs as u64;
+
+                                // Handle clock skew: if workflow timestamp is in the future, treat as age 0
+                                let age_secs = if created_secs_u64 > now {
+                                    eprintln!(
+                                        "  ⚠️  Workflow has future timestamp (clock skew detected): {name}"
+                                    );
+                                    0
+                                } else {
+                                    now - created_secs_u64
+                                };
+
+                                // Skip workflows created within the last 10 seconds to avoid race conditions
+                                if age_secs < 10 {
+                                    eprintln!(
+                                        "  ⏭️  Skipping recent workflow ({age_secs}s old): {name}"
+                                    );
+                                    continue;
+                                }
+
+                                // Check workflow status - only delete completed/failed workflows
+                                // Skip running, pending, or uninitialized workflows to avoid data loss
+                                let phase_lower = phase.map(str::to_lowercase);
+                                match phase_lower.as_deref() {
+                                    Some("running" | "pending") => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping active workflow (status: {phase:?}): {name}"
+                                        );
+                                    }
+                                    Some("succeeded" | "failed" | "error") => {
+                                        eprintln!(
+                                            "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
+                                        );
+                                        let _ =
+                                            run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                        let _ =
+                                            run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                    }
+                                    None => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with no phase (may be initializing): {name}"
+                                        );
+                                    }
+                                    Some(other) => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with unknown status '{other}': {name}"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut args: Vec<&str> = vec![
         "submit",
         "--from",
-        "workflowtemplate/play-workflow-template",
+        workflow_template,
         "-n",
         "agent-platform",
     ];
+
+    // Add labels for workflow tracking (enables auto-detection)
+    args.push("-l");
+    args.push(&repo_label);
+    args.push("-l");
+    args.push(&workflow_type_label);
+    args.push("-l");
+    args.push(&task_id_label);
 
     // Add all parameters to the command
     for param in &params {
@@ -1164,42 +2575,72 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 
     match run_argo_cli(&args) {
-        Ok(output) => Ok(json!({
-            "success": true,
-            "message": "Play workflow submitted successfully",
-            "output": output,
-            "task_id": task_id,
-            "repository": repository,
-            "service": service,
-            "docs_repository": docs_repository,
-            "docs_project_directory": docs_project_directory,
-            "implementation_agent": implementation_agent,
-            "implementation_cli": implementation_cli,
-            "implementation_model": implementation_model,
-            "quality_agent": quality_agent,
-            "quality_cli": quality_cli,
-            "quality_model": quality_model,
-            "testing_agent": testing_agent,
-            "testing_cli": testing_cli,
-            "testing_model": testing_model,
-            "model": implementation_model,
-            "parameters": params
-        })),
-        Err(e) => Err(anyhow!("Failed to submit play workflow: {}", e)),
+        Ok(output) => {
+            // Extract workflow name from output
+            let workflow_name = if let Ok(wf_json) = serde_json::from_str::<Value>(&output) {
+                wf_json
+                    .get("metadata")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .map(String::from)
+            } else {
+                None
+            };
+
+            // Write progress ConfigMap if we got a workflow name
+            if let Some(ref wf_name) = workflow_name {
+                let progress = PlayProgress {
+                    repository: repository.clone(),
+                    branch: "main".to_string(),
+                    current_task_id: Some(task_id),
+                    workflow_name: Some(wf_name.clone()),
+                    status: PlayStatus::InProgress,
+                    stage: Some("implementation".to_string()),
+                };
+
+                if let Err(e) = write_play_progress(&progress) {
+                    eprintln!("⚠️  Failed to write progress ConfigMap: {e}");
+                    eprintln!("   (This won't affect workflow execution)");
+                }
+            }
+
+            Ok(json!({
+                "success": true,
+                "message": "Play workflow submitted successfully",
+                "output": output,
+                "task_id": task_id,
+                "repository": repository,
+                "service": service,
+                "docs_repository": docs_repository,
+                "docs_project_directory": docs_project_directory,
+                "implementation_agent": implementation_agent,
+                "implementation_cli": implementation_cli,
+                "implementation_model": implementation_model,
+                "quality_agent": quality_agent,
+                "quality_cli": quality_cli,
+                "quality_model": quality_model,
+                "security_agent": security_agent,
+                "security_cli": security_cli,
+                "security_model": security_model,
+                "testing_agent": testing_agent,
+                "testing_cli": testing_cli,
+                "testing_model": testing_model,
+                "model": implementation_model,
+                "parameters": params,
+                "workflow_name": workflow_name,
+            }))
+        }
+        Err(e) => Err(anyhow!("Failed to submit play workflow: {e}")),
     }
 }
 
 #[allow(clippy::disallowed_macros)]
+#[allow(clippy::too_many_lines)]
 fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🚀 Processing project intake request");
 
     // Get workspace directory from Cursor environment
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            std::path::PathBuf::from(first_path)
-        })
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+    let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
 
     eprintln!("🔍 Using workspace directory: {}", workspace_dir.display());
 
@@ -1228,9 +2669,7 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
             .with_context(|| format!("Failed to read {project_name}/intake/prd.txt"))?
     } else {
         return Err(anyhow!(
-            "No PRD found. Please create either {}/prd.txt or {}/intake/prd.txt, or provide prd_content parameter",
-            project_name,
-            project_name
+            "No PRD found. Please create either {project_name}/prd.txt or {project_name}/intake/prd.txt, or provide prd_content parameter"
         ));
     };
 
@@ -1339,7 +2778,8 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
     });
 
     // Create the ConfigMap using kubectl
-    let cm_output = std::process::Command::new("kubectl")
+    let kubectl_cmd = find_command("kubectl");
+    let cm_output = std::process::Command::new(&kubectl_cmd)
         .args([
             "create",
             "configmap",
@@ -1353,20 +2793,21 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
         .output();
 
     if let Err(e) = cm_output {
-        return Err(anyhow!("Failed to create ConfigMap: {}", e));
+        return Err(anyhow!("Failed to create ConfigMap: {e}"));
     }
 
     if let Ok(output) = cm_output {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to create ConfigMap: {}", stderr));
+            return Err(anyhow!("Failed to create ConfigMap: {stderr}"));
         }
     }
 
     // Submit Argo workflow with minimal parameters
     let workflow_name = format!("intake-{}", chrono::Utc::now().timestamp());
 
-    let output = std::process::Command::new("argo")
+    let argo_cmd = find_command("argo");
+    let output = std::process::Command::new(&argo_cmd)
         .args([
             "submit",
             "--from",
@@ -1501,18 +2942,27 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
+                Ok("play_status") => Some(handle_play_status(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
                 Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("jobs") => Some(handle_jobs_tool(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
+                Ok("jobs") => {
+                    let result = handle_jobs_tool(&arguments);
+                    Some(Ok(json!({
+                        "content": [{
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                        }]
+                    })))
+                },
                 Ok("stop_job") => Some(handle_stop_job_tool(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
@@ -1531,7 +2981,7 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))),
+                Ok(unknown) => Some(Err(anyhow!("Unknown tool: {unknown}"))),
                 Err(e) => Some(Err(e)),
             }
         }
@@ -1557,22 +3007,25 @@ fn handle_method(method: &str, params: Option<&Value>) -> Option<Result<Value>> 
         return Some(result);
     }
 
-    Some(Err(anyhow!("Unknown method: {}", method)))
+    Some(Err(anyhow!("Unknown method: {method}")))
 }
 
 fn run_kubectl_json(args: &[&str]) -> Result<Value> {
-    let output = std::process::Command::new("kubectl").args(args).output()?;
+    let kubectl_cmd = find_command("kubectl");
+    let output = std::process::Command::new(&kubectl_cmd)
+        .args(args)
+        .output()?;
     if output.status.success() {
         let stdout = String::from_utf8(output.stdout)?;
         let v: Value = serde_json::from_str(&stdout)?;
         Ok(v)
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(anyhow!("kubectl failed: {}", stderr))
+        Err(anyhow!("kubectl failed: {stderr}"))
     }
 }
 
-fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Value {
     let namespace = arguments
         .get("namespace")
         .and_then(|v| v.as_str())
@@ -1635,12 +3088,12 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
         }
     }
 
-    Ok(json!({
+    json!({
         "success": true,
         "namespace": namespace,
         "count": jobs.len(),
         "jobs": jobs
-    }))
+    })
 }
 
 fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
@@ -1705,9 +3158,10 @@ fn handle_anthropic_message_tool(
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("model is required"))?;
     let system = arguments.get("system").and_then(|v| v.as_str());
+    #[allow(clippy::cast_possible_truncation)]
     let max_tokens = arguments
         .get("max_tokens")
-        .and_then(|v| v.as_u64())
+        .and_then(serde_json::Value::as_u64)
         .unwrap_or(1024) as u32;
 
     let messages = if let Some(raw) = arguments.get("messages").and_then(|v| v.as_array()) {
@@ -1743,7 +3197,7 @@ fn handle_anthropic_message_tool(
         .header("anthropic-version", "2023-06-01")
         .json(&body)
         .send()
-        .and_then(|r| r.error_for_status())
+        .and_then(reqwest::blocking::Response::error_for_status)
         .map_err(|e| anyhow!(format!("Anthropic request failed: {e}")))?;
 
     let json_resp: Value = resp
@@ -1752,6 +3206,7 @@ fn handle_anthropic_message_tool(
     Ok(json_resp)
 }
 
+#[allow(clippy::too_many_lines)]
 fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
     let github_url = arguments
         .get("repository_url")
@@ -1834,56 +3289,57 @@ IMPORTANT:
         })?;
 
     // Extract JSON from the response - try direct parse first, then extract
-    let strategy_json: Value = match serde_json::from_str(analysis_text) {
-        Ok(json) => json,
-        Err(_) => {
-            // Try to extract JSON object from the response
-            let chars: Vec<char> = analysis_text.chars().collect();
-            let mut start = None;
-            let mut depth = 0;
-            let mut in_string = false;
-            let mut escape = false;
-            let mut json_result = None;
+    let strategy_json: Value = if let Ok(json) = serde_json::from_str(analysis_text) {
+        json
+    } else {
+        // Try to extract JSON object from the response
+        let chars: Vec<char> = analysis_text.chars().collect();
+        let mut start = None;
+        let mut depth = 0;
+        let mut in_string = false;
+        let mut escape = false;
+        let mut json_result = None;
 
-            for (i, &ch) in chars.iter().enumerate() {
-                if escape {
-                    escape = false;
-                    continue;
-                }
+        for (i, &ch) in chars.iter().enumerate() {
+            if escape {
+                escape = false;
+                continue;
+            }
 
-                match ch {
-                    '\\' if in_string => escape = true,
-                    '"' if !escape => in_string = !in_string,
-                    '{' if !in_string => {
-                        if depth == 0 {
-                            start = Some(i);
-                        }
-                        depth += 1;
+            match ch {
+                '\\' if in_string => escape = true,
+                '"' if !escape => in_string = !in_string,
+                '{' if !in_string => {
+                    if depth == 0 {
+                        start = Some(i);
                     }
-                    '}' if !in_string => {
-                        depth -= 1;
-                        if depth == 0 && start.is_some() {
-                            let json_str = &analysis_text[start.unwrap()..=i];
+                    depth += 1;
+                }
+                '}' if !in_string => {
+                    depth -= 1;
+                    if depth == 0 {
+                        if let Some(start_idx) = start {
+                            let json_str = &analysis_text[start_idx..=i];
                             if let Ok(json) = serde_json::from_str::<Value>(json_str) {
                                 json_result = Some(json);
                                 break;
                             }
                         }
                     }
-                    _ => {}
                 }
+                _ => {}
             }
-
-            json_result.ok_or_else(|| {
-                eprintln!("DEBUG: Could not extract JSON from Claude's response. Full text:");
-                eprintln!("{analysis_text}");
-                eprintln!("---");
-                anyhow!(
-                    "No valid JSON found in Claude's response. Response length: {} chars",
-                    analysis_text.len()
-                )
-            })?
         }
+
+        json_result.ok_or_else(|| {
+            eprintln!("DEBUG: Could not extract JSON from Claude's response. Full text:");
+            eprintln!("{analysis_text}");
+            eprintln!("---");
+            anyhow!(
+                "No valid JSON found in Claude's response. Response length: {} chars",
+                analysis_text.len()
+            )
+        })?
     };
 
     // Doc type is already known from user input, but verify Claude used it
@@ -1963,7 +3419,7 @@ IMPORTANT:
         .arg("-c")
         .arg(&cmd)
         .output()
-        .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
+        .map_err(|e| anyhow!("Failed to execute command: {e}"))?;
 
     if result.status.success() {
         let stdout = String::from_utf8_lossy(&result.stdout).to_string();
@@ -2018,12 +3474,12 @@ fn call_claude_api(api_key: &str, prompt: &str, model: &str) -> Result<Value> {
         .header("content-type", "application/json")
         .json(&body)
         .send()
-        .and_then(|r| r.error_for_status())
-        .map_err(|e| anyhow!("Claude API request failed: {}", e))?;
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|e| anyhow!("Claude API request failed: {e}"))?;
 
     let json_resp: Value = resp
         .json()
-        .map_err(|e| anyhow!("Failed to parse Claude API response: {}", e))?;
+        .map_err(|e| anyhow!("Failed to parse Claude API response: {e}"))?;
 
     Ok(json_resp)
 }
@@ -2076,8 +3532,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
 
     if service_items.is_empty() {
         return Err(anyhow!(
-            "No input bridge services found with selector: {}. Available parameters: job_type={}, user={:?}, service={:?}",
-            selector, job_type, user, service
+            "No input bridge services found with selector: {selector}. Available parameters: job_type={job_type}, user={user:?}, service={service:?}"
         ));
     }
 
@@ -2095,7 +3550,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .and_then(|p| p.as_array())
         .and_then(|ports| ports.first())
         .and_then(|port| port.get("port"))
-        .and_then(|p| p.as_u64())
+        .and_then(serde_json::Value::as_u64)
         .ok_or(anyhow!("Service missing port"))?;
 
     // Construct the service URL
@@ -2132,9 +3587,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
             .text()
             .unwrap_or_else(|_| "Unknown error".to_string());
         Err(anyhow!(
-            "HTTP request failed with status {}: {}",
-            status,
-            error_text
+            "HTTP request failed with status {status}: {error_text}"
         ))
     }
 }
@@ -2227,7 +3680,10 @@ async fn rpc_loop() -> Result<()> {
 
 #[allow(clippy::disallowed_macros)]
 fn main() -> Result<()> {
-    eprintln!("🚀 Starting 5D Labs MCP Server...");
+    eprintln!(
+        "🚀 Starting 5D Labs MCP Server... (built: {})",
+        env!("BUILD_TIMESTAMP")
+    );
 
     // Initialize configuration from JSON file
     let config = load_cto_config().context("Failed to load cto-config.json")?;

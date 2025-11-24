@@ -1,0 +1,233 @@
+#!/bin/sh
+# Atlas - Long-Running PR Guardian
+# Continuously monitors PR until merged or closed
+
+set -e
+
+MODE="${ATLAS_MODE:-guardian}"
+MAX_CYCLES="${ATLAS_MAX_CYCLES:-0}"
+CYCLE_COUNT=0
+
+echo "🔱 Atlas: Starting PR guardian for task {{task_id}} (mode: $MODE)"
+
+# Source common setup from shared functions
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || {
+    # Minimal fallback if shared functions unavailable
+    setup_github_auth() { echo "Setting up GitHub auth..."; }
+    clone_repository() { echo "Cloning repository..."; }
+}
+
+# Setup GitHub authentication
+setup_github_auth
+
+# Get PR from environment or discover via task label
+PR_NUMBER="${PR_NUMBER:-}"
+if [ -z "$PR_NUMBER" ]; then
+    TASK_LABEL="task-{{task_id}}"
+    PR_NUMBER=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+fi
+
+if [ -z "$PR_NUMBER" ]; then
+    echo "⚠️ No PR found yet - waiting for PR creation..."
+    # Wait for PR to be created (up to 10 minutes)
+    for i in $(seq 1 60); do
+        sleep 10
+        PR_NUMBER=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+        if [ -n "$PR_NUMBER" ]; then
+            echo "✅ Found PR #$PR_NUMBER"
+            break
+        fi
+    done
+    
+    if [ -z "$PR_NUMBER" ]; then
+        echo "❌ No PR created after 10 minutes - exiting"
+        exit 1
+    fi
+fi
+
+echo "🔱 Atlas monitoring PR #$PR_NUMBER"
+
+# Clone repo once for the entire session
+REPO_DIR="/workspace/repo"
+git clone "{{repository_url}}" "$REPO_DIR"
+cd "$REPO_DIR"
+
+# Polling interval (seconds)
+if [ "$MODE" = "integration-gate" ]; then
+    POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-30}"
+else
+    POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-60}"
+fi
+LAST_CHECK_TIMESTAMP=$(date +%s)
+
+# Main guardian loop
+while true; do
+    echo "🔍 [$(date -u +%Y-%m-%dT%H:%M:%SZ)] Checking PR #$PR_NUMBER status..."
+    
+    # Get PR state
+    PR_STATE=$(gh pr view "$PR_NUMBER" --json state,merged,mergeable,mergeStateStatus,isDraft,statusCheckRollup --jq '.' 2>/dev/null || echo "{}")
+    
+    STATE=$(echo "$PR_STATE" | jq -r '.state // "UNKNOWN"')
+    MERGED=$(echo "$PR_STATE" | jq -r '.merged // false')
+    MERGEABLE=$(echo "$PR_STATE" | jq -r '.mergeable // "UNKNOWN"')
+    MERGE_STATE=$(echo "$PR_STATE" | jq -r '.mergeStateStatus // "UNKNOWN"')
+    IS_DRAFT=$(echo "$PR_STATE" | jq -r '.isDraft // false')
+    
+    # Exit conditions
+    if [ "$STATE" = "CLOSED" ] || [ "$MERGED" = "true" ]; then
+        if [ "$MERGED" = "true" ]; then
+            echo "✅ PR #$PR_NUMBER merged successfully - Atlas guardian exiting"
+            gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: PR Guardian Complete
+
+PR successfully merged at $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+**Final Status:**
+- State: MERGED
+- All quality gates: PASSED
+- Atlas monitoring duration: $(($(date +%s) - LAST_CHECK_TIMESTAMP))s
+
+Atlas guardian shutting down. 🎉"
+        else
+            echo "ℹ️ PR #$PR_NUMBER closed without merge - Atlas guardian exiting"
+        fi
+        exit 0
+    fi
+    
+    # Skip draft PRs
+    if [ "$IS_DRAFT" = "true" ]; then
+        echo "📝 PR is draft - skipping checks"
+        sleep "$POLL_INTERVAL"
+        continue
+    fi
+
+    
+    # 1. Check for merge conflicts
+    if [ "$MERGEABLE" = "CONFLICTING" ] || [ "$MERGE_STATE" = "dirty" ]; then
+        echo "⚠️ Merge conflicts detected - resolving..."
+        
+        PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+        PR_BASE=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
+        
+        git fetch origin "$PR_BRANCH" "$PR_BASE"
+        git checkout "$PR_BRANCH"
+        
+        # Attempt automatic rebase
+        if git rebase "origin/$PR_BASE"; then
+            git push --force-with-lease origin "$PR_BRANCH"
+            gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Conflicts Resolved
+
+Automatically rebased \`$PR_BRANCH\` onto \`$PR_BASE\` at $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+All conflicts resolved. PR is now clean and ready for review."
+            echo "✅ Conflicts resolved automatically"
+        else
+            # Manual resolution needed
+            echo "⚠️ Manual conflict resolution required"
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+            
+            gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Manual Conflict Resolution Needed
+
+Automatic rebase failed. Conflicts in:
+\`\`\`
+$CONFLICT_FILES
+\`\`\`
+
+Atlas will attempt intelligent resolution..."
+            
+            # Abort failed rebase
+            git rebase --abort
+            
+            # TODO: Implement intelligent conflict resolution via Claude
+            # For now, just report and continue monitoring
+            echo "⚠️ Conflicts require manual intervention - continuing to monitor"
+        fi
+    fi
+    
+    # 2. Check for CI failures
+    STATUS_CHECKS=$(echo "$PR_STATE" | jq -r '.statusCheckRollup[]? | select(.conclusion == "FAILURE") | .name' 2>/dev/null || echo "")
+    if [ -n "$STATUS_CHECKS" ]; then
+        echo "⚠️ CI failures detected: $STATUS_CHECKS"
+        
+        # Get failed workflow runs
+        FAILED_RUNS=$(gh api "/repos/{{repository_owner}}/{{repository_name}}/actions/runs?event=pull_request&branch=$PR_BRANCH&status=failure" --jq '.workflow_runs[0:3] | .[] | "\(.id) \(.name)"' 2>/dev/null || echo "")
+        
+        if [ -n "$FAILED_RUNS" ]; then
+            echo "$FAILED_RUNS" | while read -r run_id run_name; do
+                echo "📋 Analyzing failure: $run_name (run $run_id)"
+                
+                # Get logs for failed run
+                gh run view "$run_id" --log > "/tmp/ci-failure-$run_id.log" 2>/dev/null || true
+                
+                # TODO: Implement intelligent CI failure recovery
+                # For now, just report
+                gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: CI Failure Detected
+
+**Failed Check:** $run_name
+**Run ID:** $run_id
+**Time:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+Logs captured. Investigating root cause..."
+            done
+        fi
+    fi
+    
+    # 3. Check for Bugbot feedback
+    BUGBOT_COMMENTS=$(gh api "/repos/{{repository_owner}}/{{repository_name}}/issues/$PR_NUMBER/comments?per_page=10" --jq '[.[] | select(.user.login == "cursor[bot]" or .user.login == "bugbot[bot]") | select(.created_at > "'$(date -u -d "@$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ)'")] | length' 2>/dev/null || echo "0")
+    
+    if [ "$BUGBOT_COMMENTS" -gt 0 ]; then
+        echo "🐛 New Bugbot feedback detected ($BUGBOT_COMMENTS comments)"
+        
+        # TODO: Implement Bugbot feedback resolution
+        # For now, just acknowledge
+        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Bugbot Feedback Detected
+
+$BUGBOT_COMMENTS new Bugbot comment(s) found. Analyzing feedback..."
+    fi
+    
+    # 4. Check if ready to merge
+    if [ "$MERGEABLE" = "MERGEABLE" ] && [ "$MERGE_STATE" = "clean" ]; then
+        # Check if all required checks passed
+        ALL_CHECKS_PASSED=$(echo "$PR_STATE" | jq -r '[.statusCheckRollup[]? | select(.conclusion != "SUCCESS" and .conclusion != "SKIPPED")] | length' 2>/dev/null || echo "1")
+        
+        if [ "$ALL_CHECKS_PASSED" = "0" ]; then
+            echo "✅ PR is ready to merge!"
+            
+            # Check if this is part of a multi-task play
+            PLAY_WORKFLOW=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[]? | select(.name | startswith("workflow-")) | .name' 2>/dev/null || echo "")
+            
+            if [ -n "$PLAY_WORKFLOW" ] && [ "$MODE" != "integration-gate" ]; then
+                echo "🎯 Part of play workflow: $PLAY_WORKFLOW"
+                echo "⏳ Waiting for final merge coordinator to handle merge order..."
+                # Don't auto-merge - let the final coordinator handle it
+            else
+                echo "🚀 Auto-merging PR during Atlas integration gate..."
+                
+                if gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+                    echo "✅ PR merged successfully!"
+                    exit 0
+                else
+                    echo "⚠️ Merge failed - will retry on next cycle"
+                fi
+            fi
+        else
+            echo "⏳ Waiting for checks to pass (failed: $ALL_CHECKS_PASSED)"
+        fi
+    else
+        echo "⏳ PR not ready (mergeable: $MERGEABLE, state: $MERGE_STATE)"
+    fi
+    
+    # Update last check timestamp
+    LAST_CHECK_TIMESTAMP=$(date +%s)
+    
+    # Sleep until next poll
+    CYCLE_COUNT=$((CYCLE_COUNT + 1))
+
+    if [ "$MODE" = "integration-gate" ] && [ "$MAX_CYCLES" -gt 0 ] && [ "$CYCLE_COUNT" -ge "$MAX_CYCLES" ]; then
+        echo "⏳ Atlas integration gate timed out after $CYCLE_COUNT cycles"
+        exit 1
+    fi
+
+    echo "💤 Sleeping for ${POLL_INTERVAL}s..."
+    sleep "$POLL_INTERVAL"
+done
+

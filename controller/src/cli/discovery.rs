@@ -3,7 +3,10 @@
 //! Responsible for discovering and profiling CLI tools to understand
 //! their capabilities, configuration requirements, and compatibility.
 
-use crate::cli::types::*;
+use crate::cli::types::{
+    CLIAvailability, CLICapabilities, CLIConfiguration, CLIProfile, CLIType, ConfigFormat,
+    CostModel, SessionType,
+};
 use std::collections::HashMap;
 use tokio::process::Command;
 use tracing::info;
@@ -22,6 +25,7 @@ impl Default for DiscoveryService {
 
 impl DiscoveryService {
     /// Create a new discovery service
+    #[must_use]
     pub fn new() -> Self {
         Self {
             discovered_profiles: HashMap::new(),
@@ -36,13 +40,13 @@ impl DiscoveryService {
         let _availability = self.check_availability(cli_type).await?;
 
         // Phase 2: Configuration format discovery
-        let configuration = self.discover_configuration(cli_type).await?;
+        let configuration = Self::discover_configuration(cli_type);
 
         // Phase 3: Capability assessment
-        let capabilities = self.assess_capabilities(cli_type).await?;
+        let capabilities = Self::assess_capabilities(cli_type);
 
         // Phase 4: Performance profiling
-        let cost_model = self.profile_performance(cli_type).await?;
+        let cost_model = Self::profile_performance(cli_type);
 
         let profile = CLIProfile {
             name: cli_type.to_string(),
@@ -62,7 +66,7 @@ impl DiscoveryService {
 
     /// Check if a CLI is available and get version info
     async fn check_availability(&self, cli_type: CLIType) -> Result<CLIAvailability> {
-        let (command, args) = self.get_version_command(cli_type);
+        let (command, args) = Self::get_version_command(cli_type);
 
         let output = Command::new(command)
             .args(&args)
@@ -86,58 +90,58 @@ impl DiscoveryService {
     }
 
     /// Discover configuration format and requirements
-    async fn discover_configuration(&self, cli_type: CLIType) -> Result<CLIConfiguration> {
+    fn discover_configuration(cli_type: CLIType) -> CLIConfiguration {
         match cli_type {
-            CLIType::Claude => Ok(CLIConfiguration {
+            CLIType::Claude => CLIConfiguration {
                 config_format: ConfigFormat::Markdown,
                 config_location: "/workspace/CLAUDE.md".to_string(),
                 required_env_vars: vec![],
                 init_commands: vec![],
                 cleanup_commands: vec![],
-            }),
-            CLIType::Codex => Ok(CLIConfiguration {
+            },
+            CLIType::Codex => CLIConfiguration {
                 config_format: ConfigFormat::TOML,
                 config_location: "/home/node/.codex/config.toml".to_string(),
                 required_env_vars: vec!["OPENAI_API_KEY".to_string()],
                 init_commands: vec![],
                 cleanup_commands: vec![],
-            }),
-            CLIType::Cursor => Ok(CLIConfiguration {
+            },
+            CLIType::Cursor => CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/workspace/.cursor/cli.json".to_string(),
                 required_env_vars: vec!["CURSOR_API_KEY".to_string()],
                 init_commands: vec![],
                 cleanup_commands: vec![],
-            }),
-            CLIType::Factory => Ok(CLIConfiguration {
+            },
+            CLIType::Factory => CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/workspace/.factory/cli.json".to_string(),
                 required_env_vars: vec!["FACTORY_API_KEY".to_string()],
                 init_commands: vec![],
                 cleanup_commands: vec![],
-            }),
-            CLIType::OpenCode => Ok(CLIConfiguration {
+            },
+            CLIType::OpenCode => CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/home/node/.config/opencode/config.json".to_string(),
                 required_env_vars: vec!["OPENAI_API_KEY".to_string()],
                 init_commands: vec![],
                 cleanup_commands: vec![],
-            }),
-            _ => Ok(CLIConfiguration {
+            },
+            _ => CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/workspace/config.json".to_string(),
                 required_env_vars: vec![],
                 init_commands: vec![],
                 cleanup_commands: vec![],
-            }),
+            },
         }
     }
 
     /// Assess CLI capabilities
-    async fn assess_capabilities(&self, cli_type: CLIType) -> Result<CLICapabilities> {
+    fn assess_capabilities(cli_type: CLIType) -> CLICapabilities {
         // For now, return known capabilities based on our research
         match cli_type {
-            CLIType::Claude => Ok(CLICapabilities {
+            CLIType::Claude => CLICapabilities {
                 max_context_window: 200_000,
                 supports_tools: true,
                 supports_vision: false,
@@ -145,8 +149,8 @@ impl DiscoveryService {
                 supports_code_execution: true,
                 supports_file_operations: true,
                 session_persistence: SessionType::Persistent,
-            }),
-            CLIType::Codex => Ok(CLICapabilities {
+            },
+            CLIType::Codex | CLIType::Cursor | CLIType::Factory => CLICapabilities {
                 max_context_window: 128_000,
                 supports_tools: true,
                 supports_vision: false,
@@ -154,26 +158,8 @@ impl DiscoveryService {
                 supports_code_execution: true,
                 supports_file_operations: true,
                 session_persistence: SessionType::Persistent,
-            }),
-            CLIType::Cursor => Ok(CLICapabilities {
-                max_context_window: 128_000,
-                supports_tools: true,
-                supports_vision: false,
-                supports_web_search: true,
-                supports_code_execution: true,
-                supports_file_operations: true,
-                session_persistence: SessionType::Persistent,
-            }),
-            CLIType::Factory => Ok(CLICapabilities {
-                max_context_window: 128_000,
-                supports_tools: true,
-                supports_vision: false,
-                supports_web_search: true,
-                supports_code_execution: true,
-                supports_file_operations: true,
-                session_persistence: SessionType::Persistent,
-            }),
-            CLIType::OpenCode => Ok(CLICapabilities {
+            },
+            CLIType::OpenCode => CLICapabilities {
                 max_context_window: 128_000,
                 supports_tools: true,
                 supports_vision: true,
@@ -181,8 +167,8 @@ impl DiscoveryService {
                 supports_code_execution: true,
                 supports_file_operations: true,
                 session_persistence: SessionType::Persistent,
-            }),
-            _ => Ok(CLICapabilities {
+            },
+            _ => CLICapabilities {
                 max_context_window: 8000,
                 supports_tools: false,
                 supports_vision: false,
@@ -190,49 +176,34 @@ impl DiscoveryService {
                 supports_code_execution: false,
                 supports_file_operations: true,
                 session_persistence: SessionType::Stateless,
-            }),
+            },
         }
     }
 
     /// Profile performance characteristics
-    async fn profile_performance(&self, cli_type: CLIType) -> Result<CostModel> {
+    fn profile_performance(cli_type: CLIType) -> CostModel {
         // Return estimated cost models based on our research
         match cli_type {
-            CLIType::Claude => Ok(CostModel {
+            CLIType::Claude | CLIType::OpenCode => CostModel {
                 input_token_cost: 0.003,
                 output_token_cost: 0.015,
                 free_tier_tokens: None,
-            }),
-            CLIType::Codex => Ok(CostModel {
+            },
+            CLIType::Codex | CLIType::Cursor | CLIType::Factory => CostModel {
                 input_token_cost: 0.0015,
                 output_token_cost: 0.006,
                 free_tier_tokens: None,
-            }),
-            CLIType::Cursor => Ok(CostModel {
-                input_token_cost: 0.0015,
-                output_token_cost: 0.006,
-                free_tier_tokens: None,
-            }),
-            CLIType::Factory => Ok(CostModel {
-                input_token_cost: 0.0015,
-                output_token_cost: 0.006,
-                free_tier_tokens: None,
-            }),
-            CLIType::OpenCode => Ok(CostModel {
-                input_token_cost: 0.003,
-                output_token_cost: 0.015,
-                free_tier_tokens: None,
-            }),
-            _ => Ok(CostModel {
+            },
+            _ => CostModel {
                 input_token_cost: 0.002,
                 output_token_cost: 0.010,
                 free_tier_tokens: None,
-            }),
+            },
         }
     }
 
     /// Get the version command for a CLI type
-    fn get_version_command(&self, cli_type: CLIType) -> (&str, Vec<&str>) {
+    fn get_version_command(cli_type: CLIType) -> (&'static str, Vec<&'static str>) {
         match cli_type {
             CLIType::Claude => ("claude-code", vec!["--version"]),
             CLIType::Codex => ("codex", vec!["--version"]),
@@ -250,6 +221,7 @@ impl DiscoveryService {
     }
 
     /// Get a cached profile if available
+    #[must_use]
     pub fn get_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
         self.discovered_profiles.get(&cli_type)
     }

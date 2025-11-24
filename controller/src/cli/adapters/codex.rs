@@ -37,6 +37,17 @@ fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
         .find_map(|key| value.get(*key).and_then(Value::as_f64))
 }
 
+fn safe_f32(value: f64) -> Option<f32> {
+    if value.is_finite() && value >= f64::from(f32::MIN) && value <= f64::from(f32::MAX) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        {
+            Some(value as f32)
+        }
+    } else {
+        None
+    }
+}
+
 /// Codex CLI adapter implementation
 #[derive(Debug)]
 pub struct CodexAdapter {
@@ -47,15 +58,15 @@ pub struct CodexAdapter {
 
 impl CodexAdapter {
     /// Create a new Codex adapter using default configuration.
-    pub async fn new() -> AdapterResult<Self> {
-        Self::with_config(AdapterConfig::new(CLIType::Codex)).await
+    pub fn new() -> AdapterResult<Self> {
+        Self::with_config(AdapterConfig::new(CLIType::Codex))
     }
 
     /// Create a new Codex adapter with custom configuration.
-    pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing Codex adapter");
 
-        let base = Arc::new(BaseAdapter::new(config).await?);
+        let base = Arc::new(BaseAdapter::new(config)?);
 
         let adapter = Self {
             base,
@@ -142,11 +153,11 @@ impl CodexAdapter {
                 metadata.input_tokens = tokens
                     .get("input_tokens")
                     .and_then(Value::as_i64)
-                    .map(|v| v as u32);
+                    .and_then(|v| u32::try_from(v).ok());
                 metadata.output_tokens = tokens
                     .get("output_tokens")
                     .and_then(Value::as_i64)
-                    .map(|v| v as u32);
+                    .and_then(|v| u32::try_from(v).ok());
             }
         }
 
@@ -161,6 +172,7 @@ impl CliAdapter for CodexAdapter {
         Ok(true)
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
         debug!(
             github_app = %agent_config.github_app,
@@ -173,15 +185,14 @@ impl CliAdapter for CodexAdapter {
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
         let model = first_string(&cli_config, &["model"])
-            .map(str::to_string)
-            .unwrap_or_else(|| agent_config.model.clone());
+            .map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "modelMaxOutputTokens"])
-            .map(|value| value as u32)
+            .and_then(|value| u32::try_from(value).ok())
             .or(agent_config.max_tokens);
 
         let temperature = first_f64(&cli_config, &["temperature"])
-            .map(|value| value as f32)
+            .and_then(safe_f32)
             .or(agent_config.temperature);
 
         let approval_policy = first_string(&cli_config, &["approvalPolicy"])
@@ -322,11 +333,11 @@ impl CliAdapter for CodexAdapter {
         })
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "AGENTS.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "codex"
     }
 
@@ -461,7 +472,7 @@ mod tests {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
         std::env::set_var("TOOLMAN_SERVER_URL", "http://localhost:9000/mcp");
 
-        let adapter = CodexAdapter::new().await.unwrap();
+        let adapter = CodexAdapter::new().unwrap();
         let agent_config = sample_agent_config();
         let expected_model = agent_config
             .cli_config
@@ -487,7 +498,7 @@ mod tests {
     #[tokio::test]
     async fn test_memory_template_includes_tools_and_instructions() {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        let adapter = CodexAdapter::new().await.unwrap();
+        let adapter = CodexAdapter::new().unwrap();
         let agent_config = sample_agent_config();
 
         let memory = adapter.render_memory_file(&agent_config).unwrap();

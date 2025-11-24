@@ -26,12 +26,18 @@ spec:
     directory:
       recurse: true
       include: "*.yaml"
-      exclude: "test-*"
+      exclude: "test-*,atlas-prometheus-rules.yaml"
 
   # Destination configuration
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
+
+  # Ignore PrometheusRule resources if CRD is not installed
+  # This provides a safety net in case the PrometheusRule file is included elsewhere
+  ignoreDifferences:
+    - group: monitoring.coreos.com
+      kind: PrometheusRule
 
   # Sync policy
   syncPolicy:
@@ -43,6 +49,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
 
     retry:
       limit: 3

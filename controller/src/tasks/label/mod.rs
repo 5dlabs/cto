@@ -15,12 +15,12 @@
 //!
 //! The label orchestration system consists of several key components:
 //!
-//! - **LabelSchema**: Defines label types, patterns, and lifecycle rules
-//! - **GitHubLabelClient**: GitHub API client with rate limiting and atomic operations
-//! - **LabelOrchestrator**: State machine for workflow transitions
-//! - **OverrideDetector**: Human override label detection and handling
-//! - **LabelCleanupManager**: Automated cleanup of obsolete labels
-//! - **ConcurrentLabelManager**: Race condition prevention and conflict resolution
+//! - **`LabelSchema`**: Defines label types, patterns, and lifecycle rules
+//! - **`GitHubLabelClient`**: GitHub API client with rate limiting and atomic operations
+//! - **`LabelOrchestrator`**: State machine for workflow transitions
+//! - **`OverrideDetector`**: Human override label detection and handling
+//! - **`LabelCleanupManager`**: Automated cleanup of obsolete labels
+//! - **`ConcurrentLabelManager`**: Race condition prevention and conflict resolution
 
 pub mod cleanup;
 pub mod client;

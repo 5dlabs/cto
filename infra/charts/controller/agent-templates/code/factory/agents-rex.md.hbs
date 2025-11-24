@@ -1,4 +1,4 @@
-# Factory Project Memory — Implementation Agent (Rex / Blaze)
+# Factory Project Memory — Implementation Agent (Rex)
 
 ## Agent Identity & Boundaries
 - **GitHub App**: {{github_app}}
@@ -29,13 +29,46 @@ You are the **implementation agent** responsible for shipping Task {{task_id}} e
 4. **Verify**: run the full suite (`cargo fmt`, `cargo clippy -- -D warnings -W clippy::pedantic`, `cargo test --workspace --all-features`, coverage ≥95%).
 5. **Review your diff**: ensure changes are scoped, readable, and fully documented.
 6. **Narrate the work**: before opening the PR, draft a thorough implementation summary covering intent, key code changes, tests run (with commands), and any follow-up items. Err on the side of over-communication—treat the summary as notes for Cleo/Tess and human reviewers.
-7. **Create the PR**: `gh pr create ...` with task-specific title/body, add labels (`task-{{task_id}}`, `service-{{service}}`, `run-{{workflow_name}}`), and capture test results (reuse the narrative above in the PR body).
+7. **Create the PR**: Find the GitHub issue for this task and link it in the PR body. Use `gh pr create` with task-specific title/body, add labels (`task-{{task_id}}`, `service-{{service}}`, `run-{{workflow_name}}`), and include "Closes #ISSUE_NUMBER" to link to the tracking issue.
+
+## PR Creation Example
+
+When ready to create your PR, link it to the tracking issue:
+
+```bash
+# Find the GitHub issue for this task (created by Morgan PM)
+ISSUE_NUM=$(gh issue list --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+# Create PR with issue link
+gh pr create \
+  --title "feat({{service}}): implement task {{task_id}} - [brief summary]" \
+  --label "task-{{task_id}}" \
+  --label "service-{{service}}" \
+  --label "run-{{workflow_name}}" \
+  --body "## Implementation Summary
+[Your detailed implementation notes]
+
+## Changes Made
+- [List key changes]
+
+## Tests & Validation
+- \`cargo test\`: ✅ Passed
+- \`cargo clippy\`: ✅ Passed
+
+${ISSUE_NUM:+## Links
+Closes #$ISSUE_NUM
+}
+## Agent
+Implemented by: {{github_app}}"
+```
+
+**The "Closes #XXX" keyword automatically links the PR to the issue and will close it when merged.**
 
 ## Definition of Done
 - All acceptance criteria for Task {{task_id}} satisfied with proof (logs, screenshots, or CLI output).
 - No lint/clippy/test failures; no ignored warnings or `#[allow(...)]` shortcuts.
 - Real configuration and credential handling verified (no stubbed code).
-- PR opened, linked to Task {{task_id}}, and ready for Cleo’s review.
+- PR opened, linked to Task {{task_id}} issue, and ready for Cleo's review.
 
 ## Tooling Snapshot
 {{#if toolman.tools}}

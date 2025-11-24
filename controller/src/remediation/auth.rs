@@ -19,6 +19,7 @@ pub struct AuthorValidator {
 
 impl AuthorValidator {
     /// Create a new validator with default settings
+    #[must_use]
     pub fn new() -> Self {
         let mut allowed_authors = HashSet::new();
 
@@ -39,6 +40,7 @@ impl AuthorValidator {
     }
 
     /// Create validator with custom settings
+    #[must_use]
     pub fn with_config(
         allowed_authors: HashSet<String>,
         cache_ttl_seconds: u64,
@@ -64,8 +66,7 @@ impl AuthorValidator {
                 } else {
                     warn!("Author '{}' not authorized (cached)", author);
                     Err(anyhow::anyhow!(
-                        "Author '{}' is not authorized to provide feedback",
-                        author
+                        "Author '{author}' is not authorized to provide feedback"
                     ))
                 };
             }
@@ -87,7 +88,7 @@ impl AuthorValidator {
                 "Author '{}' not authorized - not in allowlist and doesn't match team patterns",
                 author
             );
-            Err(anyhow::anyhow!("Author '{}' is not authorized to provide feedback. Contact an administrator to be added to the approved reviewers list.", author))
+            Err(anyhow::anyhow!("Author '{author}' is not authorized to provide feedback. Contact an administrator to be added to the approved reviewers list."))
         }
     }
 
@@ -104,20 +105,19 @@ impl AuthorValidator {
     }
 
     /// Add an author to the approved list
-    pub fn add_approved_author(&mut self, author: String) -> Result<()> {
+    pub fn add_approved_author(&mut self, author: &str) -> Result<()> {
         if author.trim().is_empty() {
             return Err(anyhow::anyhow!("Author name cannot be empty"));
         }
 
-        if self.allowed_authors.insert(author.clone()) {
+        if self.allowed_authors.insert(author.to_string()) {
             info!("Added '{}' to approved authors list", author);
             // Clear cache to force re-validation
             self.clear_cache();
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "Author '{}' is already in the approved list",
-                author
+                "Author '{author}' is already in the approved list"
             ))
         }
     }
@@ -131,26 +131,28 @@ impl AuthorValidator {
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "Author '{}' is not in the approved list",
-                author
+                "Author '{author}' is not in the approved list"
             ))
         }
     }
 
     /// Add a team prefix pattern
-    pub fn add_team_prefix(&mut self, prefix: String) -> Result<()> {
+    pub fn add_team_prefix(&mut self, prefix: &str) -> Result<()> {
         if prefix.trim().is_empty() {
             return Err(anyhow::anyhow!("Team prefix cannot be empty"));
         }
 
-        if self.allowed_team_prefixes.contains(&prefix) {
+        if self
+            .allowed_team_prefixes
+            .iter()
+            .any(|existing| existing == prefix)
+        {
             return Err(anyhow::anyhow!(
-                "Team prefix '{}' is already configured",
-                prefix
+                "Team prefix '{prefix}' is already configured"
             ));
         }
 
-        self.allowed_team_prefixes.push(prefix.clone());
+        self.allowed_team_prefixes.push(prefix.to_string());
         info!("Added team prefix '{}' to allowed patterns", prefix);
         // Clear cache to force re-validation
         self.clear_cache();
@@ -166,19 +168,18 @@ impl AuthorValidator {
             self.clear_cache();
             Ok(())
         } else {
-            Err(anyhow::anyhow!(
-                "Team prefix '{}' is not configured",
-                prefix
-            ))
+            Err(anyhow::anyhow!("Team prefix '{prefix}' is not configured"))
         }
     }
 
     /// Get list of approved authors
+    #[must_use]
     pub fn get_approved_authors(&self) -> Vec<String> {
         self.allowed_authors.iter().cloned().collect()
     }
 
     /// Get list of team prefixes
+    #[must_use]
     pub fn get_team_prefixes(&self) -> Vec<String> {
         self.allowed_team_prefixes.clone()
     }
@@ -191,6 +192,7 @@ impl AuthorValidator {
     }
 
     /// Get cache statistics
+    #[must_use]
     pub fn get_cache_stats(&self) -> (usize, usize, usize) {
         let total_entries = self.auth_cache.len();
         let valid_entries = self
@@ -204,11 +206,13 @@ impl AuthorValidator {
     }
 
     /// Check if an author would be authorized without caching
+    #[must_use]
     pub fn check_author_without_cache(&self, author: &str) -> bool {
         self.is_author_explicitly_allowed(author) || self.is_team_member(author)
     }
 
     /// Get cache TTL in seconds
+    #[must_use]
     pub fn get_cache_ttl_seconds(&self) -> u64 {
         self.cache_ttl.as_secs()
     }
@@ -246,6 +250,7 @@ pub struct SharedAuthorValidator {
 
 impl SharedAuthorValidator {
     /// Create a new shared validator
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: std::sync::Arc::new(std::sync::RwLock::new(AuthorValidator::new())),
@@ -257,16 +262,16 @@ impl SharedAuthorValidator {
         let validator = self
             .inner
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         validator.validate_author(author)
     }
 
     /// Add approved author with shared access
-    pub fn add_approved_author(&self, author: String) -> Result<()> {
+    pub fn add_approved_author(&self, author: &str) -> Result<()> {
         let mut validator = self
             .inner
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         validator.add_approved_author(author)
     }
 
@@ -275,7 +280,7 @@ impl SharedAuthorValidator {
         let validator = self
             .inner
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         Ok(validator.get_approved_authors())
     }
 
@@ -284,7 +289,7 @@ impl SharedAuthorValidator {
         let validator = self
             .inner
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         validator.clear_cache();
         Ok(())
     }
@@ -340,16 +345,12 @@ mod tests {
         let mut validator = AuthorValidator::new();
 
         // Add author
-        assert!(validator
-            .add_approved_author("test-author".to_string())
-            .is_ok());
+        assert!(validator.add_approved_author("test-author").is_ok());
         assert!(validator.allowed_authors.contains("test-author"));
         assert!(validator.validate_author("test-author").is_ok());
 
         // Try to add again (should fail)
-        assert!(validator
-            .add_approved_author("test-author".to_string())
-            .is_err());
+        assert!(validator.add_approved_author("test-author").is_err());
 
         // Remove author
         assert!(validator.remove_approved_author("test-author").is_ok());
@@ -362,7 +363,7 @@ mod tests {
         let mut validator = AuthorValidator::new();
 
         // Add team prefix
-        assert!(validator.add_team_prefix("MyTeam-".to_string()).is_ok());
+        assert!(validator.add_team_prefix("MyTeam-").is_ok());
         assert!(validator
             .allowed_team_prefixes
             .contains(&"MyTeam-".to_string()));
@@ -435,9 +436,7 @@ mod tests {
         assert!(shared_validator.validate_author("5DLabs-Tess").is_ok());
 
         // Test adding author
-        assert!(shared_validator
-            .add_approved_author("test-author".to_string())
-            .is_ok());
+        assert!(shared_validator.add_approved_author("test-author").is_ok());
 
         // Test getting authors
         let authors = shared_validator.get_approved_authors().unwrap();
@@ -452,12 +451,12 @@ mod tests {
         let mut validator = AuthorValidator::new();
 
         // Empty author should fail
-        assert!(validator.add_approved_author("".to_string()).is_err());
-        assert!(validator.add_approved_author("   ".to_string()).is_err());
+        assert!(validator.add_approved_author("").is_err());
+        assert!(validator.add_approved_author("   ").is_err());
 
         // Empty prefix should fail
-        assert!(validator.add_team_prefix("".to_string()).is_err());
-        assert!(validator.add_team_prefix("   ".to_string()).is_err());
+        assert!(validator.add_team_prefix("").is_err());
+        assert!(validator.add_team_prefix("   ").is_err());
     }
 
     #[test]

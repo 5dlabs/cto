@@ -44,11 +44,33 @@ spec:
     spec:
       template:
         spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 2000
+            runAsGroup: 2000
+            fsGroup: 2000
+            seccompProfile:
+              type: RuntimeDefault
           serviceAccountName: worker-patcher
           restartPolicy: OnFailure
+          volumes:
+          - name: workspace
+            emptyDir: {}
           containers:
           - name: patcher
             image: bitnami/kubectl:latest
+            env:
+            - name: HOME
+              value: /tmp/patcher
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              capabilities:
+                drop: ["ALL"]
+            volumeMounts:
+            - name: workspace
+              mountPath: /tmp/patcher
             command:
             - /bin/sh
             - -c

@@ -8,11 +8,11 @@
 //! while preserving their unique capabilities and requirements.
 
 pub mod adapter;
+pub mod adapter_factory;
 pub mod adapters;
 pub mod base_adapter;
 pub mod bridge;
 pub mod discovery;
-pub mod factory;
 pub mod router;
 pub mod session;
 pub mod types;
@@ -23,9 +23,9 @@ pub use adapter::{
     ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
     ParsedResponse, ResponseMetadata, StreamingDelta, ToolCall,
 };
+pub use adapter_factory::{AdapterFactory, FactoryConfig, FactoryStats};
 pub use adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, OpenCodeAdapter};
 pub use base_adapter::{AdapterConfig, AdapterMetrics, BaseAdapter};
-pub use factory::{AdapterFactory, FactoryConfig, FactoryStats};
 
 // Re-export legacy components for backward compatibility
 pub use adapter::{CLIExecutionAdapter, CommandBuilder, ResultProcessor};
