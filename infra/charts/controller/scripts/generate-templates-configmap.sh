@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET="$SCRIPT_DIR/generate-agent-templates-configmap.sh"
+TARGET="$SCRIPT_DIR/generate-agent-templates-configmaps-split.sh"
 
 if [ ! -f "$TARGET" ]; then
   echo "❌ Unable to locate generator at $TARGET" >&2
