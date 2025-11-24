@@ -1831,6 +1831,46 @@ echo "🔄 Rex will retry up to $MAX_RETRIES times until implementation is compl
 echo ""
 
 # =========================================================================
+# OpenMemory Integration
+# =========================================================================
+echo "🧠 Initializing OpenMemory integration..."
+if [ -f "/agent-templates/memory-functions.sh" ]; then
+  source /agent-templates/memory-functions.sh
+  
+  # Set agent context
+  export AGENT_NAME="rex"
+  export TASK_ID="{{task_id}}"
+  export SERVICE_NAME="{{service}}"
+  export MEMORY_API="${MEMORY_API:-http://openmemory.cto-system:3000}"
+  
+  # Initialize memory connection
+  if init_memory; then
+    echo "✅ OpenMemory connected - loading project context..."
+    
+    # Load relevant patterns from memory
+    PROJECT_CONTEXT=$(load_project_context || echo "")
+    if [ -n "$PROJECT_CONTEXT" ]; then
+      echo "📚 Found project context from previous tasks"
+      # Store in a file for potential inclusion in prompts
+      echo "$PROJECT_CONTEXT" > "$TASK_WORKSPACE/memory-context.md"
+    fi
+    
+    # Query for implementation patterns
+    IMPL_PATTERNS=$(query_memory "implementation patterns ${SERVICE_NAME}" 10 || echo "[]")
+    echo "🔍 Found $(echo "$IMPL_PATTERNS" | jq 'length' 2>/dev/null || echo 0) relevant implementation patterns"
+    
+    # Query for common errors to avoid
+    ERROR_PATTERNS=$(query_memory "common errors failures Docker npm TypeScript" 10 || echo "[]")
+    echo "⚠️ Found $(echo "$ERROR_PATTERNS" | jq 'length' 2>/dev/null || echo 0) error patterns to avoid"
+  else
+    echo "⚠️ OpenMemory not available - continuing without memory augmentation"
+  fi
+else
+  echo "⚠️ Memory functions not found - continuing without OpenMemory"
+fi
+echo ""
+
+# =========================================================================
 # Model rotation configuration
 # =========================================================================
 DEFAULT_MODEL="{{model}}"
@@ -2493,10 +2533,38 @@ touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
     echo "✅ Attempt $ATTEMPT: Implementation completed successfully"
     SUCCESS=1
     COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+    
+    # Store successful implementation patterns in memory
+    if command -v add_memory >/dev/null 2>&1; then
+      echo "💾 Storing successful implementation patterns..."
+      
+      # Get the branch name and PR info for context
+      BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+      PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null || echo "")
+      
+      # Store the successful completion
+      store_success_pattern \
+        "task-{{task_id}}-implementation" \
+        "Completed implementation in $COMPLETED_ATTEMPTS attempts" \
+        "Service: {{service}}, PR: #${PR_NUMBER:-unknown}, Model: ${CURRENT_MODEL:-{{model}}}" || true
+      
+      echo "✅ Implementation patterns stored in memory"
+    fi
+    
     break
   else
     echo "⚠️ Attempt $ATTEMPT: Implementation incomplete (exit code: $CLAUDE_EXIT_CODE)"
     COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+    
+    # If OpenMemory is available, check for solutions to the error
+    if command -v check_loop_with_memory >/dev/null 2>&1 && [ $ATTEMPT -ge 3 ]; then
+      echo "🔍 Checking memory for solutions to repeated failures..."
+      MEMORY_SOLUTIONS=$(check_error_memory "Claude implementation failed" || echo "")
+      if [ -n "$MEMORY_SOLUTIONS" ]; then
+        echo "💡 Found potential solutions from memory:"
+        echo "$MEMORY_SOLUTIONS"
+      fi
+    fi
     
     if [ $ATTEMPT -lt $MAX_RETRIES ]; then
       echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
