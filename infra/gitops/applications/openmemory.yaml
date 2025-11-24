@@ -16,9 +16,10 @@ spec:
       releaseName: openmemory
       values: |
         # Override values for production
+        # Using official CaviraOSS image until we build our own
         image:
-          repository: ghcr.io/5dlabs/openmemory
-          tag: "v1.0.0"
+          repository: ghcr.io/caviraoss/openmemory
+          tag: "latest"
 
         database:
           storage:
