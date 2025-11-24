@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Advanced E2E Environment Reset Script with Submodule Support
-# This script supports multiple repository initialization strategies
+# Advanced E2E Environment Reset Script
+# This script supports multiple repository initialization strategies (template, minimal)
+# Templates are regular directories (NOT git submodules) to avoid crosstalk issues
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,6 +15,7 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "${SCRIPT_DIR}/.." && pwd )"
 CONFIG_FILE="${SCRIPT_DIR}/e2e-reset-config.yaml"
 
 # Default configuration
@@ -84,7 +86,7 @@ Usage: $0 [OPTIONS]
 Reset E2E testing environment for CTO platform
 
 OPTIONS:
-    --strategy <type>   Repository initialization strategy (template|submodule|minimal)
+    --strategy <type>   Repository initialization strategy (template|minimal)
                        Default: template
     --skip-k8s         Skip Kubernetes resource cleanup
     --skip-github      Skip GitHub repository operations
@@ -92,8 +94,8 @@ OPTIONS:
     --help             Show this help message
 
 STRATEGIES:
-    template   - Use a local template directory (fastest)
-    submodule  - Use a Git submodule for the template (most maintainable)
+    template   - Use a local template directory (fastest, recommended)
+                 Template is a regular directory, NOT a git submodule
     minimal    - Create minimal structure from scratch (smallest)
 
 CONFIG:
@@ -103,8 +105,8 @@ EXAMPLES:
     # Full reset with template strategy
     $0
 
-    # Use submodule strategy
-    $0 --strategy submodule
+    # Use minimal strategy
+    $0 --strategy minimal
 
     # Only reset Kubernetes resources
     $0 --skip-github
@@ -114,49 +116,11 @@ EXAMPLES:
 EOF
 }
 
-# Initialize repository with submodule strategy
-init_with_submodule() {
-    local repo_path="$1"
-    print_step "Initializing repository with submodule strategy..."
-    
-    cd "$repo_path"
-    
-    # Initialize git
-    git init
-    git branch -M main
-    
-    # Add submodule for template
-    local submodule_url="${SUBMODULE_URL:-https://github.com/5dlabs/cto-test-template}"
-    local submodule_path="${SUBMODULE_PATH:-test-template}"
-    
-    print_info "Adding submodule: $submodule_url"
-    git submodule add "$submodule_url" "$submodule_path"
-    git submodule update --init --recursive
-    
-    # Copy files from submodule to root (excluding .git)
-    if [ -d "$submodule_path" ]; then
-        print_info "Copying template files from submodule..."
-        rsync -av --exclude='.git' "$submodule_path/" . || cp -r "$submodule_path"/* .
-    fi
-    
-    # Create .gitmodules if it doesn't exist
-    if [ ! -f .gitmodules ]; then
-        cat > .gitmodules <<EOF
-[submodule "$submodule_path"]
-    path = $submodule_path
-    url = $submodule_url
-    branch = main
-EOF
-    fi
-    
-    # Commit everything
-    git add .
-    git commit -m "Initial commit - E2E test with submodule template"
-    
-    print_success "Repository initialized with submodule"
-}
+# Note: init_with_submodule removed - we no longer use git submodules
+# to avoid crosstalk issues. Use template or minimal strategies instead.
 
 # Initialize repository with template strategy
+# Workflow: init git in template dir -> push to GitHub -> delete template -> clone to test location
 init_with_template() {
     local repo_path="$1"
     local template_path="$2"
@@ -170,21 +134,39 @@ init_with_template() {
         return
     fi
     
-    # Copy template to repo
-    print_info "Copying template files..."
-    cp -r "$template_path"/* "$repo_path"/ 2>/dev/null || true
-    cp -r "$template_path"/.[^.]* "$repo_path"/ 2>/dev/null || true
+    # Step 1: Initialize git in the template directory itself
+    print_info "Initializing git in template directory..."
+    cd "$template_path"
     
-    # Remove any existing .git directory
-    rm -rf "$repo_path/.git"
+    # Remove any existing .git directory first
+    rm -rf .git
     
-    cd "$repo_path"
+    # Initialize git
     git init
     git branch -M main
     git add .
     git commit -m "Initial commit - E2E test from template"
     
-    print_success "Repository initialized from template"
+    # Add remote and push
+    git remote add origin "git@github.com:${TEST_REPO_ORG}/${TEST_REPO}.git" 2>/dev/null || \
+        git remote set-url origin "git@github.com:${TEST_REPO_ORG}/${TEST_REPO}.git"
+    
+    print_info "Pushing template to GitHub..."
+    git push -u origin main --force
+    
+    print_success "Template pushed to GitHub"
+    
+    # Step 2: Delete the template directory (it's ephemeral)
+    print_info "Cleaning up template directory..."
+    cd "$PROJECT_ROOT"
+    rm -rf "$template_path"
+    
+    # Step 3: Clone from GitHub to the actual test location
+    print_info "Cloning from GitHub to test location: $repo_path"
+    rm -rf "$repo_path"
+    git clone "git@github.com:${TEST_REPO_ORG}/${TEST_REPO}.git" "$repo_path"
+    
+    print_success "Repository initialized from template and cloned to test location"
 }
 
 # Initialize repository with minimal strategy
@@ -398,8 +380,9 @@ recreate_repository() {
         fi
         
         # Create new repository
+        local visibility="${REPO_VISIBILITY:-private}"
         gh repo create "${TEST_REPO_ORG}/${TEST_REPO}" \
-            --${REPO_VISIBILITY:-private} \
+            "--${visibility}" \
             --description "E2E test repository for CTO platform" \
             --clone=false
         
@@ -412,9 +395,6 @@ recreate_repository() {
     
     # Initialize based on strategy
     case "$REPO_STRATEGY" in
-        submodule)
-            init_with_submodule "$repo_path"
-            ;;
         template)
             init_with_template "$repo_path" "$template_path"
             ;;
@@ -422,7 +402,7 @@ recreate_repository() {
             init_with_minimal "$repo_path"
             ;;
         *)
-            print_error "Unknown strategy: $REPO_STRATEGY"
+            print_error "Unknown strategy: $REPO_STRATEGY (valid options: template, minimal)"
             exit 1
             ;;
     esac
@@ -519,9 +499,6 @@ main() {
     echo
     echo "Repository strategies used:"
     echo "  • Strategy: $REPO_STRATEGY"
-    if [ "$REPO_STRATEGY" = "submodule" ]; then
-        echo "  • Submodule updates: git submodule update --remote --merge"
-    fi
     echo
     echo "Next steps:"
     echo "1. Trigger test: cto play --task-id <task-id>"
