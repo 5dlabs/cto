@@ -1,3 +1,3 @@
 [submodule "testing/cto-parallel-test"]
 	path = testing/cto-parallel-test
-	url = git@github.com:5dlabs/cto-parallel-test.git
+	url = https://github.com/5dlabs/cto-parallel-test.git
