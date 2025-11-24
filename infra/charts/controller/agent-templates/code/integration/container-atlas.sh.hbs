@@ -379,13 +379,33 @@ These are non-critical improvements that don't block the PR.
         fi
     fi
     
-    # 4. Check if ready to merge
+    # 4. Check if ready to merge (all scenarios resolved)
     if [ "$MERGEABLE" = "MERGEABLE" ] && [ "$MERGE_STATE" = "clean" ]; then
         # Check if all required checks passed
         ALL_CHECKS_PASSED=$(echo "$PR_STATE" | jq -r '[.statusCheckRollup[]? | select(.conclusion != "SUCCESS" and .conclusion != "SKIPPED")] | length' 2>/dev/null || echo "1")
         
         if [ "$ALL_CHECKS_PASSED" = "0" ]; then
-            echo "✅ PR is ready to merge!"
+            echo "✅ All CI checks passed!"
+            
+            # Check for unresolved Bugbot/quality comments
+            if [ -n "$REPO_OWNER" ] && [ -n "$REPO_NAME" ]; then
+                UNRESOLVED_ISSUES=$(gh api "/repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/comments" --jq '[.[] | select(.user.login == "cursor[bot]" or .user.login == "bugbot[bot]" or (.body | test("🔴|🟡"))) | select(.body | test("🔴|🟡"))] | length' 2>/dev/null || echo "0")
+                
+                if [ "$UNRESOLVED_ISSUES" -gt 0 ]; then
+                    echo "⏳ Cannot merge: $UNRESOLVED_ISSUES unresolved quality issue(s) remain"
+                    echo "   Waiting for all errors and warnings to be fixed..."
+                    sleep "$POLL_INTERVAL"
+                    continue
+                fi
+                
+                echo "✅ No unresolved quality issues"
+            fi
+            
+            # All scenarios verified - ready to merge!
+            echo "🎯 All merge criteria met:"
+            echo "   ✅ No merge conflicts"
+            echo "   ✅ All CI checks passing"
+            echo "   ✅ No unresolved quality issues"
             
             # Check if this is part of a multi-task play
             PLAY_WORKFLOW=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[]? | select(.name | startswith("workflow-")) | .name' 2>/dev/null || echo "")
@@ -395,10 +415,26 @@ These are non-critical improvements that don't block the PR.
                 echo "⏳ Waiting for final merge coordinator to handle merge order..."
                 # Don't auto-merge - let the final coordinator handle it
             else
-                echo "🚀 Auto-merging PR during Atlas integration gate..."
+                echo "🚀 All scenarios resolved - auto-merging PR #$PR_NUMBER..."
                 
                 if gh pr merge "$PR_NUMBER" --squash --delete-branch; then
-                    echo "✅ PR merged successfully!"
+                    echo "✅ PR #$PR_NUMBER merged successfully!"
+                    
+                    # Post merge notification
+                    gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: PR Merged Successfully
+
+All quality gates passed and PR has been automatically merged:
+- ✅ No merge conflicts
+- ✅ All CI checks passing
+- ✅ No unresolved quality issues
+
+**Merge Details:**
+- Strategy: Squash merge
+- Branch deleted: Yes
+- Merged at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+*Atlas Guardian has completed monitoring. Thank you for using automated quality gates! 🎉*" || true
+                    
                     exit 0
                 else
                     echo "⚠️ Merge failed - will retry on next cycle"
