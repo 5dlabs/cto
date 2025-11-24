@@ -29,4 +29,3 @@ spec:
           name: github-eventsource-svc
           port: 12000
           weight: 1
-
