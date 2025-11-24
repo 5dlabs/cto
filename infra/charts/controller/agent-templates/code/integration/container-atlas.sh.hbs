@@ -121,25 +121,176 @@ Automatically rebased \`$PR_BRANCH\` onto \`$PR_BASE\` at $(date -u +%Y-%m-%dT%H
 All conflicts resolved. PR is now clean and ready for review."
             echo "✅ Conflicts resolved automatically"
         else
-            # Manual resolution needed
-            echo "⚠️ Manual conflict resolution required"
+            # Intelligent conflict resolution needed
+            echo "⚠️ Automatic rebase failed - using AI to resolve conflicts"
             CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
             
-            gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Manual Conflict Resolution Needed
+            echo "📋 Conflicts in: $CONFLICT_FILES"
+            
+            # Get conflict details for each file
+            CONFLICT_DETAILS=""
+            for file in $CONFLICT_FILES; do
+                CONFLICT_DETAILS="$CONFLICT_DETAILS
+## Conflict in: \`$file\`
+
+\`\`\`diff
+$(git diff "$file" 2>/dev/null || echo "Unable to show diff")
+\`\`\`
+"
+            done
+            
+            # Create conflict resolution prompt
+            cat > /tmp/CONFLICT_RESOLUTION_PROMPT.md << 'CONFLICT_PROMPT_EOF'
+# 🔀 Merge Conflict Resolution
+
+## Instructions
+You need to resolve merge conflicts that occurred when rebasing this PR onto main.
+
+**Your mission:**
+1. **Understand both sides** - Read the conflict markers carefully
+2. **Merge intelligently** - Combine changes from both branches
+3. **Preserve functionality** - Keep working code from both sides
+4. **Test after resolving** - Ensure nothing breaks
+5. **Remove conflict markers** - Clean up <<<<<<< ======= >>>>>>> markers
+
+## Conflict Details
+
+CONFLICT_PROMPT_EOF
+            
+            echo "$CONFLICT_DETAILS" >> /tmp/CONFLICT_RESOLUTION_PROMPT.md
+            
+            cat >> /tmp/CONFLICT_RESOLUTION_PROMPT.md << 'CONFLICT_FOOTER_EOF'
+
+## Context
+- This PR is being rebased onto main
+- Conflicts occurred because both branches modified the same files
+- Your job is to merge the changes intelligently
+
+## Success Criteria
+- ✅ All conflict markers removed
+- ✅ Code compiles/runs
+- ✅ Functionality from both branches preserved
+- ✅ Tests pass (if applicable)
+
+After resolving, the changes will be committed and pushed automatically.
+CONFLICT_FOOTER_EOF
+            
+            # Detect available CLI
+            CLI_CMD=""
+            CLI_NAME=""
+            
+            if command -v claude >/dev/null 2>&1; then
+                CLI_CMD="claude --output-format stream-json --input-format stream-json"
+                CLI_NAME="Claude"
+            elif command -v codex >/dev/null 2>&1; then
+                CLI_CMD="codex"
+                CLI_NAME="Codex"
+            elif command -v opencode >/dev/null 2>&1; then
+                CLI_CMD="opencode"
+                CLI_NAME="OpenCode"
+            elif command -v cursor-agent >/dev/null 2>&1; then
+                CLI_CMD="cursor-agent"
+                CLI_NAME="Cursor"
+            elif command -v factory-cli >/dev/null 2>&1; then
+                CLI_CMD="factory-cli"
+                CLI_NAME="Factory"
+            fi
+            
+            if [ -n "$CLI_CMD" ]; then
+                echo "🤖 Using $CLI_NAME to resolve conflicts intelligently..."
+                
+                # Don't abort - let AI work with conflict markers
+                # (git rebase already in progress with conflicts)
+                
+                # Run CLI to resolve conflicts
+                if [ "$CLI_NAME" = "Claude" ]; then
+                    $CLI_CMD << CLI_INPUT 2>&1 | tee /tmp/conflict-resolution.log
+{
+  "type": "user",
+  "message": {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "$(cat /tmp/CONFLICT_RESOLUTION_PROMPT.md | jq -Rs .)"
+      }
+    ]
+  }
+}
+CLI_INPUT
+                else
+                    echo "$(cat /tmp/CONFLICT_RESOLUTION_PROMPT.md)" | $CLI_CMD 2>&1 | tee /tmp/conflict-resolution.log
+                fi
+                
+                # Check if conflicts are resolved
+                if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
+                    echo "✅ $CLI_NAME resolved all conflicts!"
+                    
+                    # Continue the rebase
+                    git add -A
+                    if git rebase --continue; then
+                        git push --force-with-lease origin "$PR_BRANCH"
+                        
+                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Conflicts Intelligently Resolved
+
+Successfully resolved merge conflicts using $CLI_NAME:
+- Files with conflicts: $(echo "$CONFLICT_FILES" | wc -w)
+- Resolution method: Intelligent merge using AI analysis
+- Branch rebased onto \`$PR_BASE\`
+
+All conflicts have been resolved. PR is now clean and ready for review.
+
+*Resolved by Atlas Guardian using $CLI_NAME at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                        
+                        echo "✅ Conflicts resolved and pushed"
+                    else
+                        echo "⚠️ Rebase continuation failed"
+                        git rebase --abort
+                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Conflict Resolution Incomplete
+
+$CLI_NAME attempted to resolve conflicts but the rebase could not be completed.
+Manual intervention required.
+
+*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                    fi
+                else
+                    echo "⚠️ $CLI_NAME could not fully resolve conflicts"
+                    git rebase --abort
+                    
+                    gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Complex Conflicts Detected
+
+$CLI_NAME attempted to resolve conflicts in:
+\`\`\`
+$CONFLICT_FILES
+\`\`\`
+
+These conflicts are complex and require human judgment.
+Please resolve manually and push to \`$PR_BRANCH\`.
+
+*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                fi
+            else
+                # No CLI available
+                git rebase --abort
+                
+                gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Manual Conflict Resolution Required
 
 Automatic rebase failed. Conflicts in:
 \`\`\`
 $CONFLICT_FILES
 \`\`\`
 
-Atlas will attempt intelligent resolution..."
-            
-            # Abort failed rebase
-            git rebase --abort
-            
-            # TODO: Implement intelligent conflict resolution via Claude
-            # For now, just report and continue monitoring
-            echo "⚠️ Conflicts require manual intervention - continuing to monitor"
+**To resolve:**
+1. Pull latest main: \`git fetch origin main\`
+2. Rebase your branch: \`git rebase origin/main\`
+3. Resolve conflicts in the listed files
+4. Complete rebase: \`git rebase --continue\`
+5. Push: \`git push --force-with-lease\`
+
+*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+                
+                echo "⚠️ No CLI available for intelligent resolution - continuing to monitor"
+            fi
         fi
     fi
     
