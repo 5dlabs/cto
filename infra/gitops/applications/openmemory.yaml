@@ -16,9 +16,8 @@ spec:
       releaseName: openmemory
       values: |
         # Override values for production
-        # Using official CaviraOSS image until we build our own
         image:
-          repository: ghcr.io/caviraoss/openmemory
+          repository: ghcr.io/5dlabs/openmemory
           tag: "latest"
 
         database:
@@ -46,7 +45,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: cto-system
+    namespace: agent-platform
 
   syncPolicy:
     automated:
