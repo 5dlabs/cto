@@ -1,16 +1,18 @@
 # OpenMemory Server Container
+# Based on: https://openmemory.cavira.app/docs/installation
 FROM node:20-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git python3 make g++ sqlite
 
-WORKDIR /app
+WORKDIR /build
 
 # Clone OpenMemory repository
-RUN git clone https://github.com/caviraoss/openmemory.git .
+RUN git clone --depth 1 https://github.com/caviraoss/openmemory.git .
 
-# Install dependencies and build
-RUN npm ci --production=false
+# Build from backend directory (per installation docs)
+WORKDIR /build/backend
+RUN npm install
 RUN npm run build
 
 # Production image
@@ -19,16 +21,16 @@ FROM node:20-alpine
 # Install runtime dependencies
 RUN apk add --no-cache sqlite
 
-# Create non-root user
-RUN addgroup -g 1000 -S openmemory && \
-    adduser -u 1000 -S openmemory -G openmemory
+# Create non-root user (use 1001 since node:alpine uses 1000)
+RUN addgroup -g 1001 -S openmemory && \
+    adduser -u 1001 -S openmemory -G openmemory
 
 WORKDIR /app
 
-# Copy built application
-COPY --from=builder --chown=openmemory:openmemory /app/dist ./dist
-COPY --from=builder --chown=openmemory:openmemory /app/node_modules ./node_modules
-COPY --from=builder --chown=openmemory:openmemory /app/package*.json ./
+# Copy built application from backend directory
+COPY --from=builder --chown=openmemory:openmemory /build/backend/dist ./dist
+COPY --from=builder --chown=openmemory:openmemory /build/backend/node_modules ./node_modules
+COPY --from=builder --chown=openmemory:openmemory /build/backend/package*.json ./
 
 # Create data directory
 RUN mkdir -p /data && chown -R openmemory:openmemory /data
