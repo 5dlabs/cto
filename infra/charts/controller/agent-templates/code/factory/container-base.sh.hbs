@@ -1510,22 +1510,35 @@ echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    MCP TOOLS CONFIGURATION                    ║"
 echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "🔍 Debugging Tool Configuration..."
 
+# Debug: Show what's in client-config.json
+if [ -f "$FACTORY_WORK_DIR/client-config.json" ]; then
+  echo "📄 client-config.json contents:"
+  cat "$FACTORY_WORK_DIR/client-config.json" | jq '.' 2>/dev/null || cat "$FACTORY_WORK_DIR/client-config.json"
+  echo ""
+else
+  echo "⚠️ client-config.json not found at $FACTORY_WORK_DIR/client-config.json"
+  echo ""
+fi
+
+# Show what client-config.json says
 if [ -f "$FACTORY_WORK_DIR/client-config.json" ] && command -v jq >/dev/null 2>&1; then
-  echo "📋 Remote Tools (via Toolman):"
+  echo "📋 Configured Remote Tools (from client-config.json):"
   REMOTE_TOOLS=$(jq -r '.remoteTools[]? // empty' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
   if [ -n "$REMOTE_TOOLS" ]; then
     echo "$REMOTE_TOOLS" | while read -r tool; do
       echo "  • $tool"
     done
     REMOTE_COUNT=$(echo "$REMOTE_TOOLS" | wc -l | tr -d ' ')
-    echo "  📊 Total remote tools: $REMOTE_COUNT"
+    echo "  📊 Total configured: $REMOTE_COUNT"
   else
-    echo "  (none configured)"
+    echo "  (none configured in client-config.json)"
   fi
   
   echo ""
-  echo "📋 Local MCP Servers:"
+  echo "📋 Configured Local Servers (from client-config.json):"
   LOCAL_SERVERS=$(jq -r '.localServers | keys[]? // empty' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
   if [ -n "$LOCAL_SERVERS" ]; then
     echo "$LOCAL_SERVERS" | while read -r server; do
@@ -1541,12 +1554,42 @@ if [ -f "$FACTORY_WORK_DIR/client-config.json" ] && command -v jq >/dev/null 2>&
       fi
     done
   else
-    echo "  (none configured)"
+    echo "  (none configured in client-config.json)"
   fi
 else
-  echo "⚠️ Cannot list MCP tools (client-config.json not found or jq unavailable)"
+  echo "⚠️ Cannot read client-config.json (file missing or jq unavailable)"
 fi
 
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              ACTUAL AVAILABLE TOOLS (via droid)               ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "ℹ️ Factory uses built-in tools discovered via 'droid exec --list-tools'"
+echo "ℹ️ These tools are available regardless of client-config.json"
+echo ""
+
+# Show the actual tools that were detected earlier
+if command -v droid >/dev/null 2>&1; then
+  echo "📦 Listing all available tools:"
+  ACTUAL_TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+  
+  if [ "$ACTUAL_TOOL_LIST" != "FAILED" ]; then
+    # Show full tool list
+    echo "$ACTUAL_TOOL_LIST"
+    
+    # Count them
+    ACTUAL_COUNT=$(echo "$ACTUAL_TOOL_LIST" | grep -c "status:" || echo "0")
+    echo ""
+    echo "📊 Total available tools: $ACTUAL_COUNT"
+  else
+    echo "❌ Failed to list tools"
+  fi
+else
+  echo "⚠️ droid CLI not available"
+fi
+
+echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 # =========================================================================
