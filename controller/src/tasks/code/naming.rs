@@ -347,7 +347,7 @@ mod tests {
         assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
         assert!(
             job_name.contains("pr1650"),
-            "Expected job name to contain PR number from env var: {job_name}"
+            "Expected job name to contain PR number from env var"
         );
         assert!(job_name.contains("t42"));
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
