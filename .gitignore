@@ -68,6 +68,7 @@ Chart.lock
 
 # Claude configuration files
 **/CLAUDE.md
+target/
 controller/target/
 mcp/target/
 sidecar/target/
