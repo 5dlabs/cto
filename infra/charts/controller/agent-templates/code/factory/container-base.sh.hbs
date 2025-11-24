@@ -1355,7 +1355,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
   
   # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
   GITHUB_APP="{{github_app}}"
-  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
+  AGENT_NAME=$(echo "$GITHUB_APP" | awk -F'- ' '{print $2}' | tr '[:upper:]' '[:lower:]')
   echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
   
   # Debug: Show what we're reading
@@ -1397,10 +1397,15 @@ else
   echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
 fi
 
-# Fallback: copy from task-files if generation failed or cto-config.json not found
-if [ -f /task-files/client-config.json ]; then
-  cp /task-files/client-config.json "$FACTORY_WORK_DIR/"
-  echo "✓ Copied client-config.json to working directory"
+# Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
+if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
+  echo "📋 client-config.json not generated, using ConfigMap fallback..."
+  if [ -f /task-files/client-config.json ]; then
+    cp /task-files/client-config.json "FACTORY_WORK_DIR/"
+    echo "✓ Copied client-config.json to working directory"
+  fi
+else
+  echo "✓ Using dynamically generated client-config.json from cto-config.json"
 fi
 
 if declare -F ensure_default_client_config >/dev/null 2>&1; then
