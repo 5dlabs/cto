@@ -58,10 +58,11 @@ spec:
                 entrypoint: ensure-conflict-guardian
                 serviceAccountName: argo-workflow
                 ttlStrategy:
-                  secondsAfterCompletion: 300
-                  secondsAfterFailure: 3600
+                  secondsAfterCompletion: 60
+                  secondsAfterFailure: 300
                 podGC:
                   strategy: OnPodCompletion
+                  deleteOnPodCompletion: true
                 templates:
                   - name: ensure-conflict-guardian
                     inputs:
@@ -216,6 +217,7 @@ spec:
                           workingDirectory: "."
                           continueSession: true
                           overwriteMemory: false
+                          cli: "Claude"
                           env:
                             PR_NUMBER: "$PR_NUMBER"
                             PR_URL: "$PR_URL"
