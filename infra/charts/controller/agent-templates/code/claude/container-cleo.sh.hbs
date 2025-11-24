@@ -35,13 +35,156 @@ else
 fi
 
 echo '════════════════════════════════════════════════════════════════'
-echo '║              CLEO CODE QUALITY WORKFLOW STARTING             ║'
-echo '║     Code Quality & CI/CD Pipeline Enforcement Agent          ║'
+printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
+echo '║  CLEO CODE QUALITY WORKFLOW STARTING                         ║'
+echo '║  Code Quality & CI/CD Pipeline Enforcement Agent             ║'
 echo '════════════════════════════════════════════════════════════════'
-echo "🎯 Agent: {{github_app}}"
 echo "🔍 Focus: Code quality, CI/CD setup, and Docker image building"
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: Perfect code quality AND working CI/CD pipeline with Docker builds"
+
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
+# Docker sidecar cleanup function
+stop_docker_sidecar() {
+  echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."
+  
+  # CRITICAL: Write sentinel file to signal sidecar to stop (file watch mechanism)
+  # This must happen BEFORE any returns so sidecar stops even on early exit
+  touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
+  echo "✅ Sentinel file created to signal sidecar shutdown"
+  
+  # Check if Docker processes are running (more reliable than socket check)
+  DOCKER_PID=$(pidof dockerd 2>/dev/null || true)
+  INIT_PID=$(pidof docker-init 2>/dev/null || true)
+  
+  # If no processes are running, we're done
+  if [ -z "$DOCKER_PID" ] && [ -z "$INIT_PID" ]; then
+    # Also check socket for informational purposes
+    if [ ! -S /var/run/docker.sock ]; then
+      echo "✅ Docker sidecar not running (no processes found, socket also missing)"
+    else
+      echo "⚠️ Docker processes not found but socket exists - sidecar may be in transition"
+    fi
+    return
+  fi
+
+  # Socket check for informational purposes only (don't block on it)
+  if [ ! -S /var/run/docker.sock ]; then
+    echo "⚠️ Docker socket not found at /var/run/docker.sock but processes are running"
+    echo "   Attempting to stop processes directly..."
+  else
+    echo "🛑 Stopping Docker sidecar"
+  fi
+
+  # Give sidecar a moment to see sentinel file and shut down gracefully
+  echo "   Waiting briefly for graceful sidecar shutdown..."
+  sleep 2
+  
+  # Check if processes are still running after grace period
+  DOCKER_PID=$(pidof dockerd 2>/dev/null || true)
+  INIT_PID=$(pidof docker-init 2>/dev/null || true)
+  
+  # Only kill processes if they're still running after grace period
+  if [ -z "$DOCKER_PID" ] && [ -z "$INIT_PID" ]; then
+    echo "✅ Docker sidecar stopped gracefully via sentinel file"
+    return
+  fi
+  
+  # Attempt to stop processes if still running after grace period
+  if command -v pkill >/dev/null 2>&1; then
+    if [ -n "$DOCKER_PID" ]; then
+      echo "   Sending SIGTERM to dockerd (PID: $DOCKER_PID)..."
+      pkill dockerd >/dev/null 2>&1 || true
+    fi
+    if [ -n "$INIT_PID" ]; then
+      echo "   Sending SIGTERM to docker-init (PID: $INIT_PID)..."
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
+    sleep 1
+    # Force kill if still running
+    if pidof dockerd >/dev/null 2>&1; then
+      echo "   Force killing dockerd..."
+      pkill -9 dockerd >/dev/null 2>&1 || true
+    fi
+    if pidof docker-init >/dev/null 2>&1; then
+      echo "   Force killing docker-init..."
+      pkill -9 docker-init >/dev/null 2>&1 || true
+    fi
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+    killall docker-init >/dev/null 2>&1 || true
+  else
+    if [ -n "$DOCKER_PID" ]; then
+      kill "$DOCKER_PID" >/dev/null 2>&1 || true
+      sleep 1
+      if pidof dockerd >/dev/null 2>&1; then
+        kill -9 "$DOCKER_PID" >/dev/null 2>&1 || true
+      fi
+    fi
+    if [ -n "$INIT_PID" ]; then
+      kill "$INIT_PID" >/dev/null 2>&1 || true
+      sleep 1
+      if pidof docker-init >/dev/null 2>&1; then
+        kill -9 "$INIT_PID" >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  # Wait for processes to actually stop
+  for _ in 1 2 3 4 5; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped successfully"
+      return
+    fi
+    sleep 1
+  done
+
+  # Final check - report if still running
+  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
+  if [ -n "$REMAINING_DOCKER" ] || [ -n "$REMAINING_INIT" ]; then
+    echo "⚠️ Docker sidecar still running after cleanup attempts (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+    echo "   Sidecar will stop via sentinel file watch mechanism"
+  else
+    echo "✅ Docker sidecar stopped"
+  fi
+}
+
+# Set up EXIT trap to ensure Docker sidecar cleanup
+trap 'stop_docker_sidecar || true' EXIT
+
+# =========================================================================
+# RETRY CONFIGURATION
+# =========================================================================
+MAX_RETRIES_CONFIG=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🤖 CLI: {{cli_type}}"
+echo "🎯 Model: {{model}}"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${CLAUDE_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: CLAUDE_MAX_RETRIES environment variable"
+elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
 
 # Clean up any leftover completion marker from previous runs
 # This prevents issues with sequential task executions on the same PVC
@@ -252,24 +395,77 @@ else
     exit 1
 fi
 
-# Target repository directory name - this is where the git repo will be
-TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
+# Extract repository name from URL (e.g., "5dlabs/rust-basic-api-2" -> "rust-basic-api-2")
+REPO_NAME=$(echo "{{repository_url}}" | sed -E 's|.*/([^/]+)$|\1|' | sed 's|\.git$||')
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
 
-# Set working directory for the agent - should match the repository location
-CLAUDE_WORK_DIR="/workspace/$TARGET_REPO_DIR"
-mkdir -p "$CLAUDE_WORK_DIR"
-cd "$CLAUDE_WORK_DIR"
-echo "🔧 Working directory set to: $CLAUDE_WORK_DIR"
+# Determine working directory - use repo root if working_directory is "." or empty
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  CLAUDE_WORK_DIR="$REPO_ROOT"
+else
+  CLAUDE_WORK_DIR="$REPO_ROOT/$WORK_DIR"
+fi
+
+echo "🔧 Repository: $REPO_NAME"
+echo "🔧 Working directory will be set to: $CLAUDE_WORK_DIR"
 
 # Prepare environment for QA checks
 echo "════════════════════════════════════════════════════════════════"
 echo "📊 PREPARING CODE QUALITY ENVIRONMENT"
 echo "════════════════════════════════════════════════════════════════"
 
-# Configure Git identity
-git config --global user.email "cleo@5dlabs.com"
-git config --global user.name "5DLabs-Cleo"
+# Set GitHub App attribution - use generic format for all agents
+derive_bot_identity() {
+    local app_name="$1"
+
+    if [ -z "$app_name" ] || [ "$app_name" = "null" ]; then
+        GIT_AUTHOR_NAME="automation[bot]"
+        GIT_AUTHOR_EMAIL="automation[bot]@users.noreply.github.com"
+        return
+    fi
+
+    local slug
+    slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+    if [ -z "$slug" ]; then
+        slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]')
+    fi
+
+    local bot_login="${slug}[bot]"
+    local bot_email="${bot_login}@users.noreply.github.com"
+
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        local encoded_login
+        encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/%5B/g; s/\]/%5D/g')
+        local bot_response
+        bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
+        local bot_id
+        bot_id=$(printf '%s' "$bot_response" | jq -r '.id // empty' 2>/dev/null || echo '')
+        if [ -n "$bot_id" ]; then
+            bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
+        fi
+    fi
+
+    GIT_AUTHOR_NAME="$bot_login"
+    GIT_AUTHOR_EMAIL="$bot_email"
+}
+
+GITHUB_APP="{{github_app}}"
+derive_bot_identity "$GITHUB_APP"
+
+# Configure git with proper GitHub App attribution
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
 git config --global init.defaultBranch main
+
+# Fix git dubious ownership issues
+git config --global --add safe.directory "$TASK_WORKSPACE"
+
+# Set environment variables for Claude Code to use
+export GIT_AUTHOR_NAME="$GIT_AUTHOR_NAME"
+export GIT_AUTHOR_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 
 # =============================================================================
 # AUTHENTICATION VERIFICATION
@@ -315,7 +511,7 @@ echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
 echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
 echo "  Current working directory: $(pwd)"
 echo "  Available environment variables:"
-env | grep -E "(GITHUB|ANTHROPIC)" | sort
+env | grep -E "(GITHUB|ANTHROPIC)" | sed -E 's/(=).*/=\[REDACTED\]/' | sort
 
 # Test HTTPS access to repository
 echo "🔍 DEBUG: Testing HTTPS repository access..."
@@ -352,19 +548,27 @@ else
 fi
 
 # Clone or update repository
-if [ -d "$CLAUDE_WORK_DIR" ] && [ -d "$CLAUDE_WORK_DIR/.git" ]; then
-    echo "📁 Found existing repository at '$CLAUDE_WORK_DIR', updating..."
-    cd "$CLAUDE_WORK_DIR"
-    git fetch origin
+cd "$TASK_WORKSPACE"
+if [ -d "$REPO_NAME/.git" ]; then
+    echo "📁 Found existing repository at '$REPO_ROOT', updating..."
+    cd "$REPO_NAME"
+    git fetch origin --prune
 else
-    echo "📥 Cloning repository to '$CLAUDE_WORK_DIR'..."
-    # Use the REPO_HTTP_URL constructed in authentication verification section
-    if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
+    echo "📥 Cloning repository to '$REPO_ROOT'..."
+    if ! git clone "$REPO_HTTP_URL" "$REPO_NAME"; then
         echo "❌ Failed to clone repository"
         exit 1
     fi
-    cd "$CLAUDE_WORK_DIR"
+    cd "$REPO_NAME"
 fi
+
+# Create working directory if it's a subdirectory
+if [ "$CLAUDE_WORK_DIR" != "$REPO_ROOT" ]; then
+    mkdir -p "$CLAUDE_WORK_DIR"
+fi
+
+cd "$CLAUDE_WORK_DIR"
+echo "✓ Working directory: $CLAUDE_WORK_DIR"
 
 # Derive repository slug for gh CLI operations
 REPO_SLUG=""
@@ -381,8 +585,9 @@ fi
 if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
   TASK_LABEL="task-${TASK_ID}"
   if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
-    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
-    if [ -n "$CAND_NUM" ]; then
+    # Only search OPEN PRs, sorted by creation date (newest first)
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --state open --json number,createdAt --jq 'sort_by(.createdAt) | reverse | .[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ] && [ "$CAND_NUM" != "null" ]; then
       PR_NUMBER="$CAND_NUM"
       PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
       echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
@@ -395,11 +600,22 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
     cd "$CLAUDE_WORK_DIR"
 
+    # Fix git dubious ownership before any git operations
+    git config --global --add safe.directory "$CLAUDE_WORK_DIR"
+    echo "✓ Added repository to git safe directories"
+
     # Fetch all latest changes including PR branches
     git fetch origin --prune
 
     # Get PR branch information and checkout
     PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    
+    # If we couldn't get the branch name from pr view, try getting it from the PR list
+    if [ -z "$PR_BRANCH" ]; then
+        echo "⚠️  Initial branch name lookup failed, trying alternate method..."
+        PR_BRANCH=$(gh pr list --json number,headRefName --jq ".[] | select(.number == $PR_NUMBER) | .headRefName" 2>/dev/null || echo "")
+    fi
+    
     if [ -n "$PR_BRANCH" ]; then
         echo "📦 Checking out PR branch: $PR_BRANCH"
         if git checkout "$PR_BRANCH" 2>/dev/null; then
@@ -408,12 +624,17 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
         elif git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null; then
             echo "✅ Created and checked out tracking branch for $PR_BRANCH"
         else
-            echo "⚠️  Branch checkout failed, trying GitHub CLI method..."
-            gh pr checkout "$PR_NUMBER" || echo "❌ Failed to checkout PR via gh CLI"
+            echo "⚠️  Branch checkout failed, trying to fetch and checkout..."
+            git fetch origin "$PR_BRANCH:$PR_BRANCH" 2>/dev/null && git checkout "$PR_BRANCH" || {
+                echo "❌ All checkout methods failed"
+                exit 1
+            }
         fi
     else
-        echo "⚠️  Could not determine PR branch name, using GitHub CLI to checkout PR directly"
-        gh pr checkout "$PR_NUMBER" || echo "❌ Failed to checkout PR"
+        echo "❌ CRITICAL: Could not determine PR branch name from PR #$PR_NUMBER"
+        echo "   This would create a wrong branch name (pr-$PR_NUMBER)"
+        echo "   Refusing to continue to avoid creating duplicate branches"
+        exit 1
     fi
 
     # Verify we're on the right commit
@@ -446,14 +667,411 @@ echo "- Clean YAML syntax and structure"
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
-# Task files should already be present in the project repository at /task
-echo "📋 Checking for task files in project repository..."
-if [ -d "$CLAUDE_WORK_DIR/task" ]; then
-    echo "✓ Found task directory in project repository"
-    ls -la "$CLAUDE_WORK_DIR/task/"
+# Copy task files from docs repository if configured
+echo "📋 Preparing task documentation for quality review..."
+echo "════════════════════════════════════════════════════════════════"
+
+{{#if docs_repository_url}}
+# Initialize comprehensive tracking with explicit stage flags
+COPIED_FILES=""
+FAILED_FILES=""
+EXISTING_FILES=""
+DOCS_SETUP_SUCCESS=false
+DOCS_AUTH_VERIFIED=false
+DOCS_CLONE_SUCCESS=false
+DOCS_PATH_VALID=false
+
+# Prepare target directory (ensure it exists)
+if ! mkdir -p "$CLAUDE_WORK_DIR/task" 2>/tmp/mkdir_error.log; then
+    echo "❌ CRITICAL: Cannot create task directory"
+    echo "   Error: $(cat /tmp/mkdir_error.log 2>/dev/null || echo 'unknown')"
+    echo "   Aborting docs setup"
 else
-    echo "⚠️ No /task directory found in project repository"
+    echo "✓ Task directory prepared: $CLAUDE_WORK_DIR/task"
 fi
+
+# Validate GitHub token exists before proceeding
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "❌ CRITICAL: No GITHUB_TOKEN available"
+    echo "   Cannot authenticate to docs repository"
+    echo "   Aborting docs setup - agent will have limited context"
+    DOCS_AUTH_VERIFIED=false
+else
+    echo "✓ GitHub token available (${#GITHUB_TOKEN} chars)"
+    DOCS_AUTH_VERIFIED=true
+fi
+
+# Only proceed if we have authentication
+if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+    # Build authenticated docs URL
+    DOCS_REPO_URL="{{docs_repository_url}}"
+    DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
+    
+    echo "📥 Docs Repository: $DOCS_REPO_URL"
+    
+    # Step 1: Verify repository access (fail fast if inaccessible)
+    echo ""
+    echo "🔍 Step 1/4: Verifying repository access..."
+    if ! git ls-remote "$DOCS_HTTP_URL" HEAD >/tmp/docs_access_test.out 2>&1; then
+        echo "❌ Repository access FAILED"
+        echo "   URL: $DOCS_REPO_URL"
+        echo "   Error: $(cat /tmp/docs_access_test.out 2>/dev/null | head -3)"
+        echo "   This is a blocking error - cannot proceed with docs setup"
+        DOCS_AUTH_VERIFIED=false
+    else
+        echo "✅ Repository access verified"
+        DOCS_AUTH_VERIFIED=true
+    fi
+fi
+
+# Step 2: Clone repository with explicit error handling
+if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+    echo ""
+    echo "📥 Step 2/4: Cloning docs repository..."
+    
+    # Clean up any existing docs clone
+    rm -rf /tmp/docs-repo /tmp/docs_clone_error.log 2>/dev/null || true
+    
+    MAX_ATTEMPTS=3
+    CLONE_SUCCEEDED=false
+    
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+        echo "   Clone attempt $attempt/$MAX_ATTEMPTS..."
+        
+        # Attempt clone with explicit error capture
+        if git clone --quiet --depth 1 "$DOCS_HTTP_URL" /tmp/docs-repo 2>/tmp/docs_clone_error.log; then
+            # Verify clone actually succeeded
+            if [ -d "/tmp/docs-repo/.git" ]; then
+                # Additional validation - check for at least some content
+                FILE_COUNT=$(find /tmp/docs-repo -type f 2>/dev/null | wc -l)
+                if [ "$FILE_COUNT" -gt 0 ]; then
+                    CLONE_SUCCEEDED=true
+                    DOCS_CLONE_SUCCESS=true
+                    echo "✅ Clone successful ($FILE_COUNT files)"
+                    break
+                else
+                    echo "❌ Clone succeeded but repository appears empty"
+                fi
+            else
+                echo "❌ Clone command succeeded but .git directory missing"
+            fi
+        else
+            CLONE_ERROR=$(cat /tmp/docs_clone_error.log 2>/dev/null | head -3)
+            echo "❌ Clone failed: ${CLONE_ERROR:-Unknown error}"
+        fi
+        
+        # Retry logic
+        if [ $attempt -lt $MAX_ATTEMPTS ]; then
+            echo "   Waiting 5 seconds before retry..."
+            sleep 5
+        fi
+    done
+    
+    if [ "$CLONE_SUCCEEDED" != "true" ]; then
+        echo "❌ FAILED to clone after $MAX_ATTEMPTS attempts"
+        echo "   Last error: $(cat /tmp/docs_clone_error.log 2>/dev/null || echo 'No error log available')"
+        DOCS_CLONE_SUCCESS=false
+    fi
+else
+    echo ""
+    echo "⏭️  Step 2/4: SKIPPED (authentication failed or not available)"
+fi
+
+# Step 3: Determine and validate paths with simplified logic
+if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
+    echo ""
+    echo "📂 Step 3/4: Validating documentation paths..."
+    
+    # Simplified path determination - single clear logic path
+    {{#if docs_project_directory}}
+    # docs_project_directory is specified
+    if [ "{{docs_project_directory}}" = "." ] || [ "{{docs_project_directory}}" = "" ]; then
+        # Root of repository
+        DOCS_BASE_PATH="/tmp/docs-repo"
+        echo "   Using repository root (docs_project_directory='{{docs_project_directory}}')"
+    else
+        # Subdirectory specified
+        DOCS_BASE_PATH="/tmp/docs-repo/{{docs_project_directory}}"
+        echo "   Using subdirectory: {{docs_project_directory}}"
+    fi
+    {{else}}
+    # No docs_project_directory specified - default to root
+    DOCS_BASE_PATH="/tmp/docs-repo"
+    echo "   Using repository root (no docs_project_directory specified)"
+    {{/if}}
+    
+    # Validate base path exists
+    if [ ! -d "$DOCS_BASE_PATH" ]; then
+        echo "❌ Base path does not exist: $DOCS_BASE_PATH"
+        echo "   Repository structure:"
+        ls -la /tmp/docs-repo 2>/dev/null | head -10 || echo "   Cannot list repository"
+        DOCS_PATH_VALID=false
+        DOCS_CLONE_SUCCESS=false
+    else
+        # Build and validate remaining paths
+        DOCS_PATH="$DOCS_BASE_PATH/.taskmaster"
+        TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+        
+        echo "✅ Base path exists: $DOCS_BASE_PATH"
+        echo "   Taskmaster directory: $DOCS_PATH"
+        echo "   Task directory: $TASK_DIR"
+        
+        # Validate .taskmaster directory - create if missing for resilient setup
+        if [ ! -d "$DOCS_PATH" ]; then
+            echo "⚠️  .taskmaster directory not found at: $DOCS_PATH"
+            echo "   Initializing .taskmaster structure..."
+            mkdir -p "$DOCS_PATH/tasks"
+            mkdir -p "$DOCS_PATH/docs"
+            if [ -d "$DOCS_PATH" ]; then
+                echo "✅ Created .taskmaster structure"
+                DOCS_PATH_VALID=true
+            else
+                echo "❌ Failed to create .taskmaster structure"
+                DOCS_PATH_VALID=false
+            fi
+        else
+            echo "✅ .taskmaster directory found"
+            DOCS_PATH_VALID=true
+        fi
+        
+        # Check task directory (informational only, not blocking)
+        if [ ! -d "$TASK_DIR" ]; then
+            echo "⚠️  Task-specific directory not found: $TASK_DIR"
+            if [ -d "$DOCS_PATH/docs" ]; then
+                echo "   Available task directories:"
+                ls -d "$DOCS_PATH/docs/task-"* 2>/dev/null | head -5 || echo "   None found"
+            fi
+        else
+            echo "✅ Task directory found"
+        fi
+    fi
+else
+    echo ""
+    echo "⏭️  Step 3/4: SKIPPED (clone was not successful)"
+fi
+
+# Step 4: Copy documentation files with enhanced error tracking
+if [ "$DOCS_PATH_VALID" = "true" ]; then
+    echo ""
+    echo "📋 Step 4/4: Copying documentation files..."
+    
+    # Enhanced file copy helper with better error handling
+    safe_copy_file() {
+        local src="$1"
+        local dest="$2"
+        local filename="$3"
+        
+        # Validate source exists
+        if [ ! -f "$src" ]; then
+            echo "  ⊘ $filename - source not found"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+        
+        # Check if source is readable and has content
+        if [ ! -r "$src" ]; then
+            echo "  ❌ $filename - source not readable"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+        
+        local src_size=$(wc -c < "$src" 2>/dev/null || echo "0")
+        if [ "$src_size" = "0" ]; then
+            echo "  ⚠️  $filename - source is empty (0 bytes)"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+        
+        # Check if destination already exists with content
+        if [ -f "$dest" ] && [ -s "$dest" ]; then
+            local dest_size=$(wc -c < "$dest")
+            echo "  ↻ $filename - already exists (${dest_size}B), preserving"
+            EXISTING_FILES="$EXISTING_FILES $filename"
+            return 0
+        fi
+        
+        # Attempt copy with explicit error handling
+        if cp "$src" "$dest" 2>/tmp/copy_error_${filename}.log; then
+            # Verify copy succeeded and has content
+            if [ -f "$dest" ] && [ -s "$dest" ]; then
+                local copied_size=$(wc -c < "$dest")
+                # Verify size matches source
+                if [ "$copied_size" = "$src_size" ]; then
+                    echo "  ✅ $filename - copied successfully (${copied_size}B)"
+                    COPIED_FILES="$COPIED_FILES $filename"
+                    return 0
+                else
+                    echo "  ❌ $filename - size mismatch (src:${src_size}B dest:${copied_size}B)"
+                    rm -f "$dest"
+                    FAILED_FILES="$FAILED_FILES $filename"
+                    return 1
+                fi
+            else
+                echo "  ❌ $filename - copy succeeded but destination is empty"
+                rm -f "$dest"
+                FAILED_FILES="$FAILED_FILES $filename"
+                return 1
+            fi
+        else
+            local error=$(cat /tmp/copy_error_${filename}.log 2>/dev/null || echo "unknown error")
+            echo "  ❌ $filename - copy failed: $error"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+    }
+    
+    # Copy task-specific files (task.md is critical, others are optional)
+    CRITICAL_FILES_COPIED=0
+    if [ -d "$TASK_DIR" ]; then
+        echo "  📁 Processing task-specific files from: $TASK_DIR"
+        
+        # Critical file: task.md
+        if safe_copy_file "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/task.md" "task.md"; then
+            CRITICAL_FILES_COPIED=$((CRITICAL_FILES_COPIED + 1))
+        fi
+        
+        # Optional files
+        safe_copy_file "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" "acceptance-criteria.md" || true
+        safe_copy_file "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/prompt.md" "prompt.md" || true
+    else
+        echo "  ⚠️  Task directory not found: $TASK_DIR"
+        echo "  Skipping task-specific files (task.md, acceptance-criteria.md, prompt.md)"
+        FAILED_FILES="$FAILED_FILES task.md acceptance-criteria.md prompt.md"
+    fi
+    
+    # Copy architecture documentation (optional)
+    safe_copy_file "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/architecture.md" "architecture.md" || true
+    
+    # Determine overall success
+    # Success if at least one critical file was copied/exists OR any files were copied/exist
+    AVAILABLE_FILE_COUNT=$(ls -1 "$CLAUDE_WORK_DIR/task/" 2>/dev/null | wc -l)
+    if [ "$AVAILABLE_FILE_COUNT" -gt 0 ]; then
+        DOCS_SETUP_SUCCESS=true
+        echo "  ✅ Setup successful - $AVAILABLE_FILE_COUNT file(s) available"
+    else
+        echo "  ❌ Setup failed - no files available for agent"
+        DOCS_SETUP_SUCCESS=false
+    fi
+else
+    echo ""
+    echo "⏭️  Step 4/4: SKIPPED (path validation failed)"
+fi
+
+# Comprehensive final summary with clear status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "📊 TASK DOCUMENTATION SETUP SUMMARY"
+echo "════════════════════════════════════════════════════════════════"
+
+# Overall status with clear pass/fail
+if [ "$DOCS_SETUP_SUCCESS" = "true" ]; then
+    echo "✅ STATUS: SUCCESS"
+    echo "   Documentation is available for the agent"
+else
+    echo "❌ STATUS: FAILED"
+    echo "   Agent will proceed with limited context"
+fi
+
+# Detailed stage breakdown
+echo ""
+echo "Pipeline Stages:"
+printf "  1. Authentication:   %s\n" "$([ "$DOCS_AUTH_VERIFIED" = "true" ] && echo "✅ Verified" || echo "❌ Failed")"
+printf "  2. Clone:            %s\n" "$([ "$DOCS_CLONE_SUCCESS" = "true" ] && echo "✅ Success" || echo "❌ Failed")"
+printf "  3. Path Validation:  %s\n" "$([ "$DOCS_PATH_VALID" = "true" ] && echo "✅ Valid" || echo "❌ Invalid")"
+printf "  4. File Operations:  %s\n" "$([ "$DOCS_SETUP_SUCCESS" = "true" ] && echo "✅ Complete" || echo "❌ Incomplete")"
+
+# File status tracking
+if [ -n "$COPIED_FILES" ]; then
+    echo ""
+    echo "📄 Newly copied:$COPIED_FILES"
+fi
+
+if [ -n "$EXISTING_FILES" ]; then
+    echo "📄 Preserved existing:$EXISTING_FILES"
+fi
+
+if [ -n "$FAILED_FILES" ]; then
+    echo "❌ Failed/missing:$FAILED_FILES"
+fi
+
+# List actual available files in task directory
+echo ""
+echo "📁 Task documentation available:"
+if [ -d "$CLAUDE_WORK_DIR/task" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/task" 2>/dev/null | wc -l)" -gt 0 ]; then
+    ls -lh "$CLAUDE_WORK_DIR/task/" 2>/dev/null | tail -n +2 | while read -r line; do
+        filename=$(echo "$line" | awk '{print $9}')
+        size=$(echo "$line" | awk '{print $5}')
+        printf "   ✓ %s (%s)\n" "$filename" "$size"
+    done
+else
+    echo "   (none available)"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+
+# Smart cleanup strategy - preserve debugging info on failure
+if [ "$DOCS_SETUP_SUCCESS" = "true" ] && [ -z "$FAILED_FILES" ]; then
+    # Full success - clean up everything
+    rm -rf /tmp/docs-repo /tmp/docs_access_test.out /tmp/docs_clone_error.log /tmp/copy_error_*.log 2>/dev/null || true
+    echo "✓ Temporary files cleaned (setup successful)"
+else
+    # Partial or complete failure - keep debugging info
+    echo "⚠️  Preserving temporary files for debugging"
+    echo ""
+    echo "Debug Information Available:"
+    [ -d "/tmp/docs-repo" ] && echo "   ✓ /tmp/docs-repo (cloned repository)"
+    [ -f "/tmp/docs_access_test.out" ] && echo "   ✓ /tmp/docs_access_test.out (access test output)"
+    [ -f "/tmp/docs_clone_error.log" ] && echo "   ✓ /tmp/docs_clone_error.log (clone errors)"
+    ls /tmp/copy_error_*.log 2>/dev/null | while read -r log; do
+        echo "   ✓ $log"
+    done || true
+    
+    # Provide specific troubleshooting guidance
+    echo ""
+    echo "Troubleshooting Steps:"
+    if [ "$DOCS_AUTH_VERIFIED" != "true" ]; then
+        echo "   1. Verify GITHUB_TOKEN is valid and has repository access"
+        echo "   2. Check repository URL: {{docs_repository_url}}"
+    fi
+    if [ "$DOCS_CLONE_SUCCESS" != "true" ] && [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+        echo "   1. Review clone error log: /tmp/docs_clone_error.log"
+        echo "   2. Verify repository exists and is accessible"
+    fi
+    if [ "$DOCS_PATH_VALID" != "true" ] && [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
+        echo "   1. Check docs_project_directory configuration: '{{docs_project_directory}}'"
+        echo "   2. Verify .taskmaster directory exists in configured path"
+        echo "   3. List repository structure: ls -la /tmp/docs-repo"
+    fi
+fi
+
+{{else}}
+# No docs repository configured - check for local task files
+echo "ℹ️  No docs repository configured"
+echo "Checking for local task files in repository..."
+
+if [ -d "$CLAUDE_WORK_DIR/task" ]; then
+    FILE_COUNT=$(ls -A "$CLAUDE_WORK_DIR/task" 2>/dev/null | wc -l)
+    if [ "$FILE_COUNT" -gt 0 ]; then
+        echo "✓ Found task directory with $FILE_COUNT file(s)"
+        echo ""
+        echo "📁 Available files:"
+        ls -lh "$CLAUDE_WORK_DIR/task/" 2>/dev/null | tail -n +2 | while read -r line; do
+            filename=$(echo "$line" | awk '{print $9}')
+            size=$(echo "$line" | awk '{print $5}')
+            printf "   ✓ %s (%s)\n" "$filename" "$size"
+        done
+    else
+        echo "⚠️  Task directory exists but is empty"
+        echo "   Agent will proceed with limited context"
+    fi
+else
+    echo "⚠️  No task documentation available"
+    echo "   - No docs repository configured (docs_repository_url not set)"
+    echo "   - No local task/ directory found in repository"
+    echo "   Agent will proceed with minimal context"
+fi
+echo "════════════════════════════════════════════════════════════════"
+{{/if}}
 
 # Ensure we're in the git repository working directory
 echo "✓ Working directly in git repository at: $CLAUDE_WORK_DIR"
@@ -475,10 +1093,21 @@ rm -f /workspace/CLAUDE.md
 # Generate configuration files from templates
 echo "🔧 Generating Cleo-specific configuration files..."
 
-# Enterprise managed settings are mounted directly from ConfigMap
+# Enterprise managed settings - copy to writable location for model rotation
 echo "=== ENTERPRISE MANAGED SETTINGS ==="
-echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
-echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
+echo "✓ Settings source: /etc/claude-code/managed-settings.json (ConfigMap mount)"
+
+# Copy enterprise settings to writable location
+# ConfigMap mounts use symlinks that can't be modified, so we copy to a writable path
+# Claude will use this writable copy, allowing model rotation to work
+mkdir -p "/etc/claude-code-writable"
+if [ -f "/etc/claude-code/managed-settings.json" ]; then
+  cp "/etc/claude-code/managed-settings.json" "/etc/claude-code-writable/managed-settings.json"
+  echo "✓ Copied enterprise settings to /etc/claude-code-writable/managed-settings.json (writable)"
+  echo "✓ Model rotation will modify this writable copy"
+else
+  echo "⚠️ Enterprise settings not found, Claude will use defaults"
+fi
 
 # Verify client-config.json is available and valid
 echo "=== TOOLMAN CONFIG SETUP ==="
@@ -513,7 +1142,7 @@ ensure_status_labels() {
     local desc="${rest#*:}"
 
     if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
-      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+      gh label create "$label" --force -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
     fi
   done
 }
@@ -637,7 +1266,7 @@ fi
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-  cp /task-files/client-config.json "/workspace/client-config.json"
+  cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
   echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
 else
   echo "⚠️ client-config.json not found in task-files"
@@ -833,7 +1462,7 @@ export CLAUDE_WORK_DIR
 export GITHUB_TOKEN
 export REPO_OWNER
 export REPO_NAME
-export TARGET_REPO_DIR
+export REPO_ROOT
 
 echo "════════════════════════════════════════════════════════════════"
 echo "✅ CLEO CODE QUALITY AGENT READY"
@@ -850,11 +1479,265 @@ export SERVICE_NAME="{{service}}"
 export TASK_ID="{{task_id}}"
 export GITHUB_APP="{{github_app}}"
 
+# Initialize retry loop variables
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+ATTEMPT=1
+SUCCESS=0
+CLAUDE_EXIT_CODE=1
+
+echo "🔄 Cleo will retry up to $MAX_RETRIES times until quality standards are met"
+echo ""
+
+# =========================================================================
+# OpenMemory Integration for Cleo
+# =========================================================================
+echo "🧠 Initializing OpenMemory for code quality review..."
+if [ -f "/agent-templates/memory-functions.sh" ]; then
+  source /agent-templates/memory-functions.sh
+  
+  # Set agent context
+  export AGENT_NAME="cleo"
+  export TASK_ID="{{task_id}}"
+  export SERVICE_NAME="{{service}}"
+  export MEMORY_API="${MEMORY_API:-http://openmemory.cto-system:3000}"
+  
+  # Initialize memory connection
+  if init_memory; then
+    echo "✅ OpenMemory connected - loading quality patterns..."
+    
+    # Query for common quality issues in this service
+    QUALITY_ISSUES=$(query_memory "linting errors code quality issues ${SERVICE_NAME}" 15 || echo "[]")
+    echo "🔍 Found $(echo "$QUALITY_ISSUES" | jq 'length' 2>/dev/null || echo 0) known quality patterns"
+    
+    # Query for Rex's implementation patterns to understand context
+    REX_PATTERNS=$(query_memory "rex implementation task-{{task_id}}" 5 || echo "[]")
+    echo "📚 Found $(echo "$REX_PATTERNS" | jq 'length' 2>/dev/null || echo 0) implementation context entries"
+    
+    # Store findings for potential use in prompts
+    if [ -n "$QUALITY_ISSUES" ] && [ "$QUALITY_ISSUES" != "[]" ]; then
+      echo "$QUALITY_ISSUES" > "$TASK_WORKSPACE/memory-quality-patterns.json"
+    fi
+  else
+    echo "⚠️ OpenMemory not available - continuing without memory augmentation"
+  fi
+else
+  echo "⚠️ Memory functions not found - continuing without OpenMemory"
+fi
+echo ""
+
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
+# Retry loop - Cleo will continue until quality checks pass or max retries reached
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "════════════════════════════════════════════════════════════════"
+  echo "🚀 Cleo Quality Review Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "════════════════════════════════════════════════════════════════"
+
+  # =========================================================================
+  # INCREMENTAL CONTEXT: Load previous iteration findings
+  # =========================================================================
+  AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
+  mkdir -p "$AGENT_STATE_DIR"
+  
+  PREVIOUS_CONTEXT=""
+  if [ $ATTEMPT -gt 1 ]; then
+    PREV_ATTEMPT=$((ATTEMPT - 1))
+    PREV_STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${PREV_ATTEMPT}.json"
+    
+    if [ -f "$PREV_STATE_FILE" ]; then
+      echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
+      
+      if command -v jq >/dev/null 2>&1; then
+        PREV_FINDINGS=$(jq -r '.findings // "No findings recorded"' "$PREV_STATE_FILE" 2>/dev/null || echo "")
+        PREV_STATUS=$(jq -r '.status // "unknown"' "$PREV_STATE_FILE" 2>/dev/null || echo "unknown")
+        
+        if [ -n "$PREV_FINDINGS" ] && [ "$PREV_FINDINGS" != "No findings recorded" ]; then
+          PREVIOUS_CONTEXT="
+
+## 🔄 Context from Previous Iteration (#$PREV_ATTEMPT)
+
+**Status**: $PREV_STATUS
+
+**Previous Findings**:
+$PREV_FINDINGS
+
+**Focus for This Iteration**:
+- Address the issues identified above
+- Don't repeat the same analysis
+- Build on previous progress incrementally
+
+"
+          echo "✅ Loaded context: $PREV_STATUS with findings"
+        fi
+      fi
+    else
+      echo "ℹ️ No previous iteration state found (first attempt or state cleared)"
+    fi
+  fi
+  
+  if [ -n "$PREVIOUS_CONTEXT" ]; then
+    PROMPT_CONTENT="${PROMPT_CONTENT}${PREVIOUS_CONTEXT}"
+    echo "📝 Enhanced prompt with previous iteration context"
+  fi
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+    
+    # Update writable copy of enterprise settings with current model
+    if [ -f "/etc/claude-code-writable/managed-settings.json" ]; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "/etc/claude-code-writable/managed-settings.json" > /tmp/settings-rotated.json && \
+      mv /tmp/settings-rotated.json "/etc/claude-code-writable/managed-settings.json"
+      echo "✓ Updated model rotation settings"
+    fi
+  fi
+
 # Start Claude with Cleo-specific configuration
 cd "$CLAUDE_WORK_DIR"
 
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "📖 How MCP Tool Validation Works:"
+echo "  1. Check if claude CLI is available"
+echo "  2. List all configured MCP servers (claude mcp list)"
+echo "  3. Verify required servers are connected (toolman for Cleo)"
+echo "  4. Attempt to list available tools from each server"
+echo "  5. Ensure critical tools are accessible"
+echo ""
+echo "🔍 Verifying Claude MCP tools..."
+
+TOOL_VERIFICATION_FAILED=false
+
+if command -v claude >/dev/null 2>&1; then
+  # Check MCP servers first
+  echo "📋 Checking MCP servers..."
+  MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+  
+  if echo "$MCP_LIST" | grep -q "Connected"; then
+    echo "  ✓ MCP servers connected"
+    echo "$MCP_LIST" | grep "Connected" | sed 's/^/  /'
+  else
+    echo "  ⚠️ No MCP servers connected"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Cleo needs: Context7, GitHub
+  REQUIRED_SERVERS=("toolman")
+  
+  echo ""
+  echo "🔍 Verifying required MCP servers..."
+  for server in "${REQUIRED_SERVERS[@]}"; do
+    if echo "$MCP_LIST" | grep -q "$server.*Connected"; then
+      echo "  ✓ $server server available"
+    else
+      echo "  ❌ $server server NOT available"
+      TOOL_VERIFICATION_FAILED=true
+    fi
+  done
+  
+  echo ""
+  echo "📦 Listing available MCP tools from connected servers..."
+  
+  # Try to list tools from the toolman server
+  if echo "$MCP_LIST" | grep -q "toolman.*Connected"; then
+    # Extract toolman URL from MCP list
+    TOOLMAN_URL=$(echo "$MCP_LIST" | grep "toolman" | sed -n 's/.*--url \([^ ]*\).*/\1/p' | head -1)
+    if [ -z "$TOOLMAN_URL" ]; then
+      # Fallback to known URL if extraction fails
+      TOOLMAN_URL="http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+    fi
+    
+    echo "  🔧 Toolman server tools (from $TOOLMAN_URL):"
+    
+    # Try to get tool list via direct MCP query
+    # Note: This assumes toolman MCP server supports a tools/list endpoint
+    TOOLS_RESPONSE=$(curl -s -X POST "$TOOLMAN_URL" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' 2>/dev/null || echo "")
+    
+    if [ -n "$TOOLS_RESPONSE" ] && echo "$TOOLS_RESPONSE" | grep -q "result"; then
+      # Parse and display tools if we got a valid response
+      echo "$TOOLS_RESPONSE" | jq -r '.result.tools[]?.name // empty' 2>/dev/null | sed 's/^/    - /' || echo "    ⚠️ Unable to parse tool list"
+      
+      # Count tools
+      TOOL_COUNT=$(echo "$TOOLS_RESPONSE" | jq -r '.result.tools | length' 2>/dev/null || echo "0")
+      echo "    📊 Total: $TOOL_COUNT tools available"
+    else
+      echo "    ℹ️ Unable to fetch tool list (server may not support listing)"
+      echo "    ℹ️ Tools will be discovered at runtime by Claude"
+    fi
+  fi
+  
+  echo ""
+else
+  echo "  ⚠️ claude CLI not available for tool verification"
+  TOOL_VERIFICATION_FAILED=true
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "Critical MCP servers are not available. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - Toolman server not reachable"
+  echo "  - MCP servers not initialized properly"
+  echo "  - .mcp.json misconfigured"
+  echo ""
+  echo "Full MCP server list:"
+  claude mcp list 2>&1 || echo "Failed to list MCP servers"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical MCP tools verified successfully"
+echo ""
+# =========================================================================
+
 # Build Claude command
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+
+# Add writable enterprise settings for model rotation
+if [ -f "/etc/claude-code-writable/managed-settings.json" ]; then
+    echo "✓ Using writable enterprise settings for model rotation"
+    CLAUDE_CMD="$CLAUDE_CMD --settings /etc/claude-code-writable/managed-settings.json"
+fi
 
 # Look for Cleo-specific system prompt file
 if [ -f "/task-files/cleo-system-prompt.md" ]; then
@@ -868,16 +1751,79 @@ fi
 echo "✓ Creating Cleo's code quality enforcement prompt"
 
 # Build static prompt with task context
+# Determine language-specific quality checks
+TASK_LANG="${TASK_LANGUAGE:-rust}"
+TASK_FW="${TASK_FRAMEWORK:-}"
+
+# Build language-specific guidance
+LANGUAGE_SPECIFIC=""
+case "$TASK_LANG" in
+  typescript|javascript|ts|js)
+    LANGUAGE_SPECIFIC="
+## TypeScript/JavaScript Quality Standards
+- **Type Safety**: Strict TypeScript compilation with no 'any' types
+- **Linting**: ESLint with recommended rules, no warnings allowed
+- **Formatting**: Prettier for consistent code style
+- **Testing**: Jest/Vitest with appropriate test coverage
+- **Build**: Clean TypeScript compilation with no errors
+- **Dependencies**: Properly declared in package.json with correct versions"
+    if echo "$TASK_FW" | grep -q "react\|next"; then
+      LANGUAGE_SPECIFIC="$LANGUAGE_SPECIFIC
+- **React Standards**: Hooks rules, no prop-types errors, proper component structure
+- **Next.js Standards**: App router conventions if applicable, proper data fetching"
+    fi
+    ;;
+  rust)
+    LANGUAGE_SPECIFIC="
+## Rust Quality Standards
+- **Compilation**: Zero warnings with \`cargo clippy --all-targets -- -D warnings\`
+- **Formatting**: \`cargo fmt --all --check\` must pass
+- **Testing**: All tests pass with \`cargo test\`
+- **Pedantic Linting**: \`cargo clippy -- -D clippy::all -D clippy::pedantic\`
+- **Documentation**: Public APIs must be documented
+- **Dependencies**: Minimal, well-justified additions to Cargo.toml"
+    ;;
+  python)
+    LANGUAGE_SPECIFIC="
+## Python Quality Standards
+- **Type Checking**: mypy strict mode with no errors
+- **Linting**: ruff or pylint with no violations
+- **Formatting**: black for consistent formatting
+- **Testing**: pytest with appropriate coverage
+- **Dependencies**: Properly declared in requirements.txt or pyproject.toml"
+    ;;
+  go)
+    LANGUAGE_SPECIFIC="
+## Go Quality Standards
+- **Formatting**: \`gofmt\` and \`go vet\` must pass
+- **Linting**: golangci-lint with no issues
+- **Testing**: All tests pass with \`go test ./...\`
+- **Build**: Clean compilation with \`go build\`
+- **Dependencies**: go.mod properly maintained"
+    ;;
+  *)
+    LANGUAGE_SPECIFIC="
+## General Quality Standards
+- **Build**: Project must compile/build without errors
+- **Linting**: Language-appropriate linting must pass
+- **Testing**: All existing tests must pass
+- **Formatting**: Consistent code style throughout"
+    ;;
+esac
+
 CLEO_PROMPT="# Code Quality Review Assignment
 
 You are Cleo, a rigorous code quality enforcement agent. Your mission is to ensure zero-tolerance quality standards for this pull request.
 
 ## Your Role
 - **Primary Focus**: Code quality enforcement AND CI/CD pipeline setup
+- **Language Context**: This is a **${TASK_LANG}** project${TASK_FW:+ using $TASK_FW}
+$LANGUAGE_SPECIFIC
 - **Quality Tools**: Clippy (pedantic), cargo fmt, cargo test, YAML linting
-- **DevOps Setup**: GitHub Actions workflows, Docker image building, CI verification
+- **DevOps Setup**: GitHub Actions workflows, Docker image building, permissions configuration, CI verification
+- **Permissions**: MUST fix workflow permissions (packages:write, contents:write, etc.) - don't skip!
 - **Decision Authority**: Add 'ready-for-qa' label only when ALL quality checks AND CI builds pass
-- **Standards**: Zero warnings, perfect formatting, 100% test pass rate, working Docker builds
+- **Standards**: Zero warnings, perfect formatting, 100% test pass rate, working Docker builds with successful registry push
 
 ## Current Context
 
@@ -913,6 +1859,18 @@ fi
 CLEO_PROMPT="$CLEO_PROMPT
 
 ## Your Instructions
+
+**🚨 CRITICAL: PR WORKFLOW - READ THIS FIRST 🚨**
+
+You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
+- **DO NOT create a new PR** - Rex already created one
+- **DO NOT create a new branch** - you're already on Rex's PR branch
+- **DO push your fixes** to the EXISTING PR branch
+- All your commits will automatically appear on PR #${PR_NUMBER:-UNKNOWN}
+- The repository is already checked out to the correct PR branch
+
+**Your job**: Fix code quality issues on Rex's PR, NOT create your own PR.
+
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
 3. **Verify Live Data Implementation**: Ensure NO mocks exist - all implementations must use real databases, APIs, and configurable parameters (no hard-coded trading pairs, endpoints, etc.)
@@ -927,7 +1885,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    - NOTE: Do NOT write tests - Tess handles all testing
 5. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
    - Check if .github/workflows/ci.yml exists (or similar CI workflow)
-   - If not, create using these PROVEN TEMPLATES:
+   - If not, create using these PROVEN TEMPLATES from our production platform:
 
    **a) Dockerfile (Runtime-only, expects pre-built binary):**
    \\\`\\\`\\\`dockerfile
@@ -946,7 +1904,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    CMD ["./binary-name"]
    \\\`\\\`\\\`
 
-   **b) CI Workflow (.github/workflows/ci.yml):**
+   **b) CI Workflow (.github/workflows/ci.yml) - Fast Builds with Caching:**
    \\\`\\\`\\\`yaml
    name: Continuous Integration
    on:
@@ -964,7 +1922,8 @@ CLEO_PROMPT="$CLEO_PROMPT
            with:
              toolchain: stable
              components: rustfmt, clippy
-         - uses: Swatinem/rust-cache@v2
+         # 🚀 CRITICAL: Use Swatinem/rust-cache for intelligent dependency caching
+         - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
            with:
              workspaces: . -> target
              shared-key: "rust-cache-ci"
@@ -980,7 +1939,7 @@ CLEO_PROMPT="$CLEO_PROMPT
          - uses: actions-rust-lang/setup-rust-toolchain@v1
            with:
              toolchain: stable
-         - uses: Swatinem/rust-cache@v2
+         - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
            with:
              workspaces: . -> target
              shared-key: "rust-cache-ci"
@@ -988,7 +1947,7 @@ CLEO_PROMPT="$CLEO_PROMPT
            run: cargo test --all-features --all-targets
    \\\`\\\`\\\`
 
-   **c) Deploy Workflow (.github/workflows/deploy.yml) for k8s-runner:**
+   **c) Deploy Workflow (.github/workflows/deploy.yml) - Arc Runner with Ultra-Fast Builds:**
    \\\`\\\`\\\`yaml
    name: Deploy
    on:
@@ -1001,37 +1960,75 @@ CLEO_PROMPT="$CLEO_PROMPT
 
    jobs:
      build:
-       runs-on: [k8s-runner]  # Use self-hosted runner for speed
+       # 🚀 CRITICAL: Use Arc runner (k8s-runner) for 5-10x faster builds
+       # Arc runners have pre-installed: sccache, mold linker, pre-warmed dependencies
+       runs-on: [k8s-runner]
        permissions:
          contents: read
          packages: write
        steps:
          - uses: actions/checkout@v4
+         
+         # 🚀 Build with ULTRA-FAST caching mechanisms
          - name: Build binary
            env:
+             # Use sccache for compiler-level caching (pre-installed on k8s-runner)
              RUSTC_WRAPPER: "sccache"
+             # Build to persistent cache directory for multi-run speed
              CARGO_TARGET_DIR: "\$HOME/cache/target"
-           run: |
-             cargo build --release
-             cp \$HOME/cache/target/release/<binary> ./<binary>
-         - uses: docker/setup-buildx-action@v3
-         - uses: docker/login-action@v3
+             # Optimize for speed
+             CARGO_INCREMENTAL: "0"
+             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+             CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+          run: |
+            # Pre-warm sccache (already installed on k8s-runner)
+            sccache --start-server || true
+            echo \"📊 Initial sccache stats:\"
+            sccache --show-stats
+            
+            # Build with persistent cache directory
+            mkdir -p \$HOME/cache/target
+            cargo build --release --bin <binary-name>
+            
+            # Show cache hit rates
+            echo \"📊 Final sccache stats:\"
+            sccache --show-stats
+             
+             # Copy from cache dir to workspace
+             cp \$HOME/cache/target/release/<binary-name> ./<binary-name>
+         
+         - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+           with:
+             driver: docker
+             install: true
+         
+         - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
            with:
              registry: ghcr.io
              username: ${{ github.actor }}
              password: ${{ secrets.GITHUB_TOKEN }}
-         - uses: docker/build-push-action@v5
+         
+         - uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
            with:
              context: .
              file: ./Dockerfile
-             platforms: linux/amd64,linux/arm64
+             platforms: linux/amd64  # Can add arm64 with docker-container driver
              push: true
              tags: |
                ghcr.io/${{ github.repository }}:latest
                ghcr.io/${{ github.repository }}:${{ github.sha }}
+             # Use GitHub Actions cache for Docker layers
              cache-from: type=gha
              cache-to: type=gha,mode=max
    \\\`\\\`\\\`
+
+   **KEY PERFORMANCE OPTIMIZATIONS:**
+   - ✅ **Arc Runners (k8s-runner)**: 5-10x faster than ubuntu-latest, pre-warmed dependencies
+   - ✅ **sccache**: Compiler-level caching, massive speedup on incremental builds
+   - ✅ **CARGO_TARGET_DIR**: Persistent cache across builds in \$HOME/cache/target
+   - ✅ **Swatinem/rust-cache**: Intelligent Cargo dependency caching for CI jobs
+   - ✅ **mold linker**: Ultra-fast linking (pre-installed on k8s-runner)
+   - ✅ **GitHub Actions Cache**: Docker layer caching with cache-from/cache-to
 
    - Commit and push the CI configuration
    - Push any code fixes you made locally
@@ -1058,10 +2055,22 @@ CLEO_PROMPT="$CLEO_PROMPT
      * Remove invalid actions or fix version tags
      * Ensure workflow file is in .github/workflows/
      * Check if workflow needs to be enabled in Actions settings
+   - **CRITICAL: Fix CI/CD Permissions Issues** (YOU MUST FIX THESE, DON'T SKIP!):
+     * If Docker push to GHCR fails with "write_package" error:
+       - Add 'permissions:' block to the job: 'contents: read' and 'packages: write'
+       - Example: See deploy workflow template above (lines with 'permissions:')
+       - This is REQUIRED for pushing to ghcr.io (GitHub Container Registry)
+     * If workflow can't create PRs/comments:
+       - Add 'pull-requests: write' permission
+     * If workflow can't push commits:
+       - Add 'contents: write' permission
+     * **ALWAYS** include proper permissions block - it's part of CI setup!
+     * Use 'gh run view <run-id>' to see permission errors
    - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI (when workflows exist)
    - **VERIFY NO #[allow(clippy::...)] BYPASSES**: Check that no warnings are suppressed
+   - **VERIFY DOCKER PUSH SUCCESS**: If workflow includes Docker build, ensure images push to registry successfully
    - SUCCESS = Code quality checks pass + CI passes (if workflows exist) OR code quality checks pass (if no workflows)
-   - Do NOT proceed until quality standards are met
+   - Do NOT proceed until quality standards are met AND Docker images can be pushed (if applicable)
 7. **Review against task requirements**: Verify implementation matches acceptance criteria
 8. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
 9. **Success criteria**: Quality checks must pass for approval. CI/CD validation required only when workflows exist.
@@ -1073,8 +2082,10 @@ CLEO_PROMPT="$CLEO_PROMPT
 - **Perfect formatting** required (cargo fmt --check must pass in CI if workflows exist, locally otherwise)
 - **All tests pass** (cargo test must succeed in CI if workflows exist, locally otherwise)
 - **Clean YAML** syntax and structure
-- **CI/CD Pipeline** SHOULD be working with successful Docker image build (when workflows exist)
-- **GitHub Actions** SHOULD show green checks for ALL quality gates (when workflows exist)
+- **CI/CD Pipeline** MUST be working with successful Docker image build AND push (when workflows exist)
+- **Permissions** MUST be configured correctly (packages:write for GHCR, contents:write for commits, etc.)
+- **Docker Registry** MUST accept image pushes (no "write_package" errors or permission failures)
+- **GitHub Actions** MUST show green checks for ALL quality gates (when workflows exist)
 - **Task compliance** (implementation should meet acceptance criteria)
 - **NO MOCKS ALLOWED** (all implementations must use live data and real APIs - no hard-coded or mock values)
 - **Parameterized Configuration** (trading pairs, endpoints, and business logic must be configurable, not hard-coded)
@@ -1114,24 +2125,40 @@ echo "$CLEO_PROMPT"
 echo "════════════════════════════════════════════════════════════════"
 
 echo "════════════════════════════════════════════════════════════════"
-echo "🔍 DEBUG: CLAUDE.md MEMORY CONTENT"
+echo "🔍 DEBUG: CLI MEMORY FILE CONTENT"
 echo "════════════════════════════════════════════════════════════════"
-if [ -f "$CLAUDE_WORK_DIR/CLAUDE.md" ]; then
-    cat "$CLAUDE_WORK_DIR/CLAUDE.md"
+# Check for the appropriate memory file based on CLI type
+CLI_TYPE="{{cli_type}}"
+case "$CLI_TYPE" in
+    "claude")
+        MEMORY_FILE="CLAUDE.md"
+        ;;
+    "factory")
+        MEMORY_FILE="AGENTS.md"
+        ;;
+    "codex")
+        MEMORY_FILE="AGENTS.md"
+        ;;
+    *)
+        MEMORY_FILE="CLAUDE.md"  # Default fallback
+        ;;
+esac
+
+if [ -f "$CLAUDE_WORK_DIR/$MEMORY_FILE" ]; then
+    cat "$CLAUDE_WORK_DIR/$MEMORY_FILE"
 else
-    echo "❌ No CLAUDE.md found at $CLAUDE_WORK_DIR/CLAUDE.md"
+    echo "ℹ️ No $MEMORY_FILE found at $CLAUDE_WORK_DIR/$MEMORY_FILE (using $CLI_TYPE CLI)"
 fi
 echo "════════════════════════════════════════════════════════════════"
 
-# Send the static prompt to Claude
-FIFO_PATH="/workspace/agent-input.jsonl"
-rm -f "$FIFO_PATH" 2>/dev/null || true
-mkfifo "$FIFO_PATH"
-chmod 666 "$FIFO_PATH" || true
+# Compose initial user turn with the static prompt
+USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
 
-# Start Claude (reader) first in background
-$CLAUDE_CMD < "$FIFO_PATH" &
+# Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
+# Use a subshell to ensure stdin closes after the prompt is sent
+(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED"; exec 0<&-) | $CLAUDE_CMD &
 CLAUDE_PID=$!
+echo "✓ Started Claude with Cleo prompt (PID: $CLAUDE_PID), stdin will close after prompt"
 
 # Start background token refresh for long-running jobs
 (
@@ -1152,22 +2179,6 @@ CLAUDE_PID=$!
 TOKEN_REFRESH_PID=$!
 echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
 
-# Compose initial user turn with the static prompt
-USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
-
-# Send via sidecar HTTP endpoint
-if printf '{"text":%s}\n' "$USER_COMBINED" | \
-     curl -fsS -X POST http://127.0.0.1:8080/input \
-       -H 'Content-Type: application/json' \
-       --data-binary @- >/dev/null 2>&1; then
-  echo "✓ Static Cleo prompt sent via sidecar /input"
-else
-  echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-  exec 9>"$FIFO_PATH"
-  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-  exec 9>&- 2>/dev/null || true  # Close immediately
-fi
-
 # Wait for Claude process to complete
 wait "$CLAUDE_PID"
 CLAUDE_EXIT_CODE=$?
@@ -1178,11 +2189,64 @@ if [ -n "$TOKEN_REFRESH_PID" ]; then
     echo "✓ Stopped token refresh process"
 fi
 
-# Always attempt to complete quality review - don't exit on Claude failures
-echo "🔄 Processing quality review results..."
-if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-  echo "✅ Claude quality review completed successfully"
+# =========================================================================
+# QUALITY GATE EXECUTION: Run actual checks and fix issues
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              CLEO QUALITY GATE EXECUTION                      ║"
+echo "════════════════════════════════════════════════════════════════"
+
+cd "$CLAUDE_WORK_DIR"
+
+QUALITY_PASSED=1
+QUALITY_REPORT=""
+
+# 1. Run cargo fmt
+echo "🎨 Running cargo fmt..."
+if cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-check.log; then
+    echo "✅ Format check passed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Format check: PASSED\n"
+else
+    echo "⚠️ Format issues detected - fixing..."
+    cargo fmt --all
+    git add -A
+    git commit -m "style: auto-format code with cargo fmt" || echo "No format changes to commit"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Format check: FIXED\n"
 fi
+
+# 2. Run cargo clippy
+echo "🔍 Running cargo clippy..."
+if cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic 2>&1 | tee /tmp/clippy.log; then
+    echo "✅ Clippy passed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Clippy: PASSED\n"
+else
+    echo "❌ Clippy warnings detected"
+    QUALITY_REPORT="${QUALITY_REPORT}- ❌ Clippy: FAILED\n"
+    QUALITY_REPORT="${QUALITY_REPORT}\n**Clippy Output:**\n\`\`\`\n$(tail -50 /tmp/clippy.log)\n\`\`\`\n"
+    QUALITY_PASSED=0
+fi
+
+# 3. Run cargo test
+echo "🧪 Running cargo test..."
+if cargo test --workspace --all-features 2>&1 | tee /tmp/test.log; then
+    echo "✅ Tests passed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Tests: PASSED\n"
+else
+    echo "❌ Tests failed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ❌ Tests: FAILED\n"
+    QUALITY_REPORT="${QUALITY_REPORT}\n**Test Output:**\n\`\`\`\n$(tail -50 /tmp/test.log)\n\`\`\`\n"
+    QUALITY_PASSED=0
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $QUALITY_PASSED -eq 1 ]; then
+    echo "✅ CLEO QUALITY GATE: ALL CHECKS PASSED"
+else
+    echo "❌ CLEO QUALITY GATE: ISSUES DETECTED"
+fi
+echo "════════════════════════════════════════════════════════════════"
 
 # Always attempt to post PR comment and add label regardless of Claude exit status
 # Determine OWNER/REPO slug for gh -R
@@ -1193,54 +2257,61 @@ else
   REPO_SLUG="$REPO_INPUT"
 fi
 
-# Post quality review comment to PR
+# Post quality review to PR based on ACTUAL quality check results
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
-  echo "💬 Posting quality review comment to PR..."
+  echo "📝 Posting quality review to PR..."
 
-  # Create comment body based on Claude exit status
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    COMMENT_BODY="## 🔍 Code Quality Review by Cleo
+  # Create review body based on actual quality check results
+  if [ $QUALITY_PASSED -eq 1 ]; then
+    REVIEW_BODY="## ✅ Code Quality Review - APPROVED
 
-✅ **Quality checks completed successfully**
+All quality checks have passed:
+$(echo -e "$QUALITY_REPORT")
 
-### Review Summary
-- Code has been reviewed for quality standards
-- All required checks have passed
-- Ready for QA testing
-
----
-*Reviewed by Cleo - 5DLabs Code Quality Agent*"
-  else
-    COMMENT_BODY="## 🔍 Code Quality Review by Cleo
-
-⚠️ **Quality review encountered issues**
-
-### Current Status
-- Quality checks are being processed
-- Some issues may need to be resolved
-- Review will continue until standards are met
-
-### Next Steps
-- Monitor CI/CD pipeline status
-- Address any failing quality checks
-- Iterate until all standards are met
+**Status:** Ready for security review by Cipher
+**Next Step:** Cipher will now perform security scanning
 
 ---
-*Reviewed by Cleo - 5DLabs Code Quality Agent*"
-  fi
-
-  # Post comment using PR number or URL
-  if [ -n "$PR_NUMBER" ]; then
-    if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
-    else
-      echo "⚠️ Failed to post comment using PR number"
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
+    
+    # Post APPROVE review using PR number or URL
+    if [ -n "$PR_NUMBER" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted APPROVE review"
+      else
+        echo "⚠️ Failed to post APPROVE review using PR number"
+      fi
+    elif [ -n "$PR_URL" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_URL" --approve --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted APPROVE review"
+      else
+        echo "⚠️ Failed to post APPROVE review"
+      fi
     fi
-  elif [ -n "$PR_URL" ]; then
-    if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
-    else
-      echo "⚠️ Failed to post comment"
+  else
+    REVIEW_BODY="## ❌ Code Quality Review - CHANGES REQUESTED
+
+Quality checks failed:
+$(echo -e "$QUALITY_REPORT")
+
+**Cleo will continue iterating to fix these issues.**
+
+---
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
+    
+    # Post REQUEST CHANGES review using PR number or URL
+    if [ -n "$PR_NUMBER" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --request-changes --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted REQUEST CHANGES review"
+      else
+        echo "⚠️ Failed to post REQUEST CHANGES review using PR number"
+      fi
+    elif [ -n "$PR_URL" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_URL" --request-changes --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted REQUEST CHANGES review"
+      else
+        echo "⚠️ Failed to post REQUEST CHANGES review"
+      fi
     fi
   fi
 fi
@@ -1255,102 +2326,171 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    echo "🏷️ Updating remediation labels: Cleo approved quality checks"
-    pr_remove_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" \
-      "$STATUS_LABEL_NEEDS_CLEO" \
-      "$STATUS_LABEL_NEEDS_FIXES" \
-      "$STATUS_LABEL_FIXING" \
-      "$STATUS_LABEL_APPROVED" \
-      "$STATUS_LABEL_FAILED" \
-      "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
-    pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
-    update_coderun_status "$STATUS_LABEL_NEEDS_TESS" "pending" "$PR_URL"
+  if [ $QUALITY_PASSED -eq 1 ]; then
+    echo "✅ Cleo quality checks passed - handing off to Cipher for security review"
+    
+    # Push any format fixes that were made
+    if ! git diff --cached --quiet 2>/dev/null; then
+      echo "📤 Pushing quality fixes..."
+      git push origin HEAD || echo "⚠️ Failed to push fixes"
+    fi
+    
+    # Cleo hands off to Cipher via APPROVE review and label
+    # Review already posted above
+    echo "✅ Quality checks passed - adding ready-for-security label to trigger Cipher"
+    
+    # Add ready-for-security label to signal Cipher
+    echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"
+    timeout 30 gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-security" || echo "⚠️ Failed to add ready-for-security label"
+    
+    update_coderun_status "ready-for-security" "quality-passed" "$PR_URL"
   else
-    echo "🏷️ Updating remediation labels: Quality issues detected"
-    pr_remove_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" \
-      "$STATUS_LABEL_NEEDS_CLEO" \
-      "$STATUS_LABEL_NEEDS_TESS" \
-      "$STATUS_LABEL_APPROVED" \
-      "$STATUS_LABEL_FAILED" \
-      "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
-    pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
-    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
+    echo "❌ Quality issues detected - Cleo will retry to fix them"
+    
+    # DO NOT add ready-for-security label - block Cipher until quality passes
+    echo "🛑 Blocking Cipher handoff - quality issues must be resolved first"
+    
+    update_coderun_status "needs-fixes" "quality-issues" "$PR_URL"
+    
+    # Exit with failure to trigger retry
+    exit 1
   fi
 else
   echo "⚠️ No PR reference available, skipping remediation label update"
   update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" ""
 fi
 
-# Gracefully stop sidecar (with enhanced debugging and retries)
-if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
-  echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
-else
-  echo "🔧 Attempting sidecar shutdown..."
-  shutdown_attempts=0
-  max_shutdown_attempts=3
+# No sidecar shutdown needed - container will exit naturally when main process completes
 
-  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 5 2>/dev/null; then
-      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-      break
-    else
-      shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-        echo "Retrying in 2 seconds..."
-        sleep 2
+  # =========================================================================
+  # SAVE ITERATION STATE: Persist findings for next iteration
+  # =========================================================================
+  STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${ATTEMPT}.json"
+  
+  # Check if quality review was successful using QUALITY_PASSED (from actual checks)
+  if [ ${QUALITY_PASSED:-0} -eq 1 ]; then
+    # Save successful completion state
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "completed",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": "Quality checks passed on iteration $ATTEMPT",
+  "exit_code": 0,
+  "issues": []
+}
+EOF
+    echo "💾 Saved successful completion state to $STATE_FILE"
+    
+    echo "✅ Attempt $ATTEMPT: Quality checks passed"
+    SUCCESS=1
+    
+    # Store quality review patterns in memory
+    if command -v add_memory >/dev/null 2>&1; then
+      echo "💾 Storing quality review patterns..."
+      
+      # Store successful quality review
+      store_success_pattern \
+        "task-{{task_id}}-quality-review" \
+        "Passed all quality checks: fmt, clippy, tests" \
+        "Service: {{service}}, Attempts: $ATTEMPT" || true
+      
+      # Store any recurring issues found for future reference
+      if [ -f "$TASK_WORKSPACE/quality-issues.txt" ]; then
+        ISSUES=$(cat "$TASK_WORKSPACE/quality-issues.txt" 2>/dev/null | head -5)
+        if [ -n "$ISSUES" ]; then
+          store_error_pattern \
+            "Common quality issues in {{service}}" \
+            "Task {{task_id}} review" \
+            "$ISSUES" || true
+        fi
       fi
+      
+      echo "✅ Quality patterns stored in memory"
     fi
-  done
-
-  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-    echo "🔧 Force terminating sidecar processes..."
-    pkill -f "sidecar" || echo "No sidecar processes found to kill"
-  fi
-
-# Wait for sidecar to actually terminate
-  echo "⏳ Waiting for sidecar termination..."
-  timeout=10
-  while [ $timeout -gt 0 ]; do
-    if ! pgrep -f "sidecar" > /dev/null 2>&1; then
-      echo "✅ Sidecar terminated successfully"
+    
+    break
+  else
+    # Save incomplete state
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "incomplete",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": "Quality checks failed - issues detected in fmt/clippy/tests",
+  "exit_code": 1,
+  "issues": ["Quality gate failures detected"]
+}
+EOF
+    echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
+    
+    echo "⚠️ Attempt $ATTEMPT: Quality checks failed - Cleo will retry"
+    
+    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
+      ATTEMPT=$((ATTEMPT + 1))
+      echo ""
+      # Brief pause before retry
+      sleep 2
+    else
+      echo "❌ Maximum retry attempts reached - quality issues remain"
       break
     fi
-    sleep 1
-    timeout=$((timeout - 1))
-  done
-
-  if [ $timeout -eq 0 ]; then
-    echo "⚠️ Sidecar still running after wait period"
   fi
+done
+
+# Report final status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ CLEO QUALITY GATE: ALL CHECKS PASSED"
+  echo "   Completed after $ATTEMPT attempt(s)"
+  echo "   Ready for Cipher security review"
+else
+  echo "🛑 CLEO QUALITY GATE: BLOCKING WORKFLOW"
+  echo "   Attempted $ATTEMPT time(s)"
+  echo "   Quality issues detected - retries exhausted"
+  echo "   Cipher handoff BLOCKED until issues resolved"
 fi
+echo "════════════════════════════════════════════════════════════════"
 
 # Cleanup and exit
 echo "════════════════════════════════════════════════════════════════"
 echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 Task: {{task_id}}"
-echo "✅ Code quality checks completed"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ Quality checks passed"
+else
+  echo "❌ Quality issues found - workflow blocked"
+fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Final termination sequence
 echo "════════════════════════════════════════════════════════════════"
 echo "🔚 TERMINATING CLEO CONTAINER"
 echo "════════════════════════════════════════════════════════════════"
-echo "Claude Exit Code: $CLAUDE_EXIT_CODE"
+echo "Quality Gate Result: $([ $SUCCESS -eq 1 ] && echo 'PASSED' || echo 'BLOCKED')"
 echo "Container PID: $$"
 echo "Final Process Check:"
 ps aux | head -5
 
-# Write completion marker for workflow tracking
-echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
+# Write completion marker only if passed
+if [ $SUCCESS -eq 1 ]; then
+  echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
+fi
 
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
 
-# Always exit successfully to keep workflow running
-echo "🔚 Force terminating container..."
-echo "📝 Note: Container always exits with code 0 to allow workflow continuation"
-exit 0
+# Note: Docker sidecar cleanup is handled by EXIT trap
+
+# Exit with appropriate code based on success
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔚 Terminating container with success status..."
+  exit 0
+else
+  echo "🔚 Terminating container with failure status..."
+  echo "📝 Quality issues detected - blocking workflow progression"
+  exit 1
+fi
