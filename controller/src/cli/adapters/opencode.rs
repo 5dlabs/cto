@@ -434,20 +434,25 @@ mod tests {
             parsed["exec"]["command"].as_str().unwrap(),
             "/usr/local/bin/opencode"
         );
-        
+
         // Model is passed as an argument
         let args = parsed["exec"]["args"].as_array().unwrap();
         assert!(args.contains(&json!("--model")));
         assert!(args.contains(&json!("opencode-sonnet")));
-        
+
         // Settings are in env vars (rendered as empty in test, but structure is correct)
         assert!(parsed["exec"]["env"].get("OPENCODE_API_KEY").is_some());
         assert!(parsed["exec"]["env"].get("OPENCODE_BASE_URL").is_some());
         // Temperature is rendered as float
-        assert!(parsed["exec"]["env"]["OPENCODE_TEMPERATURE"].as_str().is_some());
-        
+        assert!(parsed["exec"]["env"]["OPENCODE_TEMPERATURE"]
+            .as_str()
+            .is_some());
+
         // Tools configuration
-        assert_eq!(parsed["tools"]["remote"]["enabled"].as_bool().unwrap(), true);
+        assert_eq!(
+            parsed["tools"]["remote"]["enabled"].as_bool().unwrap(),
+            true
+        );
         assert!(parsed["tools"]["remote"]["availableTools"]
             .as_array()
             .unwrap()
