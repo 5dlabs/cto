@@ -17,12 +17,14 @@ spec:
     targetRevision: 0.127.2
     chart: opentelemetry-collector
     helm:
-      values: |
-        # OpenTelemetry collector configuration
-        mode: deployment
-        # Required image configuration
-        image:
-          repository: otel/opentelemetry-collector-k8s
+      # Use parameters instead of inline values to avoid YAML parsing issues
+      # Error: "mapping values are not allowed in this context" was caused by
+      # inline values block parsing ambiguity in ArgoCD's helm template generation
+      parameters:
+        - name: mode
+          value: deployment
+        - name: image.repository
+          value: otel/opentelemetry-collector-k8s
   destination:
     server: https://kubernetes.default.svc
     namespace: telemetry
