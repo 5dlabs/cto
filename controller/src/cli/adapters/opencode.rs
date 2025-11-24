@@ -449,9 +449,8 @@ mod tests {
             .is_some());
 
         // Tools configuration
-        assert!(
-            parsed["tools"]["remote"]["enabled"].as_bool().unwrap()
-        );        assert!(parsed["tools"]["remote"]["availableTools"]
+        assert!(parsed["tools"]["remote"]["enabled"].as_bool().unwrap());
+        assert!(parsed["tools"]["remote"]["availableTools"]
             .as_array()
             .unwrap()
             .contains(&json!("memory_create_entities")));
