@@ -1,5 +1,4 @@
 use crate::crds::CodeRun;
-use kube::ResourceExt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -11,12 +10,11 @@ pub struct ResourceNaming;
 
 impl ResourceNaming {
     /// Generate job name with guaranteed length compliance
-    /// Format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
+    /// Format: pr{pr_number}-task-{task_id}-{agent}-{cli}-{uid}-v{version}
+    /// or task-{task_id}-{agent}-{cli}-{uid}-v{version} if no PR number
     /// This is the single source of truth for job names
     #[must_use]
     pub fn job_name(code_run: &CodeRun) -> String {
-        let namespace = code_run.namespace().unwrap_or("default".to_string());
-        let name = code_run.name_any();
         let uid_suffix = code_run
             .metadata
             .uid
@@ -24,6 +22,14 @@ impl ResourceNaming {
             .map_or("unknown", |uid| &uid[..8]);
         let task_id = code_run.spec.task_id;
         let context_version = code_run.spec.context_version;
+
+        // Extract PR number from labels if available
+        let pr_number = code_run
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get("pr-number"))
+            .cloned();
 
         // Extract agent name if available
         let agent = code_run
@@ -39,9 +45,16 @@ impl ResourceNaming {
             |config| config.cli_type.to_string(),
         );
 
-        let base_name = format!(
-            "task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid_suffix}-v{context_version}"
-        );
+        // Build name with PR number prefix if available for easy identification
+        let base_name = if let Some(pr) = pr_number {
+            format!(
+                "pr{pr}-t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}"
+            )
+        } else {
+            format!(
+                "t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}"
+            )
+        };
 
         let available = MAX_K8S_NAME_LENGTH.saturating_sub(CODERUN_JOB_PREFIX.len());
         let trimmed = Self::ensure_k8s_name_length(&base_name, available);
@@ -86,59 +99,47 @@ impl ResourceNaming {
             name.to_string()
         } else {
             // Intelligent truncation: preserve the meaningful parts
-            // Format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
-            // Priority: task_id, agent, cli, uid, version > namespace, name
+            // New format: pr{pr_number}-t{task_id}-{agent}-{cli}-{uid}-v{version}
+            // or: t{task_id}-{agent}-{cli}-{uid}-v{version}
+            // Priority: pr_number, task_id, agent, uid, version > cli
             let parts: Vec<&str> = name.split('-').collect();
 
-            if parts.len() >= 8 {
-                // New format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
-                // Preserve: task-{task_id}-{agent}-{cli}-...-{uid}-v{version}
-                let task = parts[1]; // task_id is now at position 1
-                let agent = parts[2];
-                let cli = parts[3];
+            if parts.len() >= 5 {
+                // Check if first part is pr{number}
+                let has_pr = parts[0].starts_with("pr");
+                let (pr_part, task_idx) = if has_pr {
+                    (Some(parts[0]), 1)
+                } else {
+                    (None, 0)
+                };
+
+                let task = parts[task_idx];
+                let agent = parts.get(task_idx + 1).unwrap_or(&"unknown");
                 let uid = parts[parts.len() - 2];
                 let version = parts[parts.len() - 1];
 
-                // Build compact name with hash for middle parts if needed
+                // Build compact name
                 let suffix = format!("{uid}-{version}");
-                let prefix = format!("task-{task}-{agent}-{cli}");
-                let available_space = limit.saturating_sub(prefix.len() + suffix.len() + 2);
+                let prefix = if let Some(pr) = pr_part {
+                    format!("{pr}-{task}-{agent}")
+                } else {
+                    format!("{task}-{agent}")
+                };
 
-                if available_space > 8 {
-                    // Room for some of the middle parts
-                    let middle_parts = &parts[4..parts.len() - 2];
-                    let middle = middle_parts.join("-");
-                    let truncated_middle = if middle.len() > available_space {
-                        format!(
-                            "{}-{}",
-                            &middle[..available_space.saturating_sub(9)],
-                            Self::hash_string(&middle)
-                        )
+                let base = format!("{prefix}-{suffix}");
+                if base.len() <= limit {
+                    base
+                } else {
+                    // Ultra compact: pr-task-uid-version
+                    let ultra_compact = if let Some(pr) = pr_part {
+                        format!("{pr}-{task}-{suffix}")
                     } else {
-                        middle
+                        format!("{task}-{suffix}")
                     };
-                    format!("{prefix}-{truncated_middle}-{suffix}")
-                } else {
-                    // Very tight space, just use essential parts
-                    format!("{prefix}-{suffix}")
-                }
-            } else if parts.len() >= 4 {
-                // Legacy format without agent/CLI
-                // Preserve the last 3 parts: {uid}-t{task}-v{version}
-                let preserved_suffix = parts[parts.len() - 3..].join("-");
-                let available_space = limit.saturating_sub(preserved_suffix.len() + 1);
-
-                let prefix_len = available_space.min(name.len());
-                if prefix_len > 0 {
-                    format!("{}-{}", &name[..prefix_len], preserved_suffix)
-                        .chars()
-                        .take(limit)
-                        .collect()
-                } else {
-                    preserved_suffix.chars().take(limit).collect()
+                    ultra_compact.chars().take(limit).collect()
                 }
             } else {
-                // Fallback: simple truncation
+                // Fallback: simple truncation preserving start
                 name.chars().take(limit).collect()
             }
         }
@@ -151,9 +152,21 @@ impl ResourceNaming {
     }
 
     fn extract_task_id_from_job_name(job_name: &str) -> String {
-        // Extract task ID from job name pattern: task-{id}-...
-        let mut parts = job_name.split('-').peekable();
+        // Extract task ID from job name patterns:
+        // New format: play-coderun-pr{pr}-t{task_id}-... or play-coderun-t{task_id}-...
+        // Legacy format: play-coderun-task-{task_id}-...
+        for part in job_name.split('-') {
+            // New compact format: t{number}
+            if part.starts_with('t') && part.len() > 1 {
+                let candidate = &part[1..];
+                if candidate.chars().all(|c| c.is_ascii_digit()) {
+                    return candidate.to_string();
+                }
+            }
+        }
 
+        // Legacy format: task-{number}
+        let mut parts = job_name.split('-').peekable();
         while let Some(part) = parts.next() {
             if part == "task" {
                 if let Some(candidate) = parts.next() {
@@ -167,6 +180,21 @@ impl ResourceNaming {
 
         "unknown".to_string()
     }
+
+    /// Extract PR number from job name if present
+    /// Format: play-coderun-pr{pr_number}-t{task_id}-...
+    #[must_use]
+    pub fn extract_pr_number_from_job_name(job_name: &str) -> Option<String> {
+        for part in job_name.split('-') {
+            if part.starts_with("pr") && part.len() > 2 {
+                let candidate = &part[2..];
+                if candidate.chars().all(|c| c.is_ascii_digit()) {
+                    return Some(candidate.to_string());
+                }
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -174,7 +202,7 @@ mod tests {
     use super::*;
     use crate::crds::coderun::CodeRunSpec;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     fn build_code_run() -> CodeRun {
         CodeRun {
@@ -209,23 +237,102 @@ mod tests {
         }
     }
 
+    fn build_code_run_with_pr(pr_number: &str) -> CodeRun {
+        let mut labels = BTreeMap::new();
+        labels.insert("pr-number".to_string(), pr_number.to_string());
+
+        CodeRun {
+            metadata: ObjectMeta {
+                name: Some("sample-run".to_string()),
+                namespace: Some("agent-platform".to_string()),
+                uid: Some("1234567890abcdef".to_string()),
+                labels: Some(labels),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                cli_config: None,
+                task_id: 42,
+                service: "sample-service".to_string(),
+                repository_url: "https://github.com/example/repo.git".to_string(),
+                docs_repository_url: "https://github.com/example/docs.git".to_string(),
+                docs_project_directory: None,
+                working_directory: None,
+                model: "sonnet".to_string(),
+                github_user: None,
+                github_app: Some("5DLabs-Rex".to_string()),
+                context_version: 1,
+                docs_branch: "main".to_string(),
+                continue_session: false,
+                overwrite_memory: false,
+                env: HashMap::new(),
+                env_from_secrets: vec![],
+                enable_docker: true,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        }
+    }
+
     #[test]
     fn job_name_has_play_coderun_prefix() {
         let code_run = build_code_run();
         let job_name = ResourceNaming::job_name(&code_run);
 
         assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
-        assert!(job_name.contains("task-42"));
+        // New format uses t{task_id} instead of task-{task_id}
+        assert!(job_name.contains("t42"));
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
     }
 
     #[test]
-    fn extract_task_id_handles_prefixed_names() {
+    fn job_name_includes_pr_number() {
+        let code_run = build_code_run_with_pr("1627");
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
+        assert!(job_name.contains("pr1627"));
+        assert!(job_name.contains("t42"));
+        assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn extract_task_id_handles_new_format() {
         let code_run = build_code_run();
         let job_name = ResourceNaming::job_name(&code_run);
         assert_eq!(
             ResourceNaming::extract_task_id_from_job_name(&job_name),
             "42"
+        );
+    }
+
+    #[test]
+    fn extract_task_id_handles_pr_format() {
+        let code_run = build_code_run_with_pr("1627");
+        let job_name = ResourceNaming::job_name(&code_run);
+        assert_eq!(
+            ResourceNaming::extract_task_id_from_job_name(&job_name),
+            "42"
+        );
+    }
+
+    #[test]
+    fn extract_pr_number_from_job_name_works() {
+        let code_run = build_code_run_with_pr("1627");
+        let job_name = ResourceNaming::job_name(&code_run);
+        assert_eq!(
+            ResourceNaming::extract_pr_number_from_job_name(&job_name),
+            Some("1627".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_pr_number_returns_none_without_pr() {
+        let code_run = build_code_run();
+        let job_name = ResourceNaming::job_name(&code_run);
+        assert_eq!(
+            ResourceNaming::extract_pr_number_from_job_name(&job_name),
+            None
         );
     }
 
