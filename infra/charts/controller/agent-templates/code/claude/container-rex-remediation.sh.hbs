@@ -646,7 +646,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
   
   # Extract agent name from github_app (e.g., "5DLabs-Cleo" -> "cleo")
   GITHUB_APP="{{github_app}}"
-  AGENT_NAME=$(echo "$GITHUB_APP" | awk -F'- ' '{print $2}' | tr '[:upper:]' '[:lower:]')
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
   echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
   
   # Debug: Show what we're reading
@@ -678,6 +678,20 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
         echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
         rm -f "$CLIENT_CONFIG_PATH"
       fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files if generation failed or cto-config.json not found
+    if [ -f "/task-files/client-config.json" ]; then
+        cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
+        cp "$CLAUDE_WORK_DIR/client-config.json" "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
     else
       echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
     fi

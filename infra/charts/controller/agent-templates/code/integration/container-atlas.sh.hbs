@@ -370,6 +370,17 @@ When you've addressed the issues:
 3. Push to branch (Atlas will handle the push)
 
 Atlas will verify on the next iteration cycle.
+
+## ⚠️ IMPORTANT CONSTRAINTS
+
+**DO NOT:**
+- Create session summary or documentation files (e.g., `ATLAS_SESSION*.md`, `*_SUMMARY.md`)
+- Create README updates documenting your work
+- Add any markdown files that describe what you did
+- Create audit trail or log files in the repository
+
+**ONLY** make changes that directly fix the issues described above.
+Atlas handles its own documentation externally - do not pollute the repository with session logs.
 OVERALL_CRITERIA
 
     echo "✅ Generated structured prompt at /workspace/CLAUDE.md"
@@ -471,6 +482,28 @@ All quality gates passed after $ITERATION iteration(s):
     # Check if changes were made
     if [ -n "$(git status --porcelain)" ]; then
         echo "📝 Changes detected, committing..."
+        
+        # SAFETY: Remove any session documentation files the CLI may have created
+        # These should NOT be committed to the repository
+        # IMPORTANT: Only delete UNTRACKED files to avoid removing legitimate tracked files
+        # like ATLAS_FIX_SUMMARY.md, E2E_TESTING_SUMMARY.md, etc.
+        echo "🧹 Cleaning up any auto-generated documentation files..."
+        
+        # Only remove untracked session files (files not in git index)
+        # This prevents accidentally deleting legitimate tracked documentation
+        git ls-files --others --exclude-standard | grep -E \
+            '(ATLAS_SESSION|ATLAS_GUARDIAN_SESSION|SESSION_.*_PR|_SESSION_.*20[0-9]{2}).*\.md$' \
+            | xargs -r rm -f 2>/dev/null || true
+        
+        # Also ensure CLAUDE.md in workspace root isn't committed
+        rm -f ./CLAUDE.md 2>/dev/null || true
+        
+        # Check if there are still changes after cleanup
+        if [ -z "$(git status --porcelain)" ]; then
+            echo "ℹ️ Only documentation files were created - no actual fixes"
+            continue
+        fi
+        
         git add -A
         
         # Create descriptive commit message

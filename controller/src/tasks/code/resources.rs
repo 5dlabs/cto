@@ -476,17 +476,43 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
-        // Shared agent templates ConfigMap volume for shared scripts
+        // Agent templates: Use projected volume to merge shared + integration ConfigMaps
+        // This allows Atlas/Bolt to access integration templates from /agent-templates
         let shared_templates_cm_name = "controller-agent-templates-shared".to_string();
+        let integration_templates_cm_name = "controller-agent-templates-integration".to_string();
         volumes.push(json!({
             "name": "agent-templates-shared",
-            "configMap": {
-                "name": shared_templates_cm_name
+            "projected": {
+                "sources": [
+                    {
+                        "configMap": {
+                            "name": shared_templates_cm_name
+                        }
+                    },
+                    {
+                        "configMap": {
+                            "name": integration_templates_cm_name
+                        }
+                    }
+                ]
             }
         }));
         volume_mounts.push(json!({
             "name": "agent-templates-shared",
             "mountPath": "/agent-templates"
+        }));
+
+        // Integration templates ConfigMap volume for Atlas/Bolt guardian scripts
+        let integration_templates_cm_name = "controller-agent-templates-integration".to_string();
+        volumes.push(json!({
+            "name": "agent-templates-integration",
+            "configMap": {
+                "name": integration_templates_cm_name
+            }
+        }));
+        volume_mounts.push(json!({
+            "name": "agent-templates-integration",
+            "mountPath": "/agent-templates-integration"
         }));
 
         // Blaze agent scripts ConfigMap volume for frontend workflows
@@ -1128,6 +1154,14 @@ impl<'a> CodeResourceManager<'a> {
         // Code-specific labels
         labels.insert("task-type".to_string(), "code".to_string());
         labels.insert("task-id".to_string(), code_run.spec.task_id.to_string());
+
+        // Add PR number label if available in env for better pod correlation
+        if let Some(pr_number) = code_run.spec.env.get("PR_NUMBER") {
+            labels.insert(
+                "pr-number".to_string(),
+                Self::sanitize_label_value(pr_number),
+            );
+        }
         labels.insert(
             "service".to_string(),
             Self::sanitize_label_value(&code_run.spec.service),
