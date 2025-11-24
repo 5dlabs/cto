@@ -750,14 +750,14 @@ agents:
   atlas:
     name: "Atlas"
     githubApp: "5DLabs-Atlas"
-    cli: "Claude"
+    cli: "Claude"  # Supports: Claude, Codex, OpenCode, Cursor, Factory
     model: "claude-sonnet-4-5-20250929"
     maxTokens: 8192
     temperature: 0.3
     appId: "2225842"
     clientId: "Iv23liTupEPix4hvGi0w"
     role: "PR Guardian & Integration Specialist"
-    expertise: ["pr-guardian", "bugbot-resolution", "ci-recovery", "merge-conflicts", "git", "integration", "auto-merge"]
+    expertise: ["pr-guardian", "bugbot-resolution", "ci-recovery", "merge-conflicts", "git", "integration", "auto-merge", "multi-cli"]
     description: "AI PR Guardian at 5D Labs - Watches PRs from creation to merge, resolves Bugbot comments, fixes CI failures, and auto-merges when ready"
 
     # PR Guardian Mode Configuration

@@ -1,0 +1,516 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Database Schema Setup",
+        "description": "Create basic database schema files and configuration for the Rust API project.",
+        "details": "This task involves setting up the database schema and configuration files for the project:\n1. Create `src/schema.rs` with basic table definitions\n2. Set up migration files in the `migrations/` directory\n3. Update `Cargo.toml` to include necessary database dependencies such as diesel, sqlx, or similar ORM\n\nExample for `Cargo.toml` additions:\n```toml\n[dependencies]\ndiesel = { version = \"2.1.0\", features = [\"postgres\", \"r2d2\"] }\nr2d2 = \"0.8.10\"\ndotenv = \"0.15.0\"\n```\n\nExample for `src/schema.rs`:\n```rust\n// Basic schema definitions\ntable! {\n    users (id) {\n        id -> Integer,\n        username -> Varchar,\n        email -> Varchar,\n        password_hash -> Varchar,\n        created_at -> Timestamp,\n    }\n}\n\ntable! {\n    products (id) {\n        id -> Integer,\n        name -> Varchar,\n        description -> Text,\n        price -> Numeric,\n        inventory_count -> Integer,\n    }\n}\n\ntable! {\n    carts (id) {\n        id -> Integer,\n        user_id -> Integer,\n        created_at -> Timestamp,\n    }\n}\n\ntable! {\n    cart_items (id) {\n        id -> Integer,\n        cart_id -> Integer,\n        product_id -> Integer,\n        quantity -> Integer,\n    }\n}\n```\n\nCreate basic migration files in `migrations/` directory for initial schema setup.",
+        "testStrategy": "1. Verify that all required files are created: `src/schema.rs`, migration files, and database dependencies in `Cargo.toml`\n2. Run a simple validation to ensure the schema definitions are syntactically correct\n3. Check that the migration files can be applied to create the database schema\n4. Validate that the database dependencies in `Cargo.toml` are correctly specified and can be resolved",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add Database Dependencies to Cargo.toml",
+            "description": "Update the Cargo.toml file to include all necessary database-related dependencies for the project.",
+            "dependencies": [],
+            "details": "Add the following dependencies to Cargo.toml:\n\n```toml\n[dependencies]\ndiesel = { version = \"2.1.0\", features = [\"postgres\", \"r2d2\", \"chrono\"] }\nr2d2 = \"0.8.10\"\ndotenv = \"0.15.0\"\nchrono = { version = \"0.4\", features = [\"serde\"] }\nserde = { version = \"1.0\", features = [\"derive\"] }\nserde_json = \"1.0\"\n```\n\nAfter adding these dependencies, run `cargo build` to download and compile them.",
+            "status": "pending",
+            "testStrategy": "Verify that `cargo build` completes successfully without dependency resolution errors."
+          },
+          {
+            "id": 2,
+            "title": "Create Database Configuration Module",
+            "description": "Create a database configuration module to handle connection setup and environment variables.",
+            "dependencies": [],
+            "details": "1. Create a new file at `src/config/db.rs`\n2. Implement database connection configuration:\n\n```rust\nuse diesel::pg::PgConnection;\nuse diesel::r2d2::{self, ConnectionManager};\nuse dotenv::dotenv;\nuse std::env;\n\npub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;\npub type DbConnection = r2d2::PooledConnection<ConnectionManager<PgConnection>>;\n\npub fn establish_connection_pool() -> Pool {\n    dotenv().ok();\n    \n    let database_url = env::var(\"DATABASE_URL\")\n        .expect(\"DATABASE_URL must be set\");\n    \n    let manager = ConnectionManager::<PgConnection>::new(database_url);\n    r2d2::Pool::builder()\n        .build(manager)\n        .expect(\"Failed to create pool\")\n}\n```\n\n3. Create a `.env` file in the project root with: `DATABASE_URL=postgres://username:password@localhost/database_name`",
+            "status": "pending",
+            "testStrategy": "Create a simple test that verifies the connection pool can be established when valid database credentials are provided."
+          },
+          {
+            "id": 3,
+            "title": "Define Database Schema in schema.rs",
+            "description": "Create the schema.rs file with table definitions for users, products, carts, and cart_items.",
+            "dependencies": [],
+            "details": "Create `src/schema.rs` with the following content:\n\n```rust\ntable! {\n    users (id) {\n        id -> Integer,\n        username -> Varchar,\n        email -> Varchar,\n        password_hash -> Varchar,\n        created_at -> Timestamp,\n    }\n}\n\ntable! {\n    products (id) {\n        id -> Integer,\n        name -> Varchar,\n        description -> Text,\n        price -> Numeric,\n        inventory_count -> Integer,\n    }\n}\n\ntable! {\n    carts (id) {\n        id -> Integer,\n        user_id -> Integer,\n        created_at -> Timestamp,\n    }\n}\n\ntable! {\n    cart_items (id) {\n        id -> Integer,\n        cart_id -> Integer,\n        product_id -> Integer,\n        quantity -> Integer,\n    }\n}\n\njoinable!(cart_items -> carts (cart_id));\njoinable!(cart_items -> products (product_id));\njoinable!(carts -> users (user_id));\n\nallow_tables_to_appear_in_same_query!(\n    users,\n    products,\n    carts,\n    cart_items,\n);\n```\n\nThis defines the database schema and relationships between tables.",
+            "status": "pending",
+            "testStrategy": "Verify that the schema compiles without errors by running `cargo check`."
+          },
+          {
+            "id": 4,
+            "title": "Create Database Migration Files",
+            "description": "Set up migration files for creating the database tables defined in the schema.",
+            "dependencies": [],
+            "details": "1. Install the diesel CLI if not already installed: `cargo install diesel_cli --no-default-features --features postgres`\n2. Run `diesel setup` to initialize the migrations directory\n3. Create migration files for each table:\n\n```bash\ndiesel migration generate create_users\ndiesel migration generate create_products\ndiesel migration generate create_carts\ndiesel migration generate create_cart_items\n```\n\n4. For each migration, implement the up.sql and down.sql files. Example for create_users:\n\nup.sql:\n```sql\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  username VARCHAR NOT NULL UNIQUE,\n  email VARCHAR NOT NULL UNIQUE,\n  password_hash VARCHAR NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n```\n\ndown.sql:\n```sql\nDROP TABLE users;\n```\n\nImplement similar migration files for products, carts, and cart_items tables with appropriate foreign key constraints.",
+            "status": "pending",
+            "testStrategy": "Run `diesel migration run` to apply migrations and verify tables are created correctly. Then run `diesel migration redo` to test both up and down migrations."
+          },
+          {
+            "id": 5,
+            "title": "Create Model Structs for Database Entities",
+            "description": "Implement Rust model structs that correspond to the database tables, with appropriate traits for serialization and database operations.",
+            "dependencies": [],
+            "details": "Create a new file at `src/models.rs` with the following content:\n\n```rust\nuse crate::schema::*;\nuse chrono::NaiveDateTime;\nuse diesel::prelude::*;\nuse serde::{Deserialize, Serialize};\n\n#[derive(Queryable, Identifiable, Serialize, Deserialize)]\n#[table_name = \"users\"]\npub struct User {\n    pub id: i32,\n    pub username: String,\n    pub email: String,\n    pub password_hash: String,\n    pub created_at: NaiveDateTime,\n}\n\n#[derive(Insertable, Deserialize)]\n#[table_name = \"users\"]\npub struct NewUser {\n    pub username: String,\n    pub email: String,\n    pub password_hash: String,\n}\n\n#[derive(Queryable, Identifiable, Serialize, Deserialize)]\n#[table_name = \"products\"]\npub struct Product {\n    pub id: i32,\n    pub name: String,\n    pub description: String,\n    pub price: f64,\n    pub inventory_count: i32,\n}\n\n#[derive(Insertable, Deserialize)]\n#[table_name = \"products\"]\npub struct NewProduct {\n    pub name: String,\n    pub description: String,\n    pub price: f64,\n    pub inventory_count: i32,\n}\n\n#[derive(Queryable, Identifiable, Associations, Serialize, Deserialize)]\n#[belongs_to(User)]\n#[table_name = \"carts\"]\npub struct Cart {\n    pub id: i32,\n    pub user_id: i32,\n    pub created_at: NaiveDateTime,\n}\n\n#[derive(Insertable)]\n#[table_name = \"carts\"]\npub struct NewCart {\n    pub user_id: i32,\n}\n\n#[derive(Queryable, Identifiable, Associations, Serialize, Deserialize)]\n#[belongs_to(Cart)]\n#[belongs_to(Product)]\n#[table_name = \"cart_items\"]\npub struct CartItem {\n    pub id: i32,\n    pub cart_id: i32,\n    pub product_id: i32,\n    pub quantity: i32,\n}\n\n#[derive(Insertable)]\n#[table_name = \"cart_items\"]\npub struct NewCartItem {\n    pub cart_id: i32,\n    pub product_id: i32,\n    pub quantity: i32,\n}\n```\n\nUpdate `src/lib.rs` or `src/main.rs` to include these modules:\n\n```rust\npub mod config;\npub mod models;\npub mod schema;\n```",
+            "status": "pending",
+            "testStrategy": "Write a simple test that creates a new user model instance and verifies the fields are correctly set."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "API Endpoints",
+        "description": "Create REST API endpoints for core operations of the application.",
+        "details": "Implement the core API endpoints structure that will serve as the backbone for the application:\n\n1. Create `src/api/mod.rs` to export the API module components\n```rust\npub mod routes;\n```\n\n2. Create `src/api/routes.rs` with route definitions:\n```rust\nuse actix_web::{web, HttpResponse, Scope};\nuse crate::schema;\n\npub fn configure_routes(cfg: &mut web::ServiceConfig) {\n    cfg.service(\n        web::scope(\"/api\")\n            .service(health_check)\n            .service(web::scope(\"/users\").configure(user_routes))\n            .service(web::scope(\"/products\").configure(product_routes))\n    );\n}\n\n#[actix_web::get(\"/health\")]\nasync fn health_check() -> HttpResponse {\n    HttpResponse::Ok().json(serde_json::json!({\"status\": \"ok\"}))\n}\n\nfn user_routes(cfg: &mut web::ServiceConfig) {\n    // User routes will be implemented in Task 3\n    cfg.service(web::resource(\"\").route(web::get().to(|| HttpResponse::NotImplemented())));\n}\n\nfn product_routes(cfg: &mut web::ServiceConfig) {\n    // Product routes will be implemented in Task 4\n    cfg.service(web::resource(\"\").route(web::get().to(|| HttpResponse::NotImplemented())));\n}\n```\n\n3. Update `src/main.rs` to set up the API server:\n```rust\nuse actix_web::{App, HttpServer};\nmod api;\nmod schema;\n\n#[actix_web::main]\nasync fn main() -> std::io::Result<()> {\n    println!(\"Starting API server\");\n    \n    HttpServer::new(|| {\n        App::new()\n            .configure(api::routes::configure_routes)\n    })\n    .bind(\"127.0.0.1:8080\")?\n    .run()\n    .await\n}\n```\n\n4. Update `Cargo.toml` to add API dependencies:\n```toml\n[dependencies]\nactix-web = \"4.3.1\"\nserde = { version = \"1.0\", features = [\"derive\"] }\nserde_json = \"1.0\"\n```",
+        "testStrategy": "1. Verify that all required files are created: `src/api/mod.rs`, `src/api/routes.rs`, and updates to `src/main.rs`\n2. Compile the code to ensure there are no syntax errors\n3. Run the server locally and test the health check endpoint with a tool like curl or Postman\n4. Verify that the route structure is set up correctly with placeholders for user and product routes\n5. Check that the API dependencies in `Cargo.toml` are correctly specified and can be resolved",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create API Module Structure",
+            "description": "Set up the basic API module structure with mod.rs and routes.rs files to establish the foundation for API endpoints.",
+            "dependencies": [],
+            "details": "1. Create `src/api/mod.rs` to export the API module components\n2. Create `src/api/routes.rs` with the basic route configuration function\n3. Ensure proper imports and module exports\n4. Implement the health check endpoint as a simple test endpoint",
+            "status": "pending",
+            "testStrategy": "Manually verify that the files are created with correct exports. Test the health check endpoint with a simple HTTP request to ensure it returns a 200 OK response with the expected JSON payload."
+          },
+          {
+            "id": 2,
+            "title": "Implement Route Configuration",
+            "description": "Implement the main route configuration function that sets up the API structure with appropriate scopes for different resource types.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "1. Complete the `configure_routes` function in `src/api/routes.rs`\n2. Set up the main API scope with `/api` prefix\n3. Configure nested scopes for users and products\n4. Implement placeholder functions for user_routes and product_routes\n5. Ensure all routes are properly registered with the service configuration",
+            "status": "pending",
+            "testStrategy": "Test the route configuration by starting the server and making requests to various endpoints to verify they are registered correctly, even if they return NotImplemented responses."
+          },
+          {
+            "id": 3,
+            "title": "Update Main Application Entry Point",
+            "description": "Modify the main.rs file to integrate the API routes and set up the HTTP server with proper configuration.",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "1. Update `src/main.rs` to include necessary imports\n2. Set up the actix_web main function with proper error handling\n3. Configure the HTTP server with the API routes\n4. Bind the server to the specified address and port\n5. Add appropriate logging for server startup",
+            "status": "pending",
+            "testStrategy": "Start the application and verify it runs without errors. Check that the server binds to the correct address and port, and that startup messages are displayed correctly."
+          },
+          {
+            "id": 4,
+            "title": "Add API Dependencies to Cargo.toml",
+            "description": "Update the project's Cargo.toml file to include all necessary dependencies for the API implementation.",
+            "dependencies": [],
+            "details": "1. Add actix-web dependency with version 4.3.1\n2. Add serde with derive features\n3. Add serde_json for JSON serialization/deserialization\n4. Run cargo build to verify dependencies resolve correctly\n5. Update any other dependencies that might be needed for the API functionality",
+            "status": "pending",
+            "testStrategy": "Run `cargo check` and `cargo build` to ensure all dependencies are correctly specified and can be resolved without conflicts."
+          },
+          {
+            "id": 5,
+            "title": "Implement Error Handling for API Endpoints",
+            "description": "Create a standardized error handling mechanism for API endpoints to ensure consistent error responses across the application.",
+            "dependencies": [
+              "2.2",
+              "2.3"
+            ],
+            "details": "1. Create `src/api/errors.rs` to define API error types\n2. Implement error conversion traits for common error types\n3. Create a standardized error response format\n4. Update the route handlers to use the error handling mechanism\n5. Ensure all endpoints return errors in a consistent format\n6. Update `src/api/mod.rs` to export the errors module",
+            "status": "pending",
+            "testStrategy": "Test error handling by triggering various error conditions and verifying that the responses follow the expected format. Check that error status codes are appropriate for different error types."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "User Authentication Module",
+        "description": "Create user authentication and JWT handling functionality.",
+        "details": "Implement the user authentication module with JWT token handling:\n\n1. Create `src/auth/mod.rs` to export the auth module components:\n```rust\npub mod jwt;\npub mod models;\n\npub use self::jwt::{create_token, validate_token};\npub use self::models::User;\n```\n\n2. Create `src/auth/jwt.rs` for JWT token handling:\n```rust\nuse jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};\nuse serde::{Serialize, Deserialize};\nuse std::time::{SystemTime, UNIX_EPOCH};\n\n#[derive(Debug, Serialize, Deserialize)]\npub struct Claims {\n    pub sub: String,  // Subject (user id)\n    pub exp: usize,   // Expiration time\n    pub iat: usize,   // Issued at\n}\n\npub fn create_token(user_id: &str) -> Result<String, jsonwebtoken::errors::Error> {\n    let expiration = SystemTime::now()\n        .duration_since(UNIX_EPOCH)\n        .unwrap()\n        .as_secs() + 24 * 3600; // 24 hours from now\n    \n    let claims = Claims {\n        sub: user_id.to_owned(),\n        exp: expiration as usize,\n        iat: SystemTime::now()\n            .duration_since(UNIX_EPOCH)\n            .unwrap()\n            .as_secs() as usize,\n    };\n    \n    // In a real app, this would be a proper secret key\n    let secret = b\"test_secret_key\";\n    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret))\n}\n\npub fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {\n    let secret = b\"test_secret_key\";\n    let validation = Validation::default();\n    let token_data = decode::<Claims>(token, &DecodingKey::from_secret(secret), &validation)?;\n    Ok(token_data.claims)\n}\n```\n\n3. Create `src/auth/models.rs` for user model:\n```rust\nuse serde::{Serialize, Deserialize};\nuse argon2::{self, Config};\nuse rand::Rng;\n\n#[derive(Debug, Serialize, Deserialize)]\npub struct User {\n    pub id: i32,\n    pub username: String,\n    pub email: String,\n    #[serde(skip_serializing)]\n    pub password_hash: String,\n}\n\nimpl User {\n    pub fn verify_password(&self, password: &str) -> bool {\n        argon2::verify_encoded(&self.password_hash, password.as_bytes()).unwrap_or(false)\n    }\n    \n    pub fn hash_password(password: &str) -> String {\n        let salt = rand::thread_rng().gen::<[u8; 32]>();\n        let config = Config::default();\n        argon2::hash_encoded(password.as_bytes(), &salt, &config).unwrap()\n    }\n}\n```\n\n4. Update `Cargo.toml` to add authentication dependencies:\n```toml\n[dependencies]\njsonwebtoken = \"8.3.0\"\nargon2 = \"0.5.0\"\nrand = \"0.8.5\"\n```",
+        "testStrategy": "1. Verify that all required files are created: `src/auth/mod.rs`, `src/auth/jwt.rs`, and `src/auth/models.rs`\n2. Compile the code to ensure there are no syntax errors\n3. Write unit tests to verify JWT token creation and validation\n4. Test password hashing and verification functionality\n5. Verify that the authentication dependencies in `Cargo.toml` are correctly specified and can be resolved\n6. Check that the User model can be serialized and deserialized correctly",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up authentication module structure",
+            "description": "Create the basic module structure for authentication including the mod.rs file and update Cargo.toml with required dependencies.",
+            "dependencies": [],
+            "details": "1. Create the directory structure for auth module: `src/auth/`\n2. Create `src/auth/mod.rs` with the exports as specified in the task\n3. Update `Cargo.toml` to add the required dependencies:\n   - jsonwebtoken = \"8.3.0\"\n   - argon2 = \"0.5.0\"\n   - rand = \"0.8.5\"",
+            "status": "pending",
+            "testStrategy": "Verify that the project builds successfully with the new dependencies."
+          },
+          {
+            "id": 2,
+            "title": "Implement JWT token handling",
+            "description": "Create the JWT token handling functionality for creating and validating tokens.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "1. Create `src/auth/jwt.rs` file\n2. Implement the Claims struct with sub, exp, and iat fields\n3. Implement the create_token function that generates a JWT token with proper expiration\n4. Implement the validate_token function that verifies a token and returns the claims\n5. Use a constant secret key for development purposes (in production, this would be an environment variable)",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify token creation and validation works correctly, including testing expiration logic."
+          },
+          {
+            "id": 3,
+            "title": "Implement User model with password hashing",
+            "description": "Create the User model with secure password handling using Argon2.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "1. Create `src/auth/models.rs` file\n2. Implement the User struct with id, username, email, and password_hash fields\n3. Implement the verify_password method that uses argon2 to verify a password against the stored hash\n4. Implement the hash_password static method that generates a secure hash from a plaintext password\n5. Ensure proper serialization/deserialization with serde attributes",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify password hashing and verification works correctly, including testing that incorrect passwords fail verification."
+          },
+          {
+            "id": 4,
+            "title": "Create user registration functionality",
+            "description": "Implement the functionality to register new users with secure password storage.",
+            "dependencies": [
+              "3.2",
+              "3.3"
+            ],
+            "details": "1. Create a new function in models.rs to create a new user\n2. Implement input validation for username, email, and password\n3. Hash the password before storing\n4. Ensure usernames and emails are unique\n5. Return appropriate errors for validation failures",
+            "status": "pending",
+            "testStrategy": "Test registration with valid and invalid inputs, verify that passwords are properly hashed, and check that duplicate usernames/emails are rejected."
+          },
+          {
+            "id": 5,
+            "title": "Implement login functionality and middleware",
+            "description": "Create the login endpoint and authentication middleware for protected routes.",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4"
+            ],
+            "details": "1. Create a login function that validates credentials and returns a JWT token\n2. Implement an authentication middleware that extracts and validates JWT tokens from requests\n3. Create helper functions to get the current user from a request\n4. Handle authentication errors with appropriate HTTP status codes\n5. Ensure token refresh mechanism is in place",
+            "status": "pending",
+            "testStrategy": "Test login with valid and invalid credentials, verify that protected routes reject unauthenticated requests, and check that the middleware correctly extracts user information from valid tokens."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Product Catalog Module",
+        "description": "Create product catalog and inventory management functionality.",
+        "details": "Implement the product catalog module with inventory management:\n\n1. Create `src/catalog/mod.rs` to export the catalog module components:\n```rust\npub mod models;\npub mod service;\n\npub use self::models::Product;\npub use self::service::ProductService;\n```\n\n2. Create `src/catalog/models.rs` for product models:\n```rust\nuse serde::{Serialize, Deserialize};\nuse rust_decimal::Decimal;\n\n#[derive(Debug, Serialize, Deserialize)]\npub struct Product {\n    pub id: i32,\n    pub name: String,\n    pub description: String,\n    pub price: Decimal,\n    pub inventory_count: i32,\n}\n\n#[derive(Debug, Serialize, Deserialize)]\npub struct NewProduct {\n    pub name: String,\n    pub description: String,\n    pub price: Decimal,\n    pub inventory_count: i32,\n}\n\n#[derive(Debug, Serialize, Deserialize)]\npub struct ProductFilter {\n    pub name_contains: Option<String>,\n    pub min_price: Option<Decimal>,\n    pub max_price: Option<Decimal>,\n    pub in_stock: Option<bool>,\n}\n```\n\n3. Create `src/catalog/service.rs` for product service logic:\n```rust\nuse crate::catalog::models::{Product, NewProduct, ProductFilter};\nuse rust_decimal::Decimal;\nuse std::sync::{Arc, Mutex};\n\n// In a real app, this would interact with the database\npub struct ProductService {\n    products: Arc<Mutex<Vec<Product>>>,\n    next_id: Arc<Mutex<i32>>,\n}\n\nimpl ProductService {\n    pub fn new() -> Self {\n        ProductService {\n            products: Arc::new(Mutex::new(Vec::new())),\n            next_id: Arc::new(Mutex::new(1)),\n        }\n    }\n    \n    pub fn create(&self, new_product: NewProduct) -> Product {\n        let mut products = self.products.lock().unwrap();\n        let mut next_id = self.next_id.lock().unwrap();\n        \n        let product = Product {\n            id: *next_id,\n            name: new_product.name,\n            description: new_product.description,\n            price: new_product.price,\n            inventory_count: new_product.inventory_count,\n        };\n        \n        *next_id += 1;\n        products.push(product.clone());\n        product\n    }\n    \n    pub fn get_all(&self) -> Vec<Product> {\n        let products = self.products.lock().unwrap();\n        products.clone()\n    }\n    \n    pub fn get_by_id(&self, id: i32) -> Option<Product> {\n        let products = self.products.lock().unwrap();\n        products.iter().find(|p| p.id == id).cloned()\n    }\n    \n    pub fn update_inventory(&self, id: i32, new_count: i32) -> Option<Product> {\n        let mut products = self.products.lock().unwrap();\n        if let Some(product) = products.iter_mut().find(|p| p.id == id) {\n            product.inventory_count = new_count;\n            Some(product.clone())\n        } else {\n            None\n        }\n    }\n    \n    pub fn filter(&self, filter: ProductFilter) -> Vec<Product> {\n        let products = self.products.lock().unwrap();\n        products\n            .iter()\n            .filter(|p| {\n                let name_match = filter.name_contains\n                    .as_ref()\n                    .map_or(true, |name| p.name.to_lowercase().contains(&name.to_lowercase()));\n                \n                let min_price_match = filter.min_price\n                    .as_ref()\n                    .map_or(true, |min| p.price >= *min);\n                \n                let max_price_match = filter.max_price\n                    .as_ref()\n                    .map_or(true, |max| p.price <= *max);\n                \n                let in_stock_match = filter.in_stock\n                    .map_or(true, |in_stock| (p.inventory_count > 0) == in_stock);\n                \n                name_match && min_price_match && max_price_match && in_stock_match\n            })\n            .cloned()\n            .collect()\n    }\n}\n```\n\n4. Update `Cargo.toml` to add catalog dependencies:\n```toml\n[dependencies]\nrust_decimal = { version = \"1.30\", features = [\"serde\"] }\n```",
+        "testStrategy": "1. Verify that all required files are created: `src/catalog/mod.rs`, `src/catalog/models.rs`, and `src/catalog/service.rs`\n2. Compile the code to ensure there are no syntax errors\n3. Write unit tests to verify product creation, retrieval, and inventory management\n4. Test the product filtering functionality with various filter combinations\n5. Verify that the catalog dependencies in `Cargo.toml` are correctly specified and can be resolved\n6. Check that the Product models can be serialized and deserialized correctly",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Product Catalog Module Structure",
+            "description": "Set up the basic module structure for the product catalog by creating the mod.rs file that exports the module components.",
+            "dependencies": [],
+            "details": "Create the file `src/catalog/mod.rs` with the provided code to export the catalog module components. This file will serve as the entry point for the catalog module, making the models and service available to other parts of the application.",
+            "status": "pending",
+            "testStrategy": "Verify that the module can be imported correctly in the main application file."
+          },
+          {
+            "id": 2,
+            "title": "Implement Product Models",
+            "description": "Create the data models for products, including Product, NewProduct, and ProductFilter structs.",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Create the file `src/catalog/models.rs` with the provided code that defines the Product, NewProduct, and ProductFilter structs. These models will represent the core data structures for the product catalog functionality.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to ensure the structs can be properly serialized and deserialized using serde."
+          },
+          {
+            "id": 3,
+            "title": "Implement Product Service",
+            "description": "Create the service layer for product management with CRUD operations and filtering capabilities.",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "Create the file `src/catalog/service.rs` with the provided code that implements the ProductService struct with methods for creating, retrieving, updating, and filtering products. This service will handle the business logic for product management.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for each method in the ProductService to verify correct behavior for creating products, retrieving products, updating inventory, and filtering products."
+          },
+          {
+            "id": 4,
+            "title": "Update Dependencies in Cargo.toml",
+            "description": "Add the necessary dependencies for the product catalog module to the Cargo.toml file.",
+            "dependencies": [],
+            "details": "Update the `Cargo.toml` file to add the rust_decimal dependency with serde feature enabled. This dependency is required for handling monetary values in the product catalog.",
+            "status": "pending",
+            "testStrategy": "Run `cargo check` to verify that the dependencies can be resolved and imported correctly."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Product Catalog with Main Application",
+            "description": "Connect the product catalog module with the main application by registering it in the application context.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3",
+              "4.4"
+            ],
+            "details": "Update the main application file (likely `src/main.rs` or `src/lib.rs`) to import and initialize the ProductService. Add code to register the service in the application's dependency injection container or global state. Example: `let product_service = ProductService::new(); // Then store or provide access to this service`",
+            "status": "pending",
+            "testStrategy": "Create integration tests that verify the product catalog functionality works end-to-end by creating products and retrieving them through the application's public API."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Shopping Cart API",
+        "description": "Create shopping cart functionality and API endpoints.",
+        "details": "Implement the shopping cart functionality and API endpoints:\n\n1. Create `src/cart/mod.rs` to export the cart module components:\n```rust\npub mod service;\n\npub use self::service::CartService;\n```\n\n2. Create `src/cart/service.rs` for cart service logic:\n```rust\nuse crate::auth::models::User;\nuse crate::catalog::models::Product;\nuse serde::{Serialize, Deserialize};\nuse std::sync::{Arc, Mutex};\nuse std::collections::HashMap;\n\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct CartItem {\n    pub product_id: i32,\n    pub quantity: i32,\n    pub product_name: String,\n    pub unit_price: rust_decimal::Decimal,\n}\n\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct Cart {\n    pub id: i32,\n    pub user_id: i32,\n    pub items: Vec<CartItem>,\n}\n\npub struct CartService {\n    carts: Arc<Mutex<HashMap<i32, Cart>>>,\n    next_id: Arc<Mutex<i32>>,\n}\n\nimpl CartService {\n    pub fn new() -> Self {\n        CartService {\n            carts: Arc::new(Mutex::new(HashMap::new())),\n            next_id: Arc::new(Mutex::new(1)),\n        }\n    }\n    \n    pub fn get_or_create_cart(&self, user_id: i32) -> Cart {\n        let mut carts = self.carts.lock().unwrap();\n        \n        // Find existing cart for user\n        for (_, cart) in carts.iter() {\n            if cart.user_id == user_id {\n                return cart.clone();\n            }\n        }\n        \n        // Create new cart if none exists\n        let mut next_id = self.next_id.lock().unwrap();\n        let cart = Cart {\n            id: *next_id,\n            user_id,\n            items: Vec::new(),\n        };\n        \n        *next_id += 1;\n        carts.insert(cart.id, cart.clone());\n        cart\n    }\n    \n    pub fn add_item(&self, user_id: i32, product: &Product, quantity: i32) -> Cart {\n        let mut carts = self.carts.lock().unwrap();\n        \n        // Find or create cart\n        let cart_id = self.get_or_create_cart(user_id).id;\n        let cart = carts.get_mut(&cart_id).unwrap();\n        \n        // Check if product already in cart\n        if let Some(item) = cart.items.iter_mut().find(|i| i.product_id == product.id) {\n            item.quantity += quantity;\n        } else {\n            // Add new item\n            cart.items.push(CartItem {\n                product_id: product.id,\n                quantity,\n                product_name: product.name.clone(),\n                unit_price: product.price,\n            });\n        }\n        \n        cart.clone()\n    }\n    \n    pub fn remove_item(&self, user_id: i32, product_id: i32) -> Option<Cart> {\n        let mut carts = self.carts.lock().unwrap();\n        \n        // Find cart for user\n        for (_, cart) in carts.iter_mut() {\n            if cart.user_id == user_id {\n                cart.items.retain(|item| item.product_id != product_id);\n                return Some(cart.clone());\n            }\n        }\n        \n        None\n    }\n    \n    pub fn get_cart(&self, user_id: i32) -> Option<Cart> {\n        let carts = self.carts.lock().unwrap();\n        \n        for (_, cart) in carts.iter() {\n            if cart.user_id == user_id {\n                return Some(cart.clone());\n            }\n        }\n        \n        None\n    }\n    \n    pub fn clear_cart(&self, user_id: i32) -> Option<Cart> {\n        let mut carts = self.carts.lock().unwrap();\n        \n        for (_, cart) in carts.iter_mut() {\n            if cart.user_id == user_id {\n                cart.items.clear();\n                return Some(cart.clone());\n            }\n        }\n        \n        None\n    }\n}\n```\n\n3. Create `src/api/cart_routes.rs` for cart API endpoints:\n```rust\nuse actix_web::{web, HttpResponse, Responder};\nuse serde::{Serialize, Deserialize};\nuse crate::cart::CartService;\nuse crate::catalog::ProductService;\nuse crate::auth::jwt::validate_token;\n\n#[derive(Deserialize)]\npub struct AddItemRequest {\n    pub product_id: i32,\n    pub quantity: i32,\n}\n\npub fn configure_cart_routes(cfg: &mut web::ServiceConfig) {\n    cfg.service(\n        web::scope(\"/cart\")\n            .route(\"\", web::get().to(get_cart))\n            .route(\"/add\", web::post().to(add_item))\n            .route(\"/remove/{product_id}\", web::delete().to(remove_item))\n            .route(\"/clear\", web::post().to(clear_cart))\n    );\n}\n\nasync fn get_cart(\n    cart_service: web::Data<CartService>,\n    req: web::HttpRequest,\n) -> impl Responder {\n    // Extract user_id from JWT token in header\n    if let Some(auth_header) = req.headers().get(\"Authorization\") {\n        if let Ok(auth_str) = auth_header.to_str() {\n            if auth_str.starts_with(\"Bearer \") {\n                let token = &auth_str[7..]; // Skip \"Bearer \" prefix\n                if let Ok(claims) = validate_token(token) {\n                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);\n                    if let Some(cart) = cart_service.get_cart(user_id) {\n                        return HttpResponse::Ok().json(cart);\n                    }\n                    return HttpResponse::Ok().json(cart_service.get_or_create_cart(user_id));\n                }\n            }\n        }\n    }\n    \n    HttpResponse::Unauthorized().finish()\n}\n\nasync fn add_item(\n    cart_service: web::Data<CartService>,\n    product_service: web::Data<ProductService>,\n    req: web::HttpRequest,\n    item: web::Json<AddItemRequest>,\n) -> impl Responder {\n    // Extract user_id from JWT token in header\n    if let Some(auth_header) = req.headers().get(\"Authorization\") {\n        if let Ok(auth_str) = auth_header.to_str() {\n            if auth_str.starts_with(\"Bearer \") {\n                let token = &auth_str[7..]; // Skip \"Bearer \" prefix\n                if let Ok(claims) = validate_token(token) {\n                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);\n                    \n                    // Get product\n                    if let Some(product) = product_service.get_by_id(item.product_id) {\n                        // Check inventory\n                        if product.inventory_count >= item.quantity {\n                            let cart = cart_service.add_item(user_id, &product, item.quantity);\n                            return HttpResponse::Ok().json(cart);\n                        }\n                        return HttpResponse::BadRequest().json(serde_json::json!({\n                            \"error\": \"Not enough inventory\"\n                        }));\n                    }\n                    return HttpResponse::NotFound().json(serde_json::json!({\n                        \"error\": \"Product not found\"\n                    }));\n                }\n            }\n        }\n    }\n    \n    HttpResponse::Unauthorized().finish()\n}\n\nasync fn remove_item(\n    cart_service: web::Data<CartService>,\n    req: web::HttpRequest,\n    path: web::Path<i32>,\n) -> impl Responder {\n    let product_id = path.into_inner();\n    \n    // Extract user_id from JWT token in header\n    if let Some(auth_header) = req.headers().get(\"Authorization\") {\n        if let Ok(auth_str) = auth_header.to_str() {\n            if auth_str.starts_with(\"Bearer \") {\n                let token = &auth_str[7..]; // Skip \"Bearer \" prefix\n                if let Ok(claims) = validate_token(token) {\n                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);\n                    \n                    if let Some(cart) = cart_service.remove_item(user_id, product_id) {\n                        return HttpResponse::Ok().json(cart);\n                    }\n                    return HttpResponse::NotFound().json(serde_json::json!({\n                        \"error\": \"Item not found in cart\"\n                    }));\n                }\n            }\n        }\n    }\n    \n    HttpResponse::Unauthorized().finish()\n}\n\nasync fn clear_cart(\n    cart_service: web::Data<CartService>,\n    req: web::HttpRequest,\n) -> impl Responder {\n    // Extract user_id from JWT token in header\n    if let Some(auth_header) = req.headers().get(\"Authorization\") {\n        if let Ok(auth_str) = auth_header.to_str() {\n            if auth_str.starts_with(\"Bearer \") {\n                let token = &auth_str[7..]; // Skip \"Bearer \" prefix\n                if let Ok(claims) = validate_token(token) {\n                    let user_id = claims.sub.parse::<i32>().unwrap_or(0);\n                    \n                    if let Some(cart) = cart_service.clear_cart(user_id) {\n                        return HttpResponse::Ok().json(cart);\n                    }\n                    return HttpResponse::NotFound().json(serde_json::json!({\n                        \"error\": \"Cart not found\"\n                    }));\n                }\n            }\n        }\n    }\n    \n    HttpResponse::Unauthorized().finish()\n}\n```\n\n4. Update `src/api/mod.rs` to include cart routes:\n```rust\npub mod routes;\npub mod cart_routes;\n```\n\n5. Update `src/api/routes.rs` to include cart routes configuration:\n```rust\n// Add to existing imports\nuse crate::api::cart_routes::configure_cart_routes;\n\n// Update configure_routes function\npub fn configure_routes(cfg: &mut web::ServiceConfig) {\n    cfg.service(\n        web::scope(\"/api\")\n            .service(health_check)\n            .service(web::scope(\"/users\").configure(user_routes))\n            .service(web::scope(\"/products\").configure(product_routes))\n            .service(web::scope(\"/cart\").configure(configure_cart_routes))\n    );\n}\n```",
+        "testStrategy": "1. Verify that all required files are created: `src/cart/mod.rs`, `src/cart/service.rs`, and `src/api/cart_routes.rs`\n2. Compile the code to ensure there are no syntax errors\n3. Write unit tests for the CartService to verify cart creation, item addition/removal, and cart clearing\n4. Test the cart API endpoints with mock requests including JWT authentication\n5. Verify integration with the Product Catalog module when adding items to the cart\n6. Test authentication requirements for all cart operations\n7. Verify proper error handling for invalid requests or unauthorized access",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create cart module structure",
+            "description": "Set up the basic cart module structure by creating the module file and implementing the cart service with data structures for Cart and CartItem.",
+            "dependencies": [],
+            "details": "Create `src/cart/mod.rs` to export the cart module components and `src/cart/service.rs` to implement the CartService struct with its core data structures (Cart, CartItem) and basic methods for cart management. This includes implementing the new(), get_or_create_cart(), add_item(), remove_item(), get_cart(), and clear_cart() methods.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for CartService methods to verify cart creation, item addition/removal, and cart retrieval functionality."
+          },
+          {
+            "id": 2,
+            "title": "Implement cart API route configuration",
+            "description": "Create the cart routes configuration function to set up the API endpoints for cart operations.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Create `src/api/cart_routes.rs` and implement the configure_cart_routes function that sets up the routes for getting the cart, adding items, removing items, and clearing the cart. Define the AddItemRequest struct for handling item addition requests.",
+            "status": "pending",
+            "testStrategy": "Test the route configuration by ensuring all endpoints are correctly registered in the application."
+          },
+          {
+            "id": 3,
+            "title": "Implement cart retrieval and clearing endpoints",
+            "description": "Implement the API handlers for retrieving and clearing the shopping cart.",
+            "dependencies": [
+              "5.2"
+            ],
+            "details": "In `src/api/cart_routes.rs`, implement the get_cart and clear_cart handler functions. Both should extract the user ID from the JWT token in the Authorization header, then call the appropriate CartService methods and return the results as JSON responses. Include proper error handling for unauthorized requests.",
+            "status": "pending",
+            "testStrategy": "Test these endpoints with valid and invalid JWT tokens, verifying correct responses and error handling."
+          },
+          {
+            "id": 4,
+            "title": "Implement cart item management endpoints",
+            "description": "Implement the API handlers for adding and removing items from the shopping cart.",
+            "dependencies": [
+              "5.3"
+            ],
+            "details": "In `src/api/cart_routes.rs`, implement the add_item and remove_item handler functions. The add_item handler should validate product existence and inventory availability before adding to the cart. The remove_item handler should handle product removal by ID. Both should extract the user ID from JWT tokens and include proper error handling.",
+            "status": "pending",
+            "testStrategy": "Test these endpoints with various scenarios: adding items with sufficient/insufficient inventory, removing existing/non-existing items, and using valid/invalid authentication."
+          },
+          {
+            "id": 5,
+            "title": "Integrate cart routes with main application",
+            "description": "Update the application's route configuration to include the cart routes.",
+            "dependencies": [
+              "5.4"
+            ],
+            "details": "Update `src/api/mod.rs` to include the cart_routes module. Then modify `src/api/routes.rs` to import the configure_cart_routes function and update the configure_routes function to include the cart routes in the API scope. Finally, ensure the CartService is properly registered as application data in the main.rs file.",
+            "status": "pending",
+            "testStrategy": "Perform integration testing to verify that all cart endpoints are accessible and functioning correctly within the complete application."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Frontend Components",
+        "description": "Create basic frontend structure and components for the application.",
+        "agentHint": "frontend",
+        "details": "Set up the basic frontend structure and components for the application:\n\n1. Create `frontend/package.json` with necessary dependencies:\n```json\n{\n  \"name\": \"parallel-task-execution-test-frontend\",\n  \"version\": \"0.1.0\",\n  \"private\": true,\n  \"dependencies\": {\n    \"react\": \"^18.2.0\",\n    \"react-dom\": \"^18.2.0\",\n    \"react-router-dom\": \"^6.14.2\",\n    \"axios\": \"^1.4.0\",\n    \"tailwindcss\": \"^3.4.0\",\n    \"autoprefixer\": \"^10.4.16\",\n    \"postcss\": \"^8.4.32\",\n    \"class-variance-authority\": \"^0.7.0\",\n    \"clsx\": \"^2.1.0\",\n    \"tailwind-merge\": \"^2.2.0\",\n    \"lucide-react\": \"^0.309.0\"\n  },\n  \"scripts\": {\n    \"start\": \"react-scripts start\",\n    \"build\": \"react-scripts build\",\n    \"test\": \"react-scripts test\",\n    \"eject\": \"react-scripts eject\"\n  },\n  \"eslintConfig\": {\n    \"extends\": [\n      \"react-app\",\n      \"react-app/jest\"\n    ]\n  },\n  \"browserslist\": {\n    \"production\": [\n      \">0.2%\",\n      \"not dead\",\n      \"not op_mini all\"\n    ],\n    \"development\": [\n      \"last 1 chrome version\",\n      \"last 1 firefox version\",\n      \"last 1 safari version\"\n    ]\n  },\n  \"devDependencies\": {\n    \"react-scripts\": \"5.0.1\"\n  }\n}\n```\n\n2. Create `frontend/src/App.js` as the main application component:\n```jsx\nimport React from 'react';\nimport { BrowserRouter as Router, Routes, Route } from 'react-router-dom';\nimport './index.css'; // Tailwind CSS imports\n\n// Import components\nimport Header from './components/Header';\nimport Footer from './components/Footer';\nimport HomePage from './components/HomePage';\nimport ProductList from './components/ProductList';\nimport ProductDetail from './components/ProductDetail';\nimport Cart from './components/Cart';\nimport Login from './components/Login';\nimport Register from './components/Register';\n\nfunction App() {\n  return (\n    <Router>\n        <Header />\n        <main style={{ padding: '20px', minHeight: 'calc(100vh - 130px)' }}>\n          <Routes>\n            <Route path=\"/\" element={<HomePage />} />\n            <Route path=\"/products\" element={<ProductList />} />\n            <Route path=\"/products/:id\" element={<ProductDetail />} />\n            <Route path=\"/cart\" element={<Cart />} />\n            <Route path=\"/login\" element={<Login />} />\n            <Route path=\"/register\" element={<Register />} />\n          </Routes>\n        </main>\n        <Footer />\n      </Router>\n  );\n}\n\nexport default App;\n```\n\n3. Create basic components in the `frontend/src/components/` directory:\n\n- `frontend/src/components/Header.js`:\n```jsx\nimport React from 'react';\nimport { Link } from 'react-router-dom';\nimport { Button } from '@/components/ui/button';\nimport { Badge } from '@/components/ui/badge';\nimport { ShoppingCart } from 'lucide-react';\n\nconst Header = () => {\n  // In a real app, this would come from a context or state management\n  const isLoggedIn = false;\n  const cartItemCount = 0;\n\n  return (\n    <header className=\"sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60\">\n      <div className=\"container flex h-14 items-center\">\n        <Link to=\"/\" className=\"mr-6 flex items-center space-x-2\">\n          <span className=\"font-bold\">E-Commerce Demo</span>\n        </Link>\n        <nav className=\"flex items-center space-x-6 ml-auto\">\n          <Button variant=\"ghost\" asChild>\n            <Link to=\"/products\">Products</Link>\n          </Button>\n          <Button variant=\"ghost\" size=\"icon\" asChild>\n            <Link to=\"/cart\" className=\"relative\">\n              <ShoppingCart className=\"h-5 w-5\" />\n              {cartItemCount > 0 && (\n                <Badge className=\"absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0\">\n                  {cartItemCount}\n                </Badge>\n              )}\n            </Link>\n          </Button>\n          {isLoggedIn ? (\n            <Button variant=\"ghost\">Logout</Button>\n          ) : (\n            <Button variant=\"ghost\" asChild>\n              <Link to=\"/login\">Login</Link>\n            </Button>\n          )}\n        </nav>\n      </div>\n    </header>\n  );\n};\n\nexport default Header;\n```\n\n- `frontend/src/components/Footer.js`:\n```jsx\nimport React from 'react';\n\n\nconst Footer = () => {\n  return (\n    <footer className=\"border-t py-6 md:py-0\">\n      <div className=\"container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row\">\n        <p className=\"text-center text-sm text-muted-foreground\">\n          \u00a9 {new Date().getFullYear()} Parallel Task Execution Test\n        </p>\n      </div>\n    </footer>\n  );\n};\n\nexport default Footer;\n```\n\n- `frontend/src/components/HomePage.js`:\n```jsx\nimport React from 'react';\nimport { Link } from 'react-router-dom';\nimport { Button } from '@/components/ui/button';\n\nconst HomePage = () => {\n  return (\n    <div className=\"container mx-auto px-4 py-16\">\n      <div className=\"flex flex-col items-center text-center space-y-4\">\n        <h1 className=\"text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl\">\n          Welcome to Our Store\n        </h1>\n        <p className=\"max-w-[700px] text-lg text-muted-foreground md:text-xl\">\n          Browse our catalog of products\n        </p>\n        <Button size=\"lg\" asChild>\n          <Link to=\"/products\">Shop Now</Link>\n        </Button>\n      </div>\n    </div>\n  );\n};\n\nexport default HomePage;\n```\n\n- `frontend/src/components/ProductList.js` (placeholder):\n```jsx\nimport React from 'react';\nimport { Link } from 'react-router-dom';\nimport { Button } from '@/components/ui/button';\nimport { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';\n\nconst ProductList = () => {\n  // In a real app, this would fetch from the API\n  const products = [\n    { id: 1, name: 'Product 1', price: 19.99, description: 'Description for product 1' },\n    { id: 2, name: 'Product 2', price: 29.99, description: 'Description for product 2' },\n    { id: 3, name: 'Product 3', price: 39.99, description: 'Description for product 3' },\n  ];\n\n  return (\n    <div className=\"container mx-auto px-4 py-8\">\n      <h1 className=\"text-3xl font-bold mb-8\">Products</h1>\n      <div className=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6\">\n        {products.map((product) => (\n          <Card key={product.id}>\n            <CardHeader>\n              <div className=\"aspect-square w-full bg-muted rounded-t-lg mb-4\"></div>\n              <CardTitle>{product.name}</CardTitle>\n              <CardDescription>${product.price.toFixed(2)}</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <p className=\"text-sm text-muted-foreground\">{product.description}</p>\n            </CardContent>\n            <CardFooter className=\"flex gap-2\">\n              <Button variant=\"outline\" size=\"sm\" asChild>\n                <Link to={`/products/${product.id}`}>View Details</Link>\n              </Button>\n              <Button size=\"sm\">Add to Cart</Button>\n            </CardFooter>\n          </Card>\n        ))}\n      </div>\n    </div>\n  );\n};\n\nexport default ProductList;\n```\n\n4. Create placeholder components for the remaining pages:\n- `frontend/src/components/ProductDetail.js`\n- `frontend/src/components/Cart.js`\n- `frontend/src/components/Login.js`\n- `frontend/src/components/Register.js`\n\nThese can be simple components with basic structure similar to the ones above, using shadcn/ui components and Tailwind CSS for styling, with placeholders for functionality that would be implemented in a real application. Before creating components, run `npx shadcn@latest init` to set up shadcn/ui, then add the necessary components.",
+        "testStrategy": "1. Verify that all required files are created in the frontend directory structure\n2. Check that `package.json` contains all necessary dependencies\n3. Run `npm install` to ensure dependencies can be resolved\n4. Start the development server with `npm start` to verify the application loads without errors\n5. Test basic navigation between pages\n6. Verify that the component structure follows React best practices\n7. Check that the UI is responsive and displays correctly on different screen sizes\n8. Verify that placeholder components render correctly even without backend integration",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up frontend project structure",
+            "description": "Initialize the frontend project structure with necessary configuration files and dependencies",
+            "dependencies": [],
+            "details": "1. Create the frontend directory structure\n2. Create package.json with the specified dependencies\n3. Initialize the React application\n4. Set up the basic index.js and index.html files\n5. Configure the theme provider and router setup in App.js as specified in the task",
+            "status": "pending",
+            "testStrategy": "Verify that the application builds without errors and the basic structure renders correctly"
+          },
+          {
+            "id": 2,
+            "title": "Implement Header and Footer components",
+            "description": "Create the Header and Footer components that will be used across all pages of the application",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "1. Create the Header.js component with navigation links, login/logout button, and cart icon with badge\n2. Create the Footer.js component with copyright information\n3. Ensure components are responsive and follow the design theme\n4. Implement proper routing in the Header component using react-router-dom",
+            "status": "pending",
+            "testStrategy": "Test navigation links in Header, verify that the cart badge displays correctly, and ensure Footer displays at the bottom of all pages"
+          },
+          {
+            "id": 3,
+            "title": "Implement HomePage and ProductList components",
+            "description": "Create the HomePage and ProductList components with basic functionality",
+            "dependencies": [
+              "6.2"
+            ],
+            "details": "1. Create HomePage.js with welcome message and shop now button\n2. Create ProductList.js with a grid of product cards\n3. Implement placeholder product data in ProductList\n4. Add proper styling and layout for both components\n5. Ensure navigation between HomePage and ProductList works correctly",
+            "status": "pending",
+            "testStrategy": "Verify that the HomePage renders correctly and the Shop Now button navigates to ProductList. Test that ProductList displays product cards in a grid layout with correct information"
+          },
+          {
+            "id": 4,
+            "title": "Implement ProductDetail and Cart components",
+            "description": "Create the ProductDetail and Cart components with placeholder functionality",
+            "dependencies": [
+              "6.3"
+            ],
+            "details": "1. Create ProductDetail.js component that displays detailed information about a selected product\n2. Implement route parameter handling to display the correct product based on ID\n3. Create Cart.js component with a list of items, quantity controls, and total calculation\n4. Add placeholder data for both components\n5. Implement basic UI interactions (add to cart, remove from cart, etc.)",
+            "status": "pending",
+            "testStrategy": "Test navigation to ProductDetail with different product IDs. Verify that the Cart displays items correctly and UI controls work as expected"
+          },
+          {
+            "id": 5,
+            "title": "Implement Login and Register components",
+            "description": "Create the Login and Register form components with validation",
+            "dependencies": [
+              "6.2"
+            ],
+            "details": "1. Create Login.js with email/username and password fields\n2. Create Register.js with fields for username, email, password, and password confirmation\n3. Implement form validation for both components\n4. Add submit handlers (with placeholder functionality)\n5. Style the forms according to the application theme\n6. Ensure proper navigation between login and register pages",
+            "status": "pending",
+            "testStrategy": "Test form validation for both components. Verify that form submissions work correctly and error messages display appropriately. Test navigation between Login and Register pages"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Integration Tests",
+        "description": "Create comprehensive integration tests for the application.",
+        "agentHint": "integration",
+        "details": "Implement integration tests to verify the functionality of the entire application:\n\n1. Create `tests/integration_tests.rs` for general integration tests:\n```rust\n#[cfg(test)]\nmod integration_tests {\n    use actix_web::{test, web, App};\n    use actix_web::http::StatusCode;\n    use serde_json::json;\n    \n    use crate::api::routes::configure_routes;\n    use crate::auth::jwt::create_token;\n    use crate::catalog::ProductService;\n    use crate::cart::CartService;\n    \n    #[actix_web::test]\n    async fn test_health_check() {\n        let app = test::init_service(\n            App::new()\n                .configure(configure_routes)\n        ).await;\n        \n        let req = test::TestRequest::get()\n            .uri(\"/api/health\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(json[\"status\"], \"ok\");\n    }\n    \n    #[actix_web::test]\n    async fn test_full_user_flow() {\n        // Setup services\n        let product_service = web::Data::new(ProductService::new());\n        let cart_service = web::Data::new(CartService::new());\n        \n        let app = test::init_service(\n            App::new()\n                .app_data(product_service.clone())\n                .app_data(cart_service.clone())\n                .configure(configure_routes)\n        ).await;\n        \n        // 1. Create a test product\n        let test_product = product_service.create(crate::catalog::models::NewProduct {\n            name: \"Test Product\".to_string(),\n            description: \"A test product\".to_string(),\n            price: rust_decimal::Decimal::new(1999, 2), // $19.99\n            inventory_count: 10,\n        });\n        \n        // 2. Create a test user token\n        let token = create_token(\"1\").unwrap(); // User ID 1\n        \n        // 3. Add product to cart\n        let req = test::TestRequest::post()\n            .uri(\"/api/cart/add\")\n            .header(\"Authorization\", format!(\"Bearer {}\", token))\n            .set_json(json!({\n                \"product_id\": test_product.id,\n                \"quantity\": 2\n            }))\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        // 4. Get cart and verify product was added\n        let req = test::TestRequest::get()\n            .uri(\"/api/cart\")\n            .header(\"Authorization\", format!(\"Bearer {}\", token))\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let cart: crate::cart::service::Cart = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(cart.items.len(), 1);\n        assert_eq!(cart.items[0].product_id, test_product.id);\n        assert_eq!(cart.items[0].quantity, 2);\n    }\n}\n```\n\n2. Create `tests/api_tests.rs` for API-specific tests:\n```rust\n#[cfg(test)]\nmod api_tests {\n    use actix_web::{test, web, App};\n    use actix_web::http::StatusCode;\n    \n    use crate::api::routes::configure_routes;\n    use crate::catalog::ProductService;\n    \n    #[actix_web::test]\n    async fn test_product_routes() {\n        // Setup product service with test data\n        let product_service = web::Data::new(ProductService::new());\n        \n        // Add test products\n        product_service.create(crate::catalog::models::NewProduct {\n            name: \"Product 1\".to_string(),\n            description: \"Description 1\".to_string(),\n            price: rust_decimal::Decimal::new(1999, 2), // $19.99\n            inventory_count: 10,\n        });\n        \n        product_service.create(crate::catalog::models::NewProduct {\n            name: \"Product 2\".to_string(),\n            description: \"Description 2\".to_string(),\n            price: rust_decimal::Decimal::new(2999, 2), // $29.99\n            inventory_count: 5,\n        });\n        \n        let app = test::init_service(\n            App::new()\n                .app_data(product_service.clone())\n                .configure(configure_routes)\n        ).await;\n        \n        // Test get all products\n        let req = test::TestRequest::get()\n            .uri(\"/api/products\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let products: Vec<crate::catalog::models::Product> = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(products.len(), 2);\n        \n        // Test get product by ID\n        let req = test::TestRequest::get()\n            .uri(\"/api/products/1\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let product: crate::catalog::models::Product = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(product.id, 1);\n        assert_eq!(product.name, \"Product 1\");\n    }\n}\n```\n\n3. Create `tests/auth_tests.rs` for authentication tests:\n```rust\n#[cfg(test)]\nmod auth_tests {\n    use crate::auth::jwt::{create_token, validate_token};\n    use crate::auth::models::User;\n    \n    #[test]\n    fn test_jwt_creation_and_validation() {\n        // Create a token\n        let user_id = \"123\";\n        let token = create_token(user_id).unwrap();\n        \n        // Validate the token\n        let claims = validate_token(&token).unwrap();\n        \n        assert_eq!(claims.sub, user_id);\n    }\n    \n    #[test]\n    fn test_password_hashing_and_verification() {\n        // Create a test user with hashed password\n        let password = \"secure_password\";\n        let hashed = User::hash_password(password);\n        \n        let user = User {\n            id: 1,\n            username: \"testuser\".to_string(),\n            email: \"test@example.com\".to_string(),\n            password_hash: hashed,\n        };\n        \n        // Verify password\n        assert!(user.verify_password(password));\n        assert!(!user.verify_password(\"wrong_password\"));\n    }\n}\n```\n\n4. Update `src/main.rs` to make it testable:\n```rust\nuse actix_web::{App, HttpServer, web};\nmod api;\nmod schema;\nmod auth;\nmod catalog;\nmod cart;\n\n#[actix_web::main]\nasync fn main() -> std::io::Result<()> {\n    println!(\"Starting API server\");\n    \n    // Initialize services\n    let product_service = web::Data::new(catalog::ProductService::new());\n    let cart_service = web::Data::new(cart::CartService::new());\n    \n    HttpServer::new(move || {\n        App::new()\n            .app_data(product_service.clone())\n            .app_data(cart_service.clone())\n            .configure(api::routes::configure_routes)\n    })\n    .bind(\"127.0.0.1:8080\")?\n    .run()\n    .await\n}\n```",
+        "testStrategy": "1. Verify that all test files are created: `tests/integration_tests.rs`, `tests/api_tests.rs`, and `tests/auth_tests.rs`\n2. Run the tests using `cargo test` to ensure they pass\n3. Check test coverage to ensure all major components are tested\n4. Verify that the integration tests properly test the full user flow from authentication to cart management\n5. Test API endpoints with various inputs including edge cases and error conditions\n6. Verify authentication tests for token creation, validation, and password handling\n7. Check that the tests are independent and don't rely on global state\n8. Verify that the tests properly clean up any resources they create",
+        "priority": "high",
+        "dependencies": [
+          2,
+          5,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up integration test infrastructure",
+            "description": "Create the basic infrastructure for integration tests, including the test directory structure and helper functions for initializing test services and applications.",
+            "dependencies": [],
+            "details": "Create a `tests` directory at the project root if it doesn't exist. Inside this directory, create a `common` module (`tests/common/mod.rs`) that will contain shared test utilities:\n\n```rust\n// tests/common/mod.rs\npub mod test_utils {\n    use actix_web::{test, web, App};\n    use crate::api::routes::configure_routes;\n    use crate::catalog::ProductService;\n    use crate::cart::CartService;\n    \n    pub async fn get_test_app() -> impl actix_web::dev::Service<\n        actix_http::Request,\n        Response = actix_web::dev::ServiceResponse,\n        Error = actix_web::Error,\n    > {\n        let product_service = web::Data::new(ProductService::new());\n        let cart_service = web::Data::new(CartService::new());\n        \n        test::init_service(\n            App::new()\n                .app_data(product_service.clone())\n                .app_data(cart_service.clone())\n                .configure(configure_routes)\n        ).await\n    }\n    \n    pub fn get_test_services() -> (web::Data<ProductService>, web::Data<CartService>) {\n        let product_service = web::Data::new(ProductService::new());\n        let cart_service = web::Data::new(CartService::new());\n        (product_service, cart_service)\n    }\n}\n```\n\nAlso update `src/main.rs` to make it testable by ensuring all modules are properly exported and the application structure supports testing.",
+            "status": "pending",
+            "testStrategy": "Verify the test infrastructure by creating a simple test that initializes the test app and makes a basic request to ensure the setup works correctly."
+          },
+          {
+            "id": 2,
+            "title": "Implement API health check and basic route tests",
+            "description": "Create integration tests for the API health check endpoint and basic route functionality to verify the API server is working correctly.",
+            "dependencies": [],
+            "details": "Create `tests/integration_tests.rs` file with tests for the health check endpoint and basic API routes:\n\n```rust\n#[cfg(test)]\nmod integration_tests {\n    use actix_web::{test, http::StatusCode};\n    use serde_json::json;\n    \n    use crate::common::test_utils::get_test_app;\n    \n    #[actix_web::test]\n    async fn test_health_check() {\n        let app = get_test_app().await;\n        \n        let req = test::TestRequest::get()\n            .uri(\"/api/health\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(json[\"status\"], \"ok\");\n    }\n    \n    #[actix_web::test]\n    async fn test_not_found() {\n        let app = get_test_app().await;\n        \n        let req = test::TestRequest::get()\n            .uri(\"/api/nonexistent\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::NOT_FOUND);\n    }\n}\n```\n\nEnsure the tests verify that the API server responds correctly to both valid and invalid requests.",
+            "status": "pending",
+            "testStrategy": "Run the tests using `cargo test` and verify that all tests pass, confirming that the API server's basic functionality is working correctly."
+          },
+          {
+            "id": 3,
+            "title": "Implement product catalog integration tests",
+            "description": "Create comprehensive integration tests for the product catalog functionality, including listing products, getting product details, and product creation.",
+            "dependencies": [],
+            "details": "Create `tests/api_tests.rs` file with tests for the product catalog API endpoints:\n\n```rust\n#[cfg(test)]\nmod api_tests {\n    use actix_web::{test, web, http::StatusCode};\n    use serde_json::json;\n    \n    use crate::catalog::models::{Product, NewProduct};\n    use crate::catalog::ProductService;\n    use crate::common::test_utils::{get_test_app, get_test_services};\n    \n    #[actix_web::test]\n    async fn test_product_routes() {\n        // Get services and initialize test data\n        let (product_service, _) = get_test_services();\n        \n        // Add test products\n        product_service.create(NewProduct {\n            name: \"Product 1\".to_string(),\n            description: \"Description 1\".to_string(),\n            price: rust_decimal::Decimal::new(1999, 2), // $19.99\n            inventory_count: 10,\n        });\n        \n        product_service.create(NewProduct {\n            name: \"Product 2\".to_string(),\n            description: \"Description 2\".to_string(),\n            price: rust_decimal::Decimal::new(2999, 2), // $29.99\n            inventory_count: 5,\n        });\n        \n        let app = get_test_app().await;\n        \n        // Test get all products\n        let req = test::TestRequest::get()\n            .uri(\"/api/products\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let products: Vec<Product> = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(products.len(), 2);\n        \n        // Test get product by ID\n        let req = test::TestRequest::get()\n            .uri(\"/api/products/1\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::OK);\n        \n        let body = test::read_body(resp).await;\n        let product: Product = serde_json::from_slice(&body).unwrap();\n        \n        assert_eq!(product.id, 1);\n        assert_eq!(product.name, \"Product 1\");\n        \n        // Test create product (with auth)\n        // This would require auth token setup\n    }\n}\n```\n\nEnsure the tests cover all product-related functionality including error cases and edge conditions.",
+            "status": "pending",
+            "testStrategy": "Run the tests with `cargo test` and verify that all product catalog functionality works as expected. Check both success cases and error handling."
+          },
+          {
+            "id": 4,
+            "title": "Implement authentication and user integration tests",
+            "description": "Create integration tests for the authentication system, including token creation, validation, and protected route access.",
+            "dependencies": [],
+            "details": "Create `tests/auth_tests.rs` file with tests for the authentication functionality:\n\n```rust\n#[cfg(test)]\nmod auth_tests {\n    use actix_web::{test, http::StatusCode};\n    use serde_json::json;\n    \n    use crate::auth::jwt::{create_token, validate_token};\n    use crate::auth::models::User;\n    use crate::common::test_utils::get_test_app;\n    \n    #[test]\n    fn test_jwt_creation_and_validation() {\n        // Create a token\n        let user_id = \"123\";\n        let token = create_token(user_id).unwrap();\n        \n        // Validate the token\n        let claims = validate_token(&token).unwrap();\n        \n        assert_eq!(claims.sub, user_id);\n    }\n    \n    #[test]\n    fn test_password_hashing_and_verification() {\n        // Create a test user with hashed password\n        let password = \"secure_password\";\n        let hashed = User::hash_password(password);\n        \n        let user = User {\n            id: 1,\n            username: \"testuser\".to_string(),\n            email: \"test@example.com\".to_string(),\n            password_hash: hashed,\n        };\n        \n        // Verify password\n        assert!(user.verify_password(password));\n        assert!(!user.verify_password(\"wrong_password\"));\n    }\n    \n    #[actix_web::test]\n    async fn test_protected_routes() {\n        let app = get_test_app().await;\n        \n        // Try accessing protected route without token\n        let req = test::TestRequest::get()\n            .uri(\"/api/user/profile\")\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);\n        \n        // Create valid token and try again\n        let token = create_token(\"1\").unwrap();\n        \n        let req = test::TestRequest::get()\n            .uri(\"/api/user/profile\")\n            .header(\"Authorization\", format!(\"Bearer {}\", token))\n            .to_request();\n            \n        let resp = test::call_service(&app, req).await;\n        \n        // This should now succeed (assuming the endpoint exists)\n        assert_eq!(resp.status(), StatusCode::OK);\n    }\n}\n```\n\nEnsure the tests verify both the token functionality and the authentication middleware that protects routes.",
+            "status": "pending",
+            "testStrategy": "Run the tests with `cargo test` and verify that authentication works correctly, including token creation, validation, and protection of routes. Test both valid authentication and invalid authentication scenarios."
+          },
+          {
+            "id": 5,
+            "title": "Implement end-to-end shopping cart flow tests",
+            "description": "Create integration tests that simulate a complete user shopping flow, from browsing products to adding items to cart and checking out.",
+            "dependencies": [],
+            "details": "Create a comprehensive end-to-end test in `tests/integration_tests.rs` that tests the full user shopping flow:\n\n```rust\n#[actix_web::test]\nasync fn test_full_user_flow() {\n    // Get services and initialize test data\n    let (product_service, cart_service) = get_test_services();\n    \n    // 1. Create a test product\n    let test_product = product_service.create(NewProduct {\n        name: \"Test Product\".to_string(),\n        description: \"A test product\".to_string(),\n        price: rust_decimal::Decimal::new(1999, 2), // $19.99\n        inventory_count: 10,\n    });\n    \n    let app = get_test_app().await;\n    \n    // 2. Create a test user token\n    let token = create_token(\"1\").unwrap(); // User ID 1\n    \n    // 3. Add product to cart\n    let req = test::TestRequest::post()\n        .uri(\"/api/cart/add\")\n        .header(\"Authorization\", format!(\"Bearer {}\", token))\n        .set_json(json!({\n            \"product_id\": test_product.id,\n            \"quantity\": 2\n        }))\n        .to_request();\n        \n    let resp = test::call_service(&app, req).await;\n    \n    assert_eq!(resp.status(), StatusCode::OK);\n    \n    // 4. Get cart and verify product was added\n    let req = test::TestRequest::get()\n        .uri(\"/api/cart\")\n        .header(\"Authorization\", format!(\"Bearer {}\", token))\n        .to_request();\n        \n    let resp = test::call_service(&app, req).await;\n    \n    assert_eq!(resp.status(), StatusCode::OK);\n    \n    let body = test::read_body(resp).await;\n    let cart: Cart = serde_json::from_slice(&body).unwrap();\n    \n    assert_eq!(cart.items.len(), 1);\n    assert_eq!(cart.items[0].product_id, test_product.id);\n    assert_eq!(cart.items[0].quantity, 2);\n    \n    // 5. Update cart quantity\n    let req = test::TestRequest::put()\n        .uri(\"/api/cart/update\")\n        .header(\"Authorization\", format!(\"Bearer {}\", token))\n        .set_json(json!({\n            \"product_id\": test_product.id,\n            \"quantity\": 3\n        }))\n        .to_request();\n        \n    let resp = test::call_service(&app, req).await;\n    \n    assert_eq!(resp.status(), StatusCode::OK);\n    \n    // 6. Verify cart was updated\n    let req = test::TestRequest::get()\n        .uri(\"/api/cart\")\n        .header(\"Authorization\", format!(\"Bearer {}\", token))\n        .to_request();\n        \n    let resp = test::call_service(&app, req).await;\n    \n    let body = test::read_body(resp).await;\n    let cart: Cart = serde_json::from_slice(&body).unwrap();\n    \n    assert_eq!(cart.items[0].quantity, 3);\n    \n    // 7. Checkout (if implemented)\n    let req = test::TestRequest::post()\n        .uri(\"/api/orders/checkout\")\n        .header(\"Authorization\", format!(\"Bearer {}\", token))\n        .to_request();\n        \n    let resp = test::call_service(&app, req).await;\n    \n    assert_eq!(resp.status(), StatusCode::OK);\n    \n    // 8. Verify cart is empty after checkout\n    let req = test::TestRequest::get()\n        .uri(\"/api/cart\")\n        .header(\"Authorization\", format!(\"Bearer {}\", token))\n        .to_request();\n        \n    let resp = test::call_service(&app, req).await;\n    \n    let body = test::read_body(resp).await;\n    let cart: Cart = serde_json::from_slice(&body).unwrap();\n    \n    assert_eq!(cart.items.len(), 0);\n}\n```\n\nThis test should verify the entire user flow from product browsing to checkout, ensuring all components work together correctly.",
+            "status": "pending",
+            "testStrategy": "Run the end-to-end test and verify that the entire user flow works correctly. This test should catch integration issues between different components of the application."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Integration - Level 0",
+        "description": "Validate that tasks 1, 3, 4, and 6 integrate correctly before proceeding to next level",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3,
+          4,
+          6
+        ],
+        "priority": "high",
+        "agentHint": "integration",
+        "details": "Integration validation for execution level 0 - see .taskmaster/docs/task-8/",
+        "testStrategy": "Run full test suite with integrated code, verify no conflicts, validate build succeeds"
+      },
+      {
+        "id": 9,
+        "title": "Integration - Level 1",
+        "description": "Validate that tasks 2 and 5 integrate correctly before proceeding to next level",
+        "status": "pending",
+        "dependencies": [
+          2,
+          5,
+          8
+        ],
+        "priority": "high",
+        "agentHint": "integration",
+        "details": "Integration validation for execution level 1 - see .taskmaster/docs/task-9/",
+        "testStrategy": "Run full test suite with Level 1 code, verify API endpoints, validate cart operations"
+      },
+      {
+        "id": 10,
+        "title": "Final Integration & Deployment Verification",
+        "description": "End-to-end system validation and deployment readiness verification",
+        "status": "pending",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "priority": "critical",
+        "agentHint": "integration",
+        "details": "Final integration validation - see .taskmaster/docs/task-10/",
+        "testStrategy": "Complete system integration tests, deployment validation, smoke tests"
+      }
+    ],
+    "metadata": {
+      "created": "2025-10-28T04:18:12.056Z",
+      "updated": "2025-10-28T04:18:12.056Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

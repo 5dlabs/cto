@@ -1,0 +1,95 @@
+# Parallel Task Execution Test - Product Requirements Document
+
+## Overview
+Create a simple Rust API project to validate the CTO platform's parallel task execution system. This is NOT about building a real API - it's about testing task orchestration, dependency management, and parallel execution coordination.
+
+## Test Objectives
+- Validate parallel task execution with realistic dependencies
+- Test integration PR coordination across multiple parallel tasks  
+- Measure actual vs theoretical speedup calculations
+- Test conflict detection when tasks modify overlapping files
+- Validate TaskMaster dependency parsing and level generation
+
+## Project Components (Test Tasks)
+
+### Level 0 Tasks (Independent - Should Run in Parallel)
+
+**Task 1: Database Schema Setup**
+- Create basic database schema files and configuration
+- Files: `src/schema.rs`, `migrations/`, `Cargo.toml` (database deps)
+- No dependencies on other tasks
+- Estimated time: 30 minutes
+
+**Task 3: User Authentication Module** 
+- Create user authentication and JWT handling
+- Files: `src/auth/mod.rs`, `src/auth/jwt.rs`, `src/auth/models.rs`
+- No dependencies on other tasks  
+- Estimated time: 45 minutes
+
+**Task 4: Product Catalog Module**
+- Create product catalog and inventory management
+- Files: `src/catalog/mod.rs`, `src/catalog/models.rs`, `src/catalog/service.rs`
+- No dependencies on other tasks
+- Estimated time: 40 minutes  
+
+**Task 6: Frontend Components**
+- Create basic frontend structure and components
+- Files: `frontend/src/App.js`, `frontend/src/components/`, `frontend/package.json`
+- No dependencies on other tasks
+- Estimated time: 35 minutes
+
+### Level 1 Tasks (Dependent - Sequential after Level 0)
+
+**Task 2: API Endpoints**
+- Create REST API endpoints for core operations
+- Files: `src/api/mod.rs`, `src/api/routes.rs`, `src/main.rs`  
+- Dependencies: Task 1 (needs database schema)
+- Estimated time: 50 minutes
+
+**Task 5: Shopping Cart API**
+- Create shopping cart functionality and API endpoints
+- Files: `src/cart/mod.rs`, `src/cart/service.rs`, `src/api/cart_routes.rs`
+- Dependencies: Task 3 (auth), Task 4 (catalog)
+- Estimated time: 45 minutes
+
+### Level 2 Tasks (Final Integration)
+
+**Task 7: Integration Tests**  
+- Create comprehensive integration tests
+- Files: `tests/integration_tests.rs`, `tests/api_tests.rs`, `tests/auth_tests.rs`
+- Dependencies: Task 2 (API), Task 5 (cart), Task 6 (frontend)
+- Estimated time: 60 minutes
+
+## Expected Execution Plan
+- **Level 0**: Tasks 1, 3, 4, 6 (4 parallel tasks)
+- **Level 1**: Tasks 2, 5 (2 parallel tasks) 
+- **Level 2**: Task 7 (1 task)
+- **Theoretical speedup**: 7 tasks / 3 levels = 2.33x
+
+## Conflict Testing Scenarios
+Some tasks will intentionally modify shared files to test conflict detection:
+- Task 1 and Task 2 both modify `Cargo.toml` (dependencies)
+- Task 3 and Task 5 both touch auth-related files
+- Multiple tasks may update documentation files
+
+## Success Criteria
+1. All 7 tasks complete successfully
+2. Parallel execution occurs within each level  
+3. Integration PRs created per level
+4. File conflicts detected and reported
+5. Actual speedup approaches theoretical 2.33x
+6. No race conditions or coordination failures
+
+## Technical Requirements
+- Minimal actual Rust code - focus on file structure and placeholders
+- TaskMaster properly configured with accurate dependencies  
+- Clear task documentation for agents to follow
+- Simple, predictable work that agents can complete reliably
+
+## Validation
+After execution, verify:
+- Execution levels match expectations (3 levels)
+- Maximum parallel tasks = 4 (Level 0)
+- Integration branch structure created properly  
+- Telemetry shows expected speedup
+- All placeholder files created correctly
