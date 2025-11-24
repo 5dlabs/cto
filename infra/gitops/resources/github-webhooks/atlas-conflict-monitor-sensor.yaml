@@ -203,7 +203,6 @@ spec:
                           workingDirectory: "."
                           continueSession: true
                           overwriteMemory: false
-                          cli: "Claude"
                           env:
                             PR_NUMBER: "$PR_NUMBER"
                             PR_URL: "$PR_URL"
