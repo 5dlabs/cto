@@ -39,6 +39,11 @@ spec:
         conditions: "atlas-conflict-event"
         k8s:
           operation: create
+          parameters:
+            - src:
+                dependencyName: atlas-conflict-event
+                dataKey: body
+              dest: spec.templates.0.inputs.parameters.0.value
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -59,6 +64,10 @@ spec:
                   strategy: OnPodCompletion
                 templates:
                   - name: ensure-conflict-guardian
+                    inputs:
+                      parameters:
+                        - name: body
+                          value: ""
                     script:
                       image: alpine/k8s:1.31.0
                       command: [bash]
@@ -85,18 +94,19 @@ spec:
 
                         ensure_jq
 
-                        PR_NUMBER='{{ .Input.body.pull_request.number }}'
-                        PR_URL='{{ .Input.body.pull_request.html_url }}'
-                        REPO_OWNER='{{ .Input.body.repository.owner.login }}'
-                        REPO_NAME='{{ .Input.body.repository.name }}'
-                        REPO_URL='{{ .Input.body.repository.clone_url }}'
-                        PR_BRANCH='{{ .Input.body.pull_request.head.ref }}'
-                        PR_TITLE='{{ .Input.body.pull_request.title }}'
-                        PR_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        ACTION='{{ .Input.body.action }}'
-                        SENDER_LOGIN='{{ .Input.body.sender.login }}'
-                        MERGEABLE='{{ .Input.body.pull_request.mergeable }}'
-                        MERGE_STATE='{{ .Input.body.pull_request.mergeable_state }}'
+                        EVENT_BODY='{{inputs.parameters.body}}'
+                        PR_NUMBER=$(echo "$EVENT_BODY" | jq -r '.pull_request.number // empty')
+                        PR_URL=$(echo "$EVENT_BODY" | jq -r '.pull_request.html_url // empty')
+                        REPO_OWNER=$(echo "$EVENT_BODY" | jq -r '.repository.owner.login // empty')
+                        REPO_NAME=$(echo "$EVENT_BODY" | jq -r '.repository.name // empty')
+                        REPO_URL=$(echo "$EVENT_BODY" | jq -r '.repository.clone_url // empty')
+                        PR_BRANCH=$(echo "$EVENT_BODY" | jq -r '.pull_request.head.ref // empty')
+                        PR_TITLE=$(echo "$EVENT_BODY" | jq -r '.pull_request.title // empty')
+                        PR_LABELS_JSON=$(echo "$EVENT_BODY" | jq -c '.pull_request.labels // []')
+                        ACTION=$(echo "$EVENT_BODY" | jq -r '.action // empty')
+                        SENDER_LOGIN=$(echo "$EVENT_BODY" | jq -r '.sender.login // empty')
+                        MERGEABLE=$(echo "$EVENT_BODY" | jq -r '.pull_request.mergeable // null')
+                        MERGE_STATE=$(echo "$EVENT_BODY" | jq -r '.pull_request.mergeable_state // empty')
 
                         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
                           echo "ℹ️ No PR number in payload, skipping"
