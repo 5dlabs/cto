@@ -11,14 +11,6 @@
       "env": {
         "TOOLMAN_SERVER_URL": "http://toolman.agent-platform.svc.cluster.local:3000/mcp"
       }
-    },
-    "openmemory": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch",
-        "http://openmemory.cto-system.svc.cluster.local:3000/mcp"
-      ]
     }
   }
 }
