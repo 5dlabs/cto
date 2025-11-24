@@ -661,6 +661,13 @@ spec:
               continue
             fi
 
+            # Determine if this is the final level (for deployment verification)
+            IS_FINAL_LEVEL="false"
+            if [ $level_index -eq $((NUM_LEVELS - 1)) ]; then
+              IS_FINAL_LEVEL="true"
+              echo "📌 This is the final execution level - tasks will trigger deployment verification"
+            fi
+            
             # Launch all tasks in this level in parallel
             echo "🚀 Launching parallel tasks for level $level_index:"
             workflow_names=""
@@ -767,6 +774,8 @@ spec:
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.model}}`}}"
+                - name: final-task
+                  value: "$IS_FINAL_LEVEL"
           EOF
 
               workflow_name=$(kubectl create -f /tmp/workflow-task-${task_id}.yaml -o jsonpath='{.metadata.name}')
@@ -1266,11 +1275,19 @@ spec:
 
           # Process each task sequentially
           task_index=1
+          TOTAL_TASKS={{`{{inputs.parameters.task-count}}`}}
           for task_id in $task_list; do
             echo ""
             echo "════════════════════════════════════════"
-            echo "🎯 Starting Task $task_id ($task_index/{{`{{inputs.parameters.task-count}}`}})"
+            echo "🎯 Starting Task $task_id ($task_index/$TOTAL_TASKS)"
             echo "════════════════════════════════════════"
+            
+            # Determine if this is the final task (for deployment verification)
+            IS_FINAL_TASK="false"
+            if [ $task_index -eq $TOTAL_TASKS ]; then
+              IS_FINAL_TASK="true"
+              echo "📌 This is the final task - will trigger deployment verification"
+            fi
 
             # Create current-task marker
             cat > /tmp/current-task.json <<EOF
@@ -1388,6 +1405,8 @@ spec:
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.model}}`}}"
+                - name: final-task
+                  value: "$IS_FINAL_TASK"
           EOF
 
             workflow_name=$(kubectl create -f /tmp/workflow.yaml -o jsonpath='{.metadata.name}')
