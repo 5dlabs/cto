@@ -119,6 +119,27 @@ export GH_HOST="github.com"
 TASK_WORKSPACE="/workspace/task-{{task_id}}"
 mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
+
+# Function to clean completion markers from workspace
+clean_completion_markers() {
+  local context="${1:-workspace}"
+  echo "🧹 Cleaning stale completion markers from $context..."
+  # Clean both old-style and new-style markers
+  find "$TASK_WORKSPACE" -type f \( \
+    -name ".rex-complete" -o \
+    -name ".cleo-complete" -o \
+    -name ".tess-complete" -o \
+    -name ".cipher-complete" -o \
+    -name ".implementation_complete" -o \
+    -name ".agent_done" -o \
+    -name ".quality_complete" -o \
+    -name ".testing_complete" -o \
+    -name ".security_complete" \
+  \) -delete 2>/dev/null || true
+  # Also clean markers from the root workspace (non-task-specific location)
+  rm -f /workspace/.rex-complete /workspace/.cleo-complete /workspace/.tess-complete /workspace/.cipher-complete 2>/dev/null || true
+  echo "✅ Workspace markers cleaned for $context"
+}
 export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
 mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
@@ -1063,15 +1084,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
         echo "ℹ️ Previous PR was closed - starting with clean slate"
         
         # Clean stale completion markers from workspace
-        echo "🧹 Cleaning stale completion markers after branch recreation..."
-        find "$WORKSPACE_ROOT" -type f \( \
-          -name ".implementation_complete" -o \
-          -name ".agent_done" -o \
-          -name ".quality_complete" -o \
-          -name ".testing_complete" -o \
-          -name ".security_complete" \
-        \) -delete 2>/dev/null || true
-        echo "✅ Workspace markers cleaned for fresh implementation"
+        clean_completion_markers "branch recreation"
       else
         echo "ℹ️ No closed PRs found - will unset upstream and continue"
         git branch --unset-upstream 2>/dev/null || true
@@ -1108,15 +1121,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
           echo "✅ Recreated $FEATURE_BRANCH from $REMOTE_BASE"
           
           # Clean stale completion markers from workspace
-          echo "🧹 Cleaning stale completion markers after branch recreation..."
-          find "$WORKSPACE_ROOT" -type f \( \
-            -name ".implementation_complete" -o \
-            -name ".agent_done" -o \
-            -name ".quality_complete" -o \
-            -name ".testing_complete" -o \
-            -name ".security_complete" \
-          \) -delete 2>/dev/null || true
-          echo "✅ Workspace markers cleaned for fresh implementation"
+          clean_completion_markers "branch recreation after merge conflict"
         fi
       fi
     fi
@@ -1157,6 +1162,8 @@ else
   else
     git checkout -b "$FEATURE_BRANCH"
   fi
+  # Clean markers when creating a new branch
+  clean_completion_markers "new branch creation"
 fi
 
 git config --local user.name "$GIT_AUTHOR_NAME"

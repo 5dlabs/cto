@@ -1646,6 +1646,34 @@ if command -v cursor-agent >/dev/null 2>&1; then
     TOOL_VERIFICATION_FAILED=true
   fi
   
+  # List available tools through Cursor CLI
+  echo ""
+  echo "📦 Listing tools available through Cursor CLI..."
+  
+  # Try different methods to list tools
+  # Method 1: cursor-agent tool list
+  CURSOR_TOOLS=$(cursor-agent tool list 2>&1 || echo "")
+  
+  if [ -z "$CURSOR_TOOLS" ] || echo "$CURSOR_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 2: cursor-agent mcp list-tools
+    CURSOR_TOOLS=$(cursor-agent mcp list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -z "$CURSOR_TOOLS" ] || echo "$CURSOR_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 3: cursor-agent --list-tools
+    CURSOR_TOOLS=$(cursor-agent --list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -n "$CURSOR_TOOLS" ] && ! echo "$CURSOR_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    echo "  ✓ Retrieved tool list from Cursor CLI:"
+    TOOL_COUNT=$(echo "$CURSOR_TOOLS" | grep -v "^$" | wc -l | tr -d ' ')
+    echo "  📊 Total: $TOOL_COUNT tools available"
+    echo "$CURSOR_TOOLS" | sed 's/^/    - /'
+  else
+    echo "  ℹ️ Cursor CLI may not support direct tool listing"
+    echo "  ℹ️ Tools will be discovered at runtime"
+  fi
+  
   echo ""
 else
   echo "  ⚠️ cursor-agent CLI not available for tool verification"
