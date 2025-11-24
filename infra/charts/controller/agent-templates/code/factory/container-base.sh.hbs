@@ -616,6 +616,10 @@ ensure_pr_created() {
   TASK_LABEL="task-{{task_id}}"
   SERVICE_LABEL="service-{{service}}"
   REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+  
+  # Track which labels we create to avoid propagation delay issues
+  # Initialize with a leading space to simplify matching
+  CREATED_LABELS=" "
 
   echo "🔍 Ensuring PR correlation labels exist"
   for label in "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"; do
@@ -637,6 +641,8 @@ ensure_pr_created() {
 
     if gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
       echo "   ✅ Created label '$label'"
+      # Track that we created this label (with leading and trailing space for easy matching)
+      CREATED_LABELS="${CREATED_LABELS}${label} "
     else
       echo "   ❌ Failed to create label '$label'"
       cat /tmp/gh-label-create.log >&2 || true
@@ -725,10 +731,21 @@ EOF
     if [ -z "$label" ]; then
       return
     fi
+    
+    # If we just created this label, use it without checking (avoid GitHub API propagation delay)
+    # CREATED_LABELS has format " label1 label2 label3 " with spaces around each label
+    if echo "$CREATED_LABELS" | grep -q " ${label} "; then
+      echo "✓ Label '$label' (just created, using immediately)"
+      LABEL_ARGS+=("--label" "$label")
+      return
+    fi
+    
+    # Otherwise check if it exists
     if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      echo "✓ Label '$label' exists"
       LABEL_ARGS+=("--label" "$label")
     else
-      echo "⚠️ Label '$label' not found; skipping"
+      echo "⚠️ Label '$label' not found and was not created earlier; skipping"
     fi
   }
 
