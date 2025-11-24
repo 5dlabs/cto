@@ -174,7 +174,10 @@ spec:
                           TASK_LABEL_VALUE="                        "
                           TASK_LABEL_VALUE="${TASK_LABEL_VALUE}    task-id: \"$TASK_ID\""
                           TASK_ID_SPEC="                        "
-                          TASK_ID_SPEC="${TASK_ID_SPEC}  taskId: \"$TASK_ID\""
+                          TASK_ID_SPEC="${TASK_ID_SPEC}  taskId: $TASK_ID"
+                        else
+                          TASK_ID_SPEC="                        "
+                          TASK_ID_SPEC="${TASK_ID_SPEC}  taskId: 0"
                         fi
 
                         cat <<EOF | sed 's/^                        //' | kubectl create -f - >/tmp/atlas-guardian.log 2>&1 || true
@@ -201,28 +204,17 @@ spec:
                           continueSession: true
                           overwriteMemory: false
                           env:
-                            - name: PR_NUMBER
-                              value: "$PR_NUMBER"
-                            - name: PR_URL
-                              value: "$PR_URL"
-                            - name: PR_BRANCH
-                              value: "$PR_BRANCH"
-                            - name: REPOSITORY_OWNER
-                              value: "$REPO_OWNER"
-                            - name: REPOSITORY_NAME
-                              value: "$REPO_NAME"
-                            - name: REPOSITORY_SLUG
-                              value: "$REPO_FULL"
-                            - name: TASK_ID
-                              value: "${TASK_ID:-none}"
-                            - name: ATLAS_MODE
-                              value: "guardian"
-                            - name: ATLAS_POLL_INTERVAL
-                              value: "60"
-                            - name: ATLAS_MAX_CYCLES
-                              value: "0"
-                            - name: TRIGGER_ACTION
-                              value: "$ACTION"
+                            PR_NUMBER: "$PR_NUMBER"
+                            PR_URL: "$PR_URL"
+                            PR_BRANCH: "$PR_BRANCH"
+                            REPOSITORY_OWNER: "$REPO_OWNER"
+                            REPOSITORY_NAME: "$REPO_NAME"
+                            REPOSITORY_SLUG: "$REPO_FULL"
+                            TASK_ID: "${TASK_ID:-0}"
+                            ATLAS_MODE: "guardian"
+                            ATLAS_POLL_INTERVAL: "60"
+                            ATLAS_MAX_CYCLES: "0"
+                            TRIGGER_ACTION: "$ACTION"
                         EOF
 
                         if grep -qi "created" /tmp/atlas-guardian.log; then

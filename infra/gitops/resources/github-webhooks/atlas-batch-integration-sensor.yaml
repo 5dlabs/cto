@@ -144,6 +144,7 @@ spec:
                             repository: "$REPO_LABEL"
                             trigger: "$INTEGRATION_TYPE"
                         spec:
+                          taskId: 0
                           service: "atlas"
                           githubApp: "5DLabs-Atlas"
                           model: "claude-sonnet-4-5-20250929"
@@ -154,28 +155,17 @@ spec:
                           continueSession: false
                           overwriteMemory: false
                           env:
-                            - name: PR_NUMBER
-                              value: "$PR_NUMBER"
-                            - name: PR_URL
-                              value: "$PR_URL"
-                            - name: REPOSITORY_OWNER
-                              value: "$REPO_OWNER"
-                            - name: REPOSITORY_NAME
-                              value: "$REPO_NAME"
-                            - name: REPOSITORY_SLUG
-                              value: "$REPO_FULL"
-                            - name: INTEGRATION_TYPE
-                              value: "$INTEGRATION_TYPE"
-                            - name: BATCH_NUMBER
-                              value: "$BATCH_NUMBER"
-                            - name: ATLAS_MODE
-                              value: "integration-gate"
-                            - name: ATLAS_POLL_INTERVAL
-                              value: "30"
-                            - name: ATLAS_MAX_CYCLES
-                              value: "240"
-                            - name: TRIGGER_COMMENT
-                              value: "$COMMENT_BODY"
+                            PR_NUMBER: "$PR_NUMBER"
+                            PR_URL: "$PR_URL"
+                            REPOSITORY_OWNER: "$REPO_OWNER"
+                            REPOSITORY_NAME: "$REPO_NAME"
+                            REPOSITORY_SLUG: "$REPO_FULL"
+                            INTEGRATION_TYPE: "$INTEGRATION_TYPE"
+                            BATCH_NUMBER: "$BATCH_NUMBER"
+                            ATLAS_MODE: "integration-gate"
+                            ATLAS_POLL_INTERVAL: "30"
+                            ATLAS_MAX_CYCLES: "240"
+                            TRIGGER_COMMENT: "$COMMENT_BODY"
                         EOF_INTEGRATION
 
                         if grep -qi "created" /tmp/atlas-integration.log; then

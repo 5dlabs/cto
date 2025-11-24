@@ -397,7 +397,7 @@ spec:
                               repository: "$REPO_LABEL"
                               workflow: "$WORKFLOW_NAME"
                           spec:
-                            taskId: "$TASK_ID"
+                            taskId: ${TASK_ID:-0}
                             service: "atlas"
                             githubApp: "5DLabs-Atlas"
                             model: "claude-sonnet-4-5-20250929"
@@ -408,26 +408,16 @@ spec:
                             continueSession: false
                             overwriteMemory: false
                             env:
-                              - name: PR_NUMBER
-                                value: "$PR_NUMBER"
-                              - name: PR_URL
-                                value: "$PR_URL"
-                              - name: WORKFLOW_NAME
-                                value: "$WORKFLOW_NAME"
-                              - name: TASK_ID
-                                value: "$TASK_ID"
-                              - name: REPOSITORY_SLUG
-                                value: "$REPO_FULL"
-                              - name: REPOSITORY_OWNER
-                                value: "$OWNER"
-                              - name: REPOSITORY_NAME
-                                value: "$REPO_NAME"
-                              - name: ATLAS_MODE
-                                value: "integration-gate"
-                              - name: ATLAS_MAX_CYCLES
-                                value: "120"
-                              - name: ATLAS_POLL_INTERVAL
-                                value: "30"
+                              PR_NUMBER: "$PR_NUMBER"
+                              PR_URL: "$PR_URL"
+                              WORKFLOW_NAME: "$WORKFLOW_NAME"
+                              TASK_ID: "$TASK_ID"
+                              REPOSITORY_SLUG: "$REPO_FULL"
+                              REPOSITORY_OWNER: "$OWNER"
+                              REPOSITORY_NAME: "$REPO_NAME"
+                              ATLAS_MODE: "integration-gate"
+                              ATLAS_MAX_CYCLES: "120"
+                              ATLAS_POLL_INTERVAL: "30"
                           EOF_MANIFEST
                         }
 
