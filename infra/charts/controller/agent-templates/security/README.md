@@ -64,3 +64,4 @@ To add new security patterns:
 - [RustSec Advisory Database](https://rustsec.org/)
 
 
+
