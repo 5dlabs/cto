@@ -1220,7 +1220,7 @@ update_coderun_status() {
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-  cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
+  cp "$CLAUDE_WORK_DIR/client-config.json" "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
   echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
 else
   echo "⚠️ client-config.json not found in task-files"
@@ -2295,7 +2295,11 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     
     # Add ready-for-security label to signal Cipher
     echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"
-    timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-security" || echo "⚠️ Failed to add ready-for-security label"
+    if [ -n "$PR_NUMBER" ]; then
+      timeout 30 gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-security" || echo "⚠️ Failed to add ready-for-security label"
+    elif [ -n "$PR_URL" ]; then
+      timeout 30 gh pr edit "$PR_URL" --add-label "ready-for-security" || echo "⚠️ Failed to add ready-for-security label"
+    fi
     
     update_coderun_status "ready-for-security" "quality-passed" "$PR_URL"
   else
@@ -2306,8 +2310,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     
     update_coderun_status "needs-fixes" "quality-issues" "$PR_URL"
     
-    # Exit with failure to trigger retry
-    exit 1
+    # Continue to retry logic below (do not exit here - let the retry loop handle it)
   fi
 else
   echo "⚠️ No PR reference available, skipping remediation label update"
