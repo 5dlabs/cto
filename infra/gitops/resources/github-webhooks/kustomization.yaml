@@ -10,4 +10,7 @@ resources:
   - play-workflow-sensors.yaml
   - merge-to-main-sensor.yaml
   - remediation-feedback-sensor.yaml
+  - atlas-conflict-monitor-sensor.yaml
+  - atlas-batch-integration-sensor.yaml
+  - atlas-pr-monitor-sensor.yaml
 
