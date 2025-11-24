@@ -10,7 +10,12 @@
       ],
       "env": {
         "TOOLMAN_SERVER_URL": "{{toolman_url}}"
-      }
+      }{{#if toolman_tools}},
+      "availableTools": [
+        {{#each toolman_tools}}
+        "{{this}}"{{#unless @last}},{{/unless}}
+        {{/each}}
+      ]{{/if}}
     }
   }
 }
