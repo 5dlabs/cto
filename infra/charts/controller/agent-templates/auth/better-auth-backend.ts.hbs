@@ -316,7 +316,7 @@ export const auth = betterAuth({
           redirectURLs: [{{#each this.redirectURLs}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}],
           disabled: false,
           skipConsent: {{this.skipConsent}},
-          metadata: {{json this.metadata}}
+          metadata: {{{json this.metadata}}}
         },
         {{/each}}
       ],

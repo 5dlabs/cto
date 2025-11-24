@@ -555,6 +555,7 @@ export function SignUpForm() {
 
 // User Profile Component
 export function UserProfile() {
+  const router = useRouter()
   const { user, isLoading } = useSession()
   const [isUpdating, setIsUpdating] = useState(false)
   
