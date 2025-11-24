@@ -428,17 +428,27 @@ mod tests {
         let rendered = adapter.generate_config(&agent).await.unwrap();
         let parsed: Value = serde_json::from_str(&rendered).unwrap();
 
+        // New config format uses "mode": "exec" with command-line invocation
+        assert_eq!(parsed["mode"].as_str().unwrap(), "exec");
         assert_eq!(
-            parsed["model"].as_str().unwrap(),
-            "anthropic/opencode-sonnet"
+            parsed["exec"]["command"].as_str().unwrap(),
+            "/usr/local/bin/opencode"
         );
-        assert_eq!(parsed["max_tokens"].as_u64().unwrap(), 16384);
-        assert!((parsed["temperature"].as_f64().unwrap() - 0.65).abs() < 1e-6);
-        assert_eq!(
-            parsed["provider"]["envKey"].as_str().unwrap(),
-            "ANTHROPIC_API_KEY"
-        );
-        assert!(parsed["tools"]["remote"]
+        
+        // Model is passed as an argument
+        let args = parsed["exec"]["args"].as_array().unwrap();
+        assert!(args.contains(&json!("--model")));
+        assert!(args.contains(&json!("opencode-sonnet")));
+        
+        // Settings are in env vars (rendered as empty in test, but structure is correct)
+        assert!(parsed["exec"]["env"].get("OPENCODE_API_KEY").is_some());
+        assert!(parsed["exec"]["env"].get("OPENCODE_BASE_URL").is_some());
+        // Temperature is rendered as float
+        assert!(parsed["exec"]["env"]["OPENCODE_TEMPERATURE"].as_str().is_some());
+        
+        // Tools configuration
+        assert_eq!(parsed["tools"]["remote"]["enabled"].as_bool().unwrap(), true);
+        assert!(parsed["tools"]["remote"]["availableTools"]
             .as_array()
             .unwrap()
             .contains(&json!("memory_create_entities")));

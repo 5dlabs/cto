@@ -1061,7 +1061,7 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_mcp_config(code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
+    fn generate_mcp_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -1085,17 +1085,11 @@ impl CodeTemplateGenerator {
 
         let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
 
-        // Extract remote tools from client config for tool filtering
-        let remote_tools = cli_config_value
-            .get("clientConfig")
-            .and_then(|cc| cc.get("remoteTools"))
-            .and_then(|rt| rt.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect::<Vec<String>>()
-            })
-            .unwrap_or_default();
+        // Generate client config and extract remote tools (same pattern as other functions)
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
 
         let context = json!({
             "toolman_url": render_settings.toolman_url,
