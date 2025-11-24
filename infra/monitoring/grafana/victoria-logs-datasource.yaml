@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-victoria-logs-datasource
+  namespace: telemetry
+  labels:
+    grafana_datasource: "1"
+data:
+  victoria-logs.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: Victoria Logs
+        type: prometheus
+        access: proxy
+        url: http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/select/logsql
+        isDefault: false
+        editable: true
+        jsonData:
+          httpMethod: POST
+          timeInterval: "30s"
