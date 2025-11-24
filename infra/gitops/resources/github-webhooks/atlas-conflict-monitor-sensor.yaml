@@ -183,7 +183,7 @@ spec:
                             pr-number: "$PR_NUMBER"
                             repository: "$REPO_LABEL"
                         spec:
-                          taskId: "$TASK_ID"
+                          taskId: $TASK_ID
                           service: "atlas"
                           githubApp: "5DLabs-Atlas"
                           model: "claude-sonnet-4-5-20250929"
@@ -194,30 +194,18 @@ spec:
                           continueSession: true
                           overwriteMemory: false
                           env:
-                            - name: PR_NUMBER
-                              value: "$PR_NUMBER"
-                            - name: PR_URL
-                              value: "$PR_URL"
-                            - name: PR_BRANCH
-                              value: "$PR_BRANCH"
-                            - name: REPOSITORY_OWNER
-                              value: "$REPO_OWNER"
-                            - name: REPOSITORY_NAME
-                              value: "$REPO_NAME"
-                            - name: REPOSITORY_SLUG
-                              value: "$REPO_FULL"
-                            - name: TASK_ID
-                              value: "$TASK_ID"
-                            - name: ATLAS_MODE
-                              value: "guardian"
-                            - name: ATLAS_POLL_INTERVAL
-                              value: "45"
-                            - name: ATLAS_MAX_CYCLES
-                              value: "120"
-                            - name: TRIGGER_ACTION
-                              value: "conflict-detected"
-                            - name: CONFLICT_SOURCE
-                              value: "$NORMALIZED_STATE"
+                            PR_NUMBER: "$PR_NUMBER"
+                            PR_URL: "$PR_URL"
+                            PR_BRANCH: "$PR_BRANCH"
+                            REPOSITORY_OWNER: "$REPO_OWNER"
+                            REPOSITORY_NAME: "$REPO_NAME"
+                            REPOSITORY_SLUG: "$REPO_FULL"
+                            TASK_ID: "$TASK_ID"
+                            ATLAS_MODE: "guardian"
+                            ATLAS_POLL_INTERVAL: "45"
+                            ATLAS_MAX_CYCLES: "120"
+                            TRIGGER_ACTION: "conflict-detected"
+                            CONFLICT_SOURCE: "$NORMALIZED_STATE"
                         EOF_MANIFEST
 
                         if grep -qi "created" /tmp/atlas-guardian.log; then
