@@ -22,11 +22,13 @@ VALUES_FILE=${VALUES_FILE:-$VALUES_FILE_DEFAULT}
 # Split ConfigMap template names
 CONFIGMAP_TEMPLATES=(
   "agent-templates-shared.yaml"
-  "agent-templates-claude.yaml"
+  "agent-templates-claude-code.yaml"
+  "agent-templates-claude-docs.yaml"
   "agent-templates-codex.yaml"
   "agent-templates-cursor.yaml"
   "agent-templates-factory.yaml"
   "agent-templates-opencode.yaml"
+  "agent-templates-integration.yaml"
 )
 
 # Split optional extra Helm args after "--"

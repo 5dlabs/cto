@@ -1,0 +1,54 @@
+# Rust build artifacts
+target/
+**/target/
+controller/target/
+mcp/target/
+sidecar/target/
+cli/target/
+
+# Distribution files
+dist/
+**/dist/
+
+# Dependencies
+node_modules/
+
+# Lock files (large and binary-like)
+Cargo.lock
+package-lock.json
+
+# Build outputs
+*.rlib
+*.rmeta
+*.so
+*.dylib
+*.dll
+
+# Large generated documentation
+target/doc/
+
+# Temporary build files
+*.tmp
+*.temp
+
+# Editor and IDE
+.cursor/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+testing/
+.test-repo/
+.tmp/
+
+# Local data
+data/
+
+

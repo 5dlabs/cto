@@ -1,23 +1,15 @@
 {
-  "localServers": {},
   "remoteTools": [
     "brave_search_brave_web_search",
-    "context7_resolve_library_id",
     "context7_get_library_docs",
-    "shadcn_list_components",
-    "shadcn_get_component",
-    "shadcn_get_component_metadata",
-    "shadcn_get_component_demo",
-    "shadcn_list_blocks",
-    "shadcn_get_block",
-    "shadcn_get_directory_structure",
-    "memory_create_entities",
-    "memory_add_observations",
-    "memory_read_graph",
-    "filesystem_read_text_file",
-    "filesystem_list_directory",
-    "filesystem_edit_file",
-    "filesystem_search_files",
-    "kubernetes_listResources"
-  ]
+    "agent_docs_rust_query",
+    "agent_docs_codex_query",
+    "agent_docs_cursor_query",
+    "agent_docs_opencode_query",
+    "agent_docs_gemini_query",
+    "agent_docs_grok_query",
+    "agent_docs_qwen_query",
+    "agent_docs_openhands_query"
+  ],
+  "localServers": {}
 }

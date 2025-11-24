@@ -46,12 +46,13 @@ spec:
           - path: body.repository.full_name
             type: string
             value: ["5dlabs/cto"]
-          # Exclude workflows with skip-ci-remediation label
-          - path: body.workflow_run.head_commit.message
-            type: string
-            comparator: "!~"
-            value: ["\\[skip-ci-remediation\\]"]
         exprs:
+          # Exclude workflows with skip-ci-remediation in commit message
+          # Using expr instead of unsupported !~ comparator
+          - expr: '!(body.workflow_run.head_commit.message contains "[skip-ci-remediation]")'
+            fields:
+              - name: skip_check
+                path: body.workflow_run.head_commit.message
           # Additional validation
           - expr: 'body.workflow_run.id != ""'
             fields:

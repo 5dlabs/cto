@@ -11,13 +11,18 @@
   {{else if (eq tool_config "default")}}
   "remoteTools": [
     "brave_search_brave_web_search",
-    "memory_create_entities",
+    "openmemory_query",
+    "openmemory_store",
     "rustdocs_query_rust_docs"
   ]{{#if (eq tool_config "advanced")}},{{/if}}
   {{else if (eq tool_config "advanced")}}
   "remoteTools": [
     "brave_search_brave_web_search",
-    "memory_create_entities",
+    "openmemory_query",
+    "openmemory_store",
+    "openmemory_list",
+    "openmemory_get",
+    "openmemory_reinforce",
     "rustdocs_query_rust_docs",
     "github_create_issue",
     "kubernetes_listResources",
@@ -26,7 +31,8 @@
   {{else}}
   "remoteTools": [
     "brave_search_brave_web_search",
-    "memory_create_entities",
+    "openmemory_query",
+    "openmemory_store",
     "rustdocs_query_rust_docs"
   ]{{#if (eq tool_config "advanced")}},{{/if}}
   {{/if}}

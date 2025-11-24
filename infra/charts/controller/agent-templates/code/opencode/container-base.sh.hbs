@@ -31,31 +31,6 @@ fi
 echo "PATH: $PATH"
 
 # =========================================================================
-# RETRY CONFIGURATION
-# =========================================================================
-MAX_RETRIES_CONFIG=${OPENCODE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
-echo ""
-echo "════════════════════════════════════════════════════════════════"
-echo "║                    RETRY CONFIGURATION                        ║"
-echo "════════════════════════════════════════════════════════════════"
-echo "🤖 CLI: {{cli_type}}"
-echo "🎯 Model: {{model}}"
-if [ "$MAX_RETRIES_CONFIG" = "0" ]; then
-  echo "🔄 Maximum Iterations: UNLIMITED (will retry until complete)"
-else
-  echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
-fi
-if [ -n "${OPENCODE_MAX_RETRIES:-}" ]; then
-  echo "📍 Source: OPENCODE_MAX_RETRIES environment variable"
-elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
-  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
-else
-  echo "📍 Source: Default configuration"
-fi
-echo "════════════════════════════════════════════════════════════════"
-echo ""
-
-# =========================================================================
 # GitHub App authentication
 # =========================================================================
 
@@ -124,30 +99,9 @@ export GITHUB_TOKEN
 export GH_TOKEN="$GITHUB_TOKEN"
 export GH_HOST="github.com"
 
-# Task-specific workspace for parallel execution isolation
-TASK_WORKSPACE="/workspace/task-{{task_id}}"
+export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
+CREDENTIALS_FILE=/workspace/.git-credentials
 mkdir -p /workspace
-mkdir -p "$TASK_WORKSPACE"
-export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
-mkdir -p "$GH_CONFIG_DIR"
-echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
-
-# Clean up any leftover sentinel file from previous runs
-# This prevents premature sidecar shutdown on sequential task executions
-if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
-    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
-    rm -f "$TASK_WORKSPACE/.agent_done"
-fi
-
-# Clean up any leftover completion marker from previous runs
-# This prevents issues with sequential task executions on the same PVC
-if [ -f /workspace/.cipher-complete ]; then
-    echo "🧹 Cleaning up completion marker from previous run"
-    rm -f /workspace/.cipher-complete
-fi
-
-export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
-CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 
 git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 
@@ -157,35 +111,6 @@ write_git_credentials() {
   fi
   printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$CREDENTIALS_FILE"
   chmod 600 "$CREDENTIALS_FILE" 2>/dev/null || true
-}
-
-gh_hosts_file() {
-  if [ -n "${GH_CONFIG_DIR:-}" ] && [ -f "${GH_CONFIG_DIR}/hosts.yml" ]; then
-    printf '%s\n' "${GH_CONFIG_DIR}/hosts.yml"
-    return
-  fi
-  if [ -f "$HOME/.config/gh/hosts.yml" ]; then
-    printf '%s\n' "$HOME/.config/gh/hosts.yml"
-    return
-  fi
-  printf ''
-}
-
-sync_gh_hosts_to_path() {
-  local target="$1"
-  if [ -z "$target" ]; then
-    return
-  fi
-  local source
-  source=$(gh_hosts_file)
-  if [ -z "$source" ] || [ ! -f "$source" ]; then
-    return
-  fi
-  local dest_dir="$target/.config/gh"
-  mkdir -p "$dest_dir"
-  if cp "$source" "$dest_dir/hosts.yml" >/dev/null 2>&1; then
-    chmod 600 "$dest_dir/hosts.yml" 2>/dev/null || true
-  fi
 }
 
 write_git_credentials
@@ -261,109 +186,6 @@ refresh_token_if_needed() {
   fi
 }
 
-sanitize_status_message() {
-  printf '%s' "$1" | tr '\n' ' ' | tr '\r' ' '
-}
-
-resolve_pr_url() {
-  if [ -n "${PR_URL:-}" ]; then
-    printf '%s' "$PR_URL"
-    return
-  fi
-
-  if [ -n "${PR_NUMBER:-}" ] && [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ]; then
-    printf 'https://github.com/%s/%s/pull/%s' "$REPO_OWNER" "$REPO_NAME" "$PR_NUMBER"
-    return
-  fi
-
-  if command -v gh >/dev/null 2>&1; then
-    local current_branch
-    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
-    if [ -n "$current_branch" ]; then
-      local pr_url
-      pr_url=$(gh pr list --state all --head "$current_branch" --json url --jq '.[0].url' 2>/dev/null || printf '')
-      if [ -n "$pr_url" ]; then
-        printf '%s' "$pr_url"
-        return
-      fi
-    fi
-  fi
-
-  printf ''
-}
-
-patch_coderun_status() {
-  local phase="$1"
-  local message="$2"
-  local remediation_status="${3:-}"
-  local qa_status="${4:-}"
-  local pr_url="${5:-}"
-  local work_completed_flag="${6:-false}"
-
-  if [ -z "${CODERUN_NAME:-}" ] || [ -z "${NAMESPACE:-}" ]; then
-    return
-  fi
-
-  local token_path="/var/run/secrets/kubernetes.io/serviceaccount/token"
-  local ca_path="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-
-  if [ ! -f "$token_path" ] || [ ! -f "$ca_path" ]; then
-    echo "ℹ️ Service account credentials unavailable; skipping CodeRun status update"
-    return
-  fi
-
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "ℹ️ jq not available; skipping CodeRun status update"
-    return
-  fi
-
-  local work_completed="false"
-  if [ "$work_completed_flag" = "true" ]; then
-    work_completed="true"
-  fi
-
-  local payload
-  payload=$(jq -n \
-    --arg phase "$phase" \
-    --arg message "$(sanitize_status_message "$message")" \
-    --arg remediation "$remediation_status" \
-    --arg qa "$qa_status" \
-    --arg pr "$pr_url" \
-    --arg workCompleted "$work_completed" \
-    '{
-      status: (
-        {
-          phase: $phase,
-          message: $message,
-          workCompleted: ($workCompleted == "true")
-        }
-        + (if $remediation != "" then {remediationStatus: $remediation} else {} end)
-        + (if $qa != "" then {qaStatus: $qa} else {} end)
-        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
-      )
-    }'
-  ) || return
-
-  local api_host="${KUBERNETES_SERVICE_HOST:-}"
-  local api_port="${KUBERNETES_SERVICE_PORT_HTTPS:-${KUBERNETES_SERVICE_PORT:-443}}"
-
-  if [ -z "$api_host" ]; then
-    echo "ℹ️ Kubernetes API host unavailable; skipping CodeRun status update"
-    return
-  fi
-
-  local token
-  token=$(cat "$token_path")
-
-  curl -sS -X PATCH \
-    -H "Authorization: Bearer $token" \
-    -H "Content-Type: application/merge-patch+json" \
-    --cacert "$ca_path" \
-    --data "$payload" \
-    "https://${api_host}:${api_port}/apis/agents.platform/v1/namespaces/${NAMESPACE}/coderuns/${CODERUN_NAME}/status" >/dev/null 2>&1 || \
-    echo "⚠️ Failed to patch CodeRun status"
-}
-
 stop_docker_sidecar() {
   if [ ! -S /var/run/docker.sock ]; then
     return
@@ -393,7 +215,6 @@ ensure_gh_authenticated() {
 
   if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
     echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
-    refresh_github_token || true
     if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
       echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
     fi
@@ -411,25 +232,9 @@ ensure_gh_authenticated() {
 
 ensure_gh_authenticated
 
-sync_gh_hosts_to_path "$TASK_WORKSPACE"
-
 ensure_pr_created() {
   if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
     echo "⏭️  Auto PR creation disabled via SKIP_AUTO_PR=1"
-    return
-  fi
-
-  # CRITICAL GUARD #1: Check if orchestrator already provided PR_NUMBER
-  # This must be checked BEFORE any other logic to prevent duplicate PRs
-  if [ -n "${PR_NUMBER:-}" ]; then
-    echo "ℹ️ PR_NUMBER=${PR_NUMBER} provided by orchestrator; skipping fallback PR creation"
-    return
-  fi
-
-  # CRITICAL GUARD #2: Only auto-create PRs during implementation stage
-  # Quality/security/testing agents should NEVER create PRs
-  if [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
-    echo "ℹ️ Not in implementation stage (${WORKFLOW_STAGE:-unknown}); skipping fallback PR creation"
     return
   fi
 
@@ -459,45 +264,7 @@ ensure_pr_created() {
     return
   fi
 
-  # Ensure we have repo context for PR checks
-  REPO_SLUG="${REPO_OWNER:-}/${REPO_NAME:-}"
-  if [ "$REPO_SLUG" = "/" ] || [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
-    echo "⚠️ REPO_OWNER/REPO_NAME not set; checking for PRs without explicit repo context"
-    REPO_SLUG=""
-  fi
-
-  # Check if PR already exists for this branch (with explicit repo context)
-  refresh_token_if_needed || true
-  if [ -n "$REPO_SLUG" ]; then
-    PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
-  else
-  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
-  fi
-  PR_EXIT_CODE=$?
-
-  if [ $PR_EXIT_CODE -ne 0 ] && printf '%s' "$PR_OUTPUT" | grep -qi "HTTP 401"; then
-    echo "⚠️ gh pr list returned HTTP 401; refreshing GitHub credentials"
-    refresh_github_token || true
-    ensure_gh_authenticated
-    if [ -n "$REPO_SLUG" ]; then
-      PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
-    else
-    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
-    fi
-    PR_EXIT_CODE=$?
-  fi
-
-  if [ $PR_EXIT_CODE -ne 0 ]; then
-    printf '%s\n' "$PR_OUTPUT" >&2
-    PR_DATA="[]"
-  else
-    PR_DATA="$PR_OUTPUT"
-  fi
-
-  if [ -z "$PR_DATA" ]; then
-    PR_DATA="[]"
-  fi
-
+  PR_DATA=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>/dev/null || echo "[]")
   if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
     echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
     return
@@ -590,13 +357,13 @@ ensure_pr_created() {
     fi
 
     case "$label" in
-      task-*) COLOR="28a745"; DESC="Task correlation" ;;
+      task-*) COLOR="f29513"; DESC="Task correlation" ;;
       service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
       run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
       *) COLOR="ededed"; DESC="Automation label" ;;
     esac
 
-    if gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
+    if gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
       echo "   ✅ Created label '$label'"
     else
       echo "   ❌ Failed to create label '$label'"
@@ -605,65 +372,8 @@ ensure_pr_created() {
     rm -f /tmp/gh-label-create.log
   done
 
-  # VALIDATION: Check for problematic commits before creating PR
-  echo "🔍 Validating changes before PR creation..."
-  
-  # Check total diff size
-  TOTAL_ADDITIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$1} END {print sum+0}')
-  TOTAL_DELETIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$2} END {print sum+0}')
-  TOTAL_CHANGES=$((TOTAL_ADDITIONS + TOTAL_DELETIONS))
-  
-  echo "   📊 Total changes: +$TOTAL_ADDITIONS -$TOTAL_DELETIONS (total: $TOTAL_CHANGES lines)"
-  
-  # Warn if commit is suspiciously large
-  if [[ $TOTAL_CHANGES -gt 100000 ]]; then
-    echo "   ⚠️  WARNING: Very large commit detected ($TOTAL_CHANGES lines)!"
-    echo "   This may include unwanted files like node_modules or build artifacts"
-  fi
-  
-  # Check for commonly ignored files that shouldn't be committed
-  PROBLEMATIC_FILES=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | grep -E "(node_modules/|\.next/|dist/|build/|target/debug/|\.pyc$|__pycache__/)" || echo "")
-  
-  if [[ -n "$PROBLEMATIC_FILES" ]]; then
-    echo "   ❌ ERROR: Detected files that should be gitignored!"
-    echo "$PROBLEMATIC_FILES" | head -10 | sed 's/^/      /'
-    if [[ $(echo "$PROBLEMATIC_FILES" | wc -l) -gt 10 ]]; then
-      echo "      ... and $(($(echo "$PROBLEMATIC_FILES" | wc -l) - 10)) more"
-    fi
-    echo ""
-    echo "   🛑 BLOCKING PR CREATION"
-    echo "   Please add a .gitignore file and remove these files from git"
-    echo "   Suggested .gitignore entries:"
-    echo "      node_modules/"
-    echo "      dist/"
-    echo "      build/"
-    echo "      target/debug/"
-    echo "      __pycache__/"
-    return 1
-  fi
-  
-  # Check file count
-  FILE_COUNT=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | wc -l)
-  echo "   📁 Files changed: $FILE_COUNT"
-  
-  if [[ $FILE_COUNT -gt 100 ]]; then
-    echo "   ⚠️  WARNING: Large number of files changed ($FILE_COUNT)"
-    echo "   Verify this is intentional and not due to dependency/build commits"
-  fi
-  
-  echo "   ✅ Validation passed"
-  
-  # Find the GitHub issue for this task (created by Morgan PM)
-  ISSUE_NUMBER=$(gh issue list -R "$REPO_SLUG" --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
-  
-  ISSUE_LINK=""
-  if [[ -n "$ISSUE_NUMBER" ]]; then
-    echo "🔗 Found GitHub issue #$ISSUE_NUMBER for task {{task_id}}"
-    ISSUE_LINK="Closes #$ISSUE_NUMBER"
-  fi
-
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
-  read -r -d '' PR_BODY <<EOF || true
+  read -r -d '' PR_BODY <<'EOF' || true
 ## Summary
 - Auto-generated fallback PR because the OpenCode agent finished without opening one
 - Task {{task_id}} for service {{service}} is ready for review
@@ -672,119 +382,42 @@ ensure_pr_created() {
 - Agent: {{github_app}}
 - Workflow: {{workflow_name}}
 - Branch: \`$CURRENT_BRANCH\` → \`$BASE_BRANCH\`
-${ISSUE_LINK:+
-## Links
-$ISSUE_LINK
-}
+
 _This PR was created automatically by the OpenCode container._
 EOF
 
   LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
 
-  # Create PR first without labels, then add labels separately
-  # This prevents the entire PR creation from failing if a label doesn't exist
-  if PR_URL=$(gh pr create "${LABEL_ARGS[@]}" 2>&1); then
-    echo "✅ Auto-created pull request: $PR_URL"
-    
-    # Now add labels one by one (non-critical if they fail)
-    for label in "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"; do
-      if [ -z "$label" ]; then
-        continue
-      fi
-
-      # Try to create label if it doesn't exist
-      if ! gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
-        case "$label" in
-          task-*) COLOR="28a745"; DESC="Task correlation" ;;
-          service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
-          run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
-          *) COLOR="ededed"; DESC="Automation label" ;;
-        esac
-        gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/dev/null 2>&1 || true
-      fi
-
-      # Add label to PR (continue even if it fails)
-      if gh pr edit "$CURRENT_BRANCH" --add-label "$label" >/dev/null 2>&1; then
-        echo "   ✓ Added label: $label"
-      else
-        echo "   ⚠️ Could not add label: $label (PR still created)"
-      fi
-    done
-
-    # Add PR to GitHub Project (works for all CLIs: Claude, Codex, Cursor, Factory, OpenCode, Blaze, Rex)
-    echo "=== Linking PR to GitHub Project ==="
-
-    # Get PR number for this branch
-    PR_NUMBER=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
-
-    if [ -n "$PR_NUMBER" ]; then
-      # Use organization project number 1 (Task Master / CTO Project)
-      # This works across all repos and agents
-      PROJECT_NUMBER="1"
-
-      echo "🔗 Adding PR #$PR_NUMBER to Project #$PROJECT_NUMBER..."
-
-      # Use gh project item-add command (simpler than GraphQL)
-      if gh project item-add "$PROJECT_NUMBER" --owner 5dlabs --url "https://github.com/$REPO_SLUG/pull/$PR_NUMBER" 2>&1 | grep -q "Added\|already"; then
-        echo "✅ PR linked to GitHub Project #$PROJECT_NUMBER"
-      else
-        echo "⚠️ Could not link PR to project (may already be linked or permissions issue)"
-      fi
+  maybe_add_label() {
+    local label="$1"
+    if [ -z "$label" ]; then
+      return
+    fi
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      LABEL_ARGS+=("--label" "$label")
     else
-      echo "⚠️ Could not get PR number for project linking"
+      echo "⚠️ Label '$label' not found; skipping"
     fi
+  }
+
+  maybe_add_label "$TASK_LABEL"
+  maybe_add_label "$SERVICE_LABEL"
+  maybe_add_label "$RUN_LABEL"
+
+  if gh pr create "${LABEL_ARGS[@]}"; then
+    echo "✅ Auto-created pull request for $CURRENT_BRANCH"
   else
-    echo "⚠️ Failed to create pull request: $PR_URL"
-    echo "   This may be because a PR already exists or there's an authentication issue"
+    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
   fi
 }
 
-git config --global --add safe.directory "$TASK_WORKSPACE"
+git config --global --add safe.directory /workspace
 GITHUB_APP="{{github_app}}"
-
-derive_bot_identity() {
-  local app_name="$1"
-
-  if [ -z "$app_name" ] || [ "$app_name" = "null" ]; then
-    GIT_AUTHOR_NAME="automation[bot]"
-    GIT_AUTHOR_EMAIL="automation[bot]@users.noreply.github.com"
-    return
-  fi
-
-  local slug
-  slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
-  if [ -z "$slug" ]; then
-    slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]')
-  fi
-
-  local bot_login="${slug}[bot]"
-  local bot_email="${bot_login}@users.noreply.github.com"
-
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    local encoded_login
-    encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/%5B/g; s/\]/%5D/g')
-    local bot_response
-    bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
-    local bot_id
-    bot_id=$(printf '%s' "$bot_response" | jq -r '.id // empty' 2>/dev/null || echo '')
-    if [ -n "$bot_id" ]; then
-      bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
-    fi
-  fi
-
-  GIT_AUTHOR_NAME="$bot_login"
-  GIT_AUTHOR_EMAIL="$bot_email"
-}
-
-GITHUB_APP="{{github_app}}"
-derive_bot_identity "$GITHUB_APP"
-
-# Extract agent name for display (e.g., "5DLabs-Rex" → "Rex", "5DLabs-Cipher" → "Cipher")
-AGENT_NAME=$(echo "$GITHUB_APP" | sed -E 's/.*-([^-]+)$/\1/')
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (OpenCode CLI)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
 
 git config --global user.name "$GIT_AUTHOR_NAME"
 git config --global user.email "$GIT_AUTHOR_EMAIL"
-
 export GIT_AUTHOR_NAME
 export GIT_AUTHOR_EMAIL
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
@@ -792,13 +425,21 @@ export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
 export SSH_ASKPASS=/bin/true
+
+# =========================================================================
 # Repository checkout
 # =========================================================================
 
 WORK_DIR="{{working_directory}}"
-cd "$TASK_WORKSPACE"
+if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  WORK_DIR="{{service}}"
+fi
 
-REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
+TARGET_DIR="/workspace/$WORK_DIR"
+mkdir -p "$TARGET_DIR"
+cd /workspace
+
+REPO_ROOT="/workspace/$REPO_NAME"
 git config --global --add safe.directory "$REPO_ROOT"
 
 if [ -d "$REPO_NAME/.git" ]; then
@@ -813,8 +454,8 @@ else
   cd "$REPO_NAME"
 fi
 
+git config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
-sync_gh_hosts_to_path "$REPO_ROOT"
 
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
@@ -827,27 +468,9 @@ MANAGED_PATHS=(
 )
 
 for managed_path in "${MANAGED_PATHS[@]}"; do
-  if git ls-files --error-unmatch -- "$managed_path" >/dev/null 2>&1; then
-    status_output=$(git status --short -- "$managed_path" 2>/dev/null || true)
-    untracked=false
-    while IFS= read -r line; do
-      case "$line" in
-        "?? "*)
-          untracked=true
-          break
-          ;;
-      esac
-    done <<EOF
-$status_output
-EOF
-
-    if [ "$untracked" = true ]; then
-      echo "🧹 Removing stale untracked files to allow checkout: $managed_path"
-      git clean -fd -- "$managed_path" >/dev/null 2>&1 || rm -rf "$managed_path"
-    fi
+  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
     continue
   fi
-
   if [ -e "$managed_path" ]; then
     echo "🧹 Removing stale file to allow checkout: $managed_path"
     rm -rf "$managed_path"
@@ -879,208 +502,18 @@ fi
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
-  # Clean up any local changes from previous runs to avoid checkout conflicts
-  # Preserve task/ directory since it was just copied
-  if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    echo "🔄 Cleaning workspace before checkout (preserving task/ directory)"
-    
-    # Use unique backup name to avoid PID collisions (PID + timestamp + random)
-    BACKUP_DIR="/tmp/task-backup-$$-$(date +%s)-$RANDOM"
-    
-    # Save task/ directory if it exists
-    if [ -d "task" ]; then
-      echo "📦 Backing up task/ directory to $BACKUP_DIR"
-      
-      # Copy with verification - fail if backup fails
-      if ! cp -r task "$BACKUP_DIR" 2>/dev/null; then
-        echo "❌ CRITICAL: Failed to backup task/ directory!"
-        echo "   Aborting workspace cleanup to prevent data loss"
-        exit 1
-      fi
-      
-      # Verify backup succeeded
-      if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A "$BACKUP_DIR" 2>/dev/null)" ]; then
-        echo "❌ CRITICAL: Backup verification failed - directory empty or missing!"
-        echo "   Aborting to prevent data loss"
-        rm -rf "$BACKUP_DIR" 2>/dev/null || true
-        exit 1
-      fi
-      
-      echo "✅ Backup verified: $(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1) in $BACKUP_DIR"
-    fi
-    
-    # NOW safe to wipe workspace (backup verified)
-    echo "🧹 Resetting workspace (backup secured)"
-    git reset --hard HEAD 2>/dev/null || true
-    git clean -fdx -e task/ 2>/dev/null || true
-    
-    # Restore task/ directory from verified backup
-    if [ -d "$BACKUP_DIR" ]; then
-      echo "📦 Restoring task/ directory from backup"
-      rm -rf task 2>/dev/null || true
-      
-      if ! cp -r "$BACKUP_DIR" task 2>/dev/null; then
-        echo "❌ CRITICAL: Failed to restore task/ directory!"
-        echo "   Backup is at: $BACKUP_DIR (preserved for manual recovery)"
-        exit 1
-      fi
-      
-      # Verify restore
-      if [ ! -d "task" ]; then
-        echo "❌ CRITICAL: Restore verification failed!"
-        echo "   Backup preserved at: $BACKUP_DIR"
-        exit 1
-      fi
-      
-      # Cleanup backup only after successful restore
-      rm -rf "$BACKUP_DIR" 2>/dev/null || true
-      echo "✅ Task directory restored successfully"
-    fi
-    
-    echo "✅ Workspace cleaned and task/ preserved"
-  fi
-  
-  # Now checkout should work
   git checkout "$FEATURE_BRANCH"
-  
-  # Check if upstream branch is gone (deleted after previous PR was closed)
-  UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
-  if [ -n "$UPSTREAM_BRANCH" ]; then
-    if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
-      echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
-      echo "🔍 Checking for closed PRs from previous runs..."
-      
-      # Check if there's a CLOSED PR for this branch
-      refresh_token_if_needed || true
-      CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
-      
-      if [ -n "$CLOSED_PR" ]; then
-        echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
-        echo "🔄 Deleting stale branch and recreating fresh from $REMOTE_BASE"
-        
-        # Switch off the branch before deleting it
-        git checkout "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-cleanup-branch "$REMOTE_BASE"
-        git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
-        
-        # Recreate fresh branch
-        git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
-        echo "✅ Created fresh branch $FEATURE_BRANCH from $REMOTE_BASE"
-        echo "ℹ️ Previous PR was closed - starting with clean slate"
-      else
-        echo "ℹ️ No closed PRs found - will unset upstream and continue"
-        git branch --unset-upstream 2>/dev/null || true
-      fi
-    fi
-  fi
-  
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
     if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
-      # Check if PR exists for this branch before creating timestamped fallback
-      echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; checking for existing PR"
-      refresh_token_if_needed || true
-      EXISTING_PR=$(gh pr list --state open --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
-      
-      if [ -n "$EXISTING_PR" ]; then
-        echo "✅ Found existing PR #$EXISTING_PR for branch $FEATURE_BRANCH"
-        echo "ℹ️ Continuing with this branch despite merge conflict (will be resolved in PR)"
-        # Stay on the current branch and let the PR handle conflicts
-      else
-        echo "ℹ️ No existing PR found; recreating branch from $REMOTE_BASE"
-        # Delete local branch and recreate fresh from base
-        # Force discard all local changes since we're recreating from scratch
-        git reset --hard HEAD 2>/dev/null || true
-        git clean -fd 2>/dev/null || true
-        git checkout -f "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-branch "$REMOTE_BASE"
-        git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
-        git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
-        echo "✅ Recreated $FEATURE_BRANCH from $REMOTE_BASE"
-      fi
+      echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; creating fresh branch from $REMOTE_BASE"
+      NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+      git checkout -B "$NEW_BRANCH" "$REMOTE_BASE"
+      FEATURE_BRANCH="$NEW_BRANCH"
     fi
   fi
 else
   echo "Creating new feature branch '$FEATURE_BRANCH'"
-  
-  # Check for and abort any in-progress merge conflicts before checkout
-  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^DD\|^AU\|^UA\|^DU\|^UD"; then
-    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
-    git merge --abort 2>/dev/null || true
-    echo "✓ Merge conflicts aborted"
-  fi
-  
-  # Check for and reset any incomplete merge (rebase, cherry-pick, etc.)
-  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
-    echo "⚠️ Detecting incomplete git operation, resetting..."
-    git rebase --abort 2>/dev/null || true
-    git cherry-pick --abort 2>/dev/null || true  
-    git merge --abort 2>/dev/null || true
-    if ! git diff-index --quiet HEAD; then
-      git reset --hard HEAD 2>/dev/null || true
-    fi
-    echo "✓ Git operations reset"
-  fi
-  
-  # Clean up any local changes from previous runs to avoid checkout conflicts
-  # Preserve task/ directory since it was just copied
-  if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    echo "🔄 Cleaning workspace before creating new branch (preserving task/ directory)"
-    
-    # Use unique backup name to avoid PID collisions (PID + timestamp + random)
-    BACKUP_DIR="/tmp/task-backup-$$-$(date +%s)-$RANDOM"
-    
-    # Save task/ directory if it exists
-    if [ -d "task" ]; then
-      echo "📦 Backing up task/ directory to $BACKUP_DIR"
-      
-      # Copy with verification - fail if backup fails
-      if ! cp -r task "$BACKUP_DIR" 2>/dev/null; then
-        echo "❌ CRITICAL: Failed to backup task/ directory!"
-        echo "   Aborting workspace cleanup to prevent data loss"
-        exit 1
-      fi
-      
-      # Verify backup succeeded
-      if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A "$BACKUP_DIR" 2>/dev/null)" ]; then
-        echo "❌ CRITICAL: Backup verification failed - directory empty or missing!"
-        echo "   Aborting to prevent data loss"
-        rm -rf "$BACKUP_DIR" 2>/dev/null || true
-        exit 1
-      fi
-      
-      echo "✅ Backup verified: $(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1) in $BACKUP_DIR"
-    fi
-    
-    # NOW safe to wipe workspace (backup verified)
-    echo "🧹 Resetting workspace (backup secured)"
-    git reset --hard HEAD 2>/dev/null || true
-    git clean -fdx -e task/ 2>/dev/null || true
-    
-    # Restore task/ directory from verified backup
-    if [ -d "$BACKUP_DIR" ]; then
-      echo "📦 Restoring task/ directory from backup"
-      rm -rf task 2>/dev/null || true
-      
-      if ! cp -r "$BACKUP_DIR" task 2>/dev/null; then
-        echo "❌ CRITICAL: Failed to restore task/ directory!"
-        echo "   Backup is at: $BACKUP_DIR (preserved for manual recovery)"
-        exit 1
-      fi
-      
-      # Verify restore
-      if [ ! -d "task" ]; then
-        echo "❌ CRITICAL: Restore verification failed!"
-        echo "   Backup preserved at: $BACKUP_DIR"
-        exit 1
-      fi
-      
-      # Cleanup backup only after successful restore
-      rm -rf "$BACKUP_DIR" 2>/dev/null || true
-      echo "✅ Task directory restored successfully"
-    fi
-    
-    echo "✅ Workspace cleaned and task/ preserved"
-  fi
-  
   if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
     git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
   else
@@ -1094,70 +527,26 @@ git config --local push.autoSetupRemote true
 export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
 echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
 
-# Set working directory: use repo root if working_directory is "." or empty
-if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
-  OPENCODE_WORK_DIR="$REPO_ROOT"
-else
-  OPENCODE_WORK_DIR="$REPO_ROOT/$WORK_DIR"
+OPENCODE_WORK_DIR="$REPO_ROOT"
+if [ "$WORK_DIR" != "$REPO_NAME" ]; then
+  OPENCODE_WORK_DIR="$OPENCODE_WORK_DIR/$WORK_DIR"
   mkdir -p "$OPENCODE_WORK_DIR"
 fi
 
 cd "$OPENCODE_WORK_DIR"
-sync_gh_hosts_to_path "$OPENCODE_WORK_DIR"
 echo "✓ Working directory: $OPENCODE_WORK_DIR"
 
 echo "📦 git status"
 refresh_token_if_needed
 git status --short || true
 
-# Load resilient task setup functions (mounted from shared ConfigMap)
-source /agent-templates/shared_task-setup-functions.sh || {
-    echo "⚠️ Warning: Resilient task functions not available, using basic operations"
-    # Define minimal fallback functions
-    safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
-    safe_copy_directory() { cp -r "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
-    safe_ensure_directory() { mkdir -p "$1"; }
-    verify_task_files() { 
-        if [ -f "$1/prompt.md" ]; then
-            echo "✅ Task files verified"
-            return 0
-        else
-            echo "❌ Task files missing"
-            return 1
-        fi
-    }
-    create_error_report() { echo "❌ ERROR: $3"; }
-    attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
-}
-
-# Optional helper for billing/quota failure detection
-if [ -f /agent-templates/helpers_detect-billing-failure.sh ]; then
-  # shellcheck disable=SC1091
-  source /agent-templates/helpers_detect-billing-failure.sh
-else
-  echo "⚠️ Billing failure helper not found; skipping quota detection"
-fi
-
 # =========================================================================
-# Materialise task context (RESILIENT MODE)
+# Materialise task context
 # =========================================================================
 
-echo "🧱 Syncing task assets (RESILIENT MODE)"
-# Use safe directory creation to avoid overwriting files
-if ! safe_ensure_directory "$OPENCODE_WORK_DIR/task" "OpenCode task directory"; then
-    echo "❌ CRITICAL: Cannot create OpenCode task directory"
-    exit 1
-fi
-
-# Safely copy task files from ConfigMap
-if [ -d "/task-files/task" ]; then
-    echo "📂 Copying task files from ConfigMap..."
-    if ! safe_copy_directory "/task-files/task" "$OPENCODE_WORK_DIR/task" "ConfigMap task files"; then
-        echo "⚠️ Warning: Could not copy all task files from ConfigMap"
-    fi
-else
-    echo "ℹ️ No task files in ConfigMap - will rely on docs repository"
-fi
+echo "🧱 Syncing task assets"
+mkdir -p "$OPENCODE_WORK_DIR/task"
+cp -R /task-files/task/* "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
 
 DOCS_REPO_URL="{{docs_repository_url}}"
 DOCS_BRANCH="{{docs_branch}}"
@@ -1178,51 +567,46 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
 
   if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
     echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
     DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
     if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
       DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
     fi
 
     echo "🔍 Docs base path: $DOCS_BASE_PATH"
-    
-    # Resilient task directory discovery - check regular, tasks/, and .completed locations
-    # Check both regular location and .completed location (tasks moved after completion)
-    TASK_DIR=""
-    if [ -d "$DOCS_BASE_PATH/docs/task-{{task_id}}" ]; then
-      TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
-      echo "✓ Found task files in docs/ directory"
-    elif [ -d "$DOCS_BASE_PATH/docs/.completed/task-{{task_id}}" ]; then
-      TASK_DIR="$DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
-      echo "✓ Found task files in docs/.completed/ directory"
-      echo "ℹ️ Task appears to be completed - using files from .completed folder"
-    elif [ -d "$DOCS_BASE_PATH/tasks/task-{{task_id}}" ]; then
-      TASK_DIR="$DOCS_BASE_PATH/tasks/task-{{task_id}}"
-      echo "✓ Found task files in tasks/ directory"
-    fi
+    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
 
-    if [ -n "$TASK_DIR" ] && [ -d "$TASK_DIR" ]; then
-      echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
-      refresh_token_if_needed
-      if safe_copy_directory "$TASK_DIR" "$OPENCODE_WORK_DIR/task" "docs task files"; then
-          echo "✅ Task files copied successfully from docs repository"
-      else
-          echo "❌ CRITICAL: Failed to copy task files from docs repository"
-          create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
-      fi
+  if [ -d "$TASK_DIR" ]; then
+    echo "✓ Copying task definition from $TASK_DIR"
+    refresh_token_if_needed
+    cp -R "$TASK_DIR"/. "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
     else
-      echo "❌ CRITICAL: Task directory not found. Checked:"
-      echo "   - $DOCS_BASE_PATH/docs/task-{{task_id}}"
-      echo "   - $DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
-      echo "   - $DOCS_BASE_PATH/tasks/task-{{task_id}}"
-      create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
+      echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
     fi
 
     if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
       refresh_token_if_needed
-      safe_copy_file "$DOCS_BASE_PATH/tasks.json" "$OPENCODE_WORK_DIR/task/tasks.json" "tasks.json"
+      cp "$DOCS_BASE_PATH/tasks.json" "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
     fi
   fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
 fi
+
+if [ -f /task-files/AGENTS.md ]; then
+  cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
+fi
+
 if [ -f /task-files/coding-guidelines.md ]; then
   cp /task-files/coding-guidelines.md "$OPENCODE_WORK_DIR/"
   echo "✓ Copied coding-guidelines.md to working directory"
@@ -1233,27 +617,57 @@ if [ -f /task-files/github-guidelines.md ]; then
   echo "✓ Copied github-guidelines.md to working directory"
 fi
 
-# AGENTS.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
-OVERWRITE_MEMORY="{{overwrite_memory}}"
 
-# Handle AGENTS.md based on overwriteMemory setting
-if [ "$OVERWRITE_MEMORY" = "true" ]; then
-  # Overwrite mode: Always replace AGENTS.md with fresh template
-  if [ -f /task-files/AGENTS.md ]; then
-    cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
-    echo "✓ Overwrote AGENTS.md memory file (fresh start requested)"
+# Generate client-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating client-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$OPENCODE_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$OPENCODE_WORK_DIR/client-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | awk -F'- ' '{print $2}' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
   fi
-else
-  # Preserve mode (default): Only copy if doesn't exist
-  if [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
-    # Initial creation - copy from ConfigMap
-    if [ -f /task-files/AGENTS.md ]; then
-      cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
-      echo "✓ Created initial AGENTS.md memory file"
+  
+  # Extract tools configuration and generate client-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated client-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated client-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
     fi
   else
-    echo "✓ Preserved existing AGENTS.md memory file (maintaining accumulated context)"
+    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
   fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
 fi
 
 # Generate client-config.json from cto-config.json in the cloned repository
@@ -1322,8 +736,6 @@ if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$OPENCODE_WORK_DIR/.mcp.json"
 fi
 
-export OPENCODE_PERMISSION='{"bash":{"*":"allow"},"edit":"allow","webfetch":"allow"}'
-
 # Guard against destructive workspace cleanup
 guard_rm() {
   if [ "$#" -ge 2 ]; then
@@ -1356,7 +768,7 @@ guard_rm() {
         esac
         local resolved
         resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
-        if [ "$resolved" = "$OPENCODE_WORK_DIR" ] || [ "$resolved" = "$TASK_WORKSPACE" ] ||
+        if [ "$resolved" = "$OPENCODE_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||
            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
           echo "❌ Guard: destructive rm blocked (target=$target)" >&2
           return 1
@@ -1386,7 +798,7 @@ fi
 echo "=== MCP CLIENT CONFIG ==="
 WORKSPACE_CFG="$OPENCODE_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
-TARGET_CFG="${MCP_CLIENT_CONFIG:-$TASK_WORKSPACE/client-config.json}"
+TARGET_CFG="${MCP_CLIENT_CONFIG:-/workspace/client-config.json}"
 
 is_valid_cfg() {
   local path="$1"
@@ -1454,37 +866,17 @@ fi
 TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
 TOOLMAN_URL="${TOOLMAN_URL%/}"
 echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-TOOLMAN_RETRIES=3
-TOOLMAN_WAIT=2
-TOOLMAN_SUCCESS=false
-for i in $(seq 1 $TOOLMAN_RETRIES); do
-  if curl -sSf --connect-timeout 5 --max-time 10 \
-    -X POST "$TOOLMAN_URL" \
-    -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
-    TOOLMAN_SUCCESS=true
-    rm -f /tmp/toolman-ping.log
-    break
-  fi
-  if [ $i -lt $TOOLMAN_RETRIES ]; then
-    echo "⚠️ Toolman connectivity check failed (attempt $i/$TOOLMAN_RETRIES), retrying in ${TOOLMAN_WAIT}s..."
-    cat /tmp/toolman-ping.log >&2 || true
-    rm -f /tmp/toolman-ping.log
-    sleep $TOOLMAN_WAIT
-    TOOLMAN_WAIT=$((TOOLMAN_WAIT * 2))  # Exponential backoff
-  fi
-done
-
-if [ "$TOOLMAN_SUCCESS" != "true" ]; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL after $TOOLMAN_RETRIES attempts"
+if ! curl -sSf --connect-timeout 2 --max-time 6 \
+  -X POST "$TOOLMAN_URL" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
-  echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
-  echo "⚠️ If OpenCode execution fails, check Toolman service health and DNS resolution."
-  # Don't exit - allow OpenCode to proceed in case Toolman comes back online
-  # The MCP client will handle connection failures gracefully
+  exit 1
 fi
-echo "✓ Toolman endpoint check completed"
+rm -f /tmp/toolman-ping.log
+echo "✓ Toolman endpoint reachable"
 
 # Verify OpenCode provider API key is set based on config
 OPENCODE_CONFIG_PATH="$HOME/.opencode/config.json"
@@ -1502,7 +894,7 @@ fi
 echo "🔑 Configuring OpenCode authentication (provider key: $PROVIDER_ENV_KEY)"
 
 if [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
-  echo "⚠️ No AGENTS.md guidance file detected; creating placeholder"
+  echo "⚠️ AGENTS.md missing; creating placeholder"
   cat <<'PLACEHOLDER' > "$OPENCODE_WORK_DIR/AGENTS.md"
 # Project Guidance
 
@@ -1515,499 +907,127 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
-
-# Simple, focused context - let @ references do the heavy lifting
-PROMPT_PREFIX="${PROMPT_PREFIX}## Task Context\n\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}You're working on **Task {{task_id}}** for service **{{service}}**.\n\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}**Required Reading:**\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- @task/acceptance-criteria.md — Your success criteria (complete ALL of these)\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- @AGENTS.md — Repository guidelines and workflow\n"
-if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
-  ensure_default_toolman_guide "$OPENCODE_WORK_DIR/task" "{{task_id}}" "{{service}}"
-fi
-
 if [ -f "$OPENCODE_WORK_DIR/task/toolman-guide.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}- @task/toolman-guide.md — Tool usage reference\n"
-fi
-if [ -f "$OPENCODE_WORK_DIR/coding-guidelines.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md — Coding standards\n"
-fi
-if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md — Git workflow\n"
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$OPENCODE_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}\n**Key Requirements:**\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- Implement ALL acceptance criteria before completing\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- Write production code (no TODOs or placeholders)\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- Commit frequently and create a PR when done\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- Run quality gates (cargo fmt, clippy, test) before finishing\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- You're on branch \`feature/task-{{task_id}}-implementation\`\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- GitHub auth is pre-configured (GH_TOKEN is set)\n\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **GitHub auth ready**: the GitHub App token (\`GH_TOKEN\`) is already configured; skip manual \`gh auth login\` flows and avoid hitting user-only endpoints like \`/user\`.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
 
-# Resilient verification of task files
-echo "🔍 RESILIENT VERIFICATION: Checking task files at: $OPENCODE_WORK_DIR/task/"
-if verify_task_files "$OPENCODE_WORK_DIR/task" "{{task_id}}"; then
-    echo "✅ Task files verification: PASSED"
-else
-    echo "❌ CRITICAL: Task files verification: FAILED"
-    create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Task files missing before agent execution"
-    
-    # Attempt recovery
-    if attempt_task_recovery "/tmp/docs-repo" "$OPENCODE_WORK_DIR/task" "{{task_id}}"; then
-        echo "✅ Recovery successful - continuing with execution"
-    else
-        echo "❌ Recovery failed - cannot proceed without prompt.md"
-        exit 1
+if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ] || [ -f "$OPENCODE_WORK_DIR/coding-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
+  if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md\n"
+  fi
+  if [ -f "$OPENCODE_WORK_DIR/coding-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md\n"
+  fi
+  PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
+fi
+
+if [ -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
+  if AGENT_GUIDANCE=$(jq -Rs @json "$OPENCODE_WORK_DIR/AGENTS.md" 2>/dev/null); then
+    if [ "${#AGENT_GUIDANCE}" -gt 2 ]; then
+      AGENT_GUIDANCE=${AGENT_GUIDANCE:1:-1}
+      PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${AGENT_GUIDANCE}\n\n---\n\n"
     fi
+  fi
 fi
+
+echo "🔍 DEBUG: About to check for prompt.md at: $OPENCODE_WORK_DIR/task/prompt.md"
+echo "🔍 DEBUG: Contents of task directory:"
+ls -la "$OPENCODE_WORK_DIR/task/" || echo "Task directory not found or empty"
+echo "🔍 DEBUG: Current working directory contents:"
+ls -la "$OPENCODE_WORK_DIR/" || echo "Working directory not accessible"
 
 PROMPT_FILE="$OPENCODE_WORK_DIR/task/prompt.md"
-echo "📄 Using prompt file: $PROMPT_FILE"
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "❌ prompt.md not found at $PROMPT_FILE"
+  exit 1
+fi
 
 echo "startingTask:{{task_id}}"
 echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
-# Print prompt preview (similar to Factory/Claude CLIs)
-echo "📤 Sending prompt to OpenCode/Grok (truncated to 2000 chars for log safety):"
-echo "=================================================================================="
-PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
-printf '%s\n' "$PROMPT_PREVIEW"
-echo "..."
-echo "=================================================================================="
-PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
-echo "📏 Total prompt size: $PROMPT_BYTES bytes"
-echo ""
-
 ORIGINAL_PROMPT="$PROMPT_CONTENT"
 PREVIOUS_MESSAGE_FILE=""
-
-# Grok Code Fast 1 has 256k context window - MAX IT OUT
-TOKEN_LIMIT=${OPENCODE_TOKEN_LIMIT:-256000}
-
-# Grok is fast (190 tokens/sec) so can handle longer timeouts
-OPENCODE_TIMEOUT=${OPENCODE_EXEC_TIMEOUT:-2400}  # 40 minutes (was 30)
-
+TOKEN_LIMIT=${OPENCODE_TOKEN_LIMIT:-240000}
+OPENCODE_TIMEOUT=${OPENCODE_EXEC_TIMEOUT:-1800}
 RESET_SESSION_ON_RETRY=${OPENCODE_RESET_SESSION_ON_RETRY:-1}
 CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
 
-# Reasonable retries for Grok - not too many to waste tokens
-# Special case: 0 means unlimited (keep going until acceptance criteria met)
-MAX_RETRIES=${OPENCODE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
-if [ "$MAX_RETRIES" = "0" ]; then
-  echo "🔄 Unlimited retries enabled - will continue until acceptance criteria met"
-  UNLIMITED_RETRIES=1
-else
-  UNLIMITED_RETRIES=0
-fi
-
-# Output format: json (structured, parseable) or markdown (human-readable)
-# JSON is better for automated parsing (session IDs, circuit breaker, token tracking)
-# MARKDOWN is better for human observation during development/debugging
-# Set OPENCODE_VERBOSE=1 to use markdown format for readability
-if [ "${OPENCODE_VERBOSE:-0}" = "1" ]; then
-  OPENCODE_FORMAT="markdown"
-  # Only set log level if not explicitly provided by user
-  if [ -z "${OPENCODE_LOG_LEVEL:-}" ]; then
-    OPENCODE_LOG_LEVEL="INFO"
-  fi
-  echo "📢 Verbose mode enabled - using markdown format with ${OPENCODE_LOG_LEVEL} log level for readability"
-  if [ "${OPENCODE_LOG_LEVEL}" != "DEBUG" ]; then
-    echo "   To see even more detail, set OPENCODE_LOG_LEVEL=DEBUG"
-  fi
-else
-  OPENCODE_FORMAT=${OPENCODE_FORMAT:-json}
-  # Only set log level if not explicitly provided by user
-  if [ -z "${OPENCODE_LOG_LEVEL:-}" ]; then
-    OPENCODE_LOG_LEVEL="DEBUG"
-  fi
-fi
-
+MAX_RETRIES=${OPENCODE_MAX_RETRIES:-5}
 ATTEMPT=1
 SUCCESS=0
 OPENCODE_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
-COMPLETION_REASON=""
-LAST_COMPLETION_REASON=""
-NEXT_ITERATION_GUIDANCE=""
-
-BILLING_FAILURE_DETECTED=0
-BILLING_FAILURE_REASON=""
 
 SESSION_DIR="$HOME/.opencode/sessions"
-LATEST_SESSION_ID=""
+RESUME_ARGS=()
+SESSION_FILE="$OPENCODE_WORK_DIR/.opencode-session"
+CURRENT_SESSION_ID=""
 
-# Circuit breaker: track repeated command failures
-declare -A FAILED_COMMANDS
-MAX_SAME_COMMAND_FAILURES=3
-
-# Session continuation: retry within same session when no tools used
-MAX_CONTINUATION_RETRIES=5
-
-# Helper: Check if response had any tool calls
-has_tool_calls() {
-  local log_file="$1"
-  if [ ! -f "$log_file" ]; then
-    return 1
-  fi
-  
-  # Check for tool_use events in the JSON log
-  if grep -q '"type":"tool_use"' "$log_file" 2>/dev/null; then
-    return 0
-  fi
-  return 1
-}
-
-has_existing_sessions() {
-  local session_dir="$1"
-  if [ ! -d "$session_dir" ]; then
-    return 1
-  fi
-
-  for session_file in "$session_dir"/*.json; do
-    if [ -f "$session_file" ]; then
-      return 0
-    fi
-  done
-
-  return 1
-}
+if [ -f "$SESSION_FILE" ]; then
+  CURRENT_SESSION_ID=$(tr -d '\r\n ' < "$SESSION_FILE" 2>/dev/null || true)
+fi
 
 extract_session_id() {
   local log_file="$1"
   [ -f "$log_file" ] || return 1
-  if command -v jq >/dev/null 2>&1; then
-    jq -r 'select(.sessionID != null) | .sessionID' "$log_file" 2>/dev/null | tail -n1 | tr -d '\r' | tr -d '\n'
-  else
-    awk '
-      {
-        gsub(/\033\[[0-9;]*[mK]/, "");
-        if ($0 ~ /sessionID"[[:space:]]*:[[:space:]]*"[0-9a-fA-F-]{4,}/) {
-          match($0, /sessionID"[[:space:]]*:[[:space:]]*"([0-9a-fA-F-]+)/, a);
-          if (a[1] != "") last=a[1];
-        } else if ($0 ~ /opencode session[[:space:]]+[0-9a-fA-F-]{4,}/) {
-          match($0, /opencode session[[:space:]]+([0-9a-fA-F-]+)/, a);
-          if (a[1] != "") last=a[1];
-        }
+  awk '
+    {
+      gsub(/\033\[[0-9;]*[mK]/, "");
+      if ($0 ~ /opencode session[[:space:]]+[0-9a-fA-F-]{4,}/) {
+        match($0, /opencode session[[:space:]]+([0-9a-fA-F-]+)/, a);
+        if (a[1] != "") last=a[1];
       }
-      END {
-        if (last != "") print last;
-      }
-    ' "$log_file" 2>/dev/null
-  fi
+    }
+    END {
+      if (last != "") print last;
+    }
+  ' "$log_file" 2>/dev/null
 }
 
-print_attempt_banner() {
-  local attempt="$1"
-  local max="$2"
-  local unlimited="$3"
-  local border="════════════════════════════════════════════════════════════════"
-  local label
-
-  if [ "$unlimited" = "1" ]; then
-    label="║ 🚀 EXECUTION ATTEMPT #${attempt} (UNLIMITED MODE)"
-  elif [ -n "$max" ] && [ "$max" -gt 0 ]; then
-    label="║ 🚀 EXECUTION ATTEMPT ${attempt} / ${max}"
-  else
-    label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
+persist_session_id() {
+  local session_id="$1"
+  if [ -n "$session_id" ]; then
+    printf '%s\n' "$session_id" > "$SESSION_FILE"
   fi
-
-  local base_padding=$(( ${#border} - ${#label} - 1 ))
-  local extra_width=0
-
-  if [[ "$label" == *"🚀"* ]]; then
-    extra_width=$((extra_width + 1))
-  fi
-
-  local padding=$((base_padding - extra_width))
-  if [ $padding -lt 0 ]; then
-    padding=0
-  fi
-
-  echo ""
-  echo "$border"
-  printf '%s%*s║\n' "$label" "$padding" ""
-  echo "$border"
-  echo ""
 }
 
 if [ "$CONTINUE_SESSION" = "1" ]; then
-  if ! has_existing_sessions "$SESSION_DIR"; then
-    echo "ℹ️ No existing OpenCode sessions detected; starting new session"
-    CONTINUE_SESSION=0
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    echo "ℹ️  Resuming OpenCode session from breadcrumb: $CURRENT_SESSION_ID"
+    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+  elif [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
+    echo "ℹ️  Existing OpenCode sessions found; will resume most recent"
+    RESUME_ARGS=("resume" "--last")
   fi
-fi
-
-write_last_message() {
-  local log_file="$1"
-  local dest_file="$2"
-  [ -f "$log_file" ] || return 1
-
-  if command -v jq >/dev/null 2>&1; then
-    local last_text
-    last_text=$(jq -r '
-      select(.type == "text")
-      | (if (.text | type) == "object" then .text.text
-         else if (.part | type) == "object" then .part.text
-         else .text end)
-      | select(. != null and . != "")
-    ' "$log_file" 2>/dev/null | tail -n1)
-
-    if [ -n "$last_text" ]; then
-      printf '%s\n' "$last_text" > "$dest_file"
-      return 0
-    fi
-  fi
-
-  tail -n 100 "$log_file" 2>/dev/null > "$dest_file"
-  return 0
-}
-
-if [ "$CONTINUE_SESSION" = "1" ]; then
-  echo "ℹ️ OpenCode will attempt to continue the most recent session when available."
 else
   if [ -d "$SESSION_DIR" ]; then
     find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
   fi
+  rm -f "$SESSION_FILE"
 fi
 
-# =========================================================================
-# Model rotation configuration
-# =========================================================================
-DEFAULT_MODEL="{{model}}"
-MODEL_ROTATION=()
-MODEL_ROTATION_COUNT=0
-{{#if model_rotation}}
-MODEL_ROTATION=(
-{{#each model_rotation}}
-"{{this}}"
-{{/each}}
-)
-MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
-if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
-  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
-fi
-{{/if}}
-if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
-  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
-fi
-if [ -n "$DEFAULT_MODEL" ]; then
-  echo "🎯 Default model: $DEFAULT_MODEL"
-fi
-
-# =========================================================================
-# QA Mode Safeguard: Prevent PR creation when in testing mode
-# =========================================================================
-if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
-  echo "🛡️  Installing PR creation safeguard for ${WORKFLOW_STAGE:-unknown} stage"
-
-  block_pr_create_stage="${WORKFLOW_STAGE:-unknown}"
-  case "$block_pr_create_stage" in
-    "quality"|"quality-in-progress")
-      block_reason="Cleo reviews existing PRs. You're working on PR #${PR_NUMBER:-unknown}, so never create a new one."
-      ;;
-    "security"|"security-in-progress")
-      block_reason="Cipher performs security scans on the implementation PR. Creating a new PR would bypass Rex/Blaze ownership."
-      ;;
-    "testing"|"testing-in-progress")
-      block_reason="Tess is in QA review mode and must validate PR #${PR_NUMBER:-unknown}; PR creation is forbidden."
-      ;;
-    *)
-      block_reason="Non-implementation stages must only review the branch created by Rex/Blaze. Do not open new PRs."
-      ;;
-  esac
-
-  gh() {
-    if [[ "$1" == "pr" && "$2" == "create" ]]; then
-      echo "❌ ERROR: 'gh pr create' is blocked for ${block_pr_create_stage:-non-implementation} stage."
-      echo "❌ ${block_reason}"
-      echo "❌ Use review commands such as 'gh pr checkout ${PR_NUMBER:-...}' or 'gh pr review ${PR_NUMBER:-...}' instead."
-      return 1
-    fi
-    command gh "$@"
-  }
-  export -f gh
-
-  echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
-fi
-
-# Clean up any leftover completion markers from previous runs (agent-specific)
-# This prevents issues with sequential task executions on the same PVC
-if [[ "{{github_app}}" =~ [Rr]ex ]] && [ -f /workspace/.rex-complete ]; then
-    echo "🧹 Rex cleaning up completion marker from previous run"
-    rm -f /workspace/.rex-complete
-elif [[ "{{github_app}}" =~ [Cc]leo ]] && [ -f /workspace/.cleo-complete ]; then
-    echo "🧹 Cleo cleaning up completion marker from previous run"
-    rm -f /workspace/.cleo-complete
-elif [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
-    echo "🧹 Cipher cleaning up completion marker from previous run"
-    rm -f /workspace/.cipher-complete
-elif [[ "{{github_app}}" =~ [Tt]ess ]] && [ -f /workspace/.tess-complete ]; then
-    echo "🧹 Tess cleaning up completion marker from previous run"
-    rm -f /workspace/.tess-complete
-fi
-
-# =========================================================================
-# MCP TOOLS VALIDATION
-# =========================================================================
-echo ""
-echo "════════════════════════════════════════════════════════════════"
-echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
-echo "════════════════════════════════════════════════════════════════"
-echo ""
-echo "🔍 Verifying OpenCode MCP tools..."
-
-TOOL_VERIFICATION_FAILED=false
-
-if command -v opencode >/dev/null 2>&1; then
-  # OpenCode uses MCP servers - check if the binary is functional
-  echo "📋 Checking OpenCode installation..."
-  OPENCODE_VERSION=$(opencode --version 2>&1 || echo "FAILED")
-  
-  if echo "$OPENCODE_VERSION" | grep -q "opencode\|version"; then
-    echo "  ✓ OpenCode CLI is functional"
-    echo "  Version: $OPENCODE_VERSION"
-  else
-    echo "  ⚠️ OpenCode CLI may not be properly installed"
-    echo "  Output: $OPENCODE_VERSION"
-    TOOL_VERIFICATION_FAILED=true
-  fi
-  
-  # Check for ANTHROPIC_API_KEY since OpenCode uses Claude models
-  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "  ✓ ANTHROPIC_API_KEY is set"
-  else
-    echo "  ❌ ANTHROPIC_API_KEY is NOT set"
-    TOOL_VERIFICATION_FAILED=true
-  fi
-  
-  # List available tools through OpenCode CLI
-  echo ""
-  echo "📦 Listing tools available through OpenCode CLI..."
-  
-  # Try different methods to list tools
-  # Method 1: opencode tool list
-  OPENCODE_TOOLS=$(opencode tool list 2>&1 || echo "")
-  
-  if [ -z "$OPENCODE_TOOLS" ] || echo "$OPENCODE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
-    # Method 2: opencode mcp list-tools
-    OPENCODE_TOOLS=$(opencode mcp list-tools 2>&1 || echo "")
-  fi
-  
-  if [ -z "$OPENCODE_TOOLS" ] || echo "$OPENCODE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
-    # Method 3: opencode --list-tools
-    OPENCODE_TOOLS=$(opencode --list-tools 2>&1 || echo "")
-  fi
-  
-  if [ -n "$OPENCODE_TOOLS" ] && ! echo "$OPENCODE_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
-    echo "  ✓ Retrieved tool list from OpenCode CLI:"
-    TOOL_COUNT=$(echo "$OPENCODE_TOOLS" | grep -v "^$" | wc -l | tr -d ' ')
-    echo "  📊 Total: $TOOL_COUNT tools available"
-    echo "$OPENCODE_TOOLS" | sed 's/^/    - /'
-  else
-    echo "  ℹ️ OpenCode CLI may not support direct tool listing"
-    echo "  ℹ️ Tools will be discovered at runtime"
-  fi
-  
-  echo ""
-else
-  echo "  ⚠️ opencode CLI not available for tool verification"
-  TOOL_VERIFICATION_FAILED=true
-fi
-
-echo "════════════════════════════════════════════════════════════════"
-echo ""
-
-if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
-  echo ""
-  echo "❌ TOOL VERIFICATION FAILED"
-  echo "OpenCode is not properly configured. Cannot proceed with task."
-  echo ""
-  echo "Common issues:"
-  echo "  - ANTHROPIC_API_KEY not set (check secret mounting)"
-  echo "  - OpenCode binary not installed or not in PATH"
-  echo "  - OpenCode installation failed during image build"
-  echo ""
-  echo "OpenCode status:"
-  opencode --version 2>&1 || echo "Failed to get OpenCode version"
-  echo ""
-  exit 1
-fi
-
-echo "✅ All critical tools verified successfully"
-echo ""
-# =========================================================================
-
-COMPLETED_ATTEMPTS=0
-while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
-  print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"
-  
-  # Reset completion status for each iteration (fixes bug where it persists across retries)
-  COMPLETION_RESPONSE=""
-
-  # Calculate which model to use for this attempt
-  CURRENT_MODEL="$DEFAULT_MODEL"
-  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
-    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
-    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
-  fi
-  if [ -n "$CURRENT_MODEL" ]; then
-    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
-    
-    # Update opencode config with current model (format: provider/model)
-    if [ -f "$HOME/.opencode/config.json" ]; then
-      jq --arg model "$CURRENT_MODEL" '.model = $model' "$HOME/.opencode/config.json" > /tmp/opencode-config-rotated.json && \
-      mv /tmp/opencode-config-rotated.json "$HOME/.opencode/config.json"
-    fi
-  fi
-
-  # Special handling for different workflow stages - check for completion marker files
-  if [ "$WORKFLOW_STAGE" = "implementation" ] || [ "$WORKFLOW_STAGE" = "implementation-in-progress" ]; then
-    if [ -f "/workspace/.rex-complete" ]; then
-      echo "✅ Implementation completion marker found - Rex has declared work complete"
-      SUCCESS=1
-      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
-      break
-    fi
-  elif [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
-    if [ -f "/workspace/.cleo-complete" ]; then
-      echo "✅ Quality completion marker found - Cleo has declared review complete"
-      SUCCESS=1
-      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
-      break
-    fi
-  elif [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
-    if [ -f "/workspace/.cipher-complete" ]; then
-      echo "✅ Security completion marker found - Cipher has declared work complete"
-      SUCCESS=1
-      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
-      break
-    fi
-  elif [ "$WORKFLOW_STAGE" = "testing" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
-    if [ -f "/workspace/.tess-complete" ]; then
-      echo "✅ Testing completion marker found - Tess has declared QA complete"
-      SUCCESS=1
-      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
-      break
-    fi
-  fi
-  
-  # Always refresh the GitHub token before starting a new iteration to avoid credential expiry
-  refresh_github_token || true
-
-  CURRENT_ATTEMPT=$ATTEMPT
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "🚀 OpenCode execution attempt $ATTEMPT/$MAX_RETRIES"
   LAST_MESSAGE_FILE="/tmp/opencode-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/opencode-run-${ATTEMPT}.jsonl"
 
-  if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ "$CONTINUE_SESSION" != "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
-    find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+  SESSION_FLAGS=()
+  if [ $ATTEMPT -eq 1 ] && [ ${#RESUME_ARGS[@]} -gt 0 ]; then
+    SESSION_FLAGS=("${RESUME_ARGS[@]}")
+  else
+    SESSION_FLAGS=()
+    if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
+      find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+      rm -f "$SESSION_FILE"
+      CURRENT_SESSION_ID=""
+    fi
   fi
-
-  # Inner continuation loop counter
-  CONTINUATION_ATTEMPT=0
 
   if [ $ATTEMPT -eq 1 ]; then
     PROMPT_PAYLOAD="$ORIGINAL_PROMPT"
@@ -2015,106 +1035,43 @@ while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
     if [ -n "$PREVIOUS_MESSAGE_FILE" ] && [ -s "$PREVIOUS_MESSAGE_FILE" ]; then
       PREVIOUS_SNIPPET=$(tail -n 40 "$PREVIOUS_MESSAGE_FILE" 2>/dev/null | sed 's/^/    /')
     else
-      PREVIOUS_SNIPPET="    <no previous output available>"
+      PREVIOUS_SNIPPET="    <no previous OpenCode summary available>"
     fi
-    PROMPT_PAYLOAD="## Continuation - Attempt $ATTEMPT/$MAX_RETRIES
+    PROMPT_PAYLOAD="Continuing Task {{task_id}} for service {{service}} (attempt $ATTEMPT).
 
-The task isn't complete yet. Here's what you said last time:
-
+Previous OpenCode summary:
 $PREVIOUS_SNIPPET
 
-**Next steps:**
-1. Review @task/acceptance-criteria.md to see what's still missing
-2. Implement the remaining requirements
-3. Commit your changes and push
-4. Verify all acceptance criteria are met
-
-Continue working on the incomplete items."
-    if [ -n "$NEXT_ITERATION_GUIDANCE" ]; then
-      PROMPT_PAYLOAD="${PROMPT_PAYLOAD}
-
-${NEXT_ITERATION_GUIDANCE}"
-    fi
+Focus on unresolved work, avoid repeating completed steps, and progress toward completion."
   fi
 
-  # Inner loop: keep session alive when model returns text-only (no tools)
-  while [ $CONTINUATION_ATTEMPT -le $MAX_CONTINUATION_RETRIES ]; do
-    if [ $CONTINUATION_ATTEMPT -gt 0 ]; then
-      echo "🔄 Continuation $CONTINUATION_ATTEMPT/$MAX_CONTINUATION_RETRIES (keeping session alive)"
-      PROMPT_PAYLOAD="The task is not complete yet. **Use tools** to continue working on the remaining requirements.
+  set +e
+  set -o pipefail
+  OPENCODE_CMD=(
+    "opencode"
+    "exec"
+    "--no-approval"
+    "--output-last-message" "$LAST_MESSAGE_FILE"
+    "--cwd" "$OPENCODE_WORK_DIR"
+  )
+  if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
+    OPENCODE_CMD+=("${SESSION_FLAGS[@]}")
+  fi
+  OPENCODE_CMD+=("$PROMPT_PAYLOAD")
 
-Remaining work:
-- Review acceptance criteria: \`cat task/acceptance-criteria.md\`  
-- Check what's been done: \`git status\` and \`git log\`
-- Fix any errors or incomplete implementations
-- Run quality gates (cargo fmt, cargo clippy, cargo test)
-- Commit and push changes
-- Create or update PR
-
-**Important:** Do not just explain - take action with tools to complete the task."
-      if [ -n "$NEXT_ITERATION_GUIDANCE" ]; then
-        PROMPT_PAYLOAD="${PROMPT_PAYLOAD}
-
-${NEXT_ITERATION_GUIDANCE}"
-      fi
-      RUN_LOG="/tmp/opencode-run-${ATTEMPT}-cont${CONTINUATION_ATTEMPT}.jsonl"
-    fi
-    
-    set +e
-    set -o pipefail
-    # Write prompt to temp file to avoid "Argument list too long" error
-    PROMPT_FILE="/tmp/opencode-prompt-${ATTEMPT}-${CONTINUATION_ATTEMPT}.txt"
-    printf '%s' "$PROMPT_PAYLOAD" > "$PROMPT_FILE"
-    
-    OPENCODE_CMD=(
-      "opencode"
-      "run"
-      "--format"
-      "$OPENCODE_FORMAT"
-      "--log-level"
-      "$OPENCODE_LOG_LEVEL"
-    )
-    if [ "$CONTINUE_SESSION" = "1" ]; then
-      if [ -n "$LATEST_SESSION_ID" ]; then
-        OPENCODE_CMD+=("--session" "$LATEST_SESSION_ID")
-      else
-        OPENCODE_CMD+=("--continue")
-      fi
-    fi
-    
-    # Pass prompt via stdin to handle large prompts
-    if command -v timeout >/dev/null 2>&1; then
-      timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
-    else
-      "${OPENCODE_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
-    fi
-    OPENCODE_EXIT=${PIPESTATUS[0]}
-    set +o pipefail
-    set -e
-    
-    # Clean up prompt file
-    rm -f "$PROMPT_FILE"
-    
-    # Check if this run had tool calls
-    if has_tool_calls "$RUN_LOG"; then
-      echo "✅ Session produced tool calls - good progress"
-      break
-    else
-      echo "⚠️ No tool calls detected - model stuck in explanation mode"
-      if [ $CONTINUATION_ATTEMPT -ge $MAX_CONTINUATION_RETRIES ]; then
-        echo "❌ Max continuation retries reached - moving to next attempt"
-        break
-      fi
-    fi
-    
-    CONTINUATION_ATTEMPT=$((CONTINUATION_ATTEMPT + 1))
-  done
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+  else
+    "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+  fi
+  OPENCODE_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
 
   if [ $OPENCODE_EXIT -eq 124 ]; then
     echo "⏱️ OpenCode command exceeded ${OPENCODE_TIMEOUT}s timeout; terminating session"
     pkill -f "opencode" 2>/dev/null || true
     PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
-    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     ATTEMPT=$((ATTEMPT + 1))
     continue
   fi
@@ -2123,75 +1080,6 @@ ${NEXT_ITERATION_GUIDANCE}"
 
   if [ $OPENCODE_EXIT -ne 0 ]; then
     echo "⚠️ OpenCode exited with status $OPENCODE_EXIT on attempt $ATTEMPT"
-    
-    if command -v detect_billing_failure >/dev/null 2>&1; then
-      CLI_OUTPUT_SNIPPET=""
-      if [ -f "$RUN_LOG" ]; then
-        CLI_OUTPUT_SNIPPET=$(tail -n 400 "$RUN_LOG" 2>/dev/null || cat "$RUN_LOG" 2>/dev/null || true)
-      fi
-      
-      if [ -n "$CLI_OUTPUT_SNIPPET" ]; then
-        if ! detect_billing_failure "$CLI_OUTPUT_SNIPPET" "$OPENCODE_EXIT" "${PR_NUMBER:-}" "${REPOSITORY:-}" "$AGENT_NAME" "{{task_id}}" "${WORKFLOW_STAGE:-}" "{{workflow_name}}"; then
-          BILLING_DETECT_EXIT=$?
-          if [ "$BILLING_DETECT_EXIT" -eq 1 ]; then
-            echo "🚫 Billing/quota failure detected - aborting additional OpenCode retries"
-            BILLING_FAILURE_DETECTED=1
-            BILLING_FAILURE_REASON="Billing or quota error detected for $AGENT_NAME. Restore provider credits/quota, then rerun task {{task_id}}."
-            LAST_COMPLETION_REASON="$BILLING_FAILURE_REASON"
-            NEXT_ITERATION_GUIDANCE=""
-            break
-          elif [ "$BILLING_DETECT_EXIT" -ne 0 ]; then
-            echo "⚠️ Billing failure detector exited with status $BILLING_DETECT_EXIT"
-          fi
-        fi
-      fi
-    fi
-  fi
-
-  # Circuit breaker: detect repeated failing bash commands
-  if [ -f "$RUN_LOG" ]; then
-    # Extract failed bash commands from the log
-    FAILED_CMD=$(jq -r 'select(.type=="tool_use" and .part.tool=="bash" and .part.state.status=="completed" and .part.state.metadata.exit!=0) | .part.state.input.command' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100)
-    
-    if [ -n "$FAILED_CMD" ]; then
-      # Track how many times this command has failed
-      FAILED_COMMANDS["$FAILED_CMD"]=$((${FAILED_COMMANDS["$FAILED_CMD"]:-0} + 1))
-      FAIL_COUNT=${FAILED_COMMANDS["$FAILED_CMD"]}
-      
-      if [ $FAIL_COUNT -ge $MAX_SAME_COMMAND_FAILURES ]; then
-        echo "🔴 CIRCUIT BREAKER TRIGGERED: Command has failed $FAIL_COUNT times in a row:"
-        echo "   Command: $FAILED_CMD"
-        echo "   This indicates the agent is stuck in a loop. Adding explicit guidance..."
-        
-        # Force a stronger prompt for next retry
-        PROMPT_PAYLOAD="⚠️ **LOOP DETECTED**: You have tried this command $FAIL_COUNT times:
-\`\`\`bash
-$FAILED_CMD
-\`\`\`
-
-It keeps failing with the same error. **STOP REPEATING THIS COMMAND.**
-
-Instead:
-1. Check your working directory with \`pwd\`
-2. List files with \`ls -la\`
-3. Try a completely different approach (create files one at a time, use different syntax, etc.)
-4. If directories don't exist, create them step-by-step and verify each step
-
-Continuing Task {{task_id}} - focus on solving the underlying issue, not repeating the same failed command."
-        
-        # Reset the counter to give it a fresh chance with new guidance
-        FAILED_COMMANDS["$FAILED_CMD"]=0
-      fi
-    fi
-  fi
-
-  write_last_message "$RUN_LOG" "$LAST_MESSAGE_FILE" || true
-
-  if [ -s "$LAST_MESSAGE_FILE" ]; then
-    echo "📝 OpenCode summary (attempt $ATTEMPT):"
-    sed 's/^/    /' "$LAST_MESSAGE_FILE"
-  else
-    echo "ℹ️ No textual summary captured from OpenCode on attempt $ATTEMPT"
   fi
 
   NEW_SESSION_ID=""
@@ -2199,11 +1087,17 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
   fi
   if [ -n "$NEW_SESSION_ID" ]; then
-    if [ "$LATEST_SESSION_ID" != "$NEW_SESSION_ID" ]; then
+    if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
       echo "ℹ️  Captured OpenCode session ID: $NEW_SESSION_ID"
-      LATEST_SESSION_ID="$NEW_SESSION_ID"
+      CURRENT_SESSION_ID="$NEW_SESSION_ID"
+      persist_session_id "$CURRENT_SESSION_ID"
     fi
-    CONTINUE_SESSION=1
+  fi
+
+  if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then
+    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+  else
+    RESUME_ARGS=()
   fi
 
   PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
@@ -2218,775 +1112,77 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
           find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
         fi
         PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
-        COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
         ATTEMPT=$((ATTEMPT + 1))
         continue
       fi
     fi
   fi
 
-  COMPLETION_REASON=""
-  # Rex-specific completion criteria (implementation-focused, not quality-focused)
-  if [[ "{{github_app}}" == *"Rex"* ]] || [[ "{{github_app}}" == *"rex"* ]]; then
-    COMPLETION_PROMPT="Task {{task_id}} completion verification — Rex Implementation Agent
-
-**Your Role**: You are Rex, the IMPLEMENTATION agent. Cleo will handle code quality in the next stage.
-
-**FIRST**: Review the FUNCTIONAL requirements in task/acceptance-criteria.md
-
-**Then answer 'yes' if ALL of these are true:**
-
-1. **FUNCTIONAL acceptance criteria implemented** (features exist and basically work)
-2. Code COMPILES successfully (\`cargo build\` passes)
-3. All code changes are committed to git
-4. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
-
-**Code quality issues are OK for Rex - Cleo will fix:**
-- ⚠️ Clippy warnings? OK - Cleo will fix
-- ⚠️ Formatting issues? OK - Cleo will fix  
-- ⚠️ Some tests failing? OK if basic functionality works - Cleo/Tess will fix
-- ⚠️ Unused functions/variables? OK - Cleo will clean up
-
-**Focus on**: Does the implementation work? Are the features there?
-
-**Response format:**
-
-If functionally complete (features work, code compiles, PR created), respond with: yes
-
-If features incomplete or code doesn't compile, respond with:
-no
-REASON: <specific FUNCTIONAL issue>
-
-Example 'yes' response (even with warnings):
-yes
-
-Example 'no' response:
-no
-REASON: Acceptance criteria 2 incomplete - health endpoint not yet implemented. Feature work remains.
-
-Your response:"
-  else
-    # Default completion prompt for other agents (Cleo, Tess)
-    COMPLETION_PROMPT="Task {{task_id}} completion verification.
-
-**FIRST**: Review the acceptance criteria in task/acceptance-criteria.md
-
-**Then answer 'yes' ONLY if ALL of these are true:**
-
-1. **EVERY acceptance criterion is fully implemented** (not just started, but DONE)
-2. All code changes are committed to git
-3. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
-4. A pull request exists (with at least task-{{task_id}} label; other labels are optional)
-5. Quality gates passed (cargo fmt, cargo clippy with no warnings, tests pass)
-
-**Be honest**: If ANY acceptance criterion is incomplete or partially implemented, answer 'no' and continue working.
-
-**To verify:**
-- Review: \`cat task/acceptance-criteria.md\`
-- Git status: \`git status\`
-- Commits pushed: \`git log origin/main..HEAD\`
-- PR exists: \`gh pr view\`
-- Tests pass: Check your test results
-
-**Response format:**
-
-If complete, respond with: yes
-
-If incomplete, respond with:
-no
-REASON: <specific reason why not complete>
-
-For 'no' responses, REASON must specify:
-- Which acceptance criteria are incomplete (list them by number/name)
-- What specific work remains (be concrete)
-- Any blockers or issues encountered
-
-Example 'no' response:
-no
-REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
-
-Your response:"
-  fi
+  COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
   COMPLETION_LAST_MESSAGE="/tmp/opencode-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/opencode-completion-${ATTEMPT}.jsonl"
 
-  COMPLETION_RESPONSE=""
-  if [ "$CONTINUE_SESSION" = "1" ]; then
-    # Write completion prompt to file (same pattern as main prompt)
-    COMPLETION_PROMPT_FILE="/tmp/opencode-completion-prompt-${ATTEMPT}.txt"
-    printf '%s' "$COMPLETION_PROMPT" > "$COMPLETION_PROMPT_FILE"
-    
-    set +e
-    set -o pipefail
-    COMPLETION_CMD=(
-      "opencode"
-      "run"
-      "--format"
-      "$OPENCODE_FORMAT"
-      "--log-level"
-      "$OPENCODE_LOG_LEVEL"
-    )
-    if [ -n "$LATEST_SESSION_ID" ]; then
-      COMPLETION_CMD+=("--session" "$LATEST_SESSION_ID")
-    else
-      COMPLETION_CMD+=("--continue")
-    fi
-    
-    # Pass completion prompt via stdin
-    "${COMPLETION_CMD[@]}" < "$COMPLETION_PROMPT_FILE" | tee "$COMPLETION_LOG"
-    COMPLETION_EXIT=${PIPESTATUS[0]}
-    set +o pipefail
-    set -e
-    
-    # Clean up prompt file
-    rm -f "$COMPLETION_PROMPT_FILE"
-
-    if [ $COMPLETION_EXIT -ne 0 ]; then
-      echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
-    fi
-
-    write_last_message "$COMPLETION_LOG" "$COMPLETION_LAST_MESSAGE" || true
-
-    echo "[opencode-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
-
-    if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
-      COMPLETION_RESPONSE_RAW=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE")
-      COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_RESPONSE_RAW" | tr '[:upper:]' '[:lower:]')
-      echo "🧮 Completion probe response: $COMPLETION_RESPONSE"
-      
-      # Extract reason if response is 'no'
-      if printf '%s\n' "$COMPLETION_RESPONSE" | grep -Eq '^no'; then
-        COMPLETION_REASON=$(printf '%s\n' "$COMPLETION_RESPONSE_RAW" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
-        if [ -n "$COMPLETION_REASON" ]; then
-          echo "📋 Incompletion details:"
-          echo "$COMPLETION_REASON"
-          echo ""
-          echo "════════════════════════════════════════════════════════════════"
-          echo "║ 🔁 NEXT ITERATION FOCUS (FROM COMPLETION PROBE)              ║"
-          echo "════════════════════════════════════════════════════════════════"
-          printf '%s\n' "$COMPLETION_REASON"
-          echo "════════════════════════════════════════════════════════════════"
-          echo ""
-          printf -v NEXT_ITERATION_GUIDANCE $'🔁 **NEXT ITERATION FOCUS (from completion probe attempt %s)**\n\n%s\n\nAddress the items above before rerunning checks.' "$ATTEMPT" "$COMPLETION_REASON"
-          LAST_COMPLETION_REASON="$COMPLETION_REASON"
-        else
-          echo "⚠️ No reason provided for incomplete status"
-        fi
-      fi
-    fi
+  set +e
+  set -o pipefail
+  COMPLETION_CMD=(
+    "opencode"
+    "exec"
+    "--no-approval"
+    "--output-last-message" "$COMPLETION_LAST_MESSAGE"
+    "--cwd" "$OPENCODE_WORK_DIR"
+    "resume"
+  )
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    COMPLETION_CMD+=("$CURRENT_SESSION_ID")
   else
-    echo "ℹ️ Completion probe skipped (session continuation disabled)"
+    COMPLETION_CMD+=("--last")
+  fi
+  COMPLETION_CMD+=("$COMPLETION_PROMPT")
+  "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  if [ $COMPLETION_EXIT -ne 0 ]; then
+    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
   fi
 
+  echo "[opencode-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+
+  if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
+    COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
+  else
+    COMPLETION_RESPONSE=""
+  fi
   if echo "$COMPLETION_RESPONSE" | grep -Eq '^yes'; then
     SUCCESS=1
-    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     break
   fi
 
   echo "[opencode-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
 
-  if [ -n "$COMPLETION_REASON" ]; then
-    echo "⚠️ OpenCode reported task incomplete; retrying with new guidance..."
-  else
-    echo "⚠️ OpenCode reported task incomplete; retrying..."
-  fi
-  COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+  echo "⚠️ OpenCode reported task incomplete; retrying..."
   ATTEMPT=$((ATTEMPT + 1))
 done
 
-if [ "${BILLING_FAILURE_DETECTED:-0}" -eq 1 ]; then
-  echo ""
-  echo "════════════════════════════════════════════════════════════════"
-  echo "║      TASK COMPLETION STATUS: BLOCKED - BILLING/QUOTA ISSUE    ║"
-  echo "════════════════════════════════════════════════════════════════"
-  echo ""
-  echo "❌ ${AGENT_NAME} cannot continue until provider billing/quota issues are resolved."
-  echo "   A remediation comment has been posted to the PR with details."
-  if [ -n "$BILLING_FAILURE_REASON" ]; then
-    echo ""
-    echo "📋 Reason:"
-    echo "$BILLING_FAILURE_REASON"
-  fi
-  echo ""
-  echo "════════════════════════════════════════════════════════════════"
-  EXIT_CODE=1
-  SUCCESS=0
-  exit $EXIT_CODE
-fi
-
-FINAL_ATTEMPTS=$COMPLETED_ATTEMPTS
-if [ "${FINAL_ATTEMPTS:-0}" -le 0 ]; then
-  FINAL_ATTEMPTS=$((ATTEMPT - 1))
-fi
-if [ "$UNLIMITED_RETRIES" != "1" ] && [ $FINAL_ATTEMPTS -gt $MAX_RETRIES ]; then
-  FINAL_ATTEMPTS=$MAX_RETRIES
-fi
-
-if [ -z "$COMPLETION_REASON" ] && [ -n "$LAST_COMPLETION_REASON" ]; then
-  COMPLETION_REASON="$LAST_COMPLETION_REASON"
-fi
-
 if [ $SUCCESS -ne 1 ]; then
-  if [ "$UNLIMITED_RETRIES" = "1" ]; then
-    echo "⚠️ OpenCode did not confirm task completion after $FINAL_ATTEMPTS attempts (unlimited mode)"
-  else
-    echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
-  fi
-  
-  # Display the last recorded reason for incompletion
-  if [ -n "$COMPLETION_REASON" ]; then
-    echo ""
-    echo "💡 Last reported reason for incompletion:"
-    echo "$COMPLETION_REASON"
-  fi
-  
-  # Document remaining work for downstream agents (stage-aware)
-  echo ""
-  
-  # Determine handoff target and agent name based on workflow stage
-  HANDOFF_TARGET="Cleo"
-  HANDOFF_AGENT="Rex"
-  HANDOFF_FILE="$OPENCODE_WORK_DIR/task/rex-handoff.md"
-  
-  case "${WORKFLOW_STAGE:-implementation}" in
-    "implementation")
-      HANDOFF_TARGET="Cleo"
-      HANDOFF_AGENT="Rex"
-      HANDOFF_FILE="$OPENCODE_WORK_DIR/task/rex-handoff.md"
-      ;;
-    "quality"|"quality-in-progress")
-      HANDOFF_TARGET="Tess"
-      HANDOFF_AGENT="Cleo"
-      HANDOFF_FILE="$OPENCODE_WORK_DIR/task/cleo-handoff.md"
-      ;;
-    "security"|"security-in-progress")
-      HANDOFF_TARGET="Tess"
-      HANDOFF_AGENT="Cipher"
-      HANDOFF_FILE="$OPENCODE_WORK_DIR/task/cipher-handoff.md"
-      ;;
-    "testing"|"testing-in-progress")
-      HANDOFF_TARGET="Human Reviewer"
-      HANDOFF_AGENT="Tess"
-      HANDOFF_FILE="$OPENCODE_WORK_DIR/task/tess-handoff.md"
-      ;;
-    *)
-      HANDOFF_TARGET="Next Agent"
-      HANDOFF_AGENT="${AGENT_NAME:-Agent}"
-      HANDOFF_FILE="$OPENCODE_WORK_DIR/task/agent-handoff.md"
-      ;;
-  esac
-  
-  echo "📝 Creating handoff document for $HANDOFF_TARGET..."
-  mkdir -p "$OPENCODE_WORK_DIR/task"
-  
-  # Prepare handoff content with proper variable expansion
-  HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-  if [ -n "$COMPLETION_REASON" ]; then
-    REMAINING_WORK="$COMPLETION_REASON"
-  else
-    REMAINING_WORK="Review the completion probe responses in the logs above for details on what remains to be done."
-  fi
-  
-  cat > "$HANDOFF_FILE" << EOF
-# $HANDOFF_AGENT Handoff to $HANDOFF_TARGET
-
-**Status**: Incomplete after $FINAL_ATTEMPTS iterations (max: $MAX_RETRIES)
-**Date**: $HANDOFF_DATE
-**Task**: {{task_id}}
-**Stage**: ${WORKFLOW_STAGE:-implementation}
-
-## What Was Accomplished
-
-$HANDOFF_AGENT made $FINAL_ATTEMPTS attempts to complete this task. Review the PR and commit history for details on what was done.
-
-## Remaining Work
-
-$REMAINING_WORK
-
-Compare current implementation against acceptance criteria in task/acceptance-criteria.md.
-
-## Next Steps for $HANDOFF_TARGET
-
-1. Review the PR and commits made by $HANDOFF_AGENT
-2. Identify gaps between current state and acceptance criteria
-3. Complete any remaining work
-4. Ensure all checks pass before proceeding
-
-## Acceptance Criteria Reference
-
-See \`task/acceptance-criteria.md\` for complete requirements.
-
----
-*Generated by $HANDOFF_AGENT (OpenCode) after $FINAL_ATTEMPTS attempts*
-EOF
-
-  echo "✅ Handoff document created at $(basename "$HANDOFF_FILE")"
-  
-  # Commit and push the handoff document
-  cd "$OPENCODE_WORK_DIR"
-  git add "task/$(basename "$HANDOFF_FILE")" 2>/dev/null || true
-  
-  # Build commit message with proper variable expansion
-  COMMIT_MSG="docs(task-{{task_id}}): add $HANDOFF_AGENT handoff document
-
-$HANDOFF_AGENT completed $FINAL_ATTEMPTS iterations with incomplete status (max: $MAX_RETRIES).
-Handoff document created for $HANDOFF_TARGET to continue work."
-  
-  if [ -n "$COMPLETION_REASON" ]; then
-    COMMIT_MSG="$COMMIT_MSG
-
-Reason: $COMPLETION_REASON"
-  fi
-  
-  git commit -m "$COMMIT_MSG" 2>/dev/null || echo "⚠️ Could not commit handoff document"
-  
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-  if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
-    git push origin HEAD 2>/dev/null || echo "⚠️ Could not push handoff document"
-  fi
-  
-  # Check if agent made any commits before deciding to handoff vs fail
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-  REMOTE_BASE="origin/${BASE_BRANCH:-main}"
-  COMMITS_MADE=0
-  
-  if [ -n "$CURRENT_BRANCH" ]; then
-    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
-    AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
-    if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
-      COMMITS_MADE=1
-      echo "✅ $AGENT_NAME made $AHEAD_COUNT commit(s) - will handoff to next stage"
-    else
-      echo "⚠️ $AGENT_NAME made NO commits - cannot handoff without progress"
-    fi
-  fi
-  
-  if [ "$COMMITS_MADE" -eq 1 ]; then
-    # Agent made progress - BUT check if this is Cipher with security issues
-    # Cipher must NOT hand off to Tess if security issues found (even if commits were made)
-    if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
-      echo ""
-      echo "════════════════════════════════════════════════════════════════"
-      echo "║      CIPHER SECURITY GATE: ISSUES FOUND - BLOCKING TESS      ║"
-      echo "════════════════════════════════════════════════════════════════"
-      echo ""
-      echo "🛑 Security issues detected - Tess handoff BLOCKED"
-      echo "   - Cipher found security vulnerabilities or policy violations"
-      echo "   - Rex remediation will be triggered to fix issues"
-      echo "   - Cipher will re-scan after Rex pushes fixes"
-      echo "   - Tess will only start after Cipher approves"
-      echo ""
-      echo "════════════════════════════════════════════════════════════════"
-      
-      EXIT_CODE=1  # Exit with failure to block workflow progression
-    else
-      # Non-security stages can handoff with partial completion
-      echo ""
-      echo "════════════════════════════════════════════════════════════════"
-      echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
-      echo "════════════════════════════════════════════════════════════════"
-      echo ""
-      echo "🔄 NEXT STEPS:"
-      echo "   - Handoff document created at task/rex-handoff.md"
-      echo "   - Workflow will continue to next stage for completion"
-      echo "   - Next agent will review PR and finish remaining work"
-      echo ""
-      echo "════════════════════════════════════════════════════════════════"
-      
-      EXIT_CODE=0  # Exit successfully to allow next stage to continue
-    fi
-  else
-    # Agent made NO progress - this is a failure, should retry
-    echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    echo "║          TASK COMPLETION STATUS: FAILED - NO PROGRESS         ║"
-    echo "════════════════════════════════════════════════════════════════"
-    echo ""
-    echo "❌ Rex failed to make any commits after $MAX_RETRIES attempts"
-    echo ""
-    if [ -n "$COMPLETION_REASON" ]; then
-      echo "📋 LAST COMPLETION REASON:"
-      echo "$COMPLETION_REASON"
-    else
-      echo "⚠️ OpenCode did not provide a reason for incompletion"
-      echo "   This may indicate an error occurred before OpenCode could respond"
-    fi
-    echo ""
-    echo "🔄 NEXT STEPS:"
-    echo "   - Check OpenCode logs above for errors"
-    echo "   - CodeRun will retry this task"
-    echo "   - If retries exhausted, workflow will fail"
-    echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    echo ""
-    EXIT_CODE=1  # Exit with failure to trigger retry
-  fi
+  echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
+  EXIT_CODE=0
 else
-  echo "✅ OpenCode confirmed task completion"
   if [ ${OPENCODE_EXIT:-0} -ne 0 ]; then
-    echo "⚠️ OpenCode returned non-zero exit code ${OPENCODE_EXIT}, but completion probe passed"
+    echo "⚠️ OpenCode returned exit code ${OPENCODE_EXIT}; treating as success"
   fi
   EXIT_CODE=0
 fi
 
-if [ $SUCCESS -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
-elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
-  echo "🔍 Implementation agent ($AGENT_NAME) made commits - ensuring PR exists"
-  ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
 else
-  echo "⚠️ Skipping auto PR enforcement (no commits or non-implementation stage)"
+  echo "⚠️ Skipping auto PR enforcement due to OpenCode completion status"
 fi
 
-RESOLVED_PR_URL="$(resolve_pr_url)"
-
-if [ $SUCCESS -eq 1 ]; then
-  # Create completion marker for the appropriate agent based on workflow stage
-  if [[ "{{github_app}}" =~ [Rr]ex ]] && ([ "$WORKFLOW_STAGE" = "implementation" ] || [ "$WORKFLOW_STAGE" = "implementation-in-progress" ]); then
-    echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
-    echo "✅ Rex created implementation completion marker at /workspace/.rex-complete"
-  elif [[ "{{github_app}}" =~ [Cc]leo ]] && ([ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "quality-in-progress" ]); then
-    echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
-    echo "✅ Cleo created quality completion marker at /workspace/.cleo-complete"
-  elif [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]); then
-    echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
-    echo "✅ Cipher created security completion marker at /workspace/.cipher-complete"
-  elif [[ "{{github_app}}" =~ [Tt]ess ]] && ([ "$WORKFLOW_STAGE" = "testing" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]); then
-    echo "tess-testing-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
-    echo "✅ Tess created testing completion marker at /workspace/.tess-complete"
-  fi
-  
-  patch_coderun_status \
-    "Running" \
-    "Implementation completed - ready for security review" \
-    "ready-for-security" \
-    "" \
-    "$RESOLVED_PR_URL" \
-    "false"
-else
-  STATUS_NOTE="$COMPLETION_REASON"
-  if [ -z "$STATUS_NOTE" ]; then
-    STATUS_NOTE="Implementation requires follow-up"
-  fi
-
-  patch_coderun_status \
-    "Running" \
-    "$STATUS_NOTE" \
-    "needs-fixes" \
-    "" \
-    "$RESOLVED_PR_URL" \
-    "false"
-fi
-
-# Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
-# Map CodeRun stage values to workflow stage labels expected by container logic
-case "${WORKFLOW_STAGE:-}" in
-  "quality")
-    WORKFLOW_STAGE="quality-in-progress"
-    ;;
-  "testing")
-    WORKFLOW_STAGE="testing-in-progress"
-    ;;
-  *)
-    # Use existing value for other stages (implementation, etc.)
-    ;;
-esac
-
-if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
-  PR_NUM="${PR_NUMBER:-}"
-  if [ -z "$PR_NUM" ]; then
-    # Try to get PR number from current branch
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    if [ -n "$CURRENT_BRANCH" ]; then
-      PR_NUM=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
-    fi
-  fi
-
-  if [ -n "$PR_NUM" ]; then
-    if [ $SUCCESS -eq 1 ]; then
-      STAGE_NAME="Quality"
-      STAGE_EMOJI="🛡️"
-      CHECKS_PASSED=$'- Code formatting verified
-- Linting passed
-- Unit tests successful
-- Quality standards met'
-      NEXT_STAGE="end-to-end testing by Tess"
-      
-      if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
-        # Cipher security review
-        STAGE_NAME="Security"
-        STAGE_EMOJI="🔒"
-        CHECKS_PASSED=$'- No vulnerabilities detected
-- Dependency audit passed
-- Secret scanning completed
-- Security best practices verified'
-        NEXT_STAGE="QA testing by Tess"
-        
-        echo "✅ $STAGE_NAME checks passed - posting status comment (no approval)"
-        REVIEW_BODY_FILE=$(mktemp)
-        cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - PASSED (Status Only)
-All security checks have passed:
-$CHECKS_PASSED
-
-**Status:** Ready for $NEXT_STAGE
-**Next Step:** Tess will now perform comprehensive QA validation
-
----
-*Security review by Cipher — final approval belongs to Tess*
-EOF
-        refresh_token_if_needed || true
-        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
-        rm -f "$REVIEW_BODY_FILE"
-        
-        # Add security-approved label (create if missing)
-        LABEL_NAME="security-approved"
-        LABEL_API_PATH=$(printf '%s' "$LABEL_NAME" | sed 's/ /%20/g')
-        echo "🏷️  Ensuring '$LABEL_NAME' label exists"
-        if ! gh api -H "Accept: application/vnd.github+json" "repos/$REPO_OWNER/$REPO_NAME/labels/$LABEL_API_PATH" >/dev/null 2>&1; then
-          gh api -X POST \
-            -H "Accept: application/vnd.github+json" \
-            "repos/$REPO_OWNER/$REPO_NAME/labels" \
-            -f name="$LABEL_NAME" \
-            -f color="0E8A16" \
-            -f description="Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
-        fi
-        echo "🏷️  Adding '$LABEL_NAME' label"
-        if ! gh api -X POST \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
-          -F labels[]="$LABEL_NAME" >/dev/null 2>&1; then
-          echo "⚠️ Failed to add $LABEL_NAME label"
-        fi
-
-        LABEL_READY_FOR_SECURITY="ready-for-security"
-        LABEL_READY_FOR_QA="ready-for-qa"
-        echo "🧹 Removing '$LABEL_READY_FOR_SECURITY' label after security approval"
-        gh api -X DELETE \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels/$LABEL_READY_FOR_SECURITY" >/dev/null 2>&1 || echo "ℹ️ '$LABEL_READY_FOR_SECURITY' label already absent"
-
-        echo "♻️ Refreshing '$LABEL_READY_FOR_QA' label to trigger Tess"
-        gh api -X DELETE \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels/$LABEL_READY_FOR_QA" >/dev/null 2>&1 || true
-        if gh api -X POST \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
-          -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
-          echo "🏷️  Added '$LABEL_READY_FOR_QA' label to signal Tess"
-        else
-          echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
-        fi
-      elif [ "$WORKFLOW_STAGE" = "testing" ]; then
-        # Tess has final approval authority - but ONLY if CI passes
-        STAGE_NAME="QA Testing"
-        STAGE_EMOJI="🧪"
-        CHECKS_PASSED=$'- End-to-end tests passed
-- Integration tests successful
-- Acceptance criteria validated
-- Production readiness confirmed'
-        NEXT_STAGE="human review and merge"
-        
-        # CRITICAL: Check GitHub CI status before approving
-        if [ $SUCCESS -eq 1 ]; then
-          echo "🔍 Verifying GitHub CI status before Tess approval..."
-          CI_CHECK_FAILED=0
-          
-          CI_TIMEOUT=300
-          CI_WAIT=0
-          CI_ALL_COMPLETE=false
-          
-          while [ $CI_WAIT -lt $CI_TIMEOUT ]; do
-            PENDING_COUNT=$(gh pr checks "$PR_NUM" --json state --jq '[.[] | select(.state != "COMPLETED")] | length' 2>/dev/null || echo "99")
-            
-            if [ "${PENDING_COUNT:-99}" -eq 0 ]; then
-              CI_ALL_COMPLETE=true
-              echo "✅ All CI checks completed"
-              break
-            fi
-            
-            echo "⏳ Waiting for CI... ${PENDING_COUNT} pending (${CI_WAIT}s / ${CI_TIMEOUT}s)"
-            sleep 15
-            CI_WAIT=$((CI_WAIT + 15))
-          done
-          
-          if [ "$CI_ALL_COMPLETE" = "false" ]; then
-            echo "⚠️ CI still running after ${CI_TIMEOUT}s - NOT approving"
-            CI_CHECK_FAILED=1
-          else
-            FAILED_COUNT=$(gh pr checks "$PR_NUM" --json conclusion --jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED")] | length' 2>/dev/null || echo "0")
-            
-            if [ "${FAILED_COUNT:-0}" -gt 0 ]; then
-              echo "❌ ${FAILED_COUNT} CI check(s) FAILED - NOT approving"
-              CI_CHECK_FAILED=1
-            else
-              echo "✅ All CI checks PASSED"
-            fi
-          fi
-          
-          if [ $CI_CHECK_FAILED -eq 1 ]; then
-            SUCCESS=0
-            CHECKS_PASSED="CI checks must pass before approval"
-          fi
-        fi
-        
-        # Check if this is the final task requiring deployment verification
-        DEPLOYMENT_STATUS=""
-        if [ "${FINAL_TASK:-false}" = "true" ] && [ $SUCCESS -eq 1 ]; then
-          echo "🎯 Final task detected - verifying Kubernetes deployment"
-          
-          # Extract service name from repository or use default
-          SERVICE_NAME="${SERVICE_NAME:-$(basename "$REPOSITORY" .git)}"
-          NAMESPACE="${NAMESPACE:-agent-platform}"
-          
-          # Check for deployment
-          if kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" &>/dev/null; then
-            READY_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
-            DESIRED_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-            
-            if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "0" ]; then
-              echo "✅ Deployment verified: $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
-              
-              # Get ingress URLs
-              INGRESS_URLS=$(kubectl get ingress -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.rules[*].host}{"\n"}{end}' 2>/dev/null | grep -v "^$" || echo "")
-              
-              if [ -n "$INGRESS_URLS" ]; then
-                DEPLOYMENT_STATUS="
-
-## 🚀 Deployment Verified
-- **Service**: $SERVICE_NAME
-- **Namespace**: $NAMESPACE
-- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
-- **Live URLs**:
-$(echo "$INGRESS_URLS" | sed 's/^/  - https:\/\//')"
-              else
-                DEPLOYMENT_STATUS="
-
-## 🚀 Deployment Verified
-- **Service**: $SERVICE_NAME
-- **Namespace**: $NAMESPACE
-- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
-- **Access**: Service deployed (no ingress configured)"
-              fi
-            else
-              echo "⚠️ Deployment not ready: $READY_REPLICAS/$DESIRED_REPLICAS replicas"
-              DEPLOYMENT_STATUS="
-
-## ⚠️ Deployment Not Ready
-- **Service**: $SERVICE_NAME
-- **Namespace**: $NAMESPACE
-- **Status**: ⏳ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
-- **Action Required**: Waiting for deployment to stabilize"
-            fi
-          else
-            echo "⚠️ Deployment not found: $SERVICE_NAME in namespace $NAMESPACE"
-            DEPLOYMENT_STATUS="
-
-## ⚠️ Deployment Not Found
-- **Service**: $SERVICE_NAME
-- **Namespace**: $NAMESPACE
-- **Status**: ❌ Deployment not detected
-- **Action Required**: Ensure deployment manifests are applied"
-          fi
-        fi
-        
-        echo "✅ $STAGE_NAME complete - posting APPROVE review (Tess final approval)"
-        REVIEW_BODY_FILE=$(mktemp)
-        cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
-All checks have passed:
-$CHECKS_PASSED
-Ready for $NEXT_STAGE.$DEPLOYMENT_STATUS
-
-**Final Approval:** Tess has verified all acceptance criteria are met.
-EOF
-        refresh_token_if_needed || true
-        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
-        rm -f "$REVIEW_BODY_FILE"
-        
-        # Auto-merge if enabled (Tess only)
-        if [ "${AUTO_MERGE:-false}" = "true" ]; then
-          echo "🔀 AUTO_MERGE enabled - merging PR automatically"
-          if timeout 30 gh pr merge "$PR_NUM" --auto --squash --delete-branch; then
-            echo "✅ PR scheduled for auto-merge"
-          else
-            echo "⚠️ Auto-merge failed - PR may need manual intervention"
-          fi
-        fi
-      else
-        # Cleo posts APPROVE review to show up in Reviews tab
-        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
-        REVIEW_BODY_FILE=$(mktemp)
-        cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
-All quality checks have passed:
-$CHECKS_PASSED
-
-**Status:** Ready for $NEXT_STAGE
-**Next Step:** Tess will now perform comprehensive QA validation
-
----
-*Quality review by Cleo*
-EOF
-        refresh_token_if_needed || true
-        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
-        rm -f "$REVIEW_BODY_FILE"
-        
-        # Add ready-for-qa label to signal Tess
-        echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
-        timeout 30 gh pr edit "$PR_NUM" --add-label "ready-for-qa" 2>&1 || echo "⚠️ Failed to add ready-for-qa label"
-      fi
-    else
-      STAGE_NAME="Quality"
-      STAGE_EMOJI="🛡️"
-      ISSUES_DESC=$'- Review code formatting
-- Fix linting errors
-- Ensure unit tests pass
-- Meet quality standards'
-      if [ "$WORKFLOW_STAGE" = "security" ]; then
-        STAGE_NAME="Security"
-        STAGE_EMOJI="🔒"
-        ISSUES_DESC=$'- Fix security vulnerabilities
-- Update insecure dependencies
-- Remove exposed secrets
-- Address security best practice violations'
-      elif [ "$WORKFLOW_STAGE" = "testing" ]; then
-        STAGE_NAME="QA Testing"
-        STAGE_EMOJI="🧪"
-        ISSUES_DESC=$'- Fix failing end-to-end tests
-- Address integration test failures
-- Validate acceptance criteria
-- Ensure production readiness'
-      fi
-
-      echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
-      REVIEW_BODY_FILE=$(mktemp)
-      cat <<EOF > "$REVIEW_BODY_FILE"
-### 🔴 Required Changes
-$STAGE_NAME issues detected. Please address the following:
-$ISSUES_DESC
-EOF
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --request-changes --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
-      rm -f "$REVIEW_BODY_FILE"
-    fi
-  else
-    echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
-  fi
-fi
-
-touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
-
-# Explicitly stop Docker sidecar before exiting
-echo "🛑 Explicitly stopping Docker sidecar..."
-stop_docker_sidecar || true
-
-# Kill any remaining background processes to ensure clean exit
-echo "🧹 Cleaning up background processes..."
-pkill -P $$ 2>/dev/null || true
+touch /workspace/.agent_done 2>/dev/null || true
 
 if [ $SUCCESS -ne 1 ]; then
   {{#if agent_completion_message}}
@@ -2994,7 +1190,6 @@ echo "{{agent_completion_message}}"
   {{else}}
 echo "⚠️ OpenCode execution incomplete"
   {{/if}}
-  # Force exit to ensure container stops
   exit $EXIT_CODE
 fi
 
@@ -3003,7 +1198,4 @@ echo "{{agent_completion_message}}"
 {{else}}
 echo "✅ OpenCode execution complete"
 {{/if}}
-
-# Ensure container exits by terminating the shell process
-echo "🏁 Terminating container..."
-  exit $EXIT_CODE
+exit $EXIT_CODE

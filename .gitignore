@@ -12,7 +12,6 @@ node_modules/
 # Environment variables
 .env
 *.env
-.agent-credentials*.env
 
 # Agent secrets (SSH keys and tokens)
 agents/
@@ -42,7 +41,6 @@ kubeconfig*
 # Test and Debug Files
 test-*.yaml
 debug-*.yaml
-debug-*.sh
 !infra/gitops/applications/test-db.yaml
 !infra/gitops/rbac/test-db-access.yaml
 
@@ -70,10 +68,9 @@ Chart.lock
 
 # Claude configuration files
 **/CLAUDE.md
+target/
 controller/target/
 mcp/target/
-mcp/dist/
-dist/
 sidecar/target/
 
 # Agent files
@@ -105,15 +102,9 @@ cloudflare.env
 # Factory credentials
 factory.env
 
-# Deployment instructions with sensitive data
-*DEPLOYMENT_INSTRUCTIONS*.md
-CONTEXT7_DEPLOYMENT_INSTRUCTIONS.md
-
 # Charts repository (for local development)
 charts-repo/
 
 # Task files
 # tasks.json
-# tasks/
-**/target/*docs/tasks-reference/
-target/
+# tasks/ 
