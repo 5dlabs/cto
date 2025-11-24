@@ -767,6 +767,8 @@ spec:
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.model}}`}}"
+                - name: final-task
+                  value: "false"
           EOF
 
               workflow_name=$(kubectl create -f /tmp/workflow-task-${task_id}.yaml -o jsonpath='{.metadata.name}')
@@ -1388,6 +1390,8 @@ spec:
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.model}}`}}"
+                - name: final-task
+                  value: "false"
           EOF
 
             workflow_name=$(kubectl create -f /tmp/workflow.yaml -o jsonpath='{.metadata.name}')
