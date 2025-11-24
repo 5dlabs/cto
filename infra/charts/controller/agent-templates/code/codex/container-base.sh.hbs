@@ -1425,21 +1425,29 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
   
   # Extract tools configuration and generate client-config.json
   if command -v jq >/dev/null 2>&1; then
-    jq -n \
-      --arg agent "$AGENT_NAME" \
-      --slurpfile cto "$CTO_CONFIG_PATH" \
-      '{
-        remoteTools: ($cto[0].agents[$agent].tools.remote // []),
-        localServers: ($cto[0].agents[$agent].tools.localServers // {})
-      }' > "$CLIENT_CONFIG_PATH"
-    
-    if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ]; then
-      echo "✅ Generated client-config.json from cto-config.json"
-      echo "🔍 DEBUG: Generated client-config.json contents:"
-      jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated client-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated client-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
     else
-      echo "❌ Failed to generate client-config.json - file is empty or missing"
-      rm -f "$CLIENT_CONFIG_PATH"
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
     fi
   else
     echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
