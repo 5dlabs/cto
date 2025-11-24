@@ -460,3 +460,6 @@ This document establishes BetterAuth as the official authentication standard for
 
 **Approved by:** CTO Platform Team  
 **Date:** November 24, 2025
+
+
+
