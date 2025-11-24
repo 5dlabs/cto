@@ -120,15 +120,16 @@ spec:
 
                         # Check conflict status - only skip if explicitly mergeable AND clean
                         NORMALIZED_STATE=$(echo "${MERGE_STATE:-}" | tr '[:upper:]' '[:lower:]')
-                        
+
                         echo "📊 PR #$PR_NUMBER status: mergeable=${MERGEABLE:-null}, state=${NORMALIZED_STATE:-null}"
-                        
+
                         # Only skip if we're CERTAIN there are no conflicts
-                        if [ "$MERGEABLE" = "true" ] && [ "$NORMALIZED_STATE" != "dirty" ] && [ "$NORMALIZED_STATE" != "unstable" ] && [ "$NORMALIZED_STATE" != "behind" ]; then
+                        if [ "$MERGEABLE" = "true" ] && [ "$NORMALIZED_STATE" != "dirty" ] && \
+                          [ "$NORMALIZED_STATE" != "unstable" ] && [ "$NORMALIZED_STATE" != "behind" ]; then
                           echo "ℹ️ PR is mergeable and clean, no conflict handling required"
                           exit 0
                         fi
-                        
+
                         # If mergeable is null/false OR state is dirty/unstable, proceed
                         if [ "$MERGEABLE" = "null" ] || [ -z "$MERGEABLE" ]; then
                           echo "⚠️ Mergeable status is null - will create guardian to monitor"
