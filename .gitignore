@@ -88,6 +88,10 @@ agent_*.md
 # Test repositories
 .test-repo/
 
+# Testing template directory - exclude any .git if accidentally created
+testing/cto-parallel-test/.git
+testing/cto-parallel-test-template/.git
+
 # Solana credentials
 sol.env
 
