@@ -1,0 +1,59 @@
+<prompt>
+    <role>You are a senior frontend developer specializing in React, shadcn/ui, Tailwind CSS, and modern web application development.</role>
+    <task>
+        <id>6</id>
+        <title>Frontend Components</title>
+        <description>Create a complete React frontend with shadcn/ui for an e-commerce application with all major UI components.</description>
+        <priority>medium</priority>
+        <status>pending</status>
+        <dependencies></dependencies>
+        <estimated_time>35 minutes</estimated_time>
+        <level>0</level>
+    </task>
+    <technical_specifications>
+        <spec>React 18.2.0 with functional components and hooks</spec>
+        <spec>shadcn/ui for component library (built on Radix UI primitives)</spec>
+        <spec>Tailwind CSS for styling</spec>
+        <spec>React Router DOM 6.14.2 for client-side routing</spec>
+        <spec>Responsive design for mobile and desktop</spec>
+        <spec>Axios for future API integration</spec>
+        <spec>Component-based architecture</spec>
+    </technical_specifications>
+    <implementation_details>
+Create package.json with all dependencies.
+Initialize shadcn/ui with `npx shadcn@latest init`.
+Add required shadcn/ui components (button, card, badge, input, form, navigation-menu).
+Build App.js with Router (no ThemeProvider needed - uses Tailwind CSS).
+Create Header with navigation links, cart badge using shadcn/ui components.
+Create Footer component using Tailwind CSS.
+Implement HomePage, ProductList (with mock data), ProductDetail, Cart, Login, Register.
+Use shadcn/ui components and Tailwind CSS for styling throughout.
+Ensure responsive grid layouts with Tailwind CSS classes.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>All dependencies in package.json</criterion>
+        <criterion>App launches with npm start</criterion>
+        <criterion>All routes navigate correctly</criterion>
+        <criterion>Components render without errors</criterion>
+        <criterion>shadcn/ui components render correctly</criterion>
+        <criterion>Tailwind CSS styles applied consistently</criterion>
+        <criterion>Responsive design works</criterion>
+        <criterion>Production build succeeds</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+npm install - verify dependencies resolve
+npm start - verify app launches
+Test all navigation routes
+Verify responsive design (resize browser)
+Check browser console for errors
+npm run build - verify production build
+    </test_strategy>
+    <instructions>
+1. Create frontend directory structure
+2. Set up package.json with dependencies
+3. Create App.js with routing
+4. Build layout components (Header, Footer)
+5. Implement page components with placeholder content
+6. Test navigation and responsiveness
+    </instructions>
+</prompt>
