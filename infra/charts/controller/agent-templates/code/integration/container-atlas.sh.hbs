@@ -1,210 +1,96 @@
-#!/bin/sh
-# Atlas - Long-Running PR Guardian
-# Continuously monitors PR until merged or closed
+#!/bin/bash
+# Atlas Guardian - Structured Prompting with Probe/Acceptance Criteria Pattern
+# Applies the proven Rex/Cleo/Tess pattern to PR monitoring and remediation
 
-set -e
+set -euo pipefail
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
 MODE="${ATLAS_MODE:-guardian}"
-MAX_CYCLES="${ATLAS_MAX_CYCLES:-0}"
-CYCLE_COUNT=0
+MAX_ITERATIONS="${ATLAS_MAX_ITERATIONS:-10}"
+ITERATION=0
+REPO_OWNER="${REPOSITORY_OWNER}"
+REPO_NAME="${REPOSITORY_NAME}"
+PR_NUMBER="${PR_NUMBER}"
+PR_URL="${PR_URL}"
+PR_BRANCH="${PR_BRANCH}"
+REPO_URL="{{repository_url}}"
 
-echo "🔱 Atlas: Starting PR guardian for task {{task_id}} (mode: $MODE)"
+echo "🔱 Atlas Guardian - Structured Prompting Mode"
+echo "=============================================="
+echo "PR: #$PR_NUMBER"
+echo "Branch: $PR_BRANCH"
+echo "Mode: $MODE"
+echo "Max Iterations: $MAX_ITERATIONS"
+echo ""
 
-# Source common setup from shared functions
+# ============================================================================
+# SETUP (GitHub Auth, Repository Clone)
+# ============================================================================
+
+# Source common setup functions
 source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || {
-    # Minimal fallback if shared functions unavailable
-    setup_github_auth() { echo "Setting up GitHub auth..."; }
-    clone_repository() { echo "Cloning repository..."; }
+    echo "⚠️ Shared functions not available, using minimal setup"
 }
 
 # Setup GitHub authentication
-setup_github_auth
+setup_github_auth 2>/dev/null || {
+    echo "Setting up GitHub auth manually..."
+    # Minimal auth setup if shared function fails
+    export GH_TOKEN="$GITHUB_TOKEN"
+}
 
-# Get PR from environment or discover via task label
-PR_NUMBER="${PR_NUMBER:-}"
-if [ -z "$PR_NUMBER" ]; then
-    TASK_LABEL="task-{{task_id}}"
-    PR_NUMBER=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
-fi
-
-if [ -z "$PR_NUMBER" ]; then
-    echo "⚠️ No PR found yet - waiting for PR creation..."
-    # Wait for PR to be created (up to 10 minutes)
-    for i in $(seq 1 60); do
-        sleep 10
-        PR_NUMBER=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
-        if [ -n "$PR_NUMBER" ]; then
-            echo "✅ Found PR #$PR_NUMBER"
-            break
-        fi
-    done
-    
-    if [ -z "$PR_NUMBER" ]; then
-        echo "❌ No PR created after 10 minutes - exiting"
-        exit 1
-    fi
-fi
-
-echo "🔱 Atlas monitoring PR #$PR_NUMBER"
-
-# Clone repo once for the entire session
+# Clone repository
 REPO_DIR="/workspace/repo"
-git clone "{{repository_url}}" "$REPO_DIR"
+if [ ! -d "$REPO_DIR" ]; then
+    echo "📥 Cloning repository..."
+    git clone "$REPO_URL" "$REPO_DIR"
+fi
 cd "$REPO_DIR"
 
-# Polling interval (seconds)
-if [ "$MODE" = "integration-gate" ]; then
-    POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-30}"
-else
-    POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-60}"
-fi
-LAST_CHECK_TIMESTAMP=$(date +%s)
+# Fetch latest
+git fetch --all
 
-# Main guardian loop
-while true; do
-    echo "🔍 [$(date -u +%Y-%m-%dT%H:%M:%SZ)] Checking PR #$PR_NUMBER status..."
+echo "✅ Setup complete"
+echo ""
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+# Detect available CLI
+detect_cli() {
+    if command -v claude >/dev/null 2>&1; then
+        echo "claude"
+    elif command -v codex >/dev/null 2>&1; then
+        echo "codex"
+    elif command -v opencode >/dev/null 2>&1; then
+        echo "opencode"
+    elif command -v cursor-agent >/dev/null 2>&1; then
+        echo "cursor-agent"
+    elif command -v factory-cli >/dev/null 2>&1; then
+        echo "factory-cli"
+    else
+        echo ""
+    fi
+}
+
+# Run CLI with structured prompt
+run_cli_with_prompt() {
+    local prompt_file="$1"
+    local cli_cmd=$(detect_cli)
     
-    # Get PR state
-    PR_STATE=$(gh pr view "$PR_NUMBER" --json state,merged,mergeable,mergeStateStatus,isDraft,statusCheckRollup --jq '.' 2>/dev/null || echo "{}")
-    
-    STATE=$(echo "$PR_STATE" | jq -r '.state // "UNKNOWN"')
-    MERGED=$(echo "$PR_STATE" | jq -r '.merged // false')
-    MERGEABLE=$(echo "$PR_STATE" | jq -r '.mergeable // "UNKNOWN"')
-    MERGE_STATE=$(echo "$PR_STATE" | jq -r '.mergeStateStatus // "UNKNOWN"')
-    IS_DRAFT=$(echo "$PR_STATE" | jq -r '.isDraft // false')
-    
-    # Exit conditions
-    if [ "$STATE" = "CLOSED" ] || [ "$MERGED" = "true" ]; then
-        if [ "$MERGED" = "true" ]; then
-            echo "✅ PR #$PR_NUMBER merged successfully - Atlas guardian exiting"
-            gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: PR Guardian Complete
-
-PR successfully merged at $(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-**Final Status:**
-- State: MERGED
-- All quality gates: PASSED
-- Atlas monitoring duration: $(($(date +%s) - LAST_CHECK_TIMESTAMP))s
-
-Atlas guardian shutting down. 🎉"
-        else
-            echo "ℹ️ PR #$PR_NUMBER closed without merge - Atlas guardian exiting"
-        fi
-        exit 0
+    if [ -z "$cli_cmd" ]; then
+        echo "❌ No CLI available"
+        return 1
     fi
     
-    # Skip draft PRs
-    if [ "$IS_DRAFT" = "true" ]; then
-        echo "📝 PR is draft - skipping checks"
-        sleep "$POLL_INTERVAL"
-        continue
-    fi
-
+    echo "🤖 Using $cli_cmd with structured prompt"
     
-    # 1. Check for merge conflicts
-    if [ "$MERGEABLE" = "CONFLICTING" ] || [ "$MERGE_STATE" = "dirty" ]; then
-        echo "⚠️ Merge conflicts detected - resolving..."
-        
-        PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
-        PR_BASE=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
-        
-        git fetch origin "$PR_BRANCH" "$PR_BASE"
-        git checkout "$PR_BRANCH"
-        
-        # Attempt automatic rebase
-        if git rebase "origin/$PR_BASE"; then
-            git push --force-with-lease origin "$PR_BRANCH"
-            gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Conflicts Resolved
-
-Automatically rebased \`$PR_BRANCH\` onto \`$PR_BASE\` at $(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-All conflicts resolved. PR is now clean and ready for review."
-            echo "✅ Conflicts resolved automatically"
-        else
-            # Intelligent conflict resolution needed
-            echo "⚠️ Automatic rebase failed - using AI to resolve conflicts"
-            CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
-            
-            echo "📋 Conflicts in: $CONFLICT_FILES"
-            
-            # Get conflict details for each file
-            CONFLICT_DETAILS=""
-            for file in $CONFLICT_FILES; do
-                CONFLICT_DETAILS="$CONFLICT_DETAILS
-## Conflict in: \`$file\`
-
-\`\`\`diff
-$(git diff "$file" 2>/dev/null || echo "Unable to show diff")
-\`\`\`
-"
-            done
-            
-            # Create conflict resolution prompt
-            cat > /tmp/CONFLICT_RESOLUTION_PROMPT.md << 'CONFLICT_PROMPT_EOF'
-# 🔀 Merge Conflict Resolution
-
-## Instructions
-You need to resolve merge conflicts that occurred when rebasing this PR onto main.
-
-**Your mission:**
-1. **Understand both sides** - Read the conflict markers carefully
-2. **Merge intelligently** - Combine changes from both branches
-3. **Preserve functionality** - Keep working code from both sides
-4. **Test after resolving** - Ensure nothing breaks
-5. **Remove conflict markers** - Clean up <<<<<<< ======= >>>>>>> markers
-
-## Conflict Details
-
-CONFLICT_PROMPT_EOF
-            
-            echo "$CONFLICT_DETAILS" >> /tmp/CONFLICT_RESOLUTION_PROMPT.md
-            
-            cat >> /tmp/CONFLICT_RESOLUTION_PROMPT.md << 'CONFLICT_FOOTER_EOF'
-
-## Context
-- This PR is being rebased onto main
-- Conflicts occurred because both branches modified the same files
-- Your job is to merge the changes intelligently
-
-## Success Criteria
-- ✅ All conflict markers removed
-- ✅ Code compiles/runs
-- ✅ Functionality from both branches preserved
-- ✅ Tests pass (if applicable)
-
-After resolving, the changes will be committed and pushed automatically.
-CONFLICT_FOOTER_EOF
-            
-            # Detect available CLI
-            CLI_CMD=""
-            CLI_NAME=""
-            
-            if command -v claude >/dev/null 2>&1; then
-                CLI_CMD="claude --output-format stream-json --input-format stream-json"
-                CLI_NAME="Claude"
-            elif command -v codex >/dev/null 2>&1; then
-                CLI_CMD="codex"
-                CLI_NAME="Codex"
-            elif command -v opencode >/dev/null 2>&1; then
-                CLI_CMD="opencode"
-                CLI_NAME="OpenCode"
-            elif command -v cursor-agent >/dev/null 2>&1; then
-                CLI_CMD="cursor-agent"
-                CLI_NAME="Cursor"
-            elif command -v factory-cli >/dev/null 2>&1; then
-                CLI_CMD="factory-cli"
-                CLI_NAME="Factory"
-            fi
-            
-            if [ -n "$CLI_CMD" ]; then
-                echo "🤖 Using $CLI_NAME to resolve conflicts intelligently..."
-                
-                # Don't abort - let AI work with conflict markers
-                # (git rebase already in progress with conflicts)
-                
-                # Run CLI to resolve conflicts
-                if [ "$CLI_NAME" = "Claude" ]; then
-                    $CLI_CMD << CLI_INPUT 2>&1 | tee /tmp/conflict-resolution.log
+    if [ "$cli_cmd" = "claude" ]; then
+        claude --output-format stream-json --input-format stream-json << CLI_INPUT
 {
   "type": "user",
   "message": {
@@ -212,404 +98,442 @@ CONFLICT_FOOTER_EOF
     "content": [
       {
         "type": "text",
-        "text": "$(cat /tmp/CONFLICT_RESOLUTION_PROMPT.md | jq -Rs .)"
+        "text": "$(cat "$prompt_file" | jq -Rs .)"
       }
     ]
   }
 }
 CLI_INPUT
-                else
-                    echo "$(cat /tmp/CONFLICT_RESOLUTION_PROMPT.md)" | $CLI_CMD 2>&1 | tee /tmp/conflict-resolution.log
-                fi
-                
-                # Check if conflicts are resolved
-                if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
-                    echo "✅ $CLI_NAME resolved all conflicts!"
-                    
-                    # Continue the rebase
-                    git add -A
-                    if git rebase --continue; then
-                        git push --force-with-lease origin "$PR_BRANCH"
-                        
-                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Conflicts Intelligently Resolved
-
-Successfully resolved merge conflicts using $CLI_NAME:
-- Files with conflicts: $(echo "$CONFLICT_FILES" | wc -w)
-- Resolution method: Intelligent merge using AI analysis
-- Branch rebased onto \`$PR_BASE\`
-
-All conflicts have been resolved. PR is now clean and ready for review.
-
-*Resolved by Atlas Guardian using $CLI_NAME at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                        
-                        echo "✅ Conflicts resolved and pushed"
-                    else
-                        echo "⚠️ Rebase continuation failed"
-                        git rebase --abort
-                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Conflict Resolution Incomplete
-
-$CLI_NAME attempted to resolve conflicts but the rebase could not be completed.
-Manual intervention required.
-
-*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                    fi
-                else
-                    echo "⚠️ $CLI_NAME could not fully resolve conflicts"
-                    git rebase --abort
-                    
-                    gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Complex Conflicts Detected
-
-$CLI_NAME attempted to resolve conflicts in:
-\`\`\`
-$CONFLICT_FILES
-\`\`\`
-
-These conflicts are complex and require human judgment.
-Please resolve manually and push to \`$PR_BRANCH\`.
-
-*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                fi
-            else
-                # No CLI available
-                git rebase --abort
-                
-                gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Manual Conflict Resolution Required
-
-Automatic rebase failed. Conflicts in:
-\`\`\`
-$CONFLICT_FILES
-\`\`\`
-
-**To resolve:**
-1. Pull latest main: \`git fetch origin main\`
-2. Rebase your branch: \`git rebase origin/main\`
-3. Resolve conflicts in the listed files
-4. Complete rebase: \`git rebase --continue\`
-5. Push: \`git push --force-with-lease\`
-
-*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                
-                echo "⚠️ No CLI available for intelligent resolution - continuing to monitor"
-            fi
-        fi
-    fi
-    
-    # 2. Check for CI failures
-    STATUS_CHECKS=$(echo "$PR_STATE" | jq -r '.statusCheckRollup[]? | select(.conclusion == "FAILURE") | .name' 2>/dev/null || echo "")
-    if [ -n "$STATUS_CHECKS" ]; then
-        echo "⚠️ CI failures detected: $STATUS_CHECKS"
-        
-        # Get failed workflow runs
-        FAILED_RUNS=$(gh api "/repos/{{repository_owner}}/{{repository_name}}/actions/runs?event=pull_request&branch=$PR_BRANCH&status=failure" --jq '.workflow_runs[0:3] | .[] | "\(.id) \(.name)"' 2>/dev/null || echo "")
-        
-        if [ -n "$FAILED_RUNS" ]; then
-            echo "$FAILED_RUNS" | while read -r run_id run_name; do
-                echo "📋 Analyzing failure: $run_name (run $run_id)"
-                
-                # Get logs for failed run
-                gh run view "$run_id" --log > "/tmp/ci-failure-$run_id.log" 2>/dev/null || true
-                
-                # TODO: Implement intelligent CI failure recovery
-                # For now, just report
-                gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: CI Failure Detected
-
-**Failed Check:** $run_name
-**Run ID:** $run_id
-**Time:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-Logs captured. Investigating root cause..."
-            done
-        fi
-    fi
-    
-    # 3. Check for ANY new comments (filter for Bugbot in script, not at API level)
-    REPO_OWNER="${REPOSITORY_OWNER:-}"
-    REPO_NAME="${REPOSITORY_NAME:-}"
-    
-    if [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
-        echo "⚠️ Repository owner/name not available, skipping comment checks"
     else
-        ALL_COMMENTS_JSON=$(gh api "/repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/comments?per_page=20" --jq '[.[] | select(.created_at > "'$(date -u -d "@$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$LAST_CHECK_TIMESTAMP" +%Y-%m-%dT%H:%M:%SZ)'")]' 2>/dev/null || echo "[]")
+        cat "$prompt_file" | $cli_cmd
+    fi
+}
+
+# Probe for merge conflicts
+probe_merge_conflicts() {
+    local pr_data=$(gh pr view $PR_NUMBER --json mergeable,mergeStateStatus,headRefName,baseRefName)
+    local mergeable=$(echo "$pr_data" | jq -r '.mergeable')
+    local merge_state=$(echo "$pr_data" | jq -r '.mergeStateStatus')
+    
+    if [ "$mergeable" = "CONFLICTING" ] || [ "$merge_state" = "DIRTY" ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# Probe for CI failures
+probe_ci_failures() {
+    local failed_count=$(gh pr view $PR_NUMBER --json statusCheckRollup \
+        --jq '[.statusCheckRollup[]? | select(.conclusion == "FAILURE")] | length')
+    
+    if [ "$failed_count" -gt 0 ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# Probe for quality issues
+probe_quality_issues() {
+    local issue_count=$(gh api "/repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/comments" \
+        --jq '[.[] | select(.body | test("🔴|🟡"))] | length' 2>/dev/null || echo "0")
+    
+    if [ "$issue_count" -gt 0 ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# Generate merge conflict content
+generate_conflict_content() {
+    cat << 'CONFLICT_CONTENT'
+# 🔀 MERGE CONFLICT RESOLUTION
+
+## Problem
+This PR has merge conflicts with the base branch that must be resolved.
+
+## Conflicted Files
+CONFLICT_CONTENT
+
+    # Try to rebase to get conflict details
+    git fetch origin "$PR_BRANCH" "$(gh pr view $PR_NUMBER --json baseRefName --jq '.baseRefName')"
+    git checkout "$PR_BRANCH" 2>/dev/null || true
+    git rebase "origin/$(gh pr view $PR_NUMBER --json baseRefName --jq '.baseRefName')" 2>&1 >/dev/null || true
+    
+    # Get conflicted files
+    local conflict_files=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
+    
+    if [ -n "$conflict_files" ]; then
+        echo "$conflict_files" | while read -r file; do
+            echo "- \`$file\`"
+        done
         
-        # Filter for Bugbot comments in the script
-        BUGBOT_COMMENTS_JSON=$(echo "$ALL_COMMENTS_JSON" | jq '[.[] | select(.user.login == "cursor[bot]" or .user.login == "bugbot[bot]" or (.body | test("🔴|🟡|💡")))]')
-        BUGBOT_COMMENTS=$(echo "$BUGBOT_COMMENTS_JSON" | jq 'length')
+        echo ""
+        echo "## Conflict Details"
+        echo ""
         
-        if [ "$BUGBOT_COMMENTS" -gt 0 ]; then
-            echo "🐛 New Bugbot/quality feedback detected ($BUGBOT_COMMENTS comments)"
-        
-        # Process each Bugbot comment
-        echo "$BUGBOT_COMMENTS_JSON" | jq -c '.[]' | while read -r comment; do
-            COMMENT_ID=$(echo "$comment" | jq -r '.id')
-            COMMENT_BODY=$(echo "$comment" | jq -r '.body')
-            COMMENT_URL=$(echo "$comment" | jq -r '.html_url')
-            
-            echo "📝 Processing Bugbot comment ID: $COMMENT_ID"
-            
-            # Extract issues from Bugbot comment
-            HAS_ERRORS=$(echo "$COMMENT_BODY" | grep -c "🔴" || true)
-            HAS_WARNINGS=$(echo "$COMMENT_BODY" | grep -c "🟡" || true)
-            HAS_SUGGESTIONS=$(echo "$COMMENT_BODY" | grep -c "💡" || true)
-            
-            # Only fix if there are actual issues
-            if [ "$HAS_ERRORS" -gt 0 ] || [ "$HAS_WARNINGS" -gt 0 ]; then
-                echo "🔧 Found $HAS_ERRORS errors and $HAS_WARNINGS warnings - initiating fix"
-                
-                # Fetch current PR branch
-                PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
-                git fetch origin "$PR_BRANCH"
-                git checkout "$PR_BRANCH"
-                git pull origin "$PR_BRANCH"
-                
-                # Extract comment body and create comprehensive prompt file
-                cat > /tmp/BUGBOT_PROMPT.md << 'PROMPT_EOF'
-# 🐛 Quality Feedback Resolution
+        echo "$conflict_files" | while read -r file; do
+            echo "### File: \`$file\`"
+            echo ""
+            echo "\`\`\`diff"
+            git diff "$file" 2>/dev/null || echo "Unable to show diff"
+            echo "\`\`\`"
+            echo ""
+        done
+    else
+        echo "Unable to determine specific files (rebase in progress)"
+    fi
+    
+    cat << 'CONFLICT_INSTRUCTIONS'
 
 ## Instructions
-You are fixing issues identified in automated quality feedback. Your mission:
+1. Review the conflict markers (<<<<<<< ======= >>>>>>>) in each file
+2. Understand what BOTH sides are trying to accomplish
+3. Merge changes intelligently - preserve functionality from both branches
+4. Remove all conflict markers
+5. Test that code compiles/runs
+6. Stage resolved files: `git add <file>`
+7. Complete rebase: `git rebase --continue`
 
-1. **Read the feedback carefully** - Understand what needs to be fixed
-2. **Make targeted fixes** - Address only the specific issues mentioned
-3. **Preserve functionality** - Don't break what already works
-4. **Test your changes** - Verify the fixes resolve the issues
-5. **Commit with clear message** - Explain what you fixed and why
+## Acceptance Criteria
+- ✅ All conflict markers removed
+- ✅ Code compiles successfully
+- ✅ Functionality from both branches preserved
+- ✅ No new errors introduced
+- ✅ PR shows mergeable = MERGEABLE
+CONFLICT_INSTRUCTIONS
+
+    # Abort rebase for clean state
+    git rebase --abort 2>/dev/null || true
+}
+
+# Generate CI failure content  
+generate_ci_content() {
+    cat << 'CI_CONTENT'
+# ⚠️ CI FAILURE REMEDIATION
+
+## Problem
+This PR has failing CI checks that must be fixed.
+
+## Failed Checks
+CI_CONTENT
+
+    local failed_checks=$(gh pr view $PR_NUMBER --json statusCheckRollup \
+        --jq '.statusCheckRollup[]? | select(.conclusion == "FAILURE") | {name, detailsUrl}')
+    
+    echo "$failed_checks" | jq -r '"\(.name) - \(.detailsUrl)"' 2>/dev/null || echo "Failed checks detected"
+    
+    echo ""
+    echo "## Full CI Logs"
+    echo ""
+    
+    # Get failed workflow runs for this PR
+    local failed_runs=$(gh api "/repos/$REPO_OWNER/$REPO_NAME/actions/runs?event=pull_request&branch=$PR_BRANCH&status=failure&per_page=3" \
+        --jq '.workflow_runs[] | "\(.id) \(.name)"' 2>/dev/null || echo "")
+    
+    if [ -n "$failed_runs" ]; then
+        echo "$failed_runs" | while read -r run_id run_name; do
+            echo "### Workflow: $run_name (Run ID: $run_id)"
+            echo ""
+            echo "\`\`\`"
+            gh run view "$run_id" --log 2>&1 | head -200 || echo "Unable to fetch logs"
+            echo "\`\`\`"
+            echo ""
+        done
+    else
+        echo "No detailed logs available"
+    fi
+    
+    cat << 'CI_INSTRUCTIONS'
+
+## Instructions
+1. Review the error logs above
+2. Identify the root cause (build error, test failure, lint issue)
+3. Make targeted fixes to address the specific failures
+4. Run checks locally if possible to verify
+5. Commit and push fixes
+
+## Acceptance Criteria
+- ✅ All CI checks pass (SUCCESS or SKIPPED)
+- ✅ No new test failures introduced
+- ✅ statusCheckRollup shows all green
+CI_INSTRUCTIONS
+}
+
+# Generate quality issue content
+generate_quality_content() {
+    cat << 'QUALITY_CONTENT'
+# 🐛 QUALITY ISSUE RESOLUTION
+
+## Problem
+This PR has unresolved quality feedback that must be addressed.
 
 ## Quality Feedback
+QUALITY_CONTENT
 
-PROMPT_EOF
-                # Append actual comment body
-                echo "$COMMENT_BODY" >> /tmp/BUGBOT_PROMPT.md
-                
-                cat >> /tmp/BUGBOT_PROMPT.md << 'FOOTER_EOF'
+    # Get all comments with quality issues
+    local quality_comments=$(gh api "/repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/comments" \
+        --jq '[.[] | select(.body | test("🔴|🟡"))]' 2>/dev/null || echo "[]")
+    
+    echo "$quality_comments" | jq -r '.[] | "---\n\n### Comment by @\(.user.login) at \(.created_at)\n\n\(.body)\n"' 2>/dev/null || echo "No quality feedback details available"
+    
+    cat << 'QUALITY_INSTRUCTIONS'
 
-## Context
-- PR #$PR_NUMBER
-- Branch: $PR_BRANCH  
-- Feedback source: $COMMENT_URL
+## Instructions
+1. Read each quality feedback comment above
+2. Address all 🔴 critical errors (must fix)
+3. Address all 🟡 warnings (should fix)  
+4. Consider 💡 suggestions (optional)
+5. Make minimal, targeted changes
+6. Test that fixes work
 
-## Success Criteria
-- ✅ All critical errors (🔴) fixed
-- ✅ All warnings (🟡) resolved
+## Acceptance Criteria
+- ✅ All 🔴 errors resolved
+- ✅ All 🟡 warnings resolved
+- ✅ No new issues introduced
 - ✅ Existing functionality preserved
-- ✅ Tests pass (if applicable)
-- ✅ Code follows project standards
-
-Focus on surgical, minimal changes to address the specific feedback.
-FOOTER_EOF
-                
-                # Detect available CLI (try all supported CLIs)
-                CLI_CMD=""
-                CLI_NAME=""
-                
-                if command -v claude >/dev/null 2>&1; then
-                    CLI_CMD="claude --output-format stream-json --input-format stream-json"
-                    CLI_NAME="Claude"
-                elif command -v codex >/dev/null 2>&1; then
-                    CLI_CMD="codex"
-                    CLI_NAME="Codex"
-                elif command -v opencode >/dev/null 2>&1; then
-                    CLI_CMD="opencode"
-                    CLI_NAME="OpenCode"
-                elif command -v cursor-agent >/dev/null 2>&1; then
-                    CLI_CMD="cursor-agent"
-                    CLI_NAME="Cursor"
-                elif command -v factory-cli >/dev/null 2>&1; then
-                    CLI_CMD="factory-cli"
-                    CLI_NAME="Factory"
-                else
-                    echo "⚠️ No supported CLI found (claude, codex, opencode, cursor-agent, factory-cli)"
-                    CLI_CMD=""
-                fi
-                
-                if [ -n "$CLI_CMD" ]; then
-                    echo "🤖 Using $CLI_NAME CLI to generate fixes..."
-                    
-                    # Run CLI with the prompt (format depends on CLI type)
-                    if [ "$CLI_NAME" = "Claude" ]; then
-                        # Claude uses stream-json format
-                        $CLI_CMD << CLI_INPUT | tee /tmp/cli-output.log
-{
-  "type": "user",
-  "message": {
-    "role": "user",
-    "content": [
-      {
-        "type": "text",
-        "text": "$(cat /tmp/BUGBOT_PROMPT.md | jq -Rs .)"
-      }
-    ]
-  }
+QUALITY_INSTRUCTIONS
 }
-CLI_INPUT
-                    else
-                        # Other CLIs: use standard input with prompt file
-                        echo "$(cat /tmp/BUGBOT_PROMPT.md)" | $CLI_CMD 2>&1 | tee /tmp/cli-output.log
-                    fi
-                    
-                    # Check if any files were modified
-                    if [ -n "$(git status --porcelain)" ]; then
-                        echo "✅ $CLI_NAME applied fixes successfully"
-                        
-                        # Commit the changes
-                        git add -A
-                        git commit -m "fix: address quality feedback from comment #$COMMENT_ID
 
-Automated fixes for issues identified in feedback:
-- Fixed $HAS_ERRORS critical errors
-- Resolved $HAS_WARNINGS warnings
+# Generate comprehensive CLAUDE.md
+generate_structured_prompt() {
+    cat > /workspace/CLAUDE.md << PROMPT_HEADER
+# 🔱 ATLAS GUARDIAN - PR Quality Gate
 
-Feedback: $COMMENT_URL
-Fixed by Atlas Guardian using $CLI_NAME"
-                        
-                        # Push the fixes
-                        git push origin "$PR_BRANCH"
-                        
-                        # Post success comment
-                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Quality Issues Resolved
+**PR**: #$PR_NUMBER  
+**Branch**: \`$PR_BRANCH\`  
+**Iteration**: $ITERATION/$MAX_ITERATIONS  
+**Timestamp**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-Successfully addressed feedback from [comment #$COMMENT_ID]($COMMENT_URL):
-- ✅ Fixed **$HAS_ERRORS** critical errors
-- ✅ Resolved **$HAS_WARNINGS** warnings
-${HAS_SUGGESTIONS:+- ℹ️ Reviewed **$HAS_SUGGESTIONS** suggestions}
+---
 
-Changes have been pushed to branch \`$PR_BRANCH\`.
+PROMPT_HEADER
 
-### Resolution Method
-- CLI: **$CLI_NAME**
-- Strategy: Targeted fixes for identified issues
-- Preserved existing functionality
-
-*Resolved automatically by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                        
-                    else
-                        echo "ℹ️ No changes needed or $CLI_NAME unable to determine fixes"
-                        
-                        # Post investigation comment
-                        gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Quality Feedback Reviewed
-
-Analyzed [feedback]($COMMENT_URL) using $CLI_NAME but no automatic fixes could be applied.
-
-This may require manual intervention for:
-- Complex architectural changes
-- Issues requiring human judgment
-- Problems outside the codebase
-
-*Reviewed by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                    fi
-                    
-                else
-                    echo "⚠️ No CLI available - falling back to basic acknowledgment"
-                    
-                    # Basic acknowledgment without CLI
-                    gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Quality Feedback Acknowledged
-
-Detected feedback from [comment #$COMMENT_ID]($COMMENT_URL) with:
-- 🔴 $HAS_ERRORS critical errors
-- 🟡 $HAS_WARNINGS warnings
-${HAS_SUGGESTIONS:+- 💡 $HAS_SUGGESTIONS suggestions}
-
-**Note:** Automatic resolution requires a supported CLI to be available.
-Manual intervention may be needed to address these issues.
-
-*Detected by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-                fi
-                
-            elif [ "$HAS_SUGGESTIONS" -gt 0 ]; then
-                echo "💡 Only suggestions found - acknowledging without changes"
-                
-                # Just acknowledge suggestions
-                gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: Quality Suggestions Noted
-
-Received $HAS_SUGGESTIONS suggestion(s) from [comment #$COMMENT_ID]($COMMENT_URL).
-
-These are non-critical improvements that don't block the PR.
-
-*Acknowledged by Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
-            fi
-        done
-        fi
+    # Add active scenario sections
+    local has_scenarios=false
+    
+    if [ "$(probe_merge_conflicts)" = "true" ]; then
+        generate_conflict_content >> /workspace/CLAUDE.md
+        echo "" >> /workspace/CLAUDE.md
+        echo "---" >> /workspace/CLAUDE.md
+        echo "" >> /workspace/CLAUDE.md
+        has_scenarios=true
     fi
     
-    # 4. Check if ready to merge (all scenarios resolved)
-    if [ "$MERGEABLE" = "MERGEABLE" ] && [ "$MERGE_STATE" = "clean" ]; then
-        # Check if all required checks passed
-        ALL_CHECKS_PASSED=$(echo "$PR_STATE" | jq -r '[.statusCheckRollup[]? | select(.conclusion != "SUCCESS" and .conclusion != "SKIPPED")] | length' 2>/dev/null || echo "1")
-        
-        if [ "$ALL_CHECKS_PASSED" = "0" ]; then
-            echo "✅ All CI checks passed!"
-            
-            # Check for unresolved Bugbot/quality comments
-            if [ -n "$REPO_OWNER" ] && [ -n "$REPO_NAME" ]; then
-                UNRESOLVED_ISSUES=$(gh api "/repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/comments" --jq '[.[] | select(.user.login == "cursor[bot]" or .user.login == "bugbot[bot]" or (.body | test("🔴|🟡"))) | select(.body | test("🔴|🟡"))] | length' 2>/dev/null || echo "0")
-                
-                if [ "$UNRESOLVED_ISSUES" -gt 0 ]; then
-                    echo "⏳ Cannot merge: $UNRESOLVED_ISSUES unresolved quality issue(s) remain"
-                    echo "   Waiting for all errors and warnings to be fixed..."
-                    sleep "$POLL_INTERVAL"
-                    continue
-                fi
-                
-                echo "✅ No unresolved quality issues"
-            fi
-            
-            # All scenarios verified - ready to merge!
-            echo "🎯 All merge criteria met:"
-            echo "   ✅ No merge conflicts"
-            echo "   ✅ All CI checks passing"
-            echo "   ✅ No unresolved quality issues"
-            
-            # Check if this is part of a multi-task play
-            PLAY_WORKFLOW=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[]? | select(.name | startswith("workflow-")) | .name' 2>/dev/null || echo "")
-            
-            if [ -n "$PLAY_WORKFLOW" ] && [ "$MODE" != "integration-gate" ]; then
-                echo "🎯 Part of play workflow: $PLAY_WORKFLOW"
-                echo "⏳ Waiting for final merge coordinator to handle merge order..."
-                # Don't auto-merge - let the final coordinator handle it
-            else
-                echo "🚀 All scenarios resolved - auto-merging PR #$PR_NUMBER..."
-                
-                if gh pr merge "$PR_NUMBER" --squash --delete-branch; then
-                    echo "✅ PR #$PR_NUMBER merged successfully!"
-                    
-                    # Post merge notification
-                    gh pr comment "$PR_NUMBER" --body "## 🔱 Atlas: PR Merged Successfully
+    if [ "$(probe_ci_failures)" = "true" ]; then
+        generate_ci_content >> /workspace/CLAUDE.md
+        echo "" >> /workspace/CLAUDE.md
+        echo "---" >> /workspace/CLAUDE.md
+        echo "" >> /workspace/CLAUDE.md
+        has_scenarios=true
+    fi
+    
+    if [ "$(probe_quality_issues)" = "true" ]; then
+        generate_quality_content >> /workspace/CLAUDE.md
+        echo "" >> /workspace/CLAUDE.md
+        echo "---" >> /workspace/CLAUDE.md
+        echo "" >> /workspace/CLAUDE.md
+        has_scenarios=true
+    fi
+    
+    if [ "$has_scenarios" = "false" ]; then
+        echo "✅ No issues detected - PR is clean!"
+        return 1
+    fi
+    
+    # Add overall acceptance criteria
+    cat >> /workspace/CLAUDE.md << 'OVERALL_CRITERIA'
+# 🎯 OVERALL ACCEPTANCE CRITERIA
 
-All quality gates passed and PR has been automatically merged:
+Your work is complete when ALL of these are true:
+
+1. ✅ **No merge conflicts**
+   - PR mergeable status = MERGEABLE
+   - PR merge state = clean or behind (no conflicts)
+
+2. ✅ **All CI checks passing**
+   - statusCheckRollup shows only SUCCESS or SKIPPED
+   - No FAILURE conclusions
+
+3. ✅ **No unresolved quality issues**
+   - No comments with 🔴 (errors)
+   - No comments with 🟡 (warnings)
+   - Suggestions (💡) are optional
+
+## 📋 After Fixing
+
+When you've addressed the issues:
+1. Stage all changes: `git add -A`
+2. Commit with clear message
+3. Push to branch (Atlas will handle the push)
+
+Atlas will verify on the next iteration cycle.
+OVERALL_CRITERIA
+
+    echo "✅ Generated structured prompt at /workspace/CLAUDE.md"
+    return 0
+}
+
+# ============================================================================
+# MAIN ITERATION LOOP
+# ============================================================================
+
+echo "🔄 Starting iteration loop..."
+echo ""
+
+while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+    ITERATION=$((ITERATION + 1))
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🔄 Iteration $ITERATION/$MAX_ITERATIONS - PR #$PR_NUMBER"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # PROBE: Check all scenarios
+    echo "🔍 Probing all quality gates..."
+    HAS_CONFLICTS=$(probe_merge_conflicts)
+    HAS_CI_FAILURES=$(probe_ci_failures)
+    HAS_QUALITY_ISSUES=$(probe_quality_issues)
+    
+    echo "  Merge conflicts: $HAS_CONFLICTS"
+    echo "  CI failures: $HAS_CI_FAILURES"
+    echo "  Quality issues: $HAS_QUALITY_ISSUES"
+    echo ""
+    
+    # Check if everything is resolved
+    if [ "$HAS_CONFLICTS" = "false" ] && \
+       [ "$HAS_CI_FAILURES" = "false" ] && \
+       [ "$HAS_QUALITY_ISSUES" = "false" ]; then
+        echo "🎉 ALL QUALITY GATES PASSED!"
+        echo "   ✅ No merge conflicts"
+        echo "   ✅ All CI checks passing"
+        echo "   ✅ No unresolved quality issues"
+        echo ""
+        
+        # Check if this is part of a play workflow
+        PLAY_WORKFLOW=$(gh pr view $PR_NUMBER --json labels --jq '.labels[]? | select(.name | startswith("workflow-")) | .name' 2>/dev/null || echo "")
+        
+        if [ -n "$PLAY_WORKFLOW" ] && [ "$MODE" != "integration-gate" ]; then
+            echo "🎯 Part of play workflow: $PLAY_WORKFLOW"
+            echo "⏳ Merge will be handled by play coordinator"
+            exit 0
+        else
+            echo "🚀 Auto-merging PR #$PR_NUMBER..."
+            
+            if gh pr merge $PR_NUMBER --squash --delete-branch; then
+                gh pr comment $PR_NUMBER --body "## 🔱 Atlas: PR Merged Successfully
+
+All quality gates passed after $ITERATION iteration(s):
 - ✅ No merge conflicts
-- ✅ All CI checks passing
+- ✅ All CI checks passing  
 - ✅ No unresolved quality issues
 
 **Merge Details:**
 - Strategy: Squash merge
-- Branch deleted: Yes
+- Iterations required: $ITERATION
 - Merged at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-*Atlas Guardian has completed monitoring. Thank you for using automated quality gates! 🎉*" || true
-                    
-                    exit 0
-                else
-                    echo "⚠️ Merge failed - will retry on next cycle"
-                fi
+*Atlas Guardian completed successfully! 🎉*"
+                
+                echo "✅ PR merged successfully!"
+                exit 0
+            else
+                echo "⚠️ Merge failed, will retry"
             fi
+        fi
+    fi
+    
+    # Generate structured prompt with all active scenarios
+    echo "📝 Generating structured prompt for iteration $ITERATION..."
+    if ! generate_structured_prompt; then
+        echo "✅ No issues found, checking merge readiness..."
+        sleep 30
+        continue
+    fi
+    
+    # Show prompt summary
+    echo "📄 Prompt includes:"
+    [ "$HAS_CONFLICTS" = "true" ] && echo "  - Merge conflict resolution with file diffs"
+    [ "$HAS_CI_FAILURES" = "true" ] && echo "  - CI failure logs and analysis"
+    [ "$HAS_QUALITY_ISSUES" = "true" ] && echo "  - Quality feedback comments"
+    echo ""
+    
+    # Run CLI with structured prompt
+    echo "🤖 Running CLI to address issues..."
+    if run_cli_with_prompt /workspace/CLAUDE.md; then
+        echo "✅ CLI execution completed"
+    else
+        echo "⚠️ CLI execution had issues"
+    fi
+    
+    # Check if changes were made
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "📝 Changes detected, committing..."
+        git add -A
+        
+        # Create descriptive commit message
+        COMMIT_MSG="fix: Atlas Guardian iteration $ITERATION
+
+Addressed PR quality gates:
+"
+        [ "$HAS_CONFLICTS" = "true" ] && COMMIT_MSG="${COMMIT_MSG}- Resolved merge conflicts
+"
+        [ "$HAS_CI_FAILURES" = "true" ] && COMMIT_MSG="${COMMIT_MSG}- Fixed CI failures
+"
+        [ "$HAS_QUALITY_ISSUES" = "true" ] && COMMIT_MSG="${COMMIT_MSG}- Addressed quality feedback
+"
+        COMMIT_MSG="${COMMIT_MSG}
+Iteration: $ITERATION/$MAX_ITERATIONS
+PR: #$PR_NUMBER"
+        
+        git commit -m "$COMMIT_MSG"
+        
+        echo "🚀 Pushing fixes..."
+        if git push --force-with-lease origin "$PR_BRANCH"; then
+            echo "✅ Pushed iteration $ITERATION fixes"
+            
+            # Post progress comment
+            gh pr comment $PR_NUMBER --body "## 🔱 Atlas: Iteration $ITERATION/$MAX_ITERATIONS
+
+Addressed issues and pushed fixes:
+$( [ "$HAS_CONFLICTS" = "true" ] && echo "- ✅ Resolved merge conflicts" )
+$( [ "$HAS_CI_FAILURES" = "true" ] && echo "- ✅ Fixed CI failures" )
+$( [ "$HAS_QUALITY_ISSUES" = "true" ] && echo "- ✅ Addressed quality feedback" )
+
+Waiting for CI checks and GitHub status update...
+
+*Iteration $ITERATION complete at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
         else
-            echo "⏳ Waiting for checks to pass (failed: $ALL_CHECKS_PASSED)"
+            echo "⚠️ Push failed"
         fi
     else
-        echo "⏳ PR not ready (mergeable: $MERGEABLE, state: $MERGE_STATE)"
+        echo "ℹ️ No changes made by CLI"
     fi
     
-    # Update last check timestamp
-    LAST_CHECK_TIMESTAMP=$(date +%s)
+    # Wait for changes to propagate
+    echo "⏳ Waiting for GitHub to process changes (45s)..."
+    sleep 45
     
-    # Sleep until next poll
-    CYCLE_COUNT=$((CYCLE_COUNT + 1))
-
-    if [ "$MODE" = "integration-gate" ] && [ "$MAX_CYCLES" -gt 0 ] && [ "$CYCLE_COUNT" -ge "$MAX_CYCLES" ]; then
-        echo "⏳ Atlas integration gate timed out after $CYCLE_COUNT cycles"
-        exit 1
-    fi
-
-    echo "💤 Sleeping for ${POLL_INTERVAL}s..."
-    sleep "$POLL_INTERVAL"
+    echo ""
 done
 
+# Max iterations reached
+echo "❌ Max iterations ($MAX_ITERATIONS) reached without full resolution"
+echo ""
+
+gh pr comment $PR_NUMBER --body "## 🔱 Atlas: Manual Intervention Required
+
+Atlas Guardian completed $MAX_ITERATIONS iterations but could not fully resolve all issues.
+
+**Status after $MAX_ITERATIONS iterations:**
+- Merge conflicts: $(probe_merge_conflicts)
+- CI failures: $(probe_ci_failures)
+- Quality issues: $(probe_quality_issues)
+
+Manual review and resolution may be needed.
+
+*Atlas Guardian at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
+
+exit 1
