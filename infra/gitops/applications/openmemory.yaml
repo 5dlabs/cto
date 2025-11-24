@@ -1,3 +1,4 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,12 +19,12 @@ spec:
         image:
           repository: ghcr.io/5dlabs/openmemory
           tag: "v1.0.0"
-        
+
         database:
           storage:
             size: 20Gi
             storageClassName: "longhorn"
-        
+
         resources:
           requests:
             cpu: 500m
@@ -31,21 +32,21 @@ spec:
           limits:
             cpu: 2000m
             memory: 4Gi
-        
+
         monitoring:
           enabled: true
           metrics:
             enabled: true
-        
+
         api:
           rateLimit:
             enabled: true
             maxRequests: 2000  # Higher limit for multi-agent usage
-  
+
   destination:
     server: https://kubernetes.default.svc
     namespace: cto-system
-  
+
   syncPolicy:
     automated:
       prune: true
