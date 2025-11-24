@@ -47,13 +47,9 @@ impl ResourceNaming {
 
         // Build name with PR number prefix if available for easy identification
         let base_name = if let Some(pr) = pr_number {
-            format!(
-                "pr{pr}-t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}"
-            )
+            format!("pr{pr}-t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}")
         } else {
-            format!(
-                "t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}"
-            )
+            format!("t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}")
         };
 
         let available = MAX_K8S_NAME_LENGTH.saturating_sub(CODERUN_JOB_PREFIX.len());
