@@ -43,32 +43,16 @@ if [[ "${1:-}" == "--github" ]]; then
   if gh repo view $REPO >/dev/null 2>&1; then
     echo "  Deleting existing repository..."
     if ! gh repo delete $REPO --yes 2>&1; then
-      echo ""
-      echo "  ⚠️  Failed to delete repository!"
-      echo ""
-      echo "  This usually means you need one of:"
-      echo "    1. The 'delete_repo' scope: gh auth refresh -h github.com -s delete_repo"
-      echo "    2. Admin permissions on organization repos (contact organization owner)"
-      echo ""
-      echo "  Manual deletion: https://github.com/$REPO/settings"
-      echo ""
-      echo "  NOTE: When you recreate this repo, make sure your GitHub account has"
-      echo "        admin/delete permissions to avoid this issue in the future."
-      echo ""
+      echo "  ⚠️  Failed to delete repository. You may need to grant delete_repo permission:"
+      echo "     Run: gh auth refresh -h github.com -s delete_repo"
+      echo "  Or delete it manually at: https://github.com/$REPO/settings"
       exit 1
     fi
-    echo "  ✓ Repository deleted"
   fi
   
   # Create new repository
-  # NOTE: The account creating this repo should have admin rights to delete it later
   echo "  Creating fresh repository..."
-  if gh repo create $REPO --private --clone=false; then
-    echo "  ✓ Repository created"
-  else
-    echo "  ✗ Failed to create repository"
-    exit 1
-  fi
+  gh repo create $REPO --private --clone=false
   
   # Use template if available, otherwise create minimal structure
   if [ -d "$TEMPLATE" ] && [ -f "$TEMPLATE/cto-config.json" ]; then
@@ -137,4 +121,3 @@ echo "✅ Reset complete!"
 echo ""
 echo "Run test: cto play --task-id <id>"
 echo "Monitor: kubectl logs -f -l workflow -n agent-platform"
-
