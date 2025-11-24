@@ -10,8 +10,8 @@ pub struct ResourceNaming;
 
 impl ResourceNaming {
     /// Generate job name with guaranteed length compliance
-    /// Format: pr{pr_number}-task-{task_id}-{agent}-{cli}-{uid}-v{version}
-    /// or task-{task_id}-{agent}-{cli}-{uid}-v{version} if no PR number
+    /// Format: pr{pr_number}-t{task_id}-{agent}-{cli}-{uid}-v{version}
+    /// or t{task_id}-{agent}-{cli}-{uid}-v{version} if no PR number
     /// This is the single source of truth for job names
     #[must_use]
     pub fn job_name(code_run: &CodeRun) -> String {
@@ -23,13 +23,24 @@ impl ResourceNaming {
         let task_id = code_run.spec.task_id;
         let context_version = code_run.spec.context_version;
 
-        // Extract PR number from labels if available
+        // Extract PR number from labels first, then fall back to env var
+        // This ensures we get PR number from both sensor-created CodeRuns (labels)
+        // and from env var injection (for edge cases where labels weren't set)
         let pr_number = code_run
             .metadata
             .labels
             .as_ref()
             .and_then(|labels| labels.get("pr-number"))
-            .cloned();
+            .cloned()
+            .or_else(|| {
+                // Fallback: check PR_NUMBER env var
+                code_run
+                    .spec
+                    .env
+                    .get("PR_NUMBER")
+                    .filter(|v| !v.is_empty() && *v != "0")
+                    .cloned()
+            });
 
         // Extract agent name if available
         let agent = code_run
@@ -233,7 +244,7 @@ mod tests {
         }
     }
 
-    fn build_code_run_with_pr(pr_number: &str) -> CodeRun {
+    fn build_code_run_with_pr_label(pr_number: &str) -> CodeRun {
         let mut labels = BTreeMap::new();
         labels.insert("pr-number".to_string(), pr_number.to_string());
 
@@ -270,6 +281,42 @@ mod tests {
         }
     }
 
+    fn build_code_run_with_pr_env(pr_number: &str) -> CodeRun {
+        let mut env = HashMap::new();
+        env.insert("PR_NUMBER".to_string(), pr_number.to_string());
+
+        CodeRun {
+            metadata: ObjectMeta {
+                name: Some("sample-run".to_string()),
+                namespace: Some("agent-platform".to_string()),
+                uid: Some("1234567890abcdef".to_string()),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                cli_config: None,
+                task_id: 42,
+                service: "sample-service".to_string(),
+                repository_url: "https://github.com/example/repo.git".to_string(),
+                docs_repository_url: "https://github.com/example/docs.git".to_string(),
+                docs_project_directory: None,
+                working_directory: None,
+                model: "sonnet".to_string(),
+                github_user: None,
+                github_app: Some("5DLabs-Rex".to_string()),
+                context_version: 1,
+                docs_branch: "main".to_string(),
+                continue_session: false,
+                overwrite_memory: false,
+                env,
+                env_from_secrets: vec![],
+                enable_docker: true,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        }
+    }
+
     #[test]
     fn job_name_has_play_coderun_prefix() {
         let code_run = build_code_run();
@@ -282,14 +329,102 @@ mod tests {
     }
 
     #[test]
-    fn job_name_includes_pr_number() {
-        let code_run = build_code_run_with_pr("1627");
+    fn job_name_includes_pr_number_from_label() {
+        let code_run = build_code_run_with_pr_label("1627");
         let job_name = ResourceNaming::job_name(&code_run);
 
         assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
         assert!(job_name.contains("pr1627"));
         assert!(job_name.contains("t42"));
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn job_name_includes_pr_number_from_env_fallback() {
+        let code_run = build_code_run_with_pr_env("1650");
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(job_name.starts_with(CODERUN_JOB_PREFIX));
+        assert!(
+            job_name.contains("pr1650"),
+            "Expected job name to contain PR number from env var: {job_name}"
+        );
+        assert!(job_name.contains("t42"));
+        assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn job_name_label_takes_priority_over_env() {
+        // Create CodeRun with both label and env var, label should win
+        let mut labels = BTreeMap::new();
+        labels.insert("pr-number".to_string(), "1627".to_string());
+        let mut env = HashMap::new();
+        env.insert("PR_NUMBER".to_string(), "9999".to_string());
+
+        let code_run = CodeRun {
+            metadata: ObjectMeta {
+                name: Some("sample-run".to_string()),
+                namespace: Some("agent-platform".to_string()),
+                uid: Some("1234567890abcdef".to_string()),
+                labels: Some(labels),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                cli_config: None,
+                task_id: 42,
+                service: "sample-service".to_string(),
+                repository_url: "https://github.com/example/repo.git".to_string(),
+                docs_repository_url: "https://github.com/example/docs.git".to_string(),
+                docs_project_directory: None,
+                working_directory: None,
+                model: "sonnet".to_string(),
+                github_user: None,
+                github_app: Some("5DLabs-Rex".to_string()),
+                context_version: 1,
+                docs_branch: "main".to_string(),
+                continue_session: false,
+                overwrite_memory: false,
+                env,
+                env_from_secrets: vec![],
+                enable_docker: true,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        };
+
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(
+            job_name.contains("pr1627"),
+            "Label should take priority over env: {job_name}"
+        );
+        assert!(
+            !job_name.contains("pr9999"),
+            "Env var PR should not appear when label exists: {job_name}"
+        );
+    }
+
+    #[test]
+    fn job_name_ignores_zero_pr_number_env() {
+        let code_run = build_code_run_with_pr_env("0");
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(
+            !job_name.contains("pr0"),
+            "Zero PR number should be ignored: {job_name}"
+        );
+    }
+
+    #[test]
+    fn job_name_ignores_empty_pr_number_env() {
+        let code_run = build_code_run_with_pr_env("");
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(
+            !job_name.contains("pr-"),
+            "Empty PR number should be ignored: {job_name}"
+        );
     }
 
     #[test]
@@ -304,7 +439,7 @@ mod tests {
 
     #[test]
     fn extract_task_id_handles_pr_format() {
-        let code_run = build_code_run_with_pr("1627");
+        let code_run = build_code_run_with_pr_label("1627");
         let job_name = ResourceNaming::job_name(&code_run);
         assert_eq!(
             ResourceNaming::extract_task_id_from_job_name(&job_name),
@@ -314,7 +449,7 @@ mod tests {
 
     #[test]
     fn extract_pr_number_from_job_name_works() {
-        let code_run = build_code_run_with_pr("1627");
+        let code_run = build_code_run_with_pr_label("1627");
         let job_name = ResourceNaming::job_name(&code_run);
         assert_eq!(
             ResourceNaming::extract_pr_number_from_job_name(&job_name),
