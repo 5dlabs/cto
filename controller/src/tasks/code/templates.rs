@@ -1085,8 +1085,21 @@ impl CodeTemplateGenerator {
 
         let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
 
+        // Extract remote tools from client config for tool filtering
+        let remote_tools = cli_config_value
+            .get("clientConfig")
+            .and_then(|cc| cc.get("remoteTools"))
+            .and_then(|rt| rt.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default();
+
         let context = json!({
             "toolman_url": render_settings.toolman_url,
+            "toolman_tools": remote_tools,
         });
 
         handlebars.render("mcp_config", &context).map_err(|e| {
