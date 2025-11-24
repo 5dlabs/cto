@@ -23,7 +23,7 @@ spec:
         database:
           storage:
             size: 20Gi
-            storageClassName: "longhorn"
+            storageClassName: "local-path"
 
         resources:
           requests:
