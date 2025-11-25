@@ -1,192 +1,257 @@
-# Play Remediation Loop - Automated Agent Instructions
+# Play Remediation Loop - Agent Instructions
 
-You are running a fully automated E2E test loop. No human intervention required.
-Your job is to monitor, detect failures, fix them, and continue until completion.
+You are an autonomous agent executing the full E2E play workflow.
+Your goal is to start a play, monitor it, remediate failures, and continue
+until completion.
 
-## Start the Loop
+**This process is fully automated with no manual intervention required.**
+
+## The One Command
+
+Run this single command from the test repository directory:
 
 ```bash
-play-monitor loop --play-id <PLAY_ID>
+play-monitor full --task-id <TASK_ID>
 ```
 
-This streams JSON events. Process each event and take action automatically.
+This command:
 
-## Event Handling
+1. **Reads** `cto-config.json` for play configuration
+2. **Submits** the workflow to Argo with configured agents
+3. **Monitors** the workflow via Argo CLI (efficient, event-driven)
+4. **Emits** JSON events for each status change
+5. **Fetches logs** automatically on failure
+6. **Continues** until completion or max failures
 
-### On `started`
+### Options
+
+```bash
+play-monitor full --task-id <TASK_ID> \
+  --config cto-config.json \    # Config file path (default: cto-config.json)
+  --interval 10 \               # Status check interval in seconds (default: 10)
+  --max-failures 5 \            # Stop after N consecutive failures (default: 5)
+  --template play-workflow-template  # Argo template name
+```
+
+## Environment Variables
+
+<!-- markdownlint-disable MD013 -->
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_TOKEN` | Yes | GitHub token for `gh` CLI and git push (automation) |
+| `OPENMEMORY_URL` | No | OpenMemory API endpoint (for verification commands) |
+| `KUBECONFIG` | No | Kubernetes config for `argo` and `kubectl` CLIs |
+<!-- markdownlint-enable MD013 -->
+
+The `gh` CLI uses `GITHUB_TOKEN` automatically. Git push uses HTTPS with token
+when `GITHUB_TOKEN` is set, otherwise falls back to SSH.
+
+## Agent Flow Sequence
+
+```text
+Rex/Blaze (Implementation)
+    ↓
+Cleo (Code Quality Review)
+    ↓
+Cypher (Security Review)
+    ↓
+Tess (QA Testing)
+    ↓
+Atlas (Integration + Merge)
+```
+
+## JSON Events
+
+The command emits these JSON events to stdout:
+
+### `started` - Play submitted and monitoring begun
 
 ```json
-{"event_type":"started","play_id":"42","interval_seconds":30}
+{
+  "event_type": "started",
+  "play_id": "play-task-42-abc123",
+  "interval_seconds": 10,
+  "timestamp": "2024-01-15T10:30:00Z"
+}
 ```
 
-Continue reading events. The loop is running.
-
----
-
-### On `status`
+### `status` - Current workflow state
 
 ```json
-{"event_type":"status","play_id":"42","workflow_status":"running","stage":"implementation"}
+{
+  "event_type": "status",
+  "play_id": "play-task-42-abc123",
+  "workflow_phase": "Running",
+  "stage": "implementation",
+  "steps": [...],
+  "timestamp": "2024-01-15T10:30:10Z"
+}
 ```
 
-No action. Workflow is progressing.
+### `stage_complete` - A stage finished successfully
 
----
+```json
+{
+  "event_type": "stage_complete",
+  "play_id": "play-task-42-abc123",
+  "stage": "implementation",
+  "next_stage": "code-quality",
+  "timestamp": "2024-01-15T10:35:00Z"
+}
+```
 
-### On `failure` → FIX IT AUTOMATICALLY
+### `failure` - Workflow or step failed
 
 ```json
 {
   "event_type": "failure",
-  "play_id": "42",
+  "play_id": "play-task-42-abc123",
   "stage": "code-quality",
-  "failed_pods": [{"name": "cleo-task-42-xyz", "exit_code": 1}],
-  "logs": "error: clippy::uninlined_format_args\n  --> src/main.rs:42:5",
-  "memory_suggestions": [
-    {"content": "Use {var} instead of {}, var", "relevance_score": 0.89}
-  ],
-  "consecutive_failures": 1
+  "failed_step": {
+    "name": "cleo-quality",
+    "phase": "Failed",
+    "exit_code": 1,
+    "message": "clippy failed"
+  },
+  "logs": "error: clippy::uninlined_format_args...",
+  "consecutive_failures": 1,
+  "timestamp": "2024-01-15T10:40:00Z"
 }
 ```
 
-**Automated remediation process:**
+**On failure, you should:**
 
-1. **Analyze the failure**
-   - Parse the `logs` field to identify the error
-   - Check `memory_suggestions` for known solutions
+1. Parse `logs` to identify the root cause
+2. Make code fixes in the test repository
+3. Commit and push via automated PR process
+4. The workflow will auto-retry
 
-2. **Create the fix**
-   - Clone/pull the test repository
-   - Create a new branch: `fix/<descriptive-name>`
-   - Implement the code fix
-   - Commit with descriptive message
-
-3. **Create PR**
-
-   ```bash
-   gh pr create --title "fix: <description>" --body "<details>"
-   ```
-
-4. **Handle Bugbot comments**
-   - Wait for Bugbot to run on the PR
-   - Check for Bugbot comments: `gh pr view --comments`
-   - If Bugbot comments exist, fix each issue
-   - Commit and push the fixes
-   - Wait for Bugbot to run again
-   - Repeat until no new Bugbot comments appear
-
-5. **Fix CI failures**
-   - Check CI status: `gh pr checks`
-   - If any checks fail, analyze and fix
-   - Push fixes and wait for CI to pass
-   - All checks must be green before merging
-
-6. **Handle merge conflicts**
-   - If conflicts exist: `git fetch origin main && git rebase origin/main`
-   - Resolve any conflicts
-   - Push the rebased branch: `git push --force-with-lease`
-
-7. **Merge the PR**
-
-   ```bash
-   gh pr merge --squash --delete-branch
-   ```
-
-8. **Continue monitoring** - The workflow will auto-retry
-
----
-
-### On `stage_complete`
+### `completed` - Workflow finished successfully
 
 ```json
-{"event_type":"stage_complete","play_id":"42","stage":"implementation","next_stage":"code-quality"}
+{
+  "event_type": "completed",
+  "play_id": "play-task-42-abc123",
+  "duration_seconds": 1800,
+  "timestamp": "2024-01-15T11:00:00Z"
+}
 ```
 
-Stage passed. Continue monitoring for the next stage.
-
----
-
-### On `completed` → SUCCESS
-
-```json
-{"event_type":"completed","play_id":"42","duration_seconds":1847}
-```
-
-All stages passed. The play is done. Exit successfully.
-
----
-
-### On `stopped` → RESET AND RETRY
+### `stopped` - Max failures reached
 
 ```json
 {
   "event_type": "stopped",
-  "play_id": "42",
-  "reason": "Max consecutive failures reached (5)"
+  "play_id": "play-task-42-abc123",
+  "reason": "Max consecutive failures reached (5)",
+  "timestamp": "2024-01-15T11:05:00Z"
 }
 ```
 
-Too many failures. Automatically reset and retry:
+**On stopped:**
 
-```bash
-play-monitor reset --repo cto-parallel-test --org 5dlabs
-play-monitor run --play-id <NEW_ID> --repository 5dlabs/cto-parallel-test
-play-monitor loop --play-id <NEW_ID>
-```
+1. Reset environment: `play-monitor reset --force`
+2. Re-run with new task ID
 
----
+## Automated PR Process
 
-## Stage Sequence
+When `failure` event is received:
 
-```text
-Rex/Blaze → Cleo → Cypher → Tess → Atlas
-```
+1. **Analyze** - Parse logs to identify the issue
+2. **Fix** - Make code changes in test repo
+3. **Branch** - Create `fix/<description>` branch
+4. **PR** - `gh pr create --title "fix: ..." --body "..."`
+5. **Bugbot** - Wait for Bugbot, fix any comments, repeat until clean
+6. **CI** - Wait for CI to pass, fix any failures
+7. **Merge** - `gh pr merge --squash --delete-branch`
+8. **Continue** - Workflow auto-retries on main update
 
 ## Common Fixes by Stage
 
-| Stage | Error Pattern | Automated Fix |
-|-------|--------------|---------------|
+<!-- markdownlint-disable MD013 -->
+| Stage | Error Pattern | Fix |
+|-------|---------------|-----|
+| Rex/Blaze | Compilation errors | Fix syntax, add imports |
 | Cleo | `clippy::` errors | Apply clippy suggestions |
-| Cleo | formatting | Run `cargo fmt` |
-| Tess | test failures | Fix test assertions |
-| Cypher | security warnings | Update deps |
+| Cleo | Formatting | Run `cargo fmt` |
+| Cypher | Security warnings | Update deps |
+| Tess | Test failures | Fix assertions |
+<!-- markdownlint-enable MD013 -->
 
-## The Automated Flow
+## OpenMemory Verification
 
-```text
-┌─────────────────────────────────────────────────────┐
-│  play-monitor loop --play-id X                      │
-│                                                     │
-│  ┌──────────────┐                                   │
-│  │ Read Event   │◄─────────────────────────────┐    │
-│  └──────┬───────┘                              │    │
-│         │                                      │    │
-│         ▼                                      │    │
-│  ┌──────────────┐     ┌──────────────┐         │    │
-│  │ failure?     │─YES─►│ Parse logs   │         │    │
-│  └──────┬───────┘     │ Apply fix    │         │    │
-│         │NO           │ Commit/Push  │─────────┘    │
-│         ▼             └──────────────┘              │
-│  ┌──────────────┐                                   │
-│  │ completed?   │─YES─► EXIT SUCCESS                │
-│  └──────┬───────┘                                   │
-│         │NO                                         │
-│         ▼                                           │
-│  ┌──────────────┐                                   │
-│  │ stopped?     │─YES─► Reset & Retry               │
-│  └──────┬───────┘                                   │
-│         │NO                                         │
-│         └───────────────────────────────────────────┘
-└─────────────────────────────────────────────────────┘
+After each stage completes, verify agents are using OpenMemory correctly:
+
+```bash
+# List memories created by a specific agent
+play-monitor memory list --agent rex --limit 10
+
+# Query memories for a specific task
+play-monitor memory list --task-id 42
 ```
 
-## Key Principle
+### What to Verify
 
-**No waiting for humans.** When you see a failure:
+1. **Each agent persists memories** - Check that memories are created
+2. **Memory quality** - Memories should be meaningful, not noise
+3. **Proper tagging** - Memories should have agent and task context
 
-1. Read the error
-2. Fix it
-3. Push it
-4. Move on
+### OpenMemory Documentation
 
-The goal is unattended, autonomous progression from start to finish.
+Reference the integration guide for best practices:
+`docs/openmemory-integration-guide.md`
+
+Agents should:
+
+- Store learnings from successful operations
+- Record error patterns and their solutions
+- Tag memories with task context for retrieval
+
+## Reset and Retry
+
+If too many failures occur:
+
+```bash
+# Reset cluster and test repo
+play-monitor reset --force
+
+# Start fresh with new task ID
+play-monitor full --task-id <NEW_TASK_ID>
+```
+
+## Example Session
+
+```bash
+# From test repo directory
+cd /path/to/cto-parallel-test
+
+# Set GitHub token for automation
+export GITHUB_TOKEN="ghp_..."
+
+# Run the full E2E loop
+play-monitor full --task-id 42
+
+# Output (JSON events):
+{"event_type":"started","play_id":"play-task-42-abc123",...}
+{"event_type":"status","workflow_phase":"Running","stage":"implementation",...}
+{"event_type":"stage_complete","stage":"implementation","next_stage":"code-quality",...}
+{"event_type":"failure","stage":"code-quality","logs":"error: clippy...",...}
+# (you fix the code, push, workflow retries)
+{"event_type":"status","workflow_phase":"Running","stage":"code-quality",...}
+{"event_type":"stage_complete","stage":"code-quality","next_stage":"security",...}
+# ... continues through all stages ...
+{"event_type":"completed","duration_seconds":3600,...}
+
+# After completion, verify OpenMemory usage
+play-monitor memory list --task-id 42
+```
+
+## Summary
+
+1. **One command**: `play-monitor full --task-id <ID>`
+2. **Reads config**: Uses `cto-config.json` for agent configuration
+3. **Emits events**: React to JSON events automatically
+4. **Fix failures**: Parse logs, apply fixes, push PRs
+5. **Auto-retry**: Workflow retries on main branch updates
+6. **Verify memory**: Use `play-monitor memory list` to check agent usage
+7. **Reset if stuck**: `play-monitor reset --force` then retry

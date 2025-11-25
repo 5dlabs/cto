@@ -25,6 +25,18 @@ fi
 
 echo "PATH: $PATH"
 
+{{#if telemetry.enabled}}
+# =========================================================================
+# OpenTelemetry Configuration (Standard OTEL SDK)
+# =========================================================================
+export OTEL_EXPORTER_OTLP_ENDPOINT="{{telemetry.otlpEndpoint}}"
+export OTEL_EXPORTER_OTLP_PROTOCOL="{{telemetry.otlpProtocol}}"
+export OTEL_SERVICE_NAME="factory-droid"
+export OTEL_SERVICE_VERSION="1.0.0"
+export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=production,service.namespace=agent-platform,agent.name={{github_app}}"
+echo "✓ Factory telemetry enabled: {{telemetry.otlpEndpoint}} ({{telemetry.otlpProtocol}})"
+{{/if}}
+
 # =========================================================================
 # RETRY CONFIGURATION
 # =========================================================================

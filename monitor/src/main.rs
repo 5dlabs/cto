@@ -1,15 +1,16 @@
 //! Play Monitor CLI
 //!
 //! A simple CLI tool for monitoring play workflows and retrieving failure logs.
+//! Uses Argo Workflows CLI for efficient event-driven monitoring.
 //! Used by Cursor agent for E2E feedback loop automation.
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
+use std::io::Write as IoWrite;
 use std::process::Command;
 use tracing::debug;
 
@@ -26,8 +27,8 @@ struct Cli {
     #[arg(long, default_value = "json", global = true)]
     format: OutputFormat,
 
-    /// Kubernetes namespace to query
-    #[arg(long, default_value = "agent-platform", global = true)]
+    /// Argo namespace for workflows
+    #[arg(long, default_value = "argo", global = true)]
     namespace: String,
 
     /// Enable verbose output
@@ -44,21 +45,65 @@ enum OutputFormat {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Get status of pods for a play
+    /// [PRIMARY] Full E2E loop: start play, monitor, remediate until completion
+    Full {
+        /// Task ID for the play
+        #[arg(long)]
+        task_id: String,
+
+        /// Path to cto-config.json (reads play configuration)
+        #[arg(long, default_value = "cto-config.json")]
+        config: String,
+
+        /// Poll interval in seconds
+        #[arg(long, default_value = "10")]
+        interval: u64,
+
+        /// Max consecutive failures before stopping (0 = unlimited)
+        #[arg(long, default_value = "5")]
+        max_failures: u32,
+
+        /// Workflow template name
+        #[arg(long, default_value = "play-workflow-template")]
+        template: String,
+    },
+    /// Monitor an existing play workflow - emits JSON events
+    Loop {
+        /// Play workflow name (e.g., play-42, play-task-123)
+        #[arg(long)]
+        play_id: String,
+
+        /// Poll interval in seconds (for status checks between events)
+        #[arg(long, default_value = "10")]
+        interval: u64,
+
+        /// Fetch logs automatically on failure
+        #[arg(long, default_value = "true")]
+        fetch_logs: bool,
+
+        /// Max consecutive failures before stopping (0 = unlimited)
+        #[arg(long, default_value = "5")]
+        max_failures: u32,
+
+        /// Tail lines for logs on failure
+        #[arg(long, default_value = "500")]
+        log_tail: u32,
+    },
+    /// Get current status of a workflow (single check)
     Status {
-        /// Play ID to monitor
+        /// Workflow name to check
         #[arg(long)]
         play_id: String,
     },
-    /// Get logs for a play or specific pod
+    /// Get logs for a specific workflow step or pod
     Logs {
-        /// Play ID to get logs for
-        #[arg(long, group = "target")]
-        play_id: Option<String>,
+        /// Workflow name
+        #[arg(long)]
+        play_id: String,
 
-        /// Specific pod name to get logs for
-        #[arg(long, group = "target")]
-        pod: Option<String>,
+        /// Specific step/pod name (optional - gets failed step if not specified)
+        #[arg(long)]
+        step: Option<String>,
 
         /// Number of log lines to retrieve
         #[arg(long, default_value = "500")]
@@ -67,16 +112,6 @@ enum Commands {
         /// Filter for error patterns only
         #[arg(long)]
         errors_only: bool,
-    },
-    /// Watch play workflow status continuously
-    Watch {
-        /// Play ID to watch
-        #[arg(long)]
-        play_id: String,
-
-        /// Poll interval in seconds
-        #[arg(long, default_value = "30")]
-        interval: u64,
     },
     /// Reset environment: clean cluster resources and reset test repo
     Reset {
@@ -102,9 +137,9 @@ enum Commands {
     },
     /// Run/submit a play workflow via Argo CLI
     Run {
-        /// Play ID to run
+        /// Task ID for the play
         #[arg(long)]
-        play_id: String,
+        task_id: String,
 
         /// Repository to work on
         #[arg(long, default_value = "5dlabs/cto-parallel-test")]
@@ -118,64 +153,258 @@ enum Commands {
         #[arg(long, default_value = "play-workflow-template")]
         template: String,
     },
-    /// Start the full monitoring loop - watches workflow and emits events
-    Loop {
-        /// Play ID to monitor
-        #[arg(long)]
-        play_id: String,
-
-        /// Poll interval in seconds
-        #[arg(long, default_value = "30")]
-        interval: u64,
-
-        /// Query `OpenMemory` for solutions on failure
-        #[arg(long, default_value = "true")]
-        query_memory: bool,
-
-        /// Automatically fetch logs on failure
-        #[arg(long, default_value = "true")]
-        fetch_logs: bool,
-
-        /// Stop after this many consecutive failures (0 = never stop)
-        #[arg(long, default_value = "5")]
-        max_failures: u32,
+    /// Query and analyze `OpenMemory` for agent insights
+    Memory {
+        #[command(subcommand)]
+        action: MemoryCommands,
     },
 }
 
-/// Pod status information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PodStatus {
-    name: String,
-    phase: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    exit_code: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    reason: Option<String>,
-    restarts: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    container_status: Option<String>,
-    age: String,
+#[derive(Subcommand)]
+enum MemoryCommands {
+    /// List recent memories for a task or agent
+    List {
+        /// Filter by task ID
+        #[arg(long)]
+        task_id: Option<String>,
+
+        /// Filter by agent name (rex, blaze, cleo, tess, atlas, etc.)
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Maximum number of memories to return
+        #[arg(long, default_value = "20")]
+        limit: u32,
+    },
+    /// Semantic query for memories
+    Query {
+        /// Search query text
+        #[arg(long)]
+        text: String,
+
+        /// Filter by agent name
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Maximum number of results
+        #[arg(long, default_value = "10")]
+        limit: u32,
+
+        /// Include waypoint connections
+        #[arg(long)]
+        include_waypoints: bool,
+    },
+    /// Show memory statistics and health
+    Stats {
+        /// Filter stats by agent name
+        #[arg(long)]
+        agent: Option<String>,
+    },
+    /// Get a specific memory by ID
+    Get {
+        /// Memory ID
+        #[arg(long)]
+        id: String,
+    },
 }
 
-/// Overall play status response
+// =============================================================================
+// CTO Config Types - parsed from cto-config.json
+// =============================================================================
+
+/// CTO configuration file structure (cto-config.json)
+#[derive(Debug, Deserialize)]
+struct CtoConfig {
+    defaults: CtoDefaults,
+}
+
+/// Default configurations
+#[derive(Debug, Deserialize)]
+struct CtoDefaults {
+    play: PlayConfig,
+}
+
+/// Play workflow configuration
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // Fields parsed from config, not all used yet
+struct PlayConfig {
+    /// Model to use (e.g., "claude-opus-4-5-20251101")
+    #[serde(default)]
+    model: Option<String>,
+    /// CLI tool (e.g., "factory", "cursor", "codex")
+    #[serde(default)]
+    cli: Option<String>,
+    /// Implementation agent (e.g., "5DLabs-Rex")
+    implementation_agent: String,
+    /// Frontend agent (e.g., "5DLabs-Blaze")
+    #[serde(default)]
+    frontend_agent: Option<String>,
+    /// Quality agent (e.g., "5DLabs-Cleo")
+    quality_agent: String,
+    /// Security agent (e.g., "5DLabs-Cipher")
+    #[serde(default)]
+    security_agent: Option<String>,
+    /// Testing agent (e.g., "5DLabs-Tess")
+    testing_agent: String,
+    /// Repository (e.g., "5dlabs/cto-parallel-test")
+    repository: String,
+    /// Service name
+    #[serde(default)]
+    service: Option<String>,
+    /// Docs repository
+    #[serde(default)]
+    docs_repository: Option<String>,
+    /// Working directory
+    #[serde(default)]
+    working_directory: Option<String>,
+    /// Max retries for implementation
+    #[serde(default)]
+    implementation_max_retries: Option<u32>,
+    /// Max retries for quality
+    #[serde(default)]
+    quality_max_retries: Option<u32>,
+    /// Max retries for testing
+    #[serde(default)]
+    testing_max_retries: Option<u32>,
+    /// Auto merge
+    #[serde(default)]
+    auto_merge: Option<bool>,
+    /// Parallel execution
+    #[serde(default)]
+    parallel_execution: Option<bool>,
+}
+
+// =============================================================================
+// Argo Workflow Types - parsed from `argo get -o json`
+// =============================================================================
+
+/// Argo workflow step/node information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WorkflowStep {
+    /// Step/node ID
+    id: String,
+    /// Step display name
+    name: String,
+    /// Step type (Pod, Steps, DAG, etc.)
+    #[serde(rename = "type")]
+    step_type: String,
+    /// Phase: Pending, Running, Succeeded, Failed, Error, Skipped
+    phase: String,
+    /// Pod name for this step (if type=Pod)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pod_name: Option<String>,
+    /// Exit code if completed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exit_code: Option<i32>,
+    /// Message (often error message)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+    /// Start time
+    #[serde(skip_serializing_if = "Option::is_none")]
+    started_at: Option<String>,
+    /// Finish time
+    #[serde(skip_serializing_if = "Option::is_none")]
+    finished_at: Option<String>,
+}
+
+/// Workflow status from `argo get -o json`
 #[derive(Debug, Serialize, Deserialize)]
-struct PlayStatusResponse {
-    play_id: String,
+struct WorkflowStatus {
+    /// Workflow name
+    name: String,
+    /// Workflow namespace
     namespace: String,
-    status: String,
+    /// Overall phase: Pending, Running, Succeeded, Failed, Error
+    phase: String,
+    /// Status message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+    /// Current stage (derived from running/failed steps)
+    #[serde(skip_serializing_if = "Option::is_none")]
     stage: Option<String>,
-    pods: Vec<PodStatus>,
-    failed_pods: Vec<String>,
+    /// All workflow steps/nodes
+    steps: Vec<WorkflowStep>,
+    /// Failed steps (for quick access)
+    failed_steps: Vec<WorkflowStep>,
+    /// Start time
+    #[serde(skip_serializing_if = "Option::is_none")]
+    started_at: Option<String>,
+    /// Finish time
+    #[serde(skip_serializing_if = "Option::is_none")]
+    finished_at: Option<String>,
+    /// Duration in seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_seconds: Option<i64>,
+    /// Timestamp of this status check
     timestamp: DateTime<Utc>,
+    /// Error if status check failed
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
 
+// =============================================================================
+// Loop Events - JSON events emitted by the loop command
+// =============================================================================
+
+/// Events emitted by the loop command
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "event_type", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
+enum LoopEvent {
+    /// Loop has started monitoring
+    Started {
+        play_id: String,
+        interval_seconds: u64,
+        timestamp: DateTime<Utc>,
+    },
+    /// Current workflow status update
+    Status {
+        play_id: String,
+        workflow_phase: String,
+        stage: Option<String>,
+        steps: Vec<WorkflowStep>,
+        timestamp: DateTime<Utc>,
+    },
+    /// A stage has completed successfully
+    StageComplete {
+        play_id: String,
+        stage: String,
+        next_stage: Option<String>,
+        timestamp: DateTime<Utc>,
+    },
+    /// Workflow or step failure detected
+    Failure {
+        play_id: String,
+        stage: Option<String>,
+        failed_step: Option<WorkflowStep>,
+        logs: Option<String>,
+        consecutive_failures: u32,
+        timestamp: DateTime<Utc>,
+    },
+    /// Workflow completed successfully
+    Completed {
+        play_id: String,
+        duration_seconds: i64,
+        timestamp: DateTime<Utc>,
+    },
+    /// Loop stopped (max failures reached or user interrupt)
+    Stopped {
+        play_id: String,
+        reason: String,
+        timestamp: DateTime<Utc>,
+    },
+}
+
+// =============================================================================
+// Response Types for non-loop commands
+// =============================================================================
+
 /// Logs response
 #[derive(Debug, Serialize, Deserialize)]
 struct LogsResponse {
-    play_id: Option<String>,
-    pod: Option<String>,
+    play_id: String,
+    step: Option<String>,
     namespace: String,
     logs: String,
     line_count: usize,
@@ -219,191 +448,8 @@ struct GithubResetResult {
 struct RunResponse {
     success: bool,
     workflow_name: Option<String>,
-    play_id: String,
+    task_id: String,
     repository: String,
-    timestamp: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
-// =============================================================================
-// Loop Event Types
-// =============================================================================
-
-/// Event emitted by the monitoring loop
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "event_type")]
-enum LoopEvent {
-    /// Loop has started monitoring
-    #[serde(rename = "started")]
-    Started {
-        play_id: String,
-        interval_seconds: u64,
-        timestamp: DateTime<Utc>,
-    },
-    /// Status check completed
-    #[serde(rename = "status")]
-    Status {
-        play_id: String,
-        workflow_status: String,
-        stage: Option<String>,
-        pods: Vec<PodStatus>,
-        timestamp: DateTime<Utc>,
-    },
-    /// Failure detected - includes logs and memory suggestions
-    #[serde(rename = "failure")]
-    Failure {
-        play_id: String,
-        stage: Option<String>,
-        failed_pods: Vec<PodStatus>,
-        logs: Option<String>,
-        memory_suggestions: Vec<MemorySuggestion>,
-        consecutive_failures: u32,
-        timestamp: DateTime<Utc>,
-    },
-    /// Stage completed successfully
-    #[serde(rename = "stage_complete")]
-    StageComplete {
-        play_id: String,
-        stage: String,
-        next_stage: Option<String>,
-        timestamp: DateTime<Utc>,
-    },
-    /// All stages completed - workflow done
-    #[serde(rename = "completed")]
-    Completed {
-        play_id: String,
-        duration_seconds: i64,
-        timestamp: DateTime<Utc>,
-    },
-    /// Loop stopped (max failures or manual stop)
-    #[serde(rename = "stopped")]
-    Stopped {
-        play_id: String,
-        reason: String,
-        timestamp: DateTime<Utc>,
-    },
-}
-
-/// Memory suggestion from `OpenMemory` query
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MemorySuggestion {
-    id: String,
-    content: String,
-    relevance_score: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    agent: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pattern_type: Option<String>,
-}
-
-// =============================================================================
-// Memory Response Types
-// =============================================================================
-
-/// A single memory entry from `OpenMemory`
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryEntry {
-    id: String,
-    content: String,
-    #[serde(default)]
-    metadata: MemoryMetadata,
-    #[serde(default)]
-    salience: f64,
-    #[serde(default)]
-    reinforcements: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    last_accessed: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    created_at: Option<String>,
-    #[serde(default)]
-    score: f64,
-}
-
-/// Metadata associated with a memory
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct MemoryMetadata {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    agent: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    play_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    service: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pattern_type: Option<String>,
-    #[serde(default)]
-    success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    timestamp: Option<String>,
-}
-
-/// Response for memory list command
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryListResponse {
-    success: bool,
-    memories: Vec<MemoryEntry>,
-    total: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    filter: Option<MemoryFilter>,
-    timestamp: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryFilter {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    play_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    agent: Option<String>,
-    limit: u32,
-}
-
-/// Response for memory query command
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryQueryResponse {
-    success: bool,
-    query: String,
-    results: Vec<MemoryEntry>,
-    total: usize,
-    timestamp: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
-/// Response for memory stats command
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryStatsResponse {
-    success: bool,
-    health: MemoryHealth,
-    stats: MemoryStatistics,
-    timestamp: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryHealth {
-    status: String,
-    uptime_seconds: Option<i64>,
-    database_size_bytes: Option<i64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryStatistics {
-    total_memories: i64,
-    memories_by_agent: std::collections::HashMap<String, i64>,
-    memories_by_pattern: std::collections::HashMap<String, i64>,
-    average_salience: f64,
-    recent_queries: i64,
-    recent_additions: i64,
-}
-
-/// Response for memory get command
-#[derive(Debug, Serialize, Deserialize)]
-struct MemoryGetResponse {
-    success: bool,
-    memory: Option<MemoryEntry>,
     timestamp: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
@@ -421,21 +467,52 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
+        Commands::Full {
+            task_id,
+            config,
+            interval,
+            max_failures,
+            template,
+        } => {
+            run_full_loop(
+                &task_id,
+                &config,
+                &cli.namespace,
+                interval,
+                max_failures,
+                &template,
+            )
+            .await?;
+        }
+        Commands::Loop {
+            play_id,
+            interval,
+            fetch_logs,
+            max_failures,
+            log_tail,
+        } => {
+            run_loop(
+                &play_id,
+                &cli.namespace,
+                interval,
+                fetch_logs,
+                max_failures,
+                log_tail,
+            )
+            .await?;
+        }
         Commands::Status { play_id } => {
-            let result = get_status(&play_id, &cli.namespace)?;
+            let result = get_workflow_status(&play_id, &cli.namespace)?;
             output_result(&result, cli.format)?;
         }
         Commands::Logs {
             play_id,
-            pod,
+            step,
             tail,
             errors_only,
         } => {
-            let result = get_logs(play_id, pod, &cli.namespace, tail, errors_only).await?;
+            let result = get_logs(&play_id, step.as_deref(), &cli.namespace, tail, errors_only)?;
             output_result(&result, cli.format)?;
-        }
-        Commands::Watch { play_id, interval } => {
-            watch_status(&play_id, &cli.namespace, interval).await?;
         }
         Commands::Reset {
             repo,
@@ -449,381 +526,546 @@ async fn main() -> Result<()> {
             output_result(&result, cli.format)?;
         }
         Commands::Run {
-            play_id,
+            task_id,
             repository,
             agent,
             template,
         } => {
-            let result = run_workflow(&play_id, &repository, &agent, &template)?;
+            let result = run_workflow(&task_id, &repository, &agent, &template, &cli.namespace)?;
             output_result(&result, cli.format)?;
         }
-        Commands::Loop {
-            play_id,
-            interval,
-            query_memory,
-            fetch_logs,
-            max_failures,
-        } => {
-            run_monitoring_loop(
-                &play_id,
-                &cli.namespace,
-                interval,
-                query_memory,
-                fetch_logs,
-                max_failures,
-            )
-            .await?;
+        Commands::Memory { action } => {
+            handle_memory_command(action).await?;
         }
     }
 
     Ok(())
 }
 
-/// Get status of pods for a play
-fn get_status(play_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
+// =============================================================================
+// Core Functions: Argo Workflow Status & Monitoring
+// =============================================================================
+
+/// Get workflow status using `argo get -o json`
+fn get_workflow_status(workflow_name: &str, namespace: &str) -> Result<WorkflowStatus> {
     debug!(
-        "Getting status for play {} in namespace {}",
-        play_id, namespace
+        "Getting workflow status for {} in {}",
+        workflow_name, namespace
     );
 
-    // Query kubectl for pods matching the task ID
-    let output = Command::new("kubectl")
+    let output = Command::new("argo")
+        .args(["get", workflow_name, "-n", namespace, "-o", "json"])
+        .output()
+        .context("Failed to execute argo get")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Ok(WorkflowStatus {
+            name: workflow_name.to_string(),
+            namespace: namespace.to_string(),
+            phase: "Unknown".to_string(),
+            message: None,
+            stage: None,
+            steps: vec![],
+            failed_steps: vec![],
+            started_at: None,
+            finished_at: None,
+            duration_seconds: None,
+            timestamp: Utc::now(),
+            error: Some(stderr.to_string()),
+        });
+    }
+
+    parse_workflow_status(&output.stdout, workflow_name, namespace)
+}
+
+/// Parse argo workflow JSON output
+fn parse_workflow_status(
+    json_bytes: &[u8],
+    workflow_name: &str,
+    namespace: &str,
+) -> Result<WorkflowStatus> {
+    let workflow: serde_json::Value =
+        serde_json::from_slice(json_bytes).context("Failed to parse argo JSON output")?;
+
+    let status = &workflow["status"];
+    let phase = status["phase"].as_str().unwrap_or("Unknown").to_string();
+    let message = status["message"].as_str().map(ToString::to_string);
+    let started_at = status["startedAt"].as_str().map(ToString::to_string);
+    let finished_at = status["finishedAt"].as_str().map(ToString::to_string);
+
+    // Calculate duration if both times present
+    let duration_seconds = calculate_duration(started_at.as_deref(), finished_at.as_deref());
+
+    // Parse nodes/steps
+    let (steps, failed_steps) = parse_workflow_nodes(&status["nodes"]);
+
+    // Determine current stage from running or most recent step
+    let stage = determine_stage_from_steps(&steps);
+
+    Ok(WorkflowStatus {
+        name: workflow_name.to_string(),
+        namespace: namespace.to_string(),
+        phase,
+        message,
+        stage,
+        steps,
+        failed_steps,
+        started_at,
+        finished_at,
+        duration_seconds,
+        timestamp: Utc::now(),
+        error: None,
+    })
+}
+
+/// Parse workflow nodes into steps
+fn parse_workflow_nodes(nodes: &serde_json::Value) -> (Vec<WorkflowStep>, Vec<WorkflowStep>) {
+    let mut steps = Vec::new();
+    let mut failed_steps = Vec::new();
+
+    if let Some(nodes_obj) = nodes.as_object() {
+        for (id, node) in nodes_obj {
+            let step = WorkflowStep {
+                id: id.clone(),
+                name: node["displayName"]
+                    .as_str()
+                    .or_else(|| node["name"].as_str())
+                    .unwrap_or(id)
+                    .to_string(),
+                step_type: node["type"].as_str().unwrap_or("Unknown").to_string(),
+                phase: node["phase"].as_str().unwrap_or("Unknown").to_string(),
+                pod_name: node["id"].as_str().map(ToString::to_string),
+                exit_code: node["outputs"]["exitCode"]
+                    .as_str()
+                    .and_then(|s| s.parse().ok()),
+                message: node["message"].as_str().map(ToString::to_string),
+                started_at: node["startedAt"].as_str().map(ToString::to_string),
+                finished_at: node["finishedAt"].as_str().map(ToString::to_string),
+            };
+
+            // Only include Pod-type steps (actual work with retrievable logs)
+            if step.step_type == "Pod" {
+                // Track failed Pod steps (only Pods have logs we can retrieve)
+                if step.phase == "Failed" || step.phase == "Error" {
+                    failed_steps.push(step.clone());
+                }
+                steps.push(step);
+            }
+        }
+    }
+
+    // Sort steps by start time
+    steps.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+    failed_steps.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+
+    (steps, failed_steps)
+}
+
+/// Determine current stage from workflow steps
+fn determine_stage_from_steps(steps: &[WorkflowStep]) -> Option<String> {
+    // Find the currently running step, or the most recently failed/completed
+    for step in steps.iter().rev() {
+        let name = step.name.to_lowercase();
+
+        if step.phase == "Running" || step.phase == "Failed" || step.phase == "Error" {
+            if name.contains("rex") || name.contains("blaze") || name.contains("implementation") {
+                return Some("implementation".to_string());
+            }
+            if name.contains("cleo") || name.contains("quality") {
+                return Some("code-quality".to_string());
+            }
+            if name.contains("cypher") || name.contains("security") {
+                return Some("security".to_string());
+            }
+            if name.contains("tess") || name.contains("testing") || name.contains("qa") {
+                return Some("qa".to_string());
+            }
+            if name.contains("atlas") || name.contains("integration") || name.contains("merge") {
+                return Some("integration".to_string());
+            }
+            if name.contains("bolt") || name.contains("deploy") {
+                return Some("deployment".to_string());
+            }
+        }
+    }
+
+    None
+}
+
+/// Calculate duration between two timestamps
+fn calculate_duration(started: Option<&str>, finished: Option<&str>) -> Option<i64> {
+    let start = started.and_then(|s| DateTime::parse_from_rfc3339(s).ok());
+    let end = finished
+        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+        .or_else(|| Some(Utc::now().into()));
+
+    match (start, end) {
+        (Some(s), Some(e)) => Some(e.signed_duration_since(s).num_seconds()),
+        _ => None,
+    }
+}
+
+// =============================================================================
+// Main Loop: Event-driven workflow monitoring
+// =============================================================================
+
+/// Run the full E2E loop: load config, start workflow, monitor until completion
+#[allow(clippy::too_many_arguments)]
+async fn run_full_loop(
+    task_id: &str,
+    config_path: &str,
+    namespace: &str,
+    interval: u64,
+    max_failures: u32,
+    template: &str,
+) -> Result<()> {
+    // Step 1: Read and parse cto-config.json
+    let config_content = std::fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read config file: {config_path}"))?;
+
+    let config: CtoConfig = serde_json::from_str(&config_content)
+        .with_context(|| format!("Failed to parse config file: {config_path}"))?;
+
+    let play = &config.defaults.play;
+
+    // Emit config loaded event
+    emit_event(&LoopEvent::Started {
+        play_id: format!("play-{task_id}"),
+        interval_seconds: interval,
+        timestamp: Utc::now(),
+    })?;
+
+    println!(
+        "{}",
+        format!(
+            "Loaded config: repo={}, impl={}, quality={}, testing={}",
+            play.repository, play.implementation_agent, play.quality_agent, play.testing_agent
+        )
+        .cyan()
+    );
+
+    // Step 2: Submit the workflow with config values
+    println!(
+        "{}",
+        format!("Submitting play workflow for task {task_id}...").cyan()
+    );
+
+    let output = Command::new("argo")
         .args([
-            "get",
-            "pods",
+            "submit",
+            "--from",
+            &format!("workflowtemplate/{template}"),
             "-n",
             namespace,
-            "-l",
-            &format!("task-id={play_id}"),
+            "-p",
+            &format!("task-id={task_id}"),
+            "-p",
+            &format!("repository={}", play.repository),
+            "-p",
+            &format!("implementation-agent={}", play.implementation_agent),
+            "-p",
+            &format!("quality-agent={}", play.quality_agent),
+            "-p",
+            &format!("testing-agent={}", play.testing_agent),
             "-o",
             "json",
         ])
         .output()
-        .context("Failed to execute kubectl")?;
+        .context("Failed to submit workflow via argo CLI")?;
 
     if !output.status.success() {
-        // Try alternative label selector patterns
-        let output = Command::new("kubectl")
-            .args(["get", "pods", "-n", namespace, "-o", "json"])
-            .output()
-            .context("Failed to execute kubectl")?;
-
-        if !output.status.success() {
-            return Ok(PlayStatusResponse {
-                play_id: play_id.to_string(),
-                namespace: namespace.to_string(),
-                status: "error".to_string(),
-                stage: None,
-                pods: vec![],
-                failed_pods: vec![],
-                timestamp: Utc::now(),
-                error: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-            });
-        }
-
-        // Filter pods by name pattern containing task ID
-        return parse_pods_by_pattern(&output.stdout, play_id, namespace);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to submit workflow: {stderr}"));
     }
 
-    parse_pods(&output.stdout, play_id, namespace)
+    // Parse workflow name from output
+    let workflow_json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
+
+    let workflow_name = workflow_json["metadata"]["name"]
+        .as_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| anyhow::anyhow!("Failed to get workflow name from submission response"))?;
+
+    println!(
+        "{}",
+        format!("✓ Workflow submitted: {workflow_name}").green()
+    );
+
+    // Step 3: Start monitoring loop
+    println!(
+        "{}",
+        format!("Starting monitoring loop for {workflow_name}...").cyan()
+    );
+
+    run_loop(
+        &workflow_name,
+        namespace,
+        interval,
+        true, // fetch_logs
+        max_failures,
+        500, // log_tail
+    )
+    .await
 }
 
-/// Parse kubectl JSON output for pods
-fn parse_pods(json_bytes: &[u8], play_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
-    let pod_list: serde_json::Value =
-        serde_json::from_slice(json_bytes).context("Failed to parse kubectl JSON output")?;
-
-    let empty_vec = vec![];
-    let items = pod_list["items"].as_array().unwrap_or(&empty_vec);
-
-    let mut pods = Vec::new();
-    let mut failed_pods = Vec::new();
-    let mut overall_status = "running";
-
-    for item in items {
-        let name = item["metadata"]["name"]
-            .as_str()
-            .unwrap_or("unknown")
-            .to_string();
-        let phase = item["status"]["phase"]
-            .as_str()
-            .unwrap_or("Unknown")
-            .to_string();
-
-        // Get container status details
-        let container_statuses = item["status"]["containerStatuses"].as_array();
-        let (exit_code, reason, restarts, container_status) =
-            extract_container_info(container_statuses);
-
-        let creation_timestamp = item["metadata"]["creationTimestamp"].as_str().unwrap_or("");
-        let age = calculate_age(creation_timestamp);
-
-        // Check if pod is failed
-        let is_failed = phase == "Failed"
-            || reason.as_deref() == Some("Error")
-            || reason.as_deref() == Some("OOMKilled")
-            || reason.as_deref() == Some("CrashLoopBackOff")
-            || exit_code.is_some_and(|c| c != 0);
-
-        if is_failed {
-            failed_pods.push(name.clone());
-            overall_status = "failed";
-        }
-
-        pods.push(PodStatus {
-            name,
-            phase,
-            exit_code,
-            reason,
-            restarts,
-            container_status,
-            age,
-        });
-    }
-
-    // Determine stage from pod names
-    let stage = determine_stage(&pods);
-
-    // If no pods found, status is pending
-    if pods.is_empty() {
-        overall_status = "pending";
-    } else if failed_pods.is_empty() && pods.iter().all(|p| p.phase == "Succeeded") {
-        overall_status = "completed";
-    }
-
-    Ok(PlayStatusResponse {
-        play_id: play_id.to_string(),
-        namespace: namespace.to_string(),
-        status: overall_status.to_string(),
-        stage,
-        pods,
-        failed_pods,
-        timestamp: Utc::now(),
-        error: None,
-    })
-}
-
-/// Parse pods filtered by name pattern
-fn parse_pods_by_pattern(
-    json_bytes: &[u8],
+/// Run the monitoring loop - emits JSON events
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+async fn run_loop(
     play_id: &str,
     namespace: &str,
-) -> Result<PlayStatusResponse> {
-    let pod_list: serde_json::Value =
-        serde_json::from_slice(json_bytes).context("Failed to parse kubectl JSON output")?;
-
-    let empty_vec = vec![];
-    let items = pod_list["items"].as_array().unwrap_or(&empty_vec);
-
-    // Filter pods that contain task ID in their name
-    let task_pattern = format!("task-{play_id}");
-    let filtered: Vec<&serde_json::Value> = items
-        .iter()
-        .filter(|item| {
-            item["metadata"]["name"]
-                .as_str()
-                .is_some_and(|n| n.contains(&task_pattern))
-        })
-        .collect();
-
-    let mut pods = Vec::new();
-    let mut failed_pods = Vec::new();
-    let mut overall_status = "running";
-
-    for item in filtered {
-        let name = item["metadata"]["name"]
-            .as_str()
-            .unwrap_or("unknown")
-            .to_string();
-        let phase = item["status"]["phase"]
-            .as_str()
-            .unwrap_or("Unknown")
-            .to_string();
-
-        let container_statuses = item["status"]["containerStatuses"].as_array();
-        let (exit_code, reason, restarts, container_status) =
-            extract_container_info(container_statuses);
-
-        let creation_timestamp = item["metadata"]["creationTimestamp"].as_str().unwrap_or("");
-        let age = calculate_age(creation_timestamp);
-
-        let is_failed = phase == "Failed"
-            || reason.as_deref() == Some("Error")
-            || reason.as_deref() == Some("OOMKilled")
-            || reason.as_deref() == Some("CrashLoopBackOff")
-            || exit_code.is_some_and(|c| c != 0);
-
-        if is_failed {
-            failed_pods.push(name.clone());
-            overall_status = "failed";
-        }
-
-        pods.push(PodStatus {
-            name,
-            phase,
-            exit_code,
-            reason,
-            restarts,
-            container_status,
-            age,
-        });
-    }
-
-    let stage = determine_stage(&pods);
-
-    if pods.is_empty() {
-        overall_status = "pending";
-    } else if failed_pods.is_empty() && pods.iter().all(|p| p.phase == "Succeeded") {
-        overall_status = "completed";
-    }
-
-    Ok(PlayStatusResponse {
+    interval: u64,
+    fetch_logs: bool,
+    max_failures: u32,
+    log_tail: u32,
+) -> Result<()> {
+    // Emit started event
+    emit_event(&LoopEvent::Started {
         play_id: play_id.to_string(),
-        namespace: namespace.to_string(),
-        status: overall_status.to_string(),
-        stage,
-        pods,
-        failed_pods,
+        interval_seconds: interval,
         timestamp: Utc::now(),
-        error: None,
-    })
-}
+    })?;
 
-/// Extract container status information
-fn extract_container_info(
-    container_statuses: Option<&Vec<serde_json::Value>>,
-) -> (Option<i32>, Option<String>, i32, Option<String>) {
-    let mut exit_code = None;
-    let mut reason = None;
-    let mut restarts = 0;
-    let mut container_status = None;
+    let mut consecutive_failures: u32 = 0;
+    let mut last_stage: Option<String> = None;
+    let mut last_phase = String::new();
 
-    if let Some(statuses) = container_statuses {
-        for status in statuses {
-            #[allow(clippy::cast_possible_truncation)]
-            {
-                restarts += status["restartCount"].as_i64().unwrap_or(0) as i32;
-            }
+    loop {
+        // Get current workflow status
+        let status = match get_workflow_status(play_id, namespace) {
+            Ok(s) => s,
+            Err(e) => {
+                consecutive_failures += 1;
+                emit_event(&LoopEvent::Failure {
+                    play_id: play_id.to_string(),
+                    stage: last_stage.clone(),
+                    failed_step: None,
+                    logs: Some(format!("Error getting workflow status: {e}")),
+                    consecutive_failures,
+                    timestamp: Utc::now(),
+                })?;
 
-            // Check terminated state
-            if let Some(terminated) = status["state"]["terminated"].as_object() {
-                #[allow(clippy::cast_possible_truncation)]
-                {
-                    exit_code = terminated["exitCode"].as_i64().map(|c| c as i32);
+                if max_failures > 0 && consecutive_failures >= max_failures {
+                    emit_event(&LoopEvent::Stopped {
+                        play_id: play_id.to_string(),
+                        reason: format!("Max consecutive failures reached ({max_failures})"),
+                        timestamp: Utc::now(),
+                    })?;
+                    return Ok(());
                 }
-                reason = terminated["reason"].as_str().map(ToString::to_string);
-                container_status = Some("terminated".to_string());
-            }
-            // Check waiting state (CrashLoopBackOff, etc.)
-            else if let Some(waiting) = status["state"]["waiting"].as_object() {
-                reason = waiting["reason"].as_str().map(ToString::to_string);
-                container_status = Some("waiting".to_string());
-            }
-            // Running state
-            else if status["state"]["running"].is_object() {
-                container_status = Some("running".to_string());
-            }
-        }
-    }
 
-    (exit_code, reason, restarts, container_status)
+                tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+                continue;
+            }
+        };
+
+        // Check for error in status
+        if let Some(ref err) = status.error {
+            consecutive_failures += 1;
+            emit_event(&LoopEvent::Failure {
+                play_id: play_id.to_string(),
+                stage: last_stage.clone(),
+                failed_step: None,
+                logs: Some(format!("Workflow error: {err}")),
+                consecutive_failures,
+                timestamp: Utc::now(),
+            })?;
+
+            if max_failures > 0 && consecutive_failures >= max_failures {
+                emit_event(&LoopEvent::Stopped {
+                    play_id: play_id.to_string(),
+                    reason: format!("Max consecutive failures reached ({max_failures})"),
+                    timestamp: Utc::now(),
+                })?;
+                return Ok(());
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+            continue;
+        }
+
+        // Emit status event (only when phase changes to reduce noise)
+        if status.phase != last_phase {
+            emit_event(&LoopEvent::Status {
+                play_id: play_id.to_string(),
+                workflow_phase: status.phase.clone(),
+                stage: status.stage.clone(),
+                steps: status.steps.clone(),
+                timestamp: Utc::now(),
+            })?;
+            last_phase.clone_from(&status.phase);
+        }
+
+        // Check for stage change
+        if status.stage.is_some() && status.stage != last_stage {
+            if let Some(ref prev_stage) = last_stage {
+                emit_event(&LoopEvent::StageComplete {
+                    play_id: play_id.to_string(),
+                    stage: prev_stage.clone(),
+                    next_stage: status.stage.clone(),
+                    timestamp: Utc::now(),
+                })?;
+            }
+            last_stage.clone_from(&status.stage);
+        }
+
+        // Handle workflow completion
+        if status.phase == "Succeeded" {
+            emit_event(&LoopEvent::Completed {
+                play_id: play_id.to_string(),
+                duration_seconds: status.duration_seconds.unwrap_or(0),
+                timestamp: Utc::now(),
+            })?;
+            return Ok(());
+        }
+
+        // Handle workflow failure - only check phase, not historical failed steps
+        // Workflows may have failed steps but still be running (retries, self-healing)
+        if status.phase == "Failed" || status.phase == "Error" {
+            consecutive_failures += 1;
+
+            // Get the first failed step for context
+            let failed_step = status.failed_steps.first().cloned();
+
+            // Fetch logs if enabled and we have a failed step
+            let logs = if fetch_logs {
+                if let Some(ref step) = failed_step {
+                    if let Some(ref pod_name) = step.pod_name {
+                        get_step_logs(pod_name, namespace, log_tail).ok()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            emit_event(&LoopEvent::Failure {
+                play_id: play_id.to_string(),
+                stage: status.stage.clone(),
+                failed_step,
+                logs,
+                consecutive_failures,
+                timestamp: Utc::now(),
+            })?;
+
+            // Workflow failure is terminal - exit immediately after emitting the failure event
+            emit_event(&LoopEvent::Stopped {
+                play_id: play_id.to_string(),
+                reason: "Workflow entered terminal failure state".to_string(),
+                timestamp: Utc::now(),
+            })?;
+            return Ok(());
+        }
+        // Reset consecutive failures on successful status
+        consecutive_failures = 0;
+
+        // Wait before next check
+        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+    }
 }
 
-/// Determine current stage from pod names
-fn determine_stage(pods: &[PodStatus]) -> Option<String> {
-    for pod in pods {
-        let name = pod.name.to_lowercase();
-        if name.contains("rex") || name.contains("blaze") {
-            return Some("implementation".to_string());
-        }
-        if name.contains("cleo") {
-            return Some("code-quality".to_string());
-        }
-        if name.contains("cypher") {
-            return Some("security".to_string());
-        }
-        if name.contains("tess") {
-            return Some("qa".to_string());
-        }
-        if name.contains("atlas") {
-            return Some("integration".to_string());
-        }
-    }
-    None
+/// Emit a JSON event to stdout
+fn emit_event(event: &LoopEvent) -> Result<()> {
+    let json = serde_json::to_string(event)?;
+    println!("{json}");
+    std::io::stdout().flush()?;
+    Ok(())
 }
 
-/// Calculate age from creation timestamp
-fn calculate_age(timestamp: &str) -> String {
-    if timestamp.is_empty() {
-        return "unknown".to_string();
-    }
+// =============================================================================
+// Logs: Get logs from workflow steps
+// =============================================================================
 
-    if let Ok(created) = DateTime::parse_from_rfc3339(timestamp) {
-        let duration = Utc::now().signed_duration_since(created.with_timezone(&Utc));
-        let minutes = duration.num_minutes();
-        let hours = duration.num_hours();
-        let days = duration.num_days();
-
-        if days > 0 {
-            format!("{days}d")
-        } else if hours > 0 {
-            format!("{hours}h")
-        } else {
-            format!("{minutes}m")
-        }
-    } else {
-        "unknown".to_string()
-    }
-}
-
-/// Get logs for a play or specific pod
-async fn get_logs(
-    play_id: Option<String>,
-    pod: Option<String>,
+/// Get logs for a workflow, optionally for a specific step
+fn get_logs(
+    play_id: &str,
+    step: Option<&str>,
     namespace: &str,
     tail: u32,
     errors_only: bool,
 ) -> Result<LogsResponse> {
-    let logs = if let Some(pod_name) = &pod {
-        // Get logs for specific pod
-        get_pod_logs(pod_name, namespace, tail)?
-    } else if let Some(task) = &play_id {
-        // Get logs for all pods matching task ID
-        get_task_logs(task, namespace, tail).await?
+    let logs = if let Some(step_name) = step {
+        // Get logs for specific step/pod
+        get_step_logs(step_name, namespace, tail)?
     } else {
-        return Ok(LogsResponse {
-            play_id: None,
-            pod: None,
-            namespace: namespace.to_string(),
-            logs: String::new(),
-            line_count: 0,
-            timestamp: Utc::now(),
-            error: Some("Must specify either --play-id or --pod".to_string()),
-        });
+        // Get logs from failed step(s) in the workflow
+        let status = get_workflow_status(play_id, namespace)?;
+        let mut all_logs = String::new();
+
+        if status.failed_steps.is_empty() {
+            // No failures, get logs from most recent step
+            if let Some(recent) = status.steps.last() {
+                if let Some(ref pod_name) = recent.pod_name {
+                    let _ = writeln!(all_logs, "=== {} ({}) ===", recent.name, recent.phase);
+                    all_logs.push_str(&get_step_logs(pod_name, namespace, tail)?);
+                }
+            }
+        } else {
+            // Get logs from each failed step
+            for failed in &status.failed_steps {
+                if let Some(ref pod_name) = failed.pod_name {
+                    let _ = writeln!(all_logs, "=== {} (FAILED) ===", failed.name);
+                    if let Some(ref msg) = failed.message {
+                        let _ = writeln!(all_logs, "Message: {msg}");
+                    }
+                    all_logs.push_str(&get_step_logs(pod_name, namespace, tail)?);
+                    all_logs.push('\n');
+                }
+            }
+        }
+
+        all_logs
     };
 
-    // Filter for errors if requested
-    let filtered_logs = if errors_only {
+    let filtered = if errors_only {
         filter_error_logs(&logs)
     } else {
         logs
     };
 
-    let line_count = filtered_logs.lines().count();
+    let line_count = filtered.lines().count();
 
     Ok(LogsResponse {
-        play_id,
-        pod,
+        play_id: play_id.to_string(),
+        step: step.map(ToString::to_string),
         namespace: namespace.to_string(),
-        logs: filtered_logs,
+        logs: filtered,
         line_count,
         timestamp: Utc::now(),
         error: None,
     })
 }
 
-/// Get logs for a specific pod via kubectl
-fn get_pod_logs(pod_name: &str, namespace: &str, tail: u32) -> Result<String> {
+/// Get logs for a specific step/pod
+fn get_step_logs(pod_name: &str, namespace: &str, tail: u32) -> Result<String> {
+    debug!("Getting logs for pod {} in {}", pod_name, namespace);
+
+    // First try argo logs (works even for completed pods)
+    let output = Command::new("argo")
+        .args([
+            "logs",
+            pod_name,
+            "-n",
+            namespace,
+            "--tail",
+            &tail.to_string(),
+        ])
+        .output();
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let logs = String::from_utf8_lossy(&out.stdout).to_string();
+            if !logs.is_empty() {
+                return Ok(logs);
+            }
+        }
+    }
+
+    // Fallback to kubectl logs
     let output = Command::new("kubectl")
         .args([
             "logs",
@@ -837,91 +1079,26 @@ fn get_pod_logs(pod_name: &str, namespace: &str, tail: u32) -> Result<String> {
         .output()
         .context("Failed to execute kubectl logs")?;
 
-    if !output.status.success() {
-        // Try getting previous logs if current logs fail
-        let output = Command::new("kubectl")
-            .args([
-                "logs",
-                pod_name,
-                "-n",
-                namespace,
-                "--tail",
-                &tail.to_string(),
-                "--all-containers=true",
-                "--previous",
-            ])
-            .output()
-            .context("Failed to execute kubectl logs --previous")?;
-
+    if output.status.success() {
         return Ok(String::from_utf8_lossy(&output.stdout).to_string());
     }
 
+    // Try previous logs
+    let output = Command::new("kubectl")
+        .args([
+            "logs",
+            pod_name,
+            "-n",
+            namespace,
+            "--tail",
+            &tail.to_string(),
+            "--all-containers=true",
+            "--previous",
+        ])
+        .output()
+        .context("Failed to execute kubectl logs --previous")?;
+
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
-}
-
-/// Get logs for all pods matching a play ID
-async fn get_task_logs(play_id: &str, namespace: &str, tail: u32) -> Result<String> {
-    // First get pod names
-    let status = get_status(play_id, namespace)?;
-
-    let mut all_logs = String::new();
-
-    for pod in &status.pods {
-        let pod_logs = get_pod_logs(&pod.name, namespace, tail)?;
-        if !pod_logs.is_empty() {
-            let _ = writeln!(all_logs, "\n=== Logs from {} ===", pod.name);
-            all_logs.push_str(&pod_logs);
-        }
-    }
-
-    // Also try to get logs from Victoria Logs if available
-    if let Ok(victoria_logs) = get_victoria_logs(play_id, namespace, tail).await {
-        if !victoria_logs.is_empty() {
-            all_logs.push_str("\n=== Victoria Logs ===\n");
-            all_logs.push_str(&victoria_logs);
-        }
-    }
-
-    Ok(all_logs)
-}
-
-/// Query Victoria Logs API for historical logs
-async fn get_victoria_logs(play_id: &str, namespace: &str, limit: u32) -> Result<String> {
-    // Internal Kubernetes cluster service - HTTP is standard for in-cluster traffic
-    // Set VICTORIA_LOGS_URL env var to override (e.g., for external/TLS endpoints)
-    #[allow(clippy::expect_used)] // Safe: URL is validated at startup in production
-    let victoria_logs_url = std::env::var("VICTORIA_LOGS_URL").unwrap_or_else(|_| {
-        // codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required
-        String::from(
-            "http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428",
-        )
-    });
-
-    let query = format!(
-        r#"{{kubernetes_namespace="{namespace}", kubernetes_pod_name=~".*task-{play_id}.*"}}"#
-    );
-
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{victoria_logs_url}/select/logsql/query"))
-        .form(&[("query", query.as_str()), ("limit", &limit.to_string())])
-        .send()
-        .await;
-
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            let text = resp.text().await.unwrap_or_default();
-            Ok(text)
-        }
-        Ok(resp) => {
-            debug!("Victoria Logs returned status: {}", resp.status());
-            Ok(String::new())
-        }
-        Err(e) => {
-            debug!("Failed to query Victoria Logs: {}", e);
-            Ok(String::new())
-        }
-    }
 }
 
 /// Filter logs to only include error-related lines
@@ -942,6 +1119,8 @@ fn filter_error_logs(logs: &str) -> String {
         "EXCEPTION",
         "OOMKilled",
         "CrashLoopBackOff",
+        "clippy::",
+        "warning:",
     ];
 
     logs.lines()
@@ -950,74 +1129,72 @@ fn filter_error_logs(logs: &str) -> String {
         .join("\n")
 }
 
-/// Watch status continuously
-async fn watch_status(play_id: &str, namespace: &str, interval: u64) -> Result<()> {
-    let header = format!("Watching play {play_id} (interval: {interval}s)");
-    println!("{}", header.cyan());
-    println!("{}", "Press Ctrl+C to stop".dimmed());
+// =============================================================================
+// OpenMemory Verification Commands
+// =============================================================================
 
-    loop {
-        let status = get_status(play_id, namespace)?;
+/// Handle memory subcommands for verification (not remediation)
+async fn handle_memory_command(action: MemoryCommands) -> Result<()> {
+    let openmemory_url = std::env::var("OPENMEMORY_URL")
+        .unwrap_or_else(|_| "http://openmemory.openmemory.svc.cluster.local:8080".to_string());
 
-        // Clear screen and print status
-        print!("\x1B[2J\x1B[1;1H");
-        let status_line = format!(
-            "Task: {play_id} | Status: {} | Stage: {}",
-            colorize_status(&status.status),
-            status.stage.as_deref().unwrap_or("unknown")
-        );
-        println!("{status_line}");
-        let ns_line = format!("Namespace: {namespace} | Time: {}", status.timestamp);
-        println!("{}", ns_line.dimmed());
-        println!();
-
-        for pod in &status.pods {
-            let status_icon = match pod.phase.as_str() {
-                "Running" => "●".green(),
-                "Succeeded" => "✓".green(),
-                "Failed" => "✗".red(),
-                "Pending" => "○".yellow(),
-                _ => "?".dimmed(),
-            };
-            println!(
-                "  {status_icon} {} ({}) - {} restarts - {}",
-                pod.name, pod.phase, pod.restarts, pod.age
-            );
-            if let Some(reason) = &pod.reason {
-                println!("    └─ {}", reason.red());
+    match action {
+        MemoryCommands::List {
+            task_id,
+            agent,
+            limit,
+        } => {
+            let mut url = format!("{openmemory_url}/api/v1/memories?limit={limit}");
+            if let Some(t) = task_id {
+                let _ = write!(url, "&task_id={t}");
             }
-        }
-
-        if !status.failed_pods.is_empty() {
-            println!();
-            println!("{}", "Failed pods:".red().bold());
-            for pod in &status.failed_pods {
-                println!("  - {pod}");
+            if let Some(a) = agent {
+                let _ = write!(url, "&agent={a}");
             }
+            let resp = reqwest::get(&url).await?;
+            let json: serde_json::Value = resp.json().await?;
+            println!("{}", serde_json::to_string_pretty(&json)?);
         }
-
-        // Check for completion or failure
-        if status.status == "completed" {
-            println!();
-            println!("{}", "✓ Task completed successfully!".green().bold());
-            break;
+        MemoryCommands::Query {
+            text,
+            agent,
+            limit,
+            include_waypoints,
+        } => {
+            let client = reqwest::Client::new();
+            let mut body = serde_json::json!({
+                "query": text,
+                "limit": limit,
+                "include_waypoints": include_waypoints
+            });
+            if let Some(a) = agent {
+                body["agent"] = serde_json::json!(a);
+            }
+            let resp = client
+                .post(format!("{openmemory_url}/api/v1/search"))
+                .json(&body)
+                .send()
+                .await?;
+            let json: serde_json::Value = resp.json().await?;
+            println!("{}", serde_json::to_string_pretty(&json)?);
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+        MemoryCommands::Stats { agent } => {
+            let mut url = format!("{openmemory_url}/api/v1/stats");
+            if let Some(a) = agent {
+                let _ = write!(url, "?agent={a}");
+            }
+            let resp = reqwest::get(&url).await?;
+            let json: serde_json::Value = resp.json().await?;
+            println!("{}", serde_json::to_string_pretty(&json)?);
+        }
+        MemoryCommands::Get { id } => {
+            let resp = reqwest::get(format!("{openmemory_url}/api/v1/memories/{id}")).await?;
+            let json: serde_json::Value = resp.json().await?;
+            println!("{}", serde_json::to_string_pretty(&json)?);
+        }
     }
 
     Ok(())
-}
-
-/// Colorize status string
-fn colorize_status(status: &str) -> colored::ColoredString {
-    match status {
-        "running" => status.cyan(),
-        "completed" => status.green(),
-        "failed" => status.red(),
-        "pending" => status.yellow(),
-        _ => status.dimmed(),
-    }
 }
 
 /// Output result in requested format
@@ -1047,6 +1224,22 @@ fn reset_environment(
     skip_github: bool,
     force: bool,
 ) -> Result<ResetResponse> {
+    // Prompt for confirmation unless force flag is set
+    if !force {
+        use std::io::{self, Write};
+        print!(
+            "{}",
+            "WARNING: This will delete all workflows, pods, ConfigMaps, PVCs, and reset the GitHub repo.\nContinue? [y/N]: "
+                .yellow()
+        );
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if !input.trim().eq_ignore_ascii_case("y") {
+            return Err(anyhow::anyhow!("Reset cancelled by user"));
+        }
+    }
+
     let mut k8s_cleanup = CleanupResult {
         workflows_deleted: 0,
         pods_deleted: 0,
@@ -1106,10 +1299,12 @@ fn reset_environment(
                 let cms: Vec<&str> = output_str.lines().filter(|l| l.contains(pattern)).collect();
 
                 for cm in &cms {
-                    let _ = Command::new("kubectl")
+                    let delete_result = Command::new("kubectl")
                         .args(["delete", cm, "-n", namespace, "--force", "--grace-period=0"])
                         .output();
-                    k8s_cleanup.configmaps_deleted += 1;
+                    if delete_result.is_ok_and(|o| o.status.success()) {
+                        k8s_cleanup.configmaps_deleted += 1;
+                    }
                 }
             }
         }
@@ -1130,7 +1325,7 @@ fn reset_environment(
                 let pvcs: Vec<&str> = output_str.lines().filter(|l| l.contains(pattern)).collect();
 
                 for pvc in &pvcs {
-                    let _ = Command::new("kubectl")
+                    let delete_result = Command::new("kubectl")
                         .args([
                             "delete",
                             pvc,
@@ -1140,7 +1335,9 @@ fn reset_environment(
                             "--grace-period=0",
                         ])
                         .output();
-                    k8s_cleanup.pvcs_deleted += 1;
+                    if delete_result.is_ok_and(|o| o.status.success()) {
+                        k8s_cleanup.pvcs_deleted += 1;
+                    }
                 }
             }
         }
@@ -1169,6 +1366,7 @@ fn reset_environment(
 }
 
 /// Reset GitHub repository - delete and recreate with minimal structure
+#[allow(clippy::too_many_lines)]
 fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetResult> {
     let full_repo = format!("{org}/{repo}");
     let mut result = GithubResetResult {
@@ -1243,28 +1441,50 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
         .output()?;
 
     if git_init.status.success() {
+        // Configure git user locally for this repo (required for commit)
+        let _ = Command::new("git")
+            .args(["config", "user.email", "automation@5dlabs.io"])
+            .current_dir(&temp_dir)
+            .output();
+        let _ = Command::new("git")
+            .args(["config", "user.name", "5DLabs Automation"])
+            .current_dir(&temp_dir)
+            .output();
+
         let _ = Command::new("git")
             .args(["add", "."])
             .current_dir(&temp_dir)
             .output();
 
-        let _ = Command::new("git")
+        let commit_result = Command::new("git")
             .args(["commit", "-m", "Initial commit"])
             .current_dir(&temp_dir)
             .output();
+
+        if commit_result.is_err() || !commit_result.as_ref().is_ok_and(|o| o.status.success()) {
+            let err_msg = commit_result
+                .as_ref()
+                .map_or_else(std::string::ToString::to_string, |o| {
+                    String::from_utf8_lossy(&o.stderr).to_string()
+                });
+            println!("  {} Git commit failed: {err_msg}", "⚠".yellow());
+        }
 
         let _ = Command::new("git")
             .args(["branch", "-M", "main"])
             .current_dir(&temp_dir)
             .output();
 
+        // Use HTTPS with token if GITHUB_TOKEN is set (for automation)
+        // Otherwise fall back to SSH (for local dev)
+        let remote_url = if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+            format!("https://x-access-token:{token}@github.com/{full_repo}.git")
+        } else {
+            format!("git@github.com:{full_repo}.git")
+        };
+
         let _ = Command::new("git")
-            .args([
-                "remote",
-                "add",
-                "origin",
-                &format!("git@github.com:{full_repo}.git"),
-            ])
+            .args(["remote", "add", "origin", &remote_url])
             .current_dir(&temp_dir)
             .output();
 
@@ -1276,6 +1496,9 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
         if push.status.success() {
             result.pushed = true;
             println!("  {} Initialized repository", "✓".green());
+        } else {
+            let err = String::from_utf8_lossy(&push.stderr);
+            println!("  {} Git push failed: {err}", "⚠".yellow());
         }
     }
 
@@ -1297,14 +1520,15 @@ fn count_deleted(output: &[u8]) -> i32 {
 
 /// Run/submit a play workflow via Argo CLI
 fn run_workflow(
-    play_id: &str,
+    task_id: &str,
     repository: &str,
     agent: &str,
     template: &str,
+    namespace: &str,
 ) -> Result<RunResponse> {
     println!(
         "{}",
-        format!("Submitting play workflow {play_id}...").cyan()
+        format!("Submitting play workflow for task {task_id}...").cyan()
     );
 
     // Submit workflow using argo CLI
@@ -1314,9 +1538,9 @@ fn run_workflow(
             "--from",
             &format!("workflowtemplate/{template}"),
             "-n",
-            "argo",
+            namespace,
             "-p",
-            &format!("task-id={play_id}"),
+            &format!("task-id={task_id}"),
             "-p",
             &format!("repository={repository}"),
             "-p",
@@ -1336,7 +1560,7 @@ fn run_workflow(
         return Ok(RunResponse {
             success: false,
             workflow_name: None,
-            play_id: play_id.to_string(),
+            task_id: task_id.to_string(),
             repository: repository.to_string(),
             timestamp: Utc::now(),
             error: Some(stderr.to_string()),
@@ -1363,593 +1587,11 @@ fn run_workflow(
     Ok(RunResponse {
         success: true,
         workflow_name,
-        play_id: play_id.to_string(),
+        task_id: task_id.to_string(),
         repository: repository.to_string(),
         timestamp: Utc::now(),
         error: None,
     })
-}
-
-// =============================================================================
-// Monitoring Loop
-// =============================================================================
-
-/// Run the full monitoring loop - continuously watch workflow and emit events
-#[allow(clippy::too_many_lines)]
-async fn run_monitoring_loop(
-    play_id: &str,
-    namespace: &str,
-    interval_seconds: u64,
-    query_memory: bool,
-    fetch_logs: bool,
-    max_failures: u32,
-) -> Result<()> {
-    use std::io::Write;
-    use tokio::time::{sleep, Duration};
-
-    let start_time = Utc::now();
-    let mut consecutive_failures: u32 = 0;
-    let mut last_stage: Option<String> = None;
-
-    // Emit started event
-    let started_event = LoopEvent::Started {
-        play_id: play_id.to_string(),
-        interval_seconds,
-        timestamp: Utc::now(),
-    };
-    println!("{}", serde_json::to_string(&started_event)?);
-    std::io::stdout().flush()?;
-
-    loop {
-        // Get current status
-        let status_result = get_status(play_id, namespace);
-
-        match status_result {
-            Ok(status) => {
-                let current_status = status.status.clone();
-                let current_stage = status.stage.clone();
-
-                // Check for stage change
-                if current_stage != last_stage && current_stage.is_some() {
-                    if let Some(ref prev_stage) = last_stage {
-                        // Previous stage completed
-                        let stage_complete = LoopEvent::StageComplete {
-                            play_id: play_id.to_string(),
-                            stage: prev_stage.clone(),
-                            next_stage: current_stage.clone(),
-                            timestamp: Utc::now(),
-                        };
-                        println!("{}", serde_json::to_string(&stage_complete)?);
-                        std::io::stdout().flush()?;
-                    }
-                    last_stage.clone_from(&current_stage);
-                }
-
-                // Handle different statuses
-                match current_status.as_str() {
-                    "completed" => {
-                        let duration = Utc::now().signed_duration_since(start_time).num_seconds();
-                        let completed = LoopEvent::Completed {
-                            play_id: play_id.to_string(),
-                            duration_seconds: duration,
-                            timestamp: Utc::now(),
-                        };
-                        println!("{}", serde_json::to_string(&completed)?);
-                        std::io::stdout().flush()?;
-                        return Ok(());
-                    }
-                    "failed" => {
-                        consecutive_failures += 1;
-
-                        // Get logs if enabled
-                        let logs = if fetch_logs && !status.failed_pods.is_empty() {
-                            let pod_name = &status.failed_pods[0];
-                            get_logs_for_pod(pod_name, namespace, 200, true).ok()
-                        } else {
-                            None
-                        };
-
-                        // Query memory for suggestions if enabled
-                        let memory_suggestions = if query_memory {
-                            query_memory_for_error(logs.as_ref(), &status.failed_pods).await
-                        } else {
-                            vec![]
-                        };
-
-                        // Get failed pod details
-                        let failed_pods: Vec<PodStatus> = status
-                            .pods
-                            .iter()
-                            .filter(|p| status.failed_pods.contains(&p.name))
-                            .cloned()
-                            .collect();
-
-                        let failure_event = LoopEvent::Failure {
-                            play_id: play_id.to_string(),
-                            stage: current_stage.clone(),
-                            failed_pods,
-                            logs,
-                            memory_suggestions,
-                            consecutive_failures,
-                            timestamp: Utc::now(),
-                        };
-                        println!("{}", serde_json::to_string(&failure_event)?);
-                        std::io::stdout().flush()?;
-
-                        // Check if we should stop
-                        if max_failures > 0 && consecutive_failures >= max_failures {
-                            let stopped = LoopEvent::Stopped {
-                                play_id: play_id.to_string(),
-                                reason: format!(
-                                    "Max consecutive failures reached ({max_failures})"
-                                ),
-                                timestamp: Utc::now(),
-                            };
-                            println!("{}", serde_json::to_string(&stopped)?);
-                            std::io::stdout().flush()?;
-                            return Ok(());
-                        }
-                    }
-                    "running" | "pending" => {
-                        // Reset failure count on any successful healthy status
-                        // This must be unconditional because transient get_status errors
-                        // don't update last_status, so subsequent successful polls would
-                        // see current_status == last_status and fail to reset the counter
-                        consecutive_failures = 0;
-
-                        // Emit status event periodically
-                        let status_event = LoopEvent::Status {
-                            play_id: play_id.to_string(),
-                            workflow_status: current_status.clone(),
-                            stage: current_stage.clone(),
-                            pods: status.pods.clone(),
-                            timestamp: Utc::now(),
-                        };
-                        println!("{}", serde_json::to_string(&status_event)?);
-                        std::io::stdout().flush()?;
-                    }
-                    _ => {
-                        // Unknown status - emit as status event
-                        let status_event = LoopEvent::Status {
-                            play_id: play_id.to_string(),
-                            workflow_status: current_status.clone(),
-                            stage: current_stage,
-                            pods: status.pods.clone(),
-                            timestamp: Utc::now(),
-                        };
-                        println!("{}", serde_json::to_string(&status_event)?);
-                        std::io::stdout().flush()?;
-                    }
-                }
-            }
-            Err(e) => {
-                // Error getting status - treat as failure
-                consecutive_failures += 1;
-
-                let failure_event = LoopEvent::Failure {
-                    play_id: play_id.to_string(),
-                    stage: last_stage.clone(),
-                    failed_pods: vec![],
-                    logs: Some(format!("Error getting status: {e}")),
-                    memory_suggestions: vec![],
-                    consecutive_failures,
-                    timestamp: Utc::now(),
-                };
-                println!("{}", serde_json::to_string(&failure_event)?);
-                std::io::stdout().flush()?;
-
-                // Check if we should stop
-                if max_failures > 0 && consecutive_failures >= max_failures {
-                    let stopped = LoopEvent::Stopped {
-                        play_id: play_id.to_string(),
-                        reason: format!("Max consecutive failures reached ({max_failures})"),
-                        timestamp: Utc::now(),
-                    };
-                    println!("{}", serde_json::to_string(&stopped)?);
-                    std::io::stdout().flush()?;
-                    return Ok(());
-                }
-            }
-        }
-
-        // Wait for next poll
-        sleep(Duration::from_secs(interval_seconds)).await;
-    }
-}
-
-/// Query `OpenMemory` for suggestions based on error logs
-async fn query_memory_for_error(
-    logs: Option<&String>,
-    failed_pods: &[String],
-) -> Vec<MemorySuggestion> {
-    let openmemory_url = get_openmemory_url();
-
-    // Build query from logs and pod names
-    let query_text = if let Some(log_content) = logs {
-        // Extract error keywords from logs
-        let error_lines: Vec<&str> = log_content
-            .lines()
-            .filter(|l| {
-                l.contains("error")
-                    || l.contains("Error")
-                    || l.contains("ERROR")
-                    || l.contains("failed")
-                    || l.contains("Failed")
-            })
-            .take(3)
-            .collect();
-        error_lines.join(" ")
-    } else {
-        failed_pods.join(" ")
-    };
-
-    if query_text.is_empty() {
-        return vec![];
-    }
-
-    let client = reqwest::Client::new();
-    let query_json = serde_json::json!({
-        "query": query_text,
-        "k": 5,
-        "include_waypoints": true
-    });
-
-    let response = client
-        .post(format!("{openmemory_url}/memory/query"))
-        .json(&query_json)
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await;
-
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            let results: Vec<serde_json::Value> = resp.json().await.unwrap_or_default();
-            results
-                .into_iter()
-                .filter_map(|r| {
-                    Some(MemorySuggestion {
-                        id: r["id"].as_str()?.to_string(),
-                        content: r["content"].as_str()?.to_string(),
-                        relevance_score: r["score"].as_f64().unwrap_or(0.0),
-                        agent: r["metadata"]["agent"].as_str().map(String::from),
-                        pattern_type: r["metadata"]["pattern_type"].as_str().map(String::from),
-                    })
-                })
-                .collect()
-        }
-        _ => vec![],
-    }
-}
-
-/// Get logs for a specific pod
-fn get_logs_for_pod(
-    pod_name: &str,
-    namespace: &str,
-    tail_lines: u32,
-    errors_only: bool,
-) -> Result<String> {
-    let output = Command::new("kubectl")
-        .args([
-            "logs",
-            pod_name,
-            "-n",
-            namespace,
-            "--tail",
-            &tail_lines.to_string(),
-        ])
-        .output()
-        .context("Failed to get pod logs")?;
-
-    let logs = String::from_utf8_lossy(&output.stdout).to_string();
-
-    if errors_only {
-        Ok(filter_error_logs(&logs))
-    } else {
-        Ok(logs)
-    }
-}
-
-// =============================================================================
-// OpenMemory Functions
-// =============================================================================
-
-/// Default `OpenMemory` URL - internal K8s service
-/// HTTP is standard for in-cluster traffic (no TLS between pods)
-/// Set `OPENMEMORY_URL` env var to override for external/TLS endpoints
-// codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required within cluster
-const DEFAULT_OPENMEMORY_URL: &str = "http://openmemory:3000";
-
-/// Get `OpenMemory` URL from environment or use default
-fn get_openmemory_url() -> String {
-    std::env::var("OPENMEMORY_URL").unwrap_or_else(|_| DEFAULT_OPENMEMORY_URL.to_string())
-}
-
-/// List recent memories from `OpenMemory`
-#[allow(dead_code)]
-async fn memory_list(
-    play_id: Option<&str>,
-    agent: Option<&str>,
-    limit: u32,
-) -> Result<MemoryListResponse> {
-    let openmemory_url = get_openmemory_url();
-
-    // Build filter JSON
-    let mut filter_json = serde_json::json!({
-        "limit": limit
-    });
-
-    if let Some(tid) = play_id {
-        filter_json["metadata"] = serde_json::json!({ "play_id": tid });
-    }
-
-    if let Some(ag) = agent {
-        if filter_json.get("metadata").is_some() {
-            filter_json["metadata"]["agent"] = serde_json::json!(ag);
-        } else {
-            filter_json["metadata"] = serde_json::json!({ "agent": ag });
-        }
-    }
-
-    let client = reqwest::Client::new();
-
-    // Validate URL
-    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
-
-    let response = client
-        .post(format!("{openmemory_url}/memory/list"))
-        .json(&filter_json)
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await;
-
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            let memories: Vec<MemoryEntry> = resp.json().await.unwrap_or_default();
-            let total = memories.len();
-            Ok(MemoryListResponse {
-                success: true,
-                memories,
-                total,
-                filter: Some(MemoryFilter {
-                    play_id: play_id.map(String::from),
-                    agent: agent.map(String::from),
-                    limit,
-                }),
-                timestamp: Utc::now(),
-                error: None,
-            })
-        }
-        Ok(resp) => {
-            let status = resp.status();
-            let error_text = resp.text().await.unwrap_or_default();
-            Ok(MemoryListResponse {
-                success: false,
-                memories: vec![],
-                total: 0,
-                filter: None,
-                timestamp: Utc::now(),
-                error: Some(format!("OpenMemory returned {status}: {error_text}")),
-            })
-        }
-        Err(e) => Ok(MemoryListResponse {
-            success: false,
-            memories: vec![],
-            total: 0,
-            filter: None,
-            timestamp: Utc::now(),
-            error: Some(format!("Failed to connect to OpenMemory: {e}")),
-        }),
-    }
-}
-
-/// Query memories semantically
-#[allow(dead_code)]
-async fn memory_query(
-    text: &str,
-    agent: Option<&str>,
-    limit: u32,
-    include_waypoints: bool,
-) -> Result<MemoryQueryResponse> {
-    let openmemory_url = get_openmemory_url();
-
-    let mut query_json = serde_json::json!({
-        "query": text,
-        "k": limit,
-        "include_waypoints": include_waypoints
-    });
-
-    if let Some(ag) = agent {
-        query_json["agent"] = serde_json::json!(ag);
-    }
-
-    let client = reqwest::Client::new();
-
-    // Validate URL
-    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
-
-    let response = client
-        .post(format!("{openmemory_url}/memory/query"))
-        .json(&query_json)
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await;
-
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            let results: Vec<MemoryEntry> = resp.json().await.unwrap_or_default();
-            let total = results.len();
-            Ok(MemoryQueryResponse {
-                success: true,
-                query: text.to_string(),
-                results,
-                total,
-                timestamp: Utc::now(),
-                error: None,
-            })
-        }
-        Ok(resp) => {
-            let status = resp.status();
-            let error_text = resp.text().await.unwrap_or_default();
-            Ok(MemoryQueryResponse {
-                success: false,
-                query: text.to_string(),
-                results: vec![],
-                total: 0,
-                timestamp: Utc::now(),
-                error: Some(format!("OpenMemory returned {status}: {error_text}")),
-            })
-        }
-        Err(e) => Ok(MemoryQueryResponse {
-            success: false,
-            query: text.to_string(),
-            results: vec![],
-            total: 0,
-            timestamp: Utc::now(),
-            error: Some(format!("Failed to connect to OpenMemory: {e}")),
-        }),
-    }
-}
-
-/// Get memory statistics and health
-#[allow(dead_code)]
-async fn memory_stats(agent: Option<&str>) -> Result<MemoryStatsResponse> {
-    let openmemory_url = get_openmemory_url();
-    let client = reqwest::Client::new();
-
-    // Validate URL
-    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
-
-    // Get health status
-    let health_response = client
-        .get(format!("{openmemory_url}/health"))
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await;
-
-    let health = match health_response {
-        Ok(resp) if resp.status().is_success() => {
-            let health_json: serde_json::Value = resp.json().await.unwrap_or_default();
-            MemoryHealth {
-                status: health_json["status"]
-                    .as_str()
-                    .unwrap_or("unknown")
-                    .to_string(),
-                uptime_seconds: health_json["uptime_seconds"].as_i64(),
-                database_size_bytes: health_json["database_size_bytes"].as_i64(),
-            }
-        }
-        _ => MemoryHealth {
-            status: "unreachable".to_string(),
-            uptime_seconds: None,
-            database_size_bytes: None,
-        },
-    };
-
-    // Get statistics
-    let mut stats_url = format!("{openmemory_url}/memory/stats");
-    if let Some(ag) = agent {
-        stats_url = format!("{stats_url}?agent={ag}");
-    }
-
-    let stats_response = client
-        .get(&stats_url)
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await;
-
-    let stats = match stats_response {
-        Ok(resp) if resp.status().is_success() => {
-            let stats_json: serde_json::Value = resp.json().await.unwrap_or_default();
-            MemoryStatistics {
-                total_memories: stats_json["total_memories"].as_i64().unwrap_or(0),
-                memories_by_agent: stats_json["by_agent"]
-                    .as_object()
-                    .map(|m| {
-                        m.iter()
-                            .map(|(k, v)| (k.clone(), v.as_i64().unwrap_or(0)))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-                memories_by_pattern: stats_json["by_pattern"]
-                    .as_object()
-                    .map(|m| {
-                        m.iter()
-                            .map(|(k, v)| (k.clone(), v.as_i64().unwrap_or(0)))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-                average_salience: stats_json["average_salience"].as_f64().unwrap_or(0.0),
-                recent_queries: stats_json["recent_queries"].as_i64().unwrap_or(0),
-                recent_additions: stats_json["recent_additions"].as_i64().unwrap_or(0),
-            }
-        }
-        _ => MemoryStatistics {
-            total_memories: 0,
-            memories_by_agent: std::collections::HashMap::new(),
-            memories_by_pattern: std::collections::HashMap::new(),
-            average_salience: 0.0,
-            recent_queries: 0,
-            recent_additions: 0,
-        },
-    };
-
-    Ok(MemoryStatsResponse {
-        success: health.status != "unreachable",
-        health,
-        stats,
-        timestamp: Utc::now(),
-        error: None,
-    })
-}
-
-/// Get a specific memory by ID
-#[allow(dead_code)]
-async fn memory_get(id: &str) -> Result<MemoryGetResponse> {
-    let openmemory_url = get_openmemory_url();
-    let client = reqwest::Client::new();
-
-    // Validate URL
-    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
-
-    let response = client
-        .get(format!("{openmemory_url}/memory/{id}"))
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await;
-
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            let memory: MemoryEntry = resp.json().await?;
-            Ok(MemoryGetResponse {
-                success: true,
-                memory: Some(memory),
-                timestamp: Utc::now(),
-                error: None,
-            })
-        }
-        Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => Ok(MemoryGetResponse {
-            success: false,
-            memory: None,
-            timestamp: Utc::now(),
-            error: Some(format!("Memory not found: {id}")),
-        }),
-        Ok(resp) => {
-            let status = resp.status();
-            let error_text = resp.text().await.unwrap_or_default();
-            Ok(MemoryGetResponse {
-                success: false,
-                memory: None,
-                timestamp: Utc::now(),
-                error: Some(format!("OpenMemory returned {status}: {error_text}")),
-            })
-        }
-        Err(e) => Ok(MemoryGetResponse {
-            success: false,
-            memory: None,
-            timestamp: Utc::now(),
-            error: Some(format!("Failed to connect to OpenMemory: {e}")),
-        }),
-    }
 }
 
 #[cfg(test)]
@@ -1972,38 +1614,90 @@ INFO: Continuing";
     }
 
     #[test]
-    fn test_determine_stage() {
-        let pods = vec![PodStatus {
-            name: "rex-task-42-abc123".to_string(),
+    fn test_determine_stage_from_steps() {
+        let steps = vec![WorkflowStep {
+            id: "abc123".to_string(),
+            name: "rex-implementation".to_string(),
+            step_type: "Pod".to_string(),
             phase: "Running".to_string(),
+            pod_name: Some("play-42-rex-abc".to_string()),
             exit_code: None,
-            reason: None,
-            restarts: 0,
-            container_status: Some("running".to_string()),
-            age: "5m".to_string(),
+            message: None,
+            started_at: Some("2024-01-01T00:00:00Z".to_string()),
+            finished_at: None,
         }];
 
-        assert_eq!(determine_stage(&pods), Some("implementation".to_string()));
+        assert_eq!(
+            determine_stage_from_steps(&steps),
+            Some("implementation".to_string())
+        );
 
-        let pods = vec![PodStatus {
-            name: "cleo-task-42-xyz789".to_string(),
-            phase: "Running".to_string(),
-            exit_code: None,
-            reason: None,
-            restarts: 0,
-            container_status: Some("running".to_string()),
-            age: "3m".to_string(),
+        let steps = vec![WorkflowStep {
+            id: "xyz789".to_string(),
+            name: "cleo-quality".to_string(),
+            step_type: "Pod".to_string(),
+            phase: "Failed".to_string(),
+            pod_name: Some("play-42-cleo-xyz".to_string()),
+            exit_code: Some(1),
+            message: Some("clippy failed".to_string()),
+            started_at: Some("2024-01-01T00:05:00Z".to_string()),
+            finished_at: Some("2024-01-01T00:06:00Z".to_string()),
         }];
 
-        assert_eq!(determine_stage(&pods), Some("code-quality".to_string()));
+        assert_eq!(
+            determine_stage_from_steps(&steps),
+            Some("code-quality".to_string())
+        );
     }
 
     #[test]
-    fn test_calculate_age() {
-        // Test with empty string
-        assert_eq!(calculate_age(""), "unknown");
+    fn test_calculate_duration() {
+        // Both times present
+        let duration =
+            calculate_duration(Some("2024-01-01T00:00:00Z"), Some("2024-01-01T00:05:00Z"));
+        assert_eq!(duration, Some(300)); // 5 minutes = 300 seconds
 
-        // Test with invalid format
-        assert_eq!(calculate_age("not-a-date"), "unknown");
+        // Missing start time
+        let duration = calculate_duration(None, Some("2024-01-01T00:05:00Z"));
+        assert_eq!(duration, None);
+
+        // Invalid format
+        let duration = calculate_duration(Some("invalid"), Some("2024-01-01T00:05:00Z"));
+        assert_eq!(duration, None);
+    }
+
+    #[test]
+    fn test_parse_workflow_nodes() {
+        let nodes_json = serde_json::json!({
+            "node-1": {
+                "displayName": "rex-impl",
+                "type": "Pod",
+                "phase": "Succeeded",
+                "id": "play-42-rex-abc",
+                "startedAt": "2024-01-01T00:00:00Z",
+                "finishedAt": "2024-01-01T00:05:00Z"
+            },
+            "node-2": {
+                "displayName": "cleo-quality",
+                "type": "Pod",
+                "phase": "Failed",
+                "id": "play-42-cleo-xyz",
+                "message": "exit code 1",
+                "startedAt": "2024-01-01T00:05:00Z",
+                "finishedAt": "2024-01-01T00:06:00Z"
+            },
+            "node-3": {
+                "displayName": "workflow-root",
+                "type": "Steps",
+                "phase": "Running"
+            }
+        });
+
+        let (steps, failed) = parse_workflow_nodes(&nodes_json);
+
+        // Should only include Pod types
+        assert_eq!(steps.len(), 2);
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0].name, "cleo-quality");
     }
 }

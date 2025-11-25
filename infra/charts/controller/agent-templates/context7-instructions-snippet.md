@@ -2,62 +2,100 @@
 
 You have access to **Context7** for real-time, up-to-date library documentation.
 
-## Available Tools
-
-1. **`context7_resolve_library_id`** - Resolves library names to Context7 IDs
-2. **`context7_get_library_docs`** - Fetches documentation using the library ID
-
-## Usage Workflow
+## Two-Step Workflow
 
 **Step 1: Resolve the library**
 ```
-resolve_library_id({ libraryName: "tokio" })
+resolve_library_id({ libraryName: "tokio rust" })
 ```
-Returns multiple options with scores. Choose based on:
-- Benchmark Score (higher is better)
-- Source Reputation (High is best)
-- Code Snippets count (more is better)
+Returns multiple options. Choose based on:
+- **Benchmark Score** (higher is better, max 100)
+- **Source Reputation** (High > Medium > Low)
+- **Code Snippets count** (more examples = better)
 
 **Step 2: Get documentation**
 ```
 get_library_docs({
   context7CompatibleLibraryID: "/websites/rs_tokio_tokio",
-  topic: "async runtime setup and basic usage"
+  topic: "async runtime error handling"
+})
+```
+
+## Pre-Resolved Rust Library IDs
+
+Use these directly without resolving:
+
+| Library | Context7 ID | Score | Use Case |
+|---------|-------------|-------|----------|
+| **Tokio** | `/websites/rs_tokio_tokio` | 93.8 | Async runtime, I/O, networking |
+| **Anyhow** | `/dtolnay/anyhow` | 89.3 | Application error handling |
+| **Serde** | `/websites/serde_rs` | 80.2 | Serialization/deserialization |
+| **Thiserror** | `/dtolnay/thiserror` | 83.1 | Custom error types for libraries |
+| **Clippy** | `/rust-lang/rust-clippy` | - | Linting, pedantic best practices |
+| **Tracing** | `/tokio-rs/tracing` | 69.6 | Structured logging |
+
+## Pre-Resolved Frontend Library IDs
+
+| Library | Context7 ID | Use Case |
+|---------|-------------|----------|
+| **React** | `/facebook/react` | UI components |
+| **Next.js** | `/vercel/next.js` | Full-stack framework |
+| **shadcn/ui** | Use `shadcn_*` MCP tools | Component library |
+
+## When to Query Context7
+
+**Always use Context7 before:**
+- Implementing async code with Tokio
+- Setting up error handling (anyhow context patterns, thiserror enums)
+- Using serde attributes or custom serialization
+- Configuring Clippy pedantic lints
+- Writing HTTP handlers (Axum) or database queries (SQLx)
+- Implementing React hooks or Next.js features
+
+## Example Queries
+
+**Error handling patterns:**
+```
+get_library_docs({
+  context7CompatibleLibraryID: "/dtolnay/anyhow",
+  topic: "context error handling chain"
+})
+```
+
+**Async patterns:**
+```
+get_library_docs({
+  context7CompatibleLibraryID: "/websites/rs_tokio_tokio",
+  topic: "spawn task cancellation graceful shutdown"
+})
+```
+
+**Clippy configuration:**
+```
+get_library_docs({
+  context7CompatibleLibraryID: "/rust-lang/rust-clippy",
+  topic: "pedantic lints configuration"
+})
+```
+
+**React hooks:**
+```
+get_library_docs({
+  context7CompatibleLibraryID: "/facebook/react",
+  topic: "useEffect cleanup async"
 })
 ```
 
 ## Best Practices
 
 ✅ **DO:**
-- Always resolve the library name first
-- Choose libraries with high scores and reputation
-- Be specific in your topic queries
-- Use Context7 before implementing unfamiliar features
+- Use pre-resolved IDs from the table above for common libraries
+- Query specific topics: "error handling context" not "documentation"
+- Query Context7 BEFORE implementing unfamiliar patterns
+- One focused topic per query for best results
 
 ❌ **DON'T:**
-- Skip the resolve step
-- Use vague topics
-- Query for general programming concepts
-
-## Language-Specific Examples
-
-**Rust:**
-```
-resolve_library_id({ libraryName: "tokio" })
-get_library_docs({
-  context7CompatibleLibraryID: "/websites/rs_tokio_tokio",
-  topic: "async runtime patterns"
-})
-```
-
-**TypeScript:**
-```
-resolve_library_id({ libraryName: "react" })
-get_library_docs({
-  context7CompatibleLibraryID: "/facebook/react",
-  topic: "hooks with TypeScript"
-})
-```
-
-Remember: Context7 provides **current** documentation. Use it whenever you need up-to-date library information!
-
+- Skip Context7 for library-specific code
+- Use vague topics like "how to use" or "documentation"
+- Query for basic programming concepts (use your knowledge)
+- Combine multiple unrelated questions in one topic

@@ -174,7 +174,7 @@ spec:
         # Pod annotations for monitoring
         podAnnotations:
           prometheus.io/scrape: "true"
-          prometheus.io/port: "8890"
+          prometheus.io/port: "8889"
           prometheus.io/path: "/metrics"
 
         # Liveness and readiness probes

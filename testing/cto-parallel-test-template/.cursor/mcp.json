@@ -1,13 +1,8 @@
 {
   "mcpServers": {
     "cto": {
-      "command": "node",
-      "args": [
-        "../cto/dist/cto-mcp/index.js"
-      ],
-      "env": {
-        "CTO_CONFIG_PATH": "./cto-config.json"
-      }
+      "command": "/opt/homebrew/bin/cto-mcp",
+      "args": []
     }
   }
 }
