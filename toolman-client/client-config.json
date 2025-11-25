@@ -2,19 +2,15 @@
   "localServers": {},
   "remoteTools": [
     "brave_search_brave_web_search",
-    "context7_resolve-library-id",
-    "context7_get-library-docs",
+    "context7_resolve_library_id",
+    "context7_get_library_docs",
     "shadcn_list_components",
     "shadcn_get_component",
-    "memory_create_entities",
-    "memory_add_observations",
-    "memory_read_graph",
-    "filesystem_read_text_file",
-    "filesystem_list_directory",
-    "filesystem_edit_file",
-    "filesystem_search_files",
+    "openmemory_openmemory_query",
+    "openmemory_openmemory_store",
+    "openmemory_openmemory_list",
+    "openmemory_openmemory_get",
+    "openmemory_openmemory_reinforce",
     "kubernetes_listResources"
   ]
 }
-
-

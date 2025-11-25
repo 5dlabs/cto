@@ -143,16 +143,10 @@ spec:
               workingDirectory: "/tmp"
 
         # Local tools configuration for client-side operations
+        # NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
+        # which breaks MCP protocol validation in Cursor and other clients
         localTools:
           servers:
-            filesystem:
-              name: "Filesystem"
-              description: "File system operations for reading, writing, and managing files"
-              transport: "stdio"
-              command: "npx"
-              args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-              workingDirectory: "/tmp"
-
             rust-tools:
               name: "Rust Development Tools"
               description: "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development"
