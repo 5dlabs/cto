@@ -1004,10 +1004,13 @@ async fn run_loop(
                 })?;
                 return Ok(());
             }
-        } else {
-            // No new failures - reset counter
+        } else if current_failed_count == 0 {
+            // Only reset counter when workflow is healthy (no failed steps at all)
+            // This ensures crash-looping pods accumulate failures even when
+            // they're restarting between polls
             consecutive_failures = 0;
         }
+        // else: keep counter at current value - failures exist but no new ones
         last_failed_count = current_failed_count;
 
         // Wait before next check
