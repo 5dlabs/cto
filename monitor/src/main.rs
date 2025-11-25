@@ -44,17 +44,17 @@ enum OutputFormat {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Get status of pods for a task
+    /// Get status of pods for a play
     Status {
-        /// Task ID to monitor
+        /// Play ID to monitor
         #[arg(long)]
-        task_id: String,
+        play_id: String,
     },
-    /// Get logs for a task or specific pod
+    /// Get logs for a play or specific pod
     Logs {
-        /// Task ID to get logs for
+        /// Play ID to get logs for
         #[arg(long, group = "target")]
-        task_id: Option<String>,
+        play_id: Option<String>,
 
         /// Specific pod name to get logs for
         #[arg(long, group = "target")]
@@ -70,9 +70,9 @@ enum Commands {
     },
     /// Watch play workflow status continuously
     Watch {
-        /// Task ID to watch
+        /// Play ID to watch
         #[arg(long)]
-        task_id: String,
+        play_id: String,
 
         /// Poll interval in seconds
         #[arg(long, default_value = "30")]
@@ -102,9 +102,9 @@ enum Commands {
     },
     /// Run/submit a play workflow via Argo CLI
     Run {
-        /// Task ID to run
+        /// Play ID to run
         #[arg(long)]
-        task_id: String,
+        play_id: String,
 
         /// Repository to work on
         #[arg(long, default_value = "5dlabs/cto-parallel-test")]
@@ -120,9 +120,9 @@ enum Commands {
     },
     /// Start the full monitoring loop - watches workflow and emits events
     Loop {
-        /// Task ID to monitor
+        /// Play ID to monitor
         #[arg(long)]
-        task_id: String,
+        play_id: String,
 
         /// Poll interval in seconds
         #[arg(long, default_value = "30")]
@@ -160,7 +160,7 @@ struct PodStatus {
 /// Overall play status response
 #[derive(Debug, Serialize, Deserialize)]
 struct PlayStatusResponse {
-    task_id: String,
+    play_id: String,
     namespace: String,
     status: String,
     stage: Option<String>,
@@ -174,7 +174,7 @@ struct PlayStatusResponse {
 /// Logs response
 #[derive(Debug, Serialize, Deserialize)]
 struct LogsResponse {
-    task_id: Option<String>,
+    play_id: Option<String>,
     pod: Option<String>,
     namespace: String,
     logs: String,
@@ -219,7 +219,7 @@ struct GithubResetResult {
 struct RunResponse {
     success: bool,
     workflow_name: Option<String>,
-    task_id: String,
+    play_id: String,
     repository: String,
     timestamp: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -237,14 +237,14 @@ enum LoopEvent {
     /// Loop has started monitoring
     #[serde(rename = "started")]
     Started {
-        task_id: String,
+        play_id: String,
         interval_seconds: u64,
         timestamp: DateTime<Utc>,
     },
     /// Status check completed
     #[serde(rename = "status")]
     Status {
-        task_id: String,
+        play_id: String,
         workflow_status: String,
         stage: Option<String>,
         pods: Vec<PodStatus>,
@@ -253,7 +253,7 @@ enum LoopEvent {
     /// Failure detected - includes logs and memory suggestions
     #[serde(rename = "failure")]
     Failure {
-        task_id: String,
+        play_id: String,
         stage: Option<String>,
         failed_pods: Vec<PodStatus>,
         logs: Option<String>,
@@ -264,7 +264,7 @@ enum LoopEvent {
     /// Stage completed successfully
     #[serde(rename = "stage_complete")]
     StageComplete {
-        task_id: String,
+        play_id: String,
         stage: String,
         next_stage: Option<String>,
         timestamp: DateTime<Utc>,
@@ -272,14 +272,14 @@ enum LoopEvent {
     /// All stages completed - workflow done
     #[serde(rename = "completed")]
     Completed {
-        task_id: String,
+        play_id: String,
         duration_seconds: i64,
         timestamp: DateTime<Utc>,
     },
     /// Loop stopped (max failures or manual stop)
     #[serde(rename = "stopped")]
     Stopped {
-        task_id: String,
+        play_id: String,
         reason: String,
         timestamp: DateTime<Utc>,
     },
@@ -326,7 +326,7 @@ struct MemoryMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     agent: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    task_id: Option<String>,
+    play_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     service: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -353,7 +353,7 @@ struct MemoryListResponse {
 #[derive(Debug, Serialize, Deserialize)]
 struct MemoryFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
-    task_id: Option<String>,
+    play_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     agent: Option<String>,
     limit: u32,
@@ -421,21 +421,21 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Commands::Status { task_id } => {
-            let result = get_status(&task_id, &cli.namespace)?;
+        Commands::Status { play_id } => {
+            let result = get_status(&play_id, &cli.namespace)?;
             output_result(&result, cli.format)?;
         }
         Commands::Logs {
-            task_id,
+            play_id,
             pod,
             tail,
             errors_only,
         } => {
-            let result = get_logs(task_id, pod, &cli.namespace, tail, errors_only).await?;
+            let result = get_logs(play_id, pod, &cli.namespace, tail, errors_only).await?;
             output_result(&result, cli.format)?;
         }
-        Commands::Watch { task_id, interval } => {
-            watch_status(&task_id, &cli.namespace, interval).await?;
+        Commands::Watch { play_id, interval } => {
+            watch_status(&play_id, &cli.namespace, interval).await?;
         }
         Commands::Reset {
             repo,
@@ -449,16 +449,16 @@ async fn main() -> Result<()> {
             output_result(&result, cli.format)?;
         }
         Commands::Run {
-            task_id,
+            play_id,
             repository,
             agent,
             template,
         } => {
-            let result = run_workflow(&task_id, &repository, &agent, &template)?;
+            let result = run_workflow(&play_id, &repository, &agent, &template)?;
             output_result(&result, cli.format)?;
         }
         Commands::Loop {
-            task_id,
+            play_id,
             interval,
             query_memory,
             fetch_logs,
@@ -466,7 +466,7 @@ async fn main() -> Result<()> {
         } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_monitoring_loop(
-                &task_id,
+                &play_id,
                 &cli.namespace,
                 interval,
                 query_memory,
@@ -479,11 +479,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Get status of pods for a task
-fn get_status(task_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
+/// Get status of pods for a play
+fn get_status(play_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
     debug!(
-        "Getting status for task {} in namespace {}",
-        task_id, namespace
+        "Getting status for play {} in namespace {}",
+        play_id, namespace
     );
 
     // Query kubectl for pods matching the task ID
@@ -494,7 +494,7 @@ fn get_status(task_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
             "-n",
             namespace,
             "-l",
-            &format!("task-id={task_id}"),
+            &format!("task-id={play_id}"),
             "-o",
             "json",
         ])
@@ -510,7 +510,7 @@ fn get_status(task_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
 
         if !output.status.success() {
             return Ok(PlayStatusResponse {
-                task_id: task_id.to_string(),
+                play_id: play_id.to_string(),
                 namespace: namespace.to_string(),
                 status: "error".to_string(),
                 stage: None,
@@ -522,14 +522,14 @@ fn get_status(task_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
         }
 
         // Filter pods by name pattern containing task ID
-        return parse_pods_by_pattern(&output.stdout, task_id, namespace);
+        return parse_pods_by_pattern(&output.stdout, play_id, namespace);
     }
 
-    parse_pods(&output.stdout, task_id, namespace)
+    parse_pods(&output.stdout, play_id, namespace)
 }
 
 /// Parse kubectl JSON output for pods
-fn parse_pods(json_bytes: &[u8], task_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
+fn parse_pods(json_bytes: &[u8], play_id: &str, namespace: &str) -> Result<PlayStatusResponse> {
     let pod_list: serde_json::Value =
         serde_json::from_slice(json_bytes).context("Failed to parse kubectl JSON output")?;
 
@@ -592,7 +592,7 @@ fn parse_pods(json_bytes: &[u8], task_id: &str, namespace: &str) -> Result<PlayS
     }
 
     Ok(PlayStatusResponse {
-        task_id: task_id.to_string(),
+        play_id: play_id.to_string(),
         namespace: namespace.to_string(),
         status: overall_status.to_string(),
         stage,
@@ -606,7 +606,7 @@ fn parse_pods(json_bytes: &[u8], task_id: &str, namespace: &str) -> Result<PlayS
 /// Parse pods filtered by name pattern
 fn parse_pods_by_pattern(
     json_bytes: &[u8],
-    task_id: &str,
+    play_id: &str,
     namespace: &str,
 ) -> Result<PlayStatusResponse> {
     let pod_list: serde_json::Value =
@@ -616,7 +616,7 @@ fn parse_pods_by_pattern(
     let items = pod_list["items"].as_array().unwrap_or(&empty_vec);
 
     // Filter pods that contain task ID in their name
-    let task_pattern = format!("task-{task_id}");
+    let task_pattern = format!("task-{play_id}");
     let filtered: Vec<&serde_json::Value> = items
         .iter()
         .filter(|item| {
@@ -678,7 +678,7 @@ fn parse_pods_by_pattern(
     }
 
     Ok(PlayStatusResponse {
-        task_id: task_id.to_string(),
+        play_id: play_id.to_string(),
         namespace: namespace.to_string(),
         status: overall_status.to_string(),
         stage,
@@ -776,9 +776,9 @@ fn calculate_age(timestamp: &str) -> String {
     }
 }
 
-/// Get logs for a task or specific pod
+/// Get logs for a play or specific pod
 async fn get_logs(
-    task_id: Option<String>,
+    play_id: Option<String>,
     pod: Option<String>,
     namespace: &str,
     tail: u32,
@@ -787,18 +787,18 @@ async fn get_logs(
     let logs = if let Some(pod_name) = &pod {
         // Get logs for specific pod
         get_pod_logs(pod_name, namespace, tail)?
-    } else if let Some(task) = &task_id {
+    } else if let Some(task) = &play_id {
         // Get logs for all pods matching task ID
         get_task_logs(task, namespace, tail).await?
     } else {
         return Ok(LogsResponse {
-            task_id: None,
+            play_id: None,
             pod: None,
             namespace: namespace.to_string(),
             logs: String::new(),
             line_count: 0,
             timestamp: Utc::now(),
-            error: Some("Must specify either --task-id or --pod".to_string()),
+            error: Some("Must specify either --play-id or --pod".to_string()),
         });
     };
 
@@ -812,7 +812,7 @@ async fn get_logs(
     let line_count = filtered_logs.lines().count();
 
     Ok(LogsResponse {
-        task_id,
+        play_id,
         pod,
         namespace: namespace.to_string(),
         logs: filtered_logs,
@@ -859,10 +859,10 @@ fn get_pod_logs(pod_name: &str, namespace: &str, tail: u32) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-/// Get logs for all pods matching a task ID
-async fn get_task_logs(task_id: &str, namespace: &str, tail: u32) -> Result<String> {
+/// Get logs for all pods matching a play ID
+async fn get_task_logs(play_id: &str, namespace: &str, tail: u32) -> Result<String> {
     // First get pod names
-    let status = get_status(task_id, namespace)?;
+    let status = get_status(play_id, namespace)?;
 
     let mut all_logs = String::new();
 
@@ -875,7 +875,7 @@ async fn get_task_logs(task_id: &str, namespace: &str, tail: u32) -> Result<Stri
     }
 
     // Also try to get logs from Victoria Logs if available
-    if let Ok(victoria_logs) = get_victoria_logs(task_id, namespace, tail).await {
+    if let Ok(victoria_logs) = get_victoria_logs(play_id, namespace, tail).await {
         if !victoria_logs.is_empty() {
             all_logs.push_str("\n=== Victoria Logs ===\n");
             all_logs.push_str(&victoria_logs);
@@ -886,14 +886,14 @@ async fn get_task_logs(task_id: &str, namespace: &str, tail: u32) -> Result<Stri
 }
 
 /// Query Victoria Logs API for historical logs
-async fn get_victoria_logs(task_id: &str, namespace: &str, limit: u32) -> Result<String> {
+async fn get_victoria_logs(play_id: &str, namespace: &str, limit: u32) -> Result<String> {
     let victoria_logs_url = std::env::var("VICTORIA_LOGS_URL").unwrap_or_else(|_| {
         "http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428"
             .to_string()
     });
 
     let query = format!(
-        r#"{{kubernetes_namespace="{namespace}", kubernetes_pod_name=~".*task-{task_id}.*"}}"#
+        r#"{{kubernetes_namespace="{namespace}", kubernetes_pod_name=~".*task-{play_id}.*"}}"#
     );
 
     let client = reqwest::Client::new();
@@ -946,18 +946,18 @@ fn filter_error_logs(logs: &str) -> String {
 }
 
 /// Watch status continuously
-async fn watch_status(task_id: &str, namespace: &str, interval: u64) -> Result<()> {
-    let header = format!("Watching task {task_id} (interval: {interval}s)");
+async fn watch_status(play_id: &str, namespace: &str, interval: u64) -> Result<()> {
+    let header = format!("Watching play {play_id} (interval: {interval}s)");
     println!("{}", header.cyan());
     println!("{}", "Press Ctrl+C to stop".dimmed());
 
     loop {
-        let status = get_status(task_id, namespace)?;
+        let status = get_status(play_id, namespace)?;
 
         // Clear screen and print status
         print!("\x1B[2J\x1B[1;1H");
         let status_line = format!(
-            "Task: {task_id} | Status: {} | Stage: {}",
+            "Task: {play_id} | Status: {} | Stage: {}",
             colorize_status(&status.status),
             status.stage.as_deref().unwrap_or("unknown")
         );
@@ -1292,14 +1292,14 @@ fn count_deleted(output: &[u8]) -> i32 {
 
 /// Run/submit a play workflow via Argo CLI
 fn run_workflow(
-    task_id: &str,
+    play_id: &str,
     repository: &str,
     agent: &str,
     template: &str,
 ) -> Result<RunResponse> {
     println!(
         "{}",
-        format!("Submitting play workflow for task {task_id}...").cyan()
+        format!("Submitting play workflow {play_id}...").cyan()
     );
 
     // Submit workflow using argo CLI
@@ -1311,7 +1311,7 @@ fn run_workflow(
             "-n",
             "argo",
             "-p",
-            &format!("task-id={task_id}"),
+            &format!("task-id={play_id}"),
             "-p",
             &format!("repository={repository}"),
             "-p",
@@ -1331,7 +1331,7 @@ fn run_workflow(
         return Ok(RunResponse {
             success: false,
             workflow_name: None,
-            task_id: task_id.to_string(),
+            play_id: play_id.to_string(),
             repository: repository.to_string(),
             timestamp: Utc::now(),
             error: Some(stderr.to_string()),
@@ -1358,7 +1358,7 @@ fn run_workflow(
     Ok(RunResponse {
         success: true,
         workflow_name,
-        task_id: task_id.to_string(),
+        play_id: play_id.to_string(),
         repository: repository.to_string(),
         timestamp: Utc::now(),
         error: None,
@@ -1372,7 +1372,7 @@ fn run_workflow(
 /// Run the full monitoring loop - continuously watch workflow and emit events
 #[allow(clippy::too_many_lines)]
 async fn run_monitoring_loop(
-    task_id: &str,
+    play_id: &str,
     namespace: &str,
     interval_seconds: u64,
     query_memory: bool,
@@ -1389,7 +1389,7 @@ async fn run_monitoring_loop(
 
     // Emit started event
     let started_event = LoopEvent::Started {
-        task_id: task_id.to_string(),
+        play_id: play_id.to_string(),
         interval_seconds,
         timestamp: Utc::now(),
     };
@@ -1398,7 +1398,7 @@ async fn run_monitoring_loop(
 
     loop {
         // Get current status
-        let status_result = get_status(task_id, namespace);
+        let status_result = get_status(play_id, namespace);
 
         match status_result {
             Ok(status) => {
@@ -1410,7 +1410,7 @@ async fn run_monitoring_loop(
                     if let Some(ref prev_stage) = last_stage {
                         // Previous stage completed
                         let stage_complete = LoopEvent::StageComplete {
-                            task_id: task_id.to_string(),
+                            play_id: play_id.to_string(),
                             stage: prev_stage.clone(),
                             next_stage: current_stage.clone(),
                             timestamp: Utc::now(),
@@ -1426,7 +1426,7 @@ async fn run_monitoring_loop(
                     "completed" => {
                         let duration = Utc::now().signed_duration_since(start_time).num_seconds();
                         let completed = LoopEvent::Completed {
-                            task_id: task_id.to_string(),
+                            play_id: play_id.to_string(),
                             duration_seconds: duration,
                             timestamp: Utc::now(),
                         };
@@ -1461,7 +1461,7 @@ async fn run_monitoring_loop(
                             .collect();
 
                         let failure_event = LoopEvent::Failure {
-                            task_id: task_id.to_string(),
+                            play_id: play_id.to_string(),
                             stage: current_stage.clone(),
                             failed_pods,
                             logs,
@@ -1475,7 +1475,7 @@ async fn run_monitoring_loop(
                         // Check if we should stop
                         if max_failures > 0 && consecutive_failures >= max_failures {
                             let stopped = LoopEvent::Stopped {
-                                task_id: task_id.to_string(),
+                                play_id: play_id.to_string(),
                                 reason: format!(
                                     "Max consecutive failures reached ({max_failures})"
                                 ),
@@ -1494,7 +1494,7 @@ async fn run_monitoring_loop(
 
                         // Emit status event periodically
                         let status_event = LoopEvent::Status {
-                            task_id: task_id.to_string(),
+                            play_id: play_id.to_string(),
                             workflow_status: current_status.clone(),
                             stage: current_stage.clone(),
                             pods: status.pods.clone(),
@@ -1506,7 +1506,7 @@ async fn run_monitoring_loop(
                     _ => {
                         // Unknown status - emit as status event
                         let status_event = LoopEvent::Status {
-                            task_id: task_id.to_string(),
+                            play_id: play_id.to_string(),
                             workflow_status: current_status.clone(),
                             stage: current_stage,
                             pods: status.pods.clone(),
@@ -1522,7 +1522,7 @@ async fn run_monitoring_loop(
             Err(e) => {
                 // Error getting status - emit as failure
                 let failure_event = LoopEvent::Failure {
-                    task_id: task_id.to_string(),
+                    play_id: play_id.to_string(),
                     stage: last_stage.clone(),
                     failed_pods: vec![],
                     logs: Some(format!("Error getting status: {e}")),
@@ -1647,7 +1647,7 @@ fn get_openmemory_url() -> String {
 /// List recent memories from `OpenMemory`
 #[allow(dead_code)]
 async fn memory_list(
-    task_id: Option<&str>,
+    play_id: Option<&str>,
     agent: Option<&str>,
     limit: u32,
 ) -> Result<MemoryListResponse> {
@@ -1658,8 +1658,8 @@ async fn memory_list(
         "limit": limit
     });
 
-    if let Some(tid) = task_id {
-        filter_json["metadata"] = serde_json::json!({ "task_id": tid });
+    if let Some(tid) = play_id {
+        filter_json["metadata"] = serde_json::json!({ "play_id": tid });
     }
 
     if let Some(ag) = agent {
@@ -1691,7 +1691,7 @@ async fn memory_list(
                 memories,
                 total,
                 filter: Some(MemoryFilter {
-                    task_id: task_id.map(String::from),
+                    play_id: play_id.map(String::from),
                     agent: agent.map(String::from),
                     limit,
                 }),

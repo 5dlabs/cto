@@ -39,7 +39,7 @@ cargo build -p play-monitor --release
 The simplest way to run the feedback loop is with a single command:
 
 ```bash
-play-monitor loop --task-id 42
+play-monitor loop --play-id 42
 ```
 
 This starts a continuous monitoring loop that:
@@ -54,17 +54,17 @@ This starts a continuous monitoring loop that:
 The loop emits JSON events to stdout:
 
 ```json
-{"event_type":"started","task_id":"42","interval_seconds":30,"timestamp":"..."}
-{"event_type":"status","task_id":"42","workflow_status":"running","stage":"implementation","pods":[...],"timestamp":"..."}
-{"event_type":"failure","task_id":"42","stage":"code-quality","failed_pods":[...],"logs":"...","memory_suggestions":[...],"timestamp":"..."}
-{"event_type":"stage_complete","task_id":"42","stage":"implementation","next_stage":"code-quality","timestamp":"..."}
-{"event_type":"completed","task_id":"42","duration_seconds":1234,"timestamp":"..."}
+{"event_type":"started","play_id":"42","interval_seconds":30,"timestamp":"..."}
+{"event_type":"status","play_id":"42","workflow_status":"running","stage":"implementation","pods":[...],"timestamp":"..."}
+{"event_type":"failure","play_id":"42","stage":"code-quality","failed_pods":[...],"logs":"...","memory_suggestions":[...],"timestamp":"..."}
+{"event_type":"stage_complete","play_id":"42","stage":"implementation","next_stage":"code-quality","timestamp":"..."}
+{"event_type":"completed","play_id":"42","duration_seconds":1234,"timestamp":"..."}
 ```
 
 ### Loop Options
 
 ```bash
-play-monitor loop --task-id 42 \
+play-monitor loop --play-id 42 \
   --interval 30 \           # Poll every 30 seconds (default)
   --query-memory true \     # Query OpenMemory on failure (default)
   --fetch-logs true \       # Fetch logs on failure (default)
@@ -78,7 +78,7 @@ play-monitor loop --task-id 42 \
 Run the status command to check current workflow state:
 
 ```bash
-play-monitor status --task-id <TASK_ID>
+play-monitor status --play-id <TASK_ID>
 ```
 
 This returns JSON with:
@@ -119,10 +119,10 @@ When a failure is detected:
 
 ```bash
 # Get logs for the task
-play-monitor logs --task-id <TASK_ID>
+play-monitor logs --play-id <TASK_ID>
 
 # Or get logs with error filtering
-play-monitor logs --task-id <TASK_ID> --errors-only
+play-monitor logs --play-id <TASK_ID> --errors-only
 
 # For a specific pod
 play-monitor logs --pod <POD_NAME>
@@ -176,7 +176,7 @@ If a failure cannot be fixed in code (e.g., cluster state issues):
 play-monitor reset --repo cto-parallel-test --org 5dlabs
 
 # Re-run the play workflow
-play-monitor run --task-id <TASK_ID> --repository 5dlabs/cto-parallel-test
+play-monitor run --play-id <TASK_ID> --repository 5dlabs/cto-parallel-test
 ```
 
 The reset command:
@@ -241,7 +241,7 @@ Once all stages complete for a task:
 For continuous monitoring with visual updates:
 
 ```bash
-play-monitor watch --task-id <TASK_ID> --interval 30
+play-monitor watch --play-id <TASK_ID> --interval 30
 ```
 
 This provides a real-time terminal display of pod status.
@@ -250,9 +250,9 @@ This provides a real-time terminal display of pod status.
 
 ```bash
 # Start monitoring task 42
-$ play-monitor status --task-id 42
+$ play-monitor status --play-id 42
 {
-  "task_id": "42",
+  "play_id": "42",
   "status": "running",
   "stage": "implementation",
   "pods": [
@@ -263,9 +263,9 @@ $ play-monitor status --task-id 42
 
 # ... wait and check again ...
 
-$ play-monitor status --task-id 42
+$ play-monitor status --play-id 42
 {
-  "task_id": "42",
+  "play_id": "42",
   "status": "failed",
   "stage": "code-quality",
   "pods": [
@@ -275,7 +275,7 @@ $ play-monitor status --task-id 42
 }
 
 # Get logs to understand the failure
-$ play-monitor logs --task-id 42 --errors-only
+$ play-monitor logs --play-id 42 --errors-only
 error: clippy::uninlined_format_args
   --> src/main.rs:42:5
 ...
@@ -292,7 +292,7 @@ Query agent memories to understand what patterns and solutions have been stored:
 
 ```bash
 # List memories for a specific task
-play-monitor memory list --task-id 42 --limit 20
+play-monitor memory list --play-id 42 --limit 20
 
 # List memories by agent
 play-monitor memory list --agent rex --limit 10
@@ -330,7 +330,7 @@ play-monitor memory stats --agent cleo
       "content": "Pattern: npm-clean-install\nSolution: rm node_modules",
       "metadata": {
         "agent": "rex",
-        "task_id": "task-38",
+        "play_id": "task-38",
         "pattern_type": "implementation",
         "success": true
       },
@@ -391,9 +391,9 @@ Default Victoria Logs URL:
 
 ## Summary
 
-1. **Monitor** with `play-monitor status --task-id X`
+1. **Monitor** with `play-monitor status --play-id X`
 2. **Detect** failures from status and failed_pods
-3. **Analyze** with `play-monitor logs --task-id X`
+3. **Analyze** with `play-monitor logs --play-id X`
 4. **Fix** the root cause in code
 5. **Merge** changes via PR
 6. **Repeat** until all tasks complete
