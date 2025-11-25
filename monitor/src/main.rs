@@ -81,10 +81,6 @@ enum Commands {
         #[arg(long, default_value = "true")]
         fetch_logs: bool,
 
-        /// Query `OpenMemory` for solutions on failure
-        #[arg(long, default_value = "true")]
-        query_memory: bool,
-
         /// Max consecutive failures before stopping (0 = unlimited)
         #[arg(long, default_value = "5")]
         max_failures: u32,
@@ -383,7 +379,6 @@ enum LoopEvent {
         stage: Option<String>,
         failed_step: Option<WorkflowStep>,
         logs: Option<String>,
-        memory_suggestions: Vec<MemorySuggestion>,
         consecutive_failures: u32,
         timestamp: DateTime<Utc>,
     },
@@ -401,14 +396,6 @@ enum LoopEvent {
     },
 }
 
-/// Memory suggestion from `OpenMemory` query
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MemorySuggestion {
-    content: String,
-    relevance_score: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    source: Option<String>,
-}
 
 // =============================================================================
 // Response Types for non-loop commands
@@ -495,7 +482,6 @@ async fn main() -> Result<()> {
             play_id,
             interval,
             fetch_logs,
-            query_memory,
             max_failures,
             log_tail,
         } => {
@@ -504,7 +490,6 @@ async fn main() -> Result<()> {
                 &cli.namespace,
                 interval,
                 fetch_logs,
-                query_memory,
                 max_failures,
                 log_tail,
             )
@@ -809,10 +794,9 @@ async fn run_full_loop(
         &workflow_name,
         namespace,
         interval,
-        true,  // fetch_logs
-        true,  // query_memory
+        true, // fetch_logs
         max_failures,
-        500,   // log_tail
+        500, // log_tail
     )
     .await
 }
@@ -824,7 +808,6 @@ async fn run_loop(
     namespace: &str,
     interval: u64,
     fetch_logs: bool,
-    query_memory: bool,
     max_failures: u32,
     log_tail: u32,
 ) -> Result<()> {
@@ -850,7 +833,6 @@ async fn run_loop(
                     stage: last_stage.clone(),
                     failed_step: None,
                     logs: Some(format!("Error getting workflow status: {e}")),
-                    memory_suggestions: vec![],
                     consecutive_failures,
                     timestamp: Utc::now(),
                 })?;
@@ -877,7 +859,6 @@ async fn run_loop(
                 stage: last_stage.clone(),
                 failed_step: None,
                 logs: Some(format!("Workflow error: {err}")),
-                memory_suggestions: vec![],
                 consecutive_failures,
                 timestamp: Utc::now(),
             })?;
@@ -953,19 +934,11 @@ async fn run_loop(
                 None
             };
 
-            // Query memory if enabled
-            let memory_suggestions = if query_memory {
-                query_openmemory_for_error(logs.as_deref(), failed_step.as_ref()).await
-            } else {
-                vec![]
-            };
-
             emit_event(&LoopEvent::Failure {
                 play_id: play_id.to_string(),
                 stage: status.stage.clone(),
                 failed_step,
                 logs,
-                memory_suggestions,
                 consecutive_failures,
                 timestamp: Utc::now(),
             })?;
@@ -1151,100 +1124,10 @@ fn filter_error_logs(logs: &str) -> String {
 }
 
 // =============================================================================
-// OpenMemory Integration
+// OpenMemory Verification Commands
 // =============================================================================
 
-/// Query `OpenMemory` for solutions to an error
-async fn query_openmemory_for_error(
-    logs: Option<&str>,
-    failed_step: Option<&WorkflowStep>,
-) -> Vec<MemorySuggestion> {
-    // Extract error message for query
-    let query = build_memory_query(logs, failed_step);
-    if query.is_empty() {
-        return vec![];
-    }
-
-    // Get OpenMemory URL from env
-    let openmemory_url = std::env::var("OPENMEMORY_URL")
-        .unwrap_or_else(|_| "http://openmemory.openmemory.svc.cluster.local:8080".to_string());
-
-    debug!("Querying OpenMemory: {}", query);
-
-    let client = reqwest::Client::new();
-    let response = client
-        .post(format!("{openmemory_url}/api/v1/search"))
-        .json(&serde_json::json!({
-            "query": query,
-            "limit": 5
-        }))
-        .send()
-        .await;
-
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                parse_memory_response(&json)
-            } else {
-                vec![]
-            }
-        }
-        Ok(resp) => {
-            debug!("OpenMemory returned status: {}", resp.status());
-            vec![]
-        }
-        Err(e) => {
-            debug!("Failed to query OpenMemory: {}", e);
-            vec![]
-        }
-    }
-}
-
-/// Build a query from logs and failed step info
-fn build_memory_query(logs: Option<&str>, failed_step: Option<&WorkflowStep>) -> String {
-    let mut query_parts = Vec::new();
-
-    // Add step name/stage context
-    if let Some(step) = failed_step {
-        query_parts.push(format!("workflow step {} failed", step.name));
-        if let Some(ref msg) = step.message {
-            query_parts.push(msg.clone());
-        }
-    }
-
-    // Extract key error from logs
-    if let Some(log_text) = logs {
-        let errors = filter_error_logs(log_text);
-        // Take first few error lines
-        let key_errors: Vec<&str> = errors.lines().take(3).collect();
-        if !key_errors.is_empty() {
-            query_parts.push(key_errors.join(" "));
-        }
-    }
-
-    query_parts.join(" ").chars().take(500).collect()
-}
-
-/// Parse `OpenMemory` response into suggestions
-fn parse_memory_response(json: &serde_json::Value) -> Vec<MemorySuggestion> {
-    let mut suggestions = Vec::new();
-
-    if let Some(results) = json["results"].as_array() {
-        for result in results {
-            if let Some(content) = result["content"].as_str() {
-                suggestions.push(MemorySuggestion {
-                    content: content.to_string(),
-                    relevance_score: result["score"].as_f64().unwrap_or(0.0),
-                    source: result["source"].as_str().map(ToString::to_string),
-                });
-            }
-        }
-    }
-
-    suggestions
-}
-
-/// Handle memory subcommands
+/// Handle memory subcommands for verification (not remediation)
 async fn handle_memory_command(action: MemoryCommands) -> Result<()> {
     let openmemory_url = std::env::var("OPENMEMORY_URL")
         .unwrap_or_else(|_| "http://openmemory.openmemory.svc.cluster.local:8080".to_string());
@@ -1775,25 +1658,6 @@ INFO: Continuing";
         // Invalid format
         let duration = calculate_duration(Some("invalid"), Some("2024-01-01T00:05:00Z"));
         assert_eq!(duration, None);
-    }
-
-    #[test]
-    fn test_build_memory_query() {
-        let step = WorkflowStep {
-            id: "test".to_string(),
-            name: "cleo-quality".to_string(),
-            step_type: "Pod".to_string(),
-            phase: "Failed".to_string(),
-            pod_name: None,
-            exit_code: Some(1),
-            message: Some("clippy::uninlined_format_args".to_string()),
-            started_at: None,
-            finished_at: None,
-        };
-
-        let query = build_memory_query(None, Some(&step));
-        assert!(query.contains("cleo-quality"));
-        assert!(query.contains("clippy::uninlined_format_args"));
     }
 
     #[test]

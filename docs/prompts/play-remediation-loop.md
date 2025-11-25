@@ -21,8 +21,7 @@ This command:
 3. **Monitors** the workflow via Argo CLI (efficient, event-driven)
 4. **Emits** JSON events for each status change
 5. **Fetches logs** automatically on failure
-6. **Queries `OpenMemory`** for known solutions
-7. **Continues** until completion or max failures
+6. **Continues** until completion or max failures
 
 ### Options
 
@@ -40,7 +39,7 @@ play-monitor full --task-id <TASK_ID> \
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GITHUB_TOKEN` | Yes | GitHub token for `gh` CLI and git push (automation) |
-| `OPENMEMORY_URL` | No | `OpenMemory` API endpoint (defaults to cluster DNS) |
+| `OPENMEMORY_URL` | No | OpenMemory API endpoint (for verification commands) |
 | `KUBECONFIG` | No | Kubernetes config for `argo` and `kubectl` CLIs |
 <!-- markdownlint-enable MD013 -->
 
@@ -115,9 +114,6 @@ The command emits these JSON events to stdout:
     "message": "clippy failed"
   },
   "logs": "error: clippy::uninlined_format_args...",
-  "memory_suggestions": [
-    {"content": "Use {var} instead of {}, var", "relevance_score": 0.89}
-  ],
   "consecutive_failures": 1,
   "timestamp": "2024-01-15T10:40:00Z"
 }
@@ -126,10 +122,9 @@ The command emits these JSON events to stdout:
 **On failure, you should:**
 
 1. Parse `logs` to identify the root cause
-2. Check `memory_suggestions` for known solutions
-3. Make code fixes in the test repository
-4. Commit and push via automated PR process
-5. The workflow will auto-retry
+2. Make code fixes in the test repository
+3. Commit and push via automated PR process
+4. The workflow will auto-retry
 
 ### `completed` - Workflow finished successfully
 
@@ -162,7 +157,7 @@ The command emits these JSON events to stdout:
 
 When `failure` event is received:
 
-1. **Analyze** - Parse logs, check memory suggestions
+1. **Analyze** - Parse logs to identify the issue
 2. **Fix** - Make code changes in test repo
 3. **Branch** - Create `fix/<description>` branch
 4. **PR** - `gh pr create --title "fix: ..." --body "..."`
@@ -182,6 +177,35 @@ When `failure` event is received:
 | Cypher | Security warnings | Update deps |
 | Tess | Test failures | Fix assertions |
 <!-- markdownlint-enable MD013 -->
+
+## OpenMemory Verification
+
+After each stage completes, verify agents are using OpenMemory correctly:
+
+```bash
+# List memories created by a specific agent
+play-monitor memory list --agent rex --limit 10
+
+# Query memories for a specific task
+play-monitor memory list --task-id 42
+```
+
+### What to Verify
+
+1. **Each agent persists memories** - Check that memories are created
+2. **Memory quality** - Memories should be meaningful, not noise
+3. **Proper tagging** - Memories should have agent and task context
+
+### OpenMemory Documentation
+
+Reference the integration guide for best practices:
+`docs/openmemory-integration-guide.md`
+
+Agents should:
+
+- Store learnings from successful operations
+- Record error patterns and their solutions
+- Tag memories with task context for retrieval
 
 ## Reset and Retry
 
@@ -217,6 +241,9 @@ play-monitor full --task-id 42
 {"event_type":"stage_complete","stage":"code-quality","next_stage":"security",...}
 # ... continues through all stages ...
 {"event_type":"completed","duration_seconds":3600,...}
+
+# After completion, verify OpenMemory usage
+play-monitor memory list --task-id 42
 ```
 
 ## Summary
@@ -226,4 +253,5 @@ play-monitor full --task-id 42
 3. **Emits events**: React to JSON events automatically
 4. **Fix failures**: Parse logs, apply fixes, push PRs
 5. **Auto-retry**: Workflow retries on main branch updates
-6. **Reset if stuck**: `play-monitor reset --force` then retry
+6. **Verify memory**: Use `play-monitor memory list` to check agent usage
+7. **Reset if stuck**: `play-monitor reset --force` then retry
