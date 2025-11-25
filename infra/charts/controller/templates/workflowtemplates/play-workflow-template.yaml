@@ -2643,10 +2643,12 @@ spec:
             # Empty or null check
             [ -z "$val" ] && return 1
             [ "$val" = "" ] && return 1
-            # Detect unsubstituted Argo template expressions (e.g., {{`{{`}}steps.foo.outputs.parameters.bar{{`}}`}})
+            # Detect unsubstituted Argo template expressions
             # When a step is skipped, Argo leaves these as literal strings instead of substituting
+            # Use variable to construct pattern to avoid Helm/Argo parsing the braces
+            DOUBLE_BRACE="{""{"
             case "$val" in
-              *'{{`{{`}}steps.'*|*'{{`{{`}}workflow.'*|*'{{`{{`}}inputs.'*|*'{{`{{`}}outputs.'*)
+              *"${DOUBLE_BRACE}steps."*|*"${DOUBLE_BRACE}workflow."*|*"${DOUBLE_BRACE}inputs."*|*"${DOUBLE_BRACE}outputs."*)
                 echo "⚠️ Detected unsubstituted template: $val"
                 return 1
                 ;;
