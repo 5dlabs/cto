@@ -2643,10 +2643,10 @@ spec:
             # Empty or null check
             [ -z "$val" ] && return 1
             [ "$val" = "" ] && return 1
-            # Detect unsubstituted Argo template expressions (e.g., {{steps.foo.outputs.parameters.bar}})
+            # Detect unsubstituted Argo template expressions (e.g., {{`{{`}}steps.foo.outputs.parameters.bar{{`}}`}})
             # When a step is skipped, Argo leaves these as literal strings instead of substituting
             case "$val" in
-              *'{{steps.'*|*'{{workflow.'*|*'{{inputs.'*|*'{{outputs.'*)
+              *'{{`{{`}}steps.'*|*'{{`{{`}}workflow.'*|*'{{`{{`}}inputs.'*|*'{{`{{`}}outputs.'*)
                 echo "⚠️ Detected unsubstituted template: $val"
                 return 1
                 ;;
