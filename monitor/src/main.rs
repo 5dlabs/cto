@@ -875,6 +875,22 @@ fn reset_environment(
     skip_github: bool,
     force: bool,
 ) -> Result<ResetResponse> {
+    // Prompt for confirmation unless force flag is set
+    if !force {
+        use std::io::{self, Write};
+        print!(
+            "{}",
+            "WARNING: This will delete all workflows, pods, ConfigMaps, PVCs, and reset the GitHub repo.\nContinue? [y/N]: "
+                .yellow()
+        );
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if !input.trim().eq_ignore_ascii_case("y") {
+            return Err(anyhow::anyhow!("Reset cancelled by user"));
+        }
+    }
+
     let mut k8s_cleanup = CleanupResult {
         workflows_deleted: 0,
         pods_deleted: 0,
@@ -934,10 +950,12 @@ fn reset_environment(
                 let cms: Vec<&str> = output_str.lines().filter(|l| l.contains(pattern)).collect();
 
                 for cm in &cms {
-                    let _ = Command::new("kubectl")
+                    let delete_result = Command::new("kubectl")
                         .args(["delete", cm, "-n", namespace, "--force", "--grace-period=0"])
                         .output();
-                    k8s_cleanup.configmaps_deleted += 1;
+                    if delete_result.is_ok_and(|o| o.status.success()) {
+                        k8s_cleanup.configmaps_deleted += 1;
+                    }
                 }
             }
         }
@@ -958,7 +976,7 @@ fn reset_environment(
                 let pvcs: Vec<&str> = output_str.lines().filter(|l| l.contains(pattern)).collect();
 
                 for pvc in &pvcs {
-                    let _ = Command::new("kubectl")
+                    let delete_result = Command::new("kubectl")
                         .args([
                             "delete",
                             pvc,
@@ -968,7 +986,9 @@ fn reset_environment(
                             "--grace-period=0",
                         ])
                         .output();
-                    k8s_cleanup.pvcs_deleted += 1;
+                    if delete_result.is_ok_and(|o| o.status.success()) {
+                        k8s_cleanup.pvcs_deleted += 1;
+                    }
                 }
             }
         }
