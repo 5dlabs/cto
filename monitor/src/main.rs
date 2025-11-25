@@ -1520,7 +1520,9 @@ async fn run_monitoring_loop(
                 last_status = current_status;
             }
             Err(e) => {
-                // Error getting status - emit as failure
+                // Error getting status - treat as failure
+                consecutive_failures += 1;
+
                 let failure_event = LoopEvent::Failure {
                     play_id: play_id.to_string(),
                     stage: last_stage.clone(),
@@ -1532,6 +1534,20 @@ async fn run_monitoring_loop(
                 };
                 println!("{}", serde_json::to_string(&failure_event)?);
                 std::io::stdout().flush()?;
+
+                // Check if we should stop
+                if max_failures > 0 && consecutive_failures >= max_failures {
+                    let stopped = LoopEvent::Stopped {
+                        play_id: play_id.to_string(),
+                        reason: format!(
+                            "Max consecutive failures reached ({max_failures})"
+                        ),
+                        timestamp: Utc::now(),
+                    };
+                    println!("{}", serde_json::to_string(&stopped)?);
+                    std::io::stdout().flush()?;
+                    return Ok(());
+                }
             }
         }
 
