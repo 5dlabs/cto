@@ -30,11 +30,26 @@ Before writing any code, ALWAYS check for relevant documentation:
   - Look for existing implementations to follow
   - Check for coding standards and conventions
 
-#### 2. Context and Memory Tools
-- **Memory Tools** (`memory_*`):
-  - Query existing entities before creating new ones
-  - Add observations about implementation decisions
-  - Track dependencies and relationships
+#### 2. OpenMemory & Context Tools
+- **OpenMemory Tools** (`openmemory_openmemory_*`):
+  - `openmemory_openmemory_query` - Search for relevant context and past solutions
+  - `openmemory_openmemory_store` - Save successful patterns and lessons learned
+  - `openmemory_openmemory_reinforce` - Boost useful memories
+  - **Always use `user_id: "rex"`** to isolate your memories
+
+- **MANDATORY Memory Queries** (do these BEFORE implementing):
+  - "How to implement [feature] in [technology]?"
+  - "Previous errors with [library/pattern]?"
+  - "Existing patterns for [concept] in this project?"
+
+- **When to Store Memories**:
+  - ✅ Successful error fixes: `"Fixed [error] by [solution]. Tags: error-fix, [tech]"`
+  - ✅ New patterns discovered: `"Pattern: [name]. Use when [context]. Implementation: [approach]"`
+  - ✅ Project conventions learned: `"Convention: [rule]. Applies to [scope]"`
+  - ❌ DO NOT store: trivial fixes, formatting changes, one-off debugging steps
+
+- **Tagging Convention**: Always include tags for discoverability:
+  - `["error-fix", "rust", "{{service}}", "task-{{task_id}}"]`
   
 - **Context Servers**:
   - Use context servers to understand the current state
@@ -61,10 +76,10 @@ Only after gathering documentation and context:
    - Framework/library documentation
    - Project-specific patterns
    - Best practices
-3. CONTEXT: Use memory/context tools to:
-   - Understand existing implementations
-   - Check for dependencies
-   - Verify assumptions
+3. CONTEXT: Use OpenMemory tools to:
+   - Query past solutions: `openmemory_openmemory_query("similar problem context")`
+   - Check for previous implementations
+   - Find patterns that worked before
 4. IMPLEMENT: Use filesystem/git tools to:
    - Read existing code
    - Write new implementation
@@ -89,9 +104,22 @@ Only after gathering documentation and context:
 **For Kubernetes Controllers:**
 ```
 1. Query: kubernetes_docs_query("Custom Resource Definition")
-2. Query: memory_query_entities("controller")
+2. Query: openmemory_openmemory_query("controller patterns")
 3. Read: filesystem_read_file("config/crd/bases/*.yaml")
 4. Implement: Based on documentation and examples
+5. Store: openmemory_openmemory_store("Implemented [pattern] using [approach]")
+```
+
+**After Successful Implementation:**
+```
+1. Store the solution for future use:
+   openmemory_openmemory_store({
+     "content": "Fixed [issue] by [solution]. Key pattern: [pattern]",
+     "tags": ["implementation", "rust", "successful"],
+     "user_id": "rex"
+   })
+2. If a past memory helped, reinforce it:
+   openmemory_openmemory_reinforce({"id": "mem_xyz", "boost": 0.2})
 ```
 
 ### Critical Rules

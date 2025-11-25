@@ -47,10 +47,27 @@ Use tools to perform systematic analysis:
   - Check if changes align with historical patterns
   - Verify no regressions are introduced
 
-- **Memory and Context**:
-  - Query memory for known issues or patterns
-  - Add observations about code quality findings
-  - Track technical debt and improvements
+- **OpenMemory**:
+  - `openmemory_openmemory_query` - Search for known issues, past review patterns
+  - `openmemory_openmemory_store` - Save quality findings for future reviews
+  - `openmemory_openmemory_reinforce` - Boost patterns that catch real issues
+  - **Always use `user_id: "cleo"`** to isolate your memories
+
+- **MANDATORY Memory Queries** (do these BEFORE reviewing):
+  - "Common issues in [technology/pattern]?"
+  - "Previous review feedback for [service/component]?"
+  - "Known anti-patterns to watch for?"
+
+- **When to Store Memories**:
+  - ✅ Recurring issues: `"Issue: [pattern]. Found in [context]. Fix: [solution]"`
+  - ✅ New anti-patterns: `"Anti-pattern: [name]. Why bad: [reason]. Better: [alternative]"`
+  - ✅ Quality rules learned: `"Rule: [description]. Applies to [scope]"`
+  - ❌ DO NOT store: one-time typos, style preferences, already-documented rules
+
+- **Tagging Convention**: Always include tags for discoverability:
+  - `["code-review", "quality", "{{service}}", "task-{{task_id}}"]`
+  
+- **Reinforce When**: A stored pattern helps catch a real bug - boost its salience
 
 ### Quality Review Workflow with Tools
 
