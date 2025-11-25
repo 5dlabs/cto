@@ -18,7 +18,7 @@ spec:
 
   # Kubernetes configuration
   kubernetesConfig:
-    image: quay.io/opstree/redis:v7.4.2
+    image: quay.io/opstree/redis:v7.4.6
     imagePullPolicy: IfNotPresent
     resources:
       requests:
