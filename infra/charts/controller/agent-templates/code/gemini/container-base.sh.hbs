@@ -46,6 +46,16 @@ else
     find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
 fi
 
+{{#if telemetry.enabled}}
+# Gemini CLI Telemetry Configuration (OpenTelemetry)
+export GEMINI_TELEMETRY_ENABLED=true
+export GEMINI_TELEMETRY_TARGET=local
+export GEMINI_TELEMETRY_OTLP_ENDPOINT="{{telemetry.otlpEndpoint}}"
+export GEMINI_TELEMETRY_OTLP_PROTOCOL="{{telemetry.otlpProtocol}}"
+export GEMINI_TELEMETRY_LOG_PROMPTS=false
+echo "✓ Gemini telemetry enabled: {{telemetry.otlpEndpoint}} ({{telemetry.otlpProtocol}})"
+{{/if}}
+
 echo '════════════════════════════════════════════════════════════════'
 printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
 echo '║  IMPLEMENTATION TASK STARTING                                ║'

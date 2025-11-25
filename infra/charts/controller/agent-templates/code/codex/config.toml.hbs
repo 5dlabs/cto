@@ -46,6 +46,16 @@ request_max_retries = {{model_provider.request_max_retries}}
 stream_max_retries = {{model_provider.stream_max_retries}}
 {{/if}}
 
+{{#if telemetry.enabled}}
+# OpenTelemetry configuration for observability
+[otel]
+environment = "production"
+log_user_prompt = false
+
+[otel.exporter.otlp-grpc]
+endpoint = "{{telemetry.otlpEndpoint}}"
+{{/if}}
+
 {{#if raw_additional_toml}}
 {{{raw_additional_toml}}}
 {{/if}}
