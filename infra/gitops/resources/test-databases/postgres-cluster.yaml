@@ -1,0 +1,56 @@
+---
+# Test PostgreSQL cluster using CloudNativePG
+# This is a minimal single-instance cluster for testing the operator
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: test-postgres
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: test-postgres
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database
+spec:
+  # Single instance for testing (not HA)
+  instances: 1
+
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      # Basic tuning for dev environment
+      max_connections: "100"
+      shared_buffers: "128MB"
+      effective_cache_size: "512MB"
+      maintenance_work_mem: "64MB"
+      work_mem: "4MB"
+      # Logging
+      log_statement: "mod"
+      log_min_duration_statement: "500ms"
+
+  # Storage configuration
+  storage:
+    size: 5Gi
+    storageClass: local-path
+
+  # Resource allocation
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+
+  # Bootstrap configuration - create test database
+  bootstrap:
+    initdb:
+      database: test_db
+      owner: test_user
+
+  # Enable superuser access for testing
+  enableSuperuserAccess: true
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: false
+
