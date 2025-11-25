@@ -1,0 +1,90 @@
+---
+# HashiCorp Vault Configuration
+# Standalone mode with Raft storage and manual Shamir unseal
+# See: https://developer.hashicorp.com/vault/docs/deploy/kubernetes/helm
+
+global:
+  enabled: true
+  tlsDisable: true  # Internal cluster communication only
+
+server:
+  enabled: true
+
+  image:
+    repository: "hashicorp/vault"
+    tag: "1.21.0"
+    pullPolicy: IfNotPresent
+
+  # Standalone mode configuration
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "raft" {
+        path = "/vault/data"
+      }
+
+      service_registration "kubernetes" {}
+
+  # Persistent storage for Raft backend
+  dataStorage:
+    enabled: true
+    size: 5Gi
+    storageClass: "local-path"
+    accessMode: ReadWriteOnce
+
+  # Resource limits
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+  # Enable auth delegator for Kubernetes auth method
+  authDelegator:
+    enabled: true
+
+  # Service account configuration
+  serviceAccount:
+    create: true
+    serviceDiscovery:
+      enabled: true
+
+  # Readiness probe
+  readinessProbe:
+    enabled: true
+    port: 8200
+
+  # Service configuration
+  service:
+    enabled: true
+    port: 8200
+    targetPort: 8200
+
+  # Affinity - allow deployment on single node cluster
+  affinity: ""
+
+# Vault UI
+ui:
+  enabled: true
+  serviceType: ClusterIP
+  externalPort: 8200
+  targetPort: 8200
+
+# Disable injector - using External Secrets Operator instead
+injector:
+  enabled: false
+
+# Disable CSI driver - using External Secrets Operator instead
+csi:
+  enabled: false
+

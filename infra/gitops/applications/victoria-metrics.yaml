@@ -29,7 +29,7 @@ spec:
             runAsUser: 1000
             runAsGroup: 1000
             runAsNonRoot: true
-          # Scrape configuration
+          # Scrape configuration for metrics collection
           scrape:
             enabled: true
             configMap: ""
@@ -48,6 +48,11 @@ spec:
                   static_configs:
                     - targets:
                         - kube-state-metrics.telemetry.svc.cluster.local:8080
+                  metric_relabel_configs:
+                    # Keep pod and container status metrics
+                    - source_labels: [__name__]
+                      regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*'
+                      action: keep
                 # OTEL collector metrics
                 - job_name: otel-collector
                   static_configs:

@@ -45,6 +45,8 @@ spec:
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'  # Zalando (legacy)
     - 'https://github.com/spotahome/redis-operator'  # spotahome (legacy)
     - 'https://github.com/questdb/questdb-operator'
+    # HashiCorp Vault Helm chart repository
+    - 'https://helm.releases.hashicorp.com'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -104,6 +106,9 @@ spec:
     - namespace: redis-operator-staging
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
+      server: https://kubernetes.default.svc
+    # HashiCorp Vault namespace
+    - namespace: vault
       server: https://kubernetes.default.svc
     # Removed Mailu namespace
 
