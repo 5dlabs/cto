@@ -1476,6 +1476,7 @@ fn reset_environment(
 }
 
 /// Reset GitHub repository - delete and recreate with minimal structure
+#[allow(clippy::too_many_lines)]
 fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetResult> {
     let full_repo = format!("{org}/{repo}");
     let mut result = GithubResetResult {
@@ -1573,9 +1574,8 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
         if commit_result.is_err() || !commit_result.as_ref().is_ok_and(|o| o.status.success()) {
             let err_msg = commit_result
                 .as_ref()
-                .map(|o| String::from_utf8_lossy(&o.stderr).to_string())
-                .unwrap_or_else(|e| e.to_string());
-            println!("  {} Git commit failed: {}", "⚠".yellow(), err_msg);
+                .map_or_else(std::string::ToString::to_string, |o| String::from_utf8_lossy(&o.stderr).to_string());
+            println!("  {} Git commit failed: {err_msg}", "⚠".yellow());
         }
 
         let _ = Command::new("git")
@@ -1583,13 +1583,16 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
             .current_dir(&temp_dir)
             .output();
 
+        // Use HTTPS with token if GITHUB_TOKEN is set (for automation)
+        // Otherwise fall back to SSH (for local dev)
+        let remote_url = if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+            format!("https://x-access-token:{token}@github.com/{full_repo}.git")
+        } else {
+            format!("git@github.com:{full_repo}.git")
+        };
+
         let _ = Command::new("git")
-            .args([
-                "remote",
-                "add",
-                "origin",
-                &format!("git@github.com:{full_repo}.git"),
-            ])
+            .args(["remote", "add", "origin", &remote_url])
             .current_dir(&temp_dir)
             .output();
 
@@ -1601,6 +1604,9 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
         if push.status.success() {
             result.pushed = true;
             println!("  {} Initialized repository", "✓".green());
+        } else {
+            let err = String::from_utf8_lossy(&push.stderr);
+            println!("  {} Git push failed: {err}", "⚠".yellow());
         }
     }
 
