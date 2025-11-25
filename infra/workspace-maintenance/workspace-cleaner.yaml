@@ -98,6 +98,59 @@ spec:
                 - |
                   set -euo pipefail
 
+                  # Busybox-compatible ISO 8601 to Unix epoch converter
+                  iso_to_epoch() {
+                    local ts="$1"
+                    # Use awk to parse ISO 8601 and convert to epoch
+                    # Input format: 2025-11-25T12:34:56Z or 2025-11-25T12:34:56.123456Z
+                    echo "$ts" | awk '{
+                      # Remove Z suffix and split on T
+                      gsub(/Z$/, "")
+                      split($0, dt, "T")
+                      
+                      # Parse date part: YYYY-MM-DD
+                      split(dt[1], d, "-")
+                      year = d[1]; month = d[2]; day = d[3]
+                      
+                      # Parse time part: HH:MM:SS (ignore fractional seconds)
+                      split(dt[2], t, ":")
+                      hour = t[1]; min = t[2]
+                      # Remove fractional seconds if present
+                      split(t[3], sec_parts, ".")
+                      sec = sec_parts[1]
+                      
+                      # Days per month (non-leap year)
+                      days[1]=31; days[2]=28; days[3]=31; days[4]=30; days[5]=31; days[6]=30
+                      days[7]=31; days[8]=31; days[9]=30; days[10]=31; days[11]=30; days[12]=31
+                      
+                      # Calculate total days since epoch (1970-01-01)
+                      total_days = 0
+                      
+                      # Add days for complete years
+                      for (y = 1970; y < year; y++) {
+                        if (y % 400 == 0 || (y % 4 == 0 && y % 100 != 0))
+                          total_days += 366
+                        else
+                          total_days += 365
+                      }
+                      
+                      # Add days for complete months in current year
+                      for (m = 1; m < month; m++) {
+                        total_days += days[m]
+                        # Add leap day for February if needed
+                        if (m == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)))
+                          total_days += 1
+                      }
+                      
+                      # Add remaining days (subtract 1 because day 1 = 0 days elapsed)
+                      total_days += day - 1
+                      
+                      # Convert to seconds and add time components
+                      epoch = (total_days * 86400) + (hour * 3600) + (min * 60) + sec
+                      print epoch
+                    }'
+                  }
+
                   RETENTION_HOURS="${RETENTION_HOURS:-12}"
                   MAX_DELETIONS="${MAX_DELETIONS:-15}"
                   RETENTION_SECONDS=$((RETENTION_HOURS * 3600))
@@ -116,7 +169,7 @@ spec:
                       continue
                     fi
 
-                    CREATED_TS=$(date -u -d "$PVC_TIMESTAMP" +%s)
+                    CREATED_TS=$(iso_to_epoch "$PVC_TIMESTAMP")
                     AGE=$((NOW - CREATED_TS))
 
                     if [ "${SKIP_FLAG:-false}" = "true" ]; then
@@ -198,6 +251,59 @@ spec:
                 - |
                   set -euo pipefail
 
+                  # Busybox-compatible ISO 8601 to Unix epoch converter
+                  iso_to_epoch() {
+                    local ts="$1"
+                    # Use awk to parse ISO 8601 and convert to epoch
+                    # Input format: 2025-11-25T12:34:56Z or 2025-11-25T12:34:56.123456Z
+                    echo "$ts" | awk '{
+                      # Remove Z suffix and split on T
+                      gsub(/Z$/, "")
+                      split($0, dt, "T")
+                      
+                      # Parse date part: YYYY-MM-DD
+                      split(dt[1], d, "-")
+                      year = d[1]; month = d[2]; day = d[3]
+                      
+                      # Parse time part: HH:MM:SS (ignore fractional seconds)
+                      split(dt[2], t, ":")
+                      hour = t[1]; min = t[2]
+                      # Remove fractional seconds if present
+                      split(t[3], sec_parts, ".")
+                      sec = sec_parts[1]
+                      
+                      # Days per month (non-leap year)
+                      days[1]=31; days[2]=28; days[3]=31; days[4]=30; days[5]=31; days[6]=30
+                      days[7]=31; days[8]=31; days[9]=30; days[10]=31; days[11]=30; days[12]=31
+                      
+                      # Calculate total days since epoch (1970-01-01)
+                      total_days = 0
+                      
+                      # Add days for complete years
+                      for (y = 1970; y < year; y++) {
+                        if (y % 400 == 0 || (y % 4 == 0 && y % 100 != 0))
+                          total_days += 366
+                        else
+                          total_days += 365
+                      }
+                      
+                      # Add days for complete months in current year
+                      for (m = 1; m < month; m++) {
+                        total_days += days[m]
+                        # Add leap day for February if needed
+                        if (m == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)))
+                          total_days += 1
+                      }
+                      
+                      # Add remaining days (subtract 1 because day 1 = 0 days elapsed)
+                      total_days += day - 1
+                      
+                      # Convert to seconds and add time components
+                      epoch = (total_days * 86400) + (hour * 3600) + (min * 60) + sec
+                      print epoch
+                    }'
+                  }
+
                   RETENTION_MINUTES="${RETENTION_MINUTES:-60}"
                   NOW=$(date -u +%s)
                   RETENTION_SECONDS=$((RETENTION_MINUTES * 60))
@@ -214,7 +320,7 @@ spec:
                       continue
                     fi
 
-                    EVENT_TS=$(date -u -d "$EVENT_TIMESTAMP" +%s 2>/dev/null || echo "0")
+                    EVENT_TS=$(iso_to_epoch "$EVENT_TIMESTAMP" 2>/dev/null || echo "0")
                     if [ "$EVENT_TS" = "0" ]; then
                       continue
                     fi
