@@ -1,12 +1,14 @@
 # Play Remediation Loop - Agent Instructions
 
-You are monitoring a play workflow execution for E2E testing. Your goal is
-to ensure the workflow completes successfully by detecting failures, analyzing
-logs, implementing fixes, and continuing until completion.
+You are an autonomous agent monitoring play workflow executions for E2E testing.
+Your goal is to ensure workflows complete successfully by detecting failures,
+analyzing logs, implementing fixes, and continuing until completion.
+
+**This process is fully automated with no manual intervention required.**
 
 ## Agent Flow Sequence
 
-Each task progresses through these agents in order:
+Each play progresses through these agents in order:
 
 ```text
 Rex/Blaze (Implementation)
@@ -31,260 +33,333 @@ Ensure the `play-monitor` CLI is available:
 cargo build -p play-monitor --release
 
 # The binary will be at target/release/play-monitor
-# Add to PATH or use full path
 ```
 
-## Monitoring Loop
+## Primary Command: The Automated Loop
 
-### Step 1: Check Status
-
-Run the status command to check current workflow state:
+The `play-monitor loop` command monitors an Argo Workflow and emits structured
+JSON events. This is the primary command for automated monitoring.
 
 ```bash
-play-monitor status --task-id <TASK_ID>
+play-monitor loop --play-id <WORKFLOW_NAME>
 ```
 
-This returns JSON with:
-
-- `status`: Current state (`running`, `failed`, `completed`, `pending`)
-- `stage`: Current agent stage (implementation, code-quality, security, qa)
-- `pods`: List of pods with phase, exit codes, restart counts
-- `failed_pods`: List of pods that have failed
-
-### Step 2: Handle Status
-
-Based on the status:
-
-**If `status` is "running":**
-
-- Wait 30-60 seconds
-- Check status again
-- Continue monitoring
-
-**If `status` is "failed":**
-
-- Proceed to Step 3 (Get Logs)
-- Analyze and remediate
-
-**If `status` is "completed":**
-
-- Verify stage confirmations
-- Proceed to next task or finish
-
-**If `status` is "pending":**
-
-- Wait for pods to start
-- Check status again after 30 seconds
-
-### Step 3: Get Failure Logs
-
-When a failure is detected:
+### Loop Options
 
 ```bash
-# Get logs for the task
-play-monitor logs --task-id <TASK_ID>
-
-# Or get logs with error filtering
-play-monitor logs --task-id <TASK_ID> --errors-only
-
-# For a specific pod
-play-monitor logs --pod <POD_NAME>
+play-monitor loop --play-id <WORKFLOW_NAME> \
+  --interval 10 \           # Status check interval (default: 10s)
+  --fetch-logs true \       # Auto-fetch logs on failure (default: true)
+  --query-memory true \     # Query OpenMemory for solutions (default: true)
+  --max-failures 5 \        # Stop after N consecutive failures (default: 5)
+  --log-tail 500            # Tail lines for logs (default: 500)
 ```
 
-### Step 4: Analyze Failure
+### Event Types
 
-Common failure patterns and remediation:
+The loop emits these JSON events to stdout:
+
+#### `started` - Loop has begun monitoring
+
+```json
+{
+  "event_type": "started",
+  "play_id": "play-42",
+  "interval_seconds": 10,
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+**Action:** Acknowledge monitoring has started. No immediate action required.
+
+#### `status` - Current workflow state
+
+```json
+{
+  "event_type": "status",
+  "play_id": "play-42",
+  "workflow_phase": "Running",
+  "stage": "implementation",
+  "steps": [
+    {
+      "id": "play-42-rex-abc",
+      "name": "rex-implementation",
+      "step_type": "Pod",
+      "phase": "Running",
+      "pod_name": "play-42-rex-abc"
+    }
+  ],
+  "timestamp": "2024-01-15T10:30:10Z"
+}
+```
+
+**Action:** Continue monitoring. No intervention needed unless `workflow_phase`
+indicates failure.
+
+#### `stage_complete` - A stage finished successfully
+
+```json
+{
+  "event_type": "stage_complete",
+  "play_id": "play-42",
+  "stage": "implementation",
+  "next_stage": "code-quality",
+  "timestamp": "2024-01-15T10:35:00Z"
+}
+```
+
+**Action:** Verify the completed stage's artifacts (e.g., code committed, PR
+created). Prepare for the next stage.
+
+#### `failure` - Workflow or step failed
+
+```json
+{
+  "event_type": "failure",
+  "play_id": "play-42",
+  "stage": "code-quality",
+  "failed_step": {
+    "id": "play-42-cleo-xyz",
+    "name": "cleo-quality",
+    "phase": "Failed",
+    "pod_name": "play-42-cleo-xyz",
+    "exit_code": 1,
+    "message": "exit code 1"
+  },
+  "logs": "error: clippy::uninlined_format_args\n  --> src/main.rs:42:5...",
+  "memory_suggestions": [
+    {"content": "Use {var} instead of {}, var", "relevance_score": 0.89}
+  ],
+  "consecutive_failures": 1,
+  "timestamp": "2024-01-15T10:40:00Z"
+}
+```
+
+**Action:** This is the critical event for remediation.
+
+1. **Analyze `logs`**: Identify the root cause of the failure
+2. **Consult `memory_suggestions`**: Check if `OpenMemory` has solutions
+3. **Implement fix**: Make necessary code changes in the test repository
+4. **Create PR with automated remediation process** (see below)
+5. **Merge and continue**: The workflow will auto-retry
+
+#### `completed` - Workflow finished successfully
+
+```json
+{
+  "event_type": "completed",
+  "play_id": "play-42",
+  "duration_seconds": 1800,
+  "timestamp": "2024-01-15T11:00:00Z"
+}
+```
+
+**Action:** Task complete. The loop will exit. Move to the next play if any.
+
+#### `stopped` - Loop stopped (max failures reached)
+
+```json
+{
+  "event_type": "stopped",
+  "play_id": "play-42",
+  "reason": "Max consecutive failures reached (5)",
+  "timestamp": "2024-01-15T11:05:00Z"
+}
+```
+
+**Action:** Too many failures - requires reset:
+
+1. Reset the environment
+2. Start a new workflow
+3. Restart monitoring with new workflow name
+
+## Automated Remediation Process
+
+When a `failure` event is received:
+
+### 1. Analyze the Failure
+
+- Parse the `logs` field to identify the error
+- Check `memory_suggestions` for known solutions
+- Identify which agent/stage failed
+
+### 2. Create the Fix
+
+- Clone/pull the test repository
+- Create a new branch: `fix/<descriptive-name>`
+- Implement the code fix
+- Commit with descriptive message
+
+### 3. Create PR
+
+```bash
+gh pr create --title "fix: <description>" --body "<details>"
+```
+
+### 4. Handle Bugbot Comments
+
+- Wait for Bugbot to run on the PR
+- Check for Bugbot comments: `gh pr view --comments`
+- If Bugbot comments exist, fix each issue
+- Commit and push the fixes
+- Wait for Bugbot to run again
+- Repeat until no new Bugbot comments
+
+### 5. Fix CI Failures
+
+- Monitor PR status: `gh pr checks`
+- If CI fails, analyze the failure logs
+- Fix issues and push new commits
+- Wait for CI to pass
+
+### 6. Resolve Merge Conflicts
+
+- If conflicts exist: `gh pr view --json mergeable`
+- Pull latest main and resolve conflicts
+- Push the resolution
+
+### 7. Merge PR
+
+```bash
+gh pr merge --squash --delete-branch
+```
+
+### 8. Continue Monitoring
+
+The workflow will automatically detect the fix and retry. Continue monitoring
+the loop output for the next event.
+
+## Common Fixes by Stage
 
 <!-- markdownlint-disable MD013 -->
-| Failure Type | Indicators | Remediation |
-|--------------|------------|-------------|
-| OOMKilled | `reason: "OOMKilled"` | Increase memory limits or optimize code |
-| Exit Code 1 | `exit_code: 1` | Check logs for specific error messages |
-| CrashLoopBackOff | `reason: "CrashLoopBackOff"` | Config or dependency issue |
-| Image Pull Error | `reason: "ImagePullBackOff"` | Check image name/tag/registry |
-| Lint/Format Fail | Cleo stage errors | Run `cargo fmt` and `cargo clippy` |
-| Test Failure | Tess stage errors | Fix failing tests |
-| Security Issue | Cypher stage errors | Address security findings |
+| Stage | Error Pattern | Automated Fix |
+|-------|---------------|---------------|
+| Rex/Blaze | Compilation errors | Fix syntax, add imports |
+| Cleo | `clippy::` errors | Apply clippy suggestions |
+| Cleo | Formatting | Run `cargo fmt` |
+| Cypher | Security warnings | Update deps, apply patches |
+| Tess | Test failures | Fix test assertions |
+| Atlas | Merge conflicts | Resolve conflicts |
 <!-- markdownlint-enable MD013 -->
 
-### Step 5: Implement Fix
+## Reset and Re-run
 
-1. Identify the root cause from logs
-2. Make necessary code changes
-3. Test locally if possible
-4. Commit changes with descriptive message
-
-### Step 6: Create PR and Merge
-
-1. Create a new branch from latest main
-2. Push changes
-3. Create pull request
-4. Wait for CI checks
-5. Merge to main
-
-### Step 7: Workflow Retry
-
-After merging:
-
-- The workflow will automatically detect the fix and retry
-- Monitor status to confirm the stage passes
-- Continue to next stage
-
-### Step 8: Reset and Re-run (For Unrecoverable Failures)
-
-If a failure cannot be fixed in code (e.g., cluster state issues):
+For unrecoverable failures (cluster issues, corrupted state):
 
 ```bash
 # Reset cluster resources and test repository
-play-monitor reset --repo cto-parallel-test --org 5dlabs
+play-monitor reset --repo cto-parallel-test --org 5dlabs --force
 
-# Re-run the play workflow
-play-monitor run --task-id <TASK_ID> --repository 5dlabs/cto-parallel-test
+# Start a new play workflow
+play-monitor run --task-id <NEW_ID> --repository 5dlabs/cto-parallel-test
 ```
 
 The reset command:
 
-- Deletes all workflows, pods in `agent-platform` namespace
-- Removes test ConfigMaps (play-*, test-*, coderun-*, docsrun-*)
-- Removes test PVCs (workspace-play-*, workspace-test-*)
+- Deletes all workflows, pods in the namespace
+- Removes test ConfigMaps and PVCs
 - Deletes and recreates the GitHub test repository
-- Initializes with minimal structure (README, .gitignore)
+- Returns the new workflow name
 
-The run command:
-
-- Submits a new play workflow via Argo CLI
-- Uses the play-workflow-template
-- Returns the workflow name for monitoring
-
-## Stage Confirmations
-
-Verify each stage completed successfully before moving on:
-
-### Rex/Blaze (Implementation)
-
-- [ ] Code changes committed
-- [ ] Pull request created
-- [ ] No compilation errors
-
-### Cleo (Code Quality)
-
-- [ ] `cargo fmt` passing
-- [ ] `cargo clippy` passing (pedantic)
-- [ ] No lint errors
-
-### Cypher (Security)
-
-- [ ] No secrets in code
-- [ ] Dependencies checked
-- [ ] Security scan passing
-
-### Tess (QA)
-
-- [ ] Unit tests passing
-- [ ] Integration tests passing
-- [ ] QA criteria met
-
-### Atlas (Integration)
-
-- [ ] PR merged to main
-- [ ] Build successful
-- [ ] Integration verified
-
-## Task Progression
-
-Once all stages complete for a task:
-
-1. Verify final status is "completed"
-2. Check all stage confirmations
-3. Move to next task ID in sequence
-4. Repeat the monitoring loop
-
-## Watch Mode (Optional)
-
-For continuous monitoring with visual updates:
+Then restart monitoring:
 
 ```bash
-play-monitor watch --task-id <TASK_ID> --interval 30
+play-monitor loop --play-id <NEW_WORKFLOW_NAME>
 ```
 
-This provides a real-time terminal display of pod status.
+## Other Commands
 
-## Example Session
+### Check Single Status
 
 ```bash
-# Start monitoring task 42
-$ play-monitor status --task-id 42
-{
-  "task_id": "42",
-  "status": "running",
-  "stage": "implementation",
-  "pods": [
-    {"name": "rex-task-42-abc123", "phase": "Running", "restarts": 0}
-  ],
-  "failed_pods": []
-}
-
-# ... wait and check again ...
-
-$ play-monitor status --task-id 42
-{
-  "task_id": "42",
-  "status": "failed",
-  "stage": "code-quality",
-  "pods": [
-    {"name": "cleo-task-42-xyz789", "phase": "Failed", "exit_code": 1}
-  ],
-  "failed_pods": ["cleo-task-42-xyz789"]
-}
-
-# Get logs to understand the failure
-$ play-monitor logs --task-id 42 --errors-only
-error: clippy::uninlined_format_args
-  --> src/main.rs:42:5
-...
-
-# Fix the issue, commit, push, merge
-# Monitor until completion
+play-monitor status --play-id <WORKFLOW_NAME>
 ```
 
-## Troubleshooting
+Returns current workflow status without continuous monitoring.
 
-### No pods found
+### Get Logs
 
-- Check task ID is correct
-- Verify namespace (default: `agent-platform`)
-- Workflow may not have started yet
+```bash
+# Get logs from failed steps
+play-monitor logs --play-id <WORKFLOW_NAME>
 
-### Victoria Logs not available
+# Get logs from a specific step/pod
+play-monitor logs --play-id <WORKFLOW_NAME> --step <POD_NAME>
 
-- Logs fall back to kubectl
-- Set `VICTORIA_LOGS_URL` env var if using custom endpoint
+# Filter for errors only
+play-monitor logs --play-id <WORKFLOW_NAME> --errors-only
+```
 
-### Workflow stuck
+### Query `OpenMemory`
 
-- Check controller logs
-- Verify Argo workflow status
-- May need manual intervention
+```bash
+# Search for solutions
+play-monitor memory query --text "clippy uninlined_format_args"
+
+# List recent memories
+play-monitor memory list --agent cleo --limit 10
+```
 
 ## Environment Variables
 
 <!-- markdownlint-disable MD013 -->
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VICTORIA_LOGS_URL` | See below | Victoria Logs API endpoint |
+| `OPENMEMORY_URL` | `http://openmemory.openmemory.svc.cluster.local:8080` | `OpenMemory` API endpoint |
 <!-- markdownlint-enable MD013 -->
 
-Default Victoria Logs URL:
-`http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428`
+## Automated Flow Diagram
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ play-monitor loop --play-id <WORKFLOW>                     │
+│                                                            │
+│ Uses: argo get <workflow> -o json (efficient, no polling)  │
+│ Only fetches logs when failure detected                    │
+└─────────────────────────┬──────────────────────────────────┘
+                          │
+                          ▼
+              ┌─────────────────────┐
+              │  Workflow Status?   │
+              └─────────┬───────────┘
+                        │
+        ┌───────────────┼───────────────┬───────────────┐
+        │               │               │               │
+        ▼               ▼               ▼               ▼
+    Running         Succeeded        Failed         Stopped
+        │               │               │               │
+        │               │               ▼               │
+   (wait/emit    emit completed   ┌──────────────┐     │
+    status)      and exit         │ Fetch Logs   │     │
+        │               │         │ Query Memory │     │
+        │               │         └──────┬───────┘     │
+        │               │                │             │
+        │               │                ▼             │
+        │               │         ┌──────────────┐     │
+        │               │         │ emit failure │     │
+        │               │         │    event     │     │
+        │               │         └──────┬───────┘     │
+        │               │                │             │
+        │               │                ▼             │
+        │               │    Agent: Fix, PR, Merge    │
+        │               │                │             │
+        │               │                ▼             │
+        └───────────────┴───(workflow auto-retries)───┘
+                                         │
+                                         ▼
+                              Reset if max failures
+                              Run new workflow
+                              Restart loop
+```
 
 ## Summary
 
-1. **Monitor** with `play-monitor status --task-id X`
-2. **Detect** failures from status and failed_pods
-3. **Analyze** with `play-monitor logs --task-id X`
-4. **Fix** the root cause in code
-5. **Merge** changes via PR
-6. **Repeat** until all tasks complete
+1. **Start** with `play-monitor loop --play-id <WORKFLOW_NAME>`
+2. **React** to JSON events automatically
+3. **Fix** failures using logs and memory suggestions
+4. **Merge** fixes via automated PR process (handle Bugbot, CI, conflicts)
+5. **Continue** until `completed` event
+6. **Reset** if `stopped` event (max failures reached)
 
-The goal is an unattended feedback loop that progresses through all tasks
-with automatic remediation of recoverable failures.
+The goal is a fully automated, unattended feedback loop that progresses through
+all play stages with automatic remediation of failures.
