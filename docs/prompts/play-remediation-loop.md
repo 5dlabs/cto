@@ -130,6 +130,32 @@ After merging:
 - Monitor status to confirm the stage passes
 - Continue to next stage
 
+### Step 8: Reset and Re-run (For Unrecoverable Failures)
+
+If a failure cannot be fixed in code (e.g., cluster state issues):
+
+```bash
+# Reset cluster resources and test repository
+play-monitor reset --repo cto-parallel-test --org 5dlabs
+
+# Re-run the play workflow
+play-monitor run --task-id <TASK_ID> --repository 5dlabs/cto-parallel-test
+```
+
+The reset command:
+
+- Deletes all workflows, pods in `agent-platform` namespace
+- Removes test ConfigMaps (play-*, test-*, coderun-*, docsrun-*)
+- Removes test PVCs (workspace-play-*, workspace-test-*)
+- Deletes and recreates the GitHub test repository
+- Initializes with minimal structure (README, .gitignore)
+
+The run command:
+
+- Submits a new play workflow via Argo CLI
+- Uses the play-workflow-template
+- Returns the workflow name for monitoring
+
 ## Stage Confirmations
 
 Verify each stage completed successfully before moving on:

@@ -77,6 +77,46 @@ enum Commands {
         #[arg(long, default_value = "30")]
         interval: u64,
     },
+    /// Reset environment: clean cluster resources and reset test repo
+    Reset {
+        /// Test repository name (e.g., cto-parallel-test)
+        #[arg(long, default_value = "cto-parallel-test")]
+        repo: String,
+
+        /// GitHub organization
+        #[arg(long, default_value = "5dlabs")]
+        org: String,
+
+        /// Skip Kubernetes cleanup
+        #[arg(long)]
+        skip_k8s: bool,
+
+        /// Skip GitHub repo reset
+        #[arg(long)]
+        skip_github: bool,
+
+        /// Force without confirmation
+        #[arg(long)]
+        force: bool,
+    },
+    /// Run/submit a play workflow via Argo CLI
+    Run {
+        /// Task ID to run
+        #[arg(long)]
+        task_id: String,
+
+        /// Repository to work on
+        #[arg(long, default_value = "5dlabs/cto-parallel-test")]
+        repository: String,
+
+        /// Implementation agent (Rex or Blaze)
+        #[arg(long, default_value = "5DLabs-Rex")]
+        agent: String,
+
+        /// Workflow template name
+        #[arg(long, default_value = "play-workflow-template")]
+        template: String,
+    },
 }
 
 /// Pod status information
@@ -121,6 +161,48 @@ struct LogsResponse {
     error: Option<String>,
 }
 
+/// Reset response
+#[derive(Debug, Serialize, Deserialize)]
+struct ResetResponse {
+    success: bool,
+    k8s_cleanup: CleanupResult,
+    github_reset: Option<GithubResetResult>,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+/// K8s cleanup result
+#[derive(Debug, Serialize, Deserialize)]
+struct CleanupResult {
+    workflows_deleted: i32,
+    pods_deleted: i32,
+    configmaps_deleted: i32,
+    pvcs_deleted: i32,
+    skipped: bool,
+}
+
+/// GitHub reset result
+#[derive(Debug, Serialize, Deserialize)]
+struct GithubResetResult {
+    repo: String,
+    deleted: bool,
+    created: bool,
+    pushed: bool,
+}
+
+/// Run workflow response
+#[derive(Debug, Serialize, Deserialize)]
+struct RunResponse {
+    success: bool,
+    workflow_name: Option<String>,
+    task_id: String,
+    repository: String,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -148,6 +230,26 @@ async fn main() -> Result<()> {
         }
         Commands::Watch { task_id, interval } => {
             watch_status(&task_id, &cli.namespace, interval).await?;
+        }
+        Commands::Reset {
+            repo,
+            org,
+            skip_k8s,
+            skip_github,
+            force,
+        } => {
+            let result =
+                reset_environment(&cli.namespace, &org, &repo, skip_k8s, skip_github, force)?;
+            output_result(&result, cli.format)?;
+        }
+        Commands::Run {
+            task_id,
+            repository,
+            agent,
+            template,
+        } => {
+            let result = run_workflow(&task_id, &repository, &agent, &template)?;
+            output_result(&result, cli.format)?;
         }
     }
 
@@ -705,6 +807,339 @@ fn output_result<T: Serialize>(result: &T, format: OutputFormat) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Reset the E2E environment - clean cluster and reset test repo
+#[allow(clippy::too_many_lines)]
+fn reset_environment(
+    namespace: &str,
+    org: &str,
+    repo: &str,
+    skip_k8s: bool,
+    skip_github: bool,
+    force: bool,
+) -> Result<ResetResponse> {
+    let mut k8s_cleanup = CleanupResult {
+        workflows_deleted: 0,
+        pods_deleted: 0,
+        configmaps_deleted: 0,
+        pvcs_deleted: 0,
+        skipped: skip_k8s,
+    };
+
+    // Kubernetes cleanup
+    if !skip_k8s {
+        println!("{}", "Cleaning up Kubernetes resources...".cyan());
+
+        // Delete workflows
+        let output = Command::new("kubectl")
+            .args([
+                "delete",
+                "workflows",
+                "--all",
+                "-n",
+                namespace,
+                "--force",
+                "--grace-period=0",
+            ])
+            .output()
+            .context("Failed to delete workflows")?;
+        if output.status.success() {
+            k8s_cleanup.workflows_deleted = count_deleted(&output.stdout);
+            println!("  {} Deleted workflows", "✓".green());
+        }
+
+        // Delete pods
+        let output = Command::new("kubectl")
+            .args([
+                "delete",
+                "pods",
+                "--all",
+                "-n",
+                namespace,
+                "--force",
+                "--grace-period=0",
+            ])
+            .output()
+            .context("Failed to delete pods")?;
+        if output.status.success() {
+            k8s_cleanup.pods_deleted = count_deleted(&output.stdout);
+            println!("  {} Deleted pods", "✓".green());
+        }
+
+        // Delete test ConfigMaps (play-*, test-*, coderun-*, docsrun-*)
+        for pattern in &["play-", "test-", "coderun-", "docsrun-", "remediation-"] {
+            let list_output = Command::new("kubectl")
+                .args(["get", "configmaps", "-n", namespace, "-o", "name"])
+                .output()?;
+
+            if list_output.status.success() {
+                let output_str = String::from_utf8_lossy(&list_output.stdout);
+                let cms: Vec<&str> = output_str.lines().filter(|l| l.contains(pattern)).collect();
+
+                for cm in &cms {
+                    let _ = Command::new("kubectl")
+                        .args(["delete", cm, "-n", namespace, "--force", "--grace-period=0"])
+                        .output();
+                    k8s_cleanup.configmaps_deleted += 1;
+                }
+            }
+        }
+        println!(
+            "  {} Deleted {} ConfigMaps",
+            "✓".green(),
+            k8s_cleanup.configmaps_deleted
+        );
+
+        // Delete test PVCs (workspace-play-*, workspace-test-*)
+        for pattern in &["workspace-play-", "workspace-test-"] {
+            let list_output = Command::new("kubectl")
+                .args(["get", "pvc", "-n", namespace, "-o", "name"])
+                .output()?;
+
+            if list_output.status.success() {
+                let output_str = String::from_utf8_lossy(&list_output.stdout);
+                let pvcs: Vec<&str> = output_str.lines().filter(|l| l.contains(pattern)).collect();
+
+                for pvc in &pvcs {
+                    let _ = Command::new("kubectl")
+                        .args([
+                            "delete",
+                            pvc,
+                            "-n",
+                            namespace,
+                            "--force",
+                            "--grace-period=0",
+                        ])
+                        .output();
+                    k8s_cleanup.pvcs_deleted += 1;
+                }
+            }
+        }
+        println!(
+            "  {} Deleted {} PVCs",
+            "✓".green(),
+            k8s_cleanup.pvcs_deleted
+        );
+    }
+
+    // GitHub repository reset
+    let github_reset = if skip_github {
+        None
+    } else {
+        println!("{}", "Resetting GitHub repository...".cyan());
+        Some(reset_github_repo(org, repo, force)?)
+    };
+
+    Ok(ResetResponse {
+        success: true,
+        k8s_cleanup,
+        github_reset,
+        timestamp: Utc::now(),
+        error: None,
+    })
+}
+
+/// Reset GitHub repository - delete and recreate with minimal structure
+fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetResult> {
+    let full_repo = format!("{org}/{repo}");
+    let mut result = GithubResetResult {
+        repo: full_repo.clone(),
+        deleted: false,
+        created: false,
+        pushed: false,
+    };
+
+    // Check if repo exists and delete it
+    let check = Command::new("gh")
+        .args(["repo", "view", &full_repo])
+        .output()?;
+
+    if check.status.success() {
+        println!("  Deleting existing repository...");
+        let delete = Command::new("gh")
+            .args(["repo", "delete", &full_repo, "--yes"])
+            .output()?;
+
+        if delete.status.success() {
+            result.deleted = true;
+            println!("  {} Deleted {full_repo}", "✓".green());
+        } else {
+            let err = String::from_utf8_lossy(&delete.stderr);
+            return Err(anyhow::anyhow!("Failed to delete repo: {err}"));
+        }
+    }
+
+    // Create new repository
+    println!("  Creating new repository...");
+    let create = Command::new("gh")
+        .args([
+            "repo",
+            "create",
+            &full_repo,
+            "--private",
+            "--description",
+            "E2E test repository for CTO platform",
+        ])
+        .output()?;
+
+    if create.status.success() {
+        result.created = true;
+        println!("  {} Created {full_repo}", "✓".green());
+    } else {
+        let err = String::from_utf8_lossy(&create.stderr);
+        return Err(anyhow::anyhow!("Failed to create repo: {err}"));
+    }
+
+    // Initialize with minimal structure using a temp dir and git
+    println!("  Initializing repository structure...");
+
+    // Create temp directory and initialize repo
+    let temp_dir = std::env::temp_dir().join(format!("play-monitor-{repo}"));
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir)?;
+
+    // Create README
+    let readme_content = format!(
+        "# {repo}\n\nE2E test repository for CTO platform.\n\nThis repo is managed by play-monitor."
+    );
+    std::fs::write(temp_dir.join("README.md"), readme_content)?;
+
+    // Create .gitignore
+    std::fs::write(temp_dir.join(".gitignore"), "target/\n*.log\n.env\n")?;
+
+    // Initialize git and push
+    let git_init = Command::new("git")
+        .args(["init"])
+        .current_dir(&temp_dir)
+        .output()?;
+
+    if git_init.status.success() {
+        let _ = Command::new("git")
+            .args(["add", "."])
+            .current_dir(&temp_dir)
+            .output();
+
+        let _ = Command::new("git")
+            .args(["commit", "-m", "Initial commit"])
+            .current_dir(&temp_dir)
+            .output();
+
+        let _ = Command::new("git")
+            .args(["branch", "-M", "main"])
+            .current_dir(&temp_dir)
+            .output();
+
+        let _ = Command::new("git")
+            .args([
+                "remote",
+                "add",
+                "origin",
+                &format!("git@github.com:{full_repo}.git"),
+            ])
+            .current_dir(&temp_dir)
+            .output();
+
+        let push = Command::new("git")
+            .args(["push", "-u", "origin", "main", "--force"])
+            .current_dir(&temp_dir)
+            .output()?;
+
+        if push.status.success() {
+            result.pushed = true;
+            println!("  {} Initialized repository", "✓".green());
+        }
+    }
+
+    // Cleanup temp dir
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    Ok(result)
+}
+
+/// Count deleted resources from kubectl output
+fn count_deleted(output: &[u8]) -> i32 {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    let count = String::from_utf8_lossy(output)
+        .lines()
+        .filter(|l| l.contains("deleted"))
+        .count() as i32;
+    count
+}
+
+/// Run/submit a play workflow via Argo CLI
+fn run_workflow(
+    task_id: &str,
+    repository: &str,
+    agent: &str,
+    template: &str,
+) -> Result<RunResponse> {
+    println!(
+        "{}",
+        format!("Submitting play workflow for task {task_id}...").cyan()
+    );
+
+    // Submit workflow using argo CLI
+    let output = Command::new("argo")
+        .args([
+            "submit",
+            "--from",
+            &format!("workflowtemplate/{template}"),
+            "-n",
+            "argo",
+            "-p",
+            &format!("task-id={task_id}"),
+            "-p",
+            &format!("repository={repository}"),
+            "-p",
+            &format!("implementation-agent={agent}"),
+            "-p",
+            "quality-agent=5DLabs-Cleo",
+            "-p",
+            "testing-agent=5DLabs-Tess",
+            "-o",
+            "json",
+        ])
+        .output()
+        .context("Failed to submit workflow via argo CLI")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Ok(RunResponse {
+            success: false,
+            workflow_name: None,
+            task_id: task_id.to_string(),
+            repository: repository.to_string(),
+            timestamp: Utc::now(),
+            error: Some(stderr.to_string()),
+        });
+    }
+
+    // Parse workflow name from output
+    let workflow_json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
+
+    let workflow_name = workflow_json["metadata"]["name"]
+        .as_str()
+        .map(ToString::to_string);
+
+    println!(
+        "{}",
+        format!(
+            "✓ Workflow submitted: {}",
+            workflow_name.as_deref().unwrap_or("unknown")
+        )
+        .green()
+    );
+
+    Ok(RunResponse {
+        success: true,
+        workflow_name,
+        task_id: task_id.to_string(),
+        repository: repository.to_string(),
+        timestamp: Utc::now(),
+        error: None,
+    })
 }
 
 #[cfg(test)]
