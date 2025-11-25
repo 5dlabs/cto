@@ -1,0 +1,83 @@
+---
+# Argo CD Application for kube-state-metrics
+# Provides Kubernetes cluster state metrics for pod status, failures, restarts
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-state-metrics
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 5.27.0
+    chart: kube-state-metrics
+    helm:
+      values: |
+        # kube-state-metrics configuration for play-monitor feedback loop
+
+        # Enable all collectors we need for monitoring agent pods
+        collectors:
+          - pods
+          - namespaces
+          - nodes
+          - jobs
+          - replicasets
+          - deployments
+          - configmaps
+
+        # Namespace filtering - focus on agent-platform and argo namespaces
+        namespaces: ""
+        namespacesDenylist: ""
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+        # Service configuration for Victoria Metrics scraping
+        service:
+          type: ClusterIP
+          port: 8080
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8080"
+
+        # Pod labels for service discovery
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "8080"
+
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          fsGroup: 65534
+
+        # RBAC - kube-state-metrics needs cluster-wide read access
+        rbac:
+          create: true
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: kube-state-metrics
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: telemetry
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
