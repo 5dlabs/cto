@@ -19,6 +19,7 @@ spec:
         image:
           repository: ghcr.io/5dlabs/openmemory
           tag: "latest"
+          pullPolicy: Always
 
         database:
           storage:
