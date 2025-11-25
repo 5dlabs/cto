@@ -1,0 +1,45 @@
+---
+# Test Redis instance using OT-CONTAINER-KIT Redis Operator
+# This is a minimal standalone instance for testing the operator
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: test-redis
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: test-redis
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: cache
+spec:
+  # Security context
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+
+  # Kubernetes configuration
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v7.4.2
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Redis exporter disabled for basic test
+  redisExporter:
+    enabled: false
+
+  # Storage configuration
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: local-path
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+
