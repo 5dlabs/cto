@@ -1,4 +1,10 @@
 ---
+# DEPRECATED: This namespace and RBAC are for the old Kubernetes-backed secret store.
+# Secrets are now stored in HashiCorp Vault (vault namespace).
+# This file will be removed after Vault migration is verified.
+# See: docs/runbooks/vault-operations.md
+#
+# Original description:
 # Namespace for storing platform secrets
 apiVersion: v1
 kind: Namespace
