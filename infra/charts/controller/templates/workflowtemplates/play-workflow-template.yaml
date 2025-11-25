@@ -2635,19 +2635,38 @@ spec:
           PR_URL_IMPL="{{`{{inputs.parameters.pr-url-from-implementation}}`}}"
           PR_NUMBER_IMPL="{{`{{inputs.parameters.pr-number-from-implementation}}`}}"
 
+          # Helper function to check if a value is a valid (substituted) parameter
+          # Returns 1 (false) if value is empty, contains unsubstituted template syntax,
+          # or is a literal placeholder string
+          is_valid_param() {
+            val="$1"
+            # Empty or null check
+            [ -z "$val" ] && return 1
+            [ "$val" = "" ] && return 1
+            # Detect unsubstituted Argo template expressions (e.g., {{steps.foo.outputs.parameters.bar}})
+            # When a step is skipped, Argo leaves these as literal strings instead of substituting
+            case "$val" in
+              *'{{steps.'*|*'{{workflow.'*|*'{{inputs.'*|*'{{outputs.'*)
+                echo "⚠️ Detected unsubstituted template: $val"
+                return 1
+                ;;
+            esac
+            return 0
+          }
+
           # Priority: implementation output > GitHub > ConfigMap
           PR_URL=""
           PR_NUMBER=""
 
-          if [ -n "$PR_URL_IMPL" ] && [ "$PR_URL_IMPL" != "" ] && [ "$PR_NUMBER_IMPL" != "" ]; then
+          if is_valid_param "$PR_URL_IMPL" && is_valid_param "$PR_NUMBER_IMPL"; then
             PR_URL="$PR_URL_IMPL"
             PR_NUMBER="$PR_NUMBER_IMPL"
             echo "✅ Using PR info from implementation step"
-          elif [ -n "$PR_URL_GITHUB" ] && [ "$PR_URL_GITHUB" != "" ] && [ "$PR_NUMBER_GITHUB" != "" ]; then
+          elif is_valid_param "$PR_URL_GITHUB" && is_valid_param "$PR_NUMBER_GITHUB"; then
             PR_URL="$PR_URL_GITHUB"
             PR_NUMBER="$PR_NUMBER_GITHUB"
             echo "✅ Using PR info from GitHub API"
-          elif [ -n "$PR_URL_CONFIGMAP" ] && [ "$PR_URL_CONFIGMAP" != "" ] && [ "$PR_NUMBER_CONFIGMAP" != "" ]; then
+          elif is_valid_param "$PR_URL_CONFIGMAP" && is_valid_param "$PR_NUMBER_CONFIGMAP"; then
             PR_URL="$PR_URL_CONFIGMAP"
             PR_NUMBER="$PR_NUMBER_CONFIGMAP"
             echo "✅ Using PR info from ConfigMap"
@@ -2658,7 +2677,7 @@ spec:
           echo "$PR_URL" > /tmp/pr-url-final.txt
           echo "$PR_NUMBER" > /tmp/pr-number-final.txt
 
-          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "" ]; then
+          if is_valid_param "$PR_NUMBER"; then
             echo "   PR #$PR_NUMBER: $PR_URL"
           fi
 

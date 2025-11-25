@@ -904,6 +904,36 @@ cd "$REPO_ROOT"
 sync_gh_hosts_to_path "$REPO_ROOT"
 
 echo "=== BRANCH SETUP ==="
+
+# =========================================================================
+# CRITICAL: Clean up stale git state from previous interrupted runs
+# This MUST happen before ANY git operations to prevent hangs/crashes
+# Exit code 128 is a Git fatal error - often caused by stale locks
+# =========================================================================
+if [ -f ".git/index.lock" ]; then
+  echo "🧹 Removing stale .git/index.lock (leftover from interrupted run)"
+  rm -f ".git/index.lock"
+fi
+
+# Clean up any incomplete git operations (merge, rebase, cherry-pick in progress)
+if [ -f ".git/MERGE_HEAD" ] || [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ]; then
+  echo "🧹 Aborting incomplete git operation from previous run..."
+  git merge --abort 2>/dev/null || true
+  git rebase --abort 2>/dev/null || true
+  git cherry-pick --abort 2>/dev/null || true
+  # Force reset if still dirty
+  git reset --hard HEAD 2>/dev/null || true
+  echo "✓ Git state cleaned up"
+fi
+
+# Remove any other common lock files that cause exit code 128
+for lockfile in .git/HEAD.lock .git/config.lock .git/refs/heads/*.lock; do
+  if [ -f "$lockfile" ] 2>/dev/null; then
+    echo "🧹 Removing stale lock: $lockfile"
+    rm -f "$lockfile" 2>/dev/null || true
+  fi
+done
+
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
