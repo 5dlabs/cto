@@ -1,25 +1,32 @@
 # Cursor Agent CLI - Available Models
 
-**Last Updated:** November 22, 2025  
-**Cursor Agent Version:** 2025.11.06-8fe8a63 (Latest - Verified)  
+**Last Updated:** November 25, 2025  
+**Cursor Agent Version:** 2025.11.20-a4d3945 (Latest - Verified)  
 **Status:** ✅ Up to date
 
 This document lists the exact model identifiers you can use with the `cursor agent --model <model>` command based on the latest Cursor CLI.
-
-> **Note:** Gemini models are NOT currently available through Cursor CLI. Use the dedicated `gemini` CLI for Gemini model access.
 
 ## Available Models
 
 | Model Name | CLI Identifier | Provider | Notes |
 |------------|---------------|----------|-------|
+| **Composer 1** | `composer-1` | Cursor | Cursor's internal model |
 | **Auto** | `auto` | Mixed | Automatically selects the best model for the task |
-| **Cheetah** | `cheetah` | Cursor | Cursor's proprietary fast model |
-| **Claude 4.5 Sonnet** | `sonnet-4.5` | Anthropic | Latest Claude Sonnet model |
+| **Claude 4.5 Sonnet** | `sonnet-4.5` | Anthropic | Claude Sonnet 4.5 |
 | **Claude 4.5 Sonnet (Thinking)** | `sonnet-4.5-thinking` | Anthropic | Extended reasoning mode |
-| **Claude 4.1 Opus** | `opus-4.1` | Anthropic | Most capable Claude model |
-| **GPT-5** | `gpt-5` | OpenAI | Latest GPT-5 model |
+| **Claude 4.5 Opus** | `opus-4.5` | Anthropic | Latest and most capable Claude model |
+| **Claude 4.5 Opus (Thinking)** | `opus-4.5-thinking` | Anthropic | Opus with extended reasoning |
+| **Claude 4.1 Opus** | `opus-4.1` | Anthropic | Previous Opus version (legacy) |
+| **Gemini 3 Pro** | `gemini-3-pro` | Google | Google's latest Gemini model |
+| **GPT-5** | `gpt-5` | OpenAI | GPT-5 base model |
+| **GPT-5.1** | `gpt-5.1` | OpenAI | Latest GPT-5.1 model |
+| **GPT-5 High** | `gpt-5-high` | OpenAI | GPT-5 with higher reasoning |
+| **GPT-5.1 High** | `gpt-5.1-high` | OpenAI | GPT-5.1 with higher reasoning |
 | **GPT-5 Codex** | `gpt-5-codex` | OpenAI | GPT-5 optimized for code |
-| **Grok** | `grok` | xAI | Grok model |
+| **GPT-5 Codex High** | `gpt-5-codex-high` | OpenAI | GPT-5 Codex with higher reasoning |
+| **GPT-5.1 Codex** | `gpt-5.1-codex` | OpenAI | Latest GPT-5.1 optimized for code |
+| **GPT-5.1 Codex High** | `gpt-5.1-codex-high` | OpenAI | GPT-5.1 Codex with higher reasoning |
+| **Grok** | `grok` | xAI | xAI's Grok model |
 
 ## Usage Examples
 
@@ -46,20 +53,24 @@ cursor agent --model gpt-5-codex --print "Generate a REST API"
 ## Model Selection Guide
 
 ### For General Tasks
-- **Recommended:** `sonnet-4.5` or `auto`
-- Fast, balanced performance for most coding tasks
+- **Recommended:** `opus-4.5` or `auto`
+- Best balanced performance for most coding tasks
 
 ### For Complex Reasoning
-- **Recommended:** `sonnet-4.5-thinking` or `opus-4.1`
+- **Recommended:** `opus-4.5-thinking` or `sonnet-4.5-thinking`
 - Extended thinking capabilities for complex problems
 
 ### For Code Generation
-- **Recommended:** `gpt-5-codex` or `cheetah`
+- **Recommended:** `gpt-5.1-codex` or `gpt-5.1-codex-high`
 - Optimized for code-specific tasks
 
 ### For Speed
-- **Recommended:** `cheetah` or `auto`
+- **Recommended:** `sonnet-4.5` or `auto`
 - Fastest response times
+
+### For Multi-Provider Coverage
+- **Recommended rotation:** `opus-4.5`, `gemini-3-pro`, `gpt-5.1-codex`
+- Ensures fallback across providers
 
 ## Verifying Available Models
 
@@ -104,14 +115,18 @@ When using these models in the CTO platform's `cto-config.json`, use these exact
 }
 ```
 
-## Legacy Model Names
+## Legacy/Removed Models
 
-The following model names may still work but are deprecated:
+The following models have been removed or deprecated:
 
+- ❌ `cheetah` - Removed from Cursor CLI
 - `sonnet-4` → Use `sonnet-4.5`
-- `gpt-4o` → Use `gpt-5` or `gpt-5-codex`
+- `gpt-4o` → Use `gpt-5.1` or `gpt-5.1-codex`
+- `gpt-5` → Consider upgrading to `gpt-5.1`
+- `gpt-5-codex` → Consider upgrading to `gpt-5.1-codex`
+- `opus-4.1` → Use `opus-4.5`
 - `claude-sonnet-4-5-20250929` → Use `sonnet-4.5`
-- `claude-opus-4-1-20250805` → Use `opus-4.1`
+- `claude-opus-4-5-20251101` → Use `opus-4.5`
 
 ## Additional Resources
 

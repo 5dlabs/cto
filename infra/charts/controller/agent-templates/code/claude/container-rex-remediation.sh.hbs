@@ -1154,6 +1154,59 @@ fi
 # Verify setup
 echo "✓ Code implementation environment ready"
 
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
+# Calculate which model to use for this attempt (attempt number from controller)
+ATTEMPT={{#if attempts}}{{attempts}}{{else}}1{{/if}}
+CURRENT_MODEL="$DEFAULT_MODEL"
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+  CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+fi
+if [ -n "$CURRENT_MODEL" ]; then
+  echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+  
+  # Create writable copy of enterprise settings and update model
+  if [ -f "/etc/claude-code/managed-settings.json" ]; then
+    mkdir -p /etc/claude-code-writable
+    cp /etc/claude-code/managed-settings.json /etc/claude-code-writable/managed-settings.json
+    chmod 644 /etc/claude-code-writable/managed-settings.json
+    
+    if command -v jq >/dev/null 2>&1; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "/etc/claude-code-writable/managed-settings.json" > /tmp/settings-rotated.json && \
+      mv /tmp/settings-rotated.json "/etc/claude-code-writable/managed-settings.json"
+      echo "✓ Updated model in settings: $CURRENT_MODEL"
+      
+      # Point Claude to the writable settings
+      export CLAUDE_CODE_SETTINGS_DIR="/etc/claude-code-writable"
+    else
+      echo "⚠️ jq not available, using default model from settings"
+    fi
+  fi
+fi
+
 # Build Claude command
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
@@ -1180,7 +1233,7 @@ else
     echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
 fi
 
-# Model is set via settings.json template, not CLI flag
+# Model is set via managed-settings.json (updated by model rotation above if enabled)
 
 # Add continue flag if this is a retry attempt or user requested continuation
 {{#if continue_session}}
