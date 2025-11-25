@@ -1390,7 +1390,6 @@ async fn run_monitoring_loop(
     let start_time = Utc::now();
     let mut consecutive_failures: u32 = 0;
     let mut last_stage: Option<String> = None;
-    let mut last_status = String::new();
 
     // Emit started event
     let started_event = LoopEvent::Started {
@@ -1492,10 +1491,11 @@ async fn run_monitoring_loop(
                         }
                     }
                     "running" | "pending" => {
-                        // Reset failure count on successful status
-                        if current_status != last_status {
-                            consecutive_failures = 0;
-                        }
+                        // Reset failure count on any successful healthy status
+                        // This must be unconditional because transient get_status errors
+                        // don't update last_status, so subsequent successful polls would
+                        // see current_status == last_status and fail to reset the counter
+                        consecutive_failures = 0;
 
                         // Emit status event periodically
                         let status_event = LoopEvent::Status {
@@ -1521,8 +1521,6 @@ async fn run_monitoring_loop(
                         std::io::stdout().flush()?;
                     }
                 }
-
-                last_status = current_status;
             }
             Err(e) => {
                 // Error getting status - treat as failure
