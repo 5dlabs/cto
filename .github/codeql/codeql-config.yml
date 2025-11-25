@@ -1,0 +1,20 @@
+---
+# CodeQL Configuration
+# See: https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning
+
+name: "5DLabs CTO CodeQL Config"
+
+# Paths to exclude from analysis
+paths-ignore:
+  # Generated files
+  - "**/target/**"
+  - "**/node_modules/**"
+
+# Query filters - exclude false positives for internal K8s services
+query-filters:
+  # Internal Kubernetes cluster services use HTTP (no TLS within cluster)
+  # These are not security vulnerabilities for service-to-service communication
+  - exclude:
+      tags: /security\/.*cleartext.*/
+      paths:
+        - monitor/src/main.rs

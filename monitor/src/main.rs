@@ -718,9 +718,11 @@ async fn get_task_logs(task_id: &str, namespace: &str, tail: u32) -> Result<Stri
 
 /// Query Victoria Logs API for historical logs
 async fn get_victoria_logs(task_id: &str, namespace: &str, limit: u32) -> Result<String> {
+    // Internal Kubernetes cluster service - HTTP is standard for in-cluster traffic
+    // Set VICTORIA_LOGS_URL env var to override (e.g., for external/TLS endpoints)
     let victoria_logs_url = std::env::var("VICTORIA_LOGS_URL").unwrap_or_else(|_| {
-        "http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428"
-            .to_string()
+        // codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required
+        String::from("http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428")
     });
 
     let query = format!(
