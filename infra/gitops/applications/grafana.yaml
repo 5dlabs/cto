@@ -18,12 +18,133 @@ spec:
     chart: grafana
     helm:
       values: |
-        # Enable persistence with local-path storage class
+        # Admin credentials
+        adminUser: admin
+        adminPassword: admin
+
+        # Resource allocation
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+
+        # Persistence for dashboards and settings
         persistence:
           enabled: true
-          storageClassName: local-path
           size: 10Gi
-        adminPassword: admin
+          storageClassName: local-path
+
+        # Service configuration
+        service:
+          type: ClusterIP
+          port: 80
+
+        # Data sources - Victoria Metrics and Victoria Logs
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              # VictoriaMetrics as Prometheus datasource
+              - name: VictoriaMetrics
+                type: prometheus
+                access: proxy
+                url: http://victoria-metrics-victoria-metrics-single-server:8428
+                isDefault: true
+                editable: false
+                jsonData:
+                  timeInterval: "15s"
+                  queryTimeout: "60s"
+                  httpMethod: POST
+
+              # VictoriaLogs datasource
+              - name: VictoriaLogs
+                type: victoriametrics-logs-datasource
+                access: proxy
+                url: http://victoria-logs-victoria-logs-single-server:9428
+                editable: false
+
+        # Plugins to install
+        plugins:
+          - grafana-piechart-panel
+          - grafana-worldmap-panel
+          - victoriametrics-logs-datasource
+
+        # RBAC configuration
+        rbac:
+          create: true
+          pspEnabled: false
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: grafana
+
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 472
+          fsGroup: 472
+
+        # Environment variables
+        env:
+          GF_EXPLORE_ENABLED: "true"
+          GF_ALERTING_ENABLED: "true"
+          GF_UNIFIED_ALERTING_ENABLED: "true"
+
+        # Grafana.ini configuration
+        grafana.ini:
+          server:
+            domain: grafana.local
+            root_url: "%(protocol)s://%(domain)s/"
+
+          analytics:
+            reporting_enabled: false
+            check_for_updates: false
+
+          log:
+            mode: console
+            level: info
+
+          unified_alerting:
+            enabled: true
+
+          feature_toggles:
+            enable: ngalert
+
+        # Sidecar for dynamic dashboard/datasource provisioning
+        sidecar:
+          dashboards:
+            enabled: true
+            label: grafana_dashboard
+            folder: /tmp/dashboards
+            provider:
+              name: sidecarProvider
+              orgId: 1
+              folder: 'Claude Code'
+              type: file
+              disableDeletion: false
+              allowUiUpdates: true
+
+          datasources:
+            enabled: true
+            label: grafana_datasource
+
+        # Readiness and liveness probes
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 10
   destination:
     server: https://kubernetes.default.svc
     namespace: telemetry
