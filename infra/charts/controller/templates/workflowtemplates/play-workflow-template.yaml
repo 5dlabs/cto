@@ -250,10 +250,22 @@ spec:
                 - name: verify-update
                   value: "true"
 
+          # Stage 1b: Fast-forward workflow stage when resuming from later stage
+          # This sets the workflow's current-stage label to the predecessor of the resume point
+          # so that stage transition validation will pass when we enter the resumed stage
+          - name: fast-forward-stage
+            depends: "check-main-resume.Succeeded"
+            template: initialize-resume-stage
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'implementation'"
+            arguments:
+              parameters:
+                - name: resume-stage
+                  value: "{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}"
+
           # Stage 2: Update to implementation stage before Rex starts
           # Only run if starting fresh (not resuming from later stage)
           - name: update-to-implementation
-            depends: "(initialize-stage.Succeeded || initialize-stage.Skipped) && check-main-resume.Succeeded"
+            depends: "(initialize-stage.Succeeded || initialize-stage.Skipped) && (fast-forward-stage.Succeeded || fast-forward-stage.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
             when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' == 'implementation'"
             arguments:
@@ -2363,6 +2375,112 @@ spec:
           else
             echo "▶️  Running $CURRENT_STAGE"
             echo "true" > /tmp/should-run.txt
+          fi
+
+    # Template to fast-forward workflow stage when resuming from a later stage
+    # This sets the workflow's current-stage label to the predecessor of the resume point
+    # so that stage transition validation will pass when we enter the resumed stage
+    # NOTE: This bypasses normal stage transition validation intentionally
+    - name: initialize-resume-stage
+      inputs:
+        parameters:
+          - name: resume-stage
+            description: "The stage to resume from (quality, security, testing, waiting-atlas, waiting-merge)"
+      outputs:
+        parameters:
+          - name: initialized-stage
+            valueFrom:
+              path: /tmp/initialized-stage.txt
+            default: ""
+      script:
+        image: alpine/k8s:1.31.0
+        command: [bash]
+        source: |
+          #!/bin/bash
+          set -e
+
+          echo "========================================="
+          echo "Initializing Workflow Stage for Resume"
+          echo "========================================="
+          echo "Workflow: {{`{{workflow.name}}`}}"
+          echo "Resume Stage: {{`{{inputs.parameters.resume-stage}}`}}"
+          echo ""
+
+          RESUME_STAGE="{{`{{inputs.parameters.resume-stage}}`}}"
+
+          # Map resume stage to predecessor stage
+          # This allows the normal stage transition validation to pass
+          # when we later transition TO the resume stage
+          case "$RESUME_STAGE" in
+            "quality")
+              # To transition to quality-in-progress, we need to be at implementation-in-progress
+              PREDECESSOR_STAGE="implementation-in-progress"
+              ;;
+            "security")
+              # To transition to security-in-progress, we need to be at quality-in-progress
+              PREDECESSOR_STAGE="quality-in-progress"
+              ;;
+            "testing")
+              # To transition to testing-in-progress, we need to be at security-in-progress
+              PREDECESSOR_STAGE="security-in-progress"
+              ;;
+            "waiting-atlas")
+              # To transition to waiting-atlas-integration, we need to be at testing-in-progress
+              PREDECESSOR_STAGE="testing-in-progress"
+              ;;
+            "waiting-merge")
+              # To transition to waiting-pr-merged, we need to be at waiting-atlas-integration
+              PREDECESSOR_STAGE="waiting-atlas-integration"
+              ;;
+            *)
+              echo "⚠️  Unknown resume stage: $RESUME_STAGE"
+              echo "No fast-forward needed"
+              echo "" > /tmp/initialized-stage.txt
+              exit 0
+              ;;
+          esac
+
+          echo "Setting workflow stage to predecessor: $PREDECESSOR_STAGE"
+          echo "(This allows transition validation to pass when entering $RESUME_STAGE)"
+          echo ""
+
+          # Get current resource version for the patch
+          RESOURCE_VERSION=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
+            -n {{ .Release.Namespace }} \
+            -o jsonpath='{.metadata.resourceVersion}')
+
+          echo "Current resource version: $RESOURCE_VERSION"
+
+          # Prepare the JSON patch - setting the predecessor stage directly
+          # This bypasses validation because we're setting up for a resume
+          REPOSITORY_LABEL=$(echo '{{`{{workflow.parameters.repository}}`}}' | tr '/' '-')
+          PATCH_JSON='{
+            "metadata": {
+              "resourceVersion": "'$RESOURCE_VERSION'",
+              "labels": {
+                "current-stage": "'$PREDECESSOR_STAGE'",
+                "task-id": "{{`{{workflow.parameters.task-id}}`}}",
+                "repository": "'$REPOSITORY_LABEL'",
+                "resume-initialized": "true"
+              }
+            }
+          }'
+
+          echo "Applying patch:"
+          echo "$PATCH_JSON" | jq .
+
+          # Apply the patch
+          if kubectl patch workflow "{{`{{workflow.name}}`}}" \
+            --type='merge' \
+            --patch="$PATCH_JSON" \
+            -n {{ .Release.Namespace }}; then
+            echo ""
+            echo "✅ Successfully fast-forwarded workflow stage to: $PREDECESSOR_STAGE"
+            echo "$PREDECESSOR_STAGE" > /tmp/initialized-stage.txt
+          else
+            echo ""
+            echo "❌ Failed to fast-forward workflow stage"
+            exit 1
           fi
 
     # Template to get PR info from GitHub when resuming from later stages
