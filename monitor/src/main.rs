@@ -464,15 +464,15 @@ async fn main() -> Result<()> {
             fetch_logs,
             max_failures,
         } => {
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(run_monitoring_loop(
+            run_monitoring_loop(
                 &play_id,
                 &cli.namespace,
                 interval,
                 query_memory,
                 fetch_logs,
                 max_failures,
-            ))?;
+            )
+            .await?;
         }
     }
 
@@ -892,7 +892,9 @@ async fn get_victoria_logs(play_id: &str, namespace: &str, limit: u32) -> Result
     #[allow(clippy::expect_used)] // Safe: URL is validated at startup in production
     let victoria_logs_url = std::env::var("VICTORIA_LOGS_URL").unwrap_or_else(|_| {
         // codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required
-        String::from("http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428")
+        String::from(
+            "http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428",
+        )
     });
 
     let query = format!(
@@ -1542,9 +1544,7 @@ async fn run_monitoring_loop(
                 if max_failures > 0 && consecutive_failures >= max_failures {
                     let stopped = LoopEvent::Stopped {
                         play_id: play_id.to_string(),
-                        reason: format!(
-                            "Max consecutive failures reached ({max_failures})"
-                        ),
+                        reason: format!("Max consecutive failures reached ({max_failures})"),
                         timestamp: Utc::now(),
                     };
                     println!("{}", serde_json::to_string(&stopped)?);
@@ -1657,7 +1657,7 @@ fn get_logs_for_pod(
 
 /// Default `OpenMemory` URL - internal K8s service
 /// HTTP is standard for in-cluster traffic (no TLS between pods)
-/// Set OPENMEMORY_URL env var to override for external/TLS endpoints
+/// Set `OPENMEMORY_URL` env var to override for external/TLS endpoints
 // codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required within cluster
 const DEFAULT_OPENMEMORY_URL: &str = "http://openmemory:3000";
 
