@@ -1004,13 +1004,16 @@ async fn run_loop(
                 })?;
                 return Ok(());
             }
-        } else if current_failed_count == 0 {
-            // Only reset counter when workflow is healthy (no failed steps at all)
-            // This ensures crash-looping pods accumulate failures even when
-            // they're restarting between polls
+        } else {
+            // Workflow is stable or improving - reset counter
+            // This handles:
+            // - current_failed_count == 0 (fully healthy)
+            // - current_failed_count == last_failed_count (stable, no new failures)
+            // - current_failed_count < last_failed_count (improving, some resolved)
+            // Critically, this resets after transient kubectl errors once the next
+            // successful poll shows the workflow isn't getting worse.
             consecutive_failures = 0;
         }
-        // else: keep counter at current value - failures exist but no new ones
         last_failed_count = current_failed_count;
 
         // Wait before next check
