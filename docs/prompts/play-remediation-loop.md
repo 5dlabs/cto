@@ -34,7 +34,44 @@ cargo build -p play-monitor --release
 # Add to PATH or use full path
 ```
 
-## Monitoring Loop
+## Quick Start - The Loop Command
+
+The simplest way to run the feedback loop is with a single command:
+
+```bash
+play-monitor loop --task-id 42
+```
+
+This starts a continuous monitoring loop that:
+
+1. Polls workflow status every 30 seconds
+2. Detects failures and automatically fetches logs
+3. Queries OpenMemory for similar solutions
+4. Emits JSON events for each state change
+
+### Event Types
+
+The loop emits JSON events to stdout:
+
+```json
+{"event_type":"started","task_id":"42","interval_seconds":30,"timestamp":"..."}
+{"event_type":"status","task_id":"42","workflow_status":"running","stage":"implementation","pods":[...],"timestamp":"..."}
+{"event_type":"failure","task_id":"42","stage":"code-quality","failed_pods":[...],"logs":"...","memory_suggestions":[...],"timestamp":"..."}
+{"event_type":"stage_complete","task_id":"42","stage":"implementation","next_stage":"code-quality","timestamp":"..."}
+{"event_type":"completed","task_id":"42","duration_seconds":1234,"timestamp":"..."}
+```
+
+### Loop Options
+
+```bash
+play-monitor loop --task-id 42 \
+  --interval 30 \           # Poll every 30 seconds (default)
+  --query-memory true \     # Query OpenMemory on failure (default)
+  --fetch-logs true \       # Fetch logs on failure (default)
+  --max-failures 5          # Stop after 5 consecutive failures (default)
+```
+
+## Manual Monitoring (Alternative)
 
 ### Step 1: Check Status
 

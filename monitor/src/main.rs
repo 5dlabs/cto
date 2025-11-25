@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::process::Command;
@@ -117,10 +118,32 @@ enum Commands {
         #[arg(long, default_value = "play-workflow-template")]
         template: String,
     },
+    /// Start the full monitoring loop - watches workflow and emits events
+    Loop {
+        /// Task ID to monitor
+        #[arg(long)]
+        task_id: String,
+
+        /// Poll interval in seconds
+        #[arg(long, default_value = "30")]
+        interval: u64,
+
+        /// Query `OpenMemory` for solutions on failure
+        #[arg(long, default_value = "true")]
+        query_memory: bool,
+
+        /// Automatically fetch logs on failure
+        #[arg(long, default_value = "true")]
+        fetch_logs: bool,
+
+        /// Stop after this many consecutive failures (0 = never stop)
+        #[arg(long, default_value = "5")]
+        max_failures: u32,
+    },
 }
 
 /// Pod status information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct PodStatus {
     name: String,
     phase: String,
@@ -201,6 +224,77 @@ struct RunResponse {
     timestamp: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+}
+
+// =============================================================================
+// Loop Event Types
+// =============================================================================
+
+/// Event emitted by the monitoring loop
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "event_type")]
+enum LoopEvent {
+    /// Loop has started monitoring
+    #[serde(rename = "started")]
+    Started {
+        task_id: String,
+        interval_seconds: u64,
+        timestamp: DateTime<Utc>,
+    },
+    /// Status check completed
+    #[serde(rename = "status")]
+    Status {
+        task_id: String,
+        workflow_status: String,
+        stage: Option<String>,
+        pods: Vec<PodStatus>,
+        timestamp: DateTime<Utc>,
+    },
+    /// Failure detected - includes logs and memory suggestions
+    #[serde(rename = "failure")]
+    Failure {
+        task_id: String,
+        stage: Option<String>,
+        failed_pods: Vec<PodStatus>,
+        logs: Option<String>,
+        memory_suggestions: Vec<MemorySuggestion>,
+        consecutive_failures: u32,
+        timestamp: DateTime<Utc>,
+    },
+    /// Stage completed successfully
+    #[serde(rename = "stage_complete")]
+    StageComplete {
+        task_id: String,
+        stage: String,
+        next_stage: Option<String>,
+        timestamp: DateTime<Utc>,
+    },
+    /// All stages completed - workflow done
+    #[serde(rename = "completed")]
+    Completed {
+        task_id: String,
+        duration_seconds: i64,
+        timestamp: DateTime<Utc>,
+    },
+    /// Loop stopped (max failures or manual stop)
+    #[serde(rename = "stopped")]
+    Stopped {
+        task_id: String,
+        reason: String,
+        timestamp: DateTime<Utc>,
+    },
+}
+
+/// Memory suggestion from `OpenMemory` query
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MemorySuggestion {
+    id: String,
+    content: String,
+    relevance_score: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pattern_type: Option<String>,
 }
 
 // =============================================================================
@@ -363,41 +457,22 @@ async fn main() -> Result<()> {
             let result = run_workflow(&task_id, &repository, &agent, &template)?;
             output_result(&result, cli.format)?;
         }
-        Commands::Memory { action } => {
+        Commands::Loop {
+            task_id,
+            interval,
+            query_memory,
+            fetch_logs,
+            max_failures,
+        } => {
             let rt = tokio::runtime::Runtime::new()?;
-            match action {
-                MemoryCommands::List {
-                    task_id,
-                    agent,
-                    limit,
-                } => {
-                    let result =
-                        rt.block_on(memory_list(task_id.as_deref(), agent.as_deref(), limit))?;
-                    output_result(&result, cli.format)?;
-                }
-                MemoryCommands::Query {
-                    text,
-                    agent,
-                    limit,
-                    include_waypoints,
-                } => {
-                    let result = rt.block_on(memory_query(
-                        &text,
-                        agent.as_deref(),
-                        limit,
-                        include_waypoints,
-                    ))?;
-                    output_result(&result, cli.format)?;
-                }
-                MemoryCommands::Stats { agent } => {
-                    let result = rt.block_on(memory_stats(agent.as_deref()))?;
-                    output_result(&result, cli.format)?;
-                }
-                MemoryCommands::Get { id } => {
-                    let result = rt.block_on(memory_get(&id))?;
-                    output_result(&result, cli.format)?;
-                }
-            }
+            rt.block_on(run_monitoring_loop(
+                &task_id,
+                &cli.namespace,
+                interval,
+                query_memory,
+                fetch_logs,
+                max_failures,
+            ))?;
         }
     }
 
@@ -1291,6 +1366,273 @@ fn run_workflow(
 }
 
 // =============================================================================
+// Monitoring Loop
+// =============================================================================
+
+/// Run the full monitoring loop - continuously watch workflow and emit events
+#[allow(clippy::too_many_lines)]
+async fn run_monitoring_loop(
+    task_id: &str,
+    namespace: &str,
+    interval_seconds: u64,
+    query_memory: bool,
+    fetch_logs: bool,
+    max_failures: u32,
+) -> Result<()> {
+    use std::io::Write;
+    use tokio::time::{sleep, Duration};
+
+    let start_time = Utc::now();
+    let mut consecutive_failures: u32 = 0;
+    let mut last_stage: Option<String> = None;
+    let mut last_status = String::new();
+
+    // Emit started event
+    let started_event = LoopEvent::Started {
+        task_id: task_id.to_string(),
+        interval_seconds,
+        timestamp: Utc::now(),
+    };
+    println!("{}", serde_json::to_string(&started_event)?);
+    std::io::stdout().flush()?;
+
+    loop {
+        // Get current status
+        let status_result = get_status(task_id, namespace);
+
+        match status_result {
+            Ok(status) => {
+                let current_status = status.status.clone();
+                let current_stage = status.stage.clone();
+
+                // Check for stage change
+                if current_stage != last_stage && current_stage.is_some() {
+                    if let Some(ref prev_stage) = last_stage {
+                        // Previous stage completed
+                        let stage_complete = LoopEvent::StageComplete {
+                            task_id: task_id.to_string(),
+                            stage: prev_stage.clone(),
+                            next_stage: current_stage.clone(),
+                            timestamp: Utc::now(),
+                        };
+                        println!("{}", serde_json::to_string(&stage_complete)?);
+                        std::io::stdout().flush()?;
+                    }
+                    last_stage.clone_from(&current_stage);
+                }
+
+                // Handle different statuses
+                match current_status.as_str() {
+                    "completed" => {
+                        let duration = Utc::now().signed_duration_since(start_time).num_seconds();
+                        let completed = LoopEvent::Completed {
+                            task_id: task_id.to_string(),
+                            duration_seconds: duration,
+                            timestamp: Utc::now(),
+                        };
+                        println!("{}", serde_json::to_string(&completed)?);
+                        std::io::stdout().flush()?;
+                        return Ok(());
+                    }
+                    "failed" => {
+                        consecutive_failures += 1;
+
+                        // Get logs if enabled
+                        let logs = if fetch_logs && !status.failed_pods.is_empty() {
+                            let pod_name = &status.failed_pods[0];
+                            get_logs_for_pod(pod_name, namespace, 200, true).ok()
+                        } else {
+                            None
+                        };
+
+                        // Query memory for suggestions if enabled
+                        let memory_suggestions = if query_memory {
+                            query_memory_for_error(logs.as_ref(), &status.failed_pods).await
+                        } else {
+                            vec![]
+                        };
+
+                        // Get failed pod details
+                        let failed_pods: Vec<PodStatus> = status
+                            .pods
+                            .iter()
+                            .filter(|p| status.failed_pods.contains(&p.name))
+                            .cloned()
+                            .collect();
+
+                        let failure_event = LoopEvent::Failure {
+                            task_id: task_id.to_string(),
+                            stage: current_stage.clone(),
+                            failed_pods,
+                            logs,
+                            memory_suggestions,
+                            consecutive_failures,
+                            timestamp: Utc::now(),
+                        };
+                        println!("{}", serde_json::to_string(&failure_event)?);
+                        std::io::stdout().flush()?;
+
+                        // Check if we should stop
+                        if max_failures > 0 && consecutive_failures >= max_failures {
+                            let stopped = LoopEvent::Stopped {
+                                task_id: task_id.to_string(),
+                                reason: format!(
+                                    "Max consecutive failures reached ({max_failures})"
+                                ),
+                                timestamp: Utc::now(),
+                            };
+                            println!("{}", serde_json::to_string(&stopped)?);
+                            std::io::stdout().flush()?;
+                            return Ok(());
+                        }
+                    }
+                    "running" | "pending" => {
+                        // Reset failure count on successful status
+                        if current_status != last_status {
+                            consecutive_failures = 0;
+                        }
+
+                        // Emit status event periodically
+                        let status_event = LoopEvent::Status {
+                            task_id: task_id.to_string(),
+                            workflow_status: current_status.clone(),
+                            stage: current_stage.clone(),
+                            pods: status.pods.clone(),
+                            timestamp: Utc::now(),
+                        };
+                        println!("{}", serde_json::to_string(&status_event)?);
+                        std::io::stdout().flush()?;
+                    }
+                    _ => {
+                        // Unknown status - emit as status event
+                        let status_event = LoopEvent::Status {
+                            task_id: task_id.to_string(),
+                            workflow_status: current_status.clone(),
+                            stage: current_stage,
+                            pods: status.pods.clone(),
+                            timestamp: Utc::now(),
+                        };
+                        println!("{}", serde_json::to_string(&status_event)?);
+                        std::io::stdout().flush()?;
+                    }
+                }
+
+                last_status = current_status;
+            }
+            Err(e) => {
+                // Error getting status - emit as failure
+                let failure_event = LoopEvent::Failure {
+                    task_id: task_id.to_string(),
+                    stage: last_stage.clone(),
+                    failed_pods: vec![],
+                    logs: Some(format!("Error getting status: {e}")),
+                    memory_suggestions: vec![],
+                    consecutive_failures,
+                    timestamp: Utc::now(),
+                };
+                println!("{}", serde_json::to_string(&failure_event)?);
+                std::io::stdout().flush()?;
+            }
+        }
+
+        // Wait for next poll
+        sleep(Duration::from_secs(interval_seconds)).await;
+    }
+}
+
+/// Query `OpenMemory` for suggestions based on error logs
+async fn query_memory_for_error(
+    logs: Option<&String>,
+    failed_pods: &[String],
+) -> Vec<MemorySuggestion> {
+    let openmemory_url = get_openmemory_url();
+
+    // Build query from logs and pod names
+    let query_text = if let Some(log_content) = logs {
+        // Extract error keywords from logs
+        let error_lines: Vec<&str> = log_content
+            .lines()
+            .filter(|l| {
+                l.contains("error")
+                    || l.contains("Error")
+                    || l.contains("ERROR")
+                    || l.contains("failed")
+                    || l.contains("Failed")
+            })
+            .take(3)
+            .collect();
+        error_lines.join(" ")
+    } else {
+        failed_pods.join(" ")
+    };
+
+    if query_text.is_empty() {
+        return vec![];
+    }
+
+    let client = reqwest::Client::new();
+    let query_json = serde_json::json!({
+        "query": query_text,
+        "k": 5,
+        "include_waypoints": true
+    });
+
+    let response = client
+        .post(format!("{openmemory_url}/memory/query"))
+        .json(&query_json)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) if resp.status().is_success() => {
+            let results: Vec<serde_json::Value> = resp.json().await.unwrap_or_default();
+            results
+                .into_iter()
+                .filter_map(|r| {
+                    Some(MemorySuggestion {
+                        id: r["id"].as_str()?.to_string(),
+                        content: r["content"].as_str()?.to_string(),
+                        relevance_score: r["score"].as_f64().unwrap_or(0.0),
+                        agent: r["metadata"]["agent"].as_str().map(String::from),
+                        pattern_type: r["metadata"]["pattern_type"].as_str().map(String::from),
+                    })
+                })
+                .collect()
+        }
+        _ => vec![],
+    }
+}
+
+/// Get logs for a specific pod
+fn get_logs_for_pod(
+    pod_name: &str,
+    namespace: &str,
+    tail_lines: u32,
+    errors_only: bool,
+) -> Result<String> {
+    let output = Command::new("kubectl")
+        .args([
+            "logs",
+            pod_name,
+            "-n",
+            namespace,
+            "--tail",
+            &tail_lines.to_string(),
+        ])
+        .output()
+        .context("Failed to get pod logs")?;
+
+    let logs = String::from_utf8_lossy(&output.stdout).to_string();
+
+    if errors_only {
+        Ok(filter_error_logs(&logs))
+    } else {
+        Ok(logs)
+    }
+}
+
+// =============================================================================
 // OpenMemory Functions
 // =============================================================================
 
@@ -1303,6 +1645,7 @@ fn get_openmemory_url() -> String {
 }
 
 /// List recent memories from `OpenMemory`
+#[allow(dead_code)]
 async fn memory_list(
     task_id: Option<&str>,
     agent: Option<&str>,
@@ -1380,6 +1723,7 @@ async fn memory_list(
 }
 
 /// Query memories semantically
+#[allow(dead_code)]
 async fn memory_query(
     text: &str,
     agent: Option<&str>,
@@ -1447,6 +1791,7 @@ async fn memory_query(
 }
 
 /// Get memory statistics and health
+#[allow(dead_code)]
 async fn memory_stats(agent: Option<&str>) -> Result<MemoryStatsResponse> {
     let openmemory_url = get_openmemory_url();
     let client = reqwest::Client::new();
@@ -1538,6 +1883,7 @@ async fn memory_stats(agent: Option<&str>) -> Result<MemoryStatsResponse> {
 }
 
 /// Get a specific memory by ID
+#[allow(dead_code)]
 async fn memory_get(id: &str) -> Result<MemoryGetResponse> {
     let openmemory_url = get_openmemory_url();
     let client = reqwest::Client::new();
