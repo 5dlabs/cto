@@ -304,10 +304,7 @@ Cluster-specific configurations (not managed by Helm or GitOps):
 - `talos-local-path-volume.yaml` - Talos-specific volume configuration
 
 
-- `otel-collector-metrics-service.yaml` - Additional OTEL metrics service
-
-
-- `otel-prometheus-service.yaml` - Prometheus metrics service
+- `otel-prometheus-service.yaml` - Prometheus metrics service (DEPRECATED)
 
 **Note:** These are typically one-time configurations or cluster-specific settings.
 

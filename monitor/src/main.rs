@@ -830,6 +830,7 @@ async fn run_loop(
     let mut consecutive_failures: u32 = 0;
     let mut last_stage: Option<String> = None;
     let mut last_phase = String::new();
+    let mut last_failed_count: usize = 0;
 
     loop {
         // Get current workflow status
@@ -960,8 +961,60 @@ async fn run_loop(
             })?;
             return Ok(());
         }
-        // Reset consecutive failures on successful status
-        consecutive_failures = 0;
+
+        // Track new failures (e.g., crash-looping pods) even when workflow is Running
+        // This prevents infinite loops when pods repeatedly fail but workflow stays active
+        let current_failed_count = status.failed_steps.len();
+        if current_failed_count > last_failed_count {
+            // New failures detected - increment counter
+            consecutive_failures += 1;
+
+            // Get the most recent failed step for context
+            let failed_step = status.failed_steps.last().cloned();
+
+            // Fetch logs if enabled
+            let logs = if fetch_logs {
+                if let Some(ref step) = failed_step {
+                    if let Some(ref pod_name) = step.pod_name {
+                        get_step_logs(pod_name, namespace, log_tail).ok()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            emit_event(&LoopEvent::Failure {
+                play_id: play_id.to_string(),
+                stage: status.stage.clone(),
+                failed_step,
+                logs,
+                consecutive_failures,
+                timestamp: Utc::now(),
+            })?;
+
+            if max_failures > 0 && consecutive_failures >= max_failures {
+                emit_event(&LoopEvent::Stopped {
+                    play_id: play_id.to_string(),
+                    reason: format!("Max consecutive failures reached ({max_failures})"),
+                    timestamp: Utc::now(),
+                })?;
+                return Ok(());
+            }
+        } else {
+            // Workflow is stable or improving - reset counter
+            // This handles:
+            // - current_failed_count == 0 (fully healthy)
+            // - current_failed_count == last_failed_count (stable, no new failures)
+            // - current_failed_count < last_failed_count (improving, some resolved)
+            // Critically, this resets after transient kubectl errors once the next
+            // successful poll shows the workflow isn't getting worse.
+            consecutive_failures = 0;
+        }
+        last_failed_count = current_failed_count;
 
         // Wait before next check
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
