@@ -930,11 +930,12 @@ async fn run_loop(
             return Ok(());
         }
 
-        // Handle workflow failure
-        if status.phase == "Failed" || status.phase == "Error" || !status.failed_steps.is_empty() {
+        // Handle workflow failure - only check phase, not historical failed steps
+        // Workflows may have failed steps but still be running (retries, self-healing)
+        if status.phase == "Failed" || status.phase == "Error" {
             consecutive_failures += 1;
 
-            // Get the first failed step
+            // Get the first failed step for context
             let failed_step = status.failed_steps.first().cloned();
 
             // Fetch logs if enabled and we have a failed step
