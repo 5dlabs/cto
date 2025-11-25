@@ -81,7 +81,7 @@ spec:
               name: "OpenMemory"
               description: "Long-term memory system for AI agents with multi-sector cognitive architecture"
               transport: "http"
-              url: "http://openmemory.cto-system.svc.cluster.local:3000/mcp"
+              url: "http://openmemory.agent-platform.svc.cluster.local:8080/mcp"
               workingDirectory: "/tmp"
             terraform:
               workingDirectory: "/tmp"
