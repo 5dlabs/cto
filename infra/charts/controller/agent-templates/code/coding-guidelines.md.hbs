@@ -424,6 +424,44 @@ impl Drop for Database {
 
 Remember: These guidelines promote code that is safe, performant, and maintainable. When in doubt, choose clarity over cleverness.
 
+## Context7 for Rust Best Practices
+
+Before implementing significant Rust code, use Context7 to get current documentation.
+
+### Two-Step Workflow
+
+1. **Resolve library:** `resolve_library_id({ libraryName: "tokio rust" })`
+2. **Get docs:** `get_library_docs({ context7CompatibleLibraryID: "/websites/rs_tokio_tokio", topic: "error handling async" })`
+
+### Pre-Resolved Rust Library IDs
+
+Use these directly without resolving:
+
+| Library | Context7 ID | Score | Use Case |
+|---------|-------------|-------|----------|
+| **Tokio** | `/websites/rs_tokio_tokio` | 93.8 | Async runtime, I/O, networking |
+| **Anyhow** | `/dtolnay/anyhow` | 89.3 | Application error handling |
+| **Serde** | `/websites/serde_rs` | 80.2 | Serialization/deserialization |
+| **Thiserror** | `/dtolnay/thiserror` | 83.1 | Custom error types for libraries |
+| **Clippy** | `/rust-lang/rust-clippy` | - | Linting best practices |
+| **Tracing** | `/tokio-rs/tracing` | 69.6 | Structured logging |
+
+### When to Query Context7
+
+Always consult Context7 when:
+- Setting up async code with Tokio
+- Implementing error handling (anyhow context patterns, thiserror enums)
+- Using serde attributes or custom serialization
+- Configuring Clippy pedantic lints
+- Writing HTTP handlers or database queries
+
+### Best Practices
+
+- **Resolve first** - Always resolve library names to get current IDs
+- **Be specific** - Query focused topics: "error handling context" not "documentation"
+- **High scores win** - Prefer libraries with higher benchmark scores
+- **Single topic** - One focused topic per query for best results
+
 ## Documentation-Driven Implementation
 
 When implementing or modifying code covered by these guidelines and when an internal document server is available:

@@ -1,5 +1,39 @@
 # Repository Guidelines
 
+## Context7 for Rust Best Practices
+
+Before implementing significant Rust code, use Context7 to get current documentation.
+
+### Two-Step Workflow
+
+1. **Resolve library:** `resolve_library_id({ libraryName: "tokio rust" })`
+2. **Get docs:** `get_library_docs({ context7CompatibleLibraryID: "/websites/rs_tokio_tokio", topic: "error handling async" })`
+
+### Key Rust Library IDs
+
+- **Tokio:** `/websites/rs_tokio_tokio` (async runtime, 93.8 score)
+- **Serde:** `/websites/serde_rs` (serialization)
+- **Clippy:** `/rust-lang/rust-clippy` (lints)
+- **Anyhow:** `/dtolnay/anyhow` (app errors, 89.3 score)
+- **Thiserror:** `/dtolnay/thiserror` (custom errors, 83.1 score)
+- **Tracing:** `/tokio-rs/tracing` (logging)
+
+### When to Query
+
+Always consult Context7 when:
+- Setting up async code with Tokio
+- Implementing error handling (anyhow context patterns, thiserror enums)
+- Using serde attributes or custom serialization
+- Configuring Clippy pedantic lints
+- Writing HTTP handlers or database queries
+
+### Best Practices
+
+- **Resolve first** - Always resolve library names to get current IDs
+- **Be specific** - Query focused topics: "error handling context" not "documentation"
+- **High scores win** - Prefer libraries with higher benchmark scores
+- **Single topic** - One focused topic per query for best results
+
 ## Project Structure & Module Organization
 - `mcp/` — Rust MCP server (`cto-mcp`).
 - `controller/` — Rust controllers and binaries (e.g., `agent-controller`).
