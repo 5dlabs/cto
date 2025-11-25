@@ -20,7 +20,7 @@ echo ""
 
 # 4. Test OTLP collector metrics endpoint
 echo "4. Testing OTLP Collector Prometheus Endpoint:"
-kubectl port-forward -n telemetry svc/otel-collector-metrics 8889:8889 > /dev/null 2>&1 &
+kubectl port-forward -n telemetry svc/otel-collector-opentelemetry-collector 8889:8889 > /dev/null 2>&1 &
 PF_PID=$!
 sleep 3
 echo "Checking for any metrics..."
