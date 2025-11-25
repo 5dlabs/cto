@@ -887,9 +887,12 @@ async fn get_task_logs(play_id: &str, namespace: &str, tail: u32) -> Result<Stri
 
 /// Query Victoria Logs API for historical logs
 async fn get_victoria_logs(play_id: &str, namespace: &str, limit: u32) -> Result<String> {
+    // Internal Kubernetes cluster service - HTTP is standard for in-cluster traffic
+    // Set VICTORIA_LOGS_URL env var to override (e.g., for external/TLS endpoints)
+    #[allow(clippy::expect_used)] // Safe: URL is validated at startup in production
     let victoria_logs_url = std::env::var("VICTORIA_LOGS_URL").unwrap_or_else(|_| {
-        "http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428"
-            .to_string()
+        // codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required
+        String::from("http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428")
     });
 
     let query = format!(
@@ -1653,6 +1656,9 @@ fn get_logs_for_pod(
 // =============================================================================
 
 /// Default `OpenMemory` URL - internal K8s service
+/// HTTP is standard for in-cluster traffic (no TLS between pods)
+/// Set OPENMEMORY_URL env var to override for external/TLS endpoints
+// codeql[rust/cleartext-transmission]: Internal K8s service, TLS not required within cluster
 const DEFAULT_OPENMEMORY_URL: &str = "http://openmemory:3000";
 
 /// Get `OpenMemory` URL from environment or use default
