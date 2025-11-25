@@ -203,6 +203,118 @@ struct RunResponse {
     error: Option<String>,
 }
 
+// =============================================================================
+// Memory Response Types
+// =============================================================================
+
+/// A single memory entry from `OpenMemory`
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryEntry {
+    id: String,
+    content: String,
+    #[serde(default)]
+    metadata: MemoryMetadata,
+    #[serde(default)]
+    salience: f64,
+    #[serde(default)]
+    reinforcements: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_accessed: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    created_at: Option<String>,
+    #[serde(default)]
+    score: f64,
+}
+
+/// Metadata associated with a memory
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct MemoryMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    task_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pattern_type: Option<String>,
+    #[serde(default)]
+    success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timestamp: Option<String>,
+}
+
+/// Response for memory list command
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryListResponse {
+    success: bool,
+    memories: Vec<MemoryEntry>,
+    total: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filter: Option<MemoryFilter>,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    task_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent: Option<String>,
+    limit: u32,
+}
+
+/// Response for memory query command
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryQueryResponse {
+    success: bool,
+    query: String,
+    results: Vec<MemoryEntry>,
+    total: usize,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+/// Response for memory stats command
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryStatsResponse {
+    success: bool,
+    health: MemoryHealth,
+    stats: MemoryStatistics,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryHealth {
+    status: String,
+    uptime_seconds: Option<i64>,
+    database_size_bytes: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryStatistics {
+    total_memories: i64,
+    memories_by_agent: std::collections::HashMap<String, i64>,
+    memories_by_pattern: std::collections::HashMap<String, i64>,
+    average_salience: f64,
+    recent_queries: i64,
+    recent_additions: i64,
+}
+
+/// Response for memory get command
+#[derive(Debug, Serialize, Deserialize)]
+struct MemoryGetResponse {
+    success: bool,
+    memory: Option<MemoryEntry>,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -250,6 +362,42 @@ async fn main() -> Result<()> {
         } => {
             let result = run_workflow(&task_id, &repository, &agent, &template)?;
             output_result(&result, cli.format)?;
+        }
+        Commands::Memory { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            match action {
+                MemoryCommands::List {
+                    task_id,
+                    agent,
+                    limit,
+                } => {
+                    let result =
+                        rt.block_on(memory_list(task_id.as_deref(), agent.as_deref(), limit))?;
+                    output_result(&result, cli.format)?;
+                }
+                MemoryCommands::Query {
+                    text,
+                    agent,
+                    limit,
+                    include_waypoints,
+                } => {
+                    let result = rt.block_on(memory_query(
+                        &text,
+                        agent.as_deref(),
+                        limit,
+                        include_waypoints,
+                    ))?;
+                    output_result(&result, cli.format)?;
+                }
+                MemoryCommands::Stats { agent } => {
+                    let result = rt.block_on(memory_stats(agent.as_deref()))?;
+                    output_result(&result, cli.format)?;
+                }
+                MemoryCommands::Get { id } => {
+                    let result = rt.block_on(memory_get(&id))?;
+                    output_result(&result, cli.format)?;
+                }
+            }
         }
     }
 
@@ -1140,6 +1288,302 @@ fn run_workflow(
         timestamp: Utc::now(),
         error: None,
     })
+}
+
+// =============================================================================
+// OpenMemory Functions
+// =============================================================================
+
+/// Default `OpenMemory` URL - internal K8s service
+const DEFAULT_OPENMEMORY_URL: &str = "http://openmemory:3000";
+
+/// Get `OpenMemory` URL from environment or use default
+fn get_openmemory_url() -> String {
+    std::env::var("OPENMEMORY_URL").unwrap_or_else(|_| DEFAULT_OPENMEMORY_URL.to_string())
+}
+
+/// List recent memories from `OpenMemory`
+async fn memory_list(
+    task_id: Option<&str>,
+    agent: Option<&str>,
+    limit: u32,
+) -> Result<MemoryListResponse> {
+    let openmemory_url = get_openmemory_url();
+
+    // Build filter JSON
+    let mut filter_json = serde_json::json!({
+        "limit": limit
+    });
+
+    if let Some(tid) = task_id {
+        filter_json["metadata"] = serde_json::json!({ "task_id": tid });
+    }
+
+    if let Some(ag) = agent {
+        if filter_json.get("metadata").is_some() {
+            filter_json["metadata"]["agent"] = serde_json::json!(ag);
+        } else {
+            filter_json["metadata"] = serde_json::json!({ "agent": ag });
+        }
+    }
+
+    let client = reqwest::Client::new();
+
+    // Validate URL
+    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
+
+    let response = client
+        .post(format!("{openmemory_url}/memory/list"))
+        .json(&filter_json)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) if resp.status().is_success() => {
+            let memories: Vec<MemoryEntry> = resp.json().await.unwrap_or_default();
+            let total = memories.len();
+            Ok(MemoryListResponse {
+                success: true,
+                memories,
+                total,
+                filter: Some(MemoryFilter {
+                    task_id: task_id.map(String::from),
+                    agent: agent.map(String::from),
+                    limit,
+                }),
+                timestamp: Utc::now(),
+                error: None,
+            })
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let error_text = resp.text().await.unwrap_or_default();
+            Ok(MemoryListResponse {
+                success: false,
+                memories: vec![],
+                total: 0,
+                filter: None,
+                timestamp: Utc::now(),
+                error: Some(format!("OpenMemory returned {status}: {error_text}")),
+            })
+        }
+        Err(e) => Ok(MemoryListResponse {
+            success: false,
+            memories: vec![],
+            total: 0,
+            filter: None,
+            timestamp: Utc::now(),
+            error: Some(format!("Failed to connect to OpenMemory: {e}")),
+        }),
+    }
+}
+
+/// Query memories semantically
+async fn memory_query(
+    text: &str,
+    agent: Option<&str>,
+    limit: u32,
+    include_waypoints: bool,
+) -> Result<MemoryQueryResponse> {
+    let openmemory_url = get_openmemory_url();
+
+    let mut query_json = serde_json::json!({
+        "query": text,
+        "k": limit,
+        "include_waypoints": include_waypoints
+    });
+
+    if let Some(ag) = agent {
+        query_json["agent"] = serde_json::json!(ag);
+    }
+
+    let client = reqwest::Client::new();
+
+    // Validate URL
+    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
+
+    let response = client
+        .post(format!("{openmemory_url}/memory/query"))
+        .json(&query_json)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) if resp.status().is_success() => {
+            let results: Vec<MemoryEntry> = resp.json().await.unwrap_or_default();
+            let total = results.len();
+            Ok(MemoryQueryResponse {
+                success: true,
+                query: text.to_string(),
+                results,
+                total,
+                timestamp: Utc::now(),
+                error: None,
+            })
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let error_text = resp.text().await.unwrap_or_default();
+            Ok(MemoryQueryResponse {
+                success: false,
+                query: text.to_string(),
+                results: vec![],
+                total: 0,
+                timestamp: Utc::now(),
+                error: Some(format!("OpenMemory returned {status}: {error_text}")),
+            })
+        }
+        Err(e) => Ok(MemoryQueryResponse {
+            success: false,
+            query: text.to_string(),
+            results: vec![],
+            total: 0,
+            timestamp: Utc::now(),
+            error: Some(format!("Failed to connect to OpenMemory: {e}")),
+        }),
+    }
+}
+
+/// Get memory statistics and health
+async fn memory_stats(agent: Option<&str>) -> Result<MemoryStatsResponse> {
+    let openmemory_url = get_openmemory_url();
+    let client = reqwest::Client::new();
+
+    // Validate URL
+    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
+
+    // Get health status
+    let health_response = client
+        .get(format!("{openmemory_url}/health"))
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await;
+
+    let health = match health_response {
+        Ok(resp) if resp.status().is_success() => {
+            let health_json: serde_json::Value = resp.json().await.unwrap_or_default();
+            MemoryHealth {
+                status: health_json["status"]
+                    .as_str()
+                    .unwrap_or("unknown")
+                    .to_string(),
+                uptime_seconds: health_json["uptime_seconds"].as_i64(),
+                database_size_bytes: health_json["database_size_bytes"].as_i64(),
+            }
+        }
+        _ => MemoryHealth {
+            status: "unreachable".to_string(),
+            uptime_seconds: None,
+            database_size_bytes: None,
+        },
+    };
+
+    // Get statistics
+    let mut stats_url = format!("{openmemory_url}/memory/stats");
+    if let Some(ag) = agent {
+        stats_url = format!("{stats_url}?agent={ag}");
+    }
+
+    let stats_response = client
+        .get(&stats_url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    let stats = match stats_response {
+        Ok(resp) if resp.status().is_success() => {
+            let stats_json: serde_json::Value = resp.json().await.unwrap_or_default();
+            MemoryStatistics {
+                total_memories: stats_json["total_memories"].as_i64().unwrap_or(0),
+                memories_by_agent: stats_json["by_agent"]
+                    .as_object()
+                    .map(|m| {
+                        m.iter()
+                            .map(|(k, v)| (k.clone(), v.as_i64().unwrap_or(0)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                memories_by_pattern: stats_json["by_pattern"]
+                    .as_object()
+                    .map(|m| {
+                        m.iter()
+                            .map(|(k, v)| (k.clone(), v.as_i64().unwrap_or(0)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                average_salience: stats_json["average_salience"].as_f64().unwrap_or(0.0),
+                recent_queries: stats_json["recent_queries"].as_i64().unwrap_or(0),
+                recent_additions: stats_json["recent_additions"].as_i64().unwrap_or(0),
+            }
+        }
+        _ => MemoryStatistics {
+            total_memories: 0,
+            memories_by_agent: std::collections::HashMap::new(),
+            memories_by_pattern: std::collections::HashMap::new(),
+            average_salience: 0.0,
+            recent_queries: 0,
+            recent_additions: 0,
+        },
+    };
+
+    Ok(MemoryStatsResponse {
+        success: health.status != "unreachable",
+        health,
+        stats,
+        timestamp: Utc::now(),
+        error: None,
+    })
+}
+
+/// Get a specific memory by ID
+async fn memory_get(id: &str) -> Result<MemoryGetResponse> {
+    let openmemory_url = get_openmemory_url();
+    let client = reqwest::Client::new();
+
+    // Validate URL
+    let _ = Url::parse(&openmemory_url).context("Invalid OPENMEMORY_URL")?;
+
+    let response = client
+        .get(format!("{openmemory_url}/memory/{id}"))
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) if resp.status().is_success() => {
+            let memory: MemoryEntry = resp.json().await?;
+            Ok(MemoryGetResponse {
+                success: true,
+                memory: Some(memory),
+                timestamp: Utc::now(),
+                error: None,
+            })
+        }
+        Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => Ok(MemoryGetResponse {
+            success: false,
+            memory: None,
+            timestamp: Utc::now(),
+            error: Some(format!("Memory not found: {id}")),
+        }),
+        Ok(resp) => {
+            let status = resp.status();
+            let error_text = resp.text().await.unwrap_or_default();
+            Ok(MemoryGetResponse {
+                success: false,
+                memory: None,
+                timestamp: Utc::now(),
+                error: Some(format!("OpenMemory returned {status}: {error_text}")),
+            })
+        }
+        Err(e) => Ok(MemoryGetResponse {
+            success: false,
+            memory: None,
+            timestamp: Utc::now(),
+            error: Some(format!("Failed to connect to OpenMemory: {e}")),
+        }),
+    }
 }
 
 #[cfg(test)]

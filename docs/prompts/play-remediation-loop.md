@@ -247,6 +247,80 @@ error: clippy::uninlined_format_args
 # Monitor until completion
 ```
 
+## OpenMemory Integration
+
+Query agent memories to understand what patterns and solutions have been stored:
+
+### List Recent Memories
+
+```bash
+# List memories for a specific task
+play-monitor memory list --task-id 42 --limit 20
+
+# List memories by agent
+play-monitor memory list --agent rex --limit 10
+```
+
+### Semantic Query
+
+```bash
+# Find memories related to specific errors or patterns
+play-monitor memory query --text "Docker build failures npm" --limit 10
+
+# Include waypoint connections for related memories
+play-monitor memory query --text "authentication flow" --include-waypoints
+```
+
+### Memory Statistics
+
+```bash
+# Check memory health and usage statistics
+play-monitor memory stats
+
+# Stats filtered by agent
+play-monitor memory stats --agent cleo
+```
+
+### Example Memory Response
+
+```json
+{
+  "success": true,
+  "query": "Docker build failures",
+  "results": [
+    {
+      "id": "mem_abc123",
+      "content": "Pattern: npm-clean-install\nSolution: rm node_modules",
+      "metadata": {
+        "agent": "rex",
+        "task_id": "task-38",
+        "pattern_type": "implementation",
+        "success": true
+      },
+      "salience": 0.85,
+      "score": 0.92
+    }
+  ],
+  "total": 1
+}
+```
+
+### Using Memory for Remediation
+
+Before implementing a fix, check if similar issues have been solved:
+
+1. Query memory for the error pattern
+2. If solutions exist, apply the most relevant one
+3. If no solutions, implement fix and store successful pattern
+
+```bash
+# Check for existing solutions
+play-monitor memory query --text "clippy::uninlined_format_args error"
+
+# After successful fix, the agent should store the pattern
+# (done automatically by agent container scripts)
+```
+
 ## Troubleshooting
 
 ### No pods found
@@ -272,6 +346,7 @@ error: clippy::uninlined_format_args
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VICTORIA_LOGS_URL` | See below | Victoria Logs API endpoint |
+| `OPENMEMORY_URL` | `http://openmemory:3000` | OpenMemory API endpoint |
 <!-- markdownlint-enable MD013 -->
 
 Default Victoria Logs URL:
