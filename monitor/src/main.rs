@@ -45,7 +45,29 @@ enum OutputFormat {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// [PRIMARY] Monitor a play workflow via argo watch - emits JSON events
+    /// [PRIMARY] Full E2E loop: start play, monitor, remediate until completion
+    Full {
+        /// Task ID for the play
+        #[arg(long)]
+        task_id: String,
+
+        /// Path to cto-config.json (reads play configuration)
+        #[arg(long, default_value = "cto-config.json")]
+        config: String,
+
+        /// Poll interval in seconds
+        #[arg(long, default_value = "10")]
+        interval: u64,
+
+        /// Max consecutive failures before stopping (0 = unlimited)
+        #[arg(long, default_value = "5")]
+        max_failures: u32,
+
+        /// Workflow template name
+        #[arg(long, default_value = "play-workflow-template")]
+        template: String,
+    },
+    /// Monitor an existing play workflow - emits JSON events
     Loop {
         /// Play workflow name (e.g., play-42, play-task-123)
         #[arg(long)]
@@ -188,6 +210,73 @@ enum MemoryCommands {
         #[arg(long)]
         id: String,
     },
+}
+
+// =============================================================================
+// CTO Config Types - parsed from cto-config.json
+// =============================================================================
+
+/// CTO configuration file structure (cto-config.json)
+#[derive(Debug, Deserialize)]
+struct CtoConfig {
+    defaults: CtoDefaults,
+}
+
+/// Default configurations
+#[derive(Debug, Deserialize)]
+struct CtoDefaults {
+    play: PlayConfig,
+}
+
+/// Play workflow configuration
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // Fields parsed from config, not all used yet
+struct PlayConfig {
+    /// Model to use (e.g., "claude-opus-4-5-20251101")
+    #[serde(default)]
+    model: Option<String>,
+    /// CLI tool (e.g., "factory", "cursor", "codex")
+    #[serde(default)]
+    cli: Option<String>,
+    /// Implementation agent (e.g., "5DLabs-Rex")
+    implementation_agent: String,
+    /// Frontend agent (e.g., "5DLabs-Blaze")
+    #[serde(default)]
+    frontend_agent: Option<String>,
+    /// Quality agent (e.g., "5DLabs-Cleo")
+    quality_agent: String,
+    /// Security agent (e.g., "5DLabs-Cipher")
+    #[serde(default)]
+    security_agent: Option<String>,
+    /// Testing agent (e.g., "5DLabs-Tess")
+    testing_agent: String,
+    /// Repository (e.g., "5dlabs/cto-parallel-test")
+    repository: String,
+    /// Service name
+    #[serde(default)]
+    service: Option<String>,
+    /// Docs repository
+    #[serde(default)]
+    docs_repository: Option<String>,
+    /// Working directory
+    #[serde(default)]
+    working_directory: Option<String>,
+    /// Max retries for implementation
+    #[serde(default)]
+    implementation_max_retries: Option<u32>,
+    /// Max retries for quality
+    #[serde(default)]
+    quality_max_retries: Option<u32>,
+    /// Max retries for testing
+    #[serde(default)]
+    testing_max_retries: Option<u32>,
+    /// Auto merge
+    #[serde(default)]
+    auto_merge: Option<bool>,
+    /// Parallel execution
+    #[serde(default)]
+    parallel_execution: Option<bool>,
 }
 
 // =============================================================================
@@ -392,6 +481,16 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
+        Commands::Full {
+            task_id,
+            config,
+            interval,
+            max_failures,
+            template,
+        } => {
+            run_full_loop(&task_id, &config, &cli.namespace, interval, max_failures, &template)
+                .await?;
+        }
         Commands::Loop {
             play_id,
             interval,
@@ -551,13 +650,12 @@ fn parse_workflow_nodes(nodes: &serde_json::Value) -> (Vec<WorkflowStep>, Vec<Wo
                 finished_at: node["finishedAt"].as_str().map(ToString::to_string),
             };
 
-            // Track failed steps
-            if step.phase == "Failed" || step.phase == "Error" {
-                failed_steps.push(step.clone());
-            }
-
-            // Only include Pod-type steps (actual work)
+            // Only include Pod-type steps (actual work with retrievable logs)
             if step.step_type == "Pod" {
+                // Track failed Pod steps (only Pods have logs we can retrieve)
+                if step.phase == "Failed" || step.phase == "Error" {
+                    failed_steps.push(step.clone());
+                }
                 steps.push(step);
             }
         }
@@ -617,6 +715,107 @@ fn calculate_duration(started: Option<&str>, finished: Option<&str>) -> Option<i
 // =============================================================================
 // Main Loop: Event-driven workflow monitoring
 // =============================================================================
+
+/// Run the full E2E loop: load config, start workflow, monitor until completion
+#[allow(clippy::too_many_arguments)]
+async fn run_full_loop(
+    task_id: &str,
+    config_path: &str,
+    namespace: &str,
+    interval: u64,
+    max_failures: u32,
+    template: &str,
+) -> Result<()> {
+    // Step 1: Read and parse cto-config.json
+    let config_content = std::fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read config file: {config_path}"))?;
+
+    let config: CtoConfig = serde_json::from_str(&config_content)
+        .with_context(|| format!("Failed to parse config file: {config_path}"))?;
+
+    let play = &config.defaults.play;
+
+    // Emit config loaded event
+    emit_event(&LoopEvent::Started {
+        play_id: format!("play-{task_id}"),
+        interval_seconds: interval,
+        timestamp: Utc::now(),
+    })?;
+
+    println!(
+        "{}",
+        format!(
+            "Loaded config: repo={}, impl={}, quality={}, testing={}",
+            play.repository, play.implementation_agent, play.quality_agent, play.testing_agent
+        )
+        .cyan()
+    );
+
+    // Step 2: Submit the workflow with config values
+    println!(
+        "{}",
+        format!("Submitting play workflow for task {task_id}...").cyan()
+    );
+
+    let output = Command::new("argo")
+        .args([
+            "submit",
+            "--from",
+            &format!("workflowtemplate/{template}"),
+            "-n",
+            namespace,
+            "-p",
+            &format!("task-id={task_id}"),
+            "-p",
+            &format!("repository={}", play.repository),
+            "-p",
+            &format!("implementation-agent={}", play.implementation_agent),
+            "-p",
+            &format!("quality-agent={}", play.quality_agent),
+            "-p",
+            &format!("testing-agent={}", play.testing_agent),
+            "-o",
+            "json",
+        ])
+        .output()
+        .context("Failed to submit workflow via argo CLI")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to submit workflow: {stderr}"));
+    }
+
+    // Parse workflow name from output
+    let workflow_json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
+
+    let workflow_name = workflow_json["metadata"]["name"]
+        .as_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| anyhow::anyhow!("Failed to get workflow name from submission response"))?;
+
+    println!(
+        "{}",
+        format!("✓ Workflow submitted: {workflow_name}").green()
+    );
+
+    // Step 3: Start monitoring loop
+    println!(
+        "{}",
+        format!("Starting monitoring loop for {workflow_name}...").cyan()
+    );
+
+    run_loop(
+        &workflow_name,
+        namespace,
+        interval,
+        true,  // fetch_logs
+        true,  // query_memory
+        max_failures,
+        500,   // log_tail
+    )
+    .await
+}
 
 /// Run the monitoring loop - emits JSON events
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -1351,15 +1550,33 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
         .output()?;
 
     if git_init.status.success() {
+        // Configure git user locally for this repo (required for commit)
+        let _ = Command::new("git")
+            .args(["config", "user.email", "automation@5dlabs.io"])
+            .current_dir(&temp_dir)
+            .output();
+        let _ = Command::new("git")
+            .args(["config", "user.name", "5DLabs Automation"])
+            .current_dir(&temp_dir)
+            .output();
+
         let _ = Command::new("git")
             .args(["add", "."])
             .current_dir(&temp_dir)
             .output();
 
-        let _ = Command::new("git")
+        let commit_result = Command::new("git")
             .args(["commit", "-m", "Initial commit"])
             .current_dir(&temp_dir)
             .output();
+
+        if commit_result.is_err() || !commit_result.as_ref().is_ok_and(|o| o.status.success()) {
+            let err_msg = commit_result
+                .as_ref()
+                .map(|o| String::from_utf8_lossy(&o.stderr).to_string())
+                .unwrap_or_else(|e| e.to_string());
+            println!("  {} Git commit failed: {}", "⚠".yellow(), err_msg);
+        }
 
         let _ = Command::new("git")
             .args(["branch", "-M", "main"])
