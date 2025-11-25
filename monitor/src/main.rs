@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::process::Command;
@@ -116,6 +117,59 @@ enum Commands {
         /// Workflow template name
         #[arg(long, default_value = "play-workflow-template")]
         template: String,
+    },
+    /// Query and analyze `OpenMemory` for agent insights
+    Memory {
+        #[command(subcommand)]
+        action: MemoryCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum MemoryCommands {
+    /// List recent memories for a task or agent
+    List {
+        /// Filter by task ID
+        #[arg(long)]
+        task_id: Option<String>,
+
+        /// Filter by agent name (rex, blaze, cleo, tess, atlas, etc.)
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Maximum number of memories to return
+        #[arg(long, default_value = "20")]
+        limit: u32,
+    },
+    /// Semantic query for memories
+    Query {
+        /// Search query text
+        #[arg(long)]
+        text: String,
+
+        /// Filter by agent name
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Maximum number of results
+        #[arg(long, default_value = "10")]
+        limit: u32,
+
+        /// Include waypoint connections
+        #[arg(long)]
+        include_waypoints: bool,
+    },
+    /// Show memory statistics and health
+    Stats {
+        /// Filter stats by agent name
+        #[arg(long)]
+        agent: Option<String>,
+    },
+    /// Get a specific memory by ID
+    Get {
+        /// Memory ID
+        #[arg(long)]
+        id: String,
     },
 }
 
