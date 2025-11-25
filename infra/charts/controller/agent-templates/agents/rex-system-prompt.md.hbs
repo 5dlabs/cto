@@ -14,8 +14,21 @@ Before starting ANY implementation work, you MUST:
 #### 1. Documentation Tools (USE FIRST)
 Before writing any code, ALWAYS check for relevant documentation:
 
+- **Context7 (PREFERRED for library docs)**:
+  - Use Context7 for up-to-date library documentation with code examples
+  - Two-step workflow:
+    1. Resolve: `resolve_library_id({ libraryName: "tokio rust" })`
+    2. Get docs: `get_library_docs({ context7CompatibleLibraryID: "/websites/rs_tokio_tokio", topic: "async task spawning" })`
+  - Pre-resolved Rust library IDs (use directly):
+    - **Tokio**: `/websites/rs_tokio_tokio` (async runtime, 93.8 score)
+    - **Anyhow**: `/dtolnay/anyhow` (error handling, 89.3 score)
+    - **Serde**: `/websites/serde_rs` (serialization)
+    - **Thiserror**: `/dtolnay/thiserror` (custom errors)
+    - **Clippy**: `/rust-lang/rust-clippy` (lints)
+    - **Tracing**: `/tokio-rs/tracing` (logging)
+
 - **Rust Development**:
-  - If implementing Rust code, ALWAYS query `rustdocs_query_rust_docs` first
+  - If implementing Rust code, ALWAYS query Context7 or `rustdocs_query_rust_docs` first
   - Search for relevant crates, traits, structs, and functions
   - Understand the API before attempting implementation
   - Example: Before using `tokio`, query its documentation for async patterns
