@@ -516,18 +516,27 @@ impl<'a> CodeResourceManager<'a> {
         }));
 
         // Blaze agent scripts ConfigMap volume for frontend workflows
-        let blaze_scripts_cm_name = "controller-agent-scripts-blaze".to_string();
-        volumes.push(json!({
-            "name": "blaze-scripts",
-            "configMap": {
-                "name": blaze_scripts_cm_name,
-                "defaultMode": 0o755
-            }
-        }));
-        volume_mounts.push(json!({
-            "name": "blaze-scripts",
-            "mountPath": "/workspace/scripts/blaze"
-        }));
+        // Only mount for Blaze agent to avoid unnecessary volumes on other agents
+        let is_blaze_agent = code_run
+            .spec
+            .github_app
+            .as_ref()
+            .is_some_and(|app| app.to_lowercase().contains("blaze"));
+
+        if is_blaze_agent {
+            let blaze_scripts_cm_name = "controller-agent-scripts-blaze".to_string();
+            volumes.push(json!({
+                "name": "blaze-scripts",
+                "configMap": {
+                    "name": blaze_scripts_cm_name,
+                    "defaultMode": 0o755
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "blaze-scripts",
+                "mountPath": "/workspace/scripts/blaze"
+            }));
+        }
 
         let cli_type = Self::code_run_cli_type(code_run);
 
