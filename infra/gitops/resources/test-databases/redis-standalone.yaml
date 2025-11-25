@@ -31,6 +31,7 @@ spec:
   # Redis exporter disabled for basic test
   redisExporter:
     enabled: false
+    image: quay.io/opstree/redis-exporter:v1.44.0
 
   # Storage configuration
   storage:
