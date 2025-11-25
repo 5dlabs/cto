@@ -396,7 +396,6 @@ enum LoopEvent {
     },
 }
 
-
 // =============================================================================
 // Response Types for non-loop commands
 // =============================================================================
@@ -475,8 +474,15 @@ async fn main() -> Result<()> {
             max_failures,
             template,
         } => {
-            run_full_loop(&task_id, &config, &cli.namespace, interval, max_failures, &template)
-                .await?;
+            run_full_loop(
+                &task_id,
+                &config,
+                &cli.namespace,
+                interval,
+                max_failures,
+                &template,
+            )
+            .await?;
         }
         Commands::Loop {
             play_id,
@@ -542,7 +548,10 @@ async fn main() -> Result<()> {
 
 /// Get workflow status using `argo get -o json`
 fn get_workflow_status(workflow_name: &str, namespace: &str) -> Result<WorkflowStatus> {
-    debug!("Getting workflow status for {} in {}", workflow_name, namespace);
+    debug!(
+        "Getting workflow status for {} in {}",
+        workflow_name, namespace
+    );
 
     let output = Command::new("argo")
         .args(["get", workflow_name, "-n", namespace, "-o", "json"])
@@ -943,19 +952,16 @@ async fn run_loop(
                 timestamp: Utc::now(),
             })?;
 
-            // Check max failures
-            if max_failures > 0 && consecutive_failures >= max_failures {
-                emit_event(&LoopEvent::Stopped {
-                    play_id: play_id.to_string(),
-                    reason: format!("Max consecutive failures reached ({max_failures})"),
-                    timestamp: Utc::now(),
-                })?;
-                return Ok(());
-            }
-        } else {
-            // Reset consecutive failures on successful status
-            consecutive_failures = 0;
+            // Workflow failure is terminal - exit immediately after emitting the failure event
+            emit_event(&LoopEvent::Stopped {
+                play_id: play_id.to_string(),
+                reason: "Workflow entered terminal failure state".to_string(),
+                timestamp: Utc::now(),
+            })?;
+            return Ok(());
         }
+        // Reset consecutive failures on successful status
+        consecutive_failures = 0;
 
         // Wait before next check
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
@@ -1458,7 +1464,9 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
         if commit_result.is_err() || !commit_result.as_ref().is_ok_and(|o| o.status.success()) {
             let err_msg = commit_result
                 .as_ref()
-                .map_or_else(std::string::ToString::to_string, |o| String::from_utf8_lossy(&o.stderr).to_string());
+                .map_or_else(std::string::ToString::to_string, |o| {
+                    String::from_utf8_lossy(&o.stderr).to_string()
+                });
             println!("  {} Git commit failed: {err_msg}", "⚠".yellow());
         }
 
@@ -1645,10 +1653,8 @@ INFO: Continuing";
     #[test]
     fn test_calculate_duration() {
         // Both times present
-        let duration = calculate_duration(
-            Some("2024-01-01T00:00:00Z"),
-            Some("2024-01-01T00:05:00Z"),
-        );
+        let duration =
+            calculate_duration(Some("2024-01-01T00:00:00Z"), Some("2024-01-01T00:05:00Z"));
         assert_eq!(duration, Some(300)); // 5 minutes = 300 seconds
 
         // Missing start time
@@ -1695,4 +1701,3 @@ INFO: Continuing";
         assert_eq!(failed[0].name, "cleo-quality");
     }
 }
-
