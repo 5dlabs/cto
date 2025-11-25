@@ -69,7 +69,8 @@ spec:
 
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
+      - ServerSideApply=false
+      - Replace=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
 
