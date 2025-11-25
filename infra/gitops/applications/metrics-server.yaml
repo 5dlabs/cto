@@ -64,6 +64,8 @@ spec:
           - --metric-resolution=15s
           # For development/local clusters that may have self-signed certs
           - --kubelet-insecure-tls
+          # Increase timeout for kubelet scraping (default 10s is too tight for busy nodes)
+          - --kubelet-request-timeout=30s
 
         # Service monitor for Prometheus-compatible monitoring
         serviceMonitor:
