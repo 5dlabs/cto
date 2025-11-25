@@ -8,7 +8,7 @@ metadata:
   name: database-instances
   namespace: argocd
   labels:
-    app.kubernetes.io/name: test-databases
+    app.kubernetes.io/name: database-instances
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: database
   finalizers:
