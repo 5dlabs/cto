@@ -77,8 +77,7 @@ async fn verify_required_configmaps(
 
     // Get the ConfigMap prefix from environment (set by Helm based on release name)
     // Defaults to "controller" for backward compatibility
-    let cm_prefix =
-        std::env::var("CONFIGMAP_PREFIX").unwrap_or_else(|_| "controller".to_string());
+    let cm_prefix = std::env::var("CONFIGMAP_PREFIX").unwrap_or_else(|_| "controller".to_string());
 
     let required_configmaps = vec![
         (
