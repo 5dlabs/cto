@@ -110,6 +110,9 @@ spec:
     # HashiCorp Vault namespace
     - namespace: vault
       server: https://kubernetes.default.svc
+    # Vault Secrets Operator namespace
+    - namespace: vault-secrets-operator
+      server: https://kubernetes.default.svc
     # Removed Mailu namespace
 
   # Cluster resource whitelist
@@ -139,6 +142,9 @@ spec:
     - group: 'actions.github.com'
       kind: '*'
     - group: 'external-secrets.io'
+      kind: '*'
+    # Vault Secrets Operator CRDs
+    - group: 'secrets.hashicorp.com'
       kind: '*'
     # Database operator cluster resources
     - group: 'scheduling.k8s.io'
@@ -179,6 +185,9 @@ spec:
     - group: 'actions.github.com'
       kind: '*'
     - group: 'external-secrets.io'
+      kind: '*'
+    # Vault Secrets Operator CRDs
+    - group: 'secrets.hashicorp.com'
       kind: '*'
     - group: 'policy'
       kind: '*'
