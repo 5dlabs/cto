@@ -12,7 +12,7 @@ pub fn get_tool_schemas() -> Value {
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_docs_ingest_schema()
+            get_add_docs_schema()
         ]
     })
 }
@@ -28,7 +28,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_docs_ingest_schema()
+            get_add_docs_schema()
         ]
     })
 }
@@ -273,27 +273,34 @@ fn get_input_schema() -> Value {
     })
 }
 
-fn get_docs_ingest_schema() -> Value {
+fn get_add_docs_schema() -> Value {
     json!({
-        "name": "docs_ingest",
-        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.docs_ingest.model)",
+        "name": "add_docs",
+        "description": "Ingest documentation from a URL using Firecrawl. Supports GitHub repositories (type: repo) and websites (type: scrape). Returns crawled/scraped content in markdown format.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "repository_url": {
+                "url": {
                     "type": "string",
-                    "description": "GitHub repository URL to analyze and ingest (e.g., https://github.com/cilium/cilium)"
+                    "description": "The documentation source URL. For repos: GitHub URL (e.g., https://github.com/org/repo). For scrape: any website URL (e.g., https://docs.example.com)."
                 },
-                "doc_type": {
+                "type": {
                     "type": "string",
-                    "description": "Documentation type/category for storage (e.g., cilium, solana, rust, ethereum, jupiter, meteora, raydium, ebpf, rust_best_practices, birdeye, talos)"
+                    "enum": ["repo", "scrape"],
+                    "description": "Type of ingestion: 'repo' for GitHub repositories, 'scrape' for websites."
                 },
-                "doc_server_url": {
+                "query": {
                     "type": "string",
-                    "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80 - accessible via Kilo VPN)"
+                    "description": "Optional search query/topic to focus the crawl on specific content."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of pages to crawl (default: 50).",
+                    "default": 50
                 }
             },
-            "required": ["repository_url", "doc_type"]
+            "required": ["url", "type"]
         }
     })
 }
+

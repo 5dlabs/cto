@@ -20,6 +20,7 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
 
+mod doc_proxy;
 mod tools;
 
 #[cfg(test)]
@@ -87,8 +88,6 @@ struct WorkflowDefaults {
     intake: IntakeDefaults,
     #[serde(default)]
     play: PlayDefaults,
-    #[serde(default)]
-    docs_ingest: DocsIngestDefaults,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -220,24 +219,6 @@ struct PlayDefaults {
     auto_merge: Option<bool>,
     #[serde(rename = "parallelExecution")]
     parallel_execution: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct DocsIngestDefaults {
-    model: String,
-    #[serde(rename = "docServerUrl")]
-    doc_server_url: String,
-}
-
-impl Default for DocsIngestDefaults {
-    fn default() -> Self {
-        DocsIngestDefaults {
-            model: "claude-sonnet-4-20250514".to_string(),
-            // Use the internal Kubernetes service URL - accessible via Kilo VPN
-            doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
-                .to_string(),
-        }
-    }
 }
 
 /// Load configuration from cto-config.json file
@@ -2953,13 +2934,13 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("docs_ingest") => Some(handle_docs_ingest_tool(&arguments).map(|result| json!({
+                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
-                        "text": result
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({
+                Ok("add_docs") => Some(handle_add_docs_tool(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -3190,284 +3171,6 @@ fn handle_anthropic_message_tool(
     Ok(json_resp)
 }
 
-#[allow(clippy::too_many_lines)]
-fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
-    let github_url = arguments
-        .get("repository_url")
-        .and_then(|v| v.as_str())
-        .ok_or(anyhow!("repository_url is required"))?;
-
-    // Validate it's a GitHub URL
-    if !github_url.contains("github.com") {
-        return Err(anyhow!(
-            "Only GitHub repositories are currently supported. URL must contain 'github.com'"
-        ));
-    }
-
-    // Get configuration from CTO_CONFIG
-    let config = CTO_CONFIG
-        .get()
-        .ok_or_else(|| anyhow!("CTO configuration not loaded"))?;
-
-    let doc_server_url = arguments
-        .get("doc_server_url")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.docs_ingest.doc_server_url);
-
-    let doc_type = arguments
-        .get("doc_type")
-        .and_then(|v| v.as_str())
-        .ok_or(anyhow!("doc_type is required"))?;
-
-    // Check for ANTHROPIC_API_KEY
-    let api_key = std::env::var("ANTHROPIC_API_KEY")
-        .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
-
-    // Create the Claude prompt for analyzing the repository
-    #[allow(clippy::uninlined_format_args)]
-    let analysis_prompt = format!(
-        r#"Analyze the GitHub repository at {github_url} and determine the optimal documentation ingestion strategy.
-
-You are an expert at identifying and extracting valuable documentation from software repositories.
-
-TASK: Generate a documentation ingestion plan for doc_type '{doc_type}' that will:
-1. Clone the repository
-2. Extract relevant documentation
-3. Ingest it into the doc server at {doc_server_url}
-
-The user has specified that this documentation should be categorized as '{doc_type}' type.
-
-Your response must be a valid JSON object with this exact structure:
-{{
-  "doc_type": "{doc_type}",
-  "include_paths": ["path1", "path2"],
-  "exclude_paths": ["test", "vendor"],
-  "extensions": ["md", "rst", "html"],
-  "reasoning": "Brief explanation here"
-}}
-
-IMPORTANT:
-- Respond ONLY with the JSON object
-- Do not include any text before or after the JSON
-- Use the exact doc_type value provided: "{doc_type}"
-- Include reasonable defaults if repository structure is unclear"#,
-        github_url = github_url,
-        doc_type = doc_type,
-        doc_server_url = doc_server_url
-    );
-
-    // Call Claude API to analyze the repository using configured model
-    let model = &config.defaults.docs_ingest.model;
-    let analysis = call_claude_api(&api_key, &analysis_prompt, model)?;
-
-    // Parse the analysis response
-    let analysis_text = analysis
-        .get("content")
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|msg| msg.get("text"))
-        .and_then(|t| t.as_str())
-        .ok_or_else(|| {
-            eprintln!("DEBUG: Full Claude API response: {analysis:?}");
-            anyhow!("Failed to get Claude analysis response text")
-        })?;
-
-    // Extract JSON from the response - try direct parse first, then extract
-    let strategy_json: Value = if let Ok(json) = serde_json::from_str(analysis_text) {
-        json
-    } else {
-        // Try to extract JSON object from the response
-        let chars: Vec<char> = analysis_text.chars().collect();
-        let mut start = None;
-        let mut depth = 0;
-        let mut in_string = false;
-        let mut escape = false;
-        let mut json_result = None;
-
-        for (i, &ch) in chars.iter().enumerate() {
-            if escape {
-                escape = false;
-                continue;
-            }
-
-            match ch {
-                '\\' if in_string => escape = true,
-                '"' if !escape => in_string = !in_string,
-                '{' if !in_string => {
-                    if depth == 0 {
-                        start = Some(i);
-                    }
-                    depth += 1;
-                }
-                '}' if !in_string => {
-                    depth -= 1;
-                    if depth == 0 {
-                        if let Some(start_idx) = start {
-                            let json_str = &analysis_text[start_idx..=i];
-                            if let Ok(json) = serde_json::from_str::<Value>(json_str) {
-                                json_result = Some(json);
-                                break;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        json_result.ok_or_else(|| {
-            eprintln!("DEBUG: Could not extract JSON from Claude's response. Full text:");
-            eprintln!("{analysis_text}");
-            eprintln!("---");
-            anyhow!(
-                "No valid JSON found in Claude's response. Response length: {} chars",
-                analysis_text.len()
-            )
-        })?
-    };
-
-    // Doc type is already known from user input, but verify Claude used it
-    let _claude_doc_type = strategy_json
-        .get("doc_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or(doc_type);
-
-    let include_paths = strategy_json
-        .get("include_paths")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str())
-                .collect::<Vec<_>>()
-                .join(",")
-        })
-        .unwrap_or_else(|| "docs/,Documentation/,README.md".to_string());
-
-    let extensions = strategy_json
-        .get("extensions")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str())
-                .collect::<Vec<_>>()
-                .join(",")
-        })
-        .unwrap_or_else(|| "md,rst,html".to_string());
-
-    let reasoning = strategy_json
-        .get("reasoning")
-        .and_then(|v| v.as_str())
-        .unwrap_or("No reasoning provided");
-
-    // Build the JSON payload with analysis results
-    let payload = json!({
-        "url": github_url,
-        "doc_type": doc_type,
-        "include_paths": include_paths,
-        "extensions": extensions,
-        "yes": true
-    });
-
-    // Always execute ingestion automatically
-    // Create a temporary file to safely pass JSON payload and avoid shell injection
-    let json_payload = serde_json::to_string(&payload)?;
-
-    // Use NamedTempFile for automatic cleanup
-    let mut temp_file =
-        NamedTempFile::new().with_context(|| "Failed to create temporary file for JSON payload")?;
-    temp_file
-        .write_all(json_payload.as_bytes())
-        .with_context(|| "Failed to write JSON payload to temporary file")?;
-    temp_file
-        .flush()
-        .with_context(|| "Failed to flush temporary file")?;
-
-    let temp_file_path = temp_file.path().to_string_lossy().to_string();
-    let _temp_file_guard = temp_file; // Keep alive during execution
-
-    let cmd = format!(
-        "curl -s -X POST {doc_server_url}/ingest/intelligent -H 'Content-Type: application/json' -d @{temp_file_path}"
-    );
-
-    let mut output = "📊 Repository Analysis Complete\n\n".to_string();
-    output.push_str(&format!("🔗 Repository: {github_url}\n"));
-    output.push_str(&format!("📁 Doc Type: {doc_type}\n"));
-    output.push_str(&format!("📂 Paths: {include_paths}\n"));
-    output.push_str(&format!("📄 Extensions: {extensions}\n"));
-    output.push_str(&format!("💭 Reasoning: {reasoning}\n\n"));
-
-    output.push_str("🚀 Executing ingestion...\n\n");
-    output.push_str(&format!("⚡ Executing:\n{cmd}\n"));
-
-    let result = Command::new("sh")
-        .arg("-c")
-        .arg(&cmd)
-        .output()
-        .map_err(|e| anyhow!("Failed to execute command: {e}"))?;
-
-    if result.status.success() {
-        let stdout = String::from_utf8_lossy(&result.stdout).to_string();
-        output.push_str("✅ Request submitted\n");
-        if !stdout.trim().is_empty() {
-            // Try to parse job_id for convenience
-            if let Ok(val) = serde_json::from_str::<Value>(&stdout) {
-                if let Some(job_id) = val.get("job_id").and_then(|v| v.as_str()) {
-                    output.push_str(&format!(
-                        "🆔 Job ID: {job_id}\n🔍 Check status: {doc_server_url}/ingest/jobs/{job_id}\n"
-                    ));
-                } else {
-                    let trimmed_stdout = stdout.trim();
-                    output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
-                }
-            } else {
-                let trimmed_stdout = stdout.trim();
-                output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
-            }
-        }
-        output.push_str(
-            "\n📡 Ingestion running asynchronously. Use the status URL to monitor progress.",
-        );
-    } else {
-        output.push_str(&format!(
-            "❌ Request failed: {}\n",
-            String::from_utf8_lossy(&result.stderr)
-        ));
-        return Ok(output);
-    }
-
-    Ok(output)
-}
-
-fn call_claude_api(api_key: &str, prompt: &str, model: &str) -> Result<Value> {
-    let body = json!({
-        "model": model,
-        "max_tokens": 2000,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    });
-
-    let client = reqwest::blocking::Client::new();
-    let resp = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|e| anyhow!("Claude API request failed: {e}"))?;
-
-    let json_resp: Value = resp
-        .json()
-        .map_err(|e| anyhow!("Failed to parse Claude API response: {e}"))?;
-
-    Ok(json_resp)
-}
-
 fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
     // Inputs
     let namespace = arguments
@@ -3574,6 +3277,30 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
             "HTTP request failed with status {status}: {error_text}"
         ))
     }
+}
+
+fn handle_add_docs_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let url = arguments
+        .get("url")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("url is required"))?;
+
+    let doc_type_str = arguments
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("type is required (repo or scrape)"))?;
+
+    let doc_type = doc_proxy::DocType::from_str(doc_type_str)?;
+
+    let query = arguments.get("query").and_then(|v| v.as_str());
+
+    let limit = arguments
+        .get("limit")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32)
+        .unwrap_or(50);
+
+    doc_proxy::handle_add_docs(url, doc_type, query, limit)
 }
 
 #[allow(clippy::disallowed_macros)]
