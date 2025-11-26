@@ -199,6 +199,9 @@ spec:
       kind: '*'
     - group: 'crd.questdb.io'
       kind: '*'
+    # Kilo WireGuard VPN CRDs
+    - group: 'kilo.squat.ai'
+      kind: '*'
 
   # Roles for access control
   roles:
