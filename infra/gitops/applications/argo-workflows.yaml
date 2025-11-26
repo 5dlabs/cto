@@ -31,12 +31,6 @@ spec:
           image:
             tag: v3.7.1
 
-          # Enhanced garbage collection settings
-          # Workflow GC runs periodically to clean up completed/failed workflows
-          workflowGarbageCollector:
-            enabled: true
-            period: 5m
-
           # Hard limits on workflow retention (regardless of TTL)
           # Once limit is reached, oldest workflows are deleted
           retentionPolicy:
@@ -46,6 +40,12 @@ spec:
 
           # Increase TTL processing parallelism (default is 4)
           workflowTTLWorkers: 8
+
+          # Configure workflow garbage collector period
+          # The GC runs automatically; this sets how frequently it runs
+          extraEnv:
+            - name: WORKFLOW_GC_PERIOD
+              value: "5m"
 
           workflowDefaults:
             spec:
