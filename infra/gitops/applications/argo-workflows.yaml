@@ -30,17 +30,36 @@ spec:
         controller:
           image:
             tag: v3.7.1
+
+          # Hard limits on workflow retention (regardless of TTL)
+          # Once limit is reached, oldest workflows are deleted
+          retentionPolicy:
+            completed: 100    # Keep max 100 completed workflows
+            failed: 50        # Keep max 50 failed workflows
+            errored: 50       # Keep max 50 errored workflows
+
+          # Increase TTL processing parallelism (default is 4)
+          workflowTTLWorkers: 8
+
+          # Configure workflow garbage collector period
+          # The GC runs automatically; this sets how frequently it runs
+          extraEnv:
+            - name: WORKFLOW_GC_PERIOD
+              value: "5m"
+
           workflowDefaults:
             spec:
               parallelism: 10
               # Global TTL for automatic cleanup of completed workflows
+              # More aggressive than before to prevent accumulation
               ttlStrategy:
-                secondsAfterCompletion: 3600   # Clean up after 1 hour by default
-                secondsAfterFailure: 10800     # Keep failed workflows for 3 hours
+                secondsAfterCompletion: 1800   # Clean up after 30 minutes
+                secondsAfterSuccess: 1800      # Clean up successful after 30 minutes
+                secondsAfterFailure: 7200      # Keep failed workflows for 2 hours
               # Pod garbage collection to free up resources immediately
               podGC:
                 strategy: OnPodCompletion
-                deleteDelayDuration: 60s
+                deleteDelayDuration: 30s       # Faster pod cleanup (was 60s)
         server:
           image:
             tag: v3.7.1
