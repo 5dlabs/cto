@@ -16,6 +16,13 @@ metadata:
 spec:
   project: platform
 
+  # Ignore volumeClaimTemplates diff - K8s normalizes these with apiVersion/kind
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates
+
   source:
     repoURL: https://helm.releases.hashicorp.com
     chart: vault
@@ -110,6 +117,7 @@ spec:
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - RespectIgnoreDifferences=true
 
     retry:
       limit: 5
