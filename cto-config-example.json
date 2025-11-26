@@ -55,10 +55,6 @@
       "testingMaxRetries": 5,
       "autoMerge": false,
       "parallelExecution": false
-    },
-    "docs_ingest": {
-      "model": "claude-sonnet-4-20250514",
-      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
     }
   },
   "agents": {

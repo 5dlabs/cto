@@ -247,14 +247,6 @@ config:
       url: "https://registry.ai-sdk.dev/api/mcp"
       workingDirectory: "/tmp"
 
-    # --- Documentation ---
-    agent-docs:
-      name: "Agent Docs"
-      description: "Agent documentation and knowledge base server"
-      transport: "http"
-      url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80/mcp"
-      workingDirectory: "/tmp"
-
     # --- Blockchain ---
     solana:
       name: "Solana"

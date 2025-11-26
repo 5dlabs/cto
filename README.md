@@ -475,10 +475,6 @@ Create a `cto-config.json` file in your project root to configure agents, models
         "model": "gpt-5",
         "provider": "openai"
       }
-    },
-    "docs_ingest": {
-      "model": "claude-sonnet-4-20250514",
-      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
     }
   },
   "agents": {
@@ -856,20 +852,6 @@ docs_ingest({
   repository_url: "https://github.com/cilium/cilium",
   doc_type: "cilium"
 });
-
-// Custom doc server
-docs_ingest({
-  repository_url: "https://github.com/solana-labs/solana",
-  doc_type: "solana",
-  doc_server_url: "http://my-doc-server:80"
-});
-```
-
-**What it does:**
-✅ Uses Claude to analyze repository structure  
-✅ Determines optimal ingestion strategy  
-✅ Processes documentation intelligently  
-✅ Stores in searchable format for agents
 
 ---
 

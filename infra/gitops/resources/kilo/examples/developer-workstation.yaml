@@ -31,7 +31,7 @@
 #    # macOS - import wg0.conf into WireGuard app
 #
 # 7. Test service DNS resolution:
-#    curl http://doc-server-agent-docs-server.mcp.svc.cluster.local
+#    curl http://tools.cto.svc.cluster.local/health
 #
 apiVersion: kilo.squat.ai/v1alpha1
 kind: Peer
