@@ -1,14 +1,38 @@
 ---
 # Example Peer configuration for VPN access
-# To use this:
+#
+# Setup instructions:
+#
 # 1. Generate WireGuard keys on your workstation:
 #    wg genkey | tee privatekey | wg pubkey > publickey
+#
 # 2. Replace the publicKey below with your generated public key
-# 3. Apply this resource to the cluster
+#
+# 3. Apply this resource to the cluster:
+#    kubectl apply -f developer-workstation.yaml
+#
 # 4. Generate your WireGuard config:
 #    kgctl showconf peer developer-workstation > wg0.conf
-# 5. Add your private key to wg0.conf and connect:
+#
+# 5. Edit wg0.conf to add your private key AND DNS for service resolution:
+#
+#    [Interface]
+#    PrivateKey = <contents-of-privatekey-file>
+#    Address = 10.5.0.1/32
+#    DNS = 10.96.0.10  # CoreDNS - enables *.svc.cluster.local resolution
+#
+#    [Peer]
+#    ... (keep the generated peer config)
+#
+# 6. Connect:
+#    # Linux
 #    sudo wg-quick up ./wg0.conf
+#
+#    # macOS - import wg0.conf into WireGuard app
+#
+# 7. Test service DNS resolution:
+#    curl http://doc-server-agent-docs-server.mcp.svc.cluster.local
+#
 apiVersion: kilo.squat.ai/v1alpha1
 kind: Peer
 metadata:
