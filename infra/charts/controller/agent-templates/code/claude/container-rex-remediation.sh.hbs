@@ -715,11 +715,11 @@ fi
         echo "✓ Using dynamically generated client-config.json from cto-config.json"
     fi
 
-    echo "✅ Copying toolman-guide.md..."
-    if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-        cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
+    echo "✅ Copying tools-guide.md..."
+    if [ -f "$TASK_DIR/tools-guide.md" ]; then
+        cp "$TASK_DIR/tools-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ tools-guide.md copied" || echo "❌ tools-guide.md copy failed"
     else
-        echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
+        echo "⚠️ tools-guide.md not found - code agent won't have tool usage guidance"
     fi
 
     echo "✓ Task {{task_id}} files copied from $TASK_DIR"
@@ -942,7 +942,7 @@ if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
 fi
 
 # Verify client-config.json is available and valid
-echo "=== TOOLMAN CONFIG SETUP ==="
+echo "=== TOOLS CONFIG SETUP ==="
 WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 

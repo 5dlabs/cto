@@ -64,7 +64,7 @@ The Claude Code agent inherits all tools from the runtime base image, plus speci
 - **sccache** for faster compilation
 - **dive** for Docker image analysis
 - **TaskMaster AI** for task management
-- **Toolman Client** for MCP server integration
+- **Tools Client** for MCP server integration
 - **Pre-commit** for Git hooks framework
 - **Pip-tools** for Python dependency management
 - **Node.js development tools** (nodemon, concurrently, cross-env, dotenv-cli, zx)

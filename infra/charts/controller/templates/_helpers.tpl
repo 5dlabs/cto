@@ -73,10 +73,10 @@ Create the name of the RBAC role to use
 {{- end }}
 
 {{/*
-Create a checksum for the toolman catalog ConfigMap to force pod restart when it changes
+Create a checksum for the tools catalog ConfigMap to force pod restart when it changes
 */}}
-{{- define "controller.toolmanCatalogChecksum" -}}
-{{- $catalog := lookup "v1" "ConfigMap" .Release.Namespace "toolman-tool-catalog" -}}
+{{- define "controller.toolsCatalogChecksum" -}}
+{{- $catalog := lookup "v1" "ConfigMap" .Release.Namespace "tools-tool-catalog" -}}
 {{- if $catalog }}
 {{- $catalog.data | toYaml | sha256sum }}
 {{- else }}
@@ -85,10 +85,10 @@ Create a checksum for the toolman catalog ConfigMap to force pod restart when it
 {{- end }}
 
 {{/*
-Create a checksum for the toolman catalog ConfigMap to force pod restart when it changes
+Create a checksum for the tools catalog ConfigMap to force pod restart when it changes
 */}}
-{{- define "orchestrator.toolmanCatalogChecksum" -}}
-{{- $catalog := lookup "v1" "ConfigMap" .Release.Namespace "toolman-tool-catalog" -}}
+{{- define "orchestrator.toolsCatalogChecksum" -}}
+{{- $catalog := lookup "v1" "ConfigMap" .Release.Namespace "tools-tool-catalog" -}}
 {{- if $catalog }}
 {{- $catalog.data | toYaml | sha256sum }}
 {{- else }}

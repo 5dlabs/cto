@@ -16,9 +16,9 @@ spec:
   # Project configuration
   project: platform
 
-  # Source configuration - use chart from toolman repository
+  # Source configuration - use chart from tools repository
   source:
-    repoURL: https://github.com/5dlabs/toolman
+    repoURL: https://github.com/5dlabs/tools
     targetRevision: main
     path: charts/k8s-mcp-server
 

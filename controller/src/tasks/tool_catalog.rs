@@ -4,11 +4,11 @@ use std::fs;
 use std::sync::LazyLock;
 use tracing::{debug, warn};
 
-const TOOLMAN_CATALOG_PATH: &str = "/toolman-catalog/tool-catalog.json";
+const TOOLS_CATALOG_PATH: &str = "/tools-catalog/tool-catalog.json";
 
 static TOOL_CATALOG: LazyLock<ToolCatalog> = LazyLock::new(ToolCatalog::load);
 
-/// Resolve a requested remote tool name to the canonical identifier advertised by Toolman.
+/// Resolve a requested remote tool name to the canonical identifier advertised by Tools.
 /// Returns `None` when the name is invalid (not present in the catalog) and cannot be
 /// normalized via the legacy heuristics.
 pub fn resolve_tool_name(name: &str) -> Option<String> {
@@ -33,7 +33,7 @@ pub fn resolve_tool_name(name: &str) -> Option<String> {
 
             warn!(
                 tool = trimmed,
-                "remote tool not present in Toolman catalog; leaving name unchanged"
+                "remote tool not present in Tools catalog; leaving name unchanged"
             );
             Some(trimmed.to_string())
         }
@@ -47,7 +47,7 @@ struct ToolCatalog {
 
 impl ToolCatalog {
     fn load() -> Self {
-        match fs::read_to_string(TOOLMAN_CATALOG_PATH) {
+        match fs::read_to_string(TOOLS_CATALOG_PATH) {
             Ok(raw) => match serde_json::from_str::<Value>(&raw) {
                 Ok(json) => {
                     let mut lookup = HashMap::new();
@@ -77,7 +77,7 @@ impl ToolCatalog {
                         }
                     }
 
-                    debug!(loaded = lookup.len(), "Loaded Toolman tool catalog entries");
+                    debug!(loaded = lookup.len(), "Loaded Tools tool catalog entries");
 
                     Self {
                         lookup,
@@ -87,8 +87,8 @@ impl ToolCatalog {
                 Err(err) => {
                     warn!(
                         error = %err,
-                        path = TOOLMAN_CATALOG_PATH,
-                        "Failed to parse Toolman catalog JSON"
+                        path = TOOLS_CATALOG_PATH,
+                        "Failed to parse Tools catalog JSON"
                     );
                     Self::empty_with_warning()
                 }
@@ -96,8 +96,8 @@ impl ToolCatalog {
             Err(err) => {
                 warn!(
                     error = %err,
-                    path = TOOLMAN_CATALOG_PATH,
-                    "Toolman catalog not mounted; remote tool validation disabled"
+                    path = TOOLS_CATALOG_PATH,
+                    "Tools catalog not mounted; remote tool validation disabled"
                 );
                 Self::empty_with_warning()
             }
@@ -116,7 +116,7 @@ impl ToolCatalog {
     }
 
     fn empty_with_warning() -> Self {
-        warn!("Toolman catalog unavailable; remote tool names must already match canonical values");
+        warn!("Tools catalog unavailable; remote tool names must already match canonical values");
         Self {
             lookup: HashMap::new(),
             loaded: false,

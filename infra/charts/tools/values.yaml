@@ -1,0 +1,329 @@
+---
+# Default values for tools
+# This is a YAML-formatted file.
+# All MCP server configurations are consolidated here as the single source of truth.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/5dlabs/tools
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets:
+  - name: ghcr-secret
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  name: "tools"
+
+# RBAC configuration
+rbac:
+  create: true
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1001
+  supplementalGroups: [2375]  # Docker group for Docker socket access
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 2375
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: tools.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - name: config
+    configMap:
+      name: tools-config
+  - name: tmp
+    emptyDir: {}
+  - name: docker-sock-dir
+    emptyDir: {}
+  - name: docker-data
+    emptyDir: {}
+  - name: home-mcp-pvc
+    persistentVolumeClaim:
+      claimName: home-mcp-data
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - name: config
+    mountPath: /config
+    readOnly: true
+  - name: tmp
+    mountPath: /tmp
+  - name: data
+    mountPath: /data
+  - name: home-mcp-pvc
+    mountPath: /home/mcp
+  - name: docker-sock-dir
+    mountPath: /var/run
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment variables
+env:
+  - name: PORT
+    value: "3000"
+  - name: PROJECT_DIR
+    value: "/config"
+  - name: RUST_LOG
+    value: "info,kube=debug,tools=trace"
+  - name: CONTEXT7_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: tools-context7-secrets
+        key: CONTEXT7_API_KEY
+        optional: true
+  - name: GITHUB_PERSONAL_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: tools-github-secrets
+        key: GITHUB_PERSONAL_ACCESS_TOKEN
+        optional: true
+
+# Set working directory to writable location
+workingDir: "/tmp"
+
+# =============================================================================
+# MCP Server Configuration - Single Source of Truth
+# =============================================================================
+# All available MCP servers are defined here. The tools server will proxy
+# requests to these servers based on the tool being invoked.
+
+config:
+  servers:
+    # --- Search & Web ---
+    brave-search:
+      name: "Brave Search"
+      description: "Web search using Brave Search API"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-brave-search"]
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-brave-search-secrets"
+        keys:
+          - "BRAVE_API_KEY"
+
+    # --- Memory & Context ---
+    openmemory:
+      name: "OpenMemory"
+      description: "Long-term memory system for AI agents with multi-sector cognitive architecture"
+      transport: "http"
+      url: "http://openmemory.agent-platform.svc.cluster.local:8080/mcp"
+      workingDirectory: "/tmp"
+
+    context7:
+      name: "Context7"
+      description: "Up-to-date library documentation and code examples"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@upstash/context7-mcp"]
+      workingDirectory: "/tmp"
+
+    # --- Infrastructure ---
+    terraform:
+      name: "Terraform"
+      description: "Terraform Registry API integration"
+      transport: "stdio"
+      command: "docker"
+      args: ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"]
+      workingDirectory: "/tmp"
+
+    kubernetes:
+      name: "Kubernetes"
+      description: "Kubernetes cluster management and Helm operations"
+      transport: "sse"
+      url: "http://k8s-mcp-k8s-mcp-server.mcp.svc.cluster.local:8080/sse"
+      workingDirectory: "/tmp"
+
+    # --- Databases ---
+    postgres:
+      name: "PostgreSQL"
+      description: "PostgreSQL database management and querying"
+      transport: "stdio"
+      command: "uvx"
+      args: ["postgres-mcp", "--access-mode=unrestricted"]
+      workingDirectory: "/tmp"
+      env:
+        DATABASE_URI: "postgresql://rustdocs:rustdocs123@rustdocs-mcp-postgresql.mcp.svc.cluster.local:5432/postgres"
+
+    redis:
+      name: "Redis"
+      description: "Redis database operations and caching"
+      transport: "stdio"
+      command: "uvx"
+      args: ["--from", "git+https://github.com/redis/mcp-redis.git", "redis-mcp-server"]
+      workingDirectory: "/tmp"
+
+    pg-aiguide:
+      name: "pg-aiguide"
+      description: "AI-optimized PostgreSQL expertise with semantic docs search and best practices"
+      transport: "http"
+      url: "https://mcp.tigerdata.com/docs"
+      workingDirectory: "/tmp"
+
+    # --- Development Tools ---
+    rustdocs:
+      name: "Rust Docs"
+      description: "Rust documentation MCP server"
+      transport: "sse"
+      url: "http://rustdocs-mcp-rust-docs-mcp-server.mcp.svc.cluster.local:3000/sse"
+      workingDirectory: "/tmp"
+
+    github:
+      name: "GitHub"
+      description: "GitHub API operations for repositories, issues, and pull requests"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-github"]
+      workingDirectory: "/tmp"
+
+    # --- UI Components ---
+    shadcn:
+      name: "shadcn/ui"
+      description: "shadcn/ui component library with source code and demos"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
+      workingDirectory: "/tmp"
+
+    ai-elements:
+      name: "AI Elements"
+      description: "AI-native UI component library for building chat interfaces, AI applications, and streaming UIs"
+      transport: "http"
+      url: "https://registry.ai-sdk.dev/api/mcp"
+      workingDirectory: "/tmp"
+
+    # --- Documentation ---
+    agent-docs:
+      name: "Agent Docs"
+      description: "Agent documentation and knowledge base server"
+      transport: "http"
+      url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80/mcp"
+      workingDirectory: "/tmp"
+
+    # --- Blockchain ---
+    solana:
+      name: "Solana"
+      description: "Solana blockchain development tools"
+      transport: "http"
+      url: "https://mcp.solana.com/mcp"
+      workingDirectory: "/tmp"
+
+    # --- Social ---
+    reddit:
+      name: "Reddit"
+      description: "Reddit content fetching and analysis via uvx"
+      transport: "stdio"
+      command: "uvx"
+      args: ["--from", "git+https://github.com/adhikasp/mcp-reddit.git", "mcp-reddit"]
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-reddit-secrets"
+        keys:
+          - "REDDIT_CLIENT_ID"
+          - "REDDIT_CLIENT_SECRET"
+          - "REDDIT_USERNAME"
+          - "REDDIT_PASSWORD"
+
+# Local tools configuration (client-side tools available in agent containers)
+# NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
+# which breaks MCP protocol validation in Cursor and other clients
+localTools:
+  servers:
+    rust-tools:
+      name: "Rust Development Tools"
+      description: "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development"
+      transport: "stdio"
+      command: "/home/node/.cargo/bin/cursor-rust-tools"
+      args: ["--no-ui"]
+      workingDirectory: "/workspace"
+
+# Persistence for temporary files and caches
+persistence:
+  enabled: true
+  storageClass: "local-path"
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+
+# Secret store integration (Vault Secrets Operator syncs these)
+secretRefs:
+  - name: tools-brave-search-secrets
+  - name: tools-reddit-secrets
+  - name: tools-context7-secrets
+  - name: tools-github-secrets
+
+# Network policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    labels: {}
+    interval: 30s
+    scrapeTimeout: 10s

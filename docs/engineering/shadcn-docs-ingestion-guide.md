@@ -67,7 +67,7 @@ graph LR
 
 **3. MCP Interface**
 - Tools: `query_docs`, `search_docs`, `get_examples`
-- Accessible via toolman proxy or direct connection
+- Accessible via tools proxy or direct connection
 - Streaming responses for large results
 
 ---
@@ -453,6 +453,6 @@ docs_ingest({
 - [Doc Server Repository](https://github.com/5dlabs/docs)
 - [shadcn/ui Repository](https://github.com/shadcn-ui/ui)
 - [MCP Specification](https://modelcontextprotocol.io)
-- [Toolman MCP Architecture](./toolman-mcp-architecture.md)
+- [Tools MCP Architecture](./tools-mcp-architecture.md)
 - [Blaze Modern Frontend Stack](./blaze-modern-frontend-stack.md)
 

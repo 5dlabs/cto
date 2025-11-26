@@ -155,7 +155,7 @@ sudo wg show
 
 # Test connectivity to a cluster service
 curl http://10.110.168.146/api/version  # ArgoCD
-curl http://10.96.102.139:3000/health   # Toolman
+curl http://10.96.102.139:3000/health   # Tools
 ```
 
 ## Troubleshooting

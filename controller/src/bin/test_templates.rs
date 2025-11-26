@@ -15,7 +15,7 @@ use controller::tasks::template_paths::{
     CODE_FACTORY_CONTAINER_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
     CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE,
     DOCS_CLAUDE_CONTAINER_TEMPLATE, DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE,
-    DOCS_CLAUDE_SETTINGS_TEMPLATE, DOCS_CLAUDE_TOOLMAN_TEMPLATE,
+    DOCS_CLAUDE_SETTINGS_TEMPLATE, DOCS_CLAUDE_TOOLS_TEMPLATE,
 };
 use handlebars::Handlebars;
 use serde_json::json;
@@ -54,7 +54,7 @@ fn test_docs_templates(
         "model": "claude-3-5-sonnet-20241022",
         "github_user": "pm0-5dlabs",
         "remote_tools": ["rustdocs_query_rust_docs"],
-        "toolman_catalog": {
+        "tools_catalog": {
             "local": {
                 "filesystem": {
                     "description": "Workspace filesystem access",
@@ -74,7 +74,7 @@ fn test_docs_templates(
             "remote": {
                 "docs": {
                     "description": "Documentation retrieval",
-                    "endpoint": "http://toolman/docs",
+                    "endpoint": "http://tools/docs",
                     "tools": [
                         {
                             "name": "rustdocs_query_rust_docs",
@@ -97,7 +97,7 @@ fn test_docs_templates(
         DOCS_CLAUDE_CONTAINER_TEMPLATE,
         DOCS_CLAUDE_PROMPT_TEMPLATE,
         DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE,
-        DOCS_CLAUDE_TOOLMAN_TEMPLATE,
+        DOCS_CLAUDE_TOOLS_TEMPLATE,
     ];
 
     for template_name in &docs_templates {
@@ -217,8 +217,8 @@ fn test_code_templates(
         "approval_policy": "never",
         "sandbox_mode": "workspace-write",
         "project_doc_max_bytes": 32768,
-        "toolman": {
-            "url": "http://toolman.test",
+        "tools": {
+            "url": "http://tools.test",
             "tools": ["memory_create_entities"]
         },
         "model_provider": {
@@ -313,8 +313,8 @@ fn test_code_templates(
         "sandbox_mode": "danger-full-access",
         "project_doc_max_bytes": 32768,
         "editor_vim_mode": true,
-        "toolman": {
-            "url": "http://toolman.test",
+        "tools": {
+            "url": "http://tools.test",
             "tools": [
                 "memory_create_entities",
                 "rustdocs_query_rust_docs"
@@ -388,7 +388,7 @@ fn test_code_templates(
                 "sandboxMode": "danger-full-access",
                 "projectDocMaxBytes": 65536,
                 "reasoningEffort": "high",
-                "toolmanUrl": "http://toolman.test",
+                "toolsUrl": "http://tools.test",
                 "editor": { "vimMode": true },
                 "modelProvider": {
                     "name": "Factory",
@@ -424,7 +424,7 @@ fn test_code_templates(
                 "sandboxMode": "danger-full-access",
                 "projectDocMaxBytes": 65536,
                 "reasoningEffort": "high",
-                "toolmanUrl": "http://toolman.test",
+                "toolsUrl": "http://tools.test",
                 "editor": { "vimMode": true },
                 "modelProvider": {
                     "name": "Factory",
@@ -447,8 +447,8 @@ fn test_code_templates(
         "project_doc_max_bytes": 65536,
         "reasoning_effort": "high",
         "editor_vim_mode": true,
-        "toolman": {
-            "url": "http://toolman.test",
+        "tools": {
+            "url": "http://tools.test",
             "tools": [
                 "memory_create_entities",
                 "rustdocs_query_rust_docs"

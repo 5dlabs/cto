@@ -30,14 +30,14 @@
 _No additional OpenCode memory instructions were provided for this run._
 {{/if}}
 
-{{#if toolman.tools}}
-## Toolman Tools
-{{#each toolman.tools}}
+{{#if tools.tools}}
+## Tools Tools
+{{#each tools.tools}}
 - {{this}}
 {{/each}}
 {{else}}
-## Toolman Tools
-- No remote tools configured. Toolman will still provide discovery commands.
+## Tools Tools
+- No remote tools configured. Tools will still provide discovery commands.
 {{/if}}
 
 {{#if cli_config.additionalNotes}}

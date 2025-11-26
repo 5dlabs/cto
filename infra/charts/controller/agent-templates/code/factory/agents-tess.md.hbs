@@ -83,10 +83,10 @@ git push origin HEAD
 - Language-specific test runners (pytest, jest, go test, etc.) as required by the codebase
 - Kubernetes/DB tooling for integration validation if the task touches those surfaces
 
-## Toolman Snapshot
-{{#if toolman.tools}}
+## Tools Snapshot
+{{#if tools.tools}}
 Remote tools available:
-{{#each toolman.tools}}
+{{#each tools.tools}}
 - {{this}}
 {{/each}}
 {{else}}

@@ -116,10 +116,10 @@ impl CliAdapter for FactoryAdapter {
         let raw_additional_json = first_string(&settings, &["rawJson", "raw_json"]) // legacy & snake_case
             .map(std::string::ToString::to_string);
 
-        let toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        let tools_url = env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+            "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
         });
-        let toolman_url = toolman_url.trim_end_matches('/').to_string();
+        let tools_url = tools_url.trim_end_matches('/').to_string();
 
         let remote_tools = agent_config
             .tools
@@ -154,9 +154,9 @@ impl CliAdapter for FactoryAdapter {
             context.insert("auto_level".to_string(), Value::String(value));
         }
         context.insert(
-            "toolman".to_string(),
+            "tools".to_string(),
             json!({
-                "url": toolman_url,
+                "url": tools_url,
                 "tools": remote_tools,
             }),
         );
@@ -476,7 +476,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_config_renders_factory_template() {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        std::env::set_var("TOOLMAN_SERVER_URL", "http://localhost:3000/mcp");
+        std::env::set_var("TOOLS_SERVER_URL", "http://localhost:3000/mcp");
 
         let adapter = FactoryAdapter::new().unwrap();
         let config = adapter
@@ -515,8 +515,8 @@ mod tests {
             "high"
         );
         let tools = parsed
-            .get("toolman")
-            .and_then(|toolman| toolman.get("tools"))
+            .get("tools")
+            .and_then(|tools| tools.get("tools"))
             .and_then(Value::as_array)
             .expect("tool list");
         assert!(tools.contains(&Value::String("memory_create_entities".to_string())));

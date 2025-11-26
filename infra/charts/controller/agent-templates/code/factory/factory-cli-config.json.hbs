@@ -26,24 +26,24 @@
     ],
     "deny": []
   },
-  "toolman": {
-    "endpoint": "{{toolman.url}}"{{#if toolman.tools}},
+  "tools": {
+    "endpoint": "{{tools.url}}"{{#if tools.tools}},
     "tools": [
-      {{#each toolman.tools}}
+      {{#each tools.tools}}
       "{{this}}"{{#unless @last}},{{/unless}}
       {{/each}}
     ]{{/if}}
   },
   "mcp": {
     "servers": {
-      "toolman": {
-        "command": "toolman",
-        "args": ["--url", "{{toolman.url}}"],
+      "tools": {
+        "command": "tools",
+        "args": ["--url", "{{tools.url}}"],
         "env": {
-          "TOOLMAN_SERVER_URL": "{{toolman.url}}"
-        }{{#if toolman.tools}},
+          "TOOLS_SERVER_URL": "{{tools.url}}"
+        }{{#if tools.tools}},
         "availableTools": [
-          {{#each toolman.tools}}
+          {{#each tools.tools}}
           "{{this}}"{{#unless @last}},{{/unless}}
           {{/each}}
         ]{{/if}}

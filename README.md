@@ -560,7 +560,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
 - **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`)
 - **`model`**: Model identifier for the CLI
 - **`tools`** (optional): Fine-grained tool access control
-  - **`remote`**: Array of remote tool names from Toolman
+  - **`remote`**: Array of remote tool names from Tools
   - **`localServers`**: Local MCP server configurations
     - Each server specifies `enabled` and which `tools` the agent can access
 

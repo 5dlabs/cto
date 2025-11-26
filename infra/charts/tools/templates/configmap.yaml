@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tools.configMapName" . }}
+  labels:
+    {{- include "tools.labels" . | nindent 4 }}
+data:
+  servers-config.json: |
+    {{- if .Values.config.servers }}
+    {
+      "servers": {
+        {{- $first := true }}
+        {{- range $serverName, $serverConfig := .Values.config.servers }}
+        {{- if not $first }},{{ end }}
+        {{- $first = false }}
+        "{{ $serverName }}": {
+          {{- if $serverConfig.name }}
+          "name": {{ $serverConfig.name | quote }},
+          {{- end }}
+          {{- if $serverConfig.description }}
+          "description": {{ $serverConfig.description | quote }},
+          {{- end }}
+          "transport": {{ $serverConfig.transport | default "stdio" | quote }},
+          {{- if $serverConfig.command }}
+          "command": {{ $serverConfig.command | quote }},
+          {{- else }}
+          "command": "",
+          {{- end }}
+          {{- if $serverConfig.args }}
+          "args": {{ $serverConfig.args | toJson }},
+          {{- else }}
+          "args": [],
+          {{- end }}
+          {{- if $serverConfig.workingDirectory }}
+          "workingDirectory": {{ $serverConfig.workingDirectory | quote }},
+          {{- end }}
+          {{- if $serverConfig.url }}
+          "url": {{ $serverConfig.url | quote }},
+          {{- end }}
+          {{- if $serverConfig.env }}
+          "env": {{ $serverConfig.env | toJson }}
+          {{- else }}
+          "env": {}
+          {{- end }}
+        }
+        {{- end }}
+      }
+    }
+    {{- else }}
+    {{- .Files.Get "config/servers-config.json" | nindent 4 }}
+    {{- end }}

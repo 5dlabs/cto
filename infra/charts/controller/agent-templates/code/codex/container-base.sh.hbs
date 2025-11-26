@@ -1530,7 +1530,7 @@ rm() {
 export -f guard_rm rm
 
 if [ ! -f "$CODEX_WORK_DIR/client-config.json" ]; then
-  echo "❌ client-config.json missing from workspace; required for MCP/toolman"
+  echo "❌ client-config.json missing from workspace; required for MCP/tools"
   exit 1
 fi
 
@@ -1596,47 +1596,47 @@ else
 fi
 
 echo "=== MCP PRECHECKS ==="
-if ! command -v toolman >/dev/null 2>&1; then
-  echo "❌ 'toolman' CLI not found in PATH; required for MCP"
+if ! command -v tools >/dev/null 2>&1; then
+  echo "❌ 'tools' CLI not found in PATH; required for MCP"
   exit 1
 fi
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-TOOLMAN_URL="${TOOLMAN_URL%/}"
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-TOOLMAN_RETRIES=3
-TOOLMAN_WAIT=2
-TOOLMAN_SUCCESS=false
-for i in $(seq 1 $TOOLMAN_RETRIES); do
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
+echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+TOOLS_RETRIES=3
+TOOLS_WAIT=2
+TOOLS_SUCCESS=false
+for i in $(seq 1 $TOOLS_RETRIES); do
   if curl -sSf --connect-timeout 5 --max-time 10 \
-    -X POST "$TOOLMAN_URL" \
+    -X POST "$TOOLS_URL" \
     -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
-    TOOLMAN_SUCCESS=true
-    rm -f /tmp/toolman-ping.log
+    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+    TOOLS_SUCCESS=true
+    rm -f /tmp/tools-ping.log
     break
   fi
-  if [ $i -lt $TOOLMAN_RETRIES ]; then
-    echo "⚠️ Toolman connectivity check failed (attempt $i/$TOOLMAN_RETRIES), retrying in ${TOOLMAN_WAIT}s..."
-    cat /tmp/toolman-ping.log >&2 || true
-    rm -f /tmp/toolman-ping.log
-    sleep $TOOLMAN_WAIT
-    TOOLMAN_WAIT=$((TOOLMAN_WAIT * 2))  # Exponential backoff
+  if [ $i -lt $TOOLS_RETRIES ]; then
+    echo "⚠️ Tools connectivity check failed (attempt $i/$TOOLS_RETRIES), retrying in ${TOOLS_WAIT}s..."
+    cat /tmp/tools-ping.log >&2 || true
+    rm -f /tmp/tools-ping.log
+    sleep $TOOLS_WAIT
+    TOOLS_WAIT=$((TOOLS_WAIT * 2))  # Exponential backoff
   fi
 done
 
-if [ "$TOOLMAN_SUCCESS" != "true" ]; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL after $TOOLMAN_RETRIES attempts"
-  cat /tmp/toolman-ping.log >&2 || true
-  rm -f /tmp/toolman-ping.log
+if [ "$TOOLS_SUCCESS" != "true" ]; then
+  echo "❌ Unable to reach Tools server at $TOOLS_URL after $TOOLS_RETRIES attempts"
+  cat /tmp/tools-ping.log >&2 || true
+  rm -f /tmp/tools-ping.log
   echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
-  echo "⚠️ If Codex execution fails, check Toolman service health and DNS resolution."
-  # Don't exit - allow Codex to proceed in case Toolman comes back online
+  echo "⚠️ If Codex execution fails, check Tools service health and DNS resolution."
+  # Don't exit - allow Codex to proceed in case Tools comes back online
   # The MCP client will handle connection failures gracefully
 fi
-echo "✓ Toolman endpoint check completed"
+echo "✓ Tools endpoint check completed"
 
-# Refresh Toolman remote tools so the MCP client sees the full catalog (Codex filters aggressively)
+# Refresh Tools remote tools so the MCP client sees the full catalog (Codex filters aggressively)
 if [ -z "${OPENAI_API_KEY:-}" ]; then
   echo "❌ OPENAI_API_KEY is not set; Codex cannot authenticate"
   exit 1
@@ -1665,12 +1665,12 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
-if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
-  ensure_default_toolman_guide "$CODEX_WORK_DIR/task" "{{task_id}}" "{{service}}"
+if declare -F ensure_default_tools_guide >/dev/null 2>&1; then
+  ensure_default_tools_guide "$CODEX_WORK_DIR/task" "{{task_id}}" "{{service}}"
 fi
 
-if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+if [ -f "$CODEX_WORK_DIR/task/tools-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/tools-guide.md")\n\n---\n\n"
 fi
 
 PR_STAGE="${WORKFLOW_STAGE:-implementation}"

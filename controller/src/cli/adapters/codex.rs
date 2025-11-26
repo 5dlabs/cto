@@ -81,7 +81,7 @@ impl CodexAdapter {
     fn render_memory_file(&self, agent_config: &AgentConfig) -> AdapterResult<String> {
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
-        let toolman_tools = agent_config
+        let tools_tools = agent_config
             .tools
             .as_ref()
             .map(|tools| tools.remote.clone())
@@ -91,8 +91,8 @@ impl CodexAdapter {
             "cli_config": cli_config,
             "github_app": agent_config.github_app,
             "model": agent_config.model,
-            "toolman": {
-                "tools": toolman_tools,
+            "tools": {
+                "tools": tools_tools,
             },
         });
 
@@ -206,12 +206,12 @@ impl CliAdapter for CodexAdapter {
         let project_doc_max_bytes =
             first_u64(&cli_config, &["projectDocMaxBytes"]).unwrap_or(32_768);
 
-        let toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        let tools_url = env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+            "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
         });
-        let toolman_url = toolman_url.trim_end_matches('/').to_string();
+        let tools_url = tools_url.trim_end_matches('/').to_string();
 
-        let toolman_tools = agent_config
+        let tools_tools = agent_config
             .tools
             .as_ref()
             .map(|tools| tools.remote.clone())
@@ -290,9 +290,9 @@ impl CliAdapter for CodexAdapter {
             "project_doc_max_bytes": project_doc_max_bytes,
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "correlation_id": self.base.config.correlation_id,
-            "toolman": {
-                "url": toolman_url,
-                "tools": toolman_tools,
+            "tools": {
+                "url": tools_url,
+                "tools": tools_tools,
             },
             "model_provider": model_provider,
             "cli_config": cli_config,
@@ -470,7 +470,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_config_applies_overrides() {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        std::env::set_var("TOOLMAN_SERVER_URL", "http://localhost:9000/mcp");
+        std::env::set_var("TOOLS_SERVER_URL", "http://localhost:9000/mcp");
 
         let adapter = CodexAdapter::new().unwrap();
         let agent_config = sample_agent_config();
@@ -489,7 +489,7 @@ mod tests {
         assert!(config.contains("sandbox_mode = \"workspace-write\""));
         assert!(config.contains("project_doc_max_bytes = 32768"));
         assert!(config.contains("model_reasoning_effort = \"medium\""));
-        assert!(config.contains("[mcp_servers.toolman]"));
+        assert!(config.contains("[mcp_servers.tools]"));
         assert!(config.contains("--url"));
         assert!(config.contains("memory_create_entities"));
         assert!(config.contains("[model_providers.openai]"));

@@ -5,6 +5,7 @@ members = [
     "controller",
     "mcp",
     "monitor",
+    "tools",
 ]
 
 [workspace.package]

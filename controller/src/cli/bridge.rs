@@ -334,13 +334,13 @@ impl CLIAdapter for FactoryCLIAdapter {
             .collect();
 
         let mut mcp_servers_json = serde_json::Map::new();
-        let mut toolman_endpoint: Option<String> = None;
+        let mut tools_endpoint: Option<String> = None;
 
         if let Some(mcp_config) = &universal.mcp_config {
             for server in &mcp_config.servers {
-                if server.name.eq_ignore_ascii_case("toolman") {
-                    toolman_endpoint =
-                        server.env.get("TOOLMAN_SERVER_URL").cloned().or_else(|| {
+                if server.name.eq_ignore_ascii_case("tools") {
+                    tools_endpoint =
+                        server.env.get("TOOLS_SERVER_URL").cloned().or_else(|| {
                             server
                                 .args
                                 .iter()
@@ -360,12 +360,12 @@ impl CLIAdapter for FactoryCLIAdapter {
             }
         }
 
-        let toolman_url = toolman_endpoint.unwrap_or_else(|| {
-            env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        let tools_url = tools_endpoint.unwrap_or_else(|| {
+            env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+                "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
             })
         });
-        let toolman_url = toolman_url.trim_end_matches('/').to_string();
+        let tools_url = tools_url.trim_end_matches('/').to_string();
 
         let tool_list: Vec<String> = {
             let mut list: Vec<String> = tool_names.into_iter().collect();
@@ -404,8 +404,8 @@ impl CLIAdapter for FactoryCLIAdapter {
                 "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)"],
                 "deny": []
             },
-            "toolman": {
-                "endpoint": toolman_url,
+            "tools": {
+                "endpoint": tools_url,
                 "tools": tool_list,
             },
             "mcp": {
@@ -721,10 +721,10 @@ mod tests {
         let adapter = TomlCLIAdapter;
 
         // Create test MCP server configuration
-        let mut toolman_env = std::collections::HashMap::new();
-        toolman_env.insert(
-            "TOOLMAN_SERVER_URL".to_string(),
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string(),
+        let mut tools_env = std::collections::HashMap::new();
+        tools_env.insert(
+            "TOOLS_SERVER_URL".to_string(),
+            "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string(),
         );
 
         let universal = UniversalConfig {
@@ -749,10 +749,10 @@ mod tests {
             },
             mcp_config: Some(UniversalMCPConfig {
                 servers: vec![MCPServer {
-                    name: "toolman".to_string(),
-                    command: "toolman".to_string(),
+                    name: "tools".to_string(),
+                    command: "tools".to_string(),
                     args: vec!["--working-dir".to_string(), "/workspace".to_string()],
-                    env: toolman_env,
+                    env: tools_env,
                 }],
             }),
         };
@@ -760,16 +760,16 @@ mod tests {
         let result = adapter.to_cli_config(&universal).await.unwrap();
 
         // Check that MCP server configuration is included in TOML format
-        assert!(result.content.contains("[mcp_servers.toolman]"));
-        assert!(result.content.contains("command = \"toolman\""));
+        assert!(result.content.contains("[mcp_servers.tools]"));
+        assert!(result.content.contains("command = \"tools\""));
         assert!(result
             .content
             .contains("args = [\"--working-dir\", \"/workspace\"]"));
-        assert!(result.content.contains("TOOLMAN_SERVER_URL"));
+        assert!(result.content.contains("TOOLS_SERVER_URL"));
 
         // Check that MCP server environment variables are included
         assert!(result.env_vars.contains(&"OPENAI_API_KEY".to_string()));
-        assert!(result.env_vars.contains(&"TOOLMAN_SERVER_URL".to_string()));
+        assert!(result.env_vars.contains(&"TOOLS_SERVER_URL".to_string()));
     }
 
     #[tokio::test]
@@ -843,11 +843,11 @@ mod tests {
             },
             mcp_config: Some(UniversalMCPConfig {
                 servers: vec![MCPServer {
-                    name: "toolman".to_string(),
-                    command: "toolman".to_string(),
+                    name: "tools".to_string(),
+                    command: "tools".to_string(),
                     args: vec!["--url".to_string(), "http://localhost:3000/mcp".to_string()],
                     env: HashMap::from([(
-                        String::from("TOOLMAN_SERVER_URL"),
+                        String::from("TOOLS_SERVER_URL"),
                         String::from("http://localhost:3000/mcp"),
                     )]),
                 }],
@@ -887,8 +887,8 @@ mod tests {
             "medium"
         );
         let tool_list = parsed
-            .get("toolman")
-            .and_then(|toolman| toolman.get("tools"))
+            .get("tools")
+            .and_then(|tools| tools.get("tools"))
             .and_then(Value::as_array)
             .unwrap();
         assert!(tool_list.contains(&Value::String("memory_create_entities".to_string())));

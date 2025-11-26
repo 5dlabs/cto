@@ -26,7 +26,7 @@ Kubernetes Secret (target namespace)
   - `infrastructure.yaml` - Infrastructure secrets (Cloudflare, NGrok, GitHub PAT, etc.)
   - `doc-server.yaml` - Documentation server configuration
   - `ghcr.yaml` - GitHub Container Registry credentials
-  - `toolman.yaml` - ToolMan service secrets
+  - `tools.yaml` - Tools service secrets
 
 ## Secrets to Add in Vault UI
 
@@ -96,15 +96,15 @@ Example `.dockerconfigjson` value:
 {"auths":{"ghcr.io":{"username":"<github-username>","password":"<github-pat>","auth":"<base64-encoded-username:password>"}}}
 ```
 
-### ToolMan Secrets
+### Tools Secrets
 
 | Path | Keys |
 |------|------|
-| `secret/toolman-brave-search` | `BRAVE_API_KEY` |
-| `secret/toolman-kubernetes` | `KUBECONFIG` |
-| `secret/toolman-reddit` | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` |
-| `secret/toolman-context7` | `CONTEXT7_API_KEY` |
-| `secret/toolman-github` | `GITHUB_PERSONAL_ACCESS_TOKEN` |
+| `secret/tools-brave-search` | `BRAVE_API_KEY` |
+| `secret/tools-kubernetes` | `KUBECONFIG` |
+| `secret/tools-reddit` | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` |
+| `secret/tools-context7` | `CONTEXT7_API_KEY` |
+| `secret/tools-github` | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 
 ## Initialization Steps
 

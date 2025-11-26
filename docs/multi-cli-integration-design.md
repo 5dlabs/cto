@@ -30,7 +30,7 @@ The 5D Labs Agent Platform currently operates exclusively with Claude Code CLI. 
 
 | CLI | Install Source (repo path) | Runtime Footprint | Primary Config Artifacts | Guidance / Memory Mechanism | MCP Integration Notes |
 |-----|----------------------------|-------------------|--------------------------|-----------------------------|-----------------------|
-| **Claude** | `infra/images/claude/Dockerfile` (installs `@anthropic-ai/claude-code`) | Node.js | Project `CLAUDE.md` + generated `mcp.json` | `CLAUDE.md` instructions (current baseline) | Uses Claude’s native MCP support with Toolman bridged via `toolman --url …` |
+| **Claude** | `infra/images/claude/Dockerfile` (installs `@anthropic-ai/claude-code`) | Node.js | Project `CLAUDE.md` + generated `mcp.json` | `CLAUDE.md` instructions (current baseline) | Uses Claude’s native MCP support with Tools bridged via `tools --url …` |
 | **Codex** | `infra/images/codex/Dockerfile` (installs `@openai/codex`) | Rust binary distributed via npm | `~/.codex/config.toml` (TOML) | `AGENTS.md` layered files (`docs/codex/docs/getting-started.md:62`) | STDIO-only MCP clients (`docs/codex/docs/config.md:341`) |
 | **Opencode** | `infra/images/opencode/Dockerfile` (installs OpenCode bootstrap) | TypeScript/Node | Project + global `opencode.json` / `opencode.jsonc` | `AGENTS.md` + instruction files (`docs/opencode/packages/web/src/content/docs/docs/rules.mdx`) | Ships `@modelcontextprotocol` client libraries; supports both local and remote MCP servers |
 | **Gemini** | `infra/images/gemini/Dockerfile` (installs `@google/gemini-cli`) | TypeScript/Node | TBD – need upstream config review | Guidance mechanism TBD (no `GEMINI.md` reference in repo yet) | MCP support advertised upstream; implementation specifics still to be confirmed |
@@ -111,7 +111,7 @@ fn validate_model_name(model: &str) -> Result<()> {
 
    // Option B: Wrapper pattern
    pub struct CodexMcpProxy {
-       toolman_client: ToolmanClient,
+       tools_client: ToolsClient,
        buffer_threshold: usize,
    }
    ```
@@ -132,11 +132,11 @@ fn validate_model_name(model: &str) -> Result<()> {
 
 #### Questions/Concerns for Associate Agent - ANSWERED
 
-**Q1: `toolman_client: ToolmanClient` implementation plan**
-**A:** The `ToolmanClient` refers to the existing `toolman` CLI binary already deployed in runtime containers (`infra/images/runtime/Dockerfile` installs v2.4.4). No new SDK needed - Codex will use the same STDIO interface as Claude currently does via the `toolman --url ...` wrapper pattern defined in `mcp.json.hbs`.
+**Q1: `tools_client: ToolsClient` implementation plan**
+**A:** The `ToolsClient` refers to the existing `tools` CLI binary already deployed in runtime containers (`infra/images/runtime/Dockerfile` installs v2.4.4). No new SDK needed - Codex will use the same STDIO interface as Claude currently does via the `tools --url ...` wrapper pattern defined in `mcp.json.hbs`.
 
 **Q2: Need for `McpTransport`/`CodexMcpProxy` abstractions**
-**A:** These abstractions are **OPTIONAL** - only needed if Codex lacks HTTP streaming support. Since Codex uses STDIO MCP (confirmed in `docs/codex/docs/config.md:341`), and our existing `toolman` CLI already bridges STDIO ↔ HTTP, the current infrastructure should work without additional proxies. The abstractions serve as **fallback patterns** if streaming performance issues are discovered during testing.
+**A:** These abstractions are **OPTIONAL** - only needed if Codex lacks HTTP streaming support. Since Codex uses STDIO MCP (confirmed in `docs/codex/docs/config.md:341`), and our existing `tools` CLI already bridges STDIO ↔ HTTP, the current infrastructure should work without additional proxies. The abstractions serve as **fallback patterns** if streaming performance issues are discovered during testing.
 
 **Q3: Streaming fallback motivation and constraints**
 **A:** The buffered relay approach is **precautionary** based on common CLI limitations where STDIO-based tools may not handle streaming efficiently for large tool responses (e.g., large file reads, extensive search results). The audit scope should focus on:
@@ -203,7 +203,7 @@ agent:
 
 **CLI Architecture Patterns Discovered:**
 - **npm-delivered CLIs (Claude, Codex, Opencode, Gemini, Grok, Qwen)**: Share the Node-based runtime we already ship. Integration hinges on per-CLI config formats rather than disparate language stacks.
-- **Rust CLI (Codex)**: External MCP client via `toolman` – existing STDIO wrapper continues to apply.
+- **Rust CLI (Codex)**: External MCP client via `tools` – existing STDIO wrapper continues to apply.
 - **Python CLIs (Cursor, OpenHands)**: Bring their own virtualenv / framework assumptions – staged for a later phase once Node-first CLIs land.
 
 **Memory / Guidance Mechanisms - CONFIRMED:**
@@ -242,7 +242,7 @@ This provides comprehensive coverage without scope creep to 8 different CLI arch
    ```
 
 2. **MCP Streaming Audit**:
-   - Test Codex with existing Toolman setup
+   - Test Codex with existing Tools setup
    - Document streaming capabilities and limitations
    - Design fallback strategy if needed
 
@@ -509,11 +509,11 @@ Authentication handling:
 
 #### 2.3 MCP Integration
 
-- The MCP server keeps its single Toolman instance; Codex reuses the existing Toolman client-config that is mounted for Claude today.
-- Toolman is exposed to the agents through the `toolman` CLI, which bridges STDIO ↔ HTTP (`infra/charts/controller/agent-templates/code/mcp.json.hbs` calls `toolman --url ...`). Codex’s MCP support is STDIO-only (`docs/codex/docs/config.md:341`), so the existing wrapper remains compatible without additional adapters.
-- The runtime base image already ships the `toolman` CLI (`infra/images/runtime/Dockerfile` installs release v2.4.4), ensuring the Codex container inherits the binary automatically.
-- The controller continues to derive Toolman’s configuration (tool enablement, repository workspace paths) from `agent.tools` and injects it into the Pod environment, independent of the selected CLI.
-- We will audit Codex’s current MCP support for HTTP streaming; if it lacks stable streaming, add a lightweight wrapper that proxies Toolman responses until upstream support lands.
+- The MCP server keeps its single Tools instance; Codex reuses the existing Tools client-config that is mounted for Claude today.
+- Tools is exposed to the agents through the `tools` CLI, which bridges STDIO ↔ HTTP (`infra/charts/controller/agent-templates/code/mcp.json.hbs` calls `tools --url ...`). Codex’s MCP support is STDIO-only (`docs/codex/docs/config.md:341`), so the existing wrapper remains compatible without additional adapters.
+- The runtime base image already ships the `tools` CLI (`infra/images/runtime/Dockerfile` installs release v2.4.4), ensuring the Codex container inherits the binary automatically.
+- The controller continues to derive Tools’s configuration (tool enablement, repository workspace paths) from `agent.tools` and injects it into the Pod environment, independent of the selected CLI.
+- We will audit Codex’s current MCP support for HTTP streaming; if it lacks stable streaming, add a lightweight wrapper that proxies Tools responses until upstream support lands.
 
 ### Phase 3: Standardized CLI Management
 
@@ -883,7 +883,7 @@ The enhanced `cto-config.json` schema provides:
 
 ### Transport & Streaming
 
-1. **Codex Streaming Audit**: Verify whether the Codex CLI supports HTTP streaming for MCP responses; if not, wrap Toolman responses in a buffered relay until upstream streaming is available.
+1. **Codex Streaming Audit**: Verify whether the Codex CLI supports HTTP streaming for MCP responses; if not, wrap Tools responses in a buffered relay until upstream streaming is available.
 2. **Timeout Behavior**: Align Codex’s streaming/timeout semantics with Claude’s so the controller can keep a single SLA enforcement path.
 3. **Telemetry**: Capture per-CLI streaming latency metrics to validate the relay (if required) and retire it once native streaming lands.
 

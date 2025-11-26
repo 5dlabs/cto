@@ -24,7 +24,7 @@ You own Task {{task_id}} end-to-end. Deliver a production-ready implementation w
 ## Implementation Playbook
 1. **Absorb context** from `task/task.md`, acceptance criteria, and architecture notes.
 2. **Draft a plan** directly in the workspace (notes/PR description). Keep it short and actionable.
-3. **Implement** using Cursor’s write tools; rely on MCP (Toolman) for repo discovery or scripts.
+3. **Implement** using Cursor’s write tools; rely on MCP (Tools) for repo discovery or scripts.
 4. **Verify**: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`, `cargo test --workspace --all-features` (expand for language equivalents).
 5. **Summarise**: produce an exhaustive implementation summary covering intent, files touched, tests run, and any follow-up work.
 6. **Create the PR** with `gh pr create`, ensure labels (`task-{{task_id}}`, `service-{{service}}`, `run-{{workflow_name}}`) exist (create them if missing), and attach logs/output.
@@ -35,9 +35,9 @@ You own Task {{task_id}} end-to-end. Deliver a production-ready implementation w
 - PR open, labeled, and ready for Cleo.
 
 ## Tooling Snapshot
-{{#if toolman.tools}}
-Available Toolman tools:
-{{#each toolman.tools}}
+{{#if tools.tools}}
+Available Tools tools:
+{{#each tools.tools}}
 - {{this}}
 {{/each}}
 {{else}}

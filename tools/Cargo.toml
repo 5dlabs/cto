@@ -1,0 +1,79 @@
+[package]
+name = "tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Dynamic tool management for MCP (Model Context Protocol) servers"
+keywords = ["mcp", "model-context-protocol", "ai", "tools", "cursor"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "tools"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tools-client"
+path = "src/bin/client.rs"
+
+[[bin]]
+name = "tools-server"
+path = "src/server/http_server.rs"
+
+[dependencies]
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Async runtime
+tokio.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# HTTP/Web
+axum.workspace = true
+tower-http = { version = "0.6", features = ["cors"] }
+reqwest.workspace = true
+
+# CLI
+clap.workspace = true
+
+# Kubernetes
+kube.workspace = true
+k8s-openapi.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Time
+chrono.workspace = true
+
+# UUID
+uuid.workspace = true
+
+# Text processing
+regex.workspace = true
+
+# Other
+dirs = "6.0.0"
+sha2 = "0.10"
+libc = "0.2"
+ctrlc = "3.4.7"
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"
+env_logger = "0.11.8"
+log = "0.4"
+
+# Integration test configuration
+[[test]]
+name = "integration"
+path = "tests/integration/mod.rs"
+harness = true
+

@@ -181,7 +181,7 @@ npx -y @upstash/context7-mcp
 **Once Fixed:**
 - All agents will have CONTEXT7_API_KEY
 - Local Context7 MCP servers will work
-- Agents can use Context7 directly (bypassing Toolman routing bug)
+- Agents can use Context7 directly (bypassing Tools routing bug)
 
 ---
 

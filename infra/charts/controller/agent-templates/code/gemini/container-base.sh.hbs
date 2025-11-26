@@ -117,7 +117,7 @@ if [ -f /agent-templates/shared_task-setup-functions.sh ]; then
 else
     echo "⚠️ shared_task-setup-functions.sh not found; defining minimal fallbacks"
     ensure_default_client_config() { :; }
-    ensure_default_toolman_guide() { :; }
+    ensure_default_tools_guide() { :; }
 fi
 
 # Disable interactive Git prompts globally
@@ -658,11 +658,11 @@ else
             echo "⚠️ client-config.json not found - MCP client may not be configured"
         fi
 
-        echo "✅ Copying toolman-guide.md..."
-        if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-            cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
+        echo "✅ Copying tools-guide.md..."
+        if [ -f "$TASK_DIR/tools-guide.md" ]; then
+            cp "$TASK_DIR/tools-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ tools-guide.md copied" || echo "❌ tools-guide.md copy failed"
         else
-            echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
+            echo "⚠️ tools-guide.md not found - code agent won't have tool usage guidance"
         fi
 
         echo "✓ Task {{task_id}} files copied from $TASK_DIR"
@@ -974,7 +974,7 @@ else
 fi
 
 # Verify client-config.json is available in Gemini's working directory
-echo "=== TOOLMAN CONFIG SETUP ==="
+echo "=== TOOLS CONFIG SETUP ==="
 WORKSPACE_CFG="$GEMINI_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 
@@ -1133,27 +1133,27 @@ echo "════════════════════════�
 echo "Command: $GEMINI_CMD"
 echo "Note: Gemini should automatically read GEMINI.md from the working directory if configured to do so."
 
-# Prepare prompt prefix for toolman guidance
+# Prepare prompt prefix for tools guidance
 PROMPT_PREFIX=""
-ensure_default_toolman_guide "$GEMINI_WORK_DIR/task" "{{task_id}}" "{{service}}"
-if [ -f "$GEMINI_WORK_DIR/task/toolman-guide.md" ]; then
+ensure_default_tools_guide "$GEMINI_WORK_DIR/task" "{{task_id}}" "{{service}}"
+if [ -f "$GEMINI_WORK_DIR/task/tools-guide.md" ]; then
     PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**
 
-Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/toolman-guide.md\`. This file contains:
+Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/tools-guide.md\`. This file contains:
 - Selected tools for this specific task
 - When and how to use each tool
 - Tool arguments, parameters, and configuration options
 - Implementation workflow and best practices
 - Tool relationships and sequencing
 
-**The toolman-guide.md is your authoritative reference for tool usage in this task.**
+**The tools-guide.md is your authoritative reference for tool usage in this task.**
 
 ---
 
 "
-    echo "✓ Including toolman guidance prefix"
+    echo "✓ Including tools guidance prefix"
 else
-    echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
+    echo "⚠️ No tools-guide.md found - proceeding without tool guidance"
 fi
 
 # Clean up any leftover completion markers from previous runs (agent-specific)

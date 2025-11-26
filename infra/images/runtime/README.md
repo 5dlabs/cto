@@ -126,7 +126,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 
 ### Development & Build Tools
 - **TaskMaster AI** - AI-powered task management
-- **Toolman Client** - MCP server integration
+- **Tools Client** - MCP server integration
 - **Pre-commit** - Git hooks framework
 - **SQLFluff** - SQL linter and formatter
 - **Pip-tools** - Python dependency management
