@@ -214,11 +214,11 @@ EOF
     log_info "Policy 'vault-secrets-operator' created"
 
     # Create role for Vault Secrets Operator
-    # VSO controller uses its own service account to read secrets
+    # Uses default service account which exists in all namespaces
     log_info "Creating vault-secrets-operator role..."
     vault write auth/kubernetes/role/vault-secrets-operator \
-        bound_service_account_names=vault-secrets-operator-controller-manager \
-        bound_service_account_namespaces=vault-secrets-operator \
+        bound_service_account_names=default \
+        'bound_service_account_namespaces=*' \
         policies=vault-secrets-operator \
         ttl=1h
     log_info "Role 'vault-secrets-operator' created"
