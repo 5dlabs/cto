@@ -98,7 +98,7 @@ echo ""
 
 echo "Generated configuration files:"
 echo "  📄 /tmp/atlas-bolt-values-snippet.yaml"
-echo "  📄 /tmp/atlas-bolt-external-secrets.yaml"
+echo "  📄 /tmp/atlas-bolt-vault-static-secrets.yaml"
 echo "  📄 /tmp/vault-commands.sh"
 echo ""
 
@@ -107,7 +107,7 @@ if [[ "$AUTO_UPDATE" =~ ^[Yy]?$ ]]; then
   
   # Backup original files
   cp infra/charts/controller/values.yaml infra/charts/controller/values.yaml.backup
-  cp infra/secret-store/agent-secrets-external-secrets.yaml infra/secret-store/agent-secrets-external-secrets.yaml.backup
+  cp infra/vault/secrets/github-apps.yaml infra/vault/secrets/github-apps.yaml.backup
   
   echo "✅ Created backups (.backup files)"
   
@@ -120,8 +120,8 @@ if [[ "$AUTO_UPDATE" =~ ^[Yy]?$ ]]; then
   echo "   cat /tmp/atlas-bolt-values-snippet.yaml"
   echo "   (Add under 'agents:' section, after existing agents)"
   echo ""
-  echo "2️⃣  Add to infra/secret-store/agent-secrets-external-secrets.yaml:"
-  echo "   cat /tmp/atlas-bolt-external-secrets.yaml"
+  echo "2️⃣  Add to infra/vault/secrets/github-apps.yaml:"
+  echo "   cat /tmp/atlas-bolt-vault-static-secrets.yaml"
   echo "   (Add at the end of the file)"
   echo ""
   
@@ -143,7 +143,7 @@ echo "✅ Configuration files generated"
 echo ""
 echo "📋 Configuration Files Generated:"
 echo "   🔹 /tmp/atlas-bolt-values-snippet.yaml"
-echo "   🔹 /tmp/atlas-bolt-external-secrets.yaml"
+echo "   🔹 /tmp/atlas-bolt-vault-static-secrets.yaml"
 echo "   🔹 /tmp/vault-commands.sh"
 echo ""
 echo "📋 Manual Steps Remaining:"
@@ -152,9 +152,9 @@ echo "1️⃣  Update Helm values:"
 echo "   - Edit: infra/charts/controller/values.yaml"
 echo "   - Add content from: /tmp/atlas-bolt-values-snippet.yaml"
 echo ""
-echo "2️⃣  Update ExternalSecrets:"
-echo "   - Edit: infra/secret-store/agent-secrets-external-secrets.yaml"
-echo "   - Add content from: /tmp/atlas-bolt-external-secrets.yaml"
+echo "2️⃣  Update VaultStaticSecrets:"
+echo "   - Edit: infra/vault/secrets/github-apps.yaml"
+echo "   - Add content from: /tmp/atlas-bolt-vault-static-secrets.yaml"
 echo ""
 echo "3️⃣  Store credentials in Vault:"
 echo "   bash /tmp/vault-commands.sh"
@@ -163,7 +163,7 @@ echo "4️⃣  Install GitHub Apps to repositories:"
 echo "   https://github.com/organizations/5dlabs/settings/installations"
 echo ""
 echo "5️⃣  Commit and push changes:"
-echo "   git add README.md infra/charts/controller/values.yaml infra/secret-store/"
+echo "   git add README.md infra/charts/controller/values.yaml infra/vault/secrets/"
 echo "   git commit -m 'feat: add Atlas and Bolt agents'"
 echo "   git push"
 echo ""

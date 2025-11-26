@@ -528,7 +528,7 @@ curl -G http://localhost:9000/exec \
 ## Security Considerations
 
 1. **Network Policies**: Implement network policies to restrict database access
-2. **Secrets Management**: Use external-secrets operator for credential management
+2. **Secrets Management**: Use Vault Secrets Operator for credential management
 3. **Encryption**: Enable TLS for client connections and replication
 4. **RBAC**: Limit operator permissions to necessary namespaces
 5. **Audit Logging**: Enable audit logging for compliance requirements

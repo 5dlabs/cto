@@ -1188,8 +1188,8 @@ secrets:
   anthropicApiKey: "use-existing"
   # OPTIONAL: Set your OpenAI API key (used by Codex CLI)
   openaiApiKey: "use-existing"
-  # External secrets name (created by External Secrets Operator)
-  externalSecretsName: "agent-platform-secrets"
+  # API key secret name (synced by Vault Secrets Operator)
+  apiKeySecretName: "agent-platform-secrets"
   # CLI-specific secret key overrides (env var + secret key names)
   cliApiKeys:
     claude:

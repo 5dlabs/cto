@@ -278,184 +278,96 @@ EOF
 
 echo "✅ Generated values.yaml snippet: /tmp/atlas-bolt-values-snippet.yaml"
 
-# Generate ExternalSecrets YAML
-cat > "/tmp/atlas-bolt-external-secrets.yaml" <<EOF
+# Generate VaultStaticSecrets YAML
+cat > "/tmp/atlas-bolt-vault-static-secrets.yaml" <<EOF
 # ============================================================================
-# Atlas - Integration Agent Secrets
+# Atlas - Integration Agent VaultStaticSecrets
 # ============================================================================
 ---
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: github-app-5dlabs-atlas
-  namespace: secret-store
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
-    name: github-app-5dlabs-atlas
-    creationPolicy: Owner
-  data:
-  - secretKey: GITHUB_APP_ID
-    remoteRef:
-      key: github-app-atlas
-      property: app_id
-  - secretKey: GITHUB_APP_PRIVATE_KEY
-    remoteRef:
-      key: github-app-atlas
-      property: private_key
-  - secretKey: GITHUB_APP_CLIENT_ID
-    remoteRef:
-      key: github-app-atlas
-      property: client_id
-
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: github-app-5dlabs-atlas-agent-platform
-  namespace: agent-platform
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
-    name: github-app-5dlabs-atlas
-    creationPolicy: Owner
-  data:
-  - secretKey: app-id
-    remoteRef:
-      key: github-app-atlas
-      property: app_id
-  - secretKey: private-key
-    remoteRef:
-      key: github-app-atlas
-      property: private_key
-  - secretKey: client-id
-    remoteRef:
-      key: github-app-atlas
-      property: client_id
-
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
+# GitHub App Secrets - Atlas
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
 metadata:
   name: github-app-atlas
   namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: github-app-atlas
+    app.kubernetes.io/part-of: platform
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
+  vaultAuthRef: vault-secrets-operator/vault-auth
+  mount: secret
+  path: github-app-atlas
+  type: kv-v2
+  refreshAfter: 1h
+  destination:
+    create: true
     name: github-app-atlas
-    creationPolicy: Owner
-  data:
-  - secretKey: app-id
-    remoteRef:
-      key: github-app-atlas
-      property: app_id
-  - secretKey: private-key
-    remoteRef:
-      key: github-app-atlas
-      property: private_key
-  - secretKey: client-id
-    remoteRef:
-      key: github-app-atlas
-      property: client_id
-
-# ============================================================================
-# Bolt - DevOps Agent Secrets
-# ============================================================================
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: github-app-5dlabs-bolt
-  namespace: secret-store
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
-    name: github-app-5dlabs-bolt
-    creationPolicy: Owner
-  data:
-  - secretKey: GITHUB_APP_ID
-    remoteRef:
-      key: github-app-bolt
-      property: app_id
-  - secretKey: GITHUB_APP_PRIVATE_KEY
-    remoteRef:
-      key: github-app-bolt
-      property: private_key
-  - secretKey: GITHUB_APP_CLIENT_ID
-    remoteRef:
-      key: github-app-bolt
-      property: client_id
 
 ---
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
+# GitHub App Secrets - Atlas (5dlabs prefixed)
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
 metadata:
-  name: github-app-5dlabs-bolt-agent-platform
+  name: github-app-5dlabs-atlas
   namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: github-app-5dlabs-atlas
+    app.kubernetes.io/part-of: platform
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
-    name: github-app-5dlabs-bolt
-    creationPolicy: Owner
-  data:
-  - secretKey: app-id
-    remoteRef:
-      key: github-app-bolt
-      property: app_id
-  - secretKey: private-key
-    remoteRef:
-      key: github-app-bolt
-      property: private_key
-  - secretKey: client-id
-    remoteRef:
-      key: github-app-bolt
-      property: client_id
+  vaultAuthRef: vault-secrets-operator/vault-auth
+  mount: secret
+  path: github-app-atlas
+  type: kv-v2
+  refreshAfter: 1h
+  destination:
+    create: true
+    name: github-app-5dlabs-atlas
 
+# ============================================================================
+# Bolt - DevOps Agent VaultStaticSecrets
+# ============================================================================
 ---
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
+# GitHub App Secrets - Bolt
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
 metadata:
   name: github-app-bolt
   namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: github-app-bolt
+    app.kubernetes.io/part-of: platform
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
+  vaultAuthRef: vault-secrets-operator/vault-auth
+  mount: secret
+  path: github-app-bolt
+  type: kv-v2
+  refreshAfter: 1h
+  destination:
+    create: true
     name: github-app-bolt
-    creationPolicy: Owner
-  data:
-  - secretKey: app-id
-    remoteRef:
-      key: github-app-bolt
-      property: app_id
-  - secretKey: private-key
-    remoteRef:
-      key: github-app-bolt
-      property: private_key
-  - secretKey: client-id
-    remoteRef:
-      key: github-app-bolt
-      property: client_id
+
+---
+# GitHub App Secrets - Bolt (5dlabs prefixed)
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
+metadata:
+  name: github-app-5dlabs-bolt
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: github-app-5dlabs-bolt
+    app.kubernetes.io/part-of: platform
+spec:
+  vaultAuthRef: vault-secrets-operator/vault-auth
+  mount: secret
+  path: github-app-bolt
+  type: kv-v2
+  refreshAfter: 1h
+  destination:
+    create: true
+    name: github-app-5dlabs-bolt
 EOF
 
-echo "✅ Generated ExternalSecrets: /tmp/atlas-bolt-external-secrets.yaml"
+echo "✅ Generated VaultStaticSecrets: /tmp/atlas-bolt-vault-static-secrets.yaml"
 
 # Generate Vault commands
 cat > "/tmp/vault-commands.sh" <<EOF
@@ -501,7 +413,7 @@ echo "   bash /tmp/vault-commands.sh"
 echo ""
 echo "3️⃣  Update configuration files:"
 echo "   - Add /tmp/atlas-bolt-values-snippet.yaml to infra/charts/controller/values.yaml"
-echo "   - Add /tmp/atlas-bolt-external-secrets.yaml to infra/secret-store/agent-secrets-external-secrets.yaml"
+echo "   - Add /tmp/atlas-bolt-vault-static-secrets.yaml to infra/vault/secrets/github-apps.yaml"
 echo ""
 echo "4️⃣  Commit and push changes"
 echo ""

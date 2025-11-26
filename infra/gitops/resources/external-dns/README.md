@@ -26,7 +26,7 @@ External DNS automatically creates and manages DNS records in Cloudflare based o
 
 2. **Add the token to your secret management**:
    ```bash
-   # Add to your external secrets backend (e.g., AWS Secrets Manager, etc.)
+   # Add to Vault at secret/cloudflare
    # Key: cloudflare
    # Property: api_token
    # Value: your_cloudflare_api_token

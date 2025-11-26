@@ -162,7 +162,7 @@ spec:
               args: ["--no-ui"]
               workingDirectory: "/workspace"
 
-        # Secret store integration (External Secrets will inject these)
+        # Secret store integration (Vault Secrets Operator syncs these)
         secretRefs:
           - name: toolman-brave-search-secrets
           - name: toolman-reddit-secrets

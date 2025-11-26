@@ -248,108 +248,52 @@ echo "📝 Add this to infra/charts/controller/values.yaml under 'agents:':"
 echo "$VALUES_SNIPPET"
 echo ""
 
-# Create ExternalSecret YAML for secret-store namespace
-EXTERNAL_SECRET_STORE=$(cat <<EOF
+# Create VaultStaticSecret YAML for agent-platform namespace
+VAULT_STATIC_SECRET=$(cat <<EOF
 ---
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: github-app-5dlabs-$AGENT_LOWER
-  namespace: secret-store
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
-    name: github-app-5dlabs-$AGENT_LOWER
-    creationPolicy: Owner
-  data:
-  - secretKey: GITHUB_APP_ID
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: app_id
-  - secretKey: GITHUB_APP_PRIVATE_KEY
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: private_key
-  - secretKey: GITHUB_APP_CLIENT_ID
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: client_id
-EOF
-)
-
-# Create ExternalSecret YAML for agent-platform namespace  
-EXTERNAL_SECRET_PLATFORM=$(cat <<EOF
-
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: github-app-5dlabs-$AGENT_LOWER-agent-platform
-  namespace: agent-platform
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
-    name: github-app-5dlabs-$AGENT_LOWER
-    creationPolicy: Owner
-  data:
-  - secretKey: app-id
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: app_id
-  - secretKey: private-key
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: private_key
-  - secretKey: client-id
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: client_id
-EOF
-)
-
-# Create alias ExternalSecret
-EXTERNAL_SECRET_ALIAS=$(cat <<EOF
-
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
+# GitHub App Secrets - $AGENT_DISPLAY
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
 metadata:
   name: github-app-$AGENT_LOWER
   namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: github-app-$AGENT_LOWER
+    app.kubernetes.io/part-of: platform
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: secret-store
-    kind: ClusterSecretStore
-  target:
+  vaultAuthRef: vault-secrets-operator/vault-auth
+  mount: secret
+  path: github-app-$AGENT_LOWER
+  type: kv-v2
+  refreshAfter: 1h
+  destination:
+    create: true
     name: github-app-$AGENT_LOWER
-    creationPolicy: Owner
-  data:
-  - secretKey: app-id
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: app_id
-  - secretKey: private-key
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: private_key
-  - secretKey: client-id
-    remoteRef:
-      key: github-app-$AGENT_LOWER
-      property: client_id
+
+---
+# GitHub App Secrets - $AGENT_DISPLAY (5dlabs prefixed)
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
+metadata:
+  name: github-app-5dlabs-$AGENT_LOWER
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: github-app-5dlabs-$AGENT_LOWER
+    app.kubernetes.io/part-of: platform
+spec:
+  vaultAuthRef: vault-secrets-operator/vault-auth
+  mount: secret
+  path: github-app-$AGENT_LOWER
+  type: kv-v2
+  refreshAfter: 1h
+  destination:
+    create: true
+    name: github-app-5dlabs-$AGENT_LOWER
 EOF
 )
 
-echo "📝 Add these to infra/secret-store/agent-secrets-external-secrets.yaml:"
-echo "$EXTERNAL_SECRET_STORE"
-echo "$EXTERNAL_SECRET_PLATFORM"
-echo "$EXTERNAL_SECRET_ALIAS"
+echo "📝 Add these VaultStaticSecrets to infra/vault/secrets/github-apps.yaml:"
+echo "$VAULT_STATIC_SECRET"
 echo ""
 
 # Save to temporary file for easy copying
@@ -364,12 +308,10 @@ cat > "$TEMP_CONFIG" <<EOF
 $VALUES_SNIPPET
 
 # ========================================
-# Add to: infra/secret-store/agent-secrets-external-secrets.yaml  
+# Add to: infra/vault/secrets/github-apps.yaml
 # Location: At the end of the file
 # ========================================
-$EXTERNAL_SECRET_STORE
-$EXTERNAL_SECRET_PLATFORM
-$EXTERNAL_SECRET_ALIAS
+$VAULT_STATIC_SECRET
 EOF
 
 echo "✅ Configuration saved to: $TEMP_CONFIG"
@@ -385,7 +327,7 @@ echo ""
 echo "📋 Next Steps:"
 echo "   1. Review configuration in: $TEMP_CONFIG"
 echo "   2. Add values.yaml snippet to Helm chart"
-echo "   3. Add ExternalSecrets to secret-store config"
+echo "   3. Add VaultStaticSecrets to infra/vault/secrets/github-apps.yaml"
 echo "   4. Store credentials in Vault (if not done automatically)"
 echo "   5. Install the GitHub App to your repositories"
 echo ""

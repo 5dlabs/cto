@@ -100,10 +100,3 @@ persistence:
 configMap:
   enabled: false
   data: {}
-
-# External secrets (if using)
-externalSecrets:
-  enabled: false
-  secretStore: "vault-backend"
-  refreshInterval: "1h"
-  secrets: []
