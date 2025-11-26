@@ -153,14 +153,14 @@ kubectl get eventsource github-webhook -n argo
 ### **Verification**
 ```bash
 # Check ConfigMap
-kubectl get cm controller-agent-templates-pm -n agent-platform
-kubectl describe cm controller-agent-templates-pm -n agent-platform | head -20
+kubectl get cm controller-agent-templates-pm -n cto
+kubectl describe cm controller-agent-templates-pm -n cto | head -20
 
 # Check sensor
-kubectl get sensor morgan-issue-comment -n agent-platform
+kubectl get sensor morgan-issue-comment -n cto
 
 # Check workflow template
-kubectl get workflowtemplate play-project-workflow-template -n agent-platform -o yaml | grep -A20 morgan-project-manager
+kubectl get workflowtemplate play-project-workflow-template -n cto -o yaml | grep -A20 morgan-project-manager
 ```
 
 ---
@@ -183,7 +183,7 @@ kubectl apply -f infra/gitops/resources/argo-events/sensors/morgan-issue-comment
 play({ task_id: 1 })
 
 # 4. Monitor Morgan logs
-kubectl logs -f -l agent=morgan -n agent-platform
+kubectl logs -f -l agent=morgan -n cto
 
 # 5. Check GitHub
 #    - Verify project created
@@ -234,7 +234,7 @@ kubectl logs -l agent=morgan | grep "GraphQL\|error\|failed"
 ### **Issue: Comment processing not triggering**
 ```bash
 # Check sensor status
-kubectl describe sensor morgan-issue-comment -n agent-platform
+kubectl describe sensor morgan-issue-comment -n cto
 
 # Check EventSource
 kubectl get eventsource github-webhook -n argo -o yaml

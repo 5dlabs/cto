@@ -64,7 +64,7 @@ spec:
     path: helm  # Path to Helm chart
   destination:
     server: https://kubernetes.default.svc
-    namespace: agent-platform
+    namespace: cto
   syncPolicy:
     automated:
       prune: true
@@ -97,7 +97,7 @@ apiVersion: ngrok.k8s.ngrok.com/v1alpha1
 kind: Tunnel
 metadata:
   name: my-service-ngrok
-  namespace: agent-platform
+  namespace: cto
 spec:
   forwardsTo: my-service:80  # Internal service:port
 ```
@@ -110,7 +110,7 @@ spec:
 ### Step 4: Get Public URL
 
 ```bash
-kubectl get tunnel my-service-ngrok -n agent-platform -o jsonpath='{.status.url}'
+kubectl get tunnel my-service-ngrok -n cto -o jsonpath='{.status.url}'
 # Returns: "https://abc123.ngrok.io"
 ```
 
@@ -147,7 +147,7 @@ Bolt receives these from the workflow:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SERVICE` | Name of the service to deploy | *Required* |
-| `NAMESPACE` | Kubernetes namespace | `agent-platform` |
+| `NAMESPACE` | Kubernetes namespace | `cto` |
 | `REPOSITORY` | Git repository URL | From workflow |
 | `BRANCH` | Git branch to deploy | `main` |
 | `PR_NUMBER` | GitHub PR to comment on | From trigger |
@@ -189,7 +189,7 @@ Bolt receives these from the workflow:
 4. **Create ngrok Tunnel:**
    ```bash
    kubectl apply -f ngrok-tunnel.yaml
-   # Creates: react-app-ngrok in agent-platform
+   # Creates: react-app-ngrok in cto
    ```
 
 5. **Get Production URL:**
@@ -338,7 +338,7 @@ Automatic certificate provisioning:
 ```yaml
 # Minimal configuration
 service: my-web-app
-namespace: agent-platform
+namespace: cto
 repository: https://github.com/org/repo.git
 branch: main
 argocd_path: helm

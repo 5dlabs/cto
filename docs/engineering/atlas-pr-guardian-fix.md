@@ -69,8 +69,8 @@ expr filter error (path 'body.issue.pull_request' does not exist)",
 ### CodeRun Status Before Fix
 
 ```bash
-$ kubectl get coderun -n agent-platform -l agent=atlas,role=pr-guardian
-No resources found in agent-platform namespace.
+$ kubectl get coderun -n cto -l agent=atlas,role=pr-guardian
+No resources found in cto namespace.
 ```
 
 Zero Atlas CodeRuns were ever created, despite multiple PRs being opened in the repository.
@@ -110,7 +110,7 @@ Expected results:
 4. **Verify Atlas activation**:
    ```bash
    # Check for new CodeRun
-   kubectl get coderun -n agent-platform -l agent=atlas,role=pr-guardian
+   kubectl get coderun -n cto -l agent=atlas,role=pr-guardian
    
    # Should show a CodeRun like: coderun-atlas-pr-xxxxx
    ```

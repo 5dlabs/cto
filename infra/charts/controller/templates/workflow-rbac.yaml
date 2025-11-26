@@ -1,6 +1,6 @@
 {{- if .Values.argo.enabled }}
 ---
-# Role for workflow permissions in agent-platform namespace
+# Role for workflow permissions in cto namespace
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

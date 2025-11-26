@@ -13,7 +13,7 @@ The **Tools MCP Proxy** is a centralized HTTP→MCP bridge that enables agents t
 ## Architecture Components
 
 ### 1. **Tools Server (Remote)**
-- **Location:** `http://tools.agent-platform.svc.cluster.local:3000/mcp`
+- **Location:** `http://tools.cto.svc.cluster.local:3000/mcp`
 - **Purpose:** Proxy HTTP requests to configured MCP servers
 - **Configuration:** Defined in tools repository
 - **Deployment:** Argo CD application in `infra/gitops/applications/tools.yaml`
@@ -61,9 +61,9 @@ Remote tools are accessed through the tools HTTP proxy. Agents call `tools` CLI 
   "mcpServers": {
     "brave_search_brave_web_search": {
       "command": "tools",
-      "args": ["--url", "http://tools.agent-platform.svc.cluster.local:3000/mcp", "--tool", "brave_search_brave_web_search"],
+      "args": ["--url", "http://tools.cto.svc.cluster.local:3000/mcp", "--tool", "brave_search_brave_web_search"],
       "env": {
-        "TOOLS_SERVER_URL": "http://tools.agent-platform.svc.cluster.local:3000/mcp"
+        "TOOLS_SERVER_URL": "http://tools.cto.svc.cluster.local:3000/mcp"
       }
     }
   }
@@ -323,14 +323,14 @@ Local MCP servers run directly in the agent container without proxying.
 
 **Environment Variable:**
 ```bash
-TOOLS_SERVER_URL=http://tools.agent-platform.svc.cluster.local:3000/mcp
+TOOLS_SERVER_URL=http://tools.cto.svc.cluster.local:3000/mcp
 ```
 
 **Default (if not set):**
 ```rust
 // controller/src/cli/adapters/claude.rs
 let tools_url = std::env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
-    "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
+    "http://tools.cto.svc.cluster.local:3000/mcp".to_string()
 });
 ```
 
@@ -381,7 +381,7 @@ fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
 ### Remote Tool Not Working
 
 **Check:**
-1. Tools server is running: `kubectl get pods -n agent-platform | grep tools`
+1. Tools server is running: `kubectl get pods -n cto | grep tools`
 2. Tool is configured in tools server
 3. Agent has tool in `remote` array
 4. Network connectivity to tools server
@@ -389,10 +389,10 @@ fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
 **Debug:**
 ```bash
 # Test tools directly
-tools --url http://tools.agent-platform.svc.cluster.local:3000/mcp --tool brave_search_brave_web_search
+tools --url http://tools.cto.svc.cluster.local:3000/mcp --tool brave_search_brave_web_search
 
 # Check tools logs
-kubectl logs -n agent-platform deployment/tools
+kubectl logs -n cto deployment/tools
 ```
 
 ### Local Server Not Starting
@@ -424,7 +424,7 @@ cat /workspace/.mcp.json | jq .
 cat $CLAUDE_WORK_DIR/.mcp.json
 
 # Check agent logs
-kubectl logs -n agent-platform <agent-pod-name>
+kubectl logs -n cto <agent-pod-name>
 ```
 
 ---

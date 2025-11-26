@@ -211,7 +211,7 @@ gh pr merge 1249 --squash --delete-branch
 argocd app sync controller
 
 # Verify deployment
-kubectl get pods -n agent-platform -l agent=morgan
+kubectl get pods -n cto -l agent=morgan
 ```
 
 ### Test
@@ -221,18 +221,18 @@ kubectl get pods -n agent-platform -l agent=morgan
 ./scripts/test-morgan-pm-comprehensive.sh 5dlabs cto-parallel-test
 
 # Or run specific validation
-kubectl logs -n agent-platform -l agent=morgan --tail=100 | grep "✅\|❌"
+kubectl logs -n cto -l agent=morgan --tail=100 | grep "✅\|❌"
 ```
 
 ### Monitor
 
 ```bash
 # View Prometheus metrics
-kubectl exec -n agent-platform -l agent=morgan -c main -- \
+kubectl exec -n cto -l agent=morgan -c main -- \
   cat /shared/metrics/morgan.prom
 
 # Watch for errors
-kubectl logs -f -n agent-platform -l agent=morgan -c main | \
+kubectl logs -f -n cto -l agent=morgan -c main | \
   grep "❌\|⚠️\|💡"
 ```
 
@@ -267,7 +267,7 @@ kubectl logs -f -n agent-platform -l agent=morgan -c main | \
 ./scripts/test-morgan-pm-comprehensive.sh
 
 # Check metrics
-kubectl exec -n agent-platform -l agent=morgan -c main -- \
+kubectl exec -n cto -l agent=morgan -c main -- \
   cat /shared/metrics/morgan.prom | grep morgan_issue_link_failure_total
 
 # Should be 0 or very low

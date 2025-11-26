@@ -361,7 +361,7 @@ impl CLIAdapter for FactoryCLIAdapter {
 
         let tools_url = tools_endpoint.unwrap_or_else(|| {
             env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
-                "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                "http://tools.cto.svc.cluster.local:3000/mcp".to_string()
             })
         });
         let tools_url = tools_url.trim_end_matches('/').to_string();
@@ -723,7 +723,7 @@ mod tests {
         let mut tools_env = std::collections::HashMap::new();
         tools_env.insert(
             "TOOLS_SERVER_URL".to_string(),
-            "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string(),
+            "http://tools.cto.svc.cluster.local:3000/mcp".to_string(),
         );
 
         let universal = UniversalConfig {

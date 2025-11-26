@@ -37,7 +37,7 @@ spec:
               kind: CodeRun
               metadata:
                 generateName: coderun-bolt-preview-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   agent: bolt
                   mode: preview
@@ -131,7 +131,7 @@ spec:
               kind: CodeRun
               metadata:
                 generateName: coderun-bolt-cleanup-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   agent: bolt
                   mode: cleanup
@@ -201,7 +201,7 @@ data:
       ↓
     Extract task ID from PR labels (task-{id}) or branch name
       ↓
-    Create preview namespace: agent-platform-preview-task-{id}
+    Create preview namespace: cto-preview-task-{id}
       ↓
     Create ArgoCD Application:
       - Name: task-{id}-preview
@@ -223,7 +223,7 @@ data:
     ### Preview Environment Details
 
     **Namespace:**
-    - Format: `agent-platform-preview-task-{id}`
+    - Format: `cto-preview-task-{id}`
     - Isolated from other previews and production
     - Auto-created by ArgoCD syncPolicy
 
@@ -247,7 +247,7 @@ data:
     **Cleanup Actions:**
     - Delete ArgoCD application (`task-{id}-preview`)
     - Delete ngrok Tunnel (`task-{id}-preview`)
-    - Delete namespace (`agent-platform-preview-task-{id}`)
+    - Delete namespace (`cto-preview-task-{id}`)
     - Post cleanup confirmation to PR
 
     ### Integration with Other Agents

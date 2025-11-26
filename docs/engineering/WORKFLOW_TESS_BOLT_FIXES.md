@@ -240,7 +240,7 @@ esac
 mcp_user-cto_play --task_id=7
 
 # Monitor workflow progression
-kubectl get workflows -n agent-platform -l task-id=7 --watch
+kubectl get workflows -n cto -l task-id=7 --watch
 
 # Verify stages progress without suspension:
 # implementation-in-progress → quality-in-progress → 
@@ -253,7 +253,7 @@ kubectl get workflows -n agent-platform -l task-id=7 --watch
 
 ```bash
 # Check Morgan PM pod status
-kubectl get pods -n agent-platform -l workflows.argoproj.io/component=morgan-project-manager
+kubectl get pods -n cto -l workflows.argoproj.io/component=morgan-project-manager
 
 # Should show: Completed (not Failed)
 # Exit code should be 0
@@ -319,7 +319,7 @@ git push origin <branch>
 3. **Verify Deployment:**
 ```bash
 # Check controller pod for new templates
-kubectl get workflowtemplate -n agent-platform play-workflow-template -o yaml | grep "testing-in-progress"
+kubectl get workflowtemplate -n cto play-workflow-template -o yaml | grep "testing-in-progress"
 ```
 
 4. **Test with New Workflow:**

@@ -23,7 +23,7 @@
 //! // Create a Kubernetes client
 //! let client = kube::Client::try_default().await?;
 //!
-//! let lock = DistributedLock::new(&client, "agent-platform", "cancel-task-42", "controller-1");
+//! let lock = DistributedLock::new(&client, "cto", "cancel-task-42", "controller-1");
 //! let lease = lock.try_acquire("controller-1").await?;
 //!
 //! // Critical section - only one process can execute this

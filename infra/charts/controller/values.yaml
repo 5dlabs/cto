@@ -950,7 +950,7 @@ agents:
         enabled: true
         autoCleanup: true  # Auto-cleanup on PR close
         retentionDays: 7  # Delete previews older than N days
-        namespace: "agent-platform-preview-task-{id}"
+        namespace: "cto-preview-task-{id}"
         appName: "task-{id}-preview"
         syncTimeout: 300  # 5 minutes
         # Resource quotas per preview namespace
@@ -965,7 +965,7 @@ agents:
       production:
         enabled: true
         cleanupPreview: true  # Clean up preview before production deploy
-        namespace: "agent-platform-prod-task-{id}"
+        namespace: "cto-prod-task-{id}"
         appName: "task-{id}-prod"
         syncTimeout: 600  # 10 minutes for production
         branch: "main"  # Always deploy from main in production
@@ -1088,7 +1088,7 @@ fullnameOverride: ""
 # Namespace configuration
 namespace:
   create: true
-  name: "agent-platform"
+  name: "cto"
   # PodSecurity configuration (required for Tools's Docker-in-Docker)
   podSecurity:
     enforce: "privileged"
@@ -1104,7 +1104,7 @@ serviceAccount:
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
-  name: "agent-platform"
+  name: "cto"
 
 podAnnotations:
   kubectl.kubernetes.io/restartedAt: ""
@@ -1137,7 +1137,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    - host: agent-platform.local
+    - host: cto.local
       paths:
         - path: /
           pathType: Prefix
@@ -1173,7 +1173,7 @@ affinity:
 # Configuration for the controller service
 config:
   # Kubernetes namespace (auto-populated in most cases)
-  kubernetesNamespace: "agent-platform"
+  kubernetesNamespace: "cto"
 
   # Server configuration
   serverHost: "0.0.0.0"
@@ -1189,7 +1189,7 @@ secrets:
   # OPTIONAL: Set your OpenAI API key (used by Codex CLI)
   openaiApiKey: "use-existing"
   # API key secret name (synced by Vault Secrets Operator)
-  apiKeySecretName: "agent-platform-secrets"
+  apiKeySecretName: "cto-secrets"
   # CLI-specific secret key overrides (env var + secret key names)
   cliApiKeys:
     claude:
@@ -1233,7 +1233,7 @@ rbac:
       - apiGroups: ["agents.platform"]
         resources: ["coderuns/status", "docsruns/status"]
         verbs: ["get", "update", "patch"]
-      # Job management in agent-platform namespace
+      # Job management in cto namespace
       - apiGroups: ["batch"]
         resources: ["jobs"]
         verbs: ["create", "get", "list", "watch", "delete", "patch", "update"]

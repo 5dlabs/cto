@@ -77,7 +77,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: stage-resume-atlas-integration-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: stage-resume
                   target-stage: waiting-atlas-integration
@@ -197,7 +197,7 @@ spec:
                             echo "contexts:"
                             echo "  - context:"
                             echo "      cluster: in-cluster"
-                            echo "      namespace: agent-platform"
+                            echo "      namespace: cto"
                             echo "      user: sensor-sa"
                             echo "    name: in-cluster"
                             echo "current-context: in-cluster"
@@ -216,7 +216,7 @@ spec:
                           kubeconfig_path=$(build_kubeconfig) || return 1
 
                           if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
-                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            -n cto resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
                             echo "✅ Workflow resumed successfully"
                             return 0
                           fi
@@ -339,7 +339,7 @@ spec:
                           local target_stage="$1"
                           local workflow_json
                           workflow_json=$(kubectl get workflow "$WORKFLOW_NAME" \
-                            -n agent-platform -o json 2>/dev/null)
+                            -n cto -o json 2>/dev/null)
                           if [ -z "$workflow_json" ]; then
                             echo "⚠️ Unable to fetch workflow for stage update"
                             return 1
@@ -361,13 +361,13 @@ spec:
                             --arg task "$TASK_ID" \
                             '{metadata:{resourceVersion:$rv,labels:{"current-stage":$stage,"previous-stage":$prev,"repository":$repo,"task-id":$task}}}')
 
-                          kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
+                          kubectl patch workflow "$WORKFLOW_NAME" -n cto \
                             --type='merge' -p "$patch_json"
                         }
 
                         ensure_integration_coderun() {
                           local existing_json
-                          existing_json=$(kubectl get coderuns -n agent-platform \
+                          existing_json=$(kubectl get coderuns -n cto \
                             -l agent=atlas,role=integration,pr-number="$PR_NUMBER" \
                             -o json 2>/dev/null || echo '{"items":[]}')
 
@@ -388,7 +388,7 @@ spec:
                           kind: CodeRun
                           metadata:
                             generateName: coderun-atlas-integration-
-                            namespace: agent-platform
+                            namespace: cto
                             labels:
                               agent: atlas
                               role: integration
@@ -425,7 +425,7 @@ spec:
                           local name="$1"
                           while true; do
                             local status_json
-                            status_json=$(kubectl get coderun "$name" -n agent-platform -o json 2>/dev/null || echo "")
+                            status_json=$(kubectl get coderun "$name" -n cto -o json 2>/dev/null || echo "")
                             if [ -z "$status_json" ]; then
                               echo "⚠️ Unable to fetch CodeRun $name"
                               sleep 20
@@ -509,7 +509,7 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                        WORKFLOW_NAME=$(kubectl get workflows -n cto \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
@@ -520,7 +520,7 @@ spec:
 
                         echo "Workflow: $WORKFLOW_NAME"
 
-                        WORKFLOW_JSON=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform -o json 2>/dev/null || echo "")
+                        WORKFLOW_JSON=$(kubectl get workflow "$WORKFLOW_NAME" -n cto -o json 2>/dev/null || echo "")
                         if [ -z "$WORKFLOW_JSON" ]; then
                           echo "⚠️ Unable to fetch workflow state"
                           exit 0

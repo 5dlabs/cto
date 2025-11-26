@@ -105,7 +105,7 @@ while workflow_running:
   # 2. Update each task's status
   for task_id in [1, 2, 3, ...]:
     # Find the task's individual workflow
-    TASK_WORKFLOW=$(kubectl get workflows -n agent-platform \
+    TASK_WORKFLOW=$(kubectl get workflows -n cto \
       -l task-id=1,parent-workflow=play-project-xyz \
       -o jsonpath='{.items[0].metadata.name}')
     # Returns: "play-task-1-abc123"
@@ -402,7 +402,7 @@ Morgan stores state in multiple places for resilience:
    ```bash
    kubectl create configmap project-{workflow-name}-mapping \
      --from-file=task-issue-map.json \
-     -n agent-platform
+     -n cto
    ```
 
 ---
@@ -533,7 +533,7 @@ graphql_query() {
 
 4. Sensor filters event
    Name: morgan-issue-comment
-   Namespace: agent-platform
+   Namespace: cto
    
    Checks:
    ✓ action == "created"
@@ -597,20 +597,20 @@ kubectl get eventsource github-webhook -n argo
 
 ```bash
 # 1. Check ConfigMap created
-kubectl get cm -n agent-platform | grep agent-templates-pm
-kubectl describe cm controller-agent-templates-pm -n agent-platform
+kubectl get cm -n cto | grep agent-templates-pm
+kubectl describe cm controller-agent-templates-pm -n cto
 
 # 2. Check WorkflowTemplate updated
-kubectl get workflowtemplate play-project-workflow-template -n agent-platform -o yaml | grep morgan
+kubectl get workflowtemplate play-project-workflow-template -n cto -o yaml | grep morgan
 
 # 3. Check sensor deployed
-kubectl get sensor morgan-issue-comment -n agent-platform
+kubectl get sensor morgan-issue-comment -n cto
 
 # 4. Test with actual play workflow
 play({ task_id: 1 })
 
 # 5. Watch Morgan logs
-kubectl logs -f -l agent=morgan,workflow-type=project-orchestration -n agent-platform
+kubectl logs -f -l agent=morgan,workflow-type=project-orchestration -n cto
 ```
 
 ---
@@ -690,9 +690,9 @@ After this implementation, you'll likely want to:
 kubectl apply -f infra/gitops/resources/argo-events/sensors/morgan-issue-comment-sensor.yaml
 
 # Verify deployment
-kubectl get cm controller-agent-templates-pm -n agent-platform
-kubectl get sensor morgan-issue-comment -n agent-platform
-kubectl get workflowtemplate play-project-workflow-template -n agent-platform
+kubectl get cm controller-agent-templates-pm -n cto
+kubectl get sensor morgan-issue-comment -n cto
+kubectl get workflowtemplate play-project-workflow-template -n cto
 
 # Run test
 play({ task_id: 1 })

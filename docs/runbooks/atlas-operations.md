@@ -5,26 +5,26 @@
 ### Check Atlas Status
 ```bash
 # Active Atlas CodeRuns
-kubectl get coderuns -n agent-platform -l agent=atlas
+kubectl get coderuns -n cto -l agent=atlas
 
 # Guardian CodeRuns
-kubectl get coderuns -n agent-platform -l agent=atlas,role=guardian
+kubectl get coderuns -n cto -l agent=atlas,role=guardian
 
 # Integration CodeRuns  
-kubectl get coderuns -n agent-platform -l agent=atlas,role=integration
+kubectl get coderuns -n cto -l agent=atlas,role=integration
 
 # Atlas workflows
-kubectl get workflows -n agent-platform -l type=atlas-pr-monitor
-kubectl get workflows -n agent-platform -l type=stage-resume,target-stage=waiting-atlas-integration
+kubectl get workflows -n cto -l type=atlas-pr-monitor
+kubectl get workflows -n cto -l type=stage-resume,target-stage=waiting-atlas-integration
 ```
 
 ### View Atlas Logs
 ```bash
 # Get logs for specific CodeRun
-kubectl logs -n agent-platform coderun-atlas-guardian-xxxxx -c agent
+kubectl logs -n cto coderun-atlas-guardian-xxxxx -c agent
 
 # Follow logs
-kubectl logs -n agent-platform coderun-atlas-guardian-xxxxx -c agent -f
+kubectl logs -n cto coderun-atlas-guardian-xxxxx -c agent -f
 
 # Get sensor logs
 kubectl logs -n argo deployment/atlas-pr-monitor-sensor-controller
@@ -67,7 +67,7 @@ kubectl logs -n argo deployment/atlas-pr-monitor-sensor-controller
 **Diagnosis:**
 ```bash
 # Check workflow stage
-kubectl get workflows -n agent-platform \
+kubectl get workflows -n cto \
   -l workflow=play-orchestration \
   -o jsonpath='{.items[*].metadata.labels.current-stage}'
 
@@ -75,7 +75,7 @@ kubectl get workflows -n agent-platform \
 kubectl logs -n argo deployment/stage-aware-tess-approval-sensor-controller
 
 # Look for integration gate workflows
-kubectl get workflows -n agent-platform \
+kubectl get workflows -n cto \
   -l type=stage-resume,target-stage=waiting-atlas-integration
 ```
 
@@ -88,7 +88,7 @@ kubectl get workflows -n agent-platform \
    kind: CodeRun
    metadata:
      generateName: coderun-atlas-integration-manual-
-     namespace: agent-platform
+     namespace: cto
      labels:
        agent: atlas
        role: integration
@@ -109,7 +109,7 @@ kubectl get workflows -n agent-platform \
 
 2. Resume workflow manually:
    ```bash
-   kubectl patch workflow WORKFLOW_NAME -n agent-platform \
+   kubectl patch workflow WORKFLOW_NAME -n cto \
      --type='json' -p='[{"op": "replace", "path": "/metadata/labels/current-stage", "value": "atlas-integration-in-progress"}]'
    ```
 
@@ -122,11 +122,11 @@ kubectl get workflows -n agent-platform \
 **Diagnosis:**
 ```bash
 # Check for duplicate CodeRuns
-kubectl get coderuns -n agent-platform \
+kubectl get coderuns -n cto \
   -l agent=atlas,pr-number=YOUR_PR_NUMBER
 
 # Check ConfigMap locks
-kubectl get configmaps -n agent-platform \
+kubectl get configmaps -n cto \
   -l atlas-guardian-lock
 ```
 
@@ -134,14 +134,14 @@ kubectl get configmaps -n agent-platform \
 1. Delete duplicate CodeRuns:
    ```bash
    # Keep only the oldest one
-   kubectl delete coderuns -n agent-platform \
+   kubectl delete coderuns -n cto \
      -l agent=atlas,pr-number=YOUR_PR_NUMBER \
      --field-selector metadata.name!=KEEP_THIS_ONE
    ```
 
 2. Clean up stale locks:
    ```bash
-   kubectl delete configmaps -n agent-platform \
+   kubectl delete configmaps -n cto \
      -l atlas-guardian-lock \
      --field-selector metadata.creationTimestamp<2h
    ```
@@ -155,25 +155,25 @@ kubectl get configmaps -n agent-platform \
 **Diagnosis:**
 ```bash
 # Check runtime
-kubectl get coderuns -n agent-platform \
+kubectl get coderuns -n cto \
   -l agent=atlas \
   -o custom-columns=NAME:.metadata.name,AGE:.metadata.creationTimestamp
 
 # Check cycle count in logs
-kubectl logs -n agent-platform coderun-atlas-xxxxx -c agent | grep "Cycle"
+kubectl logs -n cto coderun-atlas-xxxxx -c agent | grep "Cycle"
 ```
 
 **Solution:**
 1. Set max cycles if not set:
    ```bash
    kubectl set env coderun/coderun-atlas-xxxxx \
-     -n agent-platform \
+     -n cto \
      ATLAS_MAX_CYCLES=60
    ```
 
 2. Restart the CodeRun:
    ```bash
-   kubectl delete pod -n agent-platform \
+   kubectl delete pod -n cto \
      -l coderun=coderun-atlas-xxxxx
    ```
 
@@ -215,17 +215,17 @@ curl -H "Authorization: token $GITHUB_TOKEN" \
 
 ```bash
 # Delete completed workflows older than 1 day
-kubectl delete workflows -n agent-platform \
+kubectl delete workflows -n cto \
   --field-selector status.phase=Succeeded \
   --field-selector metadata.creationTimestamp<24h
 
 # Delete old ConfigMap locks
-kubectl delete configmaps -n agent-platform \
+kubectl delete configmaps -n cto \
   -l atlas-guardian-lock \
   --field-selector metadata.creationTimestamp<2h
 
 # Delete failed CodeRuns
-kubectl delete coderuns -n agent-platform \
+kubectl delete coderuns -n cto \
   --field-selector status.phase=Failed
 ```
 
@@ -245,7 +245,7 @@ curl -s http://victoria-metrics:8428/api/v1/query \
 
 ```bash
 # Update Atlas model
-kubectl edit configmap controller-config -n agent-platform
+kubectl edit configmap controller-config -n cto
 # Find atlas section, update model field
 
 # Update system prompt
@@ -254,7 +254,7 @@ helm upgrade controller infra/charts/controller \
   --set agents.atlas.systemPrompt="NEW_PROMPT"
 
 # Restart controller to pick up changes
-kubectl rollout restart deployment/controller -n agent-platform
+kubectl rollout restart deployment/controller -n cto
 ```
 
 ## Emergency Procedures
@@ -268,14 +268,14 @@ kubectl scale sensor atlas-conflict-monitor -n argo --replicas=0
 kubectl scale sensor atlas-batch-integration -n argo --replicas=0
 
 # Delete all running Atlas CodeRuns
-kubectl delete coderuns -n agent-platform -l agent=atlas
+kubectl delete coderuns -n cto -l agent=atlas
 ```
 
 ### Force Merge Without Atlas
 
 ```bash
 # Skip Atlas stage in workflow
-kubectl patch workflow WORKFLOW_NAME -n agent-platform \
+kubectl patch workflow WORKFLOW_NAME -n cto \
   --type='json' -p='[
     {"op": "replace", "path": "/metadata/labels/current-stage", "value": "waiting-pr-merged"}
   ]'
@@ -296,7 +296,7 @@ git checkout HEAD~1 -- stage-aware-tess-approval-sensor.yaml
 kubectl apply -k .
 
 # Revert workflow template
-helm rollback controller -n agent-platform
+helm rollback controller -n cto
 ```
 
 ## Monitoring Checklist

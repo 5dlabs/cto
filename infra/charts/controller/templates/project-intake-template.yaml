@@ -175,12 +175,12 @@ spec:
           - name: ANTHROPIC_API_KEY
             valueFrom:
               secretKeyRef:
-                name: agent-platform-secrets
+                name: cto-secrets
                 key: ANTHROPIC_API_KEY
           - name: OPENAI_API_KEY
             valueFrom:
               secretKeyRef:
-                name: agent-platform-secrets
+                name: cto-secrets
                 key: OPENAI_API_KEY
           # GitHub App credentials - use the standardized secret name
           # All GitHub App secrets follow the pattern: github-app-{normalized-name}

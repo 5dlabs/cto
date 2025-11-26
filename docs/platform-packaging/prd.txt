@@ -163,13 +163,13 @@ pub enum ComponentCategory {
 
 ### CLI Installer Implementation
 ```rust
-// cmd/agent-platform/main.go
+// cmd/cto/main.go
 use clap::{App, Arg, SubCommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let matches = App::new("agent-platform")
+    let matches = App::new("cto")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Multi-Agent Development Platform")
         .subcommand(SubCommand::with_name("install")
@@ -356,7 +356,7 @@ set -e
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={} sh -s - \
     --disable traefik \
     --write-kubeconfig-mode 644 \
-    --node-label agent-platform=true
+    --node-label cto=true
 
 # Wait for cluster to be ready
 kubectl wait --for=condition=Ready nodes --all --timeout=300s
@@ -391,7 +391,7 @@ impl ClusterProvisioner for KindProvisioner {
         let kind_config = format!(r#"
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: agent-platform
+name: cto
 nodes:
 - role: control-plane
   extraPortMappings:
@@ -414,7 +414,7 @@ nodes:
             .arg("--config")
             .arg("-")
             .arg("--name")
-            .arg("agent-platform")
+            .arg("cto")
             .stdin(Stdio::piped())
             .output()
             .await?;
@@ -610,8 +610,8 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     
     env GOOS=$GOOS GOARCH=$GOARCH go build \
         -ldflags "-X main.Version=$VERSION" \
-        -o "dist/agent-platform-${GOOS}-${GOARCH}" \
-        ./cmd/agent-platform
+        -o "dist/cto-${GOOS}-${GOARCH}" \
+        ./cmd/cto
 done
 
 # Package with assets
@@ -619,32 +619,32 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     GOOS=${PLATFORM%/*}
     GOARCH=${PLATFORM#*/}
     
-    tar -czf "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
-        -C dist "agent-platform-${GOOS}-${GOARCH}" \
+    tar -czf "dist/cto-${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
+        -C dist "cto-${GOOS}-${GOARCH}" \
         -C .. templates/ scripts/ config/
 done
 
 # Create checksums
 cd dist
-sha256sum agent-platform-${VERSION}-*.tar.gz > SHA256SUMS
+sha256sum cto-${VERSION}-*.tar.gz > SHA256SUMS
 ```
 
 ### Homebrew Integration
 ```ruby
-# Formula/agent-platform.rb
+# Formula/cto.rb
 class AgentPlatform < Formula
   desc "Multi-Agent Software Development Orchestration Platform"
-  homepage "https://github.com/yourusername/agent-platform"
+  homepage "https://github.com/yourusername/cto"
   version "0.1.0"
   
   if OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-darwin-arm64.tar.gz"
+    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-darwin-arm64.tar.gz"
     sha256 "xxx"
   elsif OS.mac?
-    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-darwin-amd64.tar.gz"
+    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-darwin-amd64.tar.gz"
     sha256 "xxx"
   elsif OS.linux?
-    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-linux-amd64.tar.gz"
+    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-linux-amd64.tar.gz"
     sha256 "xxx"
   end
   
@@ -652,17 +652,17 @@ class AgentPlatform < Formula
   depends_on "helm"
   
   def install
-    bin.install "agent-platform"
-    (share/"agent-platform").install "templates", "scripts", "config"
+    bin.install "cto"
+    (share/"cto").install "templates", "scripts", "config"
   end
   
   def post_install
-    (var/"agent-platform").mkpath
-    (etc/"agent-platform").mkpath
+    (var/"cto").mkpath
+    (etc/"cto").mkpath
   end
   
   test do
-    assert_match version.to_s, shell_output("#{bin}/agent-platform version")
+    assert_match version.to_s, shell_output("#{bin}/cto version")
   end
 end
 ```
@@ -798,7 +798,7 @@ profile: minimal
 
 platform:
   name: my-dev-platform
-  namespace: agent-platform
+  namespace: cto
 
 github:
   organization: myusername
@@ -825,7 +825,7 @@ profile: production
 platform:
   name: enterprise-platform
   domain: agents.company.com
-  namespace: agent-platform
+  namespace: cto
 
 github:
   organization: company-org

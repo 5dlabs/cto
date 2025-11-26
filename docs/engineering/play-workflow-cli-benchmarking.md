@@ -96,10 +96,10 @@ echo "════════════════════════�
 **Usage**: After workflow runs, extract metrics:
 ```bash
 # Get benchmark data from pod logs
-kubectl logs -n agent-platform <pod-name> | sed -n '/BENCHMARK RESULTS/,/════/p'
+kubectl logs -n cto <pod-name> | sed -n '/BENCHMARK RESULTS/,/════/p'
 
 # Aggregate across all pods in workflow
-kubectl logs -n agent-platform -l workflow-id=<id> | grep -A30 "BENCHMARK RESULTS" | jq -s '.'
+kubectl logs -n cto -l workflow-id=<id> | grep -A30 "BENCHMARK RESULTS" | jq -s '.'
 ```
 
 ### Phase 2: Prometheus Metrics (Production Monitoring)
@@ -313,7 +313,7 @@ sum by (cli, agent) (rate(play_fast_path_activations_total[1h]))
 #!/bin/bash
 # scripts/parse-benchmark-logs.sh
 
-kubectl logs -n agent-platform -l "workflow-id=$1" \
+kubectl logs -n cto -l "workflow-id=$1" \
   | grep -A30 "BENCHMARK RESULTS" \
   | jq -s 'group_by(.cli) | map({
       cli: .[0].cli,

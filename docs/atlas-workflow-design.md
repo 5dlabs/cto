@@ -197,7 +197,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: atlas-conflict-detector
-  namespace: agent-platform
+  namespace: cto
 spec:
   dependencies:
   - name: pr-conflict-detected
@@ -235,7 +235,7 @@ spec:
             kind: CodeRun
             metadata:
               generateName: "coderun-atlas-conflict-"
-              namespace: agent-platform
+              namespace: cto
               labels:
                 agent: atlas
                 pr-number: "{{ .Input.body.pull_request.number }}"
@@ -266,7 +266,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: atlas-pre-merge-check
-  namespace: agent-platform
+  namespace: cto
 spec:
   dependencies:
   - name: ready-to-merge
@@ -300,7 +300,7 @@ spec:
             kind: CodeRun
             metadata:
               generateName: "coderun-atlas-premerge-"
-              namespace: agent-platform
+              namespace: cto
               labels:
                 agent: atlas
                 stage: pre-merge
@@ -330,7 +330,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
 metadata:
   name: atlas-conflict-scanner
-  namespace: agent-platform
+  namespace: cto
 spec:
   schedule: "*/10 * * * *"  # Every 10 minutes
   workflowSpec:

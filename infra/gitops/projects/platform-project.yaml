@@ -52,11 +52,11 @@ spec:
   destinations:
     - namespace: '*'
       server: https://kubernetes.default.svc
-    - namespace: agent-platform
+    - namespace: cto
       server: https://kubernetes.default.svc
-    - namespace: 'agent-platform-preview-*'  # Preview deployments (Bolt)
+    - namespace: 'cto-preview-*'  # Preview deployments (Bolt)
       server: https://kubernetes.default.svc
-    - namespace: 'agent-platform-prod-*'     # Production deployments (Bolt)
+    - namespace: 'cto-prod-*'     # Production deployments (Bolt)
       server: https://kubernetes.default.svc
     - namespace: trader
       server: https://kubernetes.default.svc

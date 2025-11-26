@@ -3,7 +3,7 @@
 ## Current Status
 
 ✅ **Secret Created:**
-- Secret `context7-api-key` exists in `agent-platform` namespace
+- Secret `context7-api-key` exists in `cto` namespace
 - Contains: `CONTEXT7_API_KEY`
 - Synced from `secret-store` namespace via External Secrets
 
@@ -124,7 +124,7 @@ env_from.push(json!({
    ```bash
    # Create a test CodeRun
    # Check the pod has CONTEXT7_API_KEY
-   kubectl exec -it <agent-pod> -n agent-platform -- env | grep CONTEXT7_API_KEY
+   kubectl exec -it <agent-pod> -n cto -- env | grep CONTEXT7_API_KEY
    ```
 
 ## Alternative: Quick Test Without Controller Change
@@ -156,7 +156,7 @@ After mounting the secret, verify in an agent container:
 
 ```bash
 # Exec into agent pod
-kubectl exec -it <agent-pod> -n agent-platform -- bash
+kubectl exec -it <agent-pod> -n cto -- bash
 
 # Check environment variable
 echo $CONTEXT7_API_KEY
@@ -170,7 +170,7 @@ npx -y @upstash/context7-mcp
 ## Summary
 
 **Current State:**
-- ✅ Secret exists in agent-platform namespace
+- ✅ Secret exists in cto namespace
 - ❌ Not mounted to agent containers
 - ❌ CONTEXT7_API_KEY not available in agent environment
 

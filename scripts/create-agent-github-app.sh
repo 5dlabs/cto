@@ -248,7 +248,7 @@ echo "📝 Add this to infra/charts/controller/values.yaml under 'agents:':"
 echo "$VALUES_SNIPPET"
 echo ""
 
-# Create VaultStaticSecret YAML for agent-platform namespace
+# Create VaultStaticSecret YAML for cto namespace
 VAULT_STATIC_SECRET=$(cat <<EOF
 ---
 # GitHub App Secrets - $AGENT_DISPLAY
@@ -256,7 +256,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultStaticSecret
 metadata:
   name: github-app-$AGENT_LOWER
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: github-app-$AGENT_LOWER
     app.kubernetes.io/part-of: platform
@@ -276,7 +276,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultStaticSecret
 metadata:
   name: github-app-5dlabs-$AGENT_LOWER
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: github-app-5dlabs-$AGENT_LOWER
     app.kubernetes.io/part-of: platform

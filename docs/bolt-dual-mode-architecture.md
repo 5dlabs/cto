@@ -110,7 +110,7 @@ Bolt operates in **THREE distinct modes** to provide comprehensive deployment mo
 - Label `preview-deployment` added (optional)
 
 **Responsibilities:**
-1. Create preview namespace: `agent-platform-preview-task-{id}`
+1. Create preview namespace: `cto-preview-task-{id}`
 2. Create preview ArgoCD application: `task-{id}-preview`
    - Source: PR branch (not main)
    - Destination namespace: preview namespace
@@ -144,7 +144,7 @@ spec:
     path: helm
   destination:
     server: https://kubernetes.default.svc
-    namespace: agent-platform-preview-task-{id}
+    namespace: cto-preview-task-{id}
   syncPolicy:
     automated:
       prune: true
@@ -159,7 +159,7 @@ apiVersion: ngrok.k8s.ngrok.com/v1alpha1
 kind: Tunnel
 metadata:
   name: task-{id}-preview
-  namespace: agent-platform-preview-task-{id}
+  namespace: cto-preview-task-{id}
 spec:
   forwardsTo: service-name:port
   labels:
@@ -175,7 +175,7 @@ spec:
 
 ### Preview Details
 - **URL:** https://abc123-preview.ngrok.io
-- **Environment:** `agent-platform-preview-task-{id}`
+- **Environment:** `cto-preview-task-{id}`
 - **Branch:** `feature/branch-name`
 - **ArgoCD App:** `task-{id}-preview`
 
@@ -211,7 +211,7 @@ spec:
    - Delete preview ArgoCD application
    - Delete preview namespace
    - Delete preview ngrok tunnel
-2. Create production namespace: `agent-platform-prod-task-{id}`
+2. Create production namespace: `cto-prod-task-{id}`
 3. Create production ArgoCD application: `task-{id}-prod`
    - Source: main branch (merged code)
    - Destination namespace: production namespace
@@ -245,7 +245,7 @@ spec:
     path: helm
   destination:
     server: https://kubernetes.default.svc
-    namespace: agent-platform-prod-task-{id}
+    namespace: cto-prod-task-{id}
   syncPolicy:
     automated:
       prune: true
@@ -262,7 +262,7 @@ spec:
 
 ### Production Details
 - **URL:** https://xyz789-prod.ngrok.io
-- **Environment:** `agent-platform-prod-task-{id}`
+- **Environment:** `cto-prod-task-{id}`
 - **Branch:** `main`
 - **ArgoCD App:** `task-{id}-prod`
 
@@ -330,8 +330,8 @@ spec:
 - Correlation marker: `.taskmaster-correlation` file
 
 ### Namespace Naming
-- Preview: `agent-platform-preview-task-{id}`
-- Production: `agent-platform-prod-task-{id}`
+- Preview: `cto-preview-task-{id}`
+- Production: `cto-prod-task-{id}`
 
 ### ArgoCD Application Naming
 - Preview: `task-{id}-preview`
@@ -402,13 +402,13 @@ agents:
       enabled: true
       autoCleanup: true
       retentionDays: 7
-      namespace: "agent-platform-preview-task-{id}"
+      namespace: "cto-preview-task-{id}"
       
     # Production mode configuration
     production:
       enabled: true
       cleanupPreview: true  # Clean up preview on production deploy
-      namespace: "agent-platform-prod-task-{id}"
+      namespace: "cto-prod-task-{id}"
       
     # Common configuration
     syncTimeout: 600  # 10 minutes

@@ -236,13 +236,13 @@ After ArgoCD syncs the changes:
 
 ```bash
 # Check ExternalSecrets created
-kubectl get externalsecret -n agent-platform | grep -E "atlas|bolt"
+kubectl get externalsecret -n cto | grep -E "atlas|bolt"
 
 # Check secrets populated
-kubectl get secret -n agent-platform | grep -E "atlas|bolt"
+kubectl get secret -n cto | grep -E "atlas|bolt"
 
 # Verify agents configmap updated
-kubectl get configmap -n agent-platform controller-agents -o yaml | grep -E "atlas|bolt"
+kubectl get configmap -n cto controller-agents -o yaml | grep -E "atlas|bolt"
 ```
 
 ---
@@ -360,7 +360,7 @@ spec:
               kind: CodeRun
               metadata:
                 generateName: atlas-merge-
-                namespace: agent-platform
+                namespace: cto
               spec:
                 taskId: "{{workflow.parameters.task-id}}"
                 githubApp: "5DLabs-Atlas"
@@ -389,7 +389,7 @@ git push origin test-atlas-conflict
 ```bash
 # After Atlas merges to main
 # Watch Bolt monitor the deployment
-kubectl logs -n agent-platform -l app.kubernetes.io/name=controller,agent=bolt --follow
+kubectl logs -n cto -l app.kubernetes.io/name=controller,agent=bolt --follow
 ```
 
 ---
@@ -400,7 +400,7 @@ kubectl logs -n agent-platform -l app.kubernetes.io/name=controller,agent=bolt -
 
 Check:
 ```bash
-kubectl get configmap -n agent-platform controller-agents -o yaml
+kubectl get configmap -n cto controller-agents -o yaml
 ```
 
 Ensure values.yaml changes were synced by ArgoCD.
@@ -409,8 +409,8 @@ Ensure values.yaml changes were synced by ArgoCD.
 
 Check ExternalSecrets:
 ```bash
-kubectl get externalsecret -n agent-platform github-app-atlas -o yaml
-kubectl describe externalsecret -n agent-platform github-app-atlas
+kubectl get externalsecret -n cto github-app-atlas -o yaml
+kubectl describe externalsecret -n cto github-app-atlas
 ```
 
 Verify Vault has the secrets:

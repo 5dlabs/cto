@@ -112,7 +112,7 @@ bolt:
       enabled: true
       autoCleanup: true  # Clean up on PR close
       retentionDays: 7  # Delete old previews
-      namespace: "agent-platform-preview-task-{id}"
+      namespace: "cto-preview-task-{id}"
       appName: "task-{id}-preview"
       syncTimeout: 300  # 5 minutes
       resourceQuota:
@@ -125,7 +125,7 @@ bolt:
     production:
       enabled: true
       cleanupPreview: true  # Clean preview before production
-      namespace: "agent-platform-prod-task-{id}"
+      namespace: "cto-prod-task-{id}"
       appName: "task-{id}-prod"
       syncTimeout: 600  # 10 minutes
       branch: "main"
@@ -140,8 +140,8 @@ bolt:
 - Branch name: `task-5-implement-auth` → Task ID: `5`
 
 ### Namespaces
-- Preview: `agent-platform-preview-task-{id}`
-- Production: `agent-platform-prod-task-{id}`
+- Preview: `cto-preview-task-{id}`
+- Production: `cto-prod-task-{id}`
 
 ### ArgoCD Applications
 - Preview: `task-{id}-preview`
@@ -201,7 +201,7 @@ bolt:
 
 **How It Works:**
 1. Extract task ID from PR labels or branch name
-2. Create isolated namespace: `agent-platform-preview-task-{id}`
+2. Create isolated namespace: `cto-preview-task-{id}`
 3. Apply resource quotas (CPU: 2 cores, Memory: 4 GiB)
 4. Create ArgoCD Application tracking **PR branch** (auto-updates!)
 5. Wait for sync (timeout: 5 minutes)
@@ -223,7 +223,7 @@ bolt:
 
 ### Preview Details
 - **URL:** https://abc123-preview.ngrok.io
-- **Environment:** `agent-platform-preview-task-{id}`
+- **Environment:** `cto-preview-task-{id}`
 - **Branch:** `feature/branch-name`
 - **ArgoCD App:** `task-{id}-preview`
 
@@ -253,7 +253,7 @@ bolt:
 
 **How It Works:**
 1. **Clean up preview first** (ArgoCD app, namespace, tunnel)
-2. Create production namespace: `agent-platform-prod-task-{id}`
+2. Create production namespace: `cto-prod-task-{id}`
 3. Create production ArgoCD Application tracking **main branch**
 4. Wait for sync (timeout: 10 minutes)
 5. Create production ngrok Tunnel
@@ -274,7 +274,7 @@ bolt:
 
 ### Production Details
 - **URL:** https://xyz789-prod.ngrok.io
-- **Environment:** `agent-platform-prod-task-{id}`
+- **Environment:** `cto-prod-task-{id}`
 - **Branch:** `main`
 - **ArgoCD App:** `task-{id}-prod`
 

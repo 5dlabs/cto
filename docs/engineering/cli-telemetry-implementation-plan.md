@@ -131,7 +131,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT="{{telemetry.otlpEndpoint}}"
 export OTEL_EXPORTER_OTLP_PROTOCOL="{{telemetry.otlpProtocol}}"
 export OTEL_SERVICE_NAME="factory-droid"
 export OTEL_SERVICE_VERSION="1.0.0"
-export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=production,service.namespace=agent-platform"
+export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=production,service.namespace=cto"
 echo "✓ Factory telemetry enabled: {{telemetry.otlpEndpoint}}"
 {{/if}}
 ```

@@ -289,7 +289,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultStaticSecret
 metadata:
   name: github-app-atlas
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: github-app-atlas
     app.kubernetes.io/part-of: platform
@@ -309,7 +309,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultStaticSecret
 metadata:
   name: github-app-5dlabs-atlas
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: github-app-5dlabs-atlas
     app.kubernetes.io/part-of: platform
@@ -332,7 +332,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultStaticSecret
 metadata:
   name: github-app-bolt
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: github-app-bolt
     app.kubernetes.io/part-of: platform
@@ -352,7 +352,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultStaticSecret
 metadata:
   name: github-app-5dlabs-bolt
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: github-app-5dlabs-bolt
     app.kubernetes.io/part-of: platform

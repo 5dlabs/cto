@@ -32,14 +32,14 @@ The Victoria Logs datasource should be automatically configured. If not, add it 
 
 Victoria Logs uses LogsQL for querying. Here are examples for viewing CLI container logs:
 
-#### All logs from agent-platform namespace:
+#### All logs from cto namespace:
 ```logsql
-{kubernetes.namespace_name="agent-platform"}
+{kubernetes.namespace_name="cto"}
 ```
 
 #### Logs from specific CLI containers:
 ```logsql
-{kubernetes.namespace_name="agent-platform", kubernetes.container_name=~".*-cli"}
+{kubernetes.namespace_name="cto", kubernetes.container_name=~".*-cli"}
 ```
 
 #### Logs from specific agents (Cleo, Atlas, Cipher, etc.):
@@ -53,17 +53,17 @@ Victoria Logs uses LogsQL for querying. Here are examples for viewing CLI contai
 
 #### Filter by log level:
 ```logsql
-{kubernetes.namespace_name="agent-platform"} | json | level="error"
+{kubernetes.namespace_name="cto"} | json | level="error"
 ```
 
 #### Search for specific text in logs:
 ```logsql
-{kubernetes.namespace_name="agent-platform"} | "error" or "failed"
+{kubernetes.namespace_name="cto"} | "error" or "failed"
 ```
 
 #### Logs from a specific time range with text search:
 ```logsql
-{kubernetes.namespace_name="agent-platform", _time>"2025-11-24T00:00:00Z"} | "task"
+{kubernetes.namespace_name="cto", _time>"2025-11-24T00:00:00Z"} | "task"
 ```
 
 ## Available Log Fields
@@ -85,7 +85,7 @@ All logs include the following Kubernetes metadata fields:
 1. In Grafana, go to Dashboards → New Dashboard
 2. Add a new panel
 3. Select "Victoria Logs" as the data source
-4. Enter a LogsQL query (e.g., `{kubernetes.namespace_name="agent-platform"}`)
+4. Enter a LogsQL query (e.g., `{kubernetes.namespace_name="cto"}`)
 5. Choose visualization type (usually "Logs")
 6. Configure panel settings:
    - Time range
@@ -102,7 +102,7 @@ All logs include the following Kubernetes metadata fields:
       "title": "All Agent Platform Logs",
       "targets": [
         {
-          "expr": "{kubernetes.namespace_name=\"agent-platform\"}"
+          "expr": "{kubernetes.namespace_name=\"cto\"}"
         }
       ]
     },
@@ -110,7 +110,7 @@ All logs include the following Kubernetes metadata fields:
       "title": "Error Logs",
       "targets": [
         {
-          "expr": "{kubernetes.namespace_name=\"agent-platform\"} | \"error\" or \"ERROR\" or \"failed\""
+          "expr": "{kubernetes.namespace_name=\"cto\"} | \"error\" or \"ERROR\" or \"failed\""
         }
       ]
     }

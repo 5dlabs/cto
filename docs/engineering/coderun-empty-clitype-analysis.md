@@ -125,9 +125,9 @@ code_reconciliation_result: CodeRun reconciliation error
 
 **Action:** Delete CodeRuns with empty cliType
 ```bash
-kubectl delete coderun cto-parallel-test-t2-security-nrmnn -n agent-platform
-kubectl delete coderun cto-parallel-test-t5-security-crnvp -n agent-platform  
-kubectl delete coderun cto-parallel-test-t7-security-hdzg9 -n agent-platform
+kubectl delete coderun cto-parallel-test-t2-security-nrmnn -n cto
+kubectl delete coderun cto-parallel-test-t5-security-crnvp -n cto  
+kubectl delete coderun cto-parallel-test-t7-security-hdzg9 -n cto
 ```
 
 **Result:** Controller immediately resumed reconciliation
@@ -192,7 +192,7 @@ webhooks:
   clientConfig:
     service:
       name: controller
-      namespace: agent-platform
+      namespace: cto
       path: "/validate-coderun"
 ```
 

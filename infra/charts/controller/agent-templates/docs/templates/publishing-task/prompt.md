@@ -64,7 +64,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: <service-name>
-  namespace: agent-platform
+  namespace: cto
 spec:
   replicas: 2
   selector:
@@ -101,7 +101,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: <service-name>
-  namespace: agent-platform
+  namespace: cto
 spec:
   selector:
     app: <service-name>
@@ -119,7 +119,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: <service-name>-ngrok
-  namespace: agent-platform
+  namespace: cto
   annotations:
     k8s.ngrok.com/modules: ngrok-module-set-<service>
 spec:
@@ -145,23 +145,23 @@ kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/ingress.yaml
 
 # Wait for deployment
-kubectl rollout status deployment/<service-name> -n agent-platform
+kubectl rollout status deployment/<service-name> -n cto
 
 # Verify pods are running
-kubectl get pods -n agent-platform -l app=<service-name>
+kubectl get pods -n cto -l app=<service-name>
 ```
 
 ### 6. Get Public URLs
 
 ```bash
 # Get Ngrok URL
-kubectl get ingress <service-name>-ngrok -n agent-platform -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get ingress <service-name>-ngrok -n cto -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 
 # Or check Ngrok dashboard
-kubectl get ngrokingress -n agent-platform
+kubectl get ngrokingress -n cto
 
 # Test the URL
-NGROK_URL=$(kubectl get ingress <service-name>-ngrok -n agent-platform -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+NGROK_URL=$(kubectl get ingress <service-name>-ngrok -n cto -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 curl -f https://$NGROK_URL/health
 ```
 
@@ -204,7 +204,7 @@ test('deployed app loads successfully', async ({ page }) => {
 EOF
 
 # Run against deployed URL
-NGROK_URL=$(kubectl get ingress <service>-ngrok -n agent-platform -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+NGROK_URL=$(kubectl get ingress <service>-ngrok -n cto -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 npx playwright test --config playwright.config.ts
 
 # Post screenshots to PR
@@ -241,7 +241,7 @@ Document the deployment:
 
 **Service:** <service-name>
 **Version:** v1.0.0
-**Namespace:** agent-platform
+**Namespace:** cto
 **Date:** <current-date>
 
 ### Deployment Status

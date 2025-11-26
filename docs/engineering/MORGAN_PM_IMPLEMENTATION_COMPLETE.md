@@ -162,13 +162,13 @@ Run comprehensive validation:
 
 ```bash
 # Check Morgan is running
-kubectl get pods -n agent-platform -l agent=morgan
+kubectl get pods -n cto -l agent=morgan
 
 # View recent logs (should be clean, no errors)
-kubectl logs -n agent-platform -l agent=morgan --tail=100
+kubectl logs -n cto -l agent=morgan --tail=100
 
 # Check metrics
-kubectl exec -n agent-platform -l agent=morgan -c main -- \
+kubectl exec -n cto -l agent=morgan -c main -- \
   cat /shared/metrics/morgan.prom
 
 # Verify issue linking
@@ -203,7 +203,7 @@ argocd app sync controller
 ./scripts/test-morgan-pm-comprehensive.sh
 
 # Check pod is running new code
-kubectl logs -n agent-platform -l agent=morgan --tail=20 | grep "kubectl watch"
+kubectl logs -n cto -l agent=morgan --tail=20 | grep "kubectl watch"
 # Should see improved log messages
 ```
 
@@ -222,15 +222,15 @@ kubectl logs -n agent-platform -l agent=morgan --tail=20 | grep "kubectl watch"
 
 ```bash
 # Issue linking success rate (should be > 90%)
-kubectl exec -n agent-platform -l agent=morgan -c main -- \
+kubectl exec -n cto -l agent=morgan -c main -- \
   cat /shared/metrics/morgan.prom | grep morgan_issue_link
 
 # Event processing (should be > 0 and growing)
-kubectl exec -n agent-platform -l agent=morgan -c main -- \
+kubectl exec -n cto -l agent=morgan -c main -- \
   cat /shared/metrics/morgan.prom | grep morgan_event_processing_total
 
 # GraphQL errors (should be 0 or very low)
-kubectl exec -n agent-platform -l agent=morgan -c main -- \
+kubectl exec -n cto -l agent=morgan -c main -- \
   cat /shared/metrics/morgan.prom | grep morgan_graphql_errors_total
 ```
 

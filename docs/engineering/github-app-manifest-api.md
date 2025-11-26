@@ -566,7 +566,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: agent-morgan-github
-  namespace: agent-platform
+  namespace: cto
   labels:
     app: morgan
     type: github-app

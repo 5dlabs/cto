@@ -120,7 +120,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: remediation-feedback-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: remediation-workflow
                   trigger-type: "comment-feedback"
@@ -184,7 +184,7 @@ spec:
                         kind: CodeRun
                         metadata:
                           generateName: rex-remediation-
-                          namespace: agent-platform
+                          namespace: cto
                           labels:
                             task-id: "$TASK_ID"
                             pr-number: "{{workflow.parameters.pr-number}}"

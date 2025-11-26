@@ -54,7 +54,7 @@ Use a Kubernetes ConfigMap to store project-specific configuration that persists
 ### ConfigMap Structure
 
 **Name**: `{service}-play-project-config` (e.g., `cto-play-project-config`)
-**Namespace**: `agent-platform`
+**Namespace**: `cto`
 
 
 
@@ -65,7 +65,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cto-play-project-config
-  namespace: agent-platform
+  namespace: cto
   labels:
     type: play-workflow-config
     service: cto

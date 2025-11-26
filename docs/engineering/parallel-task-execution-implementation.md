@@ -232,7 +232,7 @@ def build_levels(tasks_with_deps):
       kind: Workflow
       metadata:
         generateName: play-task-${task_id}-
-        namespace: agent-platform
+        namespace: cto
       spec:
         workflowTemplateRef:
           name: play-workflow-template

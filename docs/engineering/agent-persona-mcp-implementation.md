@@ -59,7 +59,7 @@ Tool {
             "namespace": {
                 "type": "string",
                 "description": "Kubernetes namespace",
-                "default": "agent-platform"
+                "default": "cto"
             }
         }
     })
@@ -479,7 +479,7 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
 
     let namespace = params.get("namespace")
         .and_then(|n| n.as_str())
-        .unwrap_or("agent-platform");
+        .unwrap_or("cto");
 
     // Step 1: Generate character
     println!("🎭 Generating agent persona...");
@@ -630,7 +630,7 @@ Response:
     "installation_url": "https://github.com/apps/cipher-ai-agent/installations/new"
   },
   "kubernetes": {
-    "namespace": "agent-platform",
+    "namespace": "cto",
     "config_map": "cipher-config",
     "secret": "cipher-github-app"
   },
@@ -689,7 +689,7 @@ await mcp.call("create_agent_persona", {
   purpose: "Performance optimization and bottleneck detection",
   capabilities: ["profiling", "optimization", "benchmarking"],
   github_org: "5dlabs",
-  namespace: "agent-platform"
+  namespace: "cto"
 });
 
 

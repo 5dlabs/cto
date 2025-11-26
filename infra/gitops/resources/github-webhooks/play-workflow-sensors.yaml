@@ -39,7 +39,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: resume-pr-created-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: webhook-resume
                   target-stage: waiting-pr-created
@@ -178,7 +178,7 @@ spec:
                             echo "contexts:"
                             echo "  - context:"
                             echo "      cluster: in-cluster"
-                            echo "      namespace: agent-platform"
+                            echo "      namespace: cto"
                             echo "      user: sensor-sa"
                             echo "    name: in-cluster"
                             echo "current-context: in-cluster"
@@ -197,7 +197,7 @@ spec:
                           kubeconfig_path=$(build_kubeconfig) || return 1
 
                           if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
-                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            -n cto resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
                             echo "✅ Workflow resumed successfully"
                             return 0
                           fi
@@ -283,7 +283,7 @@ spec:
                           local pr_number="$3"
                           local workflow_json patch_json
 
-                          workflow_json=$(kubectl get workflow "$workflow_name" -n agent-platform -o json 2>/dev/null)
+                          workflow_json=$(kubectl get workflow "$workflow_name" -n cto -o json 2>/dev/null)
                           if [ -z "$workflow_json" ]; then
                             echo "⚠️ Unable to fetch workflow $workflow_name for PR metadata update"
                             return 1
@@ -317,7 +317,7 @@ spec:
                             return 1
                           fi
 
-                          kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$patch_json"
+                          kubectl patch workflow "$workflow_name" -n cto --type='merge' -p "$patch_json"
                         }
 
                         ensure_jq
@@ -461,7 +461,7 @@ spec:
                         WORKFLOW_FOUND=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
-                          WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
+                          WORKFLOW_JSON=$(kubectl get workflows -n cto \
                             -l task-id=$TASK_ID,workflow-type=play-orchestration \
                             -o json 2>/dev/null || echo "")
 
@@ -622,7 +622,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: enhanced-cancellation-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: enhanced-remediation
                   version: v2
@@ -721,7 +721,7 @@ spec:
 
                           # Find CodeRuns for quality and testing agents on this task
                           echo "Looking for outdated CodeRuns to cancel..."
-                          kubectl get coderuns -n agent-platform \
+                          kubectl get coderuns -n cto \
                             -l task-id=$TASK_ID \
                             -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.agent-type}{"\t"}{.status.phase}{"\n"}{end}' | \
                           while read coderun_name agent_type phase; do
@@ -731,12 +731,12 @@ spec:
                               # Enhanced phase checking
                               if [ "$phase" = "Running" ] || [ "$phase" = "Pending" ]; then
                                 echo "🛑 Cancelling outdated CodeRun: $coderun_name (agent: $agent_type)"
-                                kubectl delete coderun $coderun_name -n agent-platform --ignore-not-found=true
+                                kubectl delete coderun $coderun_name -n cto --ignore-not-found=true
                               elif [ "$phase" = "Succeeded" ] || [ "$phase" = "Failed" ]; then
                                 echo "✅ CodeRun $coderun_name already completed (phase: $phase), skipping"
                               else
                                 echo "❓ CodeRun $coderun_name in unknown phase: $phase, attempting cancellation"
-                                kubectl delete coderun $coderun_name -n agent-platform --ignore-not-found=true --timeout=30s
+                                kubectl delete coderun $coderun_name -n cto --ignore-not-found=true --timeout=30s
                               fi
                             fi
                           done
@@ -793,7 +793,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: resume-security-stage-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: webhook-resume
                   target-stage: security-in-progress
@@ -909,7 +909,7 @@ spec:
                             echo "contexts:"
                             echo "  - context:"
                             echo "      cluster: in-cluster"
-                            echo "      namespace: agent-platform"
+                            echo "      namespace: cto"
                             echo "      user: sensor-sa"
                             echo "    name: in-cluster"
                             echo "current-context: in-cluster"
@@ -928,7 +928,7 @@ spec:
                           kubeconfig_path=$(build_kubeconfig) || return 1
 
                           if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
-                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            -n cto resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
                             echo "✅ Workflow resumed successfully"
                             return 0
                           fi
@@ -1025,7 +1025,7 @@ spec:
                         SUSPEND_READY=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
-                          WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
+                          WORKFLOW_JSON=$(kubectl get workflows -n cto \
                             -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                             -o json 2>/dev/null || echo "")
 
@@ -1140,7 +1140,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: resume-qa-stage-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: webhook-resume
                   target-stage: waiting-ready-for-qa
@@ -1245,7 +1245,7 @@ spec:
                             echo "contexts:"
                             echo "  - context:"
                             echo "      cluster: in-cluster"
-                            echo "      namespace: agent-platform"
+                            echo "      namespace: cto"
                             echo "      user: sensor-sa"
                             echo "    name: in-cluster"
                             echo "current-context: in-cluster"
@@ -1264,7 +1264,7 @@ spec:
                           kubeconfig_path=$(build_kubeconfig) || return 1
 
                           if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
-                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            -n cto resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
                             echo "✅ Workflow resumed successfully"
                             return 0
                           fi
@@ -1360,7 +1360,7 @@ spec:
                         SUSPEND_READY=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
-                          WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
+                          WORKFLOW_JSON=$(kubectl get workflows -n cto \
                             -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                             -o json 2>/dev/null || echo "")
 

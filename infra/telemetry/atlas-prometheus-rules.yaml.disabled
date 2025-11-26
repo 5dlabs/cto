@@ -16,21 +16,21 @@ spec:
         - record: atlas:coderuns:active
           expr: |
             sum(kube_pod_container_status_running{
-              namespace="agent-platform",
+              namespace="cto",
               pod=~"coderun-atlas-.*"
             })
         
         - record: atlas:coderuns:guardian
           expr: |
             sum(kube_pod_container_status_running{
-              namespace="agent-platform",
+              namespace="cto",
               pod=~"coderun-atlas-guardian-.*"
             })
         
         - record: atlas:coderuns:integration
           expr: |
             sum(kube_pod_container_status_running{
-              namespace="agent-platform",
+              namespace="cto",
               pod=~"coderun-atlas-integration-.*"
             })
         
@@ -67,8 +67,8 @@ spec:
         # Atlas integration gate timeout
         - alert: AtlasIntegrationGateTimeout
           expr: |
-            (time() - kube_pod_created{namespace="agent-platform", pod=~"coderun-atlas-integration-.*"}) > 3600
-            and kube_pod_container_status_running{namespace="agent-platform", pod=~"coderun-atlas-integration-.*"} == 1
+            (time() - kube_pod_created{namespace="cto", pod=~"coderun-atlas-integration-.*"}) > 3600
+            and kube_pod_container_status_running{namespace="cto", pod=~"coderun-atlas-integration-.*"} == 1
           for: 5m
           labels:
             severity: critical
@@ -102,8 +102,8 @@ spec:
         # Atlas guardian stuck
         - alert: AtlasGuardianStuck
           expr: |
-            (time() - kube_pod_created{namespace="agent-platform", pod=~"coderun-atlas-guardian-.*"}) > 7200
-            and kube_pod_container_status_running{namespace="agent-platform", pod=~"coderun-atlas-guardian-.*"} == 1
+            (time() - kube_pod_created{namespace="cto", pod=~"coderun-atlas-guardian-.*"}) > 7200
+            and kube_pod_container_status_running{namespace="cto", pod=~"coderun-atlas-guardian-.*"} == 1
           for: 10m
           labels:
             severity: warning
@@ -130,7 +130,7 @@ spec:
         - alert: AtlasCodeRunFailures
           expr: |
             sum(rate(kube_pod_container_status_terminated_reason{
-              namespace="agent-platform",
+              namespace="cto",
               pod=~"coderun-atlas-.*",
               reason!="Completed"
             }[10m])) > 0.1
@@ -146,7 +146,7 @@ spec:
         - alert: AtlasLockContention
           expr: |
             count(kube_configmap_info{
-              namespace="agent-platform",
+              namespace="cto",
               configmap=~"atlas-.*-lock-.*"
             }) > 50
           for: 10m
@@ -161,7 +161,7 @@ spec:
         - alert: WorkflowStuckAtAtlas
           expr: |
             count(kube_workflow_info{
-              namespace="agent-platform",
+              namespace="cto",
               workflow=~"play-.*",
               label_current_stage="waiting-atlas-integration"
             }) > 0

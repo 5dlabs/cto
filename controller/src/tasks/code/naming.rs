@@ -215,7 +215,7 @@ mod tests {
         CodeRun {
             metadata: ObjectMeta {
                 name: Some("sample-run".to_string()),
-                namespace: Some("agent-platform".to_string()),
+                namespace: Some("cto".to_string()),
                 uid: Some("1234567890abcdef".to_string()),
                 ..Default::default()
             },
@@ -251,7 +251,7 @@ mod tests {
         CodeRun {
             metadata: ObjectMeta {
                 name: Some("sample-run".to_string()),
-                namespace: Some("agent-platform".to_string()),
+                namespace: Some("cto".to_string()),
                 uid: Some("1234567890abcdef".to_string()),
                 labels: Some(labels),
                 ..Default::default()
@@ -288,7 +288,7 @@ mod tests {
         CodeRun {
             metadata: ObjectMeta {
                 name: Some("sample-run".to_string()),
-                namespace: Some("agent-platform".to_string()),
+                namespace: Some("cto".to_string()),
                 uid: Some("1234567890abcdef".to_string()),
                 ..Default::default()
             },
@@ -364,7 +364,7 @@ mod tests {
         let code_run = CodeRun {
             metadata: ObjectMeta {
                 name: Some("sample-run".to_string()),
-                namespace: Some("agent-platform".to_string()),
+                namespace: Some("cto".to_string()),
                 uid: Some("1234567890abcdef".to_string()),
                 labels: Some(labels),
                 ..Default::default()

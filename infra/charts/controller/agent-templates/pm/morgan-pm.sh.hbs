@@ -1318,7 +1318,7 @@ add_status_history() {
   local phase="$6"
   
   local timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-  local argo_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
+  local argo_url="https://argo.5dlabs.com/workflows/cto/$WORKFLOW_NAME"
   
   # Create structured status update comment
   gh issue comment "$issue_number" \
@@ -1548,7 +1548,7 @@ create_or_update_github_check() {
   
   # Create/update check run - Include workflow name to scope check per run
   local check_name="$agent_name Quality Gate ($WORKFLOW_NAME)"
-  local argo_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
+  local argo_url="https://argo.5dlabs.com/workflows/cto/$WORKFLOW_NAME"
   
   # Check if check run already exists
   local existing_check=$(gh api \
@@ -1879,7 +1879,7 @@ update_project_summary() {
   
   # Generate comprehensive summary with metrics
   local timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-  local workflow_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
+  local workflow_url="https://argo.5dlabs.com/workflows/cto/$WORKFLOW_NAME"
   
   # Calculate task metrics
   local total_tasks=$(jq 'length' "$TASK_ISSUE_MAP")

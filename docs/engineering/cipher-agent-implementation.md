@@ -643,7 +643,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                namespace: agent-platform
+                namespace: cto
               spec:
                 suspend: false
           parameters:
@@ -955,7 +955,7 @@ Default values loaded from `cto-config.json`:
 - Check GitHub API rate limits
 
 **Issue: Workflow stuck at security stage**
-- Check CodeRun CRD status: `kubectl get coderun -n agent-platform`
+- Check CodeRun CRD status: `kubectl get coderun -n cto`
 - Review Cipher container logs
 - Verify sensor fired: `kubectl get sensor -n argo-events`
 

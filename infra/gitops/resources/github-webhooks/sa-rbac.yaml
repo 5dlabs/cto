@@ -31,8 +31,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: argo-events-workflows-agent-platform
-  namespace: agent-platform
+  name: argo-events-workflows-cto
+  namespace: cto
 rules:
   - apiGroups: ["argoproj.io"]
     resources: ["workflows"]
@@ -49,11 +49,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argo-events-workflows-binding
-  namespace: agent-platform
+  namespace: cto
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: argo-events-workflows-agent-platform
+  name: argo-events-workflows-cto
 subjects:
   - kind: ServiceAccount
     name: argo-events-sa

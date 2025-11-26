@@ -323,7 +323,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: shadcn-docs-ingest
-  namespace: agent-platform
+  namespace: cto
 spec:
   schedule: "0 0 * * 0"  # Weekly on Sunday
   jobTemplate:
@@ -400,7 +400,7 @@ const result = await context7_get_library_docs({
 
 **Check logs:**
 ```bash
-kubectl logs -n agent-platform deployment/doc-server --tail=100
+kubectl logs -n cto deployment/doc-server --tail=100
 ```
 
 **Common issues:**

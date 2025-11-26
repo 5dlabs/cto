@@ -31,7 +31,7 @@ spec:
           - deployments
           - configmaps
 
-        # Namespace filtering - focus on agent-platform and argo namespaces
+        # Namespace filtering - focus on cto and argo namespaces
         namespaces: ""
         namespacesDenylist: ""
 

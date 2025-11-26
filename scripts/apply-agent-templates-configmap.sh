@@ -5,7 +5,7 @@ set -euo pipefail
 # This script handles multiple split ConfigMaps (shared, claude, codex, cursor, factory, opencode).
 # Optional environment overrides:
 #   RELEASE_NAME  - Helm release name (default: controller)
-#   NAMESPACE     - Kubernetes namespace (default: agent-platform)
+#   NAMESPACE     - Kubernetes namespace (default: cto)
 #   VALUES_FILE   - Helm values file to include (default: infra/charts/controller/values.yaml)
 # Additional Helm args can be passed after a double dash, e.g.:
 #   ./scripts/apply-agent-templates-configmap.sh -- -f custom-values.yaml
@@ -15,7 +15,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHART_DIR="$ROOT_DIR/infra/charts/controller"
 
 RELEASE_NAME=${RELEASE_NAME:-controller}
-NAMESPACE=${NAMESPACE:-agent-platform}
+NAMESPACE=${NAMESPACE:-cto}
 VALUES_FILE_DEFAULT="$CHART_DIR/values.yaml"
 VALUES_FILE=${VALUES_FILE:-$VALUES_FILE_DEFAULT}
 

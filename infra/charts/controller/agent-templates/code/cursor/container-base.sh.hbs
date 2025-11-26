@@ -1346,7 +1346,7 @@ fi
 MCP_CLIENT_CONFIG="$TARGET_CFG"
 export MCP_CLIENT_CONFIG
 
-TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
 TOOLS_URL="${TOOLS_URL%/}"
 echo "🔍 Checking Tools endpoint: $TOOLS_URL"
 TOOLS_RETRIES=3
@@ -2543,7 +2543,7 @@ EOF
 
           # Extract service name from repository or use default
           SERVICE_NAME="${SERVICE_NAME:-$(basename "$REPOSITORY" .git)}"
-          NAMESPACE="${NAMESPACE:-agent-platform}"
+          NAMESPACE="${NAMESPACE:-cto}"
 
           # Check for deployment
           if kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" &>/dev/null; then

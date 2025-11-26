@@ -52,7 +52,7 @@ spec:
 
 Submit with:
 ```bash
-argo submit -n agent-platform parallel-play.yaml
+argo submit -n cto parallel-play.yaml
 ```
 
 ### 2. TaskMaster Requirements

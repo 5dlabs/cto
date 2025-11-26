@@ -393,16 +393,16 @@ gh pr create --title "Fix Morgan GitHub Projects sync with agent-based columns"
 argocd app sync controller
 
 # Delete Morgan PM ConfigMap to force reload
-kubectl delete configmap -n agent-platform agent-templates-pm
+kubectl delete configmap -n cto agent-templates-pm
 
 # Wait for ConfigMap recreation
-kubectl wait --for=condition=available -n agent-platform deployment controller --timeout=300s
+kubectl wait --for=condition=available -n cto deployment controller --timeout=300s
 
 # Trigger new play workflow
 task-master-play --task-id 1
 
 # Watch Morgan PM logs
-kubectl logs -n agent-platform -l agent=morgan -f
+kubectl logs -n cto -l agent=morgan -f
 ```
 
 ### 3. Expected Log Output (Cluster State Detection)
@@ -428,7 +428,7 @@ kubectl logs -n agent-platform -l agent=morgan -f
 ✅ Successfully updated stage to: Pending
 
 📡 Workflow event: task-1 (MODIFIED) - stage=implementation-in-progress, phase=Running
-🔍 Event details: workflow=play-task-1-abc123, namespace=agent-platform
+🔍 Event details: workflow=play-task-1-abc123, namespace=cto
 
 # Real cluster state detection in action:
 🔍 Detecting actual running agent for task-1 from cluster...

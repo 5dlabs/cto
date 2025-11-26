@@ -25,7 +25,7 @@ All core components are deployed and healthy.
 ### 1. ✅ **Workflow Templates (Deployed & Healthy)**
 
 ```bash
-$ kubectl get workflowtemplate -n agent-platform
+$ kubectl get workflowtemplate -n cto
 NAME                             AGE
 play-project-workflow-template   31h  # Parent orchestrator
 play-workflow-template           31h  # Individual task handler
@@ -98,7 +98,7 @@ bolt-production-deployment         3d       Bolt deployment monitoring
 
 #### GitHub Apps Configured (15 Apps)
 ```bash
-$ kubectl get secrets -n agent-platform | grep github-app
+$ kubectl get secrets -n cto | grep github-app
 github-app-5dlabs-atlas    # Conflict resolution
 github-app-5dlabs-blaze    # Implementation
 github-app-5dlabs-bolt     # Deployment monitoring
@@ -112,14 +112,14 @@ github-app-5dlabs-tess     # QA testing
 
 **Morgan PM Credentials:**
 ```bash
-$ kubectl get secret github-app-5dlabs-morgan -n agent-platform
+$ kubectl get secret github-app-5dlabs-morgan -n cto
 ✅ App ID: 1723711 (base64 encoded)
 ✅ Private Key: Present
 ```
 
 #### Agent Workspaces (PVCs)
 ```bash
-$ kubectl get pvc -n agent-platform | grep workspace
+$ kubectl get pvc -n cto | grep workspace
 workspace-cto-parallel-test          10Gi   Bound   # Implementation
 workspace-cto-parallel-test-cipher   10Gi   Bound   # Security
 workspace-cto-parallel-test-cleo     10Gi   Bound   # Quality
@@ -148,7 +148,7 @@ docsruns.agents.platform   2025-11-04T01:19:26Z
 ### 5. ✅ **Service Accounts & RBAC**
 
 ```bash
-$ kubectl get serviceaccount argo-workflow -n agent-platform
+$ kubectl get serviceaccount argo-workflow -n cto
 NAME            SECRETS   AGE
 argo-workflow   0         31h
 ```
@@ -196,7 +196,7 @@ successCondition: status.phase == Succeeded
 
 **Observation:**
 ```bash
-$ kubectl get configmap agents-config -n agent-platform
+$ kubectl get configmap agents-config -n cto
 Error: not found
 ```
 
@@ -313,7 +313,7 @@ Start Workflow
 play({ task_id: 1 })
 
 # Monitor progression
-watch kubectl get workflow -n agent-platform -l task-id=1
+watch kubectl get workflow -n cto -l task-id=1
 ```
 
 **Expected:**
@@ -341,7 +341,7 @@ play({
 })
 
 # Monitor all child workflows
-kubectl get workflows -n agent-platform -l parent-workflow=<project-workflow-name>
+kubectl get workflows -n cto -l parent-workflow=<project-workflow-name>
 ```
 
 #### 4. **Remediation Loop Test**

@@ -137,7 +137,7 @@ After installation:
 ```
 cto-platform/                    # kind cluster
 ├── Namespaces:
-│   ├── agent-platform          # CTO components
+│   ├── cto          # CTO components
 │   ├── argocd                  # GitOps
 │   ├── argo                    # Workflows & Events
 │   ├── monitoring (optional)   # Grafana, VictoriaMetrics

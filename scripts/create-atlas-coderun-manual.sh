@@ -17,7 +17,7 @@ echo "PR Number: #$PR_NUMBER"
 echo ""
 
 # Check if CodeRun already exists
-EXISTING=$(kubectl get coderuns -n agent-platform \
+EXISTING=$(kubectl get coderuns -n cto \
   -l agent=atlas,pr-number="$PR_NUMBER" \
   -o json 2>/dev/null || echo '{"items":[]}')
 
@@ -57,7 +57,7 @@ apiVersion: agents.platform/v1
 kind: CodeRun
 metadata:
   generateName: coderun-atlas-pr-$PR_NUMBER-manual-
-  namespace: agent-platform
+  namespace: cto
   labels:
     agent: atlas
     role: pr-guardian
@@ -97,8 +97,8 @@ if grep -q "created" /tmp/atlas-coderun-create.txt; then
   echo "✅ CodeRun created: $CODERUN_NAME"
   echo ""
   echo "Monitor progress:"
-  echo "  kubectl get coderun $CODERUN_NAME -n agent-platform -w"
-  echo "  kubectl logs -n agent-platform -l job-name=$CODERUN_NAME -f"
+  echo "  kubectl get coderun $CODERUN_NAME -n cto -w"
+  echo "  kubectl logs -n cto -l job-name=$CODERUN_NAME -f"
 else
   echo "❌ CodeRun creation failed:"
   cat /tmp/atlas-coderun-create.txt

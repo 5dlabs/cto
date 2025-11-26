@@ -360,10 +360,10 @@ helm repo add 5dlabs https://5dlabs.github.io/cto
 helm repo update
 
 # Install Custom Resource Definitions (CRDs) first
-kubectl apply -f https://raw.githubusercontent.com/5dlabs/cto/main/infra/charts/agent-platform/crds/platform-crds.yaml
+kubectl apply -f https://raw.githubusercontent.com/5dlabs/cto/main/infra/charts/cto/crds/platform-crds.yaml
 
-# Install the agent-platform
-helm install agent-platform 5dlabs/agent-platform --namespace agent-platform --create-namespace
+# Install the cto
+helm install cto 5dlabs/cto --namespace cto --create-namespace
 
 # Setup agent secrets (interactive)
 wget https://raw.githubusercontent.com/5dlabs/cto/main/infra/scripts/setup-agent-secrets.sh
@@ -378,7 +378,7 @@ chmod +x setup-agent-secrets.sh
 - Anthropic API Key
 
 **What you get:**
-- Complete agent-platform platform deployed to Kubernetes
+- Complete cto platform deployed to Kubernetes
 - REST API for task management
 - Separate Kubernetes controllers for CodeRun/DocsRun resources with TTL-safe reconciliation
 - Agent workspace management and isolation with persistent volumes
@@ -821,7 +821,7 @@ jobs({
 
 // Specify namespace
 jobs({
-  namespace: "agent-platform"
+  namespace: "cto"
 });
 ```
 
@@ -841,7 +841,7 @@ stop_job({
 stop_job({
   job_type: "intake",
   name: "intake-workflow-xyz789",
-  namespace: "agent-platform"
+  namespace: "cto"
 });
 ```
 
@@ -1031,14 +1031,14 @@ Refer to your CLI's documentation for hook configuration:
 
 #### 5. Deploying Template Changes
 
-After editing any template files, redeploy the agent-platform:
+After editing any template files, redeploy the cto:
 
 ```bash
 # Deploy template changes
-helm upgrade agent-platform infra/charts/controller -n agent-platform
+helm upgrade cto infra/charts/controller -n cto
 
 # Verify ConfigMap was updated (fullname = <release>-controller)
-kubectl get configmap agent-platform-controller-agent-templates -n agent-platform -o yaml
+kubectl get configmap cto-controller-agent-templates -n cto -o yaml
 ```
 
 **Important**: Template changes only affect new agent jobs. Running jobs continue with their original templates.

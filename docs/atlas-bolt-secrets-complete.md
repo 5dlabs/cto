@@ -38,23 +38,23 @@ kubectl apply -f infra/secret-store/agent-secrets-external-secrets.yaml
 **Created 6 New ExternalSecrets:**
 - `github-app-5dlabs-atlas` (secret-store namespace)
 - `github-app-5dlabs-bolt` (secret-store namespace)
-- `github-app-5dlabs-atlas-agent-platform` (agent-platform namespace)
-- `github-app-5dlabs-bolt-agent-platform` (agent-platform namespace)
-- `github-app-atlas` (agent-platform namespace - alias)
-- `github-app-bolt` (agent-platform namespace - alias)
+- `github-app-5dlabs-atlas-cto` (cto namespace)
+- `github-app-5dlabs-bolt-cto` (cto namespace)
+- `github-app-atlas` (cto namespace - alias)
+- `github-app-bolt` (cto namespace - alias)
 
 ### 3. **Verified Secret Sync**
 
 **ExternalSecrets Status:**
 ```
 NAME                                      STATUS          
-github-app-5dlabs-atlas-agent-platform    SecretSynced ✅
-github-app-5dlabs-bolt-agent-platform     SecretSynced ✅
+github-app-5dlabs-atlas-cto    SecretSynced ✅
+github-app-5dlabs-bolt-cto     SecretSynced ✅
 github-app-atlas                          SecretSynced ✅
 github-app-bolt                           SecretSynced ✅
 ```
 
-**Secrets Created in agent-platform:**
+**Secrets Created in cto:**
 ```
 NAME                       TYPE     DATA   AGE
 github-app-5dlabs-atlas    Opaque   3      ✅
@@ -102,8 +102,8 @@ This means:
 - **Client ID:** Iv23liTupEPix4hvGi0w
 - **Source Secret:** `secret-store/github-app-atlas`
 - **Agent Secrets:** 
-  - `agent-platform/github-app-5dlabs-atlas`
-  - `agent-platform/github-app-atlas` (alias)
+  - `cto/github-app-5dlabs-atlas`
+  - `cto/github-app-atlas` (alias)
 
 ### **Bolt (DevOps Specialist)**
 - **GitHub App:** 5DLabs-Bolt
@@ -111,8 +111,8 @@ This means:
 - **Client ID:** Iv23liYmdPdctJx4YCx2
 - **Source Secret:** `secret-store/github-app-bolt`
 - **Agent Secrets:**
-  - `agent-platform/github-app-5dlabs-bolt`
-  - `agent-platform/github-app-bolt` (alias)
+  - `cto/github-app-5dlabs-bolt`
+  - `cto/github-app-bolt` (alias)
 
 ---
 
@@ -151,7 +151,7 @@ git commit -m 'feat: add Atlas and Bolt agents with full secrets configuration
 - Configure ExternalSecrets for Atlas and Bolt agents
 - Add agents to MCP configuration (cto-config.json)
 - Create Kubernetes secrets in secret-store namespace
-- Verify secret sync to agent-platform namespace
+- Verify secret sync to cto namespace
 
 Agents:
 - Atlas (2225842): Integration & Merge Specialist
@@ -207,20 +207,20 @@ Run these anytime to verify everything is working:
 
 ```bash
 # Check ExternalSecrets status
-kubectl get externalsecrets -n agent-platform | grep -E 'atlas|bolt'
+kubectl get externalsecrets -n cto | grep -E 'atlas|bolt'
 
 # Check secrets exist
-kubectl get secrets -n agent-platform | grep -E 'atlas|bolt'
+kubectl get secrets -n cto | grep -E 'atlas|bolt'
 
 # Verify Atlas secret data
-kubectl get secret github-app-atlas -n agent-platform -o jsonpath='{.data}' | jq
+kubectl get secret github-app-atlas -n cto -o jsonpath='{.data}' | jq
 
 # Verify Bolt secret data  
-kubectl get secret github-app-bolt -n agent-platform -o jsonpath='{.data}' | jq
+kubectl get secret github-app-bolt -n cto -o jsonpath='{.data}' | jq
 
 # Decode and check App IDs
-kubectl get secret github-app-atlas -n agent-platform -o jsonpath='{.data.app-id}' | base64 -d
-kubectl get secret github-app-bolt -n agent-platform -o jsonpath='{.data.app-id}' | base64 -d
+kubectl get secret github-app-atlas -n cto -o jsonpath='{.data.app-id}' | base64 -d
+kubectl get secret github-app-bolt -n cto -o jsonpath='{.data.app-id}' | base64 -d
 ```
 
 ---
@@ -232,7 +232,7 @@ kubectl get secret github-app-bolt -n agent-platform -o jsonpath='{.data.app-id}
 - [x] App IDs and Client IDs in values.yaml
 - [x] Secrets created in secret-store namespace
 - [x] ExternalSecrets configured and syncing
-- [x] Secrets available in agent-platform namespace
+- [x] Secrets available in cto namespace
 - [x] MCP configuration updated
 - [x] All secrets verified and working
 

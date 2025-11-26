@@ -43,12 +43,12 @@ e2e-status:
 	@echo "📊 E2E Environment Status"
 	@echo "========================="
 	@echo ""
-	@echo "Kubernetes Resources (agent-platform namespace):"
+	@echo "Kubernetes Resources (cto namespace):"
 	@echo "-------------------------------------------------"
-	@echo "Workflows: $$(kubectl get workflows -n agent-platform --no-headers 2>/dev/null | wc -l || echo 0)"
-	@echo "Pods: $$(kubectl get pods -n agent-platform --no-headers 2>/dev/null | wc -l || echo 0)"
-	@echo "ConfigMaps (test): $$(kubectl get cm -n agent-platform --no-headers 2>/dev/null | grep -E 'play-|test-|coderun-|docsrun-' | wc -l || echo 0)"
-	@echo "PVCs (test): $$(kubectl get pvc -n agent-platform --no-headers 2>/dev/null | grep -E 'workspace-play-|workspace-test-' | wc -l || echo 0)"
+	@echo "Workflows: $$(kubectl get workflows -n cto --no-headers 2>/dev/null | wc -l || echo 0)"
+	@echo "Pods: $$(kubectl get pods -n cto --no-headers 2>/dev/null | wc -l || echo 0)"
+	@echo "ConfigMaps (test): $$(kubectl get cm -n cto --no-headers 2>/dev/null | grep -E 'play-|test-|coderun-|docsrun-' | wc -l || echo 0)"
+	@echo "PVCs (test): $$(kubectl get pvc -n cto --no-headers 2>/dev/null | grep -E 'workspace-play-|workspace-test-' | wc -l || echo 0)"
 	@echo ""
 	@echo "GitHub Repository:"
 	@echo "-----------------"
@@ -75,7 +75,7 @@ e2e-test: e2e-reset
 # Watch E2E logs
 e2e-logs:
 	@echo "📜 Following E2E Workflow Logs..."
-	kubectl logs -f -l workflow -n agent-platform
+	kubectl logs -f -l workflow -n cto
 
 # Help for E2E commands
 e2e-help:

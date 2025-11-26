@@ -31,7 +31,7 @@ spec:
               kind: CodeRun
               metadata:
                 generateName: coderun-bolt-monitor-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   agent: bolt
                   mode: monitor

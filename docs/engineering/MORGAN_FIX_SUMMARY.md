@@ -161,13 +161,13 @@ gh pr create --fill
 argocd app sync controller
 
 # 5. Delete ConfigMap to force reload
-kubectl delete configmap -n agent-platform agent-templates-pm
+kubectl delete configmap -n cto agent-templates-pm
 
 # 6. Trigger test workflow
 # (Morgan will auto-restart with new ConfigMap)
 
 # 7. Watch Morgan logs
-kubectl logs -n agent-platform -l agent=morgan -f
+kubectl logs -n cto -l agent=morgan -f
 ```
 
 ---

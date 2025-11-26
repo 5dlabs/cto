@@ -193,13 +193,13 @@ kubectl apply -f infra/gitops/applications/atlas-pr-guardian-sensor.yaml
 
 ```bash
 # List active Atlas guardians
-kubectl get coderuns -n agent-platform -l agent=atlas,role=pr-guardian
+kubectl get coderuns -n cto -l agent=atlas,role=pr-guardian
 
 # View specific guardian
-kubectl get coderun <coderun-name> -n agent-platform -o yaml
+kubectl get coderun <coderun-name> -n cto -o yaml
 
 # Check logs
-kubectl logs -n agent-platform <pod-name>
+kubectl logs -n cto <pod-name>
 ```
 
 **GitHub PR Comments**:
@@ -314,7 +314,7 @@ kubectl logs -n argo -l eventsource-name=github
 **Check Atlas logs**:
 
 ```bash
-kubectl logs -n agent-platform <atlas-coderun-pod>
+kubectl logs -n cto <atlas-coderun-pod>
 ```
 
 **Check GitHub App permissions**:
@@ -333,7 +333,7 @@ kubectl logs -n agent-platform <atlas-coderun-pod>
 
 ```bash
 # Delete stuck CodeRun
-kubectl delete coderun <coderun-name> -n agent-platform
+kubectl delete coderun <coderun-name> -n cto
 
 # Fix issue manually
 # Push new commit to trigger fresh Atlas activation
@@ -411,7 +411,7 @@ Build Grafana dashboard showing:
 For issues or questions:
 
 - Check sensor logs: `kubectl logs -n argo -l sensor-name=atlas-pr-guardian`
-- Check CodeRun logs: `kubectl logs -n agent-platform <atlas-pod>`
+- Check CodeRun logs: `kubectl logs -n cto <atlas-pod>`
 - Review PR comments from Atlas
 - Contact platform team
 

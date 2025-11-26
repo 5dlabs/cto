@@ -196,7 +196,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = kube::Client::try_default().await?;
     info!("Connected to Kubernetes cluster");
 
-    let namespace = "agent-platform".to_string();
+    let namespace = "cto".to_string();
     let controller_config = Arc::new(load_controller_config());
 
     // Verify required ConfigMaps exist before starting controller

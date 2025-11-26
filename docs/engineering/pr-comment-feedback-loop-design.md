@@ -179,7 +179,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: rex-feedback-
-                namespace: agent-platform
+                namespace: cto
               spec:
                 entrypoint: handle-feedback
                 templates:
@@ -207,7 +207,7 @@ spec:
                         fi
 
                         # Extract task ID from PR labels or branch
-                        TASK_ID=$(kubectl get workflows -n agent-platform \
+                        TASK_ID=$(kubectl get workflows -n cto \
 
 
                           -l pr-number=$PR_NUMBER \
@@ -216,7 +216,7 @@ spec:
                           -o jsonpath='{.items[0].metadata.labels.task-id}')
 
                         # Cancel any running Cleo/Tess for this task
-                        kubectl get coderuns -n agent-platform \
+                        kubectl get coderuns -n cto \
 
 
                           -l task-id=$TASK_ID \
@@ -225,7 +225,7 @@ spec:
                           -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.agent-type}{"\n"}{end}' | \
                         while read coderun agent; do
                           if [[ "$agent" == "cleo" || "$agent" == "tess" ]]; then
-                            kubectl patch coderun $coderun -n agent-platform \
+                            kubectl patch coderun $coderun -n cto \
                               --type=merge -p '{"spec":{"suspend":true}}'
                           fi
                         done
@@ -236,7 +236,7 @@ spec:
                         kind: CodeRun
                         metadata:
                           generateName: coderun-rex-feedback-
-                          namespace: agent-platform
+                          namespace: cto
                           labels:
                             task-id: "$TASK_ID"
                             workflow-stage: "remediation"

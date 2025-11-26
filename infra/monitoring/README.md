@@ -58,7 +58,7 @@ kubectl patch application otel-collector -n argocd --type=json \
 
 4. Query logs using LogsQL:
    ```
-   {namespace="agent-platform"} | json
+   {namespace="cto"} | json
    ```
 
 ## Testing Log Flow
@@ -82,7 +82,7 @@ curl 'http://localhost:9428/select/logsql/query' -d 'query={namespace=~".*"}' -d
 To view logs from CLI containers (agents) in Grafana, use queries like:
 
 ```
-{namespace="agent-platform", container=~".*-cli"} | json
+{namespace="cto", container=~".*-cli"} | json
 {pod=~".*cleo.*"} | json
 {pod=~".*atlas.*"} | json
 {pod=~".*cipher.*"} | json

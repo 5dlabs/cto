@@ -24,7 +24,7 @@ co-exists with the ARC runners on the same node.
 ## Workspace PVC cleanup
 
 - **Path:** `infra/workspace-maintenance/workspace-cleaner.yaml`
-- **Namespace:** `agent-platform`
+- **Namespace:** `cto`
 - **Schedule:** Hourly at `:15`
 - **What it does:** Lists PVCs with the `workspace-type=shared` label,
   skips any that are still mounted by running pods, and deletes the rest

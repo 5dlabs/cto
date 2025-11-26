@@ -93,7 +93,7 @@ After granting the permission, restart the Morgan PM pod or trigger a new workfl
 
 ```bash
 # Delete Morgan pod to force restart with new permissions
-kubectl delete pod -n agent-platform -l agent=morgan
+kubectl delete pod -n cto -l agent=morgan
 
 # Or trigger a new play workflow
 task-master-play --task-id 1

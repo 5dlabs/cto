@@ -452,7 +452,7 @@ impl CredentialManager {
         let secret = Secret {
             metadata: ObjectMeta {
                 name: Some(format!("github-app-{}", app.slug)),
-                namespace: Some("agent-platform".to_string()),
+                namespace: Some("cto".to_string()),
                 labels: Some(BTreeMap::from([
                     ("app".to_string(), "cto".to_string()),
                     ("component".to_string(), "github-app".to_string()),
@@ -471,7 +471,7 @@ impl CredentialManager {
             ..Default::default()
         };
         
-        let api: Api<Secret> = Api::namespaced(self.kube_client.clone(), "agent-platform");
+        let api: Api<Secret> = Api::namespaced(self.kube_client.clone(), "cto");
         api.create(&PostParams::default(), &secret).await?;
         
         Ok(())

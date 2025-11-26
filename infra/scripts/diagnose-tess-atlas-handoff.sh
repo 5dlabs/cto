@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Find stuck workflows
 echo "🔍 Checking for stuck workflows..."
-STUCK_WORKFLOWS=$(kubectl get workflows -n agent-platform \
+STUCK_WORKFLOWS=$(kubectl get workflows -n cto \
   -l current-stage=waiting-atlas-integration \
   --field-selector status.phase=Running \
   -o json 2>/dev/null | jq -r '.items[] | select((now - (.status.startedAt | fromdateiso8601)) > 1800) | .metadata.name' || true)
@@ -29,14 +29,14 @@ fi
 
 echo ""
 echo "📊 Workflow Stage Distribution:"
-kubectl get workflows -n agent-platform \
+kubectl get workflows -n cto \
   --field-selector status.phase=Running \
   -o custom-columns=NAME:.metadata.name,STAGE:.metadata.labels.current-stage,AGE:.status.startedAt \
   2>/dev/null || echo "No running workflows"
 
 echo ""
 echo "🧪 Recent Tess CodeRuns:"
-kubectl get coderuns -n agent-platform \
+kubectl get coderuns -n cto \
   -l stage=testing \
   --sort-by=.metadata.creationTimestamp \
   -o custom-columns=NAME:.metadata.name,TASK:.metadata.labels.task-id,STATUS:.status.phase,AGE:.metadata.creationTimestamp \
@@ -81,9 +81,9 @@ if [ $# -gt 0 ]; then
   echo "=== Detailed Analysis for Workflow: $WORKFLOW_NAME ==="
   
   # Get workflow details
-  TASK_ID=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform -o jsonpath='{.metadata.labels.task-id}' 2>/dev/null || echo "unknown")
-  REPO=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform -o jsonpath='{.metadata.labels.repository}' 2>/dev/null | tr '-' '/')
-  CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "unknown")
+  TASK_ID=$(kubectl get workflow "$WORKFLOW_NAME" -n cto -o jsonpath='{.metadata.labels.task-id}' 2>/dev/null || echo "unknown")
+  REPO=$(kubectl get workflow "$WORKFLOW_NAME" -n cto -o jsonpath='{.metadata.labels.repository}' 2>/dev/null | tr '-' '/')
+  CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n cto -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "unknown")
   
   echo "Task ID: $TASK_ID"
   echo "Repository: $REPO"
@@ -92,7 +92,7 @@ if [ $# -gt 0 ]; then
   # Check for suspended nodes
   echo ""
   echo "Suspended Nodes:"
-  kubectl get workflow "$WORKFLOW_NAME" -n agent-platform -o json | \
+  kubectl get workflow "$WORKFLOW_NAME" -n cto -o json | \
     jq -r '.status.nodes | to_entries[] | select(.value.type == "Suspend" and .value.phase == "Running") | "  - \(.value.displayName) (ID: \(.key))"' || echo "  None"
   
   # Find associated PR
@@ -124,7 +124,7 @@ if [ $# -gt 0 ]; then
     echo "  1. Check if Tess submitted PR review: gh pr view <PR#> --repo $REPO --json reviews"
     echo "  2. Check if 'approved' label exists: gh pr view <PR#> --repo $REPO --json labels"
     echo "  3. Resume manually if needed:"
-    echo "     kubectl patch workflow $WORKFLOW_NAME -n agent-platform --type='json' -p='[{\"op\":\"replace\",\"path\":\"/spec/suspend\",\"value\":null}]'"
+    echo "     kubectl patch workflow $WORKFLOW_NAME -n cto --type='json' -p='[{\"op\":\"replace\",\"path\":\"/spec/suspend\",\"value\":null}]'"
   fi
 fi
 
