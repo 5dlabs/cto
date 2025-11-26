@@ -343,7 +343,7 @@ spec:
 
 Migrate in order:
 
-1. Low-risk: tools, doc-server
+1. Low-risk: tools
 1. Medium-risk: ngrok, cloudflare, GHCR
 1. Higher-risk: GitHub Apps, API keys
 1. Last: ARC runner secrets

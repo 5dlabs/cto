@@ -24,7 +24,6 @@ Kubernetes Secret (target namespace)
   - `api-keys.yaml` - API keys for agent platform
   - `github-apps.yaml` - GitHub App credentials for all agents
   - `infrastructure.yaml` - Infrastructure secrets (Cloudflare, NGrok, GitHub PAT, etc.)
-  - `doc-server.yaml` - Documentation server configuration
   - `ghcr.yaml` - GitHub Container Registry credentials
   - `tools.yaml` - Tools service secrets
 
@@ -78,12 +77,6 @@ Create one secret per agent at `secret/github-app-<name>`:
 |------|------|
 | `secret/argocd-repo-charts` | `type` (git), `url`, `username` (oauth2), `password` |
 | `secret/argocd-repo-cto` | `type` (git), `url`, `username` (oauth2), `password` |
-
-### Doc Server Configuration
-
-| Path | Keys |
-|------|------|
-| `secret/doc-server-config` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `VECTOR_DATABASE_URL`, `DATABASE_URL` |
 
 ### GHCR (Docker Registry)
 

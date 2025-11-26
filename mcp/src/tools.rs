@@ -11,8 +11,7 @@ pub fn get_tool_schemas() -> Value {
             get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_input_schema(),
-            get_docs_ingest_schema()
+            get_input_schema()
         ]
     })
 }
@@ -27,8 +26,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_input_schema(),
-            get_docs_ingest_schema()
+            get_input_schema()
         ]
     })
 }
@@ -269,31 +267,6 @@ fn get_input_schema() -> Value {
                 "user": {"type": "string", "description": "Optional user label (agents.platform/user) to route to active job"}
             },
             "required": ["text"]
-        }
-    })
-}
-
-fn get_docs_ingest_schema() -> Value {
-    json!({
-        "name": "docs_ingest",
-        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.docs_ingest.model)",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "repository_url": {
-                    "type": "string",
-                    "description": "GitHub repository URL to analyze and ingest (e.g., https://github.com/cilium/cilium)"
-                },
-                "doc_type": {
-                    "type": "string",
-                    "description": "Documentation type/category for storage (e.g., cilium, solana, rust, ethereum, jupiter, meteora, raydium, ebpf, rust_best_practices, birdeye, talos)"
-                },
-                "doc_server_url": {
-                    "type": "string",
-                    "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80 - accessible via Kilo VPN)"
-                }
-            },
-            "required": ["repository_url", "doc_type"]
         }
     })
 }
