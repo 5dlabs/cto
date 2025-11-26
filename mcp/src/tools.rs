@@ -303,4 +303,3 @@ fn get_add_docs_schema() -> Value {
         }
     })
 }
-

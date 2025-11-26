@@ -22,7 +22,9 @@ impl DocType {
         match s.to_lowercase().as_str() {
             "repo" => Ok(Self::Repo),
             "scrape" => Ok(Self::Scrape),
-            _ => Err(anyhow!("Invalid doc type: '{s}'. Must be 'repo' or 'scrape'")),
+            _ => Err(anyhow!(
+                "Invalid doc type: '{s}'. Must be 'repo' or 'scrape'"
+            )),
         }
     }
 }
@@ -227,7 +229,9 @@ pub fn handle_add_docs(
     if !crawl_resp.success {
         return Err(anyhow!(
             "Firecrawl crawl failed: {}",
-            crawl_resp.error.unwrap_or_else(|| "Unknown error".to_string())
+            crawl_resp
+                .error
+                .unwrap_or_else(|| "Unknown error".to_string())
         ));
     }
 

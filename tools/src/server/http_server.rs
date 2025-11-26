@@ -1584,16 +1584,16 @@ impl BridgeState {
                             (message_url, session_id)
                         } else {
                             // Not SSE, use original direct HTTP approach
-                            (url.to_string(), String::new())
+                            (url.to_owned(), String::new())
                         }
                     } else {
                         // Failed to GET, try original direct HTTP approach
-                        (url.to_string(), String::new())
+                        (url.to_owned(), String::new())
                     }
                 } else {
                     // URL doesn't end with /sse, use direct HTTP approach
                     tracing::info!("🔗 [{}] Using direct HTTP approach", server_name);
-                    (url.to_string(), String::new())
+                    (url.to_owned(), String::new())
                 };
 
                 tracing::info!("🎯 [{}] Final message_url: {}", server_name, message_url);
