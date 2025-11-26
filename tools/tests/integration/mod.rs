@@ -18,7 +18,6 @@
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
 #![allow(clippy::redundant_else)]
-#![allow(clippy::uninlined_format_args)]
 
 pub mod common;
 pub mod http_transport_tests;
