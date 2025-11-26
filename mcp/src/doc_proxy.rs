@@ -203,7 +203,7 @@ pub fn process_repo_url(url: &str) -> String {
     }
 }
 
-/// Handle the add_docs tool call
+/// Handle the `add_docs` tool call
 pub fn handle_add_docs(
     url: &str,
     doc_type: DocType,
