@@ -52,7 +52,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
+      # Note: allowEmpty defaults to false, not specified to avoid OutOfSync
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
