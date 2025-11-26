@@ -1,0 +1,385 @@
+{
+  "version": "1.0",
+  "defaults": {
+    "docs": {
+      "model": "claude-opus-4-5-20251101",
+      "githubApp": "5DLabs-Morgan",
+      "includeCodebase": false,
+      "sourceBranch": "main"
+    },
+    "code": {
+      "model": "gpt-4o",
+      "githubApp": "5DLabs-Rex",
+      "continueSession": false,
+      "workingDirectory": ".",
+      "overwriteMemory": false,
+      "repository": "5dlabs/cto-parallel-test",
+      "docsRepository": "5dlabs/cto-parallel-test",
+      "docsProjectDirectory": "docs",
+      "service": "cto-parallel-test",
+      "cli": "codex",
+      "maxRetries": 10
+    },
+    "intake": {
+      "githubApp": "5DLabs-Morgan",
+      "primary": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "research": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "fallback": {
+        "model": "gpt-5",
+        "provider": "openai"
+      }
+    },
+    "play": {
+      "model": "claude-opus-4-5-20251101",
+      "cli": "factory",
+      "implementationAgent": "5DLabs-Rex",
+      "frontendAgent": "5DLabs-Blaze",
+      "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
+      "testingAgent": "5DLabs-Tess",
+      "repository": "5dlabs/cto-parallel-test",
+      "service": "cto-parallel-test",
+      "docsRepository": "5dlabs/cto-parallel-test",
+      "docsProjectDirectory": "docs",
+      "workingDirectory": ".",
+      "maxRetries": 10,
+      "implementationMaxRetries": 10,
+      "frontendMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "securityMaxRetries": 2,
+      "testingMaxRetries": 5,
+      "autoMerge": true,
+      "parallelExecution": true
+    },
+    "docs_ingest": {
+      "model": "claude-opus-4-5-20251101",
+      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
+    }
+  },
+  "agents": {
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "maxTokens": 8192,
+      "temperature": 0.8,
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_search_issues",
+          "github_create_issue",
+          "github_get_issue",
+          "github_list_issues",
+          "github_update_issue",
+          "github_add_issue_comment",
+          "github_search_repositories"
+        ],
+        "localServers": {}
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "claude-opus-4-5-20251101",
+      "maxTokens": 64000,
+      "temperature": 0.7,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101",
+          "gpt-5.1-codex",
+          "gpt-5.1",
+          "gemini-3-pro-preview",
+          "glm-4.6"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents",
+          "github_create_or_update_file",
+          "github_list_commits"
+        ],
+        "localServers": {
+          "openmemory": {
+            "enabled": true,
+            "url": "http://openmemory.agent-platform.svc.cluster.local:8080/mcp",
+            "tools": [
+              "openmemory_query",
+              "openmemory_store",
+              "openmemory_list",
+              "openmemory_get",
+              "openmemory_reinforce"
+            ]
+          }
+        }
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "maxTokens": 2048,
+      "temperature": 0.3,
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_get_pull_request",
+          "github_get_pull_request_files",
+          "github_get_pull_request_comments",
+          "github_add_pull_request_review_comment",
+          "github_create_pull_request_review",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "maxTokens": 4096,
+      "temperature": 0.7,
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "kubernetes_listResources",
+          "kubernetes_getResource",
+          "kubernetes_describeResource",
+          "kubernetes_createResource",
+          "kubernetes_getEvents",
+          "kubernetes_getPodsLogs",
+          "kubernetes_getPodMetrics",
+          "kubernetes_getNodeMetrics",
+          "kubernetes_getAPIResources",
+          "kubernetes_helmList",
+          "kubernetes_helmGet",
+          "kubernetes_helmHistory",
+          "kubernetes_helmInstall",
+          "kubernetes_helmUpgrade",
+          "kubernetes_helmRollback",
+          "kubernetes_helmUninstall",
+          "kubernetes_helmRepoAdd",
+          "kubernetes_helmRepoList",
+          "github_get_pull_request",
+          "github_get_pull_request_files",
+          "github_create_pull_request_review",
+          "github_get_pull_request_status"
+        ],
+        "localServers": {}
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "cli": "factory",
+      "model": "claude-opus-4-5-20251101",
+      "maxTokens": 64000,
+      "temperature": 0.6,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101",
+          "gpt-5.1-codex",
+          "gpt-5.1",
+          "gemini-3-pro-preview",
+          "glm-4.6"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "shadcn_list_components",
+          "shadcn_get_component",
+          "shadcn_get_component_demo",
+          "shadcn_get_component_metadata",
+          "shadcn_list_blocks",
+          "shadcn_get_block",
+          "shadcn_get_directory_structure",
+          "ai_elements_get_ai_elements_components",
+          "ai_elements_get_ai_elements_component",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "cipher": {
+      "githubApp": "5DLabs-Cipher",
+      "cli": "cursor",
+      "model": "opus-4.5",
+      "maxTokens": 200000,
+      "temperature": 0.6,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "opus-4.5",
+          "opus-4.5-thinking",
+          "sonnet-4.5",
+          "sonnet-4.5-thinking",
+          "gemini-3-pro",
+          "gpt-5.1",
+          "gpt-5.1-codex",
+          "grok",
+          "auto"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_list_code_scanning_alerts",
+          "github_get_code_scanning_alert",
+          "github_list_secret_scanning_alerts",
+          "github_get_secret_scanning_alert",
+          "github_get_pull_request",
+          "github_create_pull_request_review"
+        ],
+        "localServers": {}
+      }
+    },
+    "atlas": {
+      "githubApp": "5DLabs-Atlas",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "modelRotation": {
+        "enabled": false,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_issue",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_search_repositories",
+          "github_create_repository",
+          "github_get_file_contents",
+          "github_create_or_update_file",
+          "github_search_code",
+          "github_create_branch",
+          "github_list_commits"
+        ],
+        "localServers": {}
+      }
+    },
+    "bolt": {
+      "githubApp": "5DLabs-Bolt",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "kubernetes_listResources",
+          "kubernetes_getResource",
+          "kubernetes_describeResource",
+          "kubernetes_createResource",
+          "kubernetes_getEvents",
+          "kubernetes_getPodsLogs",
+          "kubernetes_getPodMetrics",
+          "kubernetes_getNodeMetrics",
+          "kubernetes_getAPIResources",
+          "kubernetes_helmList",
+          "kubernetes_helmGet",
+          "kubernetes_helmHistory",
+          "kubernetes_helmInstall",
+          "kubernetes_helmUpgrade",
+          "kubernetes_helmRollback",
+          "kubernetes_helmUninstall",
+          "kubernetes_helmRepoAdd",
+          "kubernetes_helmRepoList",
+          "github_get_pull_request",
+          "github_get_pull_request_status",
+          "github_merge_pull_request",
+          "github_update_pull_request",
+          "github_list_pull_requests"
+        ],
+        "localServers": {}
+      }
+    }
+  }
+}
