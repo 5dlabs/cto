@@ -299,7 +299,7 @@ jobs:
   # Create GitHub Release
   release:
     needs: [plan, build-binaries, build-global, build-docker]
-    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' && needs.build-global.result == 'success' }}
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' && needs.build-global.result == 'success' && needs.build-docker.result == 'success' }}
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
