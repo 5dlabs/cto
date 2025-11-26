@@ -1940,7 +1940,7 @@ spec:
             fi
 
             # Mobile/React Native detection - check first before generic frontend
-            if echo "$TASK_CONTENT" | grep -qiE "(react.native|react-native|expo|mobile.app|ios.app|android.app|nativewind|react.navigation|expo.router)"; then
+            if echo "$TASK_CONTENT" | grep -qiE "(react[- .]native|expo|mobile[- .]app|ios[- .]app|android[- .]app|nativewind|react[- .]navigation|expo[- .]router)"; then
               echo "🔍 Auto-detected MOBILE task (React Native/Expo keywords matched)"
               AGENT_TYPE="mobile"
             # Enhanced frontend detection - check for Material-UI to catch misrouted tasks
