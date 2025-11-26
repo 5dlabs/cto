@@ -14,7 +14,7 @@
 # Note that the GitHub Release will be created with a generated
 # title/body based on your changelogs.
 
-name: Release
+name: Release (MCP, Tools, Controller)
 permissions:
   "contents": "write"
   "packages": "write"
@@ -254,6 +254,14 @@ jobs:
           cargo build --release --bin agent-controller
           cp target/release/agent-controller controller
 
+      - name: Build tools-server for Docker
+        run: |
+          echo "🔨 Building tools-server for Docker image..."
+          cargo build --release -p tools --bin tools-server
+          # Copy binary to infra/images/tools for Docker build
+          cp target/release/tools-server infra/images/tools/tools-server-linux
+          chmod +x infra/images/tools/tools-server-linux
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
@@ -294,6 +302,21 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
+      - name: Build and push Tools image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./infra/images/tools
+          file: ./infra/images/tools/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
       - name: Generate Docker image summary
         run: |
           echo "## 🐳 Docker Images Built" >> $GITHUB_STEP_SUMMARY
@@ -302,14 +325,16 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🚀 **Usage**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "# Pull and run the controller" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "# Or use in Helm chart" >> $GITHUB_STEP_SUMMARY
-          echo "helm upgrade controller 5dlabs/controller --set image.tag=${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull and run tools" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   # Determines if we should publish/announce
@@ -383,17 +408,15 @@ jobs:
           echo "" >> $RUNNER_TEMP/notes.txt
           echo "## 🐳 Docker Images" >> $RUNNER_TEMP/notes.txt
           echo "" >> $RUNNER_TEMP/notes.txt
-          echo "This release includes Docker images for the controller service:" >> $RUNNER_TEMP/notes.txt
+          echo "This release includes Docker images:" >> $RUNNER_TEMP/notes.txt
           echo "" >> $RUNNER_TEMP/notes.txt
           echo '```bash' >> $RUNNER_TEMP/notes.txt
-          echo "# Pull the latest controller image" >> $RUNNER_TEMP/notes.txt
           VERSION_CLEAN=${VERSION#v}
+          echo "# Pull the controller image" >> $RUNNER_TEMP/notes.txt
           echo "docker pull ghcr.io/5dlabs/controller:${VERSION_CLEAN}" >> $RUNNER_TEMP/notes.txt
           echo "" >> $RUNNER_TEMP/notes.txt
-          echo "# Use in Helm deployments" >> $RUNNER_TEMP/notes.txt
-          echo "helm upgrade controller 5dlabs/controller \\" >> $RUNNER_TEMP/notes.txt
-          echo "  --set image.repository=ghcr.io/5dlabs/controller \\" >> $RUNNER_TEMP/notes.txt
-          echo "  --set image.tag=${VERSION_CLEAN}" >> $RUNNER_TEMP/notes.txt
+          echo "# Pull the tools (MCP server) image" >> $RUNNER_TEMP/notes.txt
+          echo "docker pull ghcr.io/5dlabs/tools:${VERSION_CLEAN}" >> $RUNNER_TEMP/notes.txt
           echo '```' >> $RUNNER_TEMP/notes.txt
 
           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
