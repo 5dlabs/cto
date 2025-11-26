@@ -1149,6 +1149,11 @@ enum WatchMessage {
         labels: Option<std::collections::HashMap<String, String>>,
         message: Option<String>,
     },
+    GitHub {
+        task_id: String,
+        repository: String,
+        pull_request: Option<PullRequestState>,
+    },
     Error {
         resource_type: ResourceType,
         error: String,
@@ -1497,18 +1502,25 @@ async fn run_multi_watch(
                 })?;
 
                 // Check for workflow completion/failure
+                // NOTE: Only workflow state changes affect the consecutive_failures counter
                 if resource_type == ResourceType::Workflow {
                     if let Some(ref p) = phase {
                         if p != &last_workflow_phase {
                             last_workflow_phase.clone_from(p);
 
                             if p == "Succeeded" {
+                                // Reset failure counter on workflow success
+                                consecutive_failures = 0;
                                 emitter.emit(&LoopEvent::Completed {
                                     play_id: name.clone(),
                                     duration_seconds: 0, // TODO: calculate from timestamps
                                     timestamp: Utc::now(),
                                 })?;
                                 workflow_completed = true;
+                            } else if p == "Running" {
+                                // Reset failure counter when workflow is running again
+                                // (e.g., after a retry)
+                                consecutive_failures = 0;
                             } else if p == "Failed" || p == "Error" {
                                 consecutive_failures += 1;
 
@@ -1588,12 +1600,23 @@ async fn run_multi_watch(
                     }
                 }
 
-                // Reset failure counter on successful progress
-                if let Some(ref p) = phase {
-                    if p == "Running" || p == "Succeeded" {
-                        consecutive_failures = 0;
-                    }
-                }
+                // NOTE: Pod/CRD failures are informational but don't affect the
+                // consecutive_failures counter - only workflow state changes do.
+                // This prevents premature counter resets when intermediate resources
+                // transition to Running/Succeeded while the workflow may still fail.
+            }
+            WatchMessage::GitHub {
+                task_id: gh_task_id,
+                repository,
+                pull_request,
+            } => {
+                // Emit GitHub event
+                emitter.emit(&LoopEvent::Github {
+                    task_id: gh_task_id,
+                    repository,
+                    pull_request,
+                    timestamp: Utc::now(),
+                })?;
             }
             WatchMessage::Error {
                 resource_type,
@@ -1624,12 +1647,12 @@ async fn run_multi_watch(
     Ok(())
 }
 
-/// Poll GitHub for PR state
+/// Poll GitHub for PR state and send events through the channel
 async fn poll_github_state(
     task_id: &str,
     repository: Option<&str>,
     interval: u64,
-    _tx: mpsc::Sender<WatchMessage>,
+    tx: mpsc::Sender<WatchMessage>,
 ) {
     let Some(repo) = repository else {
         return;
@@ -1641,15 +1664,31 @@ async fn poll_github_state(
         // Use gh CLI to get PR state
         let pr_state = get_github_pr_state(repo, task_id).await;
 
-        // We can't easily send GitHub events through the WatchMessage channel
-        // since it's designed for k8s resources. Instead, we could use a separate
-        // channel or emit directly. For now, we'll just log.
-        // TODO: Emit GitHub events through a separate mechanism
-        if let Ok(Some(state)) = pr_state {
-            debug!(
-                "GitHub PR #{} state: {} (mergeable: {:?})",
-                state.number, state.state, state.mergeable
-            );
+        match pr_state {
+            Ok(state) => {
+                // Send GitHub event through the channel
+                let msg = WatchMessage::GitHub {
+                    task_id: task_id.to_string(),
+                    repository: repo.to_string(),
+                    pull_request: state.clone(),
+                };
+
+                if tx.send(msg).await.is_err() {
+                    // Channel closed, exit the polling loop
+                    debug!("GitHub polling channel closed, stopping");
+                    break;
+                }
+
+                if let Some(ref pr) = state {
+                    debug!(
+                        "GitHub PR #{} state: {} (mergeable: {:?})",
+                        pr.number, pr.state, pr.mergeable
+                    );
+                }
+            }
+            Err(e) => {
+                warn!("Failed to get GitHub PR state: {}", e);
+            }
         }
     }
 }
