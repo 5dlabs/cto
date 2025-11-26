@@ -36,6 +36,9 @@ spec:
           "frontend-agent": "{{`{{workflow.parameters.frontend-agent}}`}}",
           "frontend-cli": "{{`{{workflow.parameters.frontend-cli}}`}}",
           "frontend-model": "{{`{{workflow.parameters.frontend-model}}`}}",
+          "mobile-agent": "{{`{{workflow.parameters.mobile-agent}}`}}",
+          "mobile-cli": "{{`{{workflow.parameters.mobile-cli}}`}}",
+          "mobile-model": "{{`{{workflow.parameters.mobile-model}}`}}",
           "quality-agent": "{{`{{workflow.parameters.quality-agent}}`}}",
           "quality-cli": "{{`{{workflow.parameters.quality-cli}}`}}",
           "quality-model": "{{`{{workflow.parameters.quality-model}}`}}",
@@ -52,6 +55,7 @@ spec:
           "working-directory": "{{`{{workflow.parameters.working-directory}}`}}",
           "implementation-max-retries": "{{`{{workflow.parameters.implementation-max-retries}}`}}",
           "frontend-max-retries": "{{`{{workflow.parameters.frontend-max-retries}}`}}",
+          "mobile-max-retries": "{{`{{workflow.parameters.mobile-max-retries}}`}}",
           "quality-max-retries": "{{`{{workflow.parameters.quality-max-retries}}`}}",
           "security-max-retries": "{{`{{workflow.parameters.security-max-retries}}`}}",
           "testing-max-retries": "{{`{{workflow.parameters.testing-max-retries}}`}}",
@@ -72,6 +76,9 @@ spec:
       - name: frontend-agent
         description: "Agent to use for frontend work (e.g., 5DLabs-Blaze)"
         value: ""  # Must be provided by MCP client
+      - name: mobile-agent
+        description: "Agent to use for mobile/React Native work (e.g., 5DLabs-Spark)"
+        value: ""  # Optional - if empty, falls back to frontend-agent
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
         value: ""  # Must be provided by MCP client
@@ -133,6 +140,12 @@ spec:
       - name: frontend-model
         description: "Model to use for frontend agent"
         value: ""  # Must be provided by MCP client
+      - name: mobile-cli
+        description: "CLI to use for mobile agent (e.g., codex, claude)"
+        value: ""  # Optional - if empty, falls back to frontend-cli
+      - name: mobile-model
+        description: "Model to use for mobile agent"
+        value: ""  # Optional - if empty, falls back to frontend-model
 
       # Agent tool configurations (JSON strings from client-side config)
       - name: implementation-tools
@@ -150,6 +163,9 @@ spec:
       - name: frontend-tools
         description: "JSON string of tools config for frontend agent"
         value: "{}"  # Defaults to empty, populated by MCP client
+      - name: mobile-tools
+        description: "JSON string of tools config for mobile agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
 
       # Model rotation configurations (JSON arrays of model names)
       - name: implementation-model-rotation
@@ -166,6 +182,9 @@ spec:
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
       - name: frontend-model-rotation
         description: "JSON array of model names for frontend agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: mobile-model-rotation
+        description: "JSON array of model names for mobile agent retry rotation"
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
 
       # PR context (populated by suspend/resume)
@@ -211,6 +230,9 @@ spec:
         value: "10"
       - name: frontend-max-retries
         description: "Maximum retry attempts for frontend agent executions (0 = unlimited)"
+        value: "10"
+      - name: mobile-max-retries
+        description: "Maximum retry attempts for mobile agent executions (0 = unlimited)"
         value: "10"
       - name: auto-merge
         description: "Whether Tess should automatically merge PRs after approval (true/false)"
@@ -1917,8 +1939,12 @@ spec:
               TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
             fi
 
+            # Mobile/React Native detection - check first before generic frontend
+            if echo "$TASK_CONTENT" | grep -qiE "(react[- .]native|expo|mobile[- .]app|ios[- .]app|android[- .]app|nativewind|react[- .]navigation|expo[- .]router)"; then
+              echo "🔍 Auto-detected MOBILE task (React Native/Expo keywords matched)"
+              AGENT_TYPE="mobile"
             # Enhanced frontend detection - check for Material-UI to catch misrouted tasks
-            if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|material-ui|mui|@mui)"; then
+            elif echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|material-ui|mui|@mui)"; then
               echo "🔍 Auto-detected frontend task (keywords matched)"
               echo "⚠️ WARNING: If Material-UI/MUI keywords detected, this MUST route to Blaze (frontend agent)"
               AGENT_TYPE="frontend"
@@ -1964,6 +1990,46 @@ spec:
 
           # Determine which agent to use based on agent type
           case "$AGENT_TYPE" in
+            "mobile"|"react-native"|"expo"|"ios"|"android")
+              echo "✅ Routing to MOBILE agent (Spark)"
+              MOBILE_AGENT="{{`{{workflow.parameters.mobile-agent}}`}}"
+
+              # Validate mobile-agent is not empty, fallback to frontend-agent
+              if [ -z "$MOBILE_AGENT" ] || [ "$MOBILE_AGENT" = "" ]; then
+                echo "⚠️ mobile-agent parameter is empty, falling back to frontend-agent"
+                MOBILE_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
+                if [ -z "$MOBILE_AGENT" ] || [ "$MOBILE_AGENT" = "" ]; then
+                  echo "❌ ERROR: Both mobile-agent and frontend-agent are empty!"
+                  echo "⚠️ Falling back to implementation-agent"
+                  echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
+                  echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
+                  echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
+                  echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
+                  echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+                else
+                  echo "$MOBILE_AGENT" > /tmp/github-app.txt
+                  echo "{{`{{workflow.parameters.frontend-cli}}`}}" > /tmp/cli-type.txt
+                  echo "{{`{{workflow.parameters.frontend-model}}`}}" > /tmp/model.txt
+                  echo "{{`{{workflow.parameters.frontend-model-rotation}}`}}" > /tmp/model-rotation.txt
+                  echo "{{`{{workflow.parameters.frontend-max-retries}}`}}" > /tmp/max-retries.txt
+                fi
+              else
+                echo "$MOBILE_AGENT" > /tmp/github-app.txt
+                MOBILE_CLI="{{`{{workflow.parameters.mobile-cli}}`}}"
+                MOBILE_MODEL="{{`{{workflow.parameters.mobile-model}}`}}"
+                # Fallback to frontend CLI/model if mobile-specific not set
+                if [ -z "$MOBILE_CLI" ] || [ "$MOBILE_CLI" = "" ]; then
+                  MOBILE_CLI="{{`{{workflow.parameters.frontend-cli}}`}}"
+                fi
+                if [ -z "$MOBILE_MODEL" ] || [ "$MOBILE_MODEL" = "" ]; then
+                  MOBILE_MODEL="{{`{{workflow.parameters.frontend-model}}`}}"
+                fi
+                echo "$MOBILE_CLI" > /tmp/cli-type.txt
+                echo "$MOBILE_MODEL" > /tmp/model.txt
+                echo "{{`{{workflow.parameters.mobile-model-rotation}}`}}" > /tmp/model-rotation.txt
+                echo "{{`{{workflow.parameters.mobile-max-retries}}`}}" > /tmp/max-retries.txt
+              fi
+              ;;
             "frontend"|"ui"|"react"|"nextjs")
               echo "✅ Routing to FRONTEND agent (Blaze)"
               FRONTEND_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
