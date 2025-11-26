@@ -339,14 +339,13 @@ impl CLIAdapter for FactoryCLIAdapter {
         if let Some(mcp_config) = &universal.mcp_config {
             for server in &mcp_config.servers {
                 if server.name.eq_ignore_ascii_case("tools") {
-                    tools_endpoint =
-                        server.env.get("TOOLS_SERVER_URL").cloned().or_else(|| {
-                            server
-                                .args
-                                .iter()
-                                .position(|arg| arg == "--url")
-                                .and_then(|idx| server.args.get(idx + 1).cloned())
-                        });
+                    tools_endpoint = server.env.get("TOOLS_SERVER_URL").cloned().or_else(|| {
+                        server
+                            .args
+                            .iter()
+                            .position(|arg| arg == "--url")
+                            .and_then(|idx| server.args.get(idx + 1).cloned())
+                    });
                 }
 
                 mcp_servers_json.insert(
