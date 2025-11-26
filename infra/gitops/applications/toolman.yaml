@@ -135,13 +135,6 @@ spec:
               args: ["-y", "@modelcontextprotocol/server-github"]
               workingDirectory: "/tmp"
 
-            agent-docs:
-              name: "Agent Docs"
-              description: "Agent documentation and knowledge base server"
-              transport: "http"
-              url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80/mcp"
-              workingDirectory: "/tmp"
-
             pg-aiguide:
               name: "pg-aiguide"
               description: "AI-optimized PostgreSQL expertise with semantic docs search and best practices"
