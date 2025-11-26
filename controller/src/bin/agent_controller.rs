@@ -80,6 +80,10 @@ async fn verify_required_configmaps(
             "controller-agent-templates-claude-code",
             "Claude code templates",
         ),
+        (
+            "controller-agent-templates-claude-docs",
+            "Claude docs templates",
+        ),
         ("controller-agent-templates-codex", "Codex agent templates"),
         (
             "controller-agent-templates-cursor",
