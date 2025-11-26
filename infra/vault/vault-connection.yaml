@@ -1,0 +1,19 @@
+---
+# VaultConnection - Cluster-wide connection to Vault server
+# Used by VaultAuth resources to establish connectivity
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultConnection
+metadata:
+  name: vault-connection
+  namespace: vault-secrets-operator
+  labels:
+    app.kubernetes.io/name: vault-connection
+    app.kubernetes.io/part-of: platform
+spec:
+  # Address of the Vault server running in the vault namespace
+  address: http://vault.vault.svc.cluster.local:8200
+
+  # TLS is disabled for internal cluster communication
+  # In production, consider enabling TLS
+  skipTLSVerify: false
+

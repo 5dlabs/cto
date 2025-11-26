@@ -197,10 +197,10 @@ configure_k8s_auth() {
         kubernetes_host="https://kubernetes.default.svc:443"
     log_info "Kubernetes auth configured with in-cluster endpoint"
 
-    # Create policy for External Secrets Operator
-    log_info "Creating external-secrets policy..."
-    vault policy write external-secrets - <<EOF
-# Policy for External Secrets Operator
+    # Create policy for Vault Secrets Operator
+    log_info "Creating vault-secrets-operator policy..."
+    vault policy write vault-secrets-operator - <<EOF
+# Policy for Vault Secrets Operator (VSO)
 # Allows reading secrets from KV v2 engine
 
 path "secret/data/*" {
@@ -211,16 +211,17 @@ path "secret/metadata/*" {
   capabilities = ["read", "list"]
 }
 EOF
-    log_info "Policy 'external-secrets' created"
+    log_info "Policy 'vault-secrets-operator' created"
 
-    # Create role for External Secrets Operator
-    log_info "Creating external-secrets role..."
-    vault write auth/kubernetes/role/external-secrets \
-        bound_service_account_names=external-secrets \
-        bound_service_account_namespaces=external-secrets-system \
-        policies=external-secrets \
+    # Create role for Vault Secrets Operator
+    # VSO controller uses its own service account to read secrets
+    log_info "Creating vault-secrets-operator role..."
+    vault write auth/kubernetes/role/vault-secrets-operator \
+        bound_service_account_names=vault-secrets-operator-controller-manager \
+        bound_service_account_namespaces=vault-secrets-operator \
+        policies=vault-secrets-operator \
         ttl=1h
-    log_info "Role 'external-secrets' created"
+    log_info "Role 'vault-secrets-operator' created"
 }
 
 # Cleanup
@@ -258,9 +259,10 @@ main() {
     log_info ""
     log_info "Next steps:"
     log_info "  1. Securely store the keys file and delete it"
-    log_info "  2. Run migrate-secrets-to-vault.sh to migrate secrets"
-    log_info "  3. Apply the vault-cluster-secret-store.yaml"
-    log_info "  4. Update ExternalSecrets to use vault-secret-store"
+    log_info "  2. Access Vault UI: kubectl port-forward svc/vault -n vault 8200:8200"
+    log_info "  3. Open http://localhost:8200 and login with root token"
+    log_info "  4. Add secrets at secret/ path (see infra/vault/README.md for list)"
+    log_info "  5. VaultStaticSecrets will automatically sync to K8s"
     log_info ""
 }
 
