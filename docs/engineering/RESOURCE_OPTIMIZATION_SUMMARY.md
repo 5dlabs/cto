@@ -60,12 +60,11 @@ kubectl delete application -n argocd fluent-bit
 
 ### Network Services (If not actively using)
 
-**Twingate connectors** (if VPN not needed right now):
+**Kilo VPN** (if VPN not needed right now):
 ```bash
-kubectl delete application -n argocd twingate-pastoral
-kubectl delete application -n argocd twingate-therapeutic
+kubectl delete application -n argocd kilo
 ```
-**Pod savings: ~2 pods**
+**Pod savings: ~2 pods (DaemonSet)**
 
 ### Kubernetes Runners (If not running CI/CD jobs)
 

@@ -40,15 +40,14 @@ echo "✅ Phase 1 complete"
 echo ""
 
 # Phase 2: Optional Network Services
-read -p "❓ Disable Twingate VPN connectors? (y/N) " -n 1 -r
+read -p "❓ Disable Kilo VPN? (y/N) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🌐 Phase 2: Disabling VPN Connectors"
-    echo "   Estimated pod savings: ~2 pods"
+    echo "🌐 Phase 2: Disabling VPN"
+    echo "   Estimated pod savings: ~2 pods (DaemonSet)"
     echo ""
     
-    disable_app "twingate-pastoral" "VPN connector"
-    disable_app "twingate-therapeutic" "VPN connector"
+    disable_app "kilo" "WireGuard VPN (DaemonSet)"
     
     echo ""
     echo "✅ Phase 2 complete"

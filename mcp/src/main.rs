@@ -233,7 +233,7 @@ impl Default for DocsIngestDefaults {
     fn default() -> Self {
         DocsIngestDefaults {
             model: "claude-sonnet-4-20250514".to_string(),
-            // Use the internal Kubernetes service URL - accessible via Twingate
+            // Use the internal Kubernetes service URL - accessible via Kilo VPN
             doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
                 .to_string(),
         }
