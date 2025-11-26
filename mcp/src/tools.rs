@@ -290,7 +290,7 @@ fn get_docs_ingest_schema() -> Value {
                 },
                 "doc_server_url": {
                     "type": "string",
-                    "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80 - accessible via Twingate)"
+                    "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80 - accessible via Kilo VPN)"
                 }
             },
             "required": ["repository_url", "doc_type"]

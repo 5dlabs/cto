@@ -385,24 +385,35 @@ chmod +x setup-agent-secrets.sh
 - Automatic resource cleanup and job lifecycle management
 - MCP tools that connect to your deployment
 
-### Optional: Remote Cluster Access with TwinGate
+### Remote Cluster Access with Kilo VPN
 
-To access your Kubernetes cluster from anywhere (not just local network), install TwinGate connector:
+Kilo is an open-source WireGuard-based VPN that provides secure access to cluster services. It's deployed automatically via ArgoCD.
 
+**Client Setup:**
+
+1. Install WireGuard and kgctl:
 ```bash
-# Add TwinGate Helm repository
-helm repo add twingate https://twingate.github.io/helm-charts
-helm repo update
+# macOS
+brew install wireguard-tools
+go install github.com/squat/kilo/cmd/kgctl@latest
 
-# Install TwinGate connector (replace tokens with your actual values)
-helm upgrade --install twingate-weightless-hummingbird twingate/connector \
-  -n default \
-  --set connector.network="maroonsnake" \
-  --set connector.accessToken="your-access-token" \
-  --set connector.refreshToken="your-refresh-token"
+# Linux
+sudo apt install wireguard-tools
+go install github.com/squat/kilo/cmd/kgctl@latest
 ```
 
-**Important**: After installation, add your Kubernetes service CIDR as resources in TwinGate admin panel. This enables the MCP tools to reach the agent-platform service using internal Kubernetes service URLs (e.g., `http://agent-platform.agent-platform.svc.cluster.local`) from anywhere.
+2. Generate your WireGuard keys and create a Peer resource (see `docs/vpn/kilo-client-setup.md`)
+
+3. Connect to access cluster services:
+```bash
+sudo wg-quick up ~/.wireguard/kilo.conf
+```
+
+This enables direct access to:
+- ClusterIPs (e.g., `curl http://10.x.x.x:port`)
+- Service DNS (e.g., `curl http://service.namespace.svc.cluster.local`)
+
+See `docs/vpn/kilo-client-setup.md` for full setup instructions.
 
 ### Install MCP Server
 
