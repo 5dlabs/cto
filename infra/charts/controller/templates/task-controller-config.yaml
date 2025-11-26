@@ -124,7 +124,7 @@ data:
 
     # Secrets configuration (references Kubernetes secrets)
     secrets:
-      apiKeySecretName: {{ .Values.secrets.externalSecretsName | quote }}
+      apiKeySecretName: {{ .Values.secrets.apiKeySecretName | quote }}
       apiKeySecretKey: "ANTHROPIC_API_KEY"
       cliApiKeys:
         {{- if .Values.secrets.cliApiKeys }}

@@ -2,13 +2,6 @@
 replicaCount: 1
 revisionHistoryLimit: 10
 
-# External secrets configuration (using External Secrets Operator)
-externalSecrets:
-  enabled: false
-  secretStore: "vault-backend"  # or "aws-secretsmanager"
-  refreshInterval: "1h"
-  secrets: []
-
 image:
   repository: "ghcr.io/5dlabs/app"  # Default to ghcr.io
   pullPolicy: IfNotPresent

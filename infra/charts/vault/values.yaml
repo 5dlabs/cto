@@ -80,11 +80,11 @@ ui:
   externalPort: 8200
   targetPort: 8200
 
-# Disable injector - using External Secrets Operator instead
+# Disable injector - using Vault Secrets Operator instead
 injector:
   enabled: false
 
-# Disable CSI driver - using External Secrets Operator instead
+# Disable CSI driver - using Vault Secrets Operator instead
 csi:
   enabled: false
 

@@ -74,10 +74,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: arc-runners
       server: https://kubernetes.default.svc
-    - namespace: secret-store
-      server: https://kubernetes.default.svc
-    - namespace: external-secrets
-      server: https://kubernetes.default.svc
     - namespace: external-dns
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
@@ -141,8 +137,6 @@ spec:
       kind: '*'
     - group: 'actions.github.com'
       kind: '*'
-    - group: 'external-secrets.io'
-      kind: '*'
     # Vault Secrets Operator CRDs
     - group: 'secrets.hashicorp.com'
       kind: '*'
@@ -186,8 +180,6 @@ spec:
     - group: 'cert-manager.io'
       kind: '*'
     - group: 'actions.github.com'
-      kind: '*'
-    - group: 'external-secrets.io'
       kind: '*'
     # Vault Secrets Operator CRDs
     - group: 'secrets.hashicorp.com'
