@@ -1,0 +1,24 @@
+---
+# Example Peer configuration for VPN access
+# To use this:
+# 1. Generate WireGuard keys on your workstation:
+#    wg genkey | tee privatekey | wg pubkey > publickey
+# 2. Replace the publicKey below with your generated public key
+# 3. Apply this resource to the cluster
+# 4. Generate your WireGuard config:
+#    kgctl showconf peer developer-workstation > wg0.conf
+# 5. Add your private key to wg0.conf and connect:
+#    sudo wg-quick up ./wg0.conf
+apiVersion: kilo.squat.ai/v1alpha1
+kind: Peer
+metadata:
+  name: developer-workstation
+spec:
+  # IP address assigned to this peer on the WireGuard network
+  allowedIPs:
+    - 10.5.0.1/32
+  # Replace with your actual WireGuard public key
+  # Generate with: wg genkey | tee privatekey | wg pubkey > publickey
+  publicKey: "REPLACE_WITH_YOUR_PUBLIC_KEY"
+  # Send keepalive packets every 25 seconds to maintain NAT mappings
+  persistentKeepalive: 25
