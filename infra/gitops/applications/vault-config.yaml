@@ -33,7 +33,8 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
+      # Note: allowEmpty defaults to false, so we don't specify it
+      # (Kubernetes doesn't persist default boolean values, causing OutOfSync)
 
     syncOptions:
       - CreateNamespace=true

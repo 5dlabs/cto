@@ -18,7 +18,8 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
-  serviceAccountName: doc-server-networking
+  # Note: serviceAccountName removed - field doesn't exist in Application CRD
+  # Use AppProject.spec.destinationServiceAccounts for impersonation if needed
   syncPolicy:
     automated:
       prune: true
