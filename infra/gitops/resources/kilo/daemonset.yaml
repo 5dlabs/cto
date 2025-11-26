@@ -73,11 +73,12 @@ spec:
         - name: kilo-dir
           hostPath:
             path: /var/lib/kilo
+        # Talos uses kubeconfig-in-cluster instead of kube-proxy
         - name: kubeconfig
           configMap:
-            name: kube-proxy
+            name: kubeconfig-in-cluster
             items:
-              - key: kubeconfig.conf
+              - key: kubeconfig
                 path: kubeconfig
         - name: lib-modules
           hostPath:
