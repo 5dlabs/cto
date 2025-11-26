@@ -24,7 +24,7 @@ spec:
 
     # Directory configuration
     directory:
-      recurse: true
+      recurse: false
       include: "{applications,projects}/*.yaml"
       exclude: "*.md"
 
