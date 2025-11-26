@@ -102,6 +102,9 @@ cloudflare.env
 # Factory credentials
 factory.env
 
+# Vault keys (NEVER commit these!)
+vault-keys*.json
+
 # Charts repository (for local development)
 charts-repo/
 dist/
