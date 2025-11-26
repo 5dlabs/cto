@@ -111,3 +111,5 @@ dist/
 # Task files
 # tasks.json
 # tasks/ 
+secrets.env
+keys/

@@ -146,7 +146,6 @@ main() {
     # Toolman secrets (individual secrets per service)
     migrate_secret "toolman-brave-search-secrets" "toolman-brave-search-secrets"
     migrate_secret "toolman-kubernetes-secrets" "toolman-kubernetes-secrets"
-    migrate_secret "toolman-reddit-secrets" "toolman-reddit-secrets"
     migrate_secret "toolman-context7-secrets" "toolman-context7-secrets"
     migrate_secret "toolman-github-secrets" "toolman-github-secrets"
 

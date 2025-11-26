@@ -529,8 +529,8 @@ impl<'a> DocsResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
-        // Agent templates volume for Claude docs templates
-        let agent_templates_cm_name = "controller-agent-templates-claude-docs".to_string();
+        // Agent templates volume for integration task templates
+        let agent_templates_cm_name = "controller-agent-templates-docs".to_string();
         volumes.push(json!({
             "name": "agent-templates",
             "configMap": {

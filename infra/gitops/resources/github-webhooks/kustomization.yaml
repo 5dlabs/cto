@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - eventsource.yaml
   - eventbus.yaml
-  # Note: ExternalSecret moved to infra/vault/secrets/infrastructure.yaml (VSO)
+  - externalsecret.yaml
   - sa-rbac.yaml
   - play-workflow-sensors.yaml
   - stage-aware-cleo-approval-sensor.yaml

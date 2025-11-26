@@ -151,9 +151,6 @@ spec:
       kind: '*'
     - group: 'acid.zalan.do'
       kind: '*'
-    # Kilo WireGuard VPN CRDs
-    - group: 'kilo.squat.ai'
-      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:

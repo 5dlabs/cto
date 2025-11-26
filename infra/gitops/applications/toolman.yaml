@@ -91,8 +91,6 @@ spec:
               workingDirectory: "/tmp"
             rustdocs:
               workingDirectory: "/tmp"
-            reddit:
-              workingDirectory: "/tmp"
             postgres:
               name: "PostgreSQL"
               description: "PostgreSQL database management and querying"
@@ -165,7 +163,6 @@ spec:
         # Secret store integration (External Secrets will inject these)
         secretRefs:
           - name: toolman-brave-search-secrets
-          - name: toolman-reddit-secrets
           - name: toolman-context7-secrets
           - name: toolman-github-secrets
 

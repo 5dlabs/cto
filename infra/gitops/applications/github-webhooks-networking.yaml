@@ -18,8 +18,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: argo
-  # Note: serviceAccountName removed - field doesn't exist in Application CRD
-  # Use AppProject.spec.destinationServiceAccounts for impersonation if needed
+  serviceAccountName: github-webhooks-networking
   syncPolicy:
     automated:
       prune: true

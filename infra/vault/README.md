@@ -102,7 +102,6 @@ Example `.dockerconfigjson` value:
 |------|------|
 | `secret/toolman-brave-search` | `BRAVE_API_KEY` |
 | `secret/toolman-kubernetes` | `KUBECONFIG` |
-| `secret/toolman-reddit` | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` |
 | `secret/toolman-context7` | `CONTEXT7_API_KEY` |
 | `secret/toolman-github` | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 

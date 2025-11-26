@@ -5,5 +5,5 @@ resources:
   - postgres-pvc.yaml
   - postgres.yaml
   - redis.yaml
-  # Note: redis-auth ExternalSecret moved to infra/vault/secrets/infrastructure.yaml (VSO)
+  - redis-auth-secret.yaml
 
