@@ -21,8 +21,8 @@ spec:
   kubernetes:
     # Role created in Vault that grants access to secrets
     role: vault-secrets-operator
-    # Service account used by VSO controller
-    serviceAccount: vault-secrets-operator-controller-manager
+    # Use default service account which exists in all namespaces
+    serviceAccount: default
 
   # Allow this auth to be used across namespaces
   allowedNamespaces:
