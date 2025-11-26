@@ -61,7 +61,8 @@ spec:
           - --cert-dir=/tmp
           - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
           - --kubelet-use-node-status-port
-          - --metric-resolution=15s
+          # metric-resolution must be > kubelet-request-timeout
+          - --metric-resolution=60s
           # For development/local clusters that may have self-signed certs
           - --kubelet-insecure-tls
           # Increase timeout for kubelet scraping (default 10s is too tight for busy nodes)
