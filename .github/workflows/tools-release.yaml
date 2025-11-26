@@ -220,10 +220,11 @@ jobs:
             ${{ env.BUILD_MANIFEST_NAME }}
 
   # Build Docker image using pre-built binaries
+  # Uses ARC runner for faster network/disk I/O
   build-docker:
     needs: [plan, build-binaries]
     if: needs.plan.outputs.publishing == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -300,7 +301,7 @@ jobs:
   release:
     needs: [plan, build-binaries, build-global, build-docker]
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' && needs.build-global.result == 'success' && needs.build-docker.result == 'success' }}
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
