@@ -142,6 +142,13 @@ spec:
               url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80/mcp"
               workingDirectory: "/tmp"
 
+            pg-aiguide:
+              name: "pg-aiguide"
+              description: "AI-optimized PostgreSQL expertise with semantic docs search and best practices"
+              transport: "http"
+              url: "https://mcp.tigerdata.com/mcp"
+              workingDirectory: "/tmp"
+
         # Local tools configuration for client-side operations
         # NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
         # which breaks MCP protocol validation in Cursor and other clients

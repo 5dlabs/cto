@@ -11,6 +11,9 @@
     "openmemory_openmemory_list",
     "openmemory_openmemory_get",
     "openmemory_openmemory_reinforce",
-    "kubernetes_listResources"
+    "kubernetes_listResources",
+    "pg_aiguide_semantic_search_postgres_docs",
+    "pg_aiguide_semantic_search_tiger_docs",
+    "pg_aiguide_view_skill"
   ]
 }
