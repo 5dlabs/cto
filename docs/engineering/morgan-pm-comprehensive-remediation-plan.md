@@ -737,7 +737,7 @@ Add project README with live stats:
 
 ## 🔗 Links
 
-- [Argo Workflow](https://argo.5dlabs.com/workflows/agent-platform/play-project-workflow-template-nhf4q)
+- [Argo Workflow](https://argo.5dlabs.com/workflows/cto/play-project-workflow-template-nhf4q)
 - [Task Master Docs](https://github.com/5dlabs/cto-parallel-test/tree/main/docs)
 ```
 
@@ -855,7 +855,7 @@ test_repo_level_project
 # test-realtime-updates.sh
 
 # Monitor Morgan's event processing
-kubectl logs -f -n agent-platform \
+kubectl logs -f -n cto \
   -l agent=morgan \
   --tail=0 | \
 while read -r line; do

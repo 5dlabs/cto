@@ -45,7 +45,7 @@ spec:
               kind: CodeRun
               metadata:
                 generateName: coderun-bolt-deploy-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   agent: bolt
                   trigger: deployment-status
@@ -74,7 +74,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: bolt-deployment-
-                namespace: agent-platform
+                namespace: cto
               spec:
                 serviceAccountName: agent-workflow-sa
                 entrypoint: validate-deployment
@@ -105,7 +105,7 @@ spec:
                         kind: CodeRun
                         metadata:
                           generateName: coderun-bolt-
-                          namespace: agent-platform
+                          namespace: cto
                         spec:
                           githubApp: "5DLabs-Bolt"
                           cli: "Claude"

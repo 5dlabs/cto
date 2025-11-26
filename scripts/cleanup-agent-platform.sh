@@ -1,10 +1,10 @@
 #!/bin/bash
-# Script to clean up orphaned resources in agent-platform namespace
+# Script to clean up orphaned resources in cto namespace
 # Removes completed pods, succeeded workflows, and succeeded CodeRuns
 
 set -euo pipefail
 
-NAMESPACE="agent-platform"
+NAMESPACE="cto"
 
 echo "🧹 Agent Platform Namespace Cleanup"
 echo "===================================="

@@ -11,14 +11,14 @@ Deploy merged code to production, clean up preview environments, create producti
 ### 1. Preview Cleanup (First!)
 - **CRITICAL:** Clean up preview deployments before creating production
 - Delete preview ArgoCD application (`task-{id}-preview`)
-- Delete preview namespace (`agent-platform-preview-task-{id}`)
+- Delete preview namespace (`cto-preview-task-{id}`)
 - Delete preview ngrok tunnel
 - Confirm cleanup in PR comment
 
 ### 2. Production ArgoCD Application Creation
 - Create production Application: `task-{id}-prod`
 - Source: **main branch** (merged code only!)
-- Namespace: `agent-platform-prod-task-{id}`
+- Namespace: `cto-prod-task-{id}`
 - Configure automated sync policies (prune, selfHeal)
 - Labels: `task-id`, `environment: production`, `managed-by: bolt`
 - Wait for sync and healthy status
@@ -54,7 +54,7 @@ Deploy merged code to production, clean up preview environments, create producti
 
 ### Production Deployment Checklist
 1. ✅ **Preview cleaned up** (ArgoCD app, namespace, tunnel deleted)
-2. ✅ Production namespace created (`agent-platform-prod-task-{id}`)
+2. ✅ Production namespace created (`cto-prod-task-{id}`)
 3. ✅ Production ArgoCD Application created (tracking `main` branch)
 4. ✅ Application status: `Healthy` and `Synced`
 5. ✅ All pods in `Running` state
@@ -115,7 +115,7 @@ kubectl get ingress -n <namespace>
 **Trigger:** PR #42 merged, has `ready-for-production` label, task ID: 5
 **Actions:**
 1. Find and delete preview: `task-5-preview` (ArgoCD app + namespace)
-2. Create production: `task-5-prod` in `agent-platform-prod-task-5`
+2. Create production: `task-5-prod` in `cto-prod-task-5`
 3. Wait for deployment
 4. Create production ngrok tunnel
 5. Verify and post production URL
@@ -184,7 +184,7 @@ This ensures we never publish untested code publicly.
 
 ## Environment Variables You Receive
 - `SERVICE` - Name of the service to deploy
-- `NAMESPACE` - Kubernetes namespace (default: agent-platform)
+- `NAMESPACE` - Kubernetes namespace (default: cto)
 - `REPOSITORY` - Git repository URL
 - `BRANCH` - Git branch (default: main)
 - `PR_NUMBER` - GitHub PR to comment on

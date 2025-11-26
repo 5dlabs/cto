@@ -47,7 +47,7 @@ if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
 fi
 
 # Configuration
-PREVIEW_NAMESPACE="agent-platform-preview-task-$TASK_ID"
+PREVIEW_NAMESPACE="cto-preview-task-$TASK_ID"
 APP_NAME="task-$TASK_ID-preview"
 ARGOCD_PATH="${ARGOCD_PATH:-helm}"
 SERVICE_PORT="${SERVICE_PORT:-80}"

@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: agent-cancellation-sa
-  namespace: agent-platform
+  namespace: cto
   labels:
     app: agent-cancellation
     component: enhanced-system
@@ -65,7 +65,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: agent-cancellation-sa
-  namespace: agent-platform
+  namespace: cto
 roleRef:
   kind: ClusterRole
   name: agent-cancellation-role

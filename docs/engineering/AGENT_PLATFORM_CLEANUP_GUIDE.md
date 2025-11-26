@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `agent-platform` namespace accumulates completed resources from workflow executions. This guide covers cleanup procedures and automation strategies.
+The `cto` namespace accumulates completed resources from workflow executions. This guide covers cleanup procedures and automation strategies.
 
 ## Current State (Before Cleanup)
 
@@ -22,7 +22,7 @@ The `agent-platform` namespace accumulates completed resources from workflow exe
 Use the provided cleanup script:
 
 ```bash
-./scripts/cleanup-agent-platform.sh
+./scripts/cleanup-cto.sh
 ```
 
 This script will:
@@ -38,17 +38,17 @@ This script will:
 
 ```bash
 # Delete succeeded CodeRuns
-kubectl delete coderuns -n agent-platform --field-selector=status.phase==Succeeded
+kubectl delete coderuns -n cto --field-selector=status.phase==Succeeded
 
 # Delete succeeded workflows
-kubectl get workflows -n agent-platform | grep Succeeded | awk '{print $1}' | \
-  xargs kubectl delete workflow -n agent-platform
+kubectl get workflows -n cto | grep Succeeded | awk '{print $1}' | \
+  xargs kubectl delete workflow -n cto
 
 # Delete succeeded pods
-kubectl delete pods -n agent-platform --field-selector=status.phase==Succeeded
+kubectl delete pods -n cto --field-selector=status.phase==Succeeded
 
 # Delete failed pods
-kubectl delete pods -n agent-platform --field-selector=status.phase==Failed
+kubectl delete pods -n cto --field-selector=status.phase==Failed
 ```
 
 ## Automated Cleanup (Long-Term Solution)
@@ -141,8 +141,8 @@ Create a Kubernetes CronJob to run cleanup daily:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: agent-platform-cleanup
-  namespace: agent-platform
+  name: cto-cleanup
+  namespace: cto
 spec:
   schedule: "0 2 * * *"  # Run at 2 AM daily
   jobTemplate:
@@ -158,14 +158,14 @@ spec:
             - -c
             - |
               # Delete succeeded resources older than 24 hours
-              kubectl delete pods -n agent-platform \
+              kubectl delete pods -n cto \
                 --field-selector=status.phase==Succeeded \
                 --field-selector=metadata.creationTimestamp<$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
               
-              kubectl delete workflows -n agent-platform \
+              kubectl delete workflows -n cto \
                 --field-selector=status.phase==Succeeded
               
-              kubectl delete coderuns -n agent-platform \
+              kubectl delete coderuns -n cto \
                 --field-selector=status.phase==Succeeded
           restartPolicy: OnFailure
 ```
@@ -177,10 +177,10 @@ Set up alerts for resource accumulation:
 ```yaml
 # Prometheus alert rule
 - alert: AgentPlatformHighPodCount
-  expr: count(kube_pod_info{namespace="agent-platform"}) > 50
+  expr: count(kube_pod_info{namespace="cto"}) > 50
   for: 10m
   annotations:
-    summary: "High pod count in agent-platform namespace"
+    summary: "High pod count in cto namespace"
     description: "{{ $value }} pods detected, cleanup may be needed"
 ```
 
@@ -192,8 +192,8 @@ Consider setting resource quotas to prevent runaway resource consumption:
 apiVersion: v1
 kind: ResourceQuota
 metadata:
-  name: agent-platform-quota
-  namespace: agent-platform
+  name: cto-quota
+  namespace: cto
 spec:
   hard:
     pods: "100"
@@ -206,7 +206,7 @@ spec:
 ## Best Practices
 
 1. **Run cleanup script weekly** during low-activity periods
-2. **Monitor pod count** regularly: `kubectl get pods -n agent-platform | wc -l`
+2. **Monitor pod count** regularly: `kubectl get pods -n cto | wc -l`
 3. **Adjust TTL values** based on debugging needs:
    - Development: Shorter TTL (1-6 hours)
    - Production: Longer TTL (24-48 hours)
@@ -219,7 +219,7 @@ spec:
 
 ```bash
 # Force delete stuck pods
-kubectl delete pod <pod-name> -n agent-platform --force --grace-period=0
+kubectl delete pod <pod-name> -n cto --force --grace-period=0
 ```
 
 ### Workflows Not Cleaning Up
@@ -233,7 +233,7 @@ kubectl logs -n argo deployment/argo-workflows-controller | grep -i ttl
 
 Check controller logs:
 ```bash
-kubectl logs -n agent-platform deployment/controller | grep -i cleanup
+kubectl logs -n cto deployment/controller | grep -i cleanup
 ```
 
 ## Deployment Instructions
@@ -260,21 +260,21 @@ After implementing these strategies:
 
 ```bash
 # Watch pods being cleaned up
-kubectl get pods -n agent-platform --watch
+kubectl get pods -n cto --watch
 
 # Count total pods
-kubectl get pods -n agent-platform --no-headers | wc -l
+kubectl get pods -n cto --no-headers | wc -l
 
 # Check workflow count
-kubectl get workflows -n agent-platform --no-headers | wc -l
+kubectl get workflows -n cto --no-headers | wc -l
 
 # Check CodeRun count
-kubectl get coderuns -n agent-platform --no-headers | wc -l
+kubectl get coderuns -n cto --no-headers | wc -l
 ```
 
 ## Summary
 
-- ✅ **Manual cleanup available**: `./scripts/cleanup-agent-platform.sh`
+- ✅ **Manual cleanup available**: `./scripts/cleanup-cto.sh`
 - ✅ **Global TTL configured**: Automatic cleanup for all workflows
 - ✅ **Pod GC enabled**: Immediate pod deletion after completion
 - ✅ **Controller cleanup**: CodeRun/DocsRun automatic cleanup

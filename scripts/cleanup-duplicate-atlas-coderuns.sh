@@ -8,7 +8,7 @@ echo "=== Atlas CodeRun Cleanup ==="
 echo "Finding duplicate CodeRuns per PR..."
 
 # Get all Atlas CodeRuns with PR numbers
-CODERUNS=$(kubectl get coderuns -n agent-platform -l agent=atlas -o json)
+CODERUNS=$(kubectl get coderuns -n cto -l agent=atlas -o json)
 
 # Group by PR number and keep only the oldest
 echo "$CODERUNS" | jq -r '.items[] | "\(.metadata.labels["pr-number"] // "none")|\(.metadata.name)|\(.metadata.creationTimestamp)"' \
@@ -58,13 +58,13 @@ echo ""
 echo "Deleting duplicate CodeRuns..."
 grep "^DELETE" /tmp/atlas-cleanup.txt | while read -r action name pr; do
   echo "  Deleting $name (PR #$pr)..."
-  kubectl delete coderun "$name" -n agent-platform --wait=false 2>&1 | grep -v "deleted" || true
+  kubectl delete coderun "$name" -n cto --wait=false 2>&1 | grep -v "deleted" || true
 done
 
 echo ""
 echo "✅ Cleanup complete!"
 echo ""
 echo "Remaining Atlas CodeRuns:"
-kubectl get coderuns -n agent-platform -l agent=atlas --no-headers | wc -l
+kubectl get coderuns -n cto -l agent=atlas --no-headers | wc -l
 
 rm -f /tmp/atlas-cleanup.txt

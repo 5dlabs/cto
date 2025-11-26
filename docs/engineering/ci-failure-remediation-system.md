@@ -226,13 +226,13 @@ kubectl logs -n argo -l sensor-name=ci-failure-remediation --tail=100
 
 ```bash
 # List all CI remediation CodeRuns
-kubectl get coderun -n agent-platform -l role=ci-remediation
+kubectl get coderun -n cto -l role=ci-remediation
 
 # Get details of specific CodeRun
-kubectl describe coderun <name> -n agent-platform
+kubectl describe coderun <name> -n cto
 
 # View agent logs
-kubectl logs -n agent-platform <pod-name> --tail=100
+kubectl logs -n cto <pod-name> --tail=100
 ```
 
 ### Metrics (Future)
@@ -274,7 +274,7 @@ Planned Grafana dashboard metrics:
 2. **Verify RBAC permissions**:
    ```bash
    kubectl get serviceaccount argo-events-sa -n argo
-   kubectl get rolebinding -n agent-platform | grep argo-events
+   kubectl get rolebinding -n cto | grep argo-events
    ```
 
 3. **Check CodeRun CRD**:
@@ -286,7 +286,7 @@ Planned Grafana dashboard metrics:
 
 1. **Check agent logs**:
    ```bash
-   kubectl logs -n agent-platform <coderun-pod> --tail=200
+   kubectl logs -n cto <coderun-pod> --tail=200
    ```
 
 2. **Verify GitHub App permissions**:
@@ -372,7 +372,7 @@ Target KPIs:
 For issues or questions:
 
 1. Check sensor logs: `kubectl logs -n argo -l sensor-name=ci-failure-remediation`
-2. Review CodeRun logs: `kubectl logs -n agent-platform <pod>`
+2. Review CodeRun logs: `kubectl logs -n cto <pod>`
 3. Run test script: `./scripts/test-ci-remediation.sh --check-only`
 4. Create issue: https://github.com/5dlabs/cto/issues
 

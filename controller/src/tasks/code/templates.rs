@@ -1366,7 +1366,7 @@ impl CodeTemplateGenerator {
             .map_or_else(
                 || {
                     std::env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
-                        "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                        "http://tools.cto.svc.cluster.local:3000/mcp".to_string()
                     })
                 },
                 std::string::ToString::to_string,

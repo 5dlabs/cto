@@ -21,9 +21,9 @@ sourceRepos:
 **Add to destinations:** (wildcard for preview/production namespaces)
 ```yaml
 destinations:
-  - namespace: 'agent-platform-preview-*'  # ← ADD THIS (preview namespaces)
+  - namespace: 'cto-preview-*'  # ← ADD THIS (preview namespaces)
     server: https://kubernetes.default.svc
-  - namespace: 'agent-platform-prod-*'     # ← ADD THIS (production namespaces)
+  - namespace: 'cto-prod-*'     # ← ADD THIS (production namespaces)
     server: https://kubernetes.default.svc
 ```
 
@@ -164,7 +164,7 @@ echo "      ArgoCD will sync them within 30 seconds"
 kubectl get appproject platform -n argocd -o yaml | grep cto-apps
 
 # Verify preview/prod namespaces are whitelisted
-kubectl get appproject platform -n argocd -o yaml | grep "agent-platform-"
+kubectl get appproject platform -n argocd -o yaml | grep "cto-"
 ```
 
 ### Check CTO-Apps Application
@@ -233,8 +233,8 @@ If applications fail to deploy to preview/production namespaces:
 kubectl get appproject platform -n argocd -o yaml
 
 # The destinations should include wildcards:
-# - namespace: 'agent-platform-preview-*'
-# - namespace: 'agent-platform-prod-*'
+# - namespace: 'cto-preview-*'
+# - namespace: 'cto-prod-*'
 ```
 
 ---
@@ -264,7 +264,7 @@ watch -n 5 git pull
 
 ```bash
 # Watch Bolt agents working
-kubectl get coderuns -n agent-platform -l agent=bolt -w
+kubectl get coderuns -n cto -l agent=bolt -w
 ```
 
 ---
@@ -315,8 +315,8 @@ echo "✅ All prerequisites met!"
 - Application repositories can be public or private (ArgoCD handles auth)
 
 ### Namespace Isolation
-- Preview namespaces: `agent-platform-preview-task-{id}`
-- Production namespaces: `agent-platform-prod-task-{id}`
+- Preview namespaces: `cto-preview-task-{id}`
+- Production namespaces: `cto-prod-task-{id}`
 - Each task gets isolated namespace
 - Resource quotas applied automatically
 

@@ -43,7 +43,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: stage-resume-pr-merged-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: stage-resume
                   target-stage: waiting-pr-merged
@@ -102,7 +102,7 @@ spec:
                         echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
 
                         # Find workflow by labels (include repository for precise matching in parallel scenarios)
-                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                        WORKFLOW_NAME=$(kubectl get workflows -n cto \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
@@ -115,7 +115,7 @@ spec:
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n agent-platform \
+                          -n cto \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
@@ -124,7 +124,7 @@ spec:
 
                           # Resume the workflow
                           kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
+                            -n cto \
                             --type='merge' \
                             -p '{"spec":{"suspend":false}}'
 

@@ -72,7 +72,7 @@ Example `.env` file for **local development** containing:
 
 The secrets are managed via External Secrets Operator:
 - **Source**: Central `secret-store` namespace
-- **Target**: `agent-platform` namespace (where code jobs run)
+- **Target**: `cto` namespace (where code jobs run)
 - **Configuration**: `infra/secret-store/doc-server-external-secrets.yaml`
 
 The following secrets are automatically available in your code jobs:

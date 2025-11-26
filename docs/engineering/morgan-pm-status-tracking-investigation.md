@@ -36,7 +36,7 @@ GitHub Project should show task statuses and current agents
 ### 2. Morgan PM Daemon Status Check
 
 ```bash
-kubectl get pods -n agent-platform -l workflows.argoproj.io/workflow=play-project-workflow-template-qldnw
+kubectl get pods -n cto -l workflows.argoproj.io/workflow=play-project-workflow-template-qldnw
 
 NAME                                                        READY   STATUS
 play-project-workflow-template-qldnw-morgan-project-manager-144363591   2/2     Running

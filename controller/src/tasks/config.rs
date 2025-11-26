@@ -780,7 +780,7 @@ cleanup:
     #[test]
     fn test_secret_binding_resolution() {
         let mut secrets = SecretsConfig {
-            api_key_secret_name: "agent-platform-secrets".to_string(),
+            api_key_secret_name: "cto-secrets".to_string(),
             api_key_secret_key: "ANTHROPIC_API_KEY".to_string(),
             cli_api_keys: HashMap::new(),
             provider_api_keys: HashMap::new(),
@@ -790,14 +790,14 @@ cleanup:
         let claude_binding = secrets.resolve_cli_binding(&CLIType::Claude, None);
         assert_eq!(claude_binding.env_var, "ANTHROPIC_API_KEY");
         assert_eq!(claude_binding.secret_key, "ANTHROPIC_API_KEY");
-        assert_eq!(claude_binding.secret_name, "agent-platform-secrets");
+        assert_eq!(claude_binding.secret_name, "cto-secrets");
 
         // Add Codex override with custom env var and secret name
         secrets.cli_api_keys.insert(
             "codex".to_string(),
             CLISecretConfig {
                 secret_key: "OPENAI_API_KEY".to_string(),
-                secret_name: Some("agent-platform-secrets".to_string()),
+                secret_name: Some("cto-secrets".to_string()),
                 env_var: Some("OPENAI_API_KEY".to_string()),
             },
         );
@@ -805,6 +805,6 @@ cleanup:
         let codex_binding = secrets.resolve_cli_binding(&CLIType::Codex, None);
         assert_eq!(codex_binding.env_var, "OPENAI_API_KEY");
         assert_eq!(codex_binding.secret_key, "OPENAI_API_KEY");
-        assert_eq!(codex_binding.secret_name, "agent-platform-secrets");
+        assert_eq!(codex_binding.secret_name, "cto-secrets");
     }
 }

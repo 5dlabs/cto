@@ -3,7 +3,7 @@
 
 set -e
 
-NAMESPACE="${NAMESPACE:-agent-platform}"
+NAMESPACE="${NAMESPACE:-cto}"
 
 echo "=================================="
 echo "🎯 Testing Play Project Workflow"

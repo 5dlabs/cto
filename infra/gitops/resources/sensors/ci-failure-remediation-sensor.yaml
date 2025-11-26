@@ -74,7 +74,7 @@ spec:
               kind: CodeRun
               metadata:
                 generateName: coderun-ci-fix-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   agent: rex
                   role: ci-remediation

@@ -12,7 +12,7 @@
 ### The Problem
 
 Atlas PR Guardian sensor was creating **multiple CodeRuns per PR**, leading to:
-- **100+ pods** in agent-platform namespace
+- **100+ pods** in cto namespace
 - **73 CodeRuns** for ~15 PRs (5-8 duplicates per PR)
 - **Many pods stuck in Pending** (resource exhaustion)
 - **Rapid-fire creation** (3+ CodeRuns per second during event storms)
@@ -88,7 +88,7 @@ triggers:
                   script:
                     source: |
                       # Check for existing CodeRuns
-                      EXISTING=$(kubectl get coderuns -n agent-platform \
+                      EXISTING=$(kubectl get coderuns -n cto \
                         -l agent=atlas,pr-number="$PR_NUMBER" ...)
                       
                       # If Running: Skip creation
@@ -100,7 +100,7 @@ triggers:
 
 ```bash
 # Check for existing CodeRuns for this PR
-EXISTING=$(kubectl get coderuns -n agent-platform \
+EXISTING=$(kubectl get coderuns -n cto \
   -l agent=atlas,pr-number="$PR_NUMBER" -o json)
 
 COUNT=$(echo "$EXISTING" | jq '.items | length')
@@ -167,7 +167,7 @@ kubectl wait --for=condition=Ready pod -n argo -l sensor-name=atlas-pr-guardian 
 
 ```bash
 # Monitor Atlas CodeRun creation
-watch kubectl get coderuns -n agent-platform -l agent=atlas
+watch kubectl get coderuns -n cto -l agent=atlas
 
 # Trigger a test PR event (e.g., open a test PR)
 # Observe that only ONE CodeRun is created
@@ -189,15 +189,15 @@ Found 1 existing CodeRun(s) for PR #1234
 
 ```bash
 # Check pod count stabilizes
-kubectl get pods -n agent-platform -l agent=atlas | wc -l
+kubectl get pods -n cto -l agent=atlas | wc -l
 # Should be ~15-20 (one per open PR)
 
 # Check no pods stuck in Pending
-kubectl get pods -n agent-platform -l agent=atlas --field-selector=status.phase=Pending
+kubectl get pods -n cto -l agent=atlas --field-selector=status.phase=Pending
 # Should be empty or very few
 
 # Monitor for 10 minutes
-watch kubectl get coderuns -n agent-platform -l agent=atlas
+watch kubectl get coderuns -n cto -l agent=atlas
 ```
 
 ---

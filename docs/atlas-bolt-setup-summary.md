@@ -21,13 +21,13 @@
 
 #### Atlas Secrets:
 1. `github-app-5dlabs-atlas` (secret-store namespace)
-2. `github-app-5dlabs-atlas-agent-platform` (agent-platform namespace)
-3. `github-app-atlas` (agent-platform namespace - short name alias)
+2. `github-app-5dlabs-atlas-cto` (cto namespace)
+3. `github-app-atlas` (cto namespace - short name alias)
 
 #### Bolt Secrets:
 4. `github-app-5dlabs-bolt` (secret-store namespace)
-5. `github-app-5dlabs-bolt-agent-platform` (agent-platform namespace)
-6. `github-app-bolt` (agent-platform namespace - short name alias)
+5. `github-app-5dlabs-bolt-cto` (cto namespace)
+6. `github-app-bolt` (cto namespace - short name alias)
 
 ### 3. **Updated MCP Configuration**
 - **File:** `cto-config.json`
@@ -74,14 +74,14 @@ cd /Users/jonathonfritz/code/work-projects/5dlabs/cto
 #### 1. Check ExternalSecrets are syncing:
 ```bash
 kubectl get externalsecrets -n secret-store | grep -E 'atlas|bolt'
-kubectl get externalsecrets -n agent-platform | grep -E 'atlas|bolt'
+kubectl get externalsecrets -n cto | grep -E 'atlas|bolt'
 ```
 
 Expected output: All ExternalSecrets should show `SecretSynced` status
 
 #### 2. Verify secrets were created:
 ```bash
-kubectl get secrets -n agent-platform | grep -E 'atlas|bolt'
+kubectl get secrets -n cto | grep -E 'atlas|bolt'
 ```
 
 Expected secrets:
@@ -92,7 +92,7 @@ Expected secrets:
 
 #### 3. Inspect a secret to verify contents:
 ```bash
-kubectl get secret github-app-atlas -n agent-platform -o yaml
+kubectl get secret github-app-atlas -n cto -o yaml
 ```
 
 Should contain keys: `app-id`, `client-id`, `private-key`

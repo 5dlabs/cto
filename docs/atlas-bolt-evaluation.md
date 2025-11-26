@@ -204,7 +204,7 @@ Bolt activated automatically:
 
 2. Add ExternalSecrets to `infra/secret-store/agent-secrets-external-secrets.yaml`:
    - `github-app-5dlabs-atlas` (secret-store namespace)
-   - `github-app-5dlabs-atlas-agent-platform` (agent-platform namespace)
+   - `github-app-5dlabs-atlas-cto` (cto namespace)
    - `github-app-atlas` (alias for short name)
    - Same pattern for Bolt
 

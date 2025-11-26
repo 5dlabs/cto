@@ -92,7 +92,7 @@ DRY_RUN=false ./scripts/trigger-atlas-for-existing-prs.sh
 
 1. **Sensor Fix Deployed**: PR #1350 must be merged and synced
 2. **GitHub CLI Authenticated**: `gh auth status` should show authentication
-3. **kubectl Access**: Access to agent-platform namespace
+3. **kubectl Access**: Access to cto namespace
 4. **Permissions**: Ability to comment on PRs in 5dlabs/cto
 
 ## Execution Plan
@@ -172,7 +172,7 @@ DRY_RUN=false ./scripts/trigger-atlas-for-existing-prs.sh
 
 1. **Check CodeRun Creation**:
    ```bash
-   kubectl get coderun -n agent-platform -l agent=atlas
+   kubectl get coderun -n cto -l agent=atlas
    ```
    Should show CodeRuns for remediated PRs.
 
@@ -228,7 +228,7 @@ If remediation causes issues:
 1. **Stop Script**: Ctrl+C if still running
 2. **Delete Atlas CodeRuns**:
    ```bash
-   kubectl delete coderun -n agent-platform -l agent=atlas,role=pr-guardian
+   kubectl delete coderun -n cto -l agent=atlas,role=pr-guardian
    ```
 3. **Manual Review**: Review affected PRs manually
 4. **Report Issues**: Document any unexpected behavior
@@ -247,7 +247,7 @@ If remediation causes issues:
 
 1. **CodeRun Creation Rate**:
    ```bash
-   kubectl get coderun -n agent-platform -l agent=atlas --sort-by=.metadata.creationTimestamp
+   kubectl get coderun -n cto -l agent=atlas --sort-by=.metadata.creationTimestamp
    ```
 
 2. **Sensor Event Processing**:

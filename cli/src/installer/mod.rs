@@ -177,7 +177,7 @@ impl Installer {
         );
         println!(
             "     {}",
-            "kubectl get pods -n agent-platform".bright_black()
+            "kubectl get pods -n cto".bright_black()
         );
         println!();
 

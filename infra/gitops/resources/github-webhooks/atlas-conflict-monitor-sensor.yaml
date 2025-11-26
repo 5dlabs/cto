@@ -45,7 +45,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: atlas-conflict-monitor-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: atlas-guardian
                   trigger: conflict
@@ -157,16 +157,16 @@ spec:
                           --from-literal=pr-number="$PR_NUMBER" \
                           --from-literal=created-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
                           --from-literal=workflow="{{workflow.name}}" \
-                          -n agent-platform \
+                          -n cto \
                           -o yaml --dry-run=client | kubectl create -f - 2>/dev/null; then
                           echo "✅ Acquired lock $LOCK_NAME"
-                          trap "kubectl delete configmap $LOCK_NAME -n agent-platform --ignore-not-found=true >/dev/null 2>&1 || true" EXIT
+                          trap "kubectl delete configmap $LOCK_NAME -n cto --ignore-not-found=true >/dev/null 2>&1 || true" EXIT
                         else
                           echo "🔒 Lock already held for PR #$PR_NUMBER, another workflow is handling conflicts"
                           exit 0
                         fi
 
-                        EXISTING=$(kubectl get coderuns -n agent-platform \
+                        EXISTING=$(kubectl get coderuns -n cto \
                           -l agent=atlas,role=guardian,pr-number="$PR_NUMBER" \
                           -o json 2>/dev/null || echo '{"items":[]}')
 
@@ -186,7 +186,7 @@ spec:
                         kind: CodeRun
                         metadata:
                           generateName: coderun-atlas-guardian-
-                          namespace: agent-platform
+                          namespace: cto
                           labels:
                             agent: atlas
                             role: guardian

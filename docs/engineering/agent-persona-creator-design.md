@@ -64,7 +64,7 @@ interface CreateAgentPersonaParams {
 
   // Deployment options
   deploy?: boolean;         // Whether to deploy immediately
-  namespace?: string;       // K8s namespace (default: agent-platform)
+  namespace?: string;       // K8s namespace (default: cto)
 }
 
 
@@ -298,7 +298,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: morgan-config
-  namespace: agent-platform
+  namespace: cto
 data:
   agent.yaml: |
     name: Morgan
@@ -358,7 +358,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: morgan-github-app
-  namespace: agent-platform
+  namespace: cto
 type: Opaque
 data:
   app-id: <base64>

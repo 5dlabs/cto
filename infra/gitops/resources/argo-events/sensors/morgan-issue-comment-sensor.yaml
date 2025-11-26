@@ -7,7 +7,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: morgan-issue-comment
-  namespace: agent-platform
+  namespace: cto
   labels:
     app.kubernetes.io/name: morgan-issue-comment-sensor
     app.kubernetes.io/part-of: argo-events
@@ -47,7 +47,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: "morgan-process-comment-"
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   agent: morgan
                   workflow-type: issue-comment-processing

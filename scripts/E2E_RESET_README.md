@@ -82,7 +82,7 @@ This directory contains scripts for resetting the end-to-end testing environment
 
 ## What Gets Reset
 
-### Kubernetes Resources (namespace: `agent-platform`)
+### Kubernetes Resources (namespace: `cto`)
 - ✅ All Argo Workflows
 - ✅ All Pods
 - ✅ Test-related ConfigMaps (play-*, test-*, coderun-*, docsrun-*)
@@ -118,7 +118,7 @@ The advanced script uses `e2e-reset-config.yaml` for configuration:
 
 ```yaml
 kubernetes:
-  namespace: agent-platform
+  namespace: cto
   cleanup:
     workflows: true
     pods: true
@@ -166,10 +166,10 @@ cto-parallel-test-template/
 3. **Monitor Progress:**
    ```bash
    # Watch workflow logs
-   kubectl logs -f -l workflow -n agent-platform
+   kubectl logs -f -l workflow -n cto
    
    # Check workflow status
-   kubectl get workflows -n agent-platform
+   kubectl get workflows -n cto
    ```
 
 4. **After Test Failure:**
@@ -195,7 +195,7 @@ cto-parallel-test-template/
 
 ### "Permission denied" Errors
 - Ensure GitHub CLI is authenticated: `gh auth status`
-- Check Kubernetes permissions: `kubectl auth can-i delete pods -n agent-platform`
+- Check Kubernetes permissions: `kubectl auth can-i delete pods -n cto`
 
 ### Template Not Found
 - First run creates template automatically
@@ -220,7 +220,7 @@ cto-parallel-test-template/
 
 1. **Confirmation Prompts:** All destructive operations require confirmation
 2. **Template Preservation:** Original state saved before first deletion
-3. **Namespace Isolation:** Only affects `agent-platform` namespace
+3. **Namespace Isolation:** Only affects `cto` namespace
 4. **Pattern Matching:** Only deletes resources matching specific patterns
 5. **Force Grace Period:** Ensures immediate resource cleanup
 
@@ -229,7 +229,7 @@ cto-parallel-test-template/
 1. **Use Quick Reset During Development:** For rapid iteration when debugging
 2. **Use Standard Reset Between Test Runs:** For consistent test environments
 3. **Use Advanced Reset for Team Collaboration:** When using shared templates
-4. **Always Check Status First:** Run `kubectl get all -n agent-platform` before reset
+4. **Always Check Status First:** Run `kubectl get all -n cto` before reset
 5. **Preserve Important Data:** Export any needed logs or configs before reset
 6. **Version Control Templates:** Keep test templates in separate repository for team sharing
 

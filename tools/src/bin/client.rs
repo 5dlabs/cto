@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .http_url
         .or(args.url)
         .or_else(|| std::env::var("TOOLS_SERVER_URL").ok())
-        .unwrap_or_else(|| "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string());
+        .unwrap_or_else(|| "http://tools.cto.svc.cluster.local:3000/mcp".to_string());
 
     // Auto-detect working directory from various sources
     // Priority: CLI args > IDE workspace env vars > PWD

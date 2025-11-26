@@ -791,10 +791,10 @@ impl<'a> CodeResourceManager<'a> {
             });
         }
 
-        // Mount agent-platform-secrets for API keys (includes Context7, Anthropic, OpenAI, etc.)
+        // Mount cto-secrets for API keys (includes Context7, Anthropic, OpenAI, etc.)
         env_from.push(json!({
             "secretRef": {
-                "name": "agent-platform-secrets"
+                "name": "cto-secrets"
             }
         }));
 

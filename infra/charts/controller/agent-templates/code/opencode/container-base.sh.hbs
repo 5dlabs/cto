@@ -863,7 +863,7 @@ if ! command -v tools >/dev/null 2>&1; then
   exit 1
 fi
 
-TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
 TOOLS_URL="${TOOLS_URL%/}"
 echo "🔍 Checking Tools endpoint: $TOOLS_URL"
 if ! curl -sSf --connect-timeout 2 --max-time 6 \

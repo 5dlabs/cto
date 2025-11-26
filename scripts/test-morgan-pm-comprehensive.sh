@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_OWNER="${1:-5dlabs}"
 REPO_NAME="${2:-cto-parallel-test}"
-NAMESPACE="${3:-agent-platform}"
+NAMESPACE="${3:-cto}"
 
 echo "🧪 Morgan PM Comprehensive Test Suite"
 echo "════════════════════════════════════════════════════════════════"

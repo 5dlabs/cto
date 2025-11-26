@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tracing::info;
 
-const NAMESPACE: &str = "agent-platform";
+const NAMESPACE: &str = "cto";
 
 /// Status of a play workflow
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -178,13 +178,13 @@ Enhanced log collection and forwarding with proper parsing and filtering.
 [INPUT]
     Name              systemd
     Tag               systemd.*
-    Systemd_Filter    _SYSTEMD_UNIT=agent-platform.service
+    Systemd_Filter    _SYSTEMD_UNIT=cto.service
     Read_From_Tail    true
 
 [FILTER]
     Name                modify
     Match               *
-    Add                 cluster_name agent-platform
+    Add                 cluster_name cto
     Add                 environment production
 
 [FILTER]
@@ -203,9 +203,9 @@ Enhanced log collection and forwarding with proper parsing and filtering.
 [OUTPUT]
     Name                loki
     Match               *
-    Host                victoria-logs.agent-platform.svc.cluster.local
+    Host                victoria-logs.cto.svc.cluster.local
     Port                3100
-    Labels              job=agent-platform,agent=$agent_name
+    Labels              job=cto,agent=$agent_name
     Label_Keys          $kubernetes['labels']['app'],$kubernetes['labels']['component']
     Remove_Keys         kubernetes,stream,time,tag
     Auto_Kubernetes_Labels On
@@ -213,7 +213,7 @@ Enhanced log collection and forwarding with proper parsing and filtering.
 [OUTPUT]
     Name                prometheus_remote_write
     Match               metrics.*
-    Host                victoria-metrics.agent-platform.svc.cluster.local
+    Host                victoria-metrics.cto.svc.cluster.local
     Port                8428
     URI                 /api/v1/write
     Header              Content-Type application/x-protobuf
@@ -231,7 +231,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: victoria-logs-config
-  namespace: agent-platform
+  namespace: cto
 data:
   victoria-logs.yaml: |
     global:
@@ -248,7 +248,7 @@ data:
               - alertmanager:9093
 
     scrape_configs:
-      - job_name: 'agent-platform'
+      - job_name: 'cto'
         static_configs:
           - targets: ['localhost:9090']
         metrics_path: /metrics

@@ -14,7 +14,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Test configuration
-TEST_NAMESPACE="${TEST_NAMESPACE:-agent-platform}"
+TEST_NAMESPACE="${TEST_NAMESPACE:-cto}"
 TEST_PR_NUMBER="${TEST_PR_NUMBER:-9999}"
 TEST_REPO="${TEST_REPO:-5dlabs/cto}"
 CLEANUP="${CLEANUP:-true}"
@@ -399,7 +399,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [options]"
             echo "Options:"
             echo "  --pr NUMBER       Test PR number (default: 9999)"
-            echo "  --namespace NS    Test namespace (default: agent-platform)"
+            echo "  --namespace NS    Test namespace (default: cto)"
             echo "  --no-cleanup      Don't cleanup test resources"
             exit 0
             ;;

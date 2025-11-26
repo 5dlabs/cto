@@ -61,7 +61,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: tess-label-fallback-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: stage-resume
                   target-stage: waiting-atlas-integration
@@ -135,7 +135,7 @@ spec:
 
                         # Find the workflow to resume
                         echo "🔍 Looking for workflow with task-id=$TASK_ID and repository=$REPO_LABEL..."
-                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                        WORKFLOW_NAME=$(kubectl get workflows -n cto \
                           -l "task-id=$TASK_ID,repository=$REPO_LABEL" \
                           --field-selector status.phase=Running \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -145,7 +145,7 @@ spec:
                           echo "   Checking for any suspended workflow..."
 
                           # Look for any workflow with suspended nodes
-                          WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          WORKFLOW_NAME=$(kubectl get workflows -n cto \
                             -l "task-id=$TASK_ID" \
                             -o json | \
                             jq -r '.items[] |
@@ -163,7 +163,7 @@ spec:
                         echo "✅ Found workflow: $WORKFLOW_NAME"
 
                         # Get current stage
-                        CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform \
+                        CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n cto \
                           -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "")
 
                         echo "Current stage: $CURRENT_STAGE"
@@ -176,20 +176,20 @@ spec:
                           echo "📍 Workflow is at stage: $CURRENT_STAGE"
 
                           # Find suspended nodes
-                          SUSPEND_NODES=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform -o json | \
+                          SUSPEND_NODES=$(kubectl get workflow "$WORKFLOW_NAME" -n cto -o json | \
                             jq -r '.status.nodes | to_entries[] | select(.value.type == "Suspend" and .value.phase == "Running") | .key')
 
                           if [ -n "$SUSPEND_NODES" ]; then
                             echo "🔄 Resuming suspended nodes..."
                             for node in $SUSPEND_NODES; do
                               echo "   Resuming node: $node"
-                              kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
+                              kubectl patch workflow "$WORKFLOW_NAME" -n cto \
                                 --type='json' \
                                 -p='[{"op":"replace","path":"/status/nodes/'"$node"'/phase","value":"Succeeded"}]' 2>/dev/null || true
                             done
 
                             # Also try to resume the workflow itself
-                            kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
+                            kubectl patch workflow "$WORKFLOW_NAME" -n cto \
                               --type='json' \
                               -p='[{"op":"replace","path":"/spec/suspend","value":null}]' 2>/dev/null || true
 
@@ -198,7 +198,7 @@ spec:
                             # Update stage if needed
                             if [[ "$CURRENT_STAGE" == "waiting-ready-for-qa" ]] || [[ "$CURRENT_STAGE" == "testing-in-progress" ]]; then
                               echo "📍 Updating stage to waiting-atlas-integration..."
-                              kubectl label workflow "$WORKFLOW_NAME" -n agent-platform \
+                              kubectl label workflow "$WORKFLOW_NAME" -n cto \
                                 current-stage=waiting-atlas-integration \
                                 previous-stage="$CURRENT_STAGE" \
                                 --overwrite

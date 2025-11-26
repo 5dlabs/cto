@@ -151,10 +151,10 @@ Created in `secret-store` namespace:
 - `github-app-atlas` (app_id, client_id, private_key)
 - `github-app-bolt` (app_id, client_id, private_key)
 
-ExternalSecrets automatically sync to `agent-platform` namespace:
-- `github-app-5dlabs-atlas-agent-platform`
+ExternalSecrets automatically sync to `cto` namespace:
+- `github-app-5dlabs-atlas-cto`
 - `github-app-atlas` (short alias)
-- `github-app-5dlabs-bolt-agent-platform`
+- `github-app-5dlabs-bolt-cto`
 - `github-app-bolt` (short alias)
 
 ### **MCP Configuration** ✅

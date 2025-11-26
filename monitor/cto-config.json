@@ -128,7 +128,7 @@
         "localServers": {
           "openmemory": {
             "enabled": true,
-            "url": "http://openmemory.agent-platform.svc.cluster.local:8080/mcp",
+            "url": "http://openmemory.cto.svc.cluster.local:8080/mcp",
             "tools": [
               "openmemory_query",
               "openmemory_store",

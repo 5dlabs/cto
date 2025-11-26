@@ -221,7 +221,7 @@ spec:
     targetRevision: {{BRANCH}}    # PR branch (auto-updates!)
     path: {{ARGOCD_PATH}}         # helm/ or k8s/
   destination:
-    namespace: {{NAMESPACE}}      # agent-platform-preview-task-{id}
+    namespace: {{NAMESPACE}}      # cto-preview-task-{id}
 ```
 
 ### Production Template
@@ -241,7 +241,7 @@ spec:
     targetRevision: main          # Always main for production
     path: {{ARGOCD_PATH}}         # helm/ or k8s/
   destination:
-    namespace: {{NAMESPACE}}      # agent-platform-prod-task-{id}
+    namespace: {{NAMESPACE}}      # cto-prod-task-{id}
 ```
 
 ---
@@ -338,14 +338,14 @@ Bolt scripts include fallback logic:
 - If Git push fails, falls back to direct `kubectl apply`
 - Check Bolt CodeRun logs for details:
 ```bash
-kubectl logs -n agent-platform -l agent=bolt --tail=100
+kubectl logs -n cto -l agent=bolt --tail=100
 ```
 
 ### Template Variables Not Replaced
 
 Check the generated YAML in Bolt logs:
 ```bash
-kubectl logs -n agent-platform <coderun-bolt-pod> | grep "Generated:"
+kubectl logs -n cto <coderun-bolt-pod> | grep "Generated:"
 ```
 
 Variables should be replaced:
@@ -378,7 +378,7 @@ kubectl get applications -n argocd -l managed-by=bolt -w
 
 Watch Bolt CodeRuns:
 ```bash
-kubectl get coderuns -n agent-platform -l agent=bolt -w
+kubectl get coderuns -n cto -l agent=bolt -w
 ```
 
 ---

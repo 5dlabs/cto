@@ -147,12 +147,12 @@ LOCK_NAME="atlas-guardian-lock-$PR_NUMBER"
 kubectl create configmap "$LOCK_NAME" \
   --from-literal=pr-number="$PR_NUMBER" \
   --from-literal=workflow="{{workflow.name}}" \
-  -n agent-platform
+  -n cto
 ```
 
 ### Active CodeRun Detection
 ```bash
-kubectl get coderuns -n agent-platform \
+kubectl get coderuns -n cto \
   -l agent=atlas,role=guardian,pr-number="$PR_NUMBER" \
   -o json | jq '.items[] | select(
     .status.phase == "Running" or 
@@ -270,7 +270,7 @@ Atlas uses dedicated GitHub App (`5DLabs-Atlas`) with:
 
 ```bash
 # Check Atlas CodeRuns for a PR
-kubectl get coderuns -n agent-platform \
+kubectl get coderuns -n cto \
   -l agent=atlas,pr-number=<PR_NUMBER>
 
 # View sensor logs
@@ -278,12 +278,12 @@ kubectl logs -n argo \
   deployment/atlas-pr-monitor-sensor-controller
 
 # Check workflow stage
-kubectl get workflows -n agent-platform \
+kubectl get workflows -n cto \
   -l workflow=play-orchestration -o json | \
   jq '.items[0].metadata.labels["current-stage"]'
 
 # View ConfigMap locks
-kubectl get configmaps -n agent-platform \
+kubectl get configmaps -n cto \
   -l atlas-guardian-lock
 ```
 

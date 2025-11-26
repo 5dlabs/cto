@@ -48,7 +48,7 @@ fi
 # Check for recent CodeRuns created by Atlas
 echo
 echo "4. Checking for Atlas PR Guardian CodeRuns..."
-CODERUN_COUNT=$(kubectl get coderun -n agent-platform -l agent=atlas,role=pr-guardian --no-headers 2>/dev/null | wc -l)
+CODERUN_COUNT=$(kubectl get coderun -n cto -l agent=atlas,role=pr-guardian --no-headers 2>/dev/null | wc -l)
 echo "   Found $CODERUN_COUNT Atlas PR Guardian CodeRuns"
 
 # Display sensor configuration
@@ -70,6 +70,6 @@ echo "To test the fix:"
 echo "  1. Apply the updated sensor: kubectl apply -f infra/gitops/resources/sensors/atlas-pr-guardian-sensor.yaml"
 echo "  2. Wait for ArgoCD to sync (or manually sync)"
 echo "  3. Create a test PR in 5dlabs/cto"
-echo "  4. Check if Atlas CodeRun is created: kubectl get coderun -n agent-platform -l agent=atlas"
+echo "  4. Check if Atlas CodeRun is created: kubectl get coderun -n cto -l agent=atlas"
 echo "  5. Monitor sensor logs: kubectl logs -f \$(kubectl get pods -n argo -l sensor-name=atlas-pr-guardian -o name | head -1) -n argo"
 

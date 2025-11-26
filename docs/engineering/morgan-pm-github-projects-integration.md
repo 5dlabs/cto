@@ -299,7 +299,7 @@ Also stores mapping as ConfigMap for persistence:
 kubectl create configmap project-$WORKFLOW_NAME-mapping \
   --from-file=task-issue-map.json \
   --from-file=project-config.json \
-  -n agent-platform
+  -n cto
 ```
 
 ---
@@ -446,7 +446,7 @@ Morgan PM templates are automatically deployed with controller Helm chart:
 
 ```bash
 helm upgrade controller ./infra/charts/controller \
-  --namespace agent-platform \
+  --namespace cto \
   --install
 ```
 
@@ -455,8 +455,8 @@ helm upgrade controller ./infra/charts/controller \
 Check ConfigMap created:
 
 ```bash
-kubectl get configmap -n agent-platform | grep agent-templates-pm
-kubectl describe configmap controller-agent-templates-pm -n agent-platform
+kubectl get configmap -n cto | grep agent-templates-pm
+kubectl describe configmap controller-agent-templates-pm -n cto
 ```
 
 ### Troubleshooting
@@ -464,19 +464,19 @@ kubectl describe configmap controller-agent-templates-pm -n agent-platform
 **Morgan PM not starting:**
 ```bash
 # Check pod logs
-kubectl logs -l agent=morgan,workflow-type=project-orchestration -n agent-platform
+kubectl logs -l agent=morgan,workflow-type=project-orchestration -n cto
 
 # Check ConfigMap exists
-kubectl get cm controller-agent-templates-pm -n agent-platform
+kubectl get cm controller-agent-templates-pm -n cto
 
 # Verify Morgan GitHub App secret
-kubectl get secret github-app-5dlabs-morgan -n agent-platform
+kubectl get secret github-app-5dlabs-morgan -n cto
 ```
 
 **Project updates not appearing:**
 ```bash
 # Check Morgan sync log
-kubectl exec -it <morgan-pod> -n agent-platform -- cat /shared/morgan-pm/sync.log
+kubectl exec -it <morgan-pod> -n cto -- cat /shared/morgan-pm/sync.log
 
 # Verify GitHub permissions
 gh auth status

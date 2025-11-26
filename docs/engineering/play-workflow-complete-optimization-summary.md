@@ -147,7 +147,7 @@ Use an existing task or create a simple one:
 ```bash
 # Example: Use play config to test end-to-end
 # Monitor workflow progress
-kubectl get workflow -n agent-platform -w
+kubectl get workflow -n cto -w
 ```
 
 ### 3. Validate Optimizations
@@ -155,28 +155,28 @@ kubectl get workflow -n agent-platform -w
 #### Fast-Path Detection
 ```bash
 # Check logs for fast-path activation
-kubectl logs -n agent-platform -l workflow-stage=quality | grep "FAST-PATH"
-kubectl logs -n agent-platform -l workflow-stage=testing | grep "FAST-PATH"
+kubectl logs -n cto -l workflow-stage=quality | grep "FAST-PATH"
+kubectl logs -n cto -l workflow-stage=testing | grep "FAST-PATH"
 ```
 
 #### PR Polling
 ```bash
 # Check workflow events for timing
-kubectl describe workflow <workflow-name> -n agent-platform | grep -A5 "pr-created-poll"
+kubectl describe workflow <workflow-name> -n cto | grep -A5 "pr-created-poll"
 # Should see ~20s total wait time vs previous 60s
 ```
 
 #### Timeout Guards
 ```bash
 # Confirm no timeouts for normal workflows
-kubectl get workflow -n agent-platform -o json | jq '.items[] | select(.status.phase == "Failed") | .status.message' | grep -i timeout
+kubectl get workflow -n cto -o json | jq '.items[] | select(.status.phase == "Failed") | .status.message' | grep -i timeout
 # Empty result = good
 ```
 
 #### Context Persistence
 ```bash
 # Check for state files in workspace PVCs
-kubectl exec -n agent-platform <pod-name> -- ls -la /workspace/.agent-state/
+kubectl exec -n cto <pod-name> -- ls -la /workspace/.agent-state/
 # Should see JSON files for each iteration
 ```
 

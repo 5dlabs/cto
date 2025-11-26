@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
-NAMESPACE="agent-platform"
+NAMESPACE="cto"
 TEST_REPO="cto-parallel-test"
 TEST_REPO_ORG="5dlabs"
 TEST_REPO_PATH="/Users/jonathonfritz/code/work-projects/5dlabs/cto-parallel-test"
@@ -101,7 +101,7 @@ delete_workflows() {
     fi
 }
 
-# Delete all pods in agent-platform namespace
+# Delete all pods in cto namespace
 delete_pods() {
     print_step "Deleting all pods in namespace $NAMESPACE..."
     
@@ -334,7 +334,7 @@ show_summary() {
     echo "Next steps:"
     echo "1. Update any CTO configuration to point to the fresh repository"
     echo "2. Run your E2E tests with: cto play --task-id <task-id>"
-    echo "3. Monitor with: kubectl logs -f -l workflow -n agent-platform"
+    echo "3. Monitor with: kubectl logs -f -l workflow -n cto"
 }
 
 # Main execution

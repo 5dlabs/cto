@@ -153,7 +153,7 @@ Each agent name becomes a board column that auto-creates!
 
 After merge:
 1. ArgoCD will sync new Morgan template
-2. Delete ConfigMap: \`kubectl delete configmap -n agent-platform agent-templates-pm\`
+2. Delete ConfigMap: \`kubectl delete configmap -n cto agent-templates-pm\`
 3. Create new test project
 4. Verify agent columns appear automatically
 5. Watch tasks move through agent columns as workflows progress

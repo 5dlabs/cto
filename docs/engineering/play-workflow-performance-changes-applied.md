@@ -168,13 +168,13 @@ argocd app sync cto-controller
 ### 3. Monitor First Workflow
 ```bash
 # Watch a workflow execution
-kubectl get workflow -n agent-platform -l workflow-type=play-orchestration -w
+kubectl get workflow -n cto -l workflow-type=play-orchestration -w
 
 # Check agent logs for fast-path detection
-kubectl logs -n agent-platform -l workflow-stage=quality --tail=100 | grep "FAST-PATH"
+kubectl logs -n cto -l workflow-stage=quality --tail=100 | grep "FAST-PATH"
 
 # Verify timeouts are applied
-kubectl describe workflow <workflow-name> -n agent-platform | grep -i timeout
+kubectl describe workflow <workflow-name> -n cto | grep -i timeout
 ```
 
 ## Validation Checklist

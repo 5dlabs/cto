@@ -313,7 +313,7 @@ kubectl logs $(kubectl get pods -n argo -l sensor-name=atlas-pr-guardian -o name
 # Should show NO errors
 
 # Create test PR and verify CodeRun
-kubectl get coderun -n agent-platform -l agent=atlas,role=pr-guardian
+kubectl get coderun -n cto -l agent=atlas,role=pr-guardian
 
 # Should show: coderun-atlas-pr-xxxxx
 ```

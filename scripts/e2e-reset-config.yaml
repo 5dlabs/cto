@@ -3,7 +3,7 @@
 
 # Kubernetes settings
 kubernetes:
-  namespace: agent-platform
+  namespace: cto
   cleanup:
     workflows: true
     pods: true

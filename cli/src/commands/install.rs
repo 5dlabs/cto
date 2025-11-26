@@ -93,7 +93,7 @@ impl InstallCommand {
         InstallConfig {
             profile: InstallProfile::Minimal,
             cluster_type,
-            namespace: "agent-platform".to_string(),
+            namespace: "cto".to_string(),
             github_org: None,
             github_repo: None,
             registry: "ghcr.io".to_string(),
@@ -156,7 +156,7 @@ impl InstallCommand {
         // Step 3: Namespace
         let namespace: String = Input::with_theme(&theme)
             .with_prompt("Kubernetes namespace")
-            .default("agent-platform".to_string())
+            .default("cto".to_string())
             .interact_text()?;
 
         println!();

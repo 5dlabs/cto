@@ -231,7 +231,7 @@ fn get_jobs_schema() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: cto)"},
                 "include": {"type": "array", "items": {"type": "string", "enum": ["play", "intake", "workflow"]}, "description": "Filter which workflow types to include (default: all)"}
             }
         }
@@ -247,7 +247,7 @@ fn get_stop_job_schema() -> Value {
             "properties": {
                 "job_type": {"type": "string", "enum": ["intake", "play", "workflow"], "description": "Type of workflow to stop"},
                 "name": {"type": "string", "description": "Workflow name"},
-                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"}
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: cto)"}
             },
             "required": ["job_type", "name"]
         }
@@ -262,7 +262,7 @@ fn get_input_schema() -> Value {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Plain text to send as a user message"},
-                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: cto)"},
                 "fifo_path": {"type": "string", "description": "FIFO path inside container (default: /workspace/agent-input.jsonl)"},
                 "job_type": {"type": "string", "enum": ["code", "docs"], "description": "Optional job type filter when routing by user"},
                 "name": {"type": "string", "description": "Optional CodeRun/DocsRun resource name when routing by explicit job"},

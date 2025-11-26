@@ -110,13 +110,13 @@ play: ## Run CTO play workflow (requires TASK_ID)
 
 .PHONY: workflow-status
 workflow-status: ## Check workflow status
-	@echo "Current workflows in agent-platform namespace:"
-	@kubectl get workflows -n agent-platform
+	@echo "Current workflows in cto namespace:"
+	@kubectl get workflows -n cto
 
 .PHONY: workflow-cleanup
 workflow-cleanup: ## Clean up all workflows
 	@echo "Cleaning up all workflows..."
-	@kubectl delete workflows --all -n agent-platform --force --grace-period=0
+	@kubectl delete workflows --all -n cto --force --grace-period=0
 
 # Combined operations
 .PHONY: fresh-test

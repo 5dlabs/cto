@@ -65,7 +65,7 @@ Events:
 
 **Why:**
 ```bash
-$ kubectl get coderuns -n agent-platform -l pr-number=1366
+$ kubectl get coderuns -n cto -l pr-number=1366
 No resources found
 ```
 
@@ -137,7 +137,7 @@ apiVersion: agents.platform.5dlabs.ai/v1alpha1
 kind: CodeRun
 metadata:
   name: coderun-atlas-pr-1366-manual
-  namespace: agent-platform
+  namespace: cto
   labels:
     agent: atlas
     role: pr-guardian
@@ -172,11 +172,11 @@ EOF
 
 ```bash
 # Find pods with terminating containers
-kubectl get pods -n agent-platform -o json \
+kubectl get pods -n cto -o json \
   | jq -r '.items[] | select(.status.containerStatuses != null) | .metadata.name'
 
 # Check specific pod logs for sidecar shutdown
-kubectl logs <pod-name> -n agent-platform -c docker-daemon
+kubectl logs <pod-name> -n cto -c docker-daemon
 
 # Look for shutdown messages or errors
 ```

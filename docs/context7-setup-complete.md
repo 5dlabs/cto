@@ -92,13 +92,13 @@ kubectl get externalsecret tools-context7-secrets -n mcp -o yaml
 
 ```bash
 # Restart Tools to pick up the new secret
-kubectl rollout restart deployment tools -n agent-platform
+kubectl rollout restart deployment tools -n cto
 
 # Watch the rollout
-kubectl rollout status deployment tools -n agent-platform
+kubectl rollout status deployment tools -n cto
 
 # Check logs to verify Context7 is working
-kubectl logs -n agent-platform deployment/tools -f
+kubectl logs -n cto deployment/tools -f
 ```
 
 ## Testing Context7
@@ -240,13 +240,13 @@ If Context7 queries fail:
 
 ```bash
 # Check Tools logs
-kubectl logs -n agent-platform deployment/tools -f | grep -i context7
+kubectl logs -n cto deployment/tools -f | grep -i context7
 
 # Verify environment variable is set
-kubectl exec -n agent-platform deployment/tools -- env | grep CONTEXT7
+kubectl exec -n cto deployment/tools -- env | grep CONTEXT7
 
 # Test the Context7 package directly
-kubectl exec -n agent-platform deployment/tools -- npx -y @upstash/context7-mcp --help
+kubectl exec -n cto deployment/tools -- npx -y @upstash/context7-mcp --help
 ```
 
 ### API Key Issues
@@ -265,7 +265,7 @@ If you see authentication errors:
 **Storage Location:**
 - Kubernetes Secret: `tools-context7-secrets` in `secret-store` namespace
 - Synced to: `tools-context7-secrets` in `mcp` namespace
-- Mounted to: Tools deployment in `agent-platform` namespace
+- Mounted to: Tools deployment in `cto` namespace
 
 **Security:**
 - Key is stored in Kubernetes secrets (base64 encoded)

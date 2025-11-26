@@ -41,11 +41,11 @@ validate: lint template ## Validate the chart (lint + template generation)
 dev-deploy: generate-templates ## Deploy to local development cluster
 	@echo "Deploying to local cluster..."
 	@helm upgrade --install controller . \
-		--namespace agent-platform \
+		--namespace cto \
 		--create-namespace \
 		--values values.yaml
 
 .PHONY: dev-delete
 dev-delete: ## Delete from local development cluster
 	@echo "Deleting from local cluster..."
-	@helm delete controller --namespace agent-platform || true
+	@helm delete controller --namespace cto || true

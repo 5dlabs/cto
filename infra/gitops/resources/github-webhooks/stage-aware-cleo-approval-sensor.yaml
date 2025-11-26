@@ -46,7 +46,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: stage-resume-cleo-approved-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: stage-resume
                   target-stage: waiting-quality-complete
@@ -135,7 +135,7 @@ spec:
                             echo "contexts:"
                             echo "  - context:"
                             echo "      cluster: in-cluster"
-                            echo "      namespace: agent-platform"
+                            echo "      namespace: cto"
                             echo "      user: sensor-sa"
                             echo "    name: in-cluster"
                             echo "current-context: in-cluster"
@@ -154,7 +154,7 @@ spec:
                           kubeconfig_path=$(build_kubeconfig) || return 1
 
                           if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
-                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            -n cto resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
                             echo "✅ Workflow resumed successfully"
                             return 0
                           fi
@@ -213,7 +213,7 @@ spec:
                         echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
 
                         # Find workflow by labels (include repository for precise matching in parallel scenarios)
-                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                        WORKFLOW_NAME=$(kubectl get workflows -n cto \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
@@ -225,7 +225,7 @@ spec:
                         echo "Found workflow: $WORKFLOW_NAME"
 
                         # Check if workflow is at correct stage and suspended
-                        WORKFLOW_JSON=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json 2>/dev/null)
+                        WORKFLOW_JSON=$(kubectl get workflow $WORKFLOW_NAME -n cto -o json 2>/dev/null)
                         CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"] // ""')
                         SUSPEND_NODE=$(echo "$WORKFLOW_JSON" | \
                           jq -r '(.status.nodes // {})

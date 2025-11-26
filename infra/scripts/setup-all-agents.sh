@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLATFORM_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 AGENTS_DIR="$PLATFORM_ROOT/agents"
-NAMESPACE="agent-platform"
+NAMESPACE="cto"
 DRY_RUN=""
 VERBOSE=""
 AUTO_GENERATE=""

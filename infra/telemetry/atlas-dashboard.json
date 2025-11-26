@@ -91,17 +91,17 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "sum(kube_pod_container_status_running{namespace=\"agent-platform\", pod=~\"coderun-atlas-.*\"})",
+          "expr": "sum(kube_pod_container_status_running{namespace=\"cto\", pod=~\"coderun-atlas-.*\"})",
           "legendFormat": "Active Atlas CodeRuns",
           "refId": "A"
         },
         {
-          "expr": "sum(kube_pod_container_status_running{namespace=\"agent-platform\", pod=~\"coderun-atlas-guardian-.*\"})",
+          "expr": "sum(kube_pod_container_status_running{namespace=\"cto\", pod=~\"coderun-atlas-guardian-.*\"})",
           "legendFormat": "Guardian Mode",
           "refId": "B"
         },
         {
-          "expr": "sum(kube_pod_container_status_running{namespace=\"agent-platform\", pod=~\"coderun-atlas-integration-.*\"})",
+          "expr": "sum(kube_pod_container_status_running{namespace=\"cto\", pod=~\"coderun-atlas-integration-.*\"})",
           "legendFormat": "Integration Mode",
           "refId": "C"
         }
@@ -161,7 +161,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "count(kube_pod_container_status_running{namespace=\"agent-platform\", pod=~\"coderun-atlas-.*\"})",
+          "expr": "count(kube_pod_container_status_running{namespace=\"cto\", pod=~\"coderun-atlas-.*\"})",
           "refId": "A"
         }
       ],

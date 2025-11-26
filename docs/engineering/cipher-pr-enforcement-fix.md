@@ -67,6 +67,6 @@ After deployment:
 
 ## Related
 
-- Task 6 log: `task-6-cipher-codex-agent-platform-cto-par-a02f65fe-fc951a6x2tc.log`
+- Task 6 log: `task-6-cipher-codex-cto-cto-par-a02f65fe-fc951a6x2tc.log`
 - Issue: Cipher completed all security work but couldn't create PR due to hardcoded Rex check
 

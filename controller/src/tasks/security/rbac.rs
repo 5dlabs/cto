@@ -97,7 +97,7 @@ impl RBACValidator {
 
         Ok(Self {
             service_account: "remediation-controller-sa".to_string(),
-            namespace: "agent-platform".to_string(),
+            namespace: "cto".to_string(),
             required_permissions,
             validation_cache: std::sync::Mutex::new(HashMap::new()),
             cache_ttl_seconds: 300, // 5 minutes

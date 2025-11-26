@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Test configuration
 TEST_BRANCH="test/ci-remediation-$(date +%s)"
-NAMESPACE="agent-platform"
+NAMESPACE="cto"
 SENSOR_NAME="ci-failure-remediation"
 
 echo "════════════════════════════════════════════════════════════════"

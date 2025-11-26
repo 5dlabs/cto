@@ -180,7 +180,7 @@ After updating agent system prompts in `values.yaml`:
 
 4. **Restart affected agents** (optional, for immediate effect):
    ```bash
-   kubectl rollout restart deployment -n agent-platform -l app.kubernetes.io/component=agent
+   kubectl rollout restart deployment -n cto -l app.kubernetes.io/component=agent
    ```
 
 ## Documentation References

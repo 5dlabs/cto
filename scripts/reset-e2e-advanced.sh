@@ -19,7 +19,7 @@ PROJECT_ROOT="$( cd "${SCRIPT_DIR}/.." && pwd )"
 CONFIG_FILE="${SCRIPT_DIR}/e2e-reset-config.yaml"
 
 # Default configuration
-NAMESPACE="${NAMESPACE:-agent-platform}"
+NAMESPACE="${NAMESPACE:-cto}"
 TEST_REPO="${TEST_REPO:-cto-parallel-test}"
 TEST_REPO_ORG="${TEST_REPO_ORG:-5dlabs}"
 REPO_STRATEGY="${REPO_STRATEGY:-template}"
@@ -502,7 +502,7 @@ main() {
     echo
     echo "Next steps:"
     echo "1. Trigger test: cto play --task-id <task-id>"
-    echo "2. Monitor: kubectl logs -f -l workflow -n agent-platform"
+    echo "2. Monitor: kubectl logs -f -l workflow -n cto"
     echo "3. Check GitHub: https://github.com/${TEST_REPO_ORG}/${TEST_REPO}"
 }
 

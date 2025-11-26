@@ -28,7 +28,7 @@ echo
 # Function to check if Atlas CodeRun exists for a PR
 check_atlas_coderun() {
     local pr_number=$1
-    kubectl get coderun -n agent-platform -l "agent=atlas,pr-number=$pr_number" --no-headers 2>/dev/null | wc -l | tr -d ' '
+    kubectl get coderun -n cto -l "agent=atlas,pr-number=$pr_number" --no-headers 2>/dev/null | wc -l | tr -d ' '
 }
 
 # Function to trigger Atlas by adding a comment
@@ -116,7 +116,7 @@ else
     echo
     echo "Next steps:"
     echo "1. Wait 30-60 seconds for Atlas CodeRuns to be created"
-    echo "2. Verify with: kubectl get coderun -n agent-platform -l agent=atlas"
+    echo "2. Verify with: kubectl get coderun -n cto -l agent=atlas"
     echo "3. Monitor sensor logs: kubectl logs -f \$(kubectl get pods -n argo -l sensor-name=atlas-pr-guardian -o name | head -1) -n argo"
 fi
 

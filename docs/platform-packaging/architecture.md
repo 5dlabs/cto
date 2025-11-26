@@ -49,14 +49,14 @@ graph TD
 Interactive command-line interface with progress tracking and error handling.
 
 ```rust
-// cmd/agent-platform/main.rs
+// cmd/cto/main.rs
 use clap::{App, Arg, SubCommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use tokio;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let matches = App::new("agent-platform")
+    let matches = App::new("cto")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Multi-Agent Development Platform")
         .subcommand(SubCommand::with_name("install")
@@ -324,7 +324,7 @@ echo "Installing k3s cluster..."
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={} sh -s - \
     --disable traefik \
     --write-kubeconfig-mode 644 \
-    --node-label agent-platform=true \
+    --node-label cto=true \
     --node-label profile={}
 
 # Wait for cluster to be ready
@@ -400,7 +400,7 @@ impl ClusterProvisioner for KindProvisioner {
         let kind_config = format!(r#"
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: agent-platform
+name: cto
 nodes:
 - role: control-plane
   extraPortMappings:
@@ -419,7 +419,7 @@ nodes:
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
-        node-labels: "agent-platform=true,profile={}"
+        node-labels: "cto=true,profile={}"
 "#, config.profile.name);
 
         // Create kind cluster
@@ -429,7 +429,7 @@ nodes:
             .arg("--config")
             .arg("-")
             .arg("--name")
-            .arg("agent-platform")
+            .arg("cto")
             .stdin(Stdio::piped())
             .output()
             .await?;
@@ -460,8 +460,8 @@ nodes:
             .output()
             .await?;
 
-        if !output.status.success() || !String::from_utf8_lossy(&output.stdout).contains("agent-platform") {
-            return Err(anyhow!("Kind cluster 'agent-platform' not found"));
+        if !output.status.success() || !String::from_utf8_lossy(&output.stdout).contains("cto") {
+            return Err(anyhow!("Kind cluster 'cto' not found"));
         }
 
         Ok(())
@@ -472,7 +472,7 @@ nodes:
             .arg("delete")
             .arg("cluster")
             .arg("--name")
-            .arg("agent-platform")
+            .arg("cto")
             .output()
             .await?;
 
@@ -802,7 +802,7 @@ set -e
 VERSION=${1:-"0.1.0"}
 PLATFORMS=("darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64" "windows/amd64")
 
-echo "Building agent-platform v${VERSION}"
+echo "Building cto v${VERSION}"
 
 # Clean previous builds
 rm -rf dist/
@@ -817,8 +817,8 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     
     env GOOS=$GOOS GOARCH=$GOARCH go build \
         -ldflags "-X main.Version=$VERSION -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" \
-        -o "dist/agent-platform-${GOOS}-${GOARCH}" \
-        ./cmd/agent-platform
+        -o "dist/cto-${GOOS}-${GOARCH}" \
+        ./cmd/cto
 done
 
 # Package with assets
@@ -829,47 +829,47 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     echo "Packaging for $GOOS/$GOARCH..."
     
     # Create package directory
-    mkdir -p "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}"
+    mkdir -p "dist/cto-${VERSION}-${GOOS}-${GOARCH}"
     
     # Copy binary
-    cp "dist/agent-platform-${GOOS}-${GOARCH}" "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}/agent-platform"
+    cp "dist/cto-${GOOS}-${GOARCH}" "dist/cto-${VERSION}-${GOOS}-${GOARCH}/cto"
     
     # Copy assets
-    cp -r templates/ "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}/"
-    cp -r scripts/ "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}/"
-    cp -r config/ "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}/"
+    cp -r templates/ "dist/cto-${VERSION}-${GOOS}-${GOARCH}/"
+    cp -r scripts/ "dist/cto-${VERSION}-${GOOS}-${GOARCH}/"
+    cp -r config/ "dist/cto-${VERSION}-${GOOS}-${GOARCH}/"
     
     # Create archive
-    tar -czf "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
-        -C "dist" "agent-platform-${VERSION}-${GOOS}-${GOARCH}"
+    tar -czf "dist/cto-${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
+        -C "dist" "cto-${VERSION}-${GOOS}-${GOARCH}"
     
     # Clean up
-    rm -rf "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}"
+    rm -rf "dist/cto-${VERSION}-${GOOS}-${GOARCH}"
 done
 
 # Create checksums
 cd dist
-sha256sum agent-platform-${VERSION}-*.tar.gz > SHA256SUMS
+sha256sum cto-${VERSION}-*.tar.gz > SHA256SUMS
 
 echo "Build complete! Artifacts in dist/"
 ```
 
 ### Homebrew Integration
 ```ruby
-# Formula/agent-platform.rb
+# Formula/cto.rb
 class AgentPlatform < Formula
   desc "Multi-Agent Software Development Orchestration Platform"
-  homepage "https://github.com/yourusername/agent-platform"
+  homepage "https://github.com/yourusername/cto"
   version "0.1.0"
   
   if OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-darwin-arm64.tar.gz"
+    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-darwin-arm64.tar.gz"
     sha256 "xxx"
   elsif OS.mac?
-    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-darwin-amd64.tar.gz"
+    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-darwin-amd64.tar.gz"
     sha256 "xxx"
   elsif OS.linux?
-    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-linux-amd64.tar.gz"
+    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-linux-amd64.tar.gz"
     sha256 "xxx"
   end
   
@@ -877,17 +877,17 @@ class AgentPlatform < Formula
   depends_on "helm"
   
   def install
-    bin.install "agent-platform"
-    (share/"agent-platform").install "templates", "scripts", "config"
+    bin.install "cto"
+    (share/"cto").install "templates", "scripts", "config"
   end
   
   def post_install
-    (var/"agent-platform").mkpath
-    (etc/"agent-platform").mkpath
+    (var/"cto").mkpath
+    (etc/"cto").mkpath
   end
   
   test do
-    assert_match version.to_s, shell_output("#{bin}/agent-platform version")
+    assert_match version.to_s, shell_output("#{bin}/cto version")
   end
 end
 ```

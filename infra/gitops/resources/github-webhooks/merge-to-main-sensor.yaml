@@ -47,7 +47,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: task-complete-
-                namespace: agent-platform
+                namespace: cto
                 labels:
                   type: task-completion
                   trigger: merge-to-main
@@ -208,16 +208,16 @@ spec:
                         if kubectl create configmap "$LOCK_NAME" \
                           --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
                           --from-literal=timestamp="$(date -u +%s)" \
-                          -n agent-platform 2>/dev/null; then
+                          -n cto 2>/dev/null; then
 
                           echo "✅ Lock acquired for PR #$PR_NUMBER by $CURRENT_WORKFLOW_NAME"
                           # Set up cleanup on exit
-                          trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true" EXIT
+                          trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true" EXIT
                         else
                           # Lock already exists, check if it's stale (older than 1 hour)
-                          EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n agent-platform \
+                          EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n cto \
                             -o jsonpath='{.data.owner}' 2>/dev/null || echo "unknown")
-                          LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n agent-platform \
+                          LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n cto \
                             -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "")
                           CURRENT_TIME=$(date -u +%s)
 
@@ -232,13 +232,13 @@ spec:
 
                           if [ $LOCK_AGE -gt 3600 ]; then
                             echo "⚠️ Stale lock detected (${LOCK_AGE}s old), attempting to claim..."
-                            kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true
+                            kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true
                             if kubectl create configmap "$LOCK_NAME" \
                               --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
                               --from-literal=timestamp="$(date -u +%s)" \
-                              -n agent-platform 2>/dev/null; then
+                              -n cto 2>/dev/null; then
                               echo "✅ Stale lock replaced, continuing..."
-                              trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true" EXIT
+                              trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true" EXIT
                             else
                               echo "❌ Failed to claim stale lock, another workflow got it first"
                               exit 0
@@ -391,7 +391,7 @@ spec:
                           echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Looking for workflow..."
 
                           # Don't filter by Running status - workflow might be suspended
-                          CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
+                          CURRENT_WORKFLOW=$(kubectl get workflows -n cto \
                             -l task-id=$TASK_ID,workflow-type=play-orchestration \
                             -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
@@ -406,7 +406,7 @@ spec:
                           echo "Found workflow: $CURRENT_WORKFLOW"
 
                           # LESSON LEARNED: Check workflow phase to understand state
-                          WORKFLOW_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform \
+                          WORKFLOW_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n cto \
                             -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
                           echo "Workflow phase: $WORKFLOW_PHASE"
 
@@ -418,7 +418,7 @@ spec:
 
                           echo "Looking for wait-merge-to-main suspend node..."
                           while [ $WAIT_TIME -lt $MAX_WAIT ]; do
-                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
                               jq -r '.status.nodes | to_entries | .[] |
                               select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
                               .key')
@@ -441,13 +441,13 @@ spec:
                           if [ -n "$NODE_ID" ]; then
 
                             # LESSON LEARNED: Check node phase before trying to resume
-                            NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                            NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
                               jq -r ".status.nodes.\"$NODE_ID\".phase")
                             echo "Node phase: $NODE_PHASE"
 
                             if [ "$NODE_PHASE" = "Running" ]; then
                               echo "Resuming suspend node..."
-                              kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
+                              kubectl patch workflow $CURRENT_WORKFLOW -n cto \
                                 --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
                               echo "✅ Task $TASK_ID workflow completed successfully"
                             else
@@ -457,16 +457,16 @@ spec:
                             echo "⚠️ No wait-merge-to-main suspend node found after waiting ${MAX_WAIT}s"
                             echo "Tess might still be running or workflow might be in unexpected state"
                             # Try legacy wait-pr-approved node
-                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
                               jq -r '.status.nodes | to_entries | .[] |
                               select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
                               .key')
                             if [ -n "$NODE_ID" ]; then
-                              NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                              NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
                                 jq -r ".status.nodes.\"$NODE_ID\".phase")
                               if [ "$NODE_PHASE" = "Running" ]; then
                                 echo "Found legacy wait-pr-approved node, resuming..."
-                                kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
+                                kubectl patch workflow $CURRENT_WORKFLOW -n cto \
                                   --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
                                 echo "✅ Task $TASK_ID workflow completed (legacy)"
                               else
@@ -548,7 +548,7 @@ spec:
                         fi
 
                         # Check if next task is already running or recently completed (avoid duplicates)
-                        EXISTING_NEXT=$(kubectl get workflows -n agent-platform \
+                        EXISTING_NEXT=$(kubectl get workflows -n cto \
                           -l task-id=$NEXT_TASK_ID,workflow-type=play-orchestration \
                           -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' 2>/dev/null)
 
@@ -566,7 +566,7 @@ spec:
                                 break
                               elif [ "$phase" = "Succeeded" ]; then
                                 # Check if completed within last 5 minutes
-                                COMPLETION_TIME=$(kubectl get workflow $workflow_name -n agent-platform \
+                                COMPLETION_TIME=$(kubectl get workflow $workflow_name -n cto \
                                   -o jsonpath='{.status.finishedAt}' 2>/dev/null || echo "")
                                 if [ -n "$COMPLETION_TIME" ]; then
                                   COMPLETION_EPOCH=$(date -d "$COMPLETION_TIME" +%s 2>/dev/null || echo "0")
@@ -619,7 +619,7 @@ spec:
                         # Retrieve parameters from the current task's workflow
                         echo "🔍 Looking for current task workflow to retrieve parameters..."
                         # Get the most recent workflow for this task (sorted by creation time, take last one)
-                        CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
+                        CURRENT_WORKFLOW=$(kubectl get workflows -n cto \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration \
                           --sort-by='.metadata.creationTimestamp' \
                           -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | tail -n1)
@@ -643,7 +643,7 @@ spec:
                           echo "✅ Found workflow: $CURRENT_WORKFLOW"
 
                           # Retrieve stored parameters from annotation
-                          INITIAL_PARAMS=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform \
+                          INITIAL_PARAMS=$(kubectl get workflow $CURRENT_WORKFLOW -n cto \
                             -o jsonpath='{.metadata.annotations.platform\.agents/initial-params}' 2>/dev/null || echo "{}")
 
                           if [ "$INITIAL_PARAMS" = "{}" ] || [ -z "$INITIAL_PARAMS" ]; then
@@ -773,7 +773,7 @@ spec:
                         kind: Workflow
                         metadata:
                           generateName: play-workflow-template-
-                          namespace: agent-platform
+                          namespace: cto
                           labels:
                             task-id: "$NEXT_TASK_ID"
                             workflow-type: play-orchestration
