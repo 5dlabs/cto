@@ -8,6 +8,14 @@ Kilo is an open-source, Kubernetes-native WireGuard mesh network that provides s
 - **Protocol**: WireGuard
 - **Mode**: Flannel compatibility (runs alongside existing CNI)
 - **Management**: kubectl + kgctl CLI
+- **DNS**: Supports cluster DNS resolution (like Twingate)
+
+## Key Features
+
+- **Service DNS Resolution**: Access services by name (e.g., `http://my-service.namespace.svc.cluster.local`)
+- **Pod Network Access**: Direct connectivity to pod IPs
+- **No Subscription**: Fully self-hosted, no external dependencies
+- **Standard Clients**: Use any WireGuard client (macOS, Linux, iOS, Android)
 
 ## Architecture
 
