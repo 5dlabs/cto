@@ -986,15 +986,7 @@ fn read_play_progress(repo: &str) -> Result<Option<PlayProgress>> {
     let kubectl_cmd = find_command("kubectl");
 
     let output = Command::new(&kubectl_cmd)
-        .args([
-            "get",
-            "configmap",
-            &name,
-            "-n",
-            "cto",
-            "-o",
-            "json",
-        ])
+        .args(["get", "configmap", &name, "-n", "cto", "-o", "json"])
         .output();
 
     match output {
@@ -2528,10 +2520,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                         eprintln!(
                                             "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
                                         );
-                                        let _ =
-                                            run_argo_cli(&["stop", name, "-n", "cto"]);
-                                        let _ =
-                                            run_argo_cli(&["delete", name, "-n", "cto"]);
+                                        let _ = run_argo_cli(&["stop", name, "-n", "cto"]);
+                                        let _ = run_argo_cli(&["delete", name, "-n", "cto"]);
                                     }
                                     None => {
                                         eprintln!(
@@ -2552,13 +2542,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         }
     }
 
-    let mut args: Vec<&str> = vec![
-        "submit",
-        "--from",
-        workflow_template,
-        "-n",
-        "cto",
-    ];
+    let mut args: Vec<&str> = vec!["submit", "--from", workflow_template, "-n", "cto"];
 
     // Add labels for workflow tracking (enables auto-detection)
     args.push("-l");

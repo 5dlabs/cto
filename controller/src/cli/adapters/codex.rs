@@ -206,9 +206,8 @@ impl CliAdapter for CodexAdapter {
         let project_doc_max_bytes =
             first_u64(&cli_config, &["projectDocMaxBytes"]).unwrap_or(32_768);
 
-        let tools_url = env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
-            "http://tools.cto.svc.cluster.local:3000/mcp".to_string()
-        });
+        let tools_url = env::var("TOOLS_SERVER_URL")
+            .unwrap_or_else(|_| "http://tools.cto.svc.cluster.local:3000/mcp".to_string());
         let tools_url = tools_url.trim_end_matches('/').to_string();
 
         let tools_tools = agent_config
