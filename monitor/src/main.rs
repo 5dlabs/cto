@@ -1184,6 +1184,7 @@ fn spawn_watch(
         "-n".to_string(),
         namespace.to_string(),
         "--watch".to_string(),
+        "--request-timeout=0".to_string(), // Disable timeout to keep watch open indefinitely
         "-o".to_string(),
         "json".to_string(),
     ];
