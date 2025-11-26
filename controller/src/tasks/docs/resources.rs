@@ -516,8 +516,13 @@ impl<'a> DocsResourceManager<'a> {
             "mountPath": "/task-files"
         }));
 
+        // Get ConfigMap prefix from environment (set by Helm based on release name)
+        // Used for all ConfigMap references below
+        let cm_prefix =
+            std::env::var("CONFIGMAP_PREFIX").unwrap_or_else(|_| "controller".to_string());
+
         // Agents ConfigMap volume for system prompts
-        let agents_cm_name = "controller-agents".to_string();
+        let agents_cm_name = format!("{cm_prefix}-agents");
         volumes.push(json!({
             "name": "agents-config",
             "configMap": {
@@ -530,7 +535,7 @@ impl<'a> DocsResourceManager<'a> {
         }));
 
         // Agent templates volume for Claude docs templates
-        let agent_templates_cm_name = "controller-agent-templates-claude-docs".to_string();
+        let agent_templates_cm_name = format!("{cm_prefix}-agent-templates-claude-docs");
         volumes.push(json!({
             "name": "agent-templates",
             "configMap": {
