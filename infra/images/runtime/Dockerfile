@@ -306,11 +306,11 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
-# Install toolman client
+# Install tools client
 RUN curl --proto '=https' --tlsv1.2 -LsSf \
-    https://github.com/5dlabs/toolman/releases/download/v2.4.4/toolman-installer.sh | \
-    TOOLMAN_NO_MODIFY_PATH=1 sh \
-  && mv ~/.cargo/bin/toolman-client /usr/local/bin/toolman
+    https://github.com/5dlabs/tools/releases/download/v2.4.4/tools-installer.sh | \
+    TOOLS_NO_MODIFY_PATH=1 sh \
+  && mv ~/.cargo/bin/tools-client /usr/local/bin/tools
 
 # Install TaskMaster globally (stable release)
 RUN npm install -g task-master-ai@0.26.0

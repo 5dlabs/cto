@@ -1,4 +1,4 @@
-# Toolman MCP Proxy Architecture
+# Tools MCP Proxy Architecture
 
 **Date:** 2025-10-31  
 **Status:** Production  
@@ -8,20 +8,20 @@
 
 ## Overview
 
-The **Toolman MCP Proxy** is a centralized HTTP→MCP bridge that enables agents to access remote MCP servers without directly connecting to each one. It simplifies agent configuration and provides a single point of control for MCP tool availability.
+The **Tools MCP Proxy** is a centralized HTTP→MCP bridge that enables agents to access remote MCP servers without directly connecting to each one. It simplifies agent configuration and provides a single point of control for MCP tool availability.
 
 ## Architecture Components
 
-### 1. **Toolman Server (Remote)**
-- **Location:** `http://toolman.agent-platform.svc.cluster.local:3000/mcp`
+### 1. **Tools Server (Remote)**
+- **Location:** `http://tools.agent-platform.svc.cluster.local:3000/mcp`
 - **Purpose:** Proxy HTTP requests to configured MCP servers
-- **Configuration:** Defined in toolman repository
-- **Deployment:** Argo CD application in `infra/gitops/applications/toolman.yaml`
+- **Configuration:** Defined in tools repository
+- **Deployment:** Argo CD application in `infra/gitops/applications/tools.yaml`
 
-### 2. **Toolman CLI (Client)**
+### 2. **Tools CLI (Client)**
 - **Binary:** Installed in agent runtime containers
-- **Command:** `toolman --url <server-url> --tool <tool-name>`
-- **Protocol:** Converts STDIO (MCP) ↔ HTTP (Toolman Server)
+- **Command:** `tools --url <server-url> --tool <tool-name>`
+- **Protocol:** Converts STDIO (MCP) ↔ HTTP (Tools Server)
 - **Usage:** Configured in agent MCP configuration files
 
 ### 3. **Local MCP Servers**
@@ -34,9 +34,9 @@ The **Toolman MCP Proxy** is a centralized HTTP→MCP bridge that enables agents
 
 ## Tool Types
 
-### **Remote Tools** (via Toolman Proxy)
+### **Remote Tools** (via Tools Proxy)
 
-Remote tools are accessed through the toolman HTTP proxy. Agents call `toolman` CLI which proxies to the remote server.
+Remote tools are accessed through the tools HTTP proxy. Agents call `tools` CLI which proxies to the remote server.
 
 **Configuration:**
 ```json
@@ -60,10 +60,10 @@ Remote tools are accessed through the toolman HTTP proxy. Agents call `toolman` 
 {
   "mcpServers": {
     "brave_search_brave_web_search": {
-      "command": "toolman",
-      "args": ["--url", "http://toolman.agent-platform.svc.cluster.local:3000/mcp", "--tool", "brave_search_brave_web_search"],
+      "command": "tools",
+      "args": ["--url", "http://tools.agent-platform.svc.cluster.local:3000/mcp", "--tool", "brave_search_brave_web_search"],
       "env": {
-        "TOOLMAN_SERVER_URL": "http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+        "TOOLS_SERVER_URL": "http://tools.agent-platform.svc.cluster.local:3000/mcp"
       }
     }
   }
@@ -76,7 +76,7 @@ Remote tools are accessed through the toolman HTTP proxy. Agents call `toolman` 
 - `memory_create_entities` - Create memory entities
 - `memory_add_observations` - Add observations to memory
 - `context7_get_library_docs` - Library documentation retrieval
-- _...and others configured in toolman server_
+- _...and others configured in tools server_
 
 ### **Local Servers** (Direct Execution)
 
@@ -185,7 +185,7 @@ Local MCP servers run directly in the agent container without proxying.
 1. **Agent starts** (Claude Code, Codex, Factory, etc.)
 2. **Reads** `.mcp.json` from working directory
 3. **Launches** MCP servers defined in configuration
-4. **Toolman CLI** proxies remote tool requests to toolman server
+4. **Tools CLI** proxies remote tool requests to tools server
 5. **Local servers** execute directly in container
 6. **Agent** uses tools via MCP protocol
 
@@ -193,10 +193,10 @@ Local MCP servers run directly in the agent container without proxying.
 
 ## Adding New Tools
 
-### Remote Tools (Toolman Server)
+### Remote Tools (Tools Server)
 
-1. **Add server** to toolman repository configuration
-2. **Deploy** toolman with updated config
+1. **Add server** to tools repository configuration
+2. **Deploy** tools with updated config
 3. **Add tool name** to agent's `remote` array in `cto-config.json`
 4. **Agent** will automatically have access
 
@@ -296,13 +296,13 @@ Local MCP servers run directly in the agent container without proxying.
 - Consistent tool availability across agents
 
 ### 2. **Network Efficiency**
-- One HTTP connection to toolman (multiplexed)
+- One HTTP connection to tools (multiplexed)
 - vs. multiple direct MCP server connections
 - Reduced network overhead
 
 ### 3. **Security**
-- Agent containers only need access to toolman URL
-- Toolman handles authentication to backend servers
+- Agent containers only need access to tools URL
+- Tools handles authentication to backend servers
 - Simplified network policies
 
 ### 4. **Flexibility**
@@ -319,18 +319,18 @@ Local MCP servers run directly in the agent container without proxying.
 
 ## Implementation Details
 
-### Toolman Server URL
+### Tools Server URL
 
 **Environment Variable:**
 ```bash
-TOOLMAN_SERVER_URL=http://toolman.agent-platform.svc.cluster.local:3000/mcp
+TOOLS_SERVER_URL=http://tools.agent-platform.svc.cluster.local:3000/mcp
 ```
 
 **Default (if not set):**
 ```rust
 // controller/src/cli/adapters/claude.rs
-let toolman_url = std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-    "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+let tools_url = std::env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+    "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
 });
 ```
 
@@ -343,13 +343,13 @@ fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
     let mut mcp_servers = json!({});
     
     if let Some(tool_config) = tools {
-        // Add remote tools (via toolman)
+        // Add remote tools (via tools)
         for tool_name in &tool_config.remote {
             let server_config = json!({
-                "command": "toolman",
-                "args": ["--url", toolman_url.clone(), "--tool", tool_name],
+                "command": "tools",
+                "args": ["--url", tools_url.clone(), "--tool", tool_name],
                 "env": {
-                    "TOOLMAN_SERVER_URL": toolman_url.clone()
+                    "TOOLS_SERVER_URL": tools_url.clone()
                 }
             });
             mcp_servers[tool_name] = server_config;
@@ -381,18 +381,18 @@ fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
 ### Remote Tool Not Working
 
 **Check:**
-1. Toolman server is running: `kubectl get pods -n agent-platform | grep toolman`
-2. Tool is configured in toolman server
+1. Tools server is running: `kubectl get pods -n agent-platform | grep tools`
+2. Tool is configured in tools server
 3. Agent has tool in `remote` array
-4. Network connectivity to toolman server
+4. Network connectivity to tools server
 
 **Debug:**
 ```bash
-# Test toolman directly
-toolman --url http://toolman.agent-platform.svc.cluster.local:3000/mcp --tool brave_search_brave_web_search
+# Test tools directly
+tools --url http://tools.agent-platform.svc.cluster.local:3000/mcp --tool brave_search_brave_web_search
 
-# Check toolman logs
-kubectl logs -n agent-platform deployment/toolman
+# Check tools logs
+kubectl logs -n agent-platform deployment/tools
 ```
 
 ### Local Server Not Starting
@@ -441,7 +441,7 @@ kubectl logs -n agent-platform <agent-pod-name>
 
 ## References
 
-- [Toolman Repository](https://github.com/5dlabs/toolman)
+- [Tools Repository](https://github.com/5dlabs/tools)
 - [MCP Specification](https://modelcontextprotocol.io)
 - [Controller MCP Integration](../../controller/src/cli/adapters/)
 - [Agent Configuration Examples](../../cto-config-example.json)

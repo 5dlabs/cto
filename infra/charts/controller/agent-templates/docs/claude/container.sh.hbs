@@ -527,7 +527,7 @@ fi
 
 echo "✓ Workspace validated"
 
-# Copy MCP servers config for Toolman if provided
+# Copy MCP servers config for Tools if provided
 if [ -f "/task-files/mcp.json" ]; then
   # Copy to both working directory (project scope) and workspace root (local scope)
   cp "/task-files/mcp.json" "$CLAUDE_WORK_DIR/.mcp.json" && echo "✓ Copied mcp.json to $CLAUDE_WORK_DIR/.mcp.json (project scope)" || echo "⚠️ mcp.json copy to working dir failed"
@@ -543,7 +543,7 @@ if [ -f "/task-files/mcp.json" ]; then
     fi
   done
 else
-  echo "ℹ️ No mcp.json provided; Toolman MCP may not be configured"
+  echo "ℹ️ No mcp.json provided; Tools MCP may not be configured"
 fi
 
 # Environment setup
@@ -553,7 +553,7 @@ export WORKING_DIR="{{working_directory}}"
 export GITHUB_USER="{{github_app}}"
 export GITHUB_APP="{{github_app}}"
 
-# Optional: copy agent-centric ToolMan client config (base from Helm/controller)
+# Optional: copy agent-centric Tools client config (base from Helm/controller)
 if [ -f "/task-files/client-config.json" ]; then
   echo "🔍 DEBUG: Source /task-files/client-config.json summary (pre-copy):"
   (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
@@ -686,7 +686,7 @@ echo "[mcp]   3. User scope: ~/.config/claude-code/.mcp.json"
 echo '=== END CONFIG DIAGNOSTICS ==='
 
 # Verify/Select client-config.json for runtime
-echo "=== TOOLMAN CONFIG SETUP ==="
+echo "=== TOOLS CONFIG SETUP ==="
 WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 
@@ -726,32 +726,32 @@ fi
 # Pre-flight MCP tool checks (fail-fast)
 echo "=== PRE-FLIGHT MCP TOOL CHECKS ==="
 
-# 1) Ensure toolman client is available when mcpServers includes it
+# 1) Ensure tools client is available when mcpServers includes it
 MCP_FILE_PROJECT="$CLAUDE_WORK_DIR/.mcp.json"
 MCP_FILE_WORKSPACE="/workspace/.mcp.json"
 if [ -f "$MCP_FILE_WORKSPACE" ] || [ -f "$MCP_FILE_PROJECT" ]; then
-  if ! command -v toolman >/dev/null 2>&1; then
-    echo "❌ 'toolman' CLI not found in PATH but required by .mcp.json. Aborting."
+  if ! command -v tools >/dev/null 2>&1; then
+    echo "❌ 'tools' CLI not found in PATH but required by .mcp.json. Aborting."
     exit 1
   fi
-  # If TOOLMAN_SERVER_URL present, attempt quick connectivity check
-  TM_URL=$(jq -r '.mcpServers.toolman.env.TOOLMAN_SERVER_URL // empty' "$MCP_FILE_WORKSPACE" 2>/dev/null || true)
+  # If TOOLS_SERVER_URL present, attempt quick connectivity check
+  TM_URL=$(jq -r '.mcpServers.tools.env.TOOLS_SERVER_URL // empty' "$MCP_FILE_WORKSPACE" 2>/dev/null || true)
   if [ -z "$TM_URL" ] && [ -f "$MCP_FILE_PROJECT" ]; then
-    TM_URL=$(jq -r '.mcpServers.toolman.env.TOOLMAN_SERVER_URL // empty' "$MCP_FILE_PROJECT" 2>/dev/null || true)
+    TM_URL=$(jq -r '.mcpServers.tools.env.TOOLS_SERVER_URL // empty' "$MCP_FILE_PROJECT" 2>/dev/null || true)
   fi
   if [ -n "$TM_URL" ]; then
-    echo "🔍 Checking Toolman endpoint: $TM_URL"
+    echo "🔍 Checking Tools endpoint: $TM_URL"
     # Treat any HTTP response as connectivity; only fail on DNS/connect/timeout errors
     HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 3 "$TM_URL" 2>/dev/null)
     CURL_RC=$?
     if [ "$CURL_RC" -ne 0 ]; then
-      echo "❌ Network error reaching Toolman MCP endpoint (curl rc=$CURL_RC): $TM_URL. Aborting."
+      echo "❌ Network error reaching Tools MCP endpoint (curl rc=$CURL_RC): $TM_URL. Aborting."
       exit 1
     fi
-    echo "✓ Toolman endpoint reachable (HTTP ${HTTP_CODE:-unknown})"
+    echo "✓ Tools endpoint reachable (HTTP ${HTTP_CODE:-unknown})"
   fi
 else
-  echo "ℹ️ No .mcp.json found; skipping toolman connectivity check"
+  echo "ℹ️ No .mcp.json found; skipping tools connectivity check"
 fi
 
 # 2) Validate local server commands defined in MCP client config

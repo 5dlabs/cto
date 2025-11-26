@@ -9,7 +9,7 @@ metadata:
     {{- with .Values.namespace.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-    # PodSecurity configuration for privileged containers (needed for Toolman)
+    # PodSecurity configuration for privileged containers (needed for Tools)
     pod-security.kubernetes.io/enforce: {{ .Values.namespace.podSecurity.enforce | default "privileged" }}
     pod-security.kubernetes.io/audit: {{ .Values.namespace.podSecurity.audit | default "privileged" }}
     pod-security.kubernetes.io/warn: {{ .Values.namespace.podSecurity.warn | default "privileged" }}

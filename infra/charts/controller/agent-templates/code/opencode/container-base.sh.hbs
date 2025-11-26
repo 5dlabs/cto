@@ -791,7 +791,7 @@ rm() {
 export -f guard_rm rm
 
 if [ ! -f "$OPENCODE_WORK_DIR/client-config.json" ]; then
-  echo "❌ client-config.json missing from workspace; required for MCP/toolman"
+  echo "❌ client-config.json missing from workspace; required for MCP/tools"
   exit 1
 fi
 
@@ -858,25 +858,25 @@ else
 fi
 
 echo "=== MCP PRECHECKS ==="
-if ! command -v toolman >/dev/null 2>&1; then
-  echo "❌ 'toolman' CLI not found in PATH; required for MCP"
+if ! command -v tools >/dev/null 2>&1; then
+  echo "❌ 'tools' CLI not found in PATH; required for MCP"
   exit 1
 fi
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-TOOLMAN_URL="${TOOLMAN_URL%/}"
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
+echo "🔍 Checking Tools endpoint: $TOOLS_URL"
 if ! curl -sSf --connect-timeout 2 --max-time 6 \
-  -X POST "$TOOLMAN_URL" \
+  -X POST "$TOOLS_URL" \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
-  cat /tmp/toolman-ping.log >&2 || true
-  rm -f /tmp/toolman-ping.log
+  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+  echo "❌ Unable to reach Tools server at $TOOLS_URL"
+  cat /tmp/tools-ping.log >&2 || true
+  rm -f /tmp/tools-ping.log
   exit 1
 fi
-rm -f /tmp/toolman-ping.log
-echo "✓ Toolman endpoint reachable"
+rm -f /tmp/tools-ping.log
+echo "✓ Tools endpoint reachable"
 
 # Verify OpenCode provider API key is set based on config
 OPENCODE_CONFIG_PATH="$HOME/.opencode/config.json"
@@ -907,8 +907,8 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
-if [ -f "$OPENCODE_WORK_DIR/task/toolman-guide.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$OPENCODE_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+if [ -f "$OPENCODE_WORK_DIR/task/tools-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$OPENCODE_WORK_DIR/task/tools-guide.md")\n\n---\n\n"
 fi
 
 PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **GitHub auth ready**: the GitHub App token (\`GH_TOKEN\`) is already configured; skip manual \`gh auth login\` flows and avoid hitting user-only endpoints like \`/user\`.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"

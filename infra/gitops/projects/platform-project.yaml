@@ -21,7 +21,7 @@ spec:
     - 'https://github.com/5dlabs/cto'
     - 'https://github.com/5dlabs/cto-apps'  # GitOps repo for Bolt-managed applications
     - 'https://github.com/5dlabs/docs'
-    - 'https://github.com/5dlabs/toolman'
+    # Note: toolman repo has been integrated into cto as the 'tools' crate
     - 'https://5dlabs.github.io/cto'
 
     - 'https://github.com/5dlabs/*'

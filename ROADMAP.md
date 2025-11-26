@@ -387,7 +387,7 @@ We welcome contributions to help build the future of AI-driven development! Prio
 ## 🔗 Related Projects
 
 - **[Tasks System](https://github.com/5dlabs/tasks)** - Task management and GitHub Projects sync
-- **[Toolman](https://github.com/5dlabs/toolman)** - Tool management and integration framework
+- **[Tools](https://github.com/5dlabs/tools)** - Tool management and integration framework
 
 
 

@@ -55,10 +55,10 @@ impl DocsTemplateGenerator {
             Self::generate_docs_prompt(docs_run)?,
         );
 
-        // Add MCP servers config to enable Toolman (reuse code/mcp.json.hbs)
+        // Add MCP servers config to enable Tools (reuse code/mcp.json.hbs)
         templates.insert("mcp.json".to_string(), Self::generate_mcp_config()?);
 
-        // Agent-centric ToolMan config for docs: generate base client-config.json
+        // Agent-centric Tools config for docs: generate base client-config.json
         // (Repo-specific cto-config.json can append at runtime in the container script.)
         templates.insert(
             "client-config.json".to_string(),
@@ -396,7 +396,7 @@ impl DocsTemplateGenerator {
                             if canonical != name {
                                 debug!(
                                     original = name,
-                                    canonical, "Normalized remote tool name using Toolman catalog"
+                                    canonical, "Normalized remote tool name using Tools catalog"
                                 );
                             }
                             normalized.push(Value::String(canonical));
@@ -411,7 +411,7 @@ impl DocsTemplateGenerator {
             if !dropped.is_empty() {
                 warn!(
                     tools = ?dropped,
-                    "Removed unknown remote tools; not present in Toolman catalog"
+                    "Removed unknown remote tools; not present in Tools catalog"
                 );
             }
 

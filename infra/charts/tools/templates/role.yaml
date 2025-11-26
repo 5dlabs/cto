@@ -1,0 +1,23 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "tools.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tools.labels" . | nindent 4 }}
+rules:
+  # Read all ConfigMaps (for tool discovery)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  # Create/update the tool catalog ConfigMap
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["tools-tool-catalog"]
+    verbs: ["update", "patch"]
+  # Create the ConfigMap if it doesn't exist
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create"]
+{{- end }}

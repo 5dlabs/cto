@@ -2,20 +2,20 @@
 
 ## Overview
 
-Context7 has been properly configured in the CTO platform to provide up-to-date library documentation and code examples to all agents through the Toolman MCP server.
+Context7 has been properly configured in the CTO platform to provide up-to-date library documentation and code examples to all agents through the Tools MCP server.
 
 ## Changes Made
 
 ### 1. External Secrets Configuration
 
-**File:** `infra/secret-store/toolman-mcp-external-secrets.yaml`
+**File:** `infra/secret-store/tools-mcp-external-secrets.yaml`
 
 Added Context7 API key secret configuration:
 ```yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
-  name: toolman-context7-secrets
+  name: tools-context7-secrets
   namespace: mcp
 spec:
   refreshInterval: 30s
@@ -23,18 +23,18 @@ spec:
     name: secret-store
     kind: ClusterSecretStore
   target:
-    name: toolman-context7-secrets
+    name: tools-context7-secrets
     creationPolicy: Owner
   data:
   - secretKey: CONTEXT7_API_KEY
     remoteRef:
-      key: toolman-context7-secrets
+      key: tools-context7-secrets
       property: CONTEXT7_API_KEY
 ```
 
-### 2. Toolman Configuration
+### 2. Tools Configuration
 
-**File:** `infra/gitops/applications/toolman.yaml`
+**File:** `infra/gitops/applications/tools.yaml`
 
 **Added:**
 - Context7 environment variable configuration in the server definition
@@ -52,7 +52,7 @@ context7:
     CONTEXT7_API_KEY: ""  # Injected from secret
 
 secretRefs:
-  - name: toolman-context7-secrets
+  - name: tools-context7-secrets
 ```
 
 ### 3. Secret Creation Script
@@ -73,42 +73,42 @@ Created helper script to add the Context7 API key to the cluster secret store.
 This will:
 1. Create the secret in the `secret-store` namespace
 2. External Secrets operator will sync it to the `mcp` namespace
-3. Toolman will pick it up on next restart
+3. Tools will pick it up on next restart
 
 ### Step 2: Verify Secret Creation
 
 ```bash
 # Check secret in secret-store namespace
-kubectl get secret toolman-context7-secrets -n secret-store
+kubectl get secret tools-context7-secrets -n secret-store
 
 # Check External Secrets synced it to mcp namespace
-kubectl get secret toolman-context7-secrets -n mcp
+kubectl get secret tools-context7-secrets -n mcp
 
 # View the ExternalSecret status
-kubectl get externalsecret toolman-context7-secrets -n mcp -o yaml
+kubectl get externalsecret tools-context7-secrets -n mcp -o yaml
 ```
 
-### Step 3: Restart Toolman
+### Step 3: Restart Tools
 
 ```bash
-# Restart Toolman to pick up the new secret
-kubectl rollout restart deployment toolman -n agent-platform
+# Restart Tools to pick up the new secret
+kubectl rollout restart deployment tools -n agent-platform
 
 # Watch the rollout
-kubectl rollout status deployment toolman -n agent-platform
+kubectl rollout status deployment tools -n agent-platform
 
 # Check logs to verify Context7 is working
-kubectl logs -n agent-platform deployment/toolman -f
+kubectl logs -n agent-platform deployment/tools -f
 ```
 
 ## Testing Context7
 
 ### Test 1: Via Cursor CLI (Local)
 
-Once Toolman is restarted with the API key:
+Once Tools is restarted with the API key:
 
 ```bash
-# Start cursor agent and connect to Toolman
+# Start cursor agent and connect to Tools
 cursor agent
 
 # In the agent, test Context7
@@ -225,13 +225,13 @@ If the External Secret isn't syncing:
 
 ```bash
 # Check ExternalSecret status
-kubectl describe externalsecret toolman-context7-secrets -n mcp
+kubectl describe externalsecret tools-context7-secrets -n mcp
 
 # Check ClusterSecretStore
 kubectl get clustersecretstore secret-store -o yaml
 
 # Verify secret exists in source namespace
-kubectl get secret toolman-context7-secrets -n secret-store
+kubectl get secret tools-context7-secrets -n secret-store
 ```
 
 ### Context7 Not Working
@@ -239,14 +239,14 @@ kubectl get secret toolman-context7-secrets -n secret-store
 If Context7 queries fail:
 
 ```bash
-# Check Toolman logs
-kubectl logs -n agent-platform deployment/toolman -f | grep -i context7
+# Check Tools logs
+kubectl logs -n agent-platform deployment/tools -f | grep -i context7
 
 # Verify environment variable is set
-kubectl exec -n agent-platform deployment/toolman -- env | grep CONTEXT7
+kubectl exec -n agent-platform deployment/tools -- env | grep CONTEXT7
 
 # Test the Context7 package directly
-kubectl exec -n agent-platform deployment/toolman -- npx -y @upstash/context7-mcp --help
+kubectl exec -n agent-platform deployment/tools -- npx -y @upstash/context7-mcp --help
 ```
 
 ### API Key Issues
@@ -255,29 +255,29 @@ If you see authentication errors:
 
 1. Verify the API key format (should start with `ctx7sk-`)
 2. Check the key is correctly set in the secret
-3. Ensure the secret is mounted to Toolman pod
-4. Restart Toolman after secret changes
+3. Ensure the secret is mounted to Tools pod
+4. Restart Tools after secret changes
 
 ## API Key Information
 
 **API Key:** `ctx7sk-df5b4d84-7418-4315-95f9-1216e24eb4e6`
 
 **Storage Location:**
-- Kubernetes Secret: `toolman-context7-secrets` in `secret-store` namespace
-- Synced to: `toolman-context7-secrets` in `mcp` namespace
-- Mounted to: Toolman deployment in `agent-platform` namespace
+- Kubernetes Secret: `tools-context7-secrets` in `secret-store` namespace
+- Synced to: `tools-context7-secrets` in `mcp` namespace
+- Mounted to: Tools deployment in `agent-platform` namespace
 
 **Security:**
 - Key is stored in Kubernetes secrets (base64 encoded)
 - Managed by External Secrets operator
-- Only accessible to Toolman service account
+- Only accessible to Tools service account
 - Not exposed in config files or logs
 
 ## Next Steps
 
 1. ✅ Run `./scripts/add-context7-secret.sh` to add the secret
 2. ✅ Verify External Secrets synced it
-3. ✅ Restart Toolman deployment
+3. ✅ Restart Tools deployment
 4. ✅ Test Context7 queries via Cursor CLI
 5. ✅ Verify agents can access Context7 in workflows
 
@@ -286,7 +286,7 @@ If you see authentication errors:
 - [Context7 Documentation](https://context7.com/docs)
 - [Context7 Installation Guide](https://context7.com/docs/installation)
 - [Context7 MCP Package](https://www.npmjs.com/package/@upstash/context7-mcp)
-- [Toolman MCP Architecture](docs/engineering/toolman-mcp-architecture.md)
+- [Tools MCP Architecture](docs/engineering/tools-mcp-architecture.md)
 
 ---
 

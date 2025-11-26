@@ -1,8 +1,8 @@
-# Agent-Centric Toolman Configuration Design
+# Agent-Centric Tools Configuration Design
 
 ## Overview
 
-This document outlines a redesign of the toolman (MCP client) configuration system, moving from task-based dynamic generation to agent-centric static configuration. This approach treats tools as inherent capabilities of agents, similar to how employees have their standard toolsets.
+This document outlines a redesign of the tools (MCP client) configuration system, moving from task-based dynamic generation to agent-centric static configuration. This approach treats tools as inherent capabilities of agents, similar to how employees have their standard toolsets.
 
 ## Problem Statement
 

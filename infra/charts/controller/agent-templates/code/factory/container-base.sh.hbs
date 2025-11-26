@@ -1475,52 +1475,52 @@ else
 fi
 
 if [ ! -f "$FACTORY_WORK_DIR/client-config.json" ]; then
-  echo "❌ client-config.json missing from workspace; required for MCP/toolman"
+  echo "❌ client-config.json missing from workspace; required for MCP/tools"
   exit 1
 fi
 
 cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true 2>/dev/null || true
 
 echo "=== MCP PRECHECKS ==="
-if ! command -v toolman >/dev/null 2>&1; then
-  echo "❌ 'toolman' CLI not found in PATH; required for MCP"
+if ! command -v tools >/dev/null 2>&1; then
+  echo "❌ 'tools' CLI not found in PATH; required for MCP"
   exit 1
 fi
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-TOOLMAN_URL="${TOOLMAN_URL%/}"
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-TOOLMAN_RETRIES=3
-TOOLMAN_WAIT=2
-TOOLMAN_SUCCESS=false
-for i in $(seq 1 $TOOLMAN_RETRIES); do
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
+echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+TOOLS_RETRIES=3
+TOOLS_WAIT=2
+TOOLS_SUCCESS=false
+for i in $(seq 1 $TOOLS_RETRIES); do
   if curl -sSf --connect-timeout 5 --max-time 10 \
-    -X POST "$TOOLMAN_URL" \
+    -X POST "$TOOLS_URL" \
     -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
-    TOOLMAN_SUCCESS=true
-    rm -f /tmp/toolman-ping.log
+    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+    TOOLS_SUCCESS=true
+    rm -f /tmp/tools-ping.log
     break
   fi
-  if [ $i -lt $TOOLMAN_RETRIES ]; then
-    echo "⚠️ Toolman connectivity check failed (attempt $i/$TOOLMAN_RETRIES), retrying in ${TOOLMAN_WAIT}s..."
-    cat /tmp/toolman-ping.log >&2 || true
-    rm -f /tmp/toolman-ping.log
-    sleep $TOOLMAN_WAIT
-    TOOLMAN_WAIT=$((TOOLMAN_WAIT * 2))  # Exponential backoff
+  if [ $i -lt $TOOLS_RETRIES ]; then
+    echo "⚠️ Tools connectivity check failed (attempt $i/$TOOLS_RETRIES), retrying in ${TOOLS_WAIT}s..."
+    cat /tmp/tools-ping.log >&2 || true
+    rm -f /tmp/tools-ping.log
+    sleep $TOOLS_WAIT
+    TOOLS_WAIT=$((TOOLS_WAIT * 2))  # Exponential backoff
   fi
 done
 
-if [ "$TOOLMAN_SUCCESS" != "true" ]; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL after $TOOLMAN_RETRIES attempts"
-  cat /tmp/toolman-ping.log >&2 || true
-  rm -f /tmp/toolman-ping.log
+if [ "$TOOLS_SUCCESS" != "true" ]; then
+  echo "❌ Unable to reach Tools server at $TOOLS_URL after $TOOLS_RETRIES attempts"
+  cat /tmp/tools-ping.log >&2 || true
+  rm -f /tmp/tools-ping.log
   echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
-  echo "⚠️ If Factory execution fails, check Toolman service health and DNS resolution."
-  # Don't exit - allow Factory to proceed in case Toolman comes back online
+  echo "⚠️ If Factory execution fails, check Tools service health and DNS resolution."
+  # Don't exit - allow Factory to proceed in case Tools comes back online
   # The MCP client will handle connection failures gracefully
 fi
-echo "✓ Toolman endpoint check completed"
+echo "✓ Tools endpoint check completed"
 
 if command -v jq >/dev/null 2>&1; then
   echo "[client-config] summary:"
@@ -1541,14 +1541,14 @@ echo "════════════════════════�
 
 TOOL_VERIFICATION_FAILED=false
 
-# All remote tools are accessed via Toolman
-# Toolman connectivity is verified above - no additional tool-specific checks needed
+# All remote tools are accessed via Tools
+# Tools connectivity is verified above - no additional tool-specific checks needed
 
-# Verify Toolman connectivity (already checked above, just summarize)
-if [ "$TOOLMAN_SUCCESS" = "true" ]; then
-  echo "✓ Toolman connectivity verified"
+# Verify Tools connectivity (already checked above, just summarize)
+if [ "$TOOLS_SUCCESS" = "true" ]; then
+  echo "✓ Tools connectivity verified"
 else
-  echo "⚠️ Toolman connectivity check failed (proceeding anyway)"
+  echo "⚠️ Tools connectivity check failed (proceeding anyway)"
 fi
 
 # Use droid --list-tools to verify MCP tools are available
@@ -1605,7 +1605,7 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
   echo "Critical tools are not available. Cannot proceed with task."
   echo ""
   echo "Common issues:"
-  echo "  - Toolman server not reachable"
+  echo "  - Tools server not reachable"
   echo "  - MCP servers not initialized properly"
   echo "  - client-config.json misconfigured"
   echo ""
@@ -1620,7 +1620,7 @@ echo ""
 # =========================================================================
 
 # =========================================================================
-# MCP TOOLS COMPARISON: Configured vs Available from Toolman
+# MCP TOOLS COMPARISON: Configured vs Available from Tools
 # =========================================================================
 echo ""
 echo "════════════════════════════════════════════════════════════════"
@@ -1682,43 +1682,43 @@ echo ""
 echo ""
 
 # -------------------------------------------------------------------------
-# LIST 2: Tools actually available from Toolman
+# LIST 2: Tools actually available from Tools
 # -------------------------------------------------------------------------
-echo "📋 LIST 2: AVAILABLE TOOLS (from Toolman MCP server)"
+echo "📋 LIST 2: AVAILABLE TOOLS (from Tools MCP server)"
 echo "────────────────────────────────────────────────────────────────"
 
 AVAILABLE_TOOLS_FILE="/tmp/available-tools.txt"
 rm -f "$AVAILABLE_TOOLS_FILE"
 touch "$AVAILABLE_TOOLS_FILE"
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-TOOLMAN_URL="${TOOLMAN_URL%/}"
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
 
-# Query Toolman for available tools via MCP protocol
-TOOLMAN_RESPONSE=$(curl -sS --connect-timeout 10 --max-time 30 \
-  -X POST "$TOOLMAN_URL" \
+# Query Tools for available tools via MCP protocol
+TOOLS_RESPONSE=$(curl -sS --connect-timeout 10 --max-time 30 \
+  -X POST "$TOOLS_URL" \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":"list-tools","method":"tools/list","params":{}}' 2>/dev/null)
 
-if [ -n "$TOOLMAN_RESPONSE" ] && echo "$TOOLMAN_RESPONSE" | jq -e '.result.tools' >/dev/null 2>&1; then
-  # Extract tool names from Toolman response
-  AVAILABLE_TOOLS=$(echo "$TOOLMAN_RESPONSE" | jq -r '.result.tools[].name // empty' 2>/dev/null | sort)
+if [ -n "$TOOLS_RESPONSE" ] && echo "$TOOLS_RESPONSE" | jq -e '.result.tools' >/dev/null 2>&1; then
+  # Extract tool names from Tools response
+  AVAILABLE_TOOLS=$(echo "$TOOLS_RESPONSE" | jq -r '.result.tools[].name // empty' 2>/dev/null | sort)
   if [ -n "$AVAILABLE_TOOLS" ]; then
     echo "$AVAILABLE_TOOLS" > "$AVAILABLE_TOOLS_FILE"
     AVAILABLE_COUNT=$(echo "$AVAILABLE_TOOLS" | wc -l | tr -d ' ')
-    echo "Tools from Toolman ($AVAILABLE_COUNT):"
+    echo "Tools from Tools ($AVAILABLE_COUNT):"
     echo "$AVAILABLE_TOOLS" | while read -r tool; do
       echo "  • $tool"
     done
     echo ""
     echo "📊 Total available: $AVAILABLE_COUNT"
   else
-    echo "⚠️ Toolman returned empty tool list"
+    echo "⚠️ Tools returned empty tool list"
     AVAILABLE_COUNT=0
   fi
 else
-  echo "⚠️ Could not query Toolman for available tools"
-  echo "   Response: ${TOOLMAN_RESPONSE:-"(empty)"}"
+  echo "⚠️ Could not query Tools for available tools"
+  echo "   Response: ${TOOLS_RESPONSE:-"(empty)"}"
   AVAILABLE_COUNT=0
 fi
 
@@ -1741,7 +1741,7 @@ if [ -s "$CONFIGURED_TOOLS_FILE" ] && [ -s "$AVAILABLE_TOOLS_FILE" ]; then
       echo "  ✅ $configured_tool"
       MATCHED=$((MATCHED + 1))
     else
-      echo "  ❌ $configured_tool (NOT FOUND in Toolman)"
+      echo "  ❌ $configured_tool (NOT FOUND in Tools)"
       MISSING=$((MISSING + 1))
       MISSING_TOOLS="${MISSING_TOOLS}${configured_tool}\n"
     fi
@@ -1759,18 +1759,18 @@ if [ -s "$CONFIGURED_TOOLS_FILE" ] && [ -s "$AVAILABLE_TOOLS_FILE" ]; then
       [ -n "$tool" ] && echo "   • $tool"
     done
     echo ""
-    echo "These tools are configured but not available from Toolman."
+    echo "These tools are configured but not available from Tools."
     echo "Check tool names match exactly (underscores vs hyphens, spelling)."
   else
     echo ""
-    echo "✅ All configured tools are available from Toolman!"
+    echo "✅ All configured tools are available from Tools!"
   fi
 else
   if [ ! -s "$CONFIGURED_TOOLS_FILE" ]; then
     echo "⚠️ No configured tools to compare"
   fi
   if [ ! -s "$AVAILABLE_TOOLS_FILE" ]; then
-    echo "⚠️ Could not get available tools from Toolman for comparison"
+    echo "⚠️ Could not get available tools from Tools for comparison"
   fi
 fi
 
@@ -1786,7 +1786,7 @@ echo ""
 # -------------------------------------------------------------------------
 echo "📋 REFERENCE: Factory Built-in Tools (via droid)"
 echo "────────────────────────────────────────────────────────────────"
-echo "ℹ️ These are Factory's native tools, separate from MCP/Toolman tools"
+echo "ℹ️ These are Factory's native tools, separate from MCP/Tools tools"
 echo ""
 
 if command -v droid >/dev/null 2>&1; then
@@ -1830,12 +1830,12 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
-if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
-  ensure_default_toolman_guide "$FACTORY_WORK_DIR/task" "{{task_id}}" "{{service}}"
+if declare -F ensure_default_tools_guide >/dev/null 2>&1; then
+  ensure_default_tools_guide "$FACTORY_WORK_DIR/task" "{{task_id}}" "{{service}}"
 fi
 
-if [ -f "$FACTORY_WORK_DIR/task/toolman-guide.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$FACTORY_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+if [ -f "$FACTORY_WORK_DIR/task/tools-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$FACTORY_WORK_DIR/task/tools-guide.md")\n\n---\n\n"
 fi
 
 PR_STAGE="${WORKFLOW_STAGE:-implementation}"

@@ -702,7 +702,7 @@ if [ -d "$TASK_DIR" ]; then
     cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
     cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
     cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/tools-guide.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
     echo "✓ Task {{task_id}} files copied"
 fi
 
@@ -741,7 +741,7 @@ echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-
 echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
 
 # Verify client-config.json is available and valid
-echo "=== TOOLMAN CONFIG SETUP ==="
+echo "=== TOOLS CONFIG SETUP ==="
 WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 
@@ -1196,17 +1196,17 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 
 3. **Deploy to Kubernetes (MANDATORY FOR END-TO-END VALIDATION)**:
    - Tess must execute a full integration smoke test in the live Kubernetes environment.
-   - Use Toolman MCP Kubernetes commands (preferred) for all cluster operations. Fall back to local `kubectl` only if required.
+   - Use Tools MCP Kubernetes commands (preferred) for all cluster operations. Fall back to local `kubectl` only if required.
    - Quick capability test:
-     * `toolman kubernetes_listResources --kind namespaces`
-     * `toolman kubernetes_getPodsLogs --namespace test-$TASK_ID --pod <pod>`
+     * `tools kubernetes_listResources --kind namespaces`
+     * `tools kubernetes_getPodsLogs --namespace test-$TASK_ID --pod <pod>`
    - End-to-end expectations when cluster access exists:
-     a) **Create namespace** for the test (via Toolman `kubernetes_createResource` or `kubectl create ns test-$TASK_ID`).
+     a) **Create namespace** for the test (via Tools `kubernetes_createResource` or `kubectl create ns test-$TASK_ID`).
      b) **Deploy** the universal chart and wait for pods to become ready.
-     c) **Verify pod health** (Toolman list pods / `kubectl get pods`).
+     c) **Verify pod health** (Tools list pods / `kubectl get pods`).
      d) **Exercise the service** (port-forward and hit health/test endpoints).
      e) **Teardown** namespace to avoid orphaned resources.
-   - If both Toolman and local `kubectl` are unavailable, record that in the PR review; otherwise a deployment check is required before approval.
+   - If both Tools and local `kubectl` are unavailable, record that in the PR review; otherwise a deployment check is required before approval.
    - Always include the exact commands/tool invocations in the review summary so operators can audit the run.
 
 4. **Task $TASK_ID Acceptance Criteria (100% or REJECT)**:
@@ -1307,9 +1307,9 @@ If you have kubectl access, deploy the application to verify it works:
 \`\`\`bash
 # 1. Check if we can actually deploy (skip Docker build/push - image should exist)
 if ! kubectl version --short 2>/dev/null; then
-  echo "ℹ️ Local kubectl not configured. Use Toolman MCP Kubernetes commands instead (e.g. 'toolman kubernetes_createResource', 'toolman kubernetes_listResources')."
-  echo "⚠️ If Toolman commands also fail, document the lack of cluster access in your PR review."
-  # Don't exit - continue with other tests (Toolman commands can still be used manually)
+  echo "ℹ️ Local kubectl not configured. Use Tools MCP Kubernetes commands instead (e.g. 'tools kubernetes_createResource', 'tools kubernetes_listResources')."
+  echo "⚠️ If Tools commands also fail, document the lack of cluster access in your PR review."
+  # Don't exit - continue with other tests (Tools commands can still be used manually)
 fi
 
 # 2. Create or use test namespace (idempotent)
@@ -1401,7 +1401,7 @@ if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
   kubectl delete namespace test-$TASK_ID --wait=false || true
 else
   echo "ℹ️ Kubernetes deployment skipped - no access or chart missing"
-  echo "   ➤ Double-check Toolman MCP commands before skipping entirely."
+  echo "   ➤ Double-check Tools MCP commands before skipping entirely."
 fi
 \`\`\`
 

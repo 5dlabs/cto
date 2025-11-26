@@ -1397,7 +1397,7 @@ else
 fi
 
 # Verify client-config.json is available and valid
-echo "=== TOOLMAN CONFIG SETUP ==="
+echo "=== TOOLS CONFIG SETUP ==="
 WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 
@@ -1868,7 +1868,7 @@ echo ""
 echo "📖 How MCP Tool Validation Works:"
 echo "  1. Check if claude CLI is available"
 echo "  2. List all configured MCP servers (claude mcp list)"
-echo "  3. Verify required servers are connected (toolman for Cipher)"
+echo "  3. Verify required servers are connected (tools for Cipher)"
 echo "  4. Attempt to list available tools from each server"
 echo "  5. Ensure critical tools are accessible"
 echo ""
@@ -1890,7 +1890,7 @@ if command -v claude >/dev/null 2>&1; then
   fi
   
   # Cipher needs: Context7, GitHub
-  REQUIRED_SERVERS=("toolman")
+  REQUIRED_SERVERS=("tools")
   
   echo ""
   echo "🔍 Verifying required MCP servers..."
@@ -1906,20 +1906,20 @@ if command -v claude >/dev/null 2>&1; then
   echo ""
   echo "📦 Listing available MCP tools from connected servers..."
   
-  # Try to list tools from the toolman server
-  if echo "$MCP_LIST" | grep -q "toolman.*Connected"; then
-    # Extract toolman URL from MCP list
-    TOOLMAN_URL=$(echo "$MCP_LIST" | grep "toolman" | sed -n 's/.*--url \([^ ]*\).*/\1/p' | head -1)
-    if [ -z "$TOOLMAN_URL" ]; then
+  # Try to list tools from the tools server
+  if echo "$MCP_LIST" | grep -q "tools.*Connected"; then
+    # Extract tools URL from MCP list
+    TOOLS_URL=$(echo "$MCP_LIST" | grep "tools" | sed -n 's/.*--url \([^ ]*\).*/\1/p' | head -1)
+    if [ -z "$TOOLS_URL" ]; then
       # Fallback to known URL if extraction fails
-      TOOLMAN_URL="http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+      TOOLS_URL="http://tools.agent-platform.svc.cluster.local:3000/mcp"
     fi
     
-    echo "  🔧 Toolman server tools (from $TOOLMAN_URL):"
+    echo "  🔧 Tools server tools (from $TOOLS_URL):"
     
     # Try to get tool list via direct MCP query
-    # Note: This assumes toolman MCP server supports a tools/list endpoint
-    TOOLS_RESPONSE=$(curl -s -X POST "$TOOLMAN_URL" \
+    # Note: This assumes tools MCP server supports a tools/list endpoint
+    TOOLS_RESPONSE=$(curl -s -X POST "$TOOLS_URL" \
       -H "Content-Type: application/json" \
       -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' 2>/dev/null || echo "")
     
@@ -1951,7 +1951,7 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
   echo "Critical MCP servers are not available. Cannot proceed with task."
   echo ""
   echo "Common issues:"
-  echo "  - Toolman server not reachable"
+  echo "  - Tools server not reachable"
   echo "  - MCP servers not initialized properly"
   echo "  - .mcp.json misconfigured"
   echo ""

@@ -34,7 +34,7 @@
     "remote": {
       "enabled": true,
       "env": {
-        "TOOLMAN_SERVER_URL": "{{agent.toolman_url}}"
+        "TOOLS_SERVER_URL": "{{agent.tools_url}}"
       }{{#if agent.remote_tools}},
       "availableTools": [{{#each agent.remote_tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
       {{/if}}

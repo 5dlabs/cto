@@ -710,10 +710,10 @@ if [ -d "$TASK_DIR" ]; then
     fi
     
     # Copy optional files
-    if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-        safe_copy_file "$TASK_DIR/toolman-guide.md" "$DEST_TASK_DIR/toolman-guide.md" "toolman-guide.md"
+    if [ -f "$TASK_DIR/tools-guide.md" ]; then
+        safe_copy_file "$TASK_DIR/tools-guide.md" "$DEST_TASK_DIR/tools-guide.md" "tools-guide.md"
     else
-        echo "ℹ️ toolman-guide.md not found - code agent won't have tool usage guidance"
+        echo "ℹ️ tools-guide.md not found - code agent won't have tool usage guidance"
     fi
 
     if declare -F ensure_default_client_config >/dev/null 2>&1; then
@@ -1054,12 +1054,12 @@ else
     exit 1
 fi
 
-if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
-    ensure_default_toolman_guide "$TASK_FINAL_DIR" "{{task_id}}" "{{service}}"
+if declare -F ensure_default_tools_guide >/dev/null 2>&1; then
+    ensure_default_tools_guide "$TASK_FINAL_DIR" "{{task_id}}" "{{service}}"
 fi
 
 # Verify client-config.json is available in Claude's working directory
-echo "=== TOOLMAN CONFIG SETUP ==="
+echo "=== TOOLS CONFIG SETUP ==="
 WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 
@@ -1859,25 +1859,25 @@ You are assigned to work on **TASK {{task_id}} ONLY**.
         
         "
 
-        # Add toolman guidance if available
-        if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
+        # Add tools guidance if available
+        if [ -f "$CLAUDE_WORK_DIR/task/tools-guide.md" ]; then
             PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **Tool Usage Reference**
 
-Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/toolman-guide.md\`. This file contains:
+Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/tools-guide.md\`. This file contains:
 - Selected tools for this specific task
 - When and how to use each tool
 - Tool arguments, parameters, and configuration options
 - Implementation workflow and best practices
 - Tool relationships and sequencing
 
-**The toolman-guide.md is your authoritative reference for tool usage in this task.**
+**The tools-guide.md is your authoritative reference for tool usage in this task.**
 
 ---
 
 "
-            echo "✓ Including task isolation instructions and toolman guidance"
+            echo "✓ Including task isolation instructions and tools guidance"
         else
-            echo "✓ Including task isolation instructions (no toolman guide found)"
+            echo "✓ Including task isolation instructions (no tools guide found)"
         fi
 
         # CRITICAL: Inject frontend validation and Playwright requirements for Tess

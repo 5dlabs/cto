@@ -161,7 +161,7 @@ verify_task_files() {
     # Optional files to check
     local optional_files=(
         "architecture.md"
-        "toolman-guide.md"
+        "tools-guide.md"
         "tasks.json"
     )
     
@@ -302,33 +302,33 @@ ensure_default_client_config() {
     return 1
 }
 
-# Ensure toolman-guide.md exists with baseline QA/implementation workflow guidance
-# Usage: ensure_default_toolman_guide "/path/to/task/dir" "task_id" "service"
-ensure_default_toolman_guide() {
+# Ensure tools-guide.md exists with baseline QA/implementation workflow guidance
+# Usage: ensure_default_tools_guide "/path/to/task/dir" "task_id" "service"
+ensure_default_tools_guide() {
     local task_dir="$1"
     local task_id="${2:-unknown}"
     local service_name="${3:-unknown service}"
     local guide_file
 
     if [ -z "$task_dir" ]; then
-        echo "⚠️ ensure_default_toolman_guide called without task directory"
+        echo "⚠️ ensure_default_tools_guide called without task directory"
         return 1
     fi
 
-    guide_file="$task_dir/toolman-guide.md"
+    guide_file="$task_dir/tools-guide.md"
 
     if [ -f "$guide_file" ] && [ -s "$guide_file" ]; then
-        echo "✓ toolman-guide.md already present at $guide_file"
+        echo "✓ tools-guide.md already present at $guide_file"
         return 0
     fi
 
-    if ! safe_ensure_directory "$task_dir" "task directory for toolman guide"; then
-        echo "⚠️ Unable to prepare task directory ($task_dir) for toolman guide"
+    if ! safe_ensure_directory "$task_dir" "task directory for tools guide"; then
+        echo "⚠️ Unable to prepare task directory ($task_dir) for tools guide"
         return 1
     fi
 
     cat >"$guide_file" <<EOF
-# Toolman Guide – ${service_name} · Task ${task_id}
+# Tools Guide – ${service_name} · Task ${task_id}
 
 ## Mission
 - Validate the implementation for **${service_name}** against \`task/acceptance-criteria.md\`.
@@ -371,6 +371,6 @@ If the task includes security or tooling checks (gitleaks, trivy, etc.), run tho
 Following this guide ensures every CLI agent (Cursor, Claude, Codex, OpenCode, Factory, Tess) behaves consistently and delivers actionable verification for Task ${task_id}.
 EOF
 
-    echo "🛠️ Created fallback toolman-guide.md at $guide_file"
+    echo "🛠️ Created fallback tools-guide.md at $guide_file"
     return 0
 }

@@ -1,13 +1,13 @@
 {{!--
-Toolman Catalog Markdown Template for Docs Agent
+Tools Catalog Markdown Template for Docs Agent
 ================================================
 
-This template renders the toolman catalog data into markdown format for embedding
+This template renders the tools catalog data into markdown format for embedding
 in the docs agent's prompt. The agent uses this information to select appropriate
-tools when generating task-specific toolman-config.json files.
+tools when generating task-specific tools-config.json files.
 
 Template Variables:
-- toolman_catalog: Complete tool catalog from toolman-tool-catalog ConfigMap
+- tools_catalog: Complete tool catalog from tools-tool-catalog ConfigMap
 - total_tool_count: Total number of available tools
 - generated_timestamp: Unix timestamp of generation
 --}}
@@ -23,7 +23,7 @@ Use this catalog to select appropriate tools for each task based on implementati
 
 Local servers run within the agent's environment and provide file system and local operations.
 
-{{#each toolman_catalog.local}}
+{{#each tools_catalog.local}}
 ### {{@key}} Server
 
 **Description**: {{this.description}}
@@ -44,7 +44,7 @@ Local servers run within the agent's environment and provide file system and loc
 
 Remote tools are available via MCP servers running in the cluster.
 
-{{#each toolman_catalog.remote}}
+{{#each tools_catalog.remote}}
 ### {{@key}} Server
 
 **Description**: {{this.description}}
@@ -65,12 +65,12 @@ Remote tools are available via MCP servers running in the cluster.
 
 1. **Analyze Task Requirements**: Read the task description and implementation details carefully
 2. **Match Categories**: Look for tools whose categories align with your task needs:
-   {{#each toolman_catalog.local}}
+   {{#each tools_catalog.local}}
      {{#each this.tools}}
    - **{{this.category}}**: {{this.description}}
      {{/each}}
    {{/each}}
-   {{#each toolman_catalog.remote}}
+   {{#each tools_catalog.remote}}
      {{#each this.tools}}
    - **{{this.category}}**: {{this.description}}
      {{/each}}

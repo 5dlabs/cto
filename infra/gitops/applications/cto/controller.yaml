@@ -1,15 +1,17 @@
 ---
 # Argo CD Application for Platform Controller
 # This enables GitOps deployment of the controller service
+# Part of the CTO App of Apps (parent: cto.yaml)
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: controller
+  name: cto-controller
   namespace: argocd
   labels:
     app.kubernetes.io/name: controller
-    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/managed-by: cto-app-of-apps
   annotations:
     # Exclude CRDs from GitOps management (managed by existing Helm release)
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true

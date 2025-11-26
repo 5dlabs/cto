@@ -1,18 +1,18 @@
 {
   "mcpServers": {
-    "toolman": {
-      "command": "toolman",
+    "tools": {
+      "command": "tools",
       "args": [
         "--url",
-        "{{toolman_url}}",
+        "{{tools_url}}",
         "--working-dir",
         "/workspace"
       ],
       "env": {
-        "TOOLMAN_SERVER_URL": "{{toolman_url}}"
-      }{{#if toolman_tools}},
+        "TOOLS_SERVER_URL": "{{tools_url}}"
+      }{{#if tools_tools}},
       "availableTools": [
-        {{#each toolman_tools}}
+        {{#each tools_tools}}
         "{{this}}"{{#unless @last}},{{/unless}}
         {{/each}}
       ]{{/if}}

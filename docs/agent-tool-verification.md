@@ -13,7 +13,7 @@ Claude Code automatically lists available MCP servers and tools during initializ
 ```
 ✓ MCP servers initialized:
   - context7 (2 tools)
-  - toolman (78 tools)
+  - tools (78 tools)
 ```
 
 **No additional verification needed** - Claude will fail if tools aren't available.
@@ -26,7 +26,7 @@ Factory doesn't have a built-in tool listing command, but tools are documented i
 
 1. **Check Memory File**
    ```bash
-   cat agents.md | grep -A 20 "Toolman Tools"
+   cat agents.md | grep -A 20 "Tools Tools"
    ```
    This shows all tools that should be available.
 
@@ -121,12 +121,12 @@ else
     VERIFICATION_FAILED=true
 fi
 
-# Test Toolman
-if [ -n "${TOOLMAN_SERVER_URL:-}" ]; then
-    echo "✓ TOOLMAN_SERVER_URL is set: ${TOOLMAN_SERVER_URL}"
-    test_tool "Toolman connectivity" "timeout 5 curl -s ${TOOLMAN_SERVER_URL}/health"
+# Test Tools
+if [ -n "${TOOLS_SERVER_URL:-}" ]; then
+    echo "✓ TOOLS_SERVER_URL is set: ${TOOLS_SERVER_URL}"
+    test_tool "Tools connectivity" "timeout 5 curl -s ${TOOLS_SERVER_URL}/health"
 else
-    echo "⚠️ TOOLMAN_SERVER_URL not set (may not be required)"
+    echo "⚠️ TOOLS_SERVER_URL not set (may not be required)"
 fi
 
 # Test GitHub CLI (if needed)
@@ -255,13 +255,13 @@ fi
 echo "✓ Context7 configured with API key"
 {{/if}}
 
-# Test Toolman if configured
+# Test Tools if configured
 {{#if remote_tools}}
-if [ -z "${TOOLMAN_SERVER_URL:-}" ]; then
-    echo "❌ TOOLMAN_SERVER_URL not set but remote tools are configured"
+if [ -z "${TOOLS_SERVER_URL:-}" ]; then
+    echo "❌ TOOLS_SERVER_URL not set but remote tools are configured"
     exit 1
 fi
-echo "✓ Toolman URL configured: ${TOOLMAN_SERVER_URL}"
+echo "✓ Tools URL configured: ${TOOLS_SERVER_URL}"
 {{/if}}
 
 echo "✅ Tool verification complete"

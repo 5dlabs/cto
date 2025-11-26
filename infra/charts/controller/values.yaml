@@ -1089,7 +1089,7 @@ fullnameOverride: ""
 namespace:
   create: true
   name: "agent-platform"
-  # PodSecurity configuration (required for Toolman's Docker-in-Docker)
+  # PodSecurity configuration (required for Tools's Docker-in-Docker)
   podSecurity:
     enforce: "privileged"
     audit: "privileged"

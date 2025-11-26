@@ -83,7 +83,7 @@ Keep these for core platform functionality:
 - `external-secrets` - Secrets management
 - `postgres-operator`, `redis-operator` - Database operators
 - `doc-server` - Documentation service
-- `toolman` - Tool management
+- `tools` - Tool management
 - `k8s-mcp` - Kubernetes MCP server
 - `ngrok-operator`, `ngrok-gateway` - External access
 - `external-dns` - DNS management

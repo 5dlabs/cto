@@ -1293,13 +1293,13 @@ fi
 
 # Check if client-config.json exists in working directory
 if [ ! -f "$CURSOR_WORK_DIR/client-config.json" ]; then
-  echo "❌ client-config.json missing from workspace; required for MCP/toolman"
+  echo "❌ client-config.json missing from workspace; required for MCP/tools"
   exit 1
 fi
 
 echo "=== MCP PRECHECKS ==="
-if ! command -v toolman >/dev/null 2>&1; then
-  echo "❌ 'toolman' CLI not found in PATH; required for MCP"
+if ! command -v tools >/dev/null 2>&1; then
+  echo "❌ 'tools' CLI not found in PATH; required for MCP"
   exit 1
 fi
 
@@ -1346,40 +1346,40 @@ fi
 MCP_CLIENT_CONFIG="$TARGET_CFG"
 export MCP_CLIENT_CONFIG
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-TOOLMAN_URL="${TOOLMAN_URL%/}"
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-TOOLMAN_RETRIES=3
-TOOLMAN_WAIT=2
-TOOLMAN_SUCCESS=false
-for i in $(seq 1 $TOOLMAN_RETRIES); do
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
+echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+TOOLS_RETRIES=3
+TOOLS_WAIT=2
+TOOLS_SUCCESS=false
+for i in $(seq 1 $TOOLS_RETRIES); do
   if curl -sSf --connect-timeout 5 --max-time 10 \
-    -X POST "$TOOLMAN_URL" \
+    -X POST "$TOOLS_URL" \
     -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
-    TOOLMAN_SUCCESS=true
-    rm -f /tmp/toolman-ping.log
+    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+    TOOLS_SUCCESS=true
+    rm -f /tmp/tools-ping.log
     break
   fi
-  if [ $i -lt $TOOLMAN_RETRIES ]; then
-    echo "⚠️ Toolman connectivity check failed (attempt $i/$TOOLMAN_RETRIES), retrying in ${TOOLMAN_WAIT}s..."
-    cat /tmp/toolman-ping.log >&2 || true
-    rm -f /tmp/toolman-ping.log
-    sleep $TOOLMAN_WAIT
-    TOOLMAN_WAIT=$((TOOLMAN_WAIT * 2))  # Exponential backoff
+  if [ $i -lt $TOOLS_RETRIES ]; then
+    echo "⚠️ Tools connectivity check failed (attempt $i/$TOOLS_RETRIES), retrying in ${TOOLS_WAIT}s..."
+    cat /tmp/tools-ping.log >&2 || true
+    rm -f /tmp/tools-ping.log
+    sleep $TOOLS_WAIT
+    TOOLS_WAIT=$((TOOLS_WAIT * 2))  # Exponential backoff
   fi
 done
 
-if [ "$TOOLMAN_SUCCESS" != "true" ]; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL after $TOOLMAN_RETRIES attempts"
-  cat /tmp/toolman-ping.log >&2 || true
-  rm -f /tmp/toolman-ping.log
+if [ "$TOOLS_SUCCESS" != "true" ]; then
+  echo "❌ Unable to reach Tools server at $TOOLS_URL after $TOOLS_RETRIES attempts"
+  cat /tmp/tools-ping.log >&2 || true
+  rm -f /tmp/tools-ping.log
   echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
-  echo "⚠️ If Cursor execution fails, check Toolman service health and DNS resolution."
-  # Don't exit - allow Cursor to proceed in case Toolman comes back online
+  echo "⚠️ If Cursor execution fails, check Tools service health and DNS resolution."
+  # Don't exit - allow Cursor to proceed in case Tools comes back online
   # The MCP client will handle connection failures gracefully
 fi
-echo "✓ Toolman endpoint check completed"
+echo "✓ Tools endpoint check completed"
 
 if command -v jq >/dev/null 2>&1; then
   echo "[client-config] summary:"
@@ -1465,12 +1465,12 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
-if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
-  ensure_default_toolman_guide "$CURSOR_WORK_DIR/task" "{{task_id}}" "{{service}}"
+if declare -F ensure_default_tools_guide >/dev/null 2>&1; then
+  ensure_default_tools_guide "$CURSOR_WORK_DIR/task" "{{task_id}}" "{{service}}"
 fi
 
-if [ -f "$CURSOR_WORK_DIR/task/toolman-guide.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CURSOR_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+if [ -f "$CURSOR_WORK_DIR/task/tools-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CURSOR_WORK_DIR/task/tools-guide.md")\n\n---\n\n"
 fi
 
 PR_STAGE="${WORKFLOW_STAGE:-implementation}"
@@ -1695,13 +1695,13 @@ if command -v cursor-agent >/dev/null 2>&1; then
     TOOL_VERIFICATION_FAILED=true
   fi
   
-  # Check for toolman server (required for remote tools)
+  # Check for tools server (required for remote tools)
   echo ""
-  echo "🔍 Verifying Toolman MCP server..."
-  if echo "$MCP_LIST" | grep -qi "toolman"; then
-    echo "  ✓ toolman server configured"
+  echo "🔍 Verifying Tools MCP server..."
+  if echo "$MCP_LIST" | grep -qi "tools"; then
+    echo "  ✓ tools server configured"
   else
-    echo "  ❌ toolman server NOT configured"
+    echo "  ❌ tools server NOT configured"
     TOOL_VERIFICATION_FAILED=true
   fi
   
@@ -1748,7 +1748,7 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
   echo "Critical MCP servers are not available. Cannot proceed with task."
   echo ""
   echo "Common issues:"
-  echo "  - Toolman server not reachable"
+  echo "  - Tools server not reachable"
   echo "  - MCP servers not initialized properly"
   echo "  - .cursor/mcp.json misconfigured"
   echo ""

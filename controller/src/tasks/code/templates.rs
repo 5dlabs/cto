@@ -38,7 +38,7 @@ struct CliRenderSettings {
     auto_level: Option<String>,
     output_format: Option<String>,
     editor_vim_mode: bool,
-    toolman_url: String,
+    tools_url: String,
     model_provider: Value,
     raw_additional_toml: Option<String>,
     raw_additional_json: Option<String>,
@@ -458,7 +458,7 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
-            "toolman": {
+            "tools": {
                 "tools": remote_tools,
             },
         });
@@ -499,8 +499,8 @@ impl CodeTemplateGenerator {
             "sandbox_mode": render_settings.sandbox_mode,
             "project_doc_max_bytes": render_settings.project_doc_max_bytes,
             "editor_vim_mode": render_settings.editor_vim_mode,
-            "toolman": {
-                "url": render_settings.toolman_url,
+            "tools": {
+                "url": render_settings.tools_url,
                 "tools": remote_tools,
             },
         });
@@ -551,8 +551,8 @@ impl CodeTemplateGenerator {
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let context = json!({
-            "toolman": {
-                "url": render_settings.toolman_url,
+            "tools": {
+                "url": render_settings.tools_url,
                 "tools": remote_tools,
             },
         });
@@ -764,7 +764,7 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
-            "toolman": {
+            "tools": {
                 "tools": remote_tools,
             },
         });
@@ -806,8 +806,8 @@ impl CodeTemplateGenerator {
             "editor_vim_mode": render_settings.editor_vim_mode,
             "reasoning_effort": render_settings.reasoning_effort,
             "auto_level": render_settings.auto_level,
-            "toolman": {
-                "url": render_settings.toolman_url,
+            "tools": {
+                "url": render_settings.tools_url,
                 "tools": remote_tools,
             },
             "cli_config": cli_config,
@@ -1019,7 +1019,7 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
-            "toolman": {
+            "tools": {
                 "tools": remote_tools,
             },
         });
@@ -1075,7 +1075,7 @@ impl CodeTemplateGenerator {
                 ))
             })?;
 
-        // Get CLI config to extract toolman URL and tools
+        // Get CLI config to extract tools URL and tools
         let cli_config_value = code_run
             .spec
             .cli_config
@@ -1092,8 +1092,8 @@ impl CodeTemplateGenerator {
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
         let context = json!({
-            "toolman_url": render_settings.toolman_url,
-            "toolman_tools": remote_tools,
+            "tools_url": render_settings.tools_url,
+            "tools_tools": remote_tools,
         });
 
         handlebars.render("mcp_config", &context).map_err(|e| {
@@ -1237,7 +1237,7 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
-            "toolman": {
+            "tools": {
                 "tools": remote_tools,
             },
         });
@@ -1360,18 +1360,18 @@ impl CodeTemplateGenerator {
             .and_then(|editor| editor.get("vimMode").and_then(Value::as_bool))
             .unwrap_or(false);
 
-        let mut toolman_url = settings
-            .get("toolmanUrl")
+        let mut tools_url = settings
+            .get("toolsUrl")
             .and_then(Value::as_str)
             .map_or_else(
                 || {
-                    std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                        "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                    std::env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+                        "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
                     })
                 },
                 std::string::ToString::to_string,
             );
-        toolman_url = toolman_url.trim_end_matches('/').to_string();
+        tools_url = tools_url.trim_end_matches('/').to_string();
 
         let model_provider = settings
             .get("modelProvider")
@@ -1482,7 +1482,7 @@ impl CodeTemplateGenerator {
             auto_level,
             output_format,
             editor_vim_mode,
-            toolman_url,
+            tools_url,
             model_provider,
             raw_additional_toml,
             raw_additional_json,
@@ -1531,8 +1531,8 @@ impl CodeTemplateGenerator {
             "approval_policy": render_settings.approval_policy,
             "sandbox_mode": render_settings.sandbox_mode,
             "project_doc_max_bytes": render_settings.project_doc_max_bytes,
-            "toolman": {
-                "url": render_settings.toolman_url,
+            "tools": {
+                "url": render_settings.tools_url,
                 "tools": remote_tools,
             },
             "model_provider": render_settings.model_provider,
@@ -1606,7 +1606,7 @@ impl CodeTemplateGenerator {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
-        // Provide shared MCP configuration for Codex as well (Toolman passthrough)
+        // Provide shared MCP configuration for Codex as well (Tools passthrough)
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
@@ -1960,7 +1960,7 @@ impl CodeTemplateGenerator {
                             if canonical != name {
                                 debug!(
                                     original = name,
-                                    canonical, "Normalized remote tool name using Toolman catalog"
+                                    canonical, "Normalized remote tool name using Tools catalog"
                                 );
                             }
                             normalized.push(Value::String(canonical));
@@ -1973,7 +1973,7 @@ impl CodeTemplateGenerator {
             if !dropped.is_empty() {
                 warn!(
                     tools = ?dropped,
-                    "Removed unknown remote tools; not present in Toolman catalog"
+                    "Removed unknown remote tools; not present in Tools catalog"
                 );
             }
 
@@ -2101,7 +2101,7 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
-            "toolman": {
+            "tools": {
                 "tools": remote_tools,
             },
             "cli_config": cli_config,
@@ -2207,7 +2207,7 @@ impl CodeTemplateGenerator {
                 "instructions": instructions_plain,
                 "remote_tools": remote_tools,
                 "local_servers": local_servers_serialized,
-                "toolman_url": render_settings.toolman_url,
+                "tools_url": render_settings.tools_url,
                 "provider": {
                     "name": provider_name,
                     "envKey": provider_env_key,
@@ -2425,7 +2425,7 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
-            "toolman": {
+            "tools": {
                 "tools": remote_tools,
             },
         });

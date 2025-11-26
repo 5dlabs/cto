@@ -1,0 +1,32 @@
+{{- if .Values.localTools.servers }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tools-local-tools
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tools.labels" . | nindent 4 }}
+data:
+  local-tools-config.json: |
+    {
+      "servers": {
+        {{- $first := true }}
+        {{- range $serverName, $serverConfig := .Values.localTools.servers }}
+        {{- if not $first }},{{ end }}
+        {{- $first = false }}
+        "{{ $serverName }}": {
+          {{- if $serverConfig.name }}
+          "name": {{ $serverConfig.name | quote }},
+          {{- end }}
+          {{- if $serverConfig.description }}
+          "description": {{ $serverConfig.description | quote }},
+          {{- end }}
+          "transport": {{ $serverConfig.transport | default "stdio" | quote }},
+          "command": {{ $serverConfig.command | quote }},
+          "args": {{ $serverConfig.args | toJson }},
+          "workingDirectory": {{ $serverConfig.workingDirectory | default "/tmp" | quote }}
+        }
+        {{- end }}
+      }
+    }
+{{- end }}

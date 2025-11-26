@@ -19,7 +19,7 @@
 6. **Stay Autonomous** – this workflow is unattended. Never pause to ask for confirmation, approval, or guidance. When in doubt, proceed with the task, document assumptions in the PR, and surface blockers via logs.
 7. **Pull Request Discipline** – ensure a PR exists, carries labels `task-{{task_id}}`, `service-{{service}}`, and `run-{{workflow_name}}`, and includes a summary of tests/coverage before you consider the task complete.
 8. **Preserve Workspace** – never run cleanup commands that wipe the workspace or PVC (e.g. `rm -rf /workspace`, deleting the repo, mass-removing cache directories). Leave artifacts in place for downstream agents; rely on `git` to stage only relevant changes.
-9. **Verify MCP Tools** – during initialization, enumerate every remote MCP tool exposed by Toolman and probe each one (e.g. lightweight health call or a no-op request). Log the outcome so we can detect missing or misconfigured tools early.
+9. **Verify MCP Tools** – during initialization, enumerate every remote MCP tool exposed by Tools and probe each one (e.g. lightweight health call or a no-op request). Log the outcome so we can detect missing or misconfigured tools early.
 
 {{#if cli_config.instructions}}
 ## Custom Instructions
@@ -32,14 +32,14 @@
 _No additional Codex memory instructions were provided for this run._
 {{/if}}
 
-{{#if toolman.tools}}
-## Toolman Tools
-{{#each toolman.tools}}
+{{#if tools.tools}}
+## Tools Tools
+{{#each tools.tools}}
 - {{this}}
 {{/each}}
 {{else}}
-## Toolman Tools
-- No remote tools configured. Toolman will still provide discovery commands.
+## Tools Tools
+- No remote tools configured. Tools will still provide discovery commands.
 {{/if}}
 
 {{#if cli_config.additionalNotes}}

@@ -163,6 +163,12 @@ impl OpenCodeAdapter {
 
         let provider = Self::build_provider_context(&cli_config);
 
+        // Get Tools MCP server URL from environment (same pattern as other adapters)
+        let tools_url = std::env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+            "http://tools.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        });
+        let tools_url = tools_url.trim_end_matches('/').to_string();
+
         json!({
             "metadata": {
                 "timestamp": chrono::Utc::now().to_rfc3339(),
@@ -178,6 +184,7 @@ impl OpenCodeAdapter {
                 "remote_tools": remote_tools,
                 "local_servers": local_servers,
                 "provider": provider,
+                "tools_url": tools_url,
             },
             "raw_cli_config": cli_config,
         })

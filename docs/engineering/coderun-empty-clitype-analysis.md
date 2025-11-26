@@ -108,7 +108,7 @@ code_reconciliation_result: CodeRun reconciliation error
 
 **Commits:**
 - `1666a612` - feat(cipher): add security agent parameters to MCP play tool
-- `8655956f` - fix: Add ready-for-qa sensor and improve Factory/Toolman resilience
+- `8655956f` - fix: Add ready-for-qa sensor and improve Factory/Tools resilience
 
 **Status:** Merged to main Oct 17, 2025
 
