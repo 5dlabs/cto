@@ -6,4 +6,5 @@ resources:
   - crds.yaml
   - rbac.yaml
   - daemonset.yaml
-  - peers/developer-workstation.yaml
+  # NOTE: Peer configs with real keys go here. See examples/ for templates.
+

@@ -48,7 +48,15 @@ cat publickey
 
 ### 2. Create Peer Resource
 
-Create a new file in `peers/` directory or edit `developer-workstation.yaml`:
+Copy the example template and fill in your public key:
+
+```bash
+cp examples/developer-workstation.yaml peers/my-device.yaml
+# Edit peers/my-device.yaml with your public key
+# Then add it to kustomization.yaml resources
+```
+
+Example peer config:
 
 ```yaml
 apiVersion: kilo.squat.ai/v1alpha1
@@ -122,7 +130,8 @@ ping 10.244.x.x
 | `crds.yaml` | Peer CustomResourceDefinition |
 | `rbac.yaml` | ServiceAccount, ClusterRole, ClusterRoleBinding |
 | `daemonset.yaml` | Kilo DaemonSet (Flannel compatibility mode) |
-| `peers/*.yaml` | Peer definitions for VPN clients |
+| `examples/*.yaml` | Peer templates (not deployed) |
+| `peers/*.yaml` | Actual peer configs (add to kustomization.yaml) |
 
 ## Useful Commands
 
@@ -168,3 +177,4 @@ DNS = 10.96.0.10
 - [Kilo Documentation](https://kilo.squat.ai/)
 - [Kilo GitHub](https://github.com/squat/kilo)
 - [WireGuard](https://www.wireguard.com/)
+
