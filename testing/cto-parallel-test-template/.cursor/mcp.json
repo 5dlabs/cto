@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "cto": {
-      "command": "/opt/homebrew/bin/cto-mcp",
-      "args": []
-    }
-  }
-}
