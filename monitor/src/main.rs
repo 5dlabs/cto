@@ -1555,18 +1555,22 @@ async fn run_multi_watch(
                     }
                 }
 
-                // Check for pod failures
+                // Emit informational failure events for pod failures
+                // NOTE: Pod/CRD failures are informational but don't affect the
+                // consecutive_failures counter - only workflow state changes do.
+                // The workflow will eventually transition to Failed if pods fail,
+                // which is when the counter should increment.
                 if resource_type == ResourceType::Pod {
                     if let Some(ref p) = phase {
                         if p == "Failed" {
-                            consecutive_failures += 1;
-
                             let logs = if fetch_logs {
                                 get_step_logs(&name, &namespace, log_tail).ok()
                             } else {
                                 None
                             };
 
+                            // Emit failure event for visibility, but don't increment
+                            // consecutive_failures - that's tracked by workflow state only
                             emitter.emit(&LoopEvent::Failure {
                                 play_id: task_id.to_string(),
                                 stage: None,
@@ -1582,28 +1586,13 @@ async fn run_multi_watch(
                                     finished_at: None,
                                 }),
                                 logs,
+                                // Report current count but don't increment for pods
                                 consecutive_failures,
                                 timestamp: Utc::now(),
                             })?;
-
-                            if max_failures > 0 && consecutive_failures >= max_failures {
-                                emitter.emit(&LoopEvent::Stopped {
-                                    play_id: task_id.to_string(),
-                                    reason: format!(
-                                        "Max consecutive failures reached ({max_failures})"
-                                    ),
-                                    timestamp: Utc::now(),
-                                })?;
-                                workflow_completed = true;
-                            }
                         }
                     }
                 }
-
-                // NOTE: Pod/CRD failures are informational but don't affect the
-                // consecutive_failures counter - only workflow state changes do.
-                // This prevents premature counter resets when intermediate resources
-                // transition to Running/Succeeded while the workflow may still fail.
             }
             WatchMessage::GitHub {
                 task_id: gh_task_id,
@@ -1659,9 +1648,7 @@ async fn poll_github_state(
     };
 
     loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
-
-        // Use gh CLI to get PR state
+        // Use gh CLI to get PR state (poll immediately, then sleep)
         let pr_state = get_github_pr_state(repo, task_id).await;
 
         match pr_state {
@@ -1690,6 +1677,9 @@ async fn poll_github_state(
                 warn!("Failed to get GitHub PR state: {}", e);
             }
         }
+
+        // Sleep after polling, so first event is immediate
+        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
     }
 }
 
