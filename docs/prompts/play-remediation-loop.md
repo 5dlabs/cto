@@ -18,19 +18,30 @@ This command:
 
 1. **Reads** `cto-config.json` for play configuration
 2. **Submits** the workflow to Argo with configured agents
-3. **Monitors** the workflow via Argo CLI (efficient, event-driven)
-4. **Emits** JSON events for each status change
+3. **Monitors** everything via `kubectl --watch` streams (real-time)
+4. **Emits** JSON events for workflows, CRDs, pods, and sensors
 5. **Fetches logs** automatically on failure
-6. **Continues** until completion or max failures
+6. **Polls GitHub** for PR status, reviews, and checks
+7. **Continues** until completion or max failures
 
 ### Options
 
 ```bash
 play-monitor full --task-id <TASK_ID> \
   --config cto-config.json \    # Config file path (default: cto-config.json)
-  --interval 10 \               # Status check interval in seconds (default: 10)
+  --interval 30 \               # GitHub poll interval in seconds (default: 30)
   --max-failures 5 \            # Stop after N consecutive failures (default: 5)
-  --template play-workflow-template  # Argo template name
+  --template play-workflow-template \  # Argo template name
+  --repository 5dlabs/cto-parallel-test \  # GitHub repo for PR polling
+  --output-file /tmp/events.jsonl  # Optional: write events to file
+```
+
+### Alternative: Watch Only (no workflow submission)
+
+```bash
+play-monitor watch --task-id <TASK_ID> \
+  --repository 5dlabs/cto-parallel-test \
+  --output-file /tmp/events.jsonl
 ```
 
 ## Environment Variables
@@ -62,20 +73,44 @@ Atlas (Integration + Merge)
 
 ## JSON Events
 
-The command emits these JSON events to stdout:
+The command emits these JSON events to stdout (and optionally to a file):
 
-### `started` - Play submitted and monitoring begun
+### `started` - Monitoring begun
 
 ```json
 {
   "event_type": "started",
-  "play_id": "play-task-42-abc123",
-  "interval_seconds": 10,
+  "task_id": "42",
+  "watching": [
+    "workflows.argoproj.io (ns: argo)",
+    "coderuns.agents.platform (ns: agent-platform)",
+    "docsruns.agents.platform (ns: agent-platform)",
+    "sensors.argoproj.io (ns: argo)",
+    "pods (ns: agent-platform)"
+  ],
   "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
 
-### `status` - Current workflow state
+### `resource` - CRD/Pod/Workflow change (real-time from kubectl --watch)
+
+```json
+{
+  "event_type": "resource",
+  "task_id": "42",
+  "resource_type": "workflow",
+  "action": "modified",
+  "name": "play-task-42-abc123",
+  "namespace": "argo",
+  "phase": "Running",
+  "labels": {"task-id": "42"},
+  "timestamp": "2024-01-15T10:30:10Z"
+}
+```
+
+Resource types: `workflow`, `coderun`, `docsrun`, `sensor`, `pod`
+
+### `status` - Current workflow state (legacy compatibility)
 
 ```json
 {
@@ -153,6 +188,27 @@ The command emits these JSON events to stdout:
 1. Reset environment: `play-monitor reset --force`
 2. Re-run with new task ID
 
+### `github` - PR state update (from polling)
+
+```json
+{
+  "event_type": "github",
+  "task_id": "42",
+  "repository": "5dlabs/cto-parallel-test",
+  "pull_request": {
+    "number": 123,
+    "state": "open",
+    "title": "feat: implement task 42",
+    "mergeable": true,
+    "draft": false,
+    "labels": ["task-42", "implementation"],
+    "reviews": [{"author": "5DLabs-Cleo", "state": "APPROVED"}],
+    "checks": [{"name": "CI", "status": "completed", "conclusion": "success"}]
+  },
+  "timestamp": "2024-01-15T10:35:00Z"
+}
+```
+
 ## Automated PR Process
 
 When `failure` event is received:
@@ -228,19 +284,22 @@ cd /path/to/cto-parallel-test
 # Set GitHub token for automation
 export GITHUB_TOKEN="ghp_..."
 
-# Run the full E2E loop
-play-monitor full --task-id 42
+# Run the full E2E loop with file output
+play-monitor full --task-id 42 --output-file /tmp/play-events.jsonl
 
-# Output (JSON events):
-{"event_type":"started","play_id":"play-task-42-abc123",...}
-{"event_type":"status","workflow_phase":"Running","stage":"implementation",...}
-{"event_type":"stage_complete","stage":"implementation","next_stage":"code-quality",...}
+# Output (JSON events - real-time from kubectl --watch):
+{"event_type":"started","task_id":"42","watching":["workflows.argoproj.io",...]}
+{"event_type":"resource","resource_type":"workflow","action":"modified","phase":"Running",...}
+{"event_type":"resource","resource_type":"coderun","action":"modified","phase":"Running",...}
+{"event_type":"resource","resource_type":"pod","action":"modified","phase":"Running",...}
+{"event_type":"github","repository":"5dlabs/cto-parallel-test","pull_request":{...},...}
 {"event_type":"failure","stage":"code-quality","logs":"error: clippy...",...}
 # (you fix the code, push, workflow retries)
-{"event_type":"status","workflow_phase":"Running","stage":"code-quality",...}
-{"event_type":"stage_complete","stage":"code-quality","next_stage":"security",...}
-# ... continues through all stages ...
+{"event_type":"resource","resource_type":"workflow","phase":"Running",...}
 {"event_type":"completed","duration_seconds":3600,...}
+
+# Tail the event file while working
+tail -f /tmp/play-events.jsonl | jq .
 
 # After completion, verify OpenMemory usage
 play-monitor memory list --task-id 42
@@ -250,8 +309,11 @@ play-monitor memory list --task-id 42
 
 1. **One command**: `play-monitor full --task-id <ID>`
 2. **Reads config**: Uses `cto-config.json` for agent configuration
-3. **Emits events**: React to JSON events automatically
-4. **Fix failures**: Parse logs, apply fixes, push PRs
-5. **Auto-retry**: Workflow retries on main branch updates
-6. **Verify memory**: Use `play-monitor memory list` to check agent usage
-7. **Reset if stuck**: `play-monitor reset --force` then retry
+3. **Watches everything**: Workflows, CRDs, pods, sensors via `kubectl --watch`
+4. **Polls GitHub**: PR status, reviews, checks on interval
+5. **Emits events**: React to JSON `resource`, `failure`, `github` events
+6. **File output**: Use `--output-file` for persistent event log
+7. **Fix failures**: Parse logs, apply fixes, push PRs
+8. **Auto-retry**: Workflow retries on main branch updates
+9. **Verify memory**: Use `play-monitor memory list` to check agent usage
+10. **Reset if stuck**: `play-monitor reset --force` then retry
