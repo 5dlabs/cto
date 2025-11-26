@@ -61,11 +61,6 @@
       "autoMerge": false,
       "parallelExecution": false
     },
-    "_comment_docs_ingest": "Default values for docs ingest workflows",
-    "docs_ingest": {
-      "model": "claude-sonnet-4-20250514",
-      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
-    }
   },
   "_comment_agents": "Agent configurations with tool profiles",
   "agents": {
@@ -296,8 +291,6 @@
     "defaults.play.testingMaxRetries": "Maximum retry attempts for testing agent (Tess)",
     "defaults.play.autoMerge": "Whether Tess should automatically merge PRs after approval (true/false)",
     "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
-    "defaults.docs_ingest.model": "Model for docs ingestion workflows",
-    "defaults.docs_ingest.docServerUrl": "URL of the documentation server for docs ingest",
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access"
   },
   "_usage_examples": {

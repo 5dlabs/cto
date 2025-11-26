@@ -463,8 +463,13 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/task-files"
         }));
 
+        // Get ConfigMap prefix from environment (set by Helm based on release name)
+        // Used for all ConfigMap references below
+        let cm_prefix =
+            std::env::var("CONFIGMAP_PREFIX").unwrap_or_else(|_| "controller".to_string());
+
         // Agents ConfigMap volume for system prompts
-        let agents_cm_name = "controller-agents".to_string();
+        let agents_cm_name = format!("{cm_prefix}-agents");
         volumes.push(json!({
             "name": "agents-config",
             "configMap": {
@@ -478,8 +483,8 @@ impl<'a> CodeResourceManager<'a> {
 
         // Agent templates: Use projected volume to merge shared + integration ConfigMaps
         // This allows Atlas/Bolt to access integration templates from /agent-templates
-        let shared_templates_cm_name = "controller-agent-templates-shared".to_string();
-        let integration_templates_cm_name = "controller-agent-templates-integration".to_string();
+        let shared_templates_cm_name = format!("{cm_prefix}-agent-templates-shared");
+        let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
         volumes.push(json!({
             "name": "agent-templates-shared",
             "projected": {
@@ -503,7 +508,8 @@ impl<'a> CodeResourceManager<'a> {
         }));
 
         // Integration templates ConfigMap volume for Atlas/Bolt guardian scripts
-        let integration_templates_cm_name = "controller-agent-templates-integration".to_string();
+        // Note: cm_prefix already defined above
+        let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
         volumes.push(json!({
             "name": "agent-templates-integration",
             "configMap": {
@@ -524,7 +530,7 @@ impl<'a> CodeResourceManager<'a> {
             .is_some_and(|app| app.to_lowercase().contains("blaze"));
 
         if is_blaze_agent {
-            let blaze_scripts_cm_name = "controller-agent-scripts-blaze".to_string();
+            let blaze_scripts_cm_name = format!("{cm_prefix}-agent-scripts-blaze");
             volumes.push(json!({
                 "name": "blaze-scripts",
                 "configMap": {

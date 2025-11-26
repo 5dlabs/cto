@@ -26,9 +26,10 @@ spec:
     # Minimal Helm overrides - most config is in values.yaml
     helm:
       values: |
-        # Image configuration
+        # Image configuration - temporarily using toolman image until tools release workflow runs
         image:
-          tag: "0.2.0"
+          repository: ghcr.io/5dlabs/toolman
+          tag: "latest"
 
         # Resource overrides for production
         resources:

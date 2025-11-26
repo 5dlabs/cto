@@ -75,30 +75,37 @@ async fn verify_required_configmaps(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
 
+    // Get the ConfigMap prefix from environment (set by Helm based on release name)
+    // Defaults to "controller" for backward compatibility
+    let cm_prefix = std::env::var("CONFIGMAP_PREFIX").unwrap_or_else(|_| "controller".to_string());
+
     let required_configmaps = vec![
         (
-            "controller-agent-templates-claude-code",
+            format!("{cm_prefix}-agent-templates-claude-code"),
             "Claude code templates",
         ),
         (
-            "controller-agent-templates-claude-docs",
+            format!("{cm_prefix}-agent-templates-claude-docs"),
             "Claude docs templates",
         ),
-        ("controller-agent-templates-codex", "Codex agent templates"),
         (
-            "controller-agent-templates-cursor",
+            format!("{cm_prefix}-agent-templates-codex"),
+            "Codex agent templates",
+        ),
+        (
+            format!("{cm_prefix}-agent-templates-cursor"),
             "Cursor agent templates",
         ),
         (
-            "controller-agent-templates-factory",
+            format!("{cm_prefix}-agent-templates-factory"),
             "Factory agent templates",
         ),
         (
-            "controller-agent-templates-integration",
+            format!("{cm_prefix}-agent-templates-integration"),
             "Integration agent templates",
         ),
         (
-            "controller-agent-templates-shared",
+            format!("{cm_prefix}-agent-templates-shared"),
             "Shared agent utilities",
         ),
     ];

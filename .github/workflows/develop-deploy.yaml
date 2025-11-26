@@ -10,10 +10,16 @@ on:
         type: string
   push:
     branches:
+      - main
       - feature/*
       - feat/*
       - fix/*
       - hotfix/*
+    paths:
+      - 'controller/**'
+      - 'infra/images/controller/**'
+      - 'infra/charts/controller/**'
+      - '.github/workflows/develop-deploy.yaml'
 
 env:
   REGISTRY: ghcr.io

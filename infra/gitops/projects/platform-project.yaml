@@ -64,8 +64,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: argocd
       server: https://kubernetes.default.svc
-    - namespace: monitoring
-      server: https://kubernetes.default.svc
     - namespace: telemetry
       server: https://kubernetes.default.svc
     - namespace: mcp
@@ -86,22 +84,11 @@ spec:
     # Database operator namespaces
     - namespace: cnpg-system
       server: https://kubernetes.default.svc
-    - namespace: postgres-operator
-      server: https://kubernetes.default.svc
     - namespace: questdb-operator
       server: https://kubernetes.default.svc
     - namespace: redis-operator
       server: https://kubernetes.default.svc
     - namespace: databases
-      server: https://kubernetes.default.svc
-    # Staging database namespaces
-    - namespace: staging
-      server: https://kubernetes.default.svc
-    - namespace: postgres-operator-staging
-      server: https://kubernetes.default.svc
-    - namespace: redis-operator-staging
-      server: https://kubernetes.default.svc
-    - namespace: questdb-operator-staging
       server: https://kubernetes.default.svc
     # HashiCorp Vault namespace
     - namespace: vault
@@ -198,6 +185,9 @@ spec:
     - group: 'databases.spotahome.com'
       kind: '*'
     - group: 'crd.questdb.io'
+      kind: '*'
+    # Kilo WireGuard VPN CRDs
+    - group: 'kilo.squat.ai'
       kind: '*'
 
   # Roles for access control

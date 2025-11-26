@@ -82,7 +82,6 @@ Keep these for core platform functionality:
 - `argo-events` - Event processing (required)
 - `external-secrets` - Secrets management
 - `postgres-operator`, `redis-operator` - Database operators
-- `doc-server` - Documentation service
 - `tools` - Tool management
 - `k8s-mcp` - Kubernetes MCP server
 - `ngrok-operator`, `ngrok-gateway` - External access

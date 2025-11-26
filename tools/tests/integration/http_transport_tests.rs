@@ -29,6 +29,7 @@ use tokio::process::Command;
 use tokio::time::timeout;
 
 #[tokio::test]
+#[ignore = "requires pre-built tools-server binary"]
 async fn test_tools_server_with_solana_config() {
     // Test our actual server implementation with Solana configured
     println!("🧪 Testing tools server HTTP transport with Solana");
