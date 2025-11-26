@@ -1211,24 +1211,52 @@ fn spawn_watch(
     let tx_clone = tx.clone();
 
     // Spawn a task to read stdout and parse JSON
+    // kubectl --watch -o json outputs pretty-printed multi-line JSON objects
+    // We need to accumulate lines until we have a complete JSON object
     tokio::spawn(async move {
         let reader = BufReader::new(stdout);
         let mut lines = reader.lines();
 
+        let mut json_buffer = String::new();
+        let mut brace_depth: i32 = 0;
+        let mut in_object = false;
+
         while let Ok(Some(line)) = lines.next_line().await {
-            if line.trim().is_empty() {
-                continue;
+            let trimmed = line.trim();
+
+            // Track brace depth to find complete JSON objects
+            for ch in trimmed.chars() {
+                match ch {
+                    '{' => {
+                        brace_depth += 1;
+                        in_object = true;
+                    }
+                    '}' => {
+                        brace_depth -= 1;
+                    }
+                    _ => {}
+                }
             }
 
-            match parse_watch_line(&line, rt) {
-                Ok(msg) => {
-                    if tx_clone.send(msg).await.is_err() {
-                        break;
+            if in_object {
+                json_buffer.push_str(&line);
+                json_buffer.push('\n');
+            }
+
+            // When brace depth returns to 0, we have a complete object
+            if in_object && brace_depth == 0 {
+                match parse_watch_line(&json_buffer, rt) {
+                    Ok(msg) => {
+                        if tx_clone.send(msg).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to parse watch JSON for {}: {}", rt, e);
                     }
                 }
-                Err(e) => {
-                    warn!("Failed to parse watch line for {}: {}", rt, e);
-                }
+                json_buffer.clear();
+                in_object = false;
             }
         }
 
