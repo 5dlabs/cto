@@ -11,7 +11,7 @@ apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
   name: github-webhooks
-  namespace: automation
+  namespace: infra
   labels:
     app.kubernetes.io/name: github-webhooks
     app.kubernetes.io/part-of: platform
