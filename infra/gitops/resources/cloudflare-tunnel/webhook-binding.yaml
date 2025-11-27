@@ -15,17 +15,14 @@ metadata:
   labels:
     app.kubernetes.io/name: github-webhooks
     app.kubernetes.io/part-of: platform
-spec:
-  # Reference to the ClusterTunnel
-  tunnelRef:
-    kind: ClusterTunnel
-    name: cto-main
-
-  # Frontend configuration (public-facing)
-  subjects:
-    - name: github-eventsource-svc
-      spec:
-        fqdn: github.public.5dlabs.ai
-        path: /github/webhook
-        protocol: http
-        target: github-eventsource-svc:12000
+# Note: TunnelBinding v1alpha1 has tunnelRef and subjects at root level, not under spec
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+subjects:
+  - name: github-eventsource-svc
+    spec:
+      fqdn: github.public.5dlabs.ai
+      path: /github/webhook
+      protocol: http
+      target: github-eventsource-svc:12000

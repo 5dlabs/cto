@@ -17,10 +17,10 @@ metadata:
 spec:
   # Cloudflare credentials configuration
   cloudflare:
-    # Secret containing CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+    # Secret containing CLOUDFLARE_API_TOKEN
     secret: cloudflare-api-credentials
-    # Account ID from secret (key name)
-    accountId: CLOUDFLARE_ACCOUNT_ID
+    # Cloudflare Account ID (actual value, not key name)
+    accountId: b73ec19faa187789b3f9d1deb0e0d95f
     # Domain for DNS records
     domain: 5dlabs.ai
 
