@@ -486,8 +486,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
         "remote": [
           "memory_create_entities",
           "memory_add_observations",
-          "brave_search_brave_web_search",
-          "rustdocs_query_rust_docs"
+          "brave_search_brave_web_search"
         ],
         "localServers": {
           "filesystem": {
@@ -508,8 +507,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
       "tools": {
         "remote": [
           "memory_create_entities",
-          "memory_add_observations",
-          "rustdocs_query_rust_docs"
+          "memory_add_observations"
         ],
         "localServers": {
           "filesystem": {
@@ -528,7 +526,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "remote": ["memory_create_entities", "memory_add_observations"],
         "localServers": {
           "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
           "git": {"enabled": true, "tools": ["git_status", "git_diff", "git_log", "git_show"]}
@@ -680,7 +678,7 @@ Autonomous AI CLI
       "cli": "claude",
       "model": "claude-opus-4-20250514",
       "tools": {
-        "remote": ["brave_search_brave_web_search", "rustdocs_query_rust_docs"]
+        "remote": ["brave_search_brave_web_search"]
       }
     },
     "rex": {
@@ -688,7 +686,7 @@ Autonomous AI CLI
       "cli": "factory",
       "model": "gpt-5-factory-high",
       "tools": {
-        "remote": ["memory_create_entities", "rustdocs_query_rust_docs"]
+        "remote": ["memory_create_entities"]
       }
     },
     "blaze": {

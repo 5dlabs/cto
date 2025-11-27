@@ -29,7 +29,7 @@ mod tests {
     fn test_sse_url_detection() {
         // URLs that should trigger SSE detection
         assert!(is_sse_url("http://example.com/sse"));
-        assert!(is_sse_url("https://rustdocs-server.com/sse"));
+        assert!(is_sse_url("https://example-server.com/sse"));
         assert!(is_sse_url("http://localhost:3000/sse"));
         assert!(is_sse_url("https://api.example.com/v1/sse"));
         
@@ -49,8 +49,8 @@ mod tests {
         // Solana - direct HTTP
         assert!(!is_sse_url("https://mcp.solana.com/mcp"));
         
-        // Rust Docs - SSE
-        assert!(is_sse_url("http://rustdocs-mcp-rust-docs-mcp-server.mcp.svc.cluster.local:3000/sse"));
+        // Example SSE server
+        assert!(is_sse_url("http://example-sse-server.mcp.svc.cluster.local:3000/sse"));
         
         // Our own server - direct HTTP
         assert!(!is_sse_url("http://localhost:3000/mcp"));

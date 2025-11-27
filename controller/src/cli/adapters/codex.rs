@@ -448,7 +448,7 @@ mod tests {
             tools: Some(ToolConfiguration {
                 remote: vec![
                     "memory_create_entities".to_string(),
-                    "rustdocs_query_rust_docs".to_string(),
+                    "brave_search_brave_web_search".to_string(),
                 ],
                 local_servers: None,
             }),

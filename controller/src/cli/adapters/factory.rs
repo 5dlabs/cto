@@ -453,7 +453,7 @@ mod tests {
             tools: Some(ToolConfiguration {
                 remote: vec![
                     "memory_create_entities".to_string(),
-                    "rustdocs_query_rust_docs".to_string(),
+                    "brave_search_brave_web_search".to_string(),
                 ],
                 local_servers: None,
             }),
@@ -519,7 +519,7 @@ mod tests {
             .and_then(Value::as_array)
             .expect("tool list");
         assert!(tools.contains(&Value::String("memory_create_entities".to_string())));
-        assert!(tools.contains(&Value::String("rustdocs_query_rust_docs".to_string())));
+        assert!(tools.contains(&Value::String("brave_search_brave_web_search".to_string())));
     }
 
     #[tokio::test]

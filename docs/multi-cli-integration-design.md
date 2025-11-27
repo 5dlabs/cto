@@ -290,7 +290,7 @@ This provides comprehensive coverage without scope creep to 8 different CLI arch
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
       "tools": {
-        "remote": ["memory_create_entities", "rustdocs_query_rust_docs"],
+        "remote": ["memory_create_entities"],
         "localServers": {
           "filesystem": {"enabled": true, "tools": ["read_file", "write_file"]},
           "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
@@ -361,7 +361,7 @@ Extend `cto-config.json` by enriching each `agents.<name>` entry instead of intr
         "sandboxPreset": "workspace-write"
       },
       "tools": {
-        "remote": ["memory_create_entities", "rustdocs_query_rust_docs"],
+        "remote": ["memory_create_entities"],
         "localServers": {
           "filesystem": {"enabled": true},
           "git": {"enabled": true}
@@ -656,7 +656,7 @@ impl AgentResolver {
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
       "tools": {
-        "remote": ["memory_create_entities", "rustdocs_query_rust_docs"],
+        "remote": ["memory_create_entities"],
         "localServers": {
           "filesystem": {"enabled": true, "tools": ["read_file", "write_file"]},
           "git": {"enabled": true, "tools": ["git_status", "git_diff"]}

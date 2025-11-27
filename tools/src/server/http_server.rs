@@ -1682,7 +1682,7 @@ impl BridgeState {
                     .map_err(|e| anyhow::anyhow!("Failed to get response text: {}", e))?;
                 tracing::info!("🔍 [{}] Raw tools response: {}", server_name, response_text);
 
-                // Handle SSE format responses (both direct HTTP endpoints like Solana and SSE endpoints like rustdocs)
+                // Handle SSE format responses (both direct HTTP endpoints like Solana and SSE endpoints)
                 let json_content = if response_text.contains("data: ")
                     && (response_text.starts_with("event:") || response_text.starts_with("data:"))
                 {
