@@ -452,7 +452,7 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
                 }
             },
             "serverInfo": {
-                "name": "agent-platform-mcp",
+                "name": "cto-mcp",
                 "title": "Agent Platform MCP Server",
                 "version": "1.0.0",
                 "buildTimestamp": env!("BUILD_TIMESTAMP")
@@ -897,7 +897,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "--from",
         "workflowtemplate/docsrun-template",
         "-n",
-        "agent-platform",
+        "cto",
     ];
 
     // Add all parameters to the command
@@ -972,7 +972,7 @@ fn read_play_progress(repo: &str) -> Result<Option<PlayProgress>> {
             "configmap",
             &name,
             "-n",
-            "agent-platform",
+            "cto",
             "-o",
             "json",
         ])
@@ -1071,7 +1071,7 @@ fn write_play_progress(progress: &PlayProgress) -> Result<()> {
         "kind": "ConfigMap",
         "metadata": {
             "name": name,
-            "namespace": "agent-platform",
+            "namespace": "cto",
             "labels": {
                 "play-tracking": "true"
             }
@@ -1110,7 +1110,7 @@ fn clear_play_progress(repo: &str) {
             "configmap",
             &name,
             "-n",
-            "agent-platform",
+            "cto",
             "--ignore-not-found=true",
         ])
         .output();
@@ -1125,7 +1125,7 @@ fn find_active_play_workflow(repo: &str) -> Result<Option<(String, u32, String)>
         .args([
             "list",
             "-n",
-            "agent-platform",
+            "cto",
             "-l",
             &format!("repository={}", repo.replace('/', "-")),
             "-l",
@@ -1417,7 +1417,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                 "workflow_phase": wf_phase,
                 "stage": prog.stage,
                 "configmap_status": prog.status.to_string(),
-                "argo_url": format!("https://argo.5dlabs.com/workflows/agent-platform/{}", wf_name),
+                "argo_url": format!("https://argo.5dlabs.com/workflows/automation/{}", wf_name),
             }))
         }
         (Some(prog), None) => {
@@ -1442,7 +1442,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                 "workflow_name": wf_name,
                 "workflow_phase": wf_phase,
                 "message": "Workflow active but no progress tracking (legacy workflow)",
-                "argo_url": format!("https://argo.5dlabs.com/workflows/agent-platform/{}", wf_name),
+                "argo_url": format!("https://argo.5dlabs.com/workflows/automation/{}", wf_name),
             }))
         }
         (None, None) => {
@@ -2447,7 +2447,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let cleanup_result = run_argo_cli(&[
         "list",
         "-n",
-        "agent-platform",
+        "cto",
         "-l",
         &repo_label,
         "-l",
@@ -2510,9 +2510,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                             "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
                                         );
                                         let _ =
-                                            run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                            run_argo_cli(&["stop", name, "-n", "automation"]);
                                         let _ =
-                                            run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                            run_argo_cli(&["delete", name, "-n", "automation"]);
                                     }
                                     None => {
                                         eprintln!(
@@ -2538,7 +2538,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "--from",
         workflow_template,
         "-n",
-        "agent-platform",
+        "cto",
     ];
 
     // Add labels for workflow tracking (enables auto-detection)
@@ -2766,7 +2766,7 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
             "configmap",
             &configmap_name,
             "-n",
-            "agent-platform",
+            "cto",
             &format!("--from-literal=prd.txt={prd_content}"),
             &format!("--from-literal=architecture.md={architecture_content}"),
             &format!("--from-literal=config.json={config_json}"),
@@ -2794,7 +2794,7 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
             "--from",
             "workflowtemplate/project-intake",
             "-n",
-            "agent-platform",
+            "cto",
             "--name",
             &workflow_name,
             "-p",
@@ -3010,7 +3010,7 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Val
     let namespace = arguments
         .get("namespace")
         .and_then(|v| v.as_str())
-        .unwrap_or("agent-platform");
+        .unwrap_or("cto");
 
     let include = arguments.get("include").and_then(|v| v.as_array());
     let include_play =
@@ -3089,7 +3089,7 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
     let namespace = arguments
         .get("namespace")
         .and_then(|v| v.as_str())
-        .unwrap_or("agent-platform");
+        .unwrap_or("cto");
 
     match job_type {
         "intake" => {
@@ -3192,7 +3192,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     let namespace = arguments
         .get("namespace")
         .and_then(|v| v.as_str())
-        .unwrap_or("agent-platform");
+        .unwrap_or("cto");
     let text = arguments
         .get("text")
         .and_then(|v| v.as_str())
