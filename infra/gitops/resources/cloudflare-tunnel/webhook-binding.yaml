@@ -3,7 +3,7 @@
 # Routes GitHub webhook traffic to the Argo Events EventSource
 #
 # Traffic flow:
-# github.public.5dlabs.ai/github/webhook
+# github-webhooks.5dlabs.ai/github/webhook
 #   -> Cloudflare Edge
 #   -> cto-main tunnel
 #   -> github-eventsource-svc:12000
@@ -22,7 +22,6 @@ tunnelRef:
 subjects:
   - name: github-eventsource-svc
     spec:
-      fqdn: github.public.5dlabs.ai
+      fqdn: github-webhooks.5dlabs.ai
       path: /github/webhook
-      protocol: http
-      target: github-eventsource-svc:12000
+      target: http://github-eventsource-svc.automation.svc:12000
