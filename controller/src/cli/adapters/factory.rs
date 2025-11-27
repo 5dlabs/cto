@@ -116,8 +116,9 @@ impl CliAdapter for FactoryAdapter {
         let raw_additional_json = first_string(&settings, &["rawJson", "raw_json"]) // legacy & snake_case
             .map(std::string::ToString::to_string);
 
-        let tools_url = env::var("TOOLS_SERVER_URL")
-            .unwrap_or_else(|_| "http://tools.cto.svc.cluster.local:3000/mcp".to_string());
+        let tools_url = env::var("TOOLS_SERVER_URL").unwrap_or_else(|_| {
+            "http://tools.cto.svc.cluster.local:3000/mcp".to_string()
+        });
         let tools_url = tools_url.trim_end_matches('/').to_string();
 
         let remote_tools = agent_config

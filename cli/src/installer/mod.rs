@@ -175,7 +175,10 @@ impl Installer {
             "  1️⃣  {} Check cluster status:",
             "Verify Installation:".bold()
         );
-        println!("     {}", "kubectl get pods -n cto".bright_black());
+        println!(
+            "     {}",
+            "kubectl get pods -n cto".bright_black()
+        );
         println!();
 
         println!("  2️⃣  {} Access ArgoCD:", "ArgoCD:".bold());
