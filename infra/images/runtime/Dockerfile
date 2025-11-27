@@ -317,9 +317,10 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
-# Install tools client
+# Install tools client from CTO monorepo release
+ARG TOOLS_VERSION=0.2.0
 RUN curl --proto '=https' --tlsv1.2 -LsSf \
-    https://github.com/5dlabs/tools/releases/download/v2.4.4/tools-installer.sh | \
+    https://github.com/5dlabs/cto/releases/download/tools-v${TOOLS_VERSION}/tools-installer.sh | \
     TOOLS_NO_MODIFY_PATH=1 sh \
   && mv ~/.cargo/bin/tools-client /usr/local/bin/tools
 
