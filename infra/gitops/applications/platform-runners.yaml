@@ -61,7 +61,7 @@ spec:
 
         controllerServiceAccount:
           name: "arc-gha-rs-controller"
-          namespace: "operators"
+          namespace: "infra"
 
         # Force persistent runner behavior with explicit configuration
         template:

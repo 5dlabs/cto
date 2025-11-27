@@ -10,6 +10,6 @@ spec:
       replicas: 1
       # Event retention configuration - clean up events aggressively
       # Events trigger workflows immediately, so keep minimal history
-      maxAge: 5m         # Keep events for only 5 minutes
+      maxAge: "5m"       # Keep events for only 5 minutes (quoted for NATS)
       maxMsgs: 1000      # Limit to 1k messages per channel
       maxBytes: 10MB     # Limit to 10MB per channel
