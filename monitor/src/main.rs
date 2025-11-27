@@ -200,6 +200,24 @@ enum Commands {
         #[command(subcommand)]
         action: MemoryCommands,
     },
+    /// Start E2E watch: monitor Play, remediate failures, loop until success
+    E2e {
+        /// Task ID for the Play workflow
+        #[arg(long)]
+        task_id: String,
+
+        /// Path to cto-config.json
+        #[arg(long, default_value = "cto-config.json")]
+        config: String,
+
+        /// Target repository (default from config or 5dlabs/cto)
+        #[arg(long)]
+        repository: Option<String>,
+
+        /// Dry run - show what would be submitted without creating resources
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -264,6 +282,49 @@ struct CtoConfig {
 #[derive(Debug, Deserialize)]
 struct CtoDefaults {
     play: PlayConfig,
+    #[serde(default)]
+    watch: Option<WatchConfig>,
+}
+
+/// E2E Watch configuration
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct WatchConfig {
+    /// Target repository for fixes (e.g., "5dlabs/cto")
+    #[serde(default)]
+    repository: Option<String>,
+    /// Service identifier
+    #[serde(default)]
+    service: Option<String>,
+    /// Play workflow template name
+    #[serde(default)]
+    play_template: Option<String>,
+    /// Monitor agent configuration
+    #[serde(default)]
+    monitor: Option<WatchAgentConfig>,
+    /// Remediation agent configuration
+    #[serde(default)]
+    remediation: Option<WatchAgentConfig>,
+}
+
+/// Watch agent configuration
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct WatchAgentConfig {
+    /// GitHub App name
+    #[serde(default)]
+    agent: Option<String>,
+    /// CLI to use (factory)
+    #[serde(default)]
+    cli: Option<String>,
+    /// Model to use
+    #[serde(default)]
+    model: Option<String>,
+    /// Tools configuration
+    #[serde(default)]
+    tools: Option<Vec<String>>,
 }
 
 /// Play workflow configuration
@@ -700,6 +761,20 @@ async fn main() -> Result<()> {
         }
         Commands::Memory { action } => {
             handle_memory_command(action).await?;
+        }
+        Commands::E2e {
+            task_id,
+            config,
+            repository,
+            dry_run,
+        } => {
+            run_e2e_watch(
+                &task_id,
+                &config,
+                repository.as_deref(),
+                dry_run,
+                &cli.namespace,
+            )?;
         }
     }
 
@@ -2006,6 +2081,265 @@ async fn handle_memory_command(action: MemoryCommands) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
     }
+
+    Ok(())
+}
+
+// =============================================================================
+// E2E Watch: Submit watch workflow and stream events
+// =============================================================================
+
+/// E2E Watch response
+#[derive(Debug, Serialize, Deserialize)]
+struct E2eWatchResponse {
+    success: bool,
+    workflow_name: Option<String>,
+    task_id: String,
+    repository: String,
+    timestamp: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    config: Option<E2eWatchConfigSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+/// Summary of watch configuration for response
+#[derive(Debug, Serialize, Deserialize)]
+struct E2eWatchConfigSummary {
+    monitor_agent: String,
+    monitor_model: String,
+    remediation_agent: String,
+    remediation_model: String,
+    play_template: String,
+}
+
+/// Run E2E watch workflow
+#[allow(clippy::too_many_lines)]
+fn run_e2e_watch(
+    task_id: &str,
+    config_path: &str,
+    repository_override: Option<&str>,
+    dry_run: bool,
+    namespace: &str,
+) -> Result<()> {
+    println!(
+        "{}",
+        format!("🔍 Starting E2E Watch for task {task_id}...").cyan()
+    );
+
+    // Step 1: Read and parse cto-config.json
+    let config_content = std::fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read config file: {config_path}"))?;
+
+    let config: CtoConfig = serde_json::from_str(&config_content)
+        .with_context(|| format!("Failed to parse config file: {config_path}"))?;
+
+    // Extract watch configuration with defaults
+    let watch_config = config.defaults.watch.unwrap_or_else(|| WatchConfig {
+        repository: Some("5dlabs/cto".to_string()),
+        service: Some("cto-platform".to_string()),
+        play_template: Some("play-workflow-template".to_string()),
+        monitor: Some(WatchAgentConfig {
+            agent: Some("5DLabs-Morgan".to_string()),
+            cli: Some("factory".to_string()),
+            model: Some("glm-4-plus".to_string()),
+            tools: None,
+        }),
+        remediation: Some(WatchAgentConfig {
+            agent: Some("5DLabs-Rex".to_string()),
+            cli: Some("factory".to_string()),
+            model: Some("claude-opus-4-5-20251101".to_string()),
+            tools: None,
+        }),
+    });
+
+    let repository = repository_override
+        .map(ToString::to_string)
+        .or_else(|| watch_config.repository.clone())
+        .unwrap_or_else(|| "5dlabs/cto".to_string());
+
+    let service = watch_config
+        .service
+        .clone()
+        .unwrap_or_else(|| "cto-platform".to_string());
+
+    let play_template = watch_config
+        .play_template
+        .clone()
+        .unwrap_or_else(|| "play-workflow-template".to_string());
+
+    let monitor = watch_config
+        .monitor
+        .clone()
+        .unwrap_or_else(|| WatchAgentConfig {
+            agent: Some("5DLabs-Morgan".to_string()),
+            cli: Some("factory".to_string()),
+            model: Some("glm-4-plus".to_string()),
+            tools: None,
+        });
+
+    let remediation = watch_config
+        .remediation
+        .clone()
+        .unwrap_or_else(|| WatchAgentConfig {
+            agent: Some("5DLabs-Rex".to_string()),
+            cli: Some("factory".to_string()),
+            model: Some("claude-opus-4-5-20251101".to_string()),
+            tools: None,
+        });
+
+    let monitor_agent = monitor.agent.unwrap_or_else(|| "5DLabs-Morgan".to_string());
+    let monitor_model = monitor.model.unwrap_or_else(|| "glm-4-plus".to_string());
+    let monitor_cli = monitor.cli.unwrap_or_else(|| "factory".to_string());
+
+    let remediation_agent = remediation
+        .agent
+        .unwrap_or_else(|| "5DLabs-Rex".to_string());
+    let remediation_model = remediation
+        .model
+        .unwrap_or_else(|| "claude-opus-4-5-20251101".to_string());
+    let remediation_cli = remediation.cli.unwrap_or_else(|| "factory".to_string());
+
+    println!("{}", "E2E Watch Configuration:".cyan());
+    println!("  Repository: {repository}");
+    println!("  Service: {service}");
+    println!("  Play Template: {play_template}");
+    println!("  Monitor: {monitor_agent} ({monitor_model} via {monitor_cli})");
+    println!("  Remediation: {remediation_agent} ({remediation_model} via {remediation_cli})");
+    println!();
+
+    if dry_run {
+        println!("{}", "DRY RUN - would submit:".yellow());
+        println!("  argo submit --from workflowtemplate/watch-workflow-template");
+        println!("    -n {namespace}");
+        println!("    -p task-id={task_id}");
+        println!("    -p repository={repository}");
+        println!("    -p service={service}");
+        println!("    -p play-template={play_template}");
+        println!("    -p monitor-agent={monitor_agent}");
+        println!("    -p monitor-model={monitor_model}");
+        println!("    -p remediation-agent={remediation_agent}");
+        println!("    -p remediation-model={remediation_model}");
+
+        let response = E2eWatchResponse {
+            success: true,
+            workflow_name: None,
+            task_id: task_id.to_string(),
+            repository,
+            timestamp: Utc::now(),
+            config: Some(E2eWatchConfigSummary {
+                monitor_agent,
+                monitor_model,
+                remediation_agent,
+                remediation_model,
+                play_template,
+            }),
+            error: None,
+        };
+        println!("{}", serde_json::to_string_pretty(&response)?);
+        return Ok(());
+    }
+
+    // Step 2: Submit watch workflow
+    println!(
+        "{}",
+        format!("📤 Submitting watch workflow for task {task_id}...").cyan()
+    );
+
+    let output = Command::new("argo")
+        .args([
+            "submit",
+            "--from",
+            "workflowtemplate/watch-workflow-template",
+            "-n",
+            namespace,
+            "-p",
+            &format!("task-id={task_id}"),
+            "-p",
+            &format!("repository={repository}"),
+            "-p",
+            &format!("service={service}"),
+            "-p",
+            &format!("play-template={play_template}"),
+            "-p",
+            &format!("monitor-agent={monitor_agent}"),
+            "-p",
+            &format!("monitor-model={monitor_model}"),
+            "-p",
+            &format!("monitor-cli={monitor_cli}"),
+            "-p",
+            &format!("remediation-agent={remediation_agent}"),
+            "-p",
+            &format!("remediation-model={remediation_model}"),
+            "-p",
+            &format!("remediation-cli={remediation_cli}"),
+            "-o",
+            "json",
+        ])
+        .output()
+        .context("Failed to submit workflow via argo CLI")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let response = E2eWatchResponse {
+            success: false,
+            workflow_name: None,
+            task_id: task_id.to_string(),
+            repository,
+            timestamp: Utc::now(),
+            config: None,
+            error: Some(stderr.to_string()),
+        };
+        println!("{}", serde_json::to_string_pretty(&response)?);
+        return Err(anyhow::anyhow!("Failed to submit watch workflow: {stderr}"));
+    }
+
+    // Parse workflow name from output
+    let workflow_json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
+
+    let workflow_name = workflow_json["metadata"]["name"]
+        .as_str()
+        .map(ToString::to_string);
+
+    println!(
+        "{}",
+        format!(
+            "✅ Watch workflow submitted: {}",
+            workflow_name.as_deref().unwrap_or("unknown")
+        )
+        .green()
+    );
+
+    let response = E2eWatchResponse {
+        success: true,
+        workflow_name,
+        task_id: task_id.to_string(),
+        repository,
+        timestamp: Utc::now(),
+        config: Some(E2eWatchConfigSummary {
+            monitor_agent,
+            monitor_model,
+            remediation_agent,
+            remediation_model,
+            play_template,
+        }),
+        error: None,
+    };
+
+    println!("{}", serde_json::to_string_pretty(&response)?);
+
+    println!();
+    println!("{}", "E2E Watch is now running. The workflow will:".cyan());
+    println!("  1. Monitor Agent submits Play workflow");
+    println!("  2. Monitor Agent evaluates results against acceptance criteria");
+    println!("  3. If issues found → Remediation Agent fixes and deploys");
+    println!("  4. Loop continues until acceptance criteria pass");
+    println!();
+    println!(
+        "{}",
+        "Use 'argo watch <workflow-name>' to follow progress.".cyan()
+    );
 
     Ok(())
 }

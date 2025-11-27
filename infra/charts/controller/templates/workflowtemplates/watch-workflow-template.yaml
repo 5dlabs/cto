@@ -1,0 +1,456 @@
+{{- if .Values.argo.enabled }}
+---
+# E2E Watch Workflow Template
+# Orchestrates Monitor → Remediation loop until Play succeeds
+# Monitor submits Play, evaluates results, writes issues
+# Remediation reads issues, fixes code, ensures deployment
+
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: watch-workflow-template
+  namespace: {{.Release.Namespace}}
+  labels:
+    app.kubernetes.io/name: watch-workflow-template
+    app.kubernetes.io/part-of: platform
+    agents.platform/orchestration: e2e-watch
+    workflow-type: e2e-watch
+spec:
+  serviceAccountName: argo-workflow
+  
+  # No timeout - watch runs until acceptance criteria met
+  # activeDeadlineSeconds: not set (infinite)
+  
+  workflowMetadata:
+    labels:
+      workflow-type: e2e-watch
+  
+  entrypoint: main
+  
+  # Shared volume for inter-agent communication
+  volumeClaimTemplates:
+    - metadata:
+        name: watch-workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: {{.Values.storageClass | default "local-path"}}
+  
+  arguments:
+    parameters:
+      # Required parameters
+      - name: task-id
+        description: "Task ID for the Play workflow"
+        value: ""
+      - name: repository
+        description: "Target repository (e.g., 5dlabs/cto)"
+        value: "5dlabs/cto"
+      - name: service
+        description: "Service identifier"
+        value: "cto-platform"
+      
+      # Play workflow configuration
+      - name: play-template
+        description: "Play workflow template name"
+        value: "play-workflow-template"
+      
+      # Monitor agent configuration
+      - name: monitor-agent
+        description: "GitHub App for monitor agent"
+        value: "5DLabs-Morgan"
+      - name: monitor-model
+        description: "Model for monitor agent (lightweight)"
+        value: "glm-4-plus"
+      - name: monitor-cli
+        description: "CLI for monitor agent"
+        value: "factory"
+      
+      # Remediation agent configuration
+      - name: remediation-agent
+        description: "GitHub App for remediation agent"
+        value: "5DLabs-Rex"
+      - name: remediation-model
+        description: "Model for remediation agent (heavy reasoning)"
+        value: "claude-opus-4-5-20251101"
+      - name: remediation-cli
+        description: "CLI for remediation agent"
+        value: "factory"
+      
+      # Play agents (passed through to Play workflow)
+      - name: implementation-agent
+        description: "Implementation agent for Play"
+        value: "5DLabs-Rex"
+      - name: quality-agent
+        description: "Quality agent for Play"
+        value: "5DLabs-Cleo"
+      - name: testing-agent
+        description: "Testing agent for Play"
+        value: "5DLabs-Tess"
+      
+      # ArgoCD configuration for deployment verification
+      - name: argocd-app
+        description: "ArgoCD application name to verify"
+        value: "controller"
+      - name: controller-namespace
+        description: "Namespace where controller runs"
+        value: "cto"
+      - name: controller-label
+        description: "Label selector for controller pods"
+        value: "app=agent-controller"
+
+  templates:
+    # Main entry point - infinite loop
+    - name: main
+      dag:
+        tasks:
+          - name: iteration-loop
+            template: watch-iteration
+            arguments:
+              parameters:
+                - name: iteration
+                  value: "1"
+
+    # Single watch iteration: Monitor → check → optionally Remediate → loop
+    - name: watch-iteration
+      inputs:
+        parameters:
+          - name: iteration
+      steps:
+        # Step 1: Run Monitor Agent
+        - - name: run-monitor
+            template: run-monitor-agent
+            arguments:
+              parameters:
+                - name: iteration
+                  value: "{{`{{inputs.parameters.iteration}}`}}"
+        
+        # Step 2: Check if remediation is needed
+        - - name: check-result
+            template: check-monitor-result
+            arguments:
+              parameters:
+                - name: monitor-exit-code
+                  value: "{{`{{steps.run-monitor.exitCode}}`}}"
+        
+        # Step 3: Run Remediation if needed
+        - - name: run-remediation
+            template: run-remediation-agent
+            when: "{{`{{steps.check-result.outputs.parameters.needs-remediation}}`}} == true"
+            arguments:
+              parameters:
+                - name: iteration
+                  value: "{{`{{inputs.parameters.iteration}}`}}"
+        
+        # Step 4: Loop back if remediation was run
+        - - name: next-iteration
+            template: watch-iteration
+            when: "{{`{{steps.check-result.outputs.parameters.needs-remediation}}`}} == true"
+            arguments:
+              parameters:
+                - name: iteration
+                  value: "{{`{{steps.check-result.outputs.parameters.next-iteration}}`}}"
+
+    # Monitor Agent - submits Play, evaluates results
+    - name: run-monitor-agent
+      inputs:
+        parameters:
+          - name: iteration
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: watch-workspace
+        - name: watch-scripts
+          configMap:
+            name: watch-scripts
+            defaultMode: 0755
+      container:
+        image: {{.Values.image.repository}}:{{.Values.image.tag}}
+        imagePullPolicy: {{.Values.image.pullPolicy}}
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Set up environment
+            export WATCH_ITERATION={{`{{inputs.parameters.iteration}}`}}
+            export TASK_ID={{`{{workflow.parameters.task-id}}`}}
+            export REPOSITORY={{`{{workflow.parameters.repository}}`}}
+            export PLAY_TEMPLATE={{`{{workflow.parameters.play-template}}`}}
+            export IMPLEMENTATION_AGENT={{`{{workflow.parameters.implementation-agent}}`}}
+            export QUALITY_AGENT={{`{{workflow.parameters.quality-agent}}`}}
+            export TESTING_AGENT={{`{{workflow.parameters.testing-agent}}`}}
+            export WATCH_WORKSPACE="/workspace/watch"
+            export GITHUB_REPO="{{`{{workflow.parameters.repository}}`}}"
+            
+            # Set up scripts path
+            mkdir -p /workspace/scripts/lib /workspace/scripts/actions
+            cp /watch-scripts/*.sh /workspace/scripts/ 2>/dev/null || true
+            # Organize library vs action scripts
+            for f in common.sh github.sh argocd.sh kubernetes.sh git.sh; do
+              [ -f "/watch-scripts/$f" ] && cp "/watch-scripts/$f" "/workspace/scripts/lib/"
+            done
+            for f in poll-ci.sh check-bugbot.sh merge-pr.sh poll-deploy.sh run-validation.sh create-fix-pr.sh full-remediation-flow.sh; do
+              [ -f "/watch-scripts/$f" ] && cp "/watch-scripts/$f" "/workspace/scripts/actions/"
+            done
+            chmod +x /workspace/scripts/lib/*.sh /workspace/scripts/actions/*.sh 2>/dev/null || true
+            
+            echo "🔍 Starting Monitor Agent (iteration $WATCH_ITERATION)"
+            
+            # Initialize workspace
+            mkdir -p "$WATCH_WORKSPACE"
+            
+            # Run play-monitor to submit and watch Play workflow
+            play-monitor run \
+              --task-id "$TASK_ID" \
+              --template "$PLAY_TEMPLATE" \
+              --namespace {{ .Release.Namespace }} \
+              --wait
+            
+            PLAY_EXIT=$?
+            
+            if [ $PLAY_EXIT -eq 0 ]; then
+              echo "✅ Play workflow succeeded"
+              exit 0
+            else
+              echo "❌ Play workflow failed - creating issue report"
+              
+              # Create issue report for remediation agent
+              cat > "$WATCH_WORKSPACE/current-issue.md" << EOF
+            # E2E Watch Issue Report
+            
+            ## Iteration $WATCH_ITERATION
+            **Task ID:** $TASK_ID
+            **Repository:** $REPOSITORY
+            **Timestamp:** $(date -Iseconds)
+            
+            ## Failure Details
+            Play workflow exited with code: $PLAY_EXIT
+            
+            ## Logs
+            \`\`\`
+            $(play-monitor logs --task-id "$TASK_ID" --tail 200 2>/dev/null || echo "Could not fetch logs")
+            \`\`\`
+            EOF
+              
+              exit 1
+            fi
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-{{`{{workflow.parameters.monitor-agent}}`}}
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-{{`{{workflow.parameters.monitor-agent}}`}}
+                key: private-key
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: watch-scripts
+            mountPath: /watch-scripts
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+    # Check if remediation is needed based on monitor exit code
+    - name: check-monitor-result
+      inputs:
+        parameters:
+          - name: monitor-exit-code
+      outputs:
+        parameters:
+          - name: needs-remediation
+            valueFrom:
+              path: /tmp/needs-remediation.txt
+          - name: next-iteration
+            valueFrom:
+              path: /tmp/next-iteration.txt
+      script:
+        image: alpine:3.19
+        command: [sh]
+        source: |
+          #!/bin/sh
+          EXIT_CODE="{{`{{inputs.parameters.monitor-exit-code}}`}}"
+          CURRENT_ITER={{`{{inputs.parameters.iteration}}`}}
+          
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "false" > /tmp/needs-remediation.txt
+            echo "$CURRENT_ITER" > /tmp/next-iteration.txt
+            echo "✅ Monitor passed - no remediation needed"
+          else
+            echo "true" > /tmp/needs-remediation.txt
+            NEXT=$((CURRENT_ITER + 1))
+            echo "$NEXT" > /tmp/next-iteration.txt
+            echo "⚠️ Monitor detected issues - triggering remediation"
+          fi
+
+    # Remediation Agent - fixes issues, ensures deployment
+    - name: run-remediation-agent
+      inputs:
+        parameters:
+          - name: iteration
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: watch-workspace
+        - name: watch-scripts
+          configMap:
+            name: watch-scripts
+            defaultMode: 0755
+      container:
+        image: {{.Values.image.repository}}:{{.Values.image.tag}}
+        imagePullPolicy: {{.Values.image.pullPolicy}}
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Set up environment
+            export WATCH_ITERATION={{`{{inputs.parameters.iteration}}`}}
+            export TASK_ID={{`{{workflow.parameters.task-id}}`}}
+            export REPOSITORY={{`{{workflow.parameters.repository}}`}}
+            export ARGOCD_APP={{`{{workflow.parameters.argocd-app}}`}}
+            export CONTROLLER_NAMESPACE={{`{{workflow.parameters.controller-namespace}}`}}
+            export CONTROLLER_LABEL={{`{{workflow.parameters.controller-label}}`}}
+            export WATCH_WORKSPACE="/workspace/watch"
+            export REPO_DIR="/workspace/repo"
+            export GITHUB_REPO="{{`{{workflow.parameters.repository}}`}}"
+            
+            # Set up scripts path
+            mkdir -p /workspace/scripts/lib /workspace/scripts/actions
+            for f in common.sh github.sh argocd.sh kubernetes.sh git.sh; do
+              [ -f "/watch-scripts/$f" ] && cp "/watch-scripts/$f" "/workspace/scripts/lib/"
+            done
+            for f in poll-ci.sh check-bugbot.sh merge-pr.sh poll-deploy.sh run-validation.sh create-fix-pr.sh full-remediation-flow.sh; do
+              [ -f "/watch-scripts/$f" ] && cp "/watch-scripts/$f" "/workspace/scripts/actions/"
+            done
+            chmod +x /workspace/scripts/lib/*.sh /workspace/scripts/actions/*.sh 2>/dev/null || true
+            
+            # Source common library
+            source /workspace/scripts/lib/common.sh
+            
+            echo "🔧 Starting Remediation Agent (iteration $WATCH_ITERATION)"
+            
+            # Check for issue file
+            ISSUE_FILE="$WATCH_WORKSPACE/current-issue.md"
+            if [ ! -f "$ISSUE_FILE" ]; then
+              log_error "No issue file found at $ISSUE_FILE"
+              exit 1
+            fi
+            
+            log_info "Reading issue report..."
+            cat "$ISSUE_FILE"
+            
+            # Set up GitHub authentication
+            if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+              log_error "Missing GitHub App credentials"
+              exit 1
+            fi
+            
+            # Generate GitHub token (reusing auth logic)
+            TEMP_KEY="/tmp/gh-key.pem"
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+            chmod 600 "$TEMP_KEY"
+            
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            JWT_HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+            JWT_PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+            JWT_SIG=$(printf '%s.%s' "$JWT_HDR" "$JWT_PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+            JWT="$JWT_HDR.$JWT_PAY.$JWT_SIG"
+            rm -f "$TEMP_KEY"
+            
+            # Get installation token
+            REPO_OWNER=$(echo "$REPOSITORY" | cut -d'/' -f1)
+            REPO_NAME=$(echo "$REPOSITORY" | cut -d'/' -f2)
+            
+            INST_ID=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id // empty')
+            
+            if [ -z "$INST_ID" ]; then
+              INST_ID=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id // empty')
+            fi
+            
+            GITHUB_TOKEN=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/app/installations/$INST_ID/access_tokens" | jq -r '.token')
+            
+            export GITHUB_TOKEN GH_TOKEN="$GITHUB_TOKEN"
+            
+            # Configure git
+            git config --global credential.helper store
+            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+            git config --global user.email "automation@5dlabs.io"
+            git config --global user.name "5DLabs E2E Watch"
+            
+            # Clone repo
+            log_step "Cloning repository..."
+            rm -rf "$REPO_DIR"
+            git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/$REPOSITORY.git" "$REPO_DIR"
+            cd "$REPO_DIR"
+            
+            # Create fix branch
+            BRANCH="fix/watch-iter-${WATCH_ITERATION}-$(date +%s)"
+            git checkout -b "$BRANCH"
+            log_success "Created branch: $BRANCH"
+            
+            # Run Factory CLI to analyze and fix (placeholder for now)
+            log_step "Running Factory CLI for remediation..."
+            # TODO: Call factory CLI here when ready
+            # factory --prompt "$(cat $ISSUE_FILE)" --model "{{`{{workflow.parameters.remediation-model}}`}}"
+            
+            # For now, check if there are any changes to commit
+            if git diff --quiet && git diff --cached --quiet; then
+              log_warn "No changes made - Factory CLI integration pending"
+              exit 0
+            fi
+            
+            # Run the full remediation flow using helper scripts
+            /workspace/scripts/actions/full-remediation-flow.sh \
+              --task-id "$TASK_ID" \
+              --title "fix(watch): remediation for iteration $WATCH_ITERATION" \
+              --body "Automated fix from E2E Watch system" \
+              --repo-dir "$REPO_DIR" \
+              --repo "$REPOSITORY" \
+              --argocd-app "$ARGOCD_APP" \
+              --namespace "$CONTROLLER_NAMESPACE" \
+              --selector "$CONTROLLER_LABEL"
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-{{`{{workflow.parameters.remediation-agent}}`}}
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-{{`{{workflow.parameters.remediation-agent}}`}}
+                key: private-key
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: watch-scripts
+            mountPath: /watch-scripts
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+
+    # Exit handler for cleanup
+    - name: cleanup-handler
+      container:
+        image: alpine:3.19
+        command: [sh, -c]
+        args:
+          - |
+            echo "E2E Watch workflow completing"
+            echo "Final status: {{`{{workflow.status}}`}}"
+{{- end }}
+

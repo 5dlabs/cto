@@ -45,6 +45,35 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "cli-agnostic-platform",
       "workingDirectory": "cli-agnostic-platform"
+    },
+    "watch": {
+      "repository": "5dlabs/cto",
+      "service": "cto-platform",
+      "playTemplate": "play-workflow-template",
+      "monitor": {
+        "agent": "5DLabs-Morgan",
+        "cli": "factory",
+        "model": "glm-4-plus",
+        "tools": [
+          "kubernetes_listResources",
+          "kubernetes_getResource",
+          "kubernetes_getPodsLogs",
+          "kubernetes_getEvents"
+        ]
+      },
+      "remediation": {
+        "agent": "5DLabs-Rex",
+        "cli": "factory",
+        "model": "claude-opus-4-5-20251101",
+        "tools": [
+          "brave_search_brave_web_search",
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch"
+        ]
+      }
     }
   },
   "agents": {

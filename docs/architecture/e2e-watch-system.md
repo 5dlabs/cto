@@ -4,75 +4,83 @@
 
 The E2E Watch System provides automated end-to-end testing and remediation for Play workflows. It consists of two agents working in coordination:
 
-1. **Monitor Agent** - Watches Play execution, detects failures, writes structured issue reports
-2. **Remediation Agent** - Reads issue reports, makes fixes, triggers Play retries
+1. **Monitor Agent (Morgan)** - Submits Play, watches execution, evaluates against acceptance criteria, writes issue reports
+2. **Remediation Agent (Rex)** - Reads issue reports, makes fixes, ensures PR merged and deployed before handing back
 
-This system reuses existing infrastructure (Argo Workflows, CodeRun CRDs, shared PVCs, MCP tools) and existing GitHub Apps (Morgan, Rex) with role-specific prompts.
+This system reuses existing infrastructure (Argo Workflows, CodeRun CRDs, shared PVCs) and existing GitHub Apps (Morgan, Rex) with role-specific prompts.
+
+**Key Design Decisions:**
+
+- **Single CLI**: Factory only (no multi-CLI complexity)
+- **Models**: GLM for Monitor (lightweight observation), Opus 4.5 for Remediation (complex reasoning)
+- **No max iterations**: Loop runs until acceptance criteria pass (infinite)
+- **Polling-based**: No sensors needed - agents poll for state changes
+- **Target repo**: `5dlabs/cto` (fixes to the platform itself)
 
 ## Goals
 
 - **Automated E2E validation**: Run a Play and verify it completes successfully
 - **Self-healing**: When failures occur, automatically remediate and retry
+- **Full deployment cycle**: Remediation includes PR → CI → merge → ArgoCD sync → cluster verification
 - **Template-driven**: Update expected behavior and remediation strategies without code changes
 - **Observability**: Same monitoring/logging as other agents
-- **Iteration**: Loop until Play succeeds or max iterations reached
 
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           E2E Watch Workflow                                 │
-│                     (Argo WorkflowTemplate: watch-workflow-template)         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                         Shared PVC                                   │   │
-│   │  /workspace/                                                         │   │
-│   │  ├── watch/                                                          │   │
-│   │  │   ├── status.md              # Current iteration, state           │   │
-│   │  │   ├── current-issue.md       # Active issue for remediation       │   │
-│   │  │   ├── issue-history.md       # Log of all issues                  │   │
-│   │  │   └── acceptance-criteria.md # Expected Play behavior             │   │
-│   │  └── play-artifacts/            # Logs, PR info from monitored Play  │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              │ (mounted by both agents)                     │
-│                              │                                              │
-│   ┌──────────────────────────┴──────────────────────────┐                  │
-│   │                                                      │                  │
-│   ▼                                                      ▼                  │
-│ ┌───────────────────────┐                    ┌───────────────────────┐     │
-│ │    Monitor Agent      │                    │   Remediation Agent   │     │
-│ │    (Morgan)           │                    │   (Rex)               │     │
-│ ├───────────────────────┤                    ├───────────────────────┤     │
-│ │ GitHub App: Morgan    │                    │ GitHub App: Rex       │     │
-│ │ CLI: factory/claude   │                    │ CLI: factory/claude   │     │
-│ │ Model: configurable   │                    │ Model: configurable   │     │
-│ │ Role: monitor         │                    │ Role: remediation     │     │
-│ └───────────┬───────────┘                    └───────────┬───────────┘     │
-│             │                                            │                  │
-│             │ 1. Submits Play                            │                  │
-│             │ 2. Monitors via Argo/kubectl               │                  │
-│             │ 3. Detects failure                         │                  │
-│             │ 4. Writes current-issue.md                 │                  │
-│             │                                            │                  │
-│             ▼                                            │                  │
-│   ┌───────────────────────────────────────┐              │                  │
-│   │           Play Workflow               │              │                  │
-│   │   (Rex → Cleo → Tess → Atlas)         │              │                  │
-│   └───────────────────────────────────────┘              │                  │
-│             │                                            │                  │
-│             │ On failure (Argo Event)                    │                  │
-│             └────────────────────────────────────────────┤                  │
-│                                                          │                  │
-│                                                          │ 5. Reads issue   │
-│                                                          │ 6. Makes fix     │
-│                                                          │ 7. Pushes code   │
-│                                                          │ 8. Triggers retry│
-│                                                          ▼                  │
-│                                                   (Loop back to Monitor)    │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           E2E Watch Workflow                                     │
+│                    (Argo WorkflowTemplate: watch-workflow-template)              │
+│                         Entry: play-monitor e2e --task-id X                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   ┌───────────────────────────────────────────────────────────────────────┐     │
+│   │                         Shared PVC (/workspace/)                       │     │
+│   │  ├── watch/                                                            │     │
+│   │  │   ├── status.md              # Current iteration, state             │     │
+│   │  │   ├── current-issue.md       # Active issue for remediation         │     │
+│   │  │   ├── issue-history.md       # Log of all issues                    │     │
+│   │  │   └── acceptance-criteria.md # Expected Play behavior               │     │
+│   │  ├── play-artifacts/            # Logs from monitored Play             │     │
+│   │  └── repo/                      # Cloned 5dlabs/cto repository         │     │
+│   └───────────────────────────────────────────────────────────────────────┘     │
+│                              │                                                   │
+│                              │ (mounted by both agents)                          │
+│                              │                                                   │
+│   ┌──────────────────────────┴──────────────────────────┐                       │
+│   │                                                      │                       │
+│   ▼                                                      ▼                       │
+│ ┌─────────────────────────────┐          ┌─────────────────────────────────┐    │
+│ │     MONITOR AGENT           │          │      REMEDIATION AGENT          │    │
+│ │     (Morgan / GLM)          │          │      (Rex / Opus 4.5)           │    │
+│ ├─────────────────────────────┤          ├─────────────────────────────────┤    │
+│ │ 1. Submit Play workflow     │          │ 1. Read issue from PVC          │    │
+│ │    (argo submit)            │          │ 2. Clone repo, make fix         │    │
+│ │ 2. Poll until complete      │          │ 3. cargo fmt/clippy/test        │    │
+│ │    (argo get)               │          │ 4. Create branch, push PR       │    │
+│ │ 3. Download all logs        │          │ 5. Poll: gh run list            │    │
+│ │ 4. Evaluate vs criteria     │          │    (wait for CI to start)       │    │
+│ │ 5. Write findings to PVC    │          │ 6. Poll: gh pr checks           │    │
+│ │ 6. Exit 0=pass, 1=issues    │          │    (wait for checks to pass)    │    │
+│ └──────────────┬──────────────┘          │ 7. Check bug-bot comments       │    │
+│                │                          │ 8. gh pr merge --squash         │    │
+│                │ Submits                  │ 9. Poll: argocd app get         │    │
+│                ▼                          │    (wait for sync)              │    │
+│   ┌───────────────────────────┐          │ 10. Poll: kubectl get pods      │    │
+│   │       Play Workflow       │          │     (verify controller ready)   │    │
+│   │  (Rex → Cleo → Tess →     │          │ 11. Exit 0                      │    │
+│   │   Cipher → Atlas)         │          └──────────────┬──────────────────┘    │
+│   └───────────────────────────┘                         │                       │
+│                                                         │                       │
+│   ┌─────────────────────────────────────────────────────┘                       │
+│   │                                                                             │
+│   │  Argo Workflow Loop Control:                                                │
+│   │  ┌──────────────────────────────────────────────────────────────────────┐   │
+│   │  │ Monitor exit 0 (success) ──────────────────────► Workflow Succeeds   │   │
+│   │  │ Monitor exit 1 (issues)  ───► Remediation ───► Loop back to Monitor  │   │
+│   │  └──────────────────────────────────────────────────────────────────────┘   │
+│   │                                                                             │
+└───┴─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Configuration Schema
@@ -83,37 +91,21 @@ This system reuses existing infrastructure (Argo Workflows, CodeRun CRDs, shared
 {
   "defaults": {
     "watch": {
-      "repository": "5dlabs/cto-parallel-test",
-      "docsRepository": "5dlabs/cto-parallel-test",
-      "docsProjectDirectory": "docs",
-      "service": "cto-parallel-test",
-      "workingDirectory": ".",
-      "maxIterations": 10,
+      "repository": "5dlabs/cto",
+      "service": "cto-platform",
       "playTemplate": "play-workflow-template",
       
       "monitor": {
         "agent": "5DLabs-Morgan",
         "cli": "factory",
-        "model": "claude-opus-4-5-20251101",
-        "maxTokens": 64000,
-        "temperature": 0.7,
-        "modelRotation": {
-          "enabled": true,
-          "models": [
-            "claude-sonnet-4-5-20250929",
-            "claude-opus-4-5-20251101"
-          ]
-        },
+        "model": "glm-4-plus",
         "tools": [
           "kubernetes_listResources",
           "kubernetes_getResource",
           "kubernetes_getPodsLogs",
           "kubernetes_getEvents",
-          "openmemory_openmemory_query",
-          "openmemory_openmemory_store",
           "github_get_pull_request",
-          "github_get_pull_request_status",
-          "github_list_pull_requests"
+          "github_get_pull_request_status"
         ]
       },
       
@@ -121,16 +113,6 @@ This system reuses existing infrastructure (Argo Workflows, CodeRun CRDs, shared
         "agent": "5DLabs-Rex",
         "cli": "factory",
         "model": "claude-opus-4-5-20251101",
-        "maxTokens": 64000,
-        "temperature": 0.7,
-        "reasoningEffort": "high",
-        "modelRotation": {
-          "enabled": true,
-          "models": [
-            "claude-sonnet-4-5-20250929",
-            "claude-opus-4-5-20251101"
-          ]
-        },
         "tools": [
           "brave_search_brave_web_search",
           "context7_resolve_library_id",
@@ -139,9 +121,7 @@ This system reuses existing infrastructure (Argo Workflows, CodeRun CRDs, shared
           "github_push_files",
           "github_create_branch",
           "github_get_file_contents",
-          "github_create_or_update_file",
-          "openmemory_openmemory_query",
-          "openmemory_openmemory_store"
+          "github_create_or_update_file"
         ]
       }
     }
@@ -153,15 +133,13 @@ This system reuses existing infrastructure (Argo Workflows, CodeRun CRDs, shared
 
 | Field | Description |
 |-------|-------------|
-| `monitor.agent` | GitHub App for monitor role (e.g., `5DLabs-Morgan`) |
-| `monitor.cli` | CLI to use: `factory` or `claude` |
-| `monitor.model` | Model identifier for the CLI |
-| `monitor.tools` | MCP tools available to monitor agent |
-| `remediation.agent` | GitHub App for remediation role (e.g., `5DLabs-Rex`) |
-| `remediation.cli` | CLI to use: `factory` or `claude` |
-| `remediation.model` | Model identifier for the CLI |
-| `remediation.tools` | MCP tools available to remediation agent |
-| `maxIterations` | Maximum monitor→remediation cycles before giving up |
+| `repository` | Target repository for fixes (`5dlabs/cto`) |
+| `monitor.agent` | GitHub App for monitor role (`5DLabs-Morgan`) |
+| `monitor.model` | Lightweight model for observation (`glm-4-plus`) |
+| `remediation.agent` | GitHub App for remediation role (`5DLabs-Rex`) |
+| `remediation.model` | Heavy reasoning model (`claude-opus-4-5-20251101`) |
+
+Note: No `maxIterations` - the loop runs until acceptance criteria pass.
 
 ## Agent Templates
 
@@ -171,209 +149,97 @@ Templates follow the existing pattern in `infra/charts/controller/agent-template
 
 ```
 infra/charts/controller/agent-templates/
-├── watch/                                    # New directory for watch templates
-│   ├── factory/
-│   │   ├── container-monitor.sh.hbs          # Monitor agent container script
-│   │   ├── container-remediation.sh.hbs      # Remediation agent container script
-│   │   ├── agents-monitor.md.hbs             # Monitor system prompt (CLAUDE.md)
-│   │   └── agents-remediation.md.hbs         # Remediation system prompt (CLAUDE.md)
-│   │
-│   └── claude/
-│       ├── container-monitor.sh.hbs
-│       ├── container-remediation.sh.hbs
-│       ├── agents-monitor.md.hbs
-│       └── agents-remediation.md.hbs
-│
-└── docs/
-    └── templates/
-        └── watch/
-            └── acceptance-criteria.md        # Default E2E acceptance criteria
+└── watch/
+    └── factory/
+        ├── container-monitor.sh.hbs          # Monitor agent container script
+        ├── container-remediation.sh.hbs      # Remediation agent container script
+        ├── agents-monitor.md.hbs             # Monitor system prompt (CLAUDE.md)
+        └── agents-remediation.md.hbs         # Remediation system prompt
 ```
 
-### Template Pattern
+### Monitor Agent Behavior
 
-Follow the newer pattern used in `factory` and `cursor` templates:
+The Monitor Agent (Morgan/GLM) performs these steps:
 
-1. **Container script** (`container-*.sh.hbs`):
-   - Sets up environment variables
-   - Configures CLI (factory or claude)
-   - Mounts MCP tools
-   - Runs the agent with appropriate prompt
-   - Handles completion/failure states
+1. **Submit Play**: `argo submit --from workflowtemplate/play-workflow-template`
+2. **Poll Status**: `argo get <workflow> -o json` until phase is Succeeded or Failed
+3. **Harvest Logs**: Download logs from all stages
+4. **Evaluate**: Compare results against acceptance criteria
+5. **Report**: Write findings to `/workspace/watch/current-issue.md`
+6. **Exit**: 0 if all criteria pass, 1 if issues found
 
-2. **Agent prompt** (`agents-*.md.hbs`):
-   - Role-specific system prompt
-   - Written to `CLAUDE.md` in workspace
-   - Defines agent behavior and constraints
+### Remediation Agent Behavior
 
-### Monitor Agent Prompt (agents-monitor.md.hbs)
+The Remediation Agent (Rex/Opus 4.5) performs the full fix-to-deployment cycle:
 
-```markdown
-# E2E Watch Monitor Agent
-
-You are the **Monitor Agent** for the E2E Watch system. Your job is to:
-
-1. **Submit and watch a Play workflow** for task {{task_id}}
-2. **Detect failures** by monitoring Argo workflow status
-3. **Write structured issue reports** when failures occur
-4. **Declare success** when the Play completes
-
-## Your Tools
-
-You have access to:
-- Kubernetes tools to monitor pods, logs, events
-- GitHub tools to check PR status
-- OpenMemory to store learnings
-
-## Workflow
-
-### Phase 1: Submit Play
-
-Submit the Play workflow using argo CLI:
+**Fix Phase:**
 ```bash
-argo submit --from workflowtemplate/{{play_template}} \
-  -n argo \
-  -p task-id={{task_id}} \
-  -p repository={{repository}} \
-  -p implementation-agent={{implementation_agent}} \
-  -p quality-agent={{quality_agent}} \
-  -p testing-agent={{testing_agent}}
+# Read issue, clone repo, make fix
+git clone https://github.com/5dlabs/cto /workspace/repo
+cd /workspace/repo
+# Make targeted code changes
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
+cargo test
 ```
 
-### Phase 2: Monitor
-
-Poll workflow status every 10 seconds:
+**PR Phase:**
 ```bash
-argo get <workflow-name> -n argo -o json
+# Create branch and PR
+git checkout -b fix/watch-iteration-N-description
+git add -A && git commit -m "fix: ..."
+git push origin fix/watch-iteration-N-description
+gh pr create --title "..." --body "..."
 ```
 
-Track:
-- Current stage (implementation, code-quality, testing, integration)
-- Step phases (Running, Succeeded, Failed)
-- Pod logs for failed steps
+**GitHub Polling Flow:**
+```bash
+# 1. Wait for CI to start (at least one workflow run appears)
+while true; do
+  RUNS=$(gh run list --branch <branch> --repo 5dlabs/cto --json status)
+  if [ "$(echo $RUNS | jq length)" -gt 0 ]; then break; fi
+  sleep 10
+done
 
-### Phase 3: On Failure
+# 2. Wait for all checks to complete (no pending)
+while true; do
+  CHECKS=$(gh pr checks <pr-number> --repo 5dlabs/cto)
+  if ! echo "$CHECKS" | grep -q "pending"; then break; fi
+  sleep 30
+done
 
-When a failure is detected, write `/workspace/watch/current-issue.md`:
+# 3. Check for bug-bot comments
+COMMENTS=$(gh api repos/5dlabs/cto/issues/<pr-number>/comments)
+# If bug-bot issues found → fix → push → back to step 1
 
-```markdown
-# 🔴 E2E Issue Detected
+# 4. Check merge status
+MERGEABLE=$(gh pr view <pr-number> --repo 5dlabs/cto --json mergeable -q '.mergeable')
+# If CONFLICTING → resolve → push → back to step 1
 
-## Metadata
-- **Task ID**: {{task_id}}
-- **Iteration**: X of {{max_iterations}}
-- **Timestamp**: <ISO8601>
-
-## Failure Context
-- **Stage**: <stage name>
-- **Failed Step**: <step name>
-- **Pod**: <pod name>
-- **Exit Code**: <code>
-
-## Error Summary
-<Concise description of what failed>
-
-## Relevant Logs
-```
-<Last 100 lines of relevant logs>
+# 5. Merge PR
+gh pr merge <pr-number> --repo 5dlabs/cto --squash
 ```
 
-## Acceptance Criteria Status
-- [x] Implementation completed
-- [ ] Quality checks passed  ← FAILED HERE
-- [ ] Tests passed
-- [ ] PR merged
+**Deployment Polling Flow:**
+```bash
+# 6. Wait for ArgoCD sync
+while true; do
+  SYNC=$(argocd app get controller -o json | jq -r '.status.sync.status')
+  HEALTH=$(argocd app get controller -o json | jq -r '.status.health.status')
+  if [ "$SYNC" = "Synced" ] && [ "$HEALTH" = "Healthy" ]; then break; fi
+  sleep 30
+done
 
-## Suggested Remediation
-<Your analysis of how to fix this>
+# 7. Verify controller pod is ready with new code
+while true; do
+  READY=$(kubectl get pods -n cto -l app=agent-controller -o json | \
+    jq -r '.items[0].status.conditions[] | select(.type=="Ready") | .status')
+  if [ "$READY" = "True" ]; then break; fi
+  sleep 10
+done
 ```
 
-Then update `/workspace/watch/status.md` and signal completion (exit 1 for failure).
-
-### Phase 4: On Success
-
-When Play completes successfully:
-1. Update `/workspace/watch/status.md` with success
-2. Store learnings to OpenMemory
-3. Exit 0
-
-## Constraints
-
-- DO NOT attempt to fix issues yourself - that's the Remediation Agent's job
-- DO write clear, actionable issue reports
-- DO include relevant logs and context
-- DO track iteration count to prevent infinite loops
-```
-
-### Remediation Agent Prompt (agents-remediation.md.hbs)
-
-```markdown
-# E2E Watch Remediation Agent
-
-You are the **Remediation Agent** for the E2E Watch system. Your job is to:
-
-1. **Read the issue report** from `/workspace/watch/current-issue.md`
-2. **Analyze the failure** and determine the fix
-3. **Make targeted code changes** to resolve the issue
-4. **Push changes** to trigger a Play retry
-
-## Your Tools
-
-You have access to:
-- Web search and Context7 for researching solutions
-- GitHub tools for creating branches, pushing files, creating PRs
-- OpenMemory to recall past fixes and store new learnings
-
-## Workflow
-
-### Phase 1: Read Issue
-
-Read and parse `/workspace/watch/current-issue.md` to understand:
-- What stage failed
-- What the error was
-- What logs are relevant
-- What the Monitor Agent suggested
-
-### Phase 2: Research (if needed)
-
-If the fix isn't obvious:
-- Check OpenMemory for similar past issues
-- Search Context7 for library documentation
-- Web search for error messages
-
-### Phase 3: Fix
-
-Make the minimal targeted fix:
-- Clone the repository (or use existing workspace)
-- Create a fix branch: `fix/watch-iteration-<N>-<description>`
-- Make code changes
-- Run local validation (cargo fmt, cargo clippy, cargo test)
-- Commit with clear message
-
-### Phase 4: Push
-
-Push changes to trigger Play retry:
-- Push to the fix branch
-- Create PR if one doesn't exist
-- The Play workflow will automatically retry when main is updated
-
-### Phase 5: Update Status
-
-Update `/workspace/watch/status.md`:
-- Mark remediation complete
-- Note what was fixed
-- Increment iteration counter
-
-Exit 0 to signal completion.
-
-## Constraints
-
-- DO make minimal, targeted fixes - don't refactor unrelated code
-- DO run quality checks before pushing (fmt, clippy, tests)
-- DO NOT over-engineer - fix only what's broken
-- DO store successful fix patterns to OpenMemory for future reference
-- DO check OpenMemory first for similar past issues
-```
+**Exit 0** → Argo workflow loops back to Monitor for fresh Play
 
 ## Shared PVC Structure
 
@@ -382,17 +248,16 @@ Both agents mount the same PVC at `/workspace/`:
 ```
 /workspace/
 ├── watch/
-│   ├── status.md                 # Current state
+│   ├── status.md                 # Current state (phase, iteration)
 │   ├── current-issue.md          # Active issue (written by Monitor)
 │   ├── issue-history.md          # Append-only log of all issues
-│   └── acceptance-criteria.md    # Expected Play behavior (from template)
+│   └── acceptance-criteria.md    # Expected Play behavior
 │
-├── play-artifacts/               # Optional: captured from Play
-│   ├── logs/
-│   │   └── <stage>-<pod>.log
-│   └── pr-info.md
+├── play-artifacts/               # Captured from Play
+│   └── logs/
+│       └── <stage>-<pod>.log
 │
-└── repo/                         # Cloned target repository
+└── repo/                         # Cloned 5dlabs/cto
     └── <repository contents>
 ```
 
@@ -402,8 +267,8 @@ Both agents mount the same PVC at `/workspace/`:
 # E2E Watch Status
 
 ## Current State
-- **Phase**: monitoring | remediating | succeeded | failed
-- **Iteration**: 3 of 10
+- **Phase**: monitoring | remediating | succeeded
+- **Iteration**: 3
 - **Started**: 2024-01-15T10:00:00Z
 - **Last Update**: 2024-01-15T10:35:00Z
 
@@ -422,198 +287,42 @@ Both agents mount the same PVC at `/workspace/`:
 
 ### current-issue.md Format
 
-See Monitor Agent prompt above for full format.
-
-### acceptance-criteria.md (Default Template)
-
 ```markdown
-# E2E Play Acceptance Criteria
+# E2E Issue Detected
 
-## Stage Completion
-- [ ] Implementation stage completed (PR created)
-- [ ] Quality stage completed (Cleo approved)
-- [ ] Testing stage completed (Tess approved)
-- [ ] Integration stage completed (PR merged to main)
+## Metadata
+- **Task ID**: 42
+- **Iteration**: 3
+- **Timestamp**: 2024-01-15T10:30:00Z
 
-## Quality Gates
-- [ ] All agents completed within max retries
-- [ ] No stage exceeded 30 minute timeout
-- [ ] No crash loops or OOM kills
+## Failure Context
+- **Stage**: code-quality
+- **Failed Step**: cleo-review
+- **Pod**: play-42-cleo-xyz
+- **Exit Code**: 1
 
-## Artifacts
-- [ ] PR exists with meaningful description
-- [ ] All CI checks passed
-- [ ] Code changes committed to main
+## Error Summary
+Clippy found unused import in controller/src/main.rs
 
-## Behavioral
-- [ ] Each agent stored memories to OpenMemory
-- [ ] Stage transitions followed expected order
-- [ ] No orphaned resources left in cluster
+## Relevant Logs
+```
+error: unused import: `std::collections::HashMap`
+ --> controller/src/main.rs:5:5
 ```
 
-## Argo Workflow Template
+## Acceptance Criteria Status
+- [x] Implementation completed (PR created)
+- [ ] Quality checks passed ← FAILED HERE
+- [ ] Tests passed
+- [ ] PR merged
 
-### watch-workflow-template.yaml
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: watch-workflow-template
-  namespace: argo
-spec:
-  entrypoint: watch-loop
-  
-  arguments:
-    parameters:
-      - name: task-id
-      - name: repository
-      - name: max-iterations
-        value: "10"
-      - name: monitor-agent
-        value: "5DLabs-Morgan"
-      - name: remediation-agent
-        value: "5DLabs-Rex"
-  
-  volumeClaimTemplates:
-    - metadata:
-        name: workspace
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
-  
-  templates:
-    - name: watch-loop
-      steps:
-        # Initialize workspace
-        - - name: init-workspace
-            template: init-workspace
-        
-        # Main loop: monitor → remediate → repeat
-        - - name: monitor-and-remediate
-            template: monitor-remediate-loop
-            arguments:
-              parameters:
-                - name: iteration
-                  value: "1"
-    
-    - name: init-workspace
-      container:
-        image: alpine:latest
-        command: [sh, -c]
-        args:
-          - |
-            mkdir -p /workspace/watch /workspace/play-artifacts /workspace/repo
-            echo "# E2E Watch Status" > /workspace/watch/status.md
-            echo "## Current State" >> /workspace/watch/status.md
-            echo "- **Phase**: initializing" >> /workspace/watch/status.md
-            echo "- **Iteration**: 0 of {{workflow.parameters.max-iterations}}" >> /workspace/watch/status.md
-        volumeMounts:
-          - name: workspace
-            mountPath: /workspace
-    
-    - name: monitor-remediate-loop
-      inputs:
-        parameters:
-          - name: iteration
-      steps:
-        # Run monitor agent
-        - - name: monitor
-            template: run-monitor
-        
-        # Check if succeeded or needs remediation
-        - - name: check-result
-            template: check-monitor-result
-        
-        # If failed and under max iterations, run remediation
-        - - name: remediate
-            template: run-remediation
-            when: "{{steps.check-result.outputs.result}} == 'needs-remediation'"
-        
-        # Loop back if remediation was run
-        - - name: next-iteration
-            template: monitor-remediate-loop
-            when: "{{steps.check-result.outputs.result}} == 'needs-remediation'"
-            arguments:
-              parameters:
-                - name: iteration
-                  value: "{{steps.check-result.outputs.parameters.next-iteration}}"
-    
-    - name: run-monitor
-      # Creates CodeRun for Monitor Agent (Morgan)
-      # Uses container-monitor.sh.hbs template
-      resource:
-        action: create
-        manifest: |
-          apiVersion: agents.platform/v1
-          kind: CodeRun
-          metadata:
-            generateName: watch-monitor-{{workflow.parameters.task-id}}-
-            namespace: cto
-          spec:
-            taskId: {{workflow.parameters.task-id}}
-            service: "watch-monitor"
-            repositoryUrl: "https://github.com/{{workflow.parameters.repository}}"
-            docsRepositoryUrl: "https://github.com/{{workflow.parameters.repository}}"
-            model: "claude-opus-4-5-20251101"
-            githubApp: "{{workflow.parameters.monitor-agent}}"
-            # Additional spec fields from config...
-    
-    - name: run-remediation
-      # Creates CodeRun for Remediation Agent (Rex)
-      # Uses container-remediation.sh.hbs template
-      resource:
-        action: create
-        manifest: |
-          apiVersion: agents.platform/v1
-          kind: CodeRun
-          metadata:
-            generateName: watch-remediation-{{workflow.parameters.task-id}}-
-            namespace: cto
-          spec:
-            taskId: {{workflow.parameters.task-id}}
-            service: "watch-remediation"
-            repositoryUrl: "https://github.com/{{workflow.parameters.repository}}"
-            docsRepositoryUrl: "https://github.com/{{workflow.parameters.repository}}"
-            model: "claude-opus-4-5-20251101"
-            githubApp: "{{workflow.parameters.remediation-agent}}"
-            # Additional spec fields from config...
-    
-    - name: check-monitor-result
-      # Reads status.md and determines next action
-      script:
-        image: alpine:latest
-        command: [sh]
-        source: |
-          STATUS=$(cat /workspace/watch/status.md | grep "Phase:" | awk '{print $NF}')
-          ITERATION=$(cat /workspace/watch/status.md | grep "Iteration:" | awk -F'of' '{print $1}' | awk '{print $NF}')
-          MAX={{workflow.parameters.max-iterations}}
-          
-          if [ "$STATUS" = "succeeded" ]; then
-            echo "succeeded"
-          elif [ "$ITERATION" -ge "$MAX" ]; then
-            echo "max-iterations-reached"
-          else
-            echo "needs-remediation"
-            echo $((ITERATION + 1)) > /tmp/next-iteration
-          fi
-        volumeMounts:
-          - name: workspace
-            mountPath: /workspace
-      outputs:
-        parameters:
-          - name: next-iteration
-            valueFrom:
-              path: /tmp/next-iteration
+## Suggested Remediation
+Remove unused import on line 5 of controller/src/main.rs
 ```
 
 ## CLI Interface
 
-### play-monitor CLI Extension
-
-Add `watch` command to `monitor/src/main.rs`:
+### play-monitor e2e Command
 
 ```rust
 #[derive(Subcommand)]
@@ -621,7 +330,7 @@ enum Commands {
     // ... existing commands ...
     
     /// Start E2E watch: monitor Play, remediate failures, loop until success
-    Watch {
+    E2e {
         /// Task ID for the Play
         #[arg(long)]
         task_id: String,
@@ -630,11 +339,11 @@ enum Commands {
         #[arg(long, default_value = "cto-config.json")]
         config: String,
         
-        /// Override max iterations (default from config)
-        #[arg(long)]
-        max_iterations: Option<u32>,
+        /// Target repository (default: 5dlabs/cto)
+        #[arg(long, default_value = "5dlabs/cto")]
+        repository: String,
         
-        /// Dry run - show what would be submitted without creating resources
+        /// Dry run - show what would be submitted
         #[arg(long)]
         dry_run: bool,
     },
@@ -644,81 +353,167 @@ enum Commands {
 ### Command Flow
 
 ```bash
-play-monitor watch --task-id 42 --config cto-config.json
+play-monitor e2e --task-id 42 --config cto-config.json
 ```
 
 1. Parse `cto-config.json`, extract `defaults.watch` section
-2. Validate configuration (agents exist, tools valid, etc.)
-3. Submit `watch-workflow-template` to Argo with parameters:
-   - task-id
-   - repository
-   - max-iterations
-   - monitor-agent, monitor-cli, monitor-model, monitor-tools
-   - remediation-agent, remediation-cli, remediation-model, remediation-tools
-4. Stream workflow status (similar to existing `loop` command)
+2. Validate configuration (agents exist, etc.)
+3. Submit `watch-workflow-template` to Argo
+4. Stream workflow status events
 5. Output JSON events for each phase change
+
+## Binary Distribution
+
+### Cargo Dist Configuration
+
+The `play-monitor` binary is distributed via GitHub releases using Cargo Dist.
+
+Create `monitor/dist-workspace.toml`:
+```toml
+[workspace]
+members = ["cargo:."]
+
+[dist]
+cargo-dist-version = "0.28.2"
+ci = "github"
+installers = ["shell"]
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+install-path = "CARGO_HOME"
+hosting = "github"
+install-updater = false
+allow-dirty = ["ci"]
+```
+
+### Runtime Image Integration
+
+Add to `infra/images/runtime/Dockerfile`:
+```dockerfile
+# Install play-monitor from CTO monorepo release
+ARG PLAY_MONITOR_VERSION=skip
+RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
+      echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION}..." && \
+      curl --proto '=https' --tlsv1.2 -LsSf \
+        "https://github.com/5dlabs/cto/releases/download/play-monitor-v${PLAY_MONITOR_VERSION}/play-monitor-installer.sh" | \
+        sh -s -- --yes && \
+      mv ~/.cargo/bin/play-monitor /usr/local/bin/play-monitor; \
+    fi
+```
 
 ## Implementation Phases
 
-### Phase 1: Configuration & Templates
+### Phase 1: Binary Distribution
+1. Add `dist-workspace.toml` to monitor crate
+2. Set up GitHub Actions release workflow
+3. Add play-monitor to runtime Dockerfile
 
-1. Add `watch` section to cto-config.json schema
-2. Create template directory structure under `agent-templates/watch/`
-3. Implement `container-monitor.sh.hbs` for factory CLI
-4. Implement `container-remediation.sh.hbs` for factory CLI
-5. Create `agents-monitor.md.hbs` system prompt
-6. Create `agents-remediation.md.hbs` system prompt
-7. Create default `acceptance-criteria.md` template
+### Phase 2: Agent Templates
+1. Create `watch/factory/` directory structure
+2. Implement `container-monitor.sh.hbs`
+3. Implement `container-remediation.sh.hbs`
+4. Create basic agent prompts (to be refined)
 
-### Phase 2: Workflow Template
-
+### Phase 3: Workflow Template
 1. Create `watch-workflow-template.yaml`
 2. Implement shared PVC setup
-3. Implement monitor→check→remediate loop logic
+3. Implement infinite monitor→remediate loop
 4. Wire up CodeRun creation for both agents
-5. Handle iteration counting and max-iterations termination
 
-### Phase 3: CLI Integration
-
-1. Add `watch` subcommand to `play-monitor`
+### Phase 4: CLI Integration
+1. Add `e2e` subcommand to play-monitor
 2. Parse watch config section
-3. Implement workflow submission with watch parameters
-4. Add status streaming for watch workflows
+3. Implement workflow submission
+4. Add status streaming
 
-### Phase 4: Claude CLI Support
-
-1. Duplicate factory templates for claude CLI
-2. Adjust container scripts for claude-specific invocation
-3. Test both CLI paths
-
-### Phase 5: Testing & Iteration
-
+### Phase 5: Testing
 1. Manual E2E test with simple failure scenarios
-2. Verify monitor→remediation handoff via shared PVC
-3. Verify iteration loop terminates correctly
-4. Add OpenMemory integration for learning persistence
+2. Verify monitor→remediation handoff
+3. Verify full deployment cycle (PR → merge → ArgoCD → pod)
 
 ## Success Criteria
 
-- [ ] `play-monitor watch --task-id X` successfully submits watch workflow
-- [ ] Monitor agent detects Play failures and writes structured issue reports
-- [ ] Remediation agent reads issues and makes targeted fixes
-- [ ] Loop continues until Play succeeds or max iterations reached
-- [ ] Both factory and claude CLIs work
+- [ ] `play-monitor e2e --task-id X` submits watch workflow
+- [ ] Monitor agent submits Play and evaluates completion
+- [ ] Remediation agent fixes issues and ensures deployment
+- [ ] Loop continues until acceptance criteria pass
 - [ ] Status visible in Argo UI and via CLI
-- [ ] Learnings stored to OpenMemory for future improvement
 
-## Open Questions
+## Helper Scripts
 
-1. **Play retry mechanism**: Should remediation push to main (triggering natural retry) or explicitly re-submit the Play workflow?
-2. **Partial progress**: If Play fails at stage 3, should retry start from stage 1 or attempt to resume?
-3. **Resource cleanup**: How to handle orphaned resources from failed Play attempts?
-4. **Timeouts**: Should individual stages have timeouts, or just overall watch timeout?
+The Remediation Agent uses predefined helper scripts to minimize token usage and ensure consistent behavior. These scripts are mounted via ConfigMap.
+
+### Library Scripts (`/workspace/scripts/lib/`)
+
+| Script | Purpose |
+|--------|---------|
+| `common.sh` | Logging, retry logic, polling utilities |
+| `github.sh` | PR operations, CI polling, bug-bot queries |
+| `argocd.sh` | ArgoCD sync status, health checks |
+| `kubernetes.sh` | Pod readiness, deployment status |
+| `git.sh` | Clone, branch, commit, push operations |
+
+### Action Scripts (`/workspace/scripts/actions/`)
+
+| Script | Purpose |
+|--------|---------|
+| `poll-ci.sh` | Wait for all PR checks to pass |
+| `check-bugbot.sh` | Query and parse bug-bot comments |
+| `merge-pr.sh` | Verify and merge PR |
+| `poll-deploy.sh` | Wait for ArgoCD sync + pod readiness |
+| `run-validation.sh` | Run cargo fmt, clippy, test |
+| `create-fix-pr.sh` | Branch, commit, push, create PR |
+| `full-remediation-flow.sh` | Complete fix-to-deployment cycle |
+
+### Usage in Remediation Agent
+
+```bash
+# Source library
+source /workspace/scripts/lib/common.sh
+source /workspace/scripts/lib/github.sh
+
+# Use action scripts
+/workspace/scripts/actions/poll-ci.sh --pr-number 123 --timeout 1800
+/workspace/scripts/actions/check-bugbot.sh --pr-number 123 --wait
+/workspace/scripts/actions/merge-pr.sh --pr-number 123
+/workspace/scripts/actions/poll-deploy.sh --app controller --namespace cto
+```
+
+## Future Enhancements
+
+### TODO: Context7 MCP Server Integration
+
+Add Context7 MCP server to Watch agents for enhanced codebase understanding:
+
+```json
+{
+  "tools": [
+    {
+      "name": "context7",
+      "type": "mcp",
+      "config": {
+        "server": "context7-server",
+        "namespace": "cto"
+      }
+    }
+  ]
+}
+```
+
+This will allow agents to query documentation and examples when fixing issues.
+*Waiting for tools configuration changes to be ready.*
+
+### Other Planned Improvements
+
+- **Acceptance criteria templates**: Domain-specific criteria for different workflow types
+- **Metrics/observability**: Prometheus metrics for Watch iterations, success rates
+- **Slack notifications**: Alert on Watch failures or prolonged loops
+- **Cost tracking**: Track token usage per Watch run
 
 ## References
 
 - Existing Play workflow: `infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml`
 - Factory container pattern: `infra/charts/controller/agent-templates/code/factory/container-base.sh.hbs`
-- Rex remediation template: `infra/charts/controller/agent-templates/code/claude/container-rex-remediation.sh.hbs`
-- Acceptance criteria pattern: `infra/charts/controller/agent-templates/docs/templates/*/acceptance-criteria.md`
+- Tools Cargo Dist config: `tools/dist-workspace.toml`
+- Runtime Dockerfile: `infra/images/runtime/Dockerfile`
 - Current monitor CLI: `monitor/src/main.rs`
+- Watch scripts ConfigMap: `infra/charts/controller/templates/configmaps/watch-scripts-configmap.yaml`
+- Helper scripts: `infra/charts/controller/agent-templates/watch/scripts/`

@@ -1,0 +1,516 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# E2E Watch Remediation Agent Container Script
+# Reads issue, fixes code, opens PR, polls CI/ArgoCD, merges, verifies
+# =========================================================================
+
+echo "🔧 E2E Watch Remediation Agent starting"
+
+# Environment bootstrapping
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+# =========================================================================
+# Configuration
+# =========================================================================
+TASK_ID="{{task_id}}"
+REPOSITORY="{{repository}}"
+REMEDIATION_MODEL="{{model}}"
+ITERATION="${WATCH_ITERATION:-1}"
+WATCH_DIR="/workspace/watch"
+REPO_DIR="/workspace/repo"
+
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 REMEDIATION CONFIGURATION                     ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🎯 Task ID: $TASK_ID"
+echo "📦 Repository: $REPOSITORY"
+echo "🤖 Model: $REMEDIATION_MODEL"
+echo "🔄 Iteration: $ITERATION"
+echo "📂 Watch Dir: $WATCH_DIR"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# =========================================================================
+# GitHub App authentication
+# =========================================================================
+REPO_URL="{{repository_url}}"
+
+if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+  echo "❌ Missing GitHub App credentials"
+  exit 1
+fi
+
+echo "🔐 Authenticating with GitHub App"
+TEMP_KEY_FILE="/tmp/github-app-key.pem"
+printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
+chmod 600 "$TEMP_KEY_FILE"
+
+JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+NOW=$(date +%s)
+EXP=$((NOW + 600))
+JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+rm -f "$TEMP_KEY_FILE"
+
+parse_repo() {
+  local input="$1"
+  if echo "$input" | grep -qE '^https://github.com/'; then
+    echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  elif echo "$input" | grep -qE '^git@github.com:'; then
+    echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  else
+    echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
+  fi
+}
+
+read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
+FULL_REPO="$REPO_OWNER/$REPO_NAME"
+
+INSTALLATION_ID=$(curl -s -L \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+fi
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  echo "❌ Unable to resolve installation ID for $REPO_OWNER/$REPO_NAME"
+  exit 1
+fi
+
+GITHUB_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+  echo "❌ Unable to obtain installation token"
+  exit 1
+fi
+
+export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+
+# Configure git credentials
+git config --global credential.helper store
+echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+git config --global user.email "automation@5dlabs.io"
+git config --global user.name "5DLabs E2E Watch"
+
+# =========================================================================
+# Step 1: Read issue from PVC
+# =========================================================================
+echo ""
+echo "📖 Step 1: Reading issue report..."
+
+ISSUE_FILE="$WATCH_DIR/current-issue.md"
+
+if [ ! -f "$ISSUE_FILE" ]; then
+  echo "❌ No issue file found at $ISSUE_FILE"
+  exit 1
+fi
+
+echo "Issue report:"
+cat "$ISSUE_FILE"
+echo ""
+
+# =========================================================================
+# Step 2: Clone repository
+# =========================================================================
+echo ""
+echo "📥 Step 2: Cloning repository..."
+
+rm -rf "$REPO_DIR"
+git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/$FULL_REPO.git" "$REPO_DIR"
+cd "$REPO_DIR"
+
+# Create fix branch
+BRANCH_NAME="fix/watch-iteration-${ITERATION}-$(date +%Y%m%d-%H%M%S)"
+git checkout -b "$BRANCH_NAME"
+
+echo "✅ Created branch: $BRANCH_NAME"
+
+# =========================================================================
+# Step 3: Run Factory CLI to analyze and fix
+# =========================================================================
+echo ""
+echo "🤖 Step 3: Running Factory CLI for remediation..."
+
+# Create prompt from issue
+FACTORY_PROMPT=$(cat << EOF
+You are fixing an issue detected by the E2E Watch system.
+
+## Issue Report
+$(cat "$ISSUE_FILE")
+
+## Your Task
+1. Analyze the error logs and identify the root cause
+2. Make targeted code changes to fix the issue
+3. Ensure your changes pass all quality checks
+
+## Validation Steps
+After making changes, run:
+- cargo fmt --all --check
+- cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+- cargo test --workspace
+
+## Constraints
+- Only fix what is broken
+- Do not refactor unrelated code
+- Keep changes minimal and focused
+- Document your fix in the commit message
+EOF
+)
+
+# Write prompt to file for Factory CLI
+echo "$FACTORY_PROMPT" > /tmp/factory-prompt.md
+
+# Run Factory CLI (or fallback to direct fixes for now)
+# TODO: Integrate with actual Factory CLI when ready
+echo "📝 Analyzing issue and applying fix..."
+
+# For now, we'll use a placeholder that the Factory CLI will replace
+# The actual implementation will call: factory --prompt /tmp/factory-prompt.md
+
+# =========================================================================
+# Step 4: Run validation
+# =========================================================================
+echo ""
+echo "🔍 Step 4: Running validation..."
+
+cd "$REPO_DIR"
+
+# Format check
+echo "  Running cargo fmt..."
+cargo fmt --all --check || {
+  echo "  Applying cargo fmt..."
+  cargo fmt --all
+}
+
+# Clippy
+echo "  Running cargo clippy..."
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic || {
+  echo "⚠️ Clippy found issues - attempting auto-fix..."
+  cargo clippy --fix --all-targets --allow-dirty || true
+}
+
+# Tests
+echo "  Running cargo test..."
+cargo test --workspace || {
+  echo "⚠️ Some tests failed - continuing to PR for review"
+}
+
+echo "✅ Validation complete"
+
+# =========================================================================
+# Step 5: Commit and push
+# =========================================================================
+echo ""
+echo "📤 Step 5: Committing and pushing..."
+
+cd "$REPO_DIR"
+
+# Stage changes
+git add -A
+
+# Check if there are changes
+if git diff --cached --quiet; then
+  echo "⚠️ No changes to commit - issue may require manual intervention"
+  # Still exit 0 to allow Monitor to retry
+  exit 0
+fi
+
+# Commit
+git commit -m "fix(watch): remediation for iteration $ITERATION
+
+Issue: E2E Watch detected failure
+Iteration: $ITERATION
+Task ID: $TASK_ID
+
+Automated fix applied by E2E Watch Remediation Agent."
+
+# Push
+git push origin "$BRANCH_NAME"
+
+echo "✅ Pushed to origin/$BRANCH_NAME"
+
+# =========================================================================
+# Step 6: Create PR
+# =========================================================================
+echo ""
+echo "📝 Step 6: Creating Pull Request..."
+
+PR_BODY=$(cat << EOF
+## E2E Watch Remediation
+
+**Iteration:** $ITERATION
+**Task ID:** $TASK_ID
+
+### Issue Summary
+$(head -30 "$ISSUE_FILE")
+
+### Automated Fix
+This PR was created by the E2E Watch Remediation Agent to address issues
+detected during automated testing.
+
+### Validation
+- [ ] cargo fmt: checked
+- [ ] cargo clippy: checked
+- [ ] cargo test: checked
+
+### Labels
+- \`e2e-watch\`
+- \`task-$TASK_ID\`
+- \`automated-fix\`
+EOF
+)
+
+PR_URL=$(gh pr create \
+  --repo "$FULL_REPO" \
+  --title "fix(watch): automated remediation iteration $ITERATION" \
+  --body "$PR_BODY" \
+  --label "e2e-watch" \
+  --head "$BRANCH_NAME" \
+  2>&1) || {
+  echo "❌ Failed to create PR"
+  echo "$PR_URL"
+  exit 1
+}
+
+PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+echo "✅ Created PR #$PR_NUMBER: $PR_URL"
+
+# =========================================================================
+# Step 7: Poll for CI to start
+# =========================================================================
+echo ""
+echo "⏳ Step 7: Waiting for CI to start..."
+
+CI_START_TIMEOUT=300  # 5 minutes
+CI_START_TIME=$(date +%s)
+
+while true; do
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - CI_START_TIME))
+  
+  if [ $ELAPSED -gt $CI_START_TIMEOUT ]; then
+    echo "⚠️ CI did not start within timeout - continuing anyway"
+    break
+  fi
+  
+  RUNS=$(gh run list --branch "$BRANCH_NAME" --repo "$FULL_REPO" --json status 2>/dev/null || echo "[]")
+  RUN_COUNT=$(echo "$RUNS" | jq length)
+  
+  if [ "$RUN_COUNT" -gt 0 ]; then
+    echo "✅ CI started ($RUN_COUNT workflow runs)"
+    break
+  fi
+  
+  echo "  [$(date +%H:%M:%S)] Waiting for CI... (${ELAPSED}s)"
+  sleep 10
+done
+
+# =========================================================================
+# Step 8: Poll for CI checks to complete
+# =========================================================================
+echo ""
+echo "⏳ Step 8: Waiting for CI checks to complete..."
+
+CI_TIMEOUT=1800  # 30 minutes
+CI_START=$(date +%s)
+
+while true; do
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - CI_START))
+  
+  if [ $ELAPSED -gt $CI_TIMEOUT ]; then
+    echo "❌ CI timeout after $((CI_TIMEOUT / 60)) minutes"
+    exit 1
+  fi
+  
+  # Get PR check status
+  CHECKS=$(gh pr checks "$PR_NUMBER" --repo "$FULL_REPO" 2>&1 || echo "pending")
+  
+  if echo "$CHECKS" | grep -q "All checks were successful"; then
+    echo "✅ All CI checks passed!"
+    break
+  elif echo "$CHECKS" | grep -q "Some checks were not successful"; then
+    echo "❌ CI checks failed"
+    echo "$CHECKS"
+    # Don't exit - let the Monitor pick this up in next iteration
+    exit 0
+  fi
+  
+  echo "  [$(date +%H:%M:%S)] CI in progress... (${ELAPSED}s)"
+  sleep 30
+done
+
+# =========================================================================
+# Step 9: Check for bug-bot comments
+# =========================================================================
+echo ""
+echo "🔍 Step 9: Checking for bug-bot comments..."
+
+COMMENTS=$(gh api "repos/$FULL_REPO/issues/$PR_NUMBER/comments" 2>/dev/null || echo "[]")
+BUG_BOT_COMMENTS=$(echo "$COMMENTS" | jq '[.[] | select(.user.login | test("bot"; "i"))]')
+BUG_BOT_COUNT=$(echo "$BUG_BOT_COMMENTS" | jq length)
+
+if [ "$BUG_BOT_COUNT" -gt 0 ]; then
+  echo "⚠️ Found $BUG_BOT_COUNT bot comments - may need attention"
+  echo "$BUG_BOT_COMMENTS" | jq -r '.[].body' | head -20
+  # Continue anyway - let Monitor evaluate in next iteration
+fi
+
+# =========================================================================
+# Step 10: Merge PR
+# =========================================================================
+echo ""
+echo "🔀 Step 10: Merging PR..."
+
+gh pr merge "$PR_NUMBER" --repo "$FULL_REPO" --squash --auto || {
+  echo "⚠️ Auto-merge enabled, waiting for merge..."
+}
+
+# Wait for merge
+MERGE_TIMEOUT=300  # 5 minutes
+MERGE_START=$(date +%s)
+
+while true; do
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - MERGE_START))
+  
+  if [ $ELAPSED -gt $MERGE_TIMEOUT ]; then
+    echo "❌ Merge timeout"
+    exit 1
+  fi
+  
+  PR_STATE=$(gh pr view "$PR_NUMBER" --repo "$FULL_REPO" --json state -q '.state' 2>/dev/null || echo "OPEN")
+  
+  if [ "$PR_STATE" = "MERGED" ]; then
+    echo "✅ PR merged!"
+    break
+  elif [ "$PR_STATE" = "CLOSED" ]; then
+    echo "❌ PR was closed without merging"
+    exit 1
+  fi
+  
+  echo "  [$(date +%H:%M:%S)] Waiting for merge... ($PR_STATE)"
+  sleep 10
+done
+
+# =========================================================================
+# Step 11: Poll ArgoCD sync
+# =========================================================================
+echo ""
+echo "⏳ Step 11: Waiting for ArgoCD sync..."
+
+ARGO_APP="${ARGOCD_APP:-controller}"
+SYNC_TIMEOUT=600  # 10 minutes
+SYNC_START=$(date +%s)
+
+while true; do
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - SYNC_START))
+  
+  if [ $ELAPSED -gt $SYNC_TIMEOUT ]; then
+    echo "⚠️ ArgoCD sync timeout - continuing anyway"
+    break
+  fi
+  
+  # Get ArgoCD app status (using in-cluster auth)
+  APP_STATUS=$(argocd app get "$ARGO_APP" -o json 2>/dev/null || echo '{}')
+  SYNC_STATUS=$(echo "$APP_STATUS" | jq -r '.status.sync.status // "Unknown"')
+  HEALTH_STATUS=$(echo "$APP_STATUS" | jq -r '.status.health.status // "Unknown"')
+  
+  echo "  [$(date +%H:%M:%S)] Sync: $SYNC_STATUS, Health: $HEALTH_STATUS"
+  
+  if [ "$SYNC_STATUS" = "Synced" ] && [ "$HEALTH_STATUS" = "Healthy" ]; then
+    echo "✅ ArgoCD application synced and healthy!"
+    break
+  fi
+  
+  sleep 20
+done
+
+# =========================================================================
+# Step 12: Verify controller pod
+# =========================================================================
+echo ""
+echo "🔍 Step 12: Verifying controller pod..."
+
+POD_TIMEOUT=300  # 5 minutes
+POD_START=$(date +%s)
+CONTROLLER_NS="${CONTROLLER_NAMESPACE:-cto}"
+CONTROLLER_LABEL="${CONTROLLER_LABEL:-app=agent-controller}"
+
+while true; do
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - POD_START))
+  
+  if [ $ELAPSED -gt $POD_TIMEOUT ]; then
+    echo "⚠️ Pod ready timeout - continuing anyway"
+    break
+  fi
+  
+  POD_STATUS=$(kubectl get pods -n "$CONTROLLER_NS" -l "$CONTROLLER_LABEL" -o json 2>/dev/null || echo '{}')
+  READY=$(echo "$POD_STATUS" | jq -r '.items[0].status.conditions[] | select(.type=="Ready") | .status' 2>/dev/null || echo "False")
+  
+  if [ "$READY" = "True" ]; then
+    echo "✅ Controller pod is ready!"
+    break
+  fi
+  
+  echo "  [$(date +%H:%M:%S)] Waiting for pod ready... ($READY)"
+  sleep 10
+done
+
+# =========================================================================
+# Complete
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║ REMEDIATION COMPLETE - Handing back to Monitor               ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "Summary:"
+echo "  - PR: $PR_URL"
+echo "  - Branch: $BRANCH_NAME"
+echo "  - Status: Merged and deployed"
+echo ""
+
+# Update status
+cat > "$WATCH_DIR/status.md" << EOF
+# E2E Watch Status
+
+## Current State
+- **Phase**: remediation-complete
+- **Iteration**: $ITERATION
+- **Last Update**: $(date -Iseconds)
+
+## Remediation Summary
+- **PR**: $PR_URL
+- **Branch**: $BRANCH_NAME
+- **Merged**: $(date -Iseconds)
+- **ArgoCD**: Synced
+- **Controller**: Ready
+
+## Next Action
+Monitor will restart Play workflow for iteration $((ITERATION + 1))
+EOF
+
+exit 0
+

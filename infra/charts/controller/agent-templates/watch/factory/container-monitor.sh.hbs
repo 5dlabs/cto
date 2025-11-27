@@ -1,0 +1,397 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# E2E Watch Monitor Agent Container Script
+# Submits Play workflow, polls for completion, evaluates against criteria
+# =========================================================================
+
+echo "🔍 E2E Watch Monitor starting"
+
+# Environment bootstrapping
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+# =========================================================================
+# Configuration
+# =========================================================================
+TASK_ID="{{task_id}}"
+REPOSITORY="{{repository}}"
+PLAY_TEMPLATE="{{play_template}}"
+MONITOR_MODEL="{{model}}"
+ITERATION="${WATCH_ITERATION:-1}"
+WATCH_DIR="/workspace/watch"
+ARTIFACTS_DIR="/workspace/play-artifacts"
+
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    MONITOR CONFIGURATION                      ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🎯 Task ID: $TASK_ID"
+echo "📦 Repository: $REPOSITORY"
+echo "🤖 Model: $MONITOR_MODEL"
+echo "🔄 Iteration: $ITERATION"
+echo "📂 Watch Dir: $WATCH_DIR"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# Ensure directories exist
+mkdir -p "$WATCH_DIR"
+mkdir -p "$ARTIFACTS_DIR/logs"
+
+# =========================================================================
+# GitHub App authentication
+# =========================================================================
+REPO_URL="{{repository_url}}"
+
+if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+  echo "❌ Missing GitHub App credentials"
+  exit 1
+fi
+
+echo "🔐 Authenticating with GitHub App"
+TEMP_KEY_FILE="/tmp/github-app-key.pem"
+printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
+chmod 600 "$TEMP_KEY_FILE"
+
+JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+NOW=$(date +%s)
+EXP=$((NOW + 600))
+JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+rm -f "$TEMP_KEY_FILE"
+
+parse_repo() {
+  local input="$1"
+  if echo "$input" | grep -qE '^https://github.com/'; then
+    echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  elif echo "$input" | grep -qE '^git@github.com:'; then
+    echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  else
+    echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
+  fi
+}
+
+read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
+
+INSTALLATION_ID=$(curl -s -L \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+fi
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  echo "❌ Unable to resolve installation ID for $REPO_OWNER/$REPO_NAME"
+  exit 1
+fi
+
+GITHUB_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+  echo "❌ Unable to obtain installation token"
+  exit 1
+fi
+
+export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+
+# =========================================================================
+# Update status
+# =========================================================================
+update_status() {
+  local phase="$1"
+  local play_status="${2:-}"
+  local stage="${3:-}"
+  
+  cat > "$WATCH_DIR/status.md" << EOF
+# E2E Watch Status
+
+## Current State
+- **Phase**: $phase
+- **Iteration**: $ITERATION
+- **Started**: $(date -Iseconds)
+- **Last Update**: $(date -Iseconds)
+
+## Play Workflow
+- **Name**: ${PLAY_WORKFLOW_NAME:-pending}
+- **Status**: ${play_status:-pending}
+- **Current Stage**: ${stage:-}
+
+## Task
+- **ID**: $TASK_ID
+- **Repository**: $REPOSITORY
+EOF
+}
+
+# =========================================================================
+# Step 1: Submit Play Workflow
+# =========================================================================
+echo ""
+echo "📤 Step 1: Submitting Play workflow..."
+
+update_status "submitting"
+
+# Build argo submit command with parameters
+SUBMIT_OUTPUT=$(argo submit \
+  --from "workflowtemplate/$PLAY_TEMPLATE" \
+  -n argo \
+  -p "task-id=$TASK_ID" \
+  -p "repository=$REPOSITORY" \
+  {{#if implementation_agent}}-p "implementation-agent={{implementation_agent}}" \{{/if}}
+  {{#if quality_agent}}-p "quality-agent={{quality_agent}}" \{{/if}}
+  {{#if testing_agent}}-p "testing-agent={{testing_agent}}" \{{/if}}
+  {{#if service}}-p "service={{service}}" \{{/if}}
+  -o json 2>&1) || {
+    echo "❌ Failed to submit Play workflow"
+    echo "$SUBMIT_OUTPUT"
+    exit 1
+  }
+
+PLAY_WORKFLOW_NAME=$(echo "$SUBMIT_OUTPUT" | jq -r '.metadata.name')
+export PLAY_WORKFLOW_NAME
+
+if [ -z "$PLAY_WORKFLOW_NAME" ] || [ "$PLAY_WORKFLOW_NAME" = "null" ]; then
+  echo "❌ Failed to get workflow name from submission"
+  exit 1
+fi
+
+echo "✅ Submitted Play workflow: $PLAY_WORKFLOW_NAME"
+update_status "monitoring" "Running"
+
+# =========================================================================
+# Step 2: Poll until workflow completes
+# =========================================================================
+echo ""
+echo "⏳ Step 2: Polling workflow status..."
+
+POLL_INTERVAL=30
+MAX_POLL_TIME=43200  # 12 hours
+POLL_START=$(date +%s)
+
+while true; do
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - POLL_START))
+  
+  if [ $ELAPSED -gt $MAX_POLL_TIME ]; then
+    echo "❌ Workflow polling timeout after $((MAX_POLL_TIME / 3600)) hours"
+    cat > "$WATCH_DIR/current-issue.md" << EOF
+# E2E Issue Detected
+
+## Metadata
+- **Task ID**: $TASK_ID
+- **Iteration**: $ITERATION
+- **Timestamp**: $(date -Iseconds)
+
+## Failure Context
+- **Reason**: Workflow timeout
+- **Duration**: $((ELAPSED / 60)) minutes
+- **Workflow**: $PLAY_WORKFLOW_NAME
+
+## Error Summary
+Play workflow did not complete within the maximum allowed time.
+
+## Suggested Remediation
+- Check if workflow is stuck in a particular stage
+- Review resource constraints and pod scheduling
+- Check for infinite loops in agent logic
+EOF
+    exit 1
+  fi
+  
+  # Get workflow status
+  WF_STATUS=$(argo get "$PLAY_WORKFLOW_NAME" -n argo -o json 2>/dev/null || echo '{}')
+  WF_PHASE=$(echo "$WF_STATUS" | jq -r '.status.phase // "Unknown"')
+  WF_MESSAGE=$(echo "$WF_STATUS" | jq -r '.status.message // ""')
+  
+  echo "  [$(date +%H:%M:%S)] Phase: $WF_PHASE (elapsed: $((ELAPSED / 60))m)"
+  update_status "monitoring" "$WF_PHASE"
+  
+  case "$WF_PHASE" in
+    "Succeeded")
+      echo "✅ Play workflow completed successfully!"
+      break
+      ;;
+    "Failed"|"Error")
+      echo "❌ Play workflow failed: $WF_MESSAGE"
+      break
+      ;;
+    *)
+      sleep $POLL_INTERVAL
+      ;;
+  esac
+done
+
+# =========================================================================
+# Step 3: Download all logs
+# =========================================================================
+echo ""
+echo "📥 Step 3: Downloading workflow logs..."
+
+# Get all pod nodes from workflow
+NODES=$(echo "$WF_STATUS" | jq -r '.status.nodes // {} | to_entries[] | select(.value.type == "Pod") | .value')
+
+if [ -n "$NODES" ]; then
+  echo "$WF_STATUS" | jq -r '.status.nodes // {} | to_entries[] | select(.value.type == "Pod") | "\(.value.displayName // .value.name)|\(.key)"' | while IFS='|' read -r NAME POD_ID; do
+    SAFE_NAME=$(echo "$NAME" | tr '/' '-' | tr ' ' '-')
+    echo "  Fetching logs for: $SAFE_NAME"
+    argo logs "$PLAY_WORKFLOW_NAME" -n argo --node "$POD_ID" > "$ARTIFACTS_DIR/logs/${SAFE_NAME}.log" 2>/dev/null || true
+  done
+fi
+
+# Also get condensed workflow logs
+argo logs "$PLAY_WORKFLOW_NAME" -n argo > "$ARTIFACTS_DIR/logs/full-workflow.log" 2>/dev/null || true
+
+echo "✅ Logs saved to $ARTIFACTS_DIR/logs/"
+
+# =========================================================================
+# Step 4: Evaluate against acceptance criteria
+# =========================================================================
+echo ""
+echo "📋 Step 4: Evaluating against acceptance criteria..."
+
+ACCEPTANCE_FILE="$WATCH_DIR/acceptance-criteria.md"
+
+# Load acceptance criteria or use defaults
+if [ ! -f "$ACCEPTANCE_FILE" ]; then
+  cat > "$ACCEPTANCE_FILE" << 'EOF'
+# E2E Acceptance Criteria
+
+## Required Outcomes
+1. Play workflow completes with status "Succeeded"
+2. Implementation PR is created and merged
+3. No critical errors in any stage logs
+4. All quality checks pass (Clippy, tests)
+
+## Success Indicators
+- `cargo clippy` exits 0
+- `cargo test` passes all tests
+- PR merge successful
+- No panics or crashes in logs
+
+## Failure Patterns
+- `error:` in log output
+- `panicked at` in log output
+- Exit code non-zero
+- Timeout waiting for resources
+EOF
+fi
+
+# Simple evaluation logic - check if workflow succeeded
+ISSUES_FOUND=false
+ISSUE_SUMMARY=""
+
+if [ "$WF_PHASE" != "Succeeded" ]; then
+  ISSUES_FOUND=true
+  ISSUE_SUMMARY="Play workflow ended in phase: $WF_PHASE"
+  
+  # Find failed steps
+  FAILED_STEPS=$(echo "$WF_STATUS" | jq -r '.status.nodes // {} | to_entries[] | select(.value.phase == "Failed" or .value.phase == "Error") | .value.displayName // .value.name' | head -5)
+  FAILED_MSG=$(echo "$WF_STATUS" | jq -r '.status.nodes // {} | to_entries[] | select(.value.phase == "Failed" or .value.phase == "Error") | .value.message // ""' | head -1)
+fi
+
+# Check logs for error patterns
+if [ -d "$ARTIFACTS_DIR/logs" ]; then
+  ERROR_COUNT=$(grep -rih "error:" "$ARTIFACTS_DIR/logs/" 2>/dev/null | wc -l || echo "0")
+  PANIC_COUNT=$(grep -rih "panicked at" "$ARTIFACTS_DIR/logs/" 2>/dev/null | wc -l || echo "0")
+  
+  if [ "$ERROR_COUNT" -gt 10 ] || [ "$PANIC_COUNT" -gt 0 ]; then
+    ISSUES_FOUND=true
+    if [ -z "$ISSUE_SUMMARY" ]; then
+      ISSUE_SUMMARY="High error count in logs: $ERROR_COUNT errors, $PANIC_COUNT panics"
+    fi
+  fi
+fi
+
+# =========================================================================
+# Step 5: Write findings and exit
+# =========================================================================
+echo ""
+echo "📝 Step 5: Writing findings..."
+
+if [ "$ISSUES_FOUND" = true ]; then
+  echo "❌ Issues detected - writing issue report"
+  
+  # Get relevant log snippets
+  RELEVANT_LOGS=""
+  if [ -d "$ARTIFACTS_DIR/logs" ]; then
+    RELEVANT_LOGS=$(grep -rih -A 2 -B 2 "error:\|panicked at\|Failed\|Error" "$ARTIFACTS_DIR/logs/" 2>/dev/null | head -50 || echo "No specific errors found")
+  fi
+  
+  cat > "$WATCH_DIR/current-issue.md" << EOF
+# E2E Issue Detected
+
+## Metadata
+- **Task ID**: $TASK_ID
+- **Iteration**: $ITERATION
+- **Timestamp**: $(date -Iseconds)
+- **Play Workflow**: $PLAY_WORKFLOW_NAME
+
+## Failure Context
+- **Workflow Phase**: $WF_PHASE
+- **Failed Steps**: ${FAILED_STEPS:-none}
+- **Message**: ${FAILED_MSG:-no message}
+
+## Error Summary
+$ISSUE_SUMMARY
+
+## Relevant Logs
+\`\`\`
+$RELEVANT_LOGS
+\`\`\`
+
+## Acceptance Criteria Status
+- [ ] Play workflow succeeded
+- [ ] No critical errors
+- [ ] Quality checks passed
+
+## Artifacts
+- Full logs: $ARTIFACTS_DIR/logs/
+- Workflow JSON: $ARTIFACTS_DIR/workflow-status.json
+EOF
+
+  # Save workflow status for analysis
+  echo "$WF_STATUS" > "$ARTIFACTS_DIR/workflow-status.json"
+  
+  # Append to history
+  echo "" >> "$WATCH_DIR/issue-history.md"
+  echo "## Iteration $ITERATION - $(date -Iseconds)" >> "$WATCH_DIR/issue-history.md"
+  echo "- Phase: $WF_PHASE" >> "$WATCH_DIR/issue-history.md"
+  echo "- Summary: $ISSUE_SUMMARY" >> "$WATCH_DIR/issue-history.md"
+  
+  update_status "issues-found" "$WF_PHASE"
+  
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo "║ MONITOR RESULT: ISSUES DETECTED - Triggering Remediation     ║"
+  echo "════════════════════════════════════════════════════════════════"
+  exit 1
+  
+else
+  echo "✅ All acceptance criteria met!"
+  
+  # Clear any existing issue
+  rm -f "$WATCH_DIR/current-issue.md"
+  
+  update_status "succeeded" "Succeeded"
+  
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo "║ MONITOR RESULT: SUCCESS - Play completed acceptance criteria ║"
+  echo "════════════════════════════════════════════════════════════════"
+  exit 0
+fi
+
