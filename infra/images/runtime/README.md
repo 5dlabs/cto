@@ -76,6 +76,8 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **AWS CLI v2** - Amazon Web Services command-line interface (latest version)
 - **Docker CLI** - Container management
 - **Docker Compose** - Multi-container orchestration
+- **Cloudflare Wrangler** - Cloudflare Workers CLI for deploying and managing Workers
+- **cloudflared** - Cloudflare Tunnel CLI for secure tunnels and access
 
 ### Container Tools
 - **Docker CLI** - Container management and inspection

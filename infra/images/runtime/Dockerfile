@@ -245,6 +245,16 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
+# Install cloudflared (Cloudflare Tunnel CLI)
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    for i in 1 2 3; do \
+        curl -fsSL -o /usr/local/bin/cloudflared "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/cloudflared && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
+
 # Install kubectx/kubens from upstream (not available via default apt)
 RUN git clone --depth=1 https://github.com/ahmetb/kubectx /opt/kubectx \
   && ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx \
@@ -277,7 +287,8 @@ RUN --mount=type=cache,target=/root/.cache \
         cross-env \
         dotenv-cli \
         zx \
-        shadcn@latest || true
+        shadcn@latest \
+        wrangler || true
 
 # Install Rust toolchain for root
 RUN --mount=type=cache,target=/root/.cache \

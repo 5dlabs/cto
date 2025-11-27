@@ -130,7 +130,19 @@ Replace:
 
 ### 6. Connect to the VPN
 
-**macOS/Linux (command line):**
+**Recommended: Use the kilo-vpn.sh script:**
+```bash
+# Connect
+./scripts/kilo-vpn.sh connect
+
+# Check status and test connectivity
+./scripts/kilo-vpn.sh status
+
+# Disconnect
+./scripts/kilo-vpn.sh disconnect
+```
+
+**Alternative: Manual wg-quick commands:**
 ```bash
 # Connect
 sudo wg-quick up ~/.wireguard/kilo.conf
@@ -142,10 +154,18 @@ sudo wg show
 sudo wg-quick down ~/.wireguard/kilo.conf
 ```
 
-**macOS (WireGuard App):**
-1. Install the WireGuard app from the App Store
-2. Import `~/.wireguard/kilo.conf` into the app
-3. Toggle the connection on/off from the menu bar
+> ⚠️ **Warning: Do NOT mix connection methods!**
+>
+> Using the WireGuard macOS app AND `wg-quick` simultaneously causes route conflicts.
+> Each creates a separate tunnel interface (e.g., `utun6` vs `utun7`), and routes
+> may point to the wrong interface, breaking connectivity.
+>
+> **Choose ONE method:**
+> - `scripts/kilo-vpn.sh` (recommended for developers)
+> - `wg-quick` manually
+> - WireGuard.app (for non-developers who prefer GUI)
+>
+> If you've been using the WireGuard app, **quit it entirely** before using the script.
 
 ### 7. Verify Connection
 
