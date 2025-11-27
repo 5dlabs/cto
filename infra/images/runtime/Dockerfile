@@ -317,12 +317,17 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
-# Install tools client from CTO monorepo release
-ARG TOOLS_VERSION=0.2.0
-RUN curl --proto '=https' --tlsv1.2 -LsSf \
-    https://github.com/5dlabs/cto/releases/download/tools-v${TOOLS_VERSION}/tools-installer.sh | \
-    TOOLS_NO_MODIFY_PATH=1 sh \
-  && mv ~/.cargo/bin/tools-client /usr/local/bin/tools
+# Install tools client from CTO monorepo release (skip if version is "skip" or empty)
+ARG TOOLS_VERSION=skip
+RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
+      echo "📦 Installing tools client v${TOOLS_VERSION}..." && \
+      curl --proto '=https' --tlsv1.2 -LsSf \
+        "https://github.com/5dlabs/cto/releases/download/tools-v${TOOLS_VERSION}/tools-installer.sh" | \
+        TOOLS_NO_MODIFY_PATH=1 sh && \
+      mv ~/.cargo/bin/tools-client /usr/local/bin/tools; \
+    else \
+      echo "⏭️ Skipping tools client installation (no release available)"; \
+    fi
 
 # Install TaskMaster globally (stable release)
 RUN npm install -g task-master-ai@0.26.0
