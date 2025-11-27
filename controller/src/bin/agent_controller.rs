@@ -18,6 +18,7 @@
 
 //! Controller Service - Kubernetes Controller for `CodeRun` and `DocsRun` CRDs
 //!
+//! Updated: 2025-11-27 - Namespace consolidation (cto namespace)
 //! This service manages the lifecycle of AI agent jobs by:
 //! - Watching for `CodeRun` and `DocsRun` custom resources
 //! - Creating and managing Kubernetes Jobs for agent execution
