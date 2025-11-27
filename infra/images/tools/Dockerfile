@@ -51,7 +51,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | bash && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
 
 # Copy the prebuilt server binary from CI/CD artifacts
-COPY target/release/tools-server /usr/local/bin/tools-server
+COPY tools-server-linux /usr/local/bin/tools-server
 RUN chmod +x /usr/local/bin/tools-server
 
 # Create non-root user (use a different UID since 1000 exists)
@@ -73,7 +73,7 @@ ENV PORT=3000 \
     DOCKER_HOST=unix:///var/run/docker.sock
 
 # Copy entrypoint script
-COPY infra/images/tools/entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Switch to non-root user
