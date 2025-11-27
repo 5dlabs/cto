@@ -1,3 +1,66 @@
 ---
+# Rust Docs MCP Server Configuration
+# This chart deploys the Rust documentation MCP server for AI-assisted Rust development
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/5dlabs/rust-docs
+  tag: "latest"
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+# Database configuration
+# Requires a PostgreSQL database with pgvector extension for vector search
+database:
+  # Load database URL from a Kubernetes secret (recommended for security)
+  useSecret: true
+  secretName: "rustdocs-mcp-secrets"
+  secretKey: "MCPDOCS_DATABASE_URL"
+  # Fallback URL only used if useSecret is false (NOT recommended for production)
+  # url: ""
+
+# Embedding model configuration
+embedding:
+  model: "text-embedding-3-large"
+  provider: "openai"
+
+# LLM model for documentation queries
+llm:
+  model: "gpt-4o-mini-2024-07-18"
+
+# Logging configuration
+logging:
+  level: "rustdocs_mcp_server_http=info,rmcp=info"
+
+# Secret containing API keys (openai-api-key, voyage-api-key)
+secrets:
+  name: "rustdocs-mcp-secrets"
+
+# Service account configuration
+serviceAccount:
+  name: "default"
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Node tolerations for scheduling
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+# Node selector for scheduling
+nodeSelector: {}
+
+# Persistence for data caching (optional)
 persistence:
-  enabled: true
+  enabled: false
