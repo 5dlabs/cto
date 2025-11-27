@@ -76,13 +76,13 @@ spec:
                 generateName: coderun-ci-fix-
                 namespace: cto
                 labels:
-                  agent: rex
+                  agent: atlas
                   role: ci-remediation
                   workflow-run-id: ""  # Extracted from webhook
                   workflow-name: ""    # Extracted from webhook
                   repository: "cto"
               spec:
-                githubApp: "5DLabs-Rex"
+                githubApp: "5DLabs-Atlas"
                 cli: "Claude"
                 model: "claude-sonnet-4-5-20250929"
                 maxTokens: 16384
@@ -92,8 +92,8 @@ spec:
                 continueSession: false  # Fresh context per failure
                 overwriteMemory: false
                 env:
-                  - name: REMEDIATION_MODE
-                    value: "ci-failure"
+                  - name: ATLAS_MODE
+                    value: "ci-remediation"
                   - name: WORKFLOW_NAME
                     value: ""  # Extracted from webhook
                   - name: WORKFLOW_RUN_ID

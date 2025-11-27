@@ -6,7 +6,7 @@ resources:
   - eventbus.yaml
   - sa-rbac.yaml
   - play-workflow-sensors.yaml
-  - stage-aware-cleo-approval-sensor.yaml
+  # stage-aware-cleo-approval-sensor.yaml - REMOVED: references non-existent wait-for-cleo-approval suspend node
   - stage-aware-pr-created.yaml
   - stage-aware-tess-approval-sensor.yaml
   - tess-label-fallback-sensor.yaml
