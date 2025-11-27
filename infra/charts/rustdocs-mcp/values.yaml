@@ -15,9 +15,12 @@ imagePullSecrets:
 # Database configuration
 # Requires a PostgreSQL database with pgvector extension for vector search
 database:
-  # Connection URL for the PostgreSQL database
-  # NOTE: This database must be created separately (e.g., via CloudNative-PG)
-  url: "postgresql://rustdocs:rustdocs123@rustdocs-mcp-postgresql:5432/rust_docs_vectors"
+  # Load database URL from a Kubernetes secret (recommended for security)
+  useSecret: true
+  secretName: "rustdocs-mcp-secrets"
+  secretKey: "MCPDOCS_DATABASE_URL"
+  # Fallback URL only used if useSecret is false (NOT recommended for production)
+  # url: ""
 
 # Embedding model configuration
 embedding:

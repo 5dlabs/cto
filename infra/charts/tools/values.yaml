@@ -202,11 +202,11 @@ config:
       command: "uvx"
       args: ["postgres-mcp", "--access-mode=unrestricted"]
       workingDirectory: "/tmp"
-      # Uses test-postgres cluster in databases namespace
-      # TODO: Move credentials to Vault secret for better security
-      env:
-        DATABASE_URI: >-
-          postgresql://test_user:kpXIhSIQ9AjjV19maDTMm53cPsz7QxraUeO0BuZru0OEyssmTluZoso00dcGmYjp@test-postgres-rw.databases.svc.cluster.local:5432/test_db
+      # Database credentials stored in Vault secret
+      secretRef:
+        name: "tools-postgres-secrets"
+        keys:
+          - "DATABASE_URI"
 
     redis:
       name: "Redis"

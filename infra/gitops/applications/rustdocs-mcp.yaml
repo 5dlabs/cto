@@ -3,8 +3,11 @@
 # Provides Rust documentation search and assistance via MCP protocol
 #
 # PREREQUISITES:
-# 1. PostgreSQL database with pgvector extension (see database.url in values)
-# 2. Secret 'rustdocs-mcp-secrets' with keys: openai-api-key, voyage-api-key
+# 1. PostgreSQL database with pgvector extension
+# 2. Secret 'rustdocs-mcp-secrets' with keys:
+#    - MCPDOCS_DATABASE_URL: PostgreSQL connection string
+#    - openai-api-key: OpenAI API key for embeddings
+#    - voyage-api-key: (optional) Voyage API key
 #
 # NOTE: This deployment will fail until the PostgreSQL dependency is resolved.
 # Consider deploying a CloudNative-PG Cluster for the database.
@@ -36,10 +39,13 @@ spec:
           tag: "latest"
           pullPolicy: Always
 
-        # Database - must match the PostgreSQL cluster service name
-        # TODO: Create CloudNative-PG Cluster for this database
+        # Database URL loaded from secret (rustdocs-mcp-secrets)
+        # Populate via: kubectl create secret generic rustdocs-mcp-secrets \
+        #   --from-literal=MCPDOCS_DATABASE_URL="postgresql://..." -n mcp
         database:
-          url: "postgresql://rustdocs:rustdocs123@rustdocs-mcp-postgresql.mcp.svc.cluster.local:5432/rust_docs_vectors"
+          useSecret: true
+          secretName: "rustdocs-mcp-secrets"
+          secretKey: "MCPDOCS_DATABASE_URL"
 
         # Resource limits for production
         resources:
