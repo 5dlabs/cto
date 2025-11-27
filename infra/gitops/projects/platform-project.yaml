@@ -72,11 +72,7 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: telemetry
       server: https://kubernetes.default.svc
-    - namespace: arc-systems
-      server: https://kubernetes.default.svc
     - namespace: arc-runners
-      server: https://kubernetes.default.svc
-    - namespace: external-dns
       server: https://kubernetes.default.svc
     - namespace: kube-system
       server: https://kubernetes.default.svc
