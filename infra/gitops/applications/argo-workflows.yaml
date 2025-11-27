@@ -88,6 +88,9 @@ spec:
 
         workflow:
           serviceAccount:
+            # Create the argo-workflow SA that sensors and RBAC reference
+            create: true
+            name: "argo-workflow"
             annotations: {}
           rbac:
             create: true
