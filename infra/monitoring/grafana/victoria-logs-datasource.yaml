@@ -12,7 +12,7 @@ data:
       - name: Victoria Logs
         type: prometheus
         access: proxy
-        url: http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/select/logsql
+        url: http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/select/logsql
         isDefault: false
         editable: true
         jsonData:

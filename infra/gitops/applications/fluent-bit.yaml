@@ -77,7 +77,7 @@ spec:
             [OUTPUT]
                 Name                opentelemetry
                 Match               kube.*
-                Host                otel-collector-opentelemetry-collector.telemetry.svc.cluster.local
+                Host                otel-collector-opentelemetry-collector.observability.svc.cluster.local
                 Port                4318
                 TLS                 Off
                 Logs_uri            /v1/logs

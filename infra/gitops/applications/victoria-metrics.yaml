@@ -47,7 +47,7 @@ spec:
                 - job_name: kube-state-metrics
                   static_configs:
                     - targets:
-                        - kube-state-metrics.telemetry.svc.cluster.local:8080
+                        - kube-state-metrics.observability.svc.cluster.local:8080
                   metric_relabel_configs:
                     # Keep pod and container status metrics
                     - source_labels: [__name__]
@@ -57,7 +57,7 @@ spec:
                 - job_name: otel-collector
                   static_configs:
                     - targets:
-                        - otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:8889
+                        - otel-collector-opentelemetry-collector.observability.svc.cluster.local:8889
                       labels:
                         namespace: observability
                         service: otel-collector

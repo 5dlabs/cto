@@ -22,7 +22,7 @@ This directory contains the configuration for the monitoring and observability s
 3. **Victoria Logs** (StatefulSet)
    - High-performance log storage
    - Retention: 31 days
-   - Query endpoint: `http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428`
+   - Query endpoint: `http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428`
    - Storage: Local-path PVC
 
 4. **Grafana** (Deployment)
@@ -54,7 +54,7 @@ kubectl patch application otel-collector -n argocd --type=json \
 
 3. Add Victoria Logs data source (if not already configured):
    - Type: Prometheus
-   - URL: `http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/select/logsql/query`
+   - URL: `http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/select/logsql/query`
 
 4. Query logs using LogsQL:
    ```
