@@ -10,6 +10,9 @@ metadata:
   labels:
     app.kubernetes.io/name: cloudflare-operator
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy before vault-config (wave 2) so namespace exists for secrets
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
