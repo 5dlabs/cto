@@ -17,10 +17,12 @@ metadata:
 spec:
   project: platform
 
+  # Using Git repository instead of OCI registry due to ArgoCD OCI compatibility issues
+  # See: https://github.com/orgs/community/discussions/160686
   source:
-    repoURL: oci://ghcr.io/actions/actions-runner-controller-charts
-    chart: gha-runner-scale-set-controller
-    targetRevision: 0.12.1
+    repoURL: https://github.com/actions/actions-runner-controller
+    targetRevision: gha-runner-scale-set-0.12.1
+    path: charts/gha-runner-scale-set-controller
 
     helm:
       values: |
