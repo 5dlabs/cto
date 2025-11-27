@@ -1,9 +1,9 @@
 ---
-# Managed Namespace for telemetry with Pod Security labels allowing hostPath
+# Managed Namespace for observability with Pod Security labels allowing hostPath
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: telemetry
+  name: observability
   labels:
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest

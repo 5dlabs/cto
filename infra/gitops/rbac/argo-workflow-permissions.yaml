@@ -9,7 +9,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: argo-workflow
-  namespace: argo
+  namespace: automation
 roleRef:
   kind: Role
   name: argo-events-workflows-cto
@@ -20,13 +20,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argo-workflow-argo-namespace-binding
-  namespace: argo
+  namespace: automation
   annotations:
     description: "Allows argo-workflow ServiceAccount to manage workflows in argo namespace"
 subjects:
 - kind: ServiceAccount
   name: argo-workflow
-  namespace: argo
+  namespace: automation
 roleRef:
   kind: ClusterRole
   name: argo-workflow

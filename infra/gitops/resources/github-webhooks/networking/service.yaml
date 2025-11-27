@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: github-eventsource-svc
-  namespace: argo
+  namespace: automation
   labels:
     app.kubernetes.io/name: github-eventsource
 spec:

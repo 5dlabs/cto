@@ -29,7 +29,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: argo
+    namespace: automation
 
   syncPolicy:
     automated:

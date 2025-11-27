@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argo-events-executor
-  namespace: argo
+  namespace: automation
 rules:
   - apiGroups: [""]
     resources: ["pods", "pods/log", "configmaps", "secrets"]
@@ -17,7 +17,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argo-events-executor-binding
-  namespace: argo
+  namespace: automation
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -25,7 +25,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: argo-events-sa
-    namespace: argo
+    namespace: automation
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -57,5 +57,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: argo-events-sa
-    namespace: argo
+    namespace: automation
 

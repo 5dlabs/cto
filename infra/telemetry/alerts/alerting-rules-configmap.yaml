@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: claude-code-alerting-rules
-  namespace: telemetry
+  namespace: observability
   labels:
     app: alerting
     component: rules
@@ -92,7 +92,7 @@ data:
         rules:
           # OTLP Collector down
           - alert: OTLPCollectorDown
-            expr: up{job="otel-collector",namespace="telemetry"} == 0
+            expr: up{job="otel-collector",namespace="observability"} == 0
             for: 2m
             labels:
               severity: critical
@@ -141,9 +141,9 @@ data:
           - alert: HighMemoryUsage
             expr: |
               (
-                container_memory_working_set_bytes{namespace="telemetry",container!=""}
+                container_memory_working_set_bytes{namespace="observability",container!=""}
                 /
-                container_spec_memory_limit_bytes{namespace="telemetry",container!=""}
+                container_spec_memory_limit_bytes{namespace="observability",container!=""}
               ) * 100 > 80
             for: 5m
             labels:
@@ -157,9 +157,9 @@ data:
           - alert: CriticalMemoryUsage
             expr: |
               (
-                container_memory_working_set_bytes{namespace="telemetry",container!=""}
+                container_memory_working_set_bytes{namespace="observability",container!=""}
                 /
-                container_spec_memory_limit_bytes{namespace="telemetry",container!=""}
+                container_spec_memory_limit_bytes{namespace="observability",container!=""}
               ) * 100 > 95
             for: 2m
             labels:

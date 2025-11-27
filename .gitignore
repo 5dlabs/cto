@@ -114,3 +114,4 @@ dist/
 
 # Secrets backup - never commit
 secrets-backup-*/
+huddle/

@@ -167,9 +167,9 @@ data:
     # Telemetry configuration (used in templates)
     telemetry:
       enabled: true
-      otlpEndpoint: "otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:4317"
+      otlpEndpoint: "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
       otlpProtocol: "grpc"
-      logsEndpoint: "otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:4317"
+      logsEndpoint: "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
       logsProtocol: "grpc"
 
     # Storage configuration

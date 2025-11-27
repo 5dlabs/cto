@@ -40,7 +40,7 @@
 [OUTPUT]
     Name                http
     Match               kube.*
-    Host                victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local
+    Host                victoria-logs-victoria-logs-single-server.observability.svc.cluster.local
     Port                9428
     URI                 /insert/jsonline
     Format              json_lines

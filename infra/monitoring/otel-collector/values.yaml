@@ -13,7 +13,7 @@ config:
     
     # Victoria Logs OTLP HTTP exporter
     otlphttp/victorialogs:
-      endpoint: http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+      endpoint: http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/insert/opentelemetry/v1/logs
       tls:
         insecure: true
 

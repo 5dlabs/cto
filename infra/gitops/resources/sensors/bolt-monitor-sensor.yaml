@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: bolt-monitor-daemon
-  namespace: argo
+  namespace: automation
 spec:
   template:
     serviceAccountName: argo-events-sa
@@ -57,7 +57,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
   name: calendar
-  namespace: argo
+  namespace: automation
 spec:
   calendar:
     monitor-interval:
@@ -71,7 +71,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: bolt-monitor-strategy
-  namespace: argo
+  namespace: automation
 data:
   strategy.md: |
     # Bolt Monitor Strategy

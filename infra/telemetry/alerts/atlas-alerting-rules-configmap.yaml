@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: atlas-alerting-rules
-  namespace: telemetry
+  namespace: observability
   labels:
     app: alerting
     component: rules
@@ -177,8 +177,8 @@ data:
           # Sensor health check
           - alert: AtlasSensorUnhealthy
             expr: |
-              up{job="argo-events-sensor-controller", namespace="argo"} == 0
-              or absent(up{job="argo-events-sensor-controller", namespace="argo"})
+              up{job="argo-events-sensor-controller", namespace="automation"} == 0
+              or absent(up{job="argo-events-sensor-controller", namespace="automation"})
             for: 5m
             labels:
               severity: critical

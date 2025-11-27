@@ -5,7 +5,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: stage-aware-tess-approval
-  namespace: argo
+  namespace: automation
   labels:
     task: "7"
     type: stage-management

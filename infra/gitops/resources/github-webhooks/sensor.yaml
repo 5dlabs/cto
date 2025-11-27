@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: github-demo-sensor
-  namespace: argo
+  namespace: automation
 spec:
   template:
     serviceAccountName: argo-events-sa
@@ -22,7 +22,7 @@ spec:
               kind: Pod
               metadata:
                 generateName: github-event-
-                namespace: argo
+                namespace: automation
               spec:
                 restartPolicy: Never
                 containers:
