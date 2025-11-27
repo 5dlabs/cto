@@ -36,7 +36,6 @@ spec:
     - 'https://github.com/actions/actions-runner-controller'
     # ARC OCI Helm charts
     - 'oci://ghcr.io/actions/actions-runner-controller-charts'
-    - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://kubernetes-sigs.github.io/external-dns/'
     - 'https://kubernetes-sigs.github.io/metrics-server/'
@@ -89,6 +88,9 @@ spec:
       server: https://kubernetes.default.svc
     # Infrastructure - operators, ingress, DNS, certs
     - namespace: infra
+      server: https://kubernetes.default.svc
+    # Cloudflare Tunnel operator
+    - namespace: cloudflare-operator-system
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
@@ -145,9 +147,7 @@ spec:
       kind: '*'
     - group: 'gateway.networking.k8s.io'
       kind: '*'
-    - group: 'ingress.k8s.ngrok.com'
-      kind: '*'
-    - group: 'ngrok.k8s.ngrok.com'
+    - group: 'networking.cfargotunnel.com'
       kind: '*'
     - group: 'rbac.authorization.k8s.io'
       kind: '*'
