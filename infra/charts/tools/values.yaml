@@ -194,37 +194,6 @@ config:
         name: "tools-kubernetes-secrets"
         keys: []
 
-    # --- Databases ---
-    postgres:
-      name: "PostgreSQL"
-      description: "PostgreSQL database management and querying"
-      transport: "stdio"
-      command: "uvx"
-      args: ["postgres-mcp", "--access-mode=unrestricted"]
-      workingDirectory: "/tmp"
-      # Database credentials stored in Vault secret
-      secretRef:
-        name: "tools-postgres-secrets"
-        keys:
-          - "DATABASE_URI"
-
-    redis:
-      name: "Redis"
-      description: "Redis database operations and caching"
-      transport: "stdio"
-      command: "uvx"
-      args: ["--from", "git+https://github.com/redis/mcp-redis.git", "redis-mcp-server"]
-      workingDirectory: "/tmp"
-
-    # pg-aiguide: DISABLED - External service https://mcp.tigerdata.com/docs is unreachable
-    # Uncomment below when the service becomes available
-    # pg-aiguide:
-    #   name: "pg-aiguide"
-    #   description: "AI-optimized PostgreSQL expertise with semantic docs search and best practices"
-    #   transport: "http"
-    #   url: "https://mcp.tigerdata.com/docs"
-    #   workingDirectory: "/tmp"
-
     # --- Development Tools ---
     github:
       name: "GitHub"
@@ -257,22 +226,6 @@ config:
       transport: "http"
       url: "https://mcp.solana.com/mcp"
       workingDirectory: "/tmp"
-
-    # --- Social ---
-    reddit:
-      name: "Reddit"
-      description: "Reddit content fetching and analysis via uvx"
-      transport: "stdio"
-      command: "uvx"
-      args: ["--from", "git+https://github.com/adhikasp/mcp-reddit.git", "mcp-reddit"]
-      workingDirectory: "/tmp"
-      secretRef:
-        name: "tools-reddit-secrets"
-        keys:
-          - "REDDIT_CLIENT_ID"
-          - "REDDIT_CLIENT_SECRET"
-          - "REDDIT_USERNAME"
-          - "REDDIT_PASSWORD"
 
 # Local tools configuration (client-side tools available in agent containers)
 # NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
