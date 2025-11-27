@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: atlas-alerting-rules
-  namespace: telemetry
+  namespace: cto
   labels:
     app: alerting
     component: rules

@@ -66,37 +66,24 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: telemetry
       server: https://kubernetes.default.svc
-    - namespace: mcp
-      server: https://kubernetes.default.svc
     - namespace: arc-systems
       server: https://kubernetes.default.svc
     - namespace: arc-runners
       server: https://kubernetes.default.svc
     - namespace: external-dns
       server: https://kubernetes.default.svc
-    - namespace: ngrok-operator
-      server: https://kubernetes.default.svc
-    # Removed Jupiter namespace
     - namespace: kube-system
       server: https://kubernetes.default.svc
     - namespace: default
-      server: https://kubernetes.default.svc
-    # Database operator namespaces
-    - namespace: cnpg-system
-      server: https://kubernetes.default.svc
-    - namespace: questdb-operator
-      server: https://kubernetes.default.svc
-    - namespace: redis-operator
       server: https://kubernetes.default.svc
     - namespace: databases
       server: https://kubernetes.default.svc
     # HashiCorp Vault namespace
     - namespace: vault
       server: https://kubernetes.default.svc
-    # Vault Secrets Operator namespace
-    - namespace: vault-secrets-operator
+    # Consolidated operators namespace (cnpg, redis, ngrok, vault-secrets-operator)
+    - namespace: operators
       server: https://kubernetes.default.svc
-    # Removed Mailu namespace
 
   # Cluster resource whitelist
   clusterResourceWhitelist:
