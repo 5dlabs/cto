@@ -31,7 +31,7 @@ spec:
   # Destination configuration
   destination:
     server: https://kubernetes.default.svc
-    namespace: cto
+    namespace: telemetry
 
   # Ignore PrometheusRule resources if CRD is not installed
   # This provides a safety net in case the PrometheusRule file is included elsewhere
