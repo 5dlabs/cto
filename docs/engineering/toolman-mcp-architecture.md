@@ -46,7 +46,6 @@ Remote tools are accessed through the tools HTTP proxy. Agents call `tools` CLI 
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "rustdocs_query_rust_docs",
           "memory_create_entities"
         ]
       }
@@ -72,7 +71,6 @@ Remote tools are accessed through the tools HTTP proxy. Agents call `tools` CLI 
 
 **Available Remote Tools:**
 - `brave_search_brave_web_search` - Web search via Brave API
-- `rustdocs_query_rust_docs` - Rust documentation search
 - `memory_create_entities` - Create memory entities
 - `memory_add_observations` - Add observations to memory
 - `context7_get_library_docs` - Library documentation retrieval
@@ -250,11 +248,11 @@ Local MCP servers run directly in the agent container without proxying.
 ### By Agent Role
 
 **Morgan (Documentation):**
-- Remote: `brave_search_brave_web_search`, `memory_create_entities`, `rustdocs_query_rust_docs`
+- Remote: `brave_search_brave_web_search`, `memory_create_entities`
 - Local: `filesystem`, `git`
 
 **Rex (Backend Implementation):**
-- Remote: `memory_create_entities`, `rustdocs_query_rust_docs`
+- Remote: `memory_create_entities`, `context7_get_library_docs`
 - Local: `filesystem`, `git`
 
 **Blaze (Frontend Implementation):**
@@ -262,7 +260,7 @@ Local MCP servers run directly in the agent container without proxying.
 - Local: `filesystem`, `git`, `shadcn`
 
 **Cleo (Code Quality):**
-- Remote: `memory_create_entities`, `rustdocs_query_rust_docs`
+- Remote: `memory_create_entities`, `context7_get_library_docs`
 - Local: `filesystem`, `git`
 
 **Tess (QA/Testing):**
@@ -283,7 +281,7 @@ Local MCP servers run directly in the agent container without proxying.
 - Add `context7_get_library_docs` for component docs
 
 **Backend/API Tasks:**
-- Add `rustdocs_query_rust_docs`
+- Add `context7_get_library_docs` for Rust/API documentation
 - Add database-specific tools if available
 
 ---

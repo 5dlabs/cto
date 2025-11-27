@@ -66,8 +66,7 @@
         "remote": [
           "memory_create_entities",
           "memory_add_observations",
-          "brave_search_brave_web_search",
-          "rustdocs_query_rust_docs"
+          "brave_search_brave_web_search"
         ],
         "localServers": {
           "filesystem": {
@@ -99,8 +98,7 @@
       "tools": {
         "remote": [
           "memory_create_entities",
-          "memory_add_observations",
-          "rustdocs_query_rust_docs"
+          "memory_add_observations"
         ],
         "localServers": {
           "filesystem": {
@@ -132,8 +130,7 @@
       "tools": {
         "remote": [
           "memory_create_entities",
-          "memory_add_observations",
-          "rustdocs_query_rust_docs"
+          "memory_add_observations"
         ],
         "localServers": {
           "filesystem": {

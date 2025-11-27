@@ -194,11 +194,11 @@ impl HttpSseTestClient {
 }
 
 #[tokio::test]
-async fn test_rust_docs_http_sse_server() -> Result<()> {
+async fn test_generic_http_sse_server() -> Result<()> {
     crate::setup_integration_tests();
 
     let server_url = get_remote_server_url();
-    println!("Testing Rust Docs HTTP/SSE server at: {}", server_url);
+    println!("Testing HTTP/SSE server at: {}", server_url);
 
     let client = HttpSseTestClient::new(server_url.clone());
 
@@ -318,34 +318,7 @@ async fn test_rust_docs_http_sse_server() -> Result<()> {
         }
     }
 
-    // Test specific Rust docs functionality (if available)
-    println!("Testing Rust docs specific functionality...");
-
-    // Try to search for Rust documentation
-    let search_result = timeout(
-        Duration::from_secs(15),
-        client.call_tool(
-            "search",
-            json!({
-                "query": "Vec"
-            }),
-        ),
-    )
-    .await;
-
-    match search_result {
-        Ok(Ok(response)) => {
-            println!("✅ Rust docs search successful: {}", response);
-        }
-        Ok(Err(e)) => {
-            println!("❌ Rust docs search failed (tool may not exist): {}", e);
-        }
-        Err(_) => {
-            println!("❌ Rust docs search timed out");
-        }
-    }
-
-    println!("✅ Rust Docs HTTP/SSE server test completed");
+    println!("✅ HTTP/SSE server test completed");
 
     Ok(())
 }

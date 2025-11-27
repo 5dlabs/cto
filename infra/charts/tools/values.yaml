@@ -226,13 +226,6 @@ config:
     #   workingDirectory: "/tmp"
 
     # --- Development Tools ---
-    rustdocs:
-      name: "Rust Docs"
-      description: "Rust documentation MCP server"
-      transport: "sse"
-      url: "http://rustdocs-mcp-rust-docs-mcp-server.mcp.svc.cluster.local:3000/sse"
-      workingDirectory: "/tmp"
-
     github:
       name: "GitHub"
       description: "GitHub API operations for repositories, issues, and pull requests"

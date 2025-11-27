@@ -53,7 +53,7 @@ fn test_docs_templates(
         "source_branch": "feature/example-project-and-cli",
         "model": "claude-3-5-sonnet-20241022",
         "github_user": "pm0-5dlabs",
-        "remote_tools": ["rustdocs_query_rust_docs"],
+        "remote_tools": ["brave_search_brave_web_search"],
         "tools_catalog": {
             "local": {
                 "filesystem": {
@@ -72,15 +72,15 @@ fn test_docs_templates(
                 }
             },
             "remote": {
-                "docs": {
-                    "description": "Documentation retrieval",
-                    "endpoint": "http://tools/docs",
+                "search": {
+                    "description": "Web search",
+                    "endpoint": "http://tools/search",
                     "tools": [
                         {
-                            "name": "rustdocs_query_rust_docs",
-                            "category": "documentation",
-                            "description": "Search Rust documentation",
-                            "use_cases": ["API lookups", "Trait discovery"]
+                            "name": "brave_search_brave_web_search",
+                            "category": "search",
+                            "description": "Search the web",
+                            "use_cases": ["Research", "Documentation lookup"]
                         }
                     ]
                 }
@@ -292,7 +292,7 @@ fn test_code_templates(
             }),
             "remote_tools": [
                 "memory_create_entities",
-                "rustdocs_query_rust_docs"
+                "brave_search_brave_web_search"
             ]
         },
         "cli_config": {
@@ -317,14 +317,14 @@ fn test_code_templates(
             "url": "http://tools.test",
             "tools": [
                 "memory_create_entities",
-                "rustdocs_query_rust_docs"
+                "brave_search_brave_web_search"
             ]
         },
         "raw_additional_json": "{}",
         "client_config": {
             "remoteTools": [
                 "memory_create_entities",
-                "rustdocs_query_rust_docs"
+                "brave_search_brave_web_search"
             ],
             "localServers": {}
         }
@@ -405,7 +405,7 @@ fn test_code_templates(
             }),
             "remote_tools": [
                 "memory_create_entities",
-                "rustdocs_query_rust_docs"
+                "brave_search_brave_web_search"
             ]
         },
         "cli_config": {
@@ -451,13 +451,13 @@ fn test_code_templates(
             "url": "http://tools.test",
             "tools": [
                 "memory_create_entities",
-                "rustdocs_query_rust_docs"
+                "brave_search_brave_web_search"
             ]
         },
         "client_config": {
             "remoteTools": [
                 "memory_create_entities",
-                "rustdocs_query_rust_docs"
+                "brave_search_brave_web_search"
             ],
             "localServers": json!({})
         }

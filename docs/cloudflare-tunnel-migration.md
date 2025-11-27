@@ -64,9 +64,6 @@ Fixed hardcoded database credentials in multiple files:
 |------|--------|
 | `infra/charts/tools/values.yaml` | Replaced hardcoded `DATABASE_URI` with `secretRef` to `tools-postgres-secrets` |
 | `infra/vault/secrets/tools.yaml` | Added `tools-postgres-secrets` VaultStaticSecret and documentation |
-| `infra/charts/rustdocs-mcp/templates/deployment.yaml` | Changed hardcoded DB URL to `secretKeyRef` |
-| `infra/charts/rustdocs-mcp/values.yaml` | Proper templated values without credentials |
-| `infra/charts/rustdocs-mcp/templates/service.yaml` | Cleaned up hardcoded values |
 
 ### 5. Documentation
 

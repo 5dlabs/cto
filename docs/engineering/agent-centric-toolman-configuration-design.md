@@ -82,7 +82,7 @@ agents:
     expertise: ["backend", "architecture", "apis"]
     tools:
       remote:
-        - "rustdocs_query_rust_docs"
+        - "context7_get_library_docs"
         - "kubernetes_listResources"
         - "kubernetes_describeResource"
         - "kubernetes_createResource"
@@ -141,7 +141,7 @@ toolProfiles:
     # Extends base
     extends: base
     remote:
-      - "rustdocs_query_rust_docs"
+      - "context7_get_library_docs"
       - "github_create_pr"
     local:
       filesystem:
@@ -405,7 +405,7 @@ agents:
     extends: developer  # Inherit from developer profile
     tools:
       remote:
-        - "rustdocs_query_rust_docs"
+        - "context7_get_library_docs"
         - "mdn_web_docs_search"
         - "npm_package_search"
         - "github_create_pr"

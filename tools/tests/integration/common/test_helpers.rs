@@ -111,7 +111,7 @@ pub fn is_ci_environment() -> bool {
 
 pub fn get_remote_server_url() -> String {
     env::var("MCP_REMOTE_SERVER_URL").unwrap_or_else(|_| {
-        "http://rustdocs-mcp-rust-docs-mcp-server.mcp.svc.cluster.local:3000/sse".to_string()
+        "http://tools.cto.svc.cluster.local:3000/mcp".to_string()
     })
 }
 
