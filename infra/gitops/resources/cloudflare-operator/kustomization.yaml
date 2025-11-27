@@ -1,0 +1,10 @@
+---
+# Kustomization overlay for cloudflare-operator
+# Deploys the upstream operator to the 'infra' namespace
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: infra
+
+resources:
+  - https://github.com/adyanth/cloudflare-operator.git/config/default?ref=v0.13.1
