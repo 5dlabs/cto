@@ -441,7 +441,7 @@ kubectl logs -n cto <agent-pod-name>
 
 ## References
 
-- [Tools Repository](https://github.com/5dlabs/tools)
+- [Tools (in CTO Monorepo)](https://github.com/5dlabs/cto/tree/main/tools)
 - [MCP Specification](https://modelcontextprotocol.io)
 - [Controller MCP Integration](../../controller/src/cli/adapters/)
 - [Agent Configuration Examples](../../cto-config-example.json)
