@@ -2,6 +2,7 @@
 FROM ubuntu:24.04
 
 # Install system dependencies and all runtimes
+# hadolint ignore=DL3008,DL3015
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
@@ -31,6 +32,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install kubectl separately
+# hadolint ignore=DL3059
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
@@ -38,12 +40,14 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 # Create symbolic links for Python
 RUN ln -sf python3 /usr/bin/python
 # Install UV and uvx for Python package management
+# hadolint ignore=DL3059,DL4006,SC1091
 RUN curl -LsSf https://astral.sh/uv/install.sh | bash && \
     (mv /root/.local/bin/uv /usr/local/bin/ && mv /root/.local/bin/uvx /usr/local/bin/) 2>/dev/null || \
     (mv /root/.cargo/bin/uv /usr/local/bin/ && mv /root/.cargo/bin/uvx /usr/local/bin/) 2>/dev/null || \
     echo "UV and uvx installed successfully"
 
 # Install minimal Rust toolchain
+# hadolint ignore=DL3059,DL4006
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
 
 # Copy the prebuilt server binary from CI/CD artifacts
@@ -51,6 +55,7 @@ COPY tools-server-linux /usr/local/bin/tools-server
 RUN chmod +x /usr/local/bin/tools-server
 
 # Create non-root user (use a different UID since 1000 exists)
+# hadolint ignore=DL3059
 RUN useradd -m -u 1001 -s /bin/bash mcp
 
 # Create directories for configs and npm cache
@@ -67,26 +72,8 @@ ENV PORT=3000 \
     DOTNET_ROOT=/usr/lib/dotnet \
     DOCKER_HOST=unix:///var/run/docker.sock
 
-# Create entrypoint script to handle environment setup
-RUN cat > /entrypoint.sh << 'EOF'
-#!/bin/bash
-set -e
-
-# Set up runtime paths
-export PATH="/usr/local/bin:/usr/local/go/bin:/root/.cargo/bin:/usr/lib/jvm/java-17-openjdk/bin:$PATH"
-
-# Check if Docker socket is available (for Docker-based MCP servers)
-if [ -S "/var/run/docker.sock" ]; then
-    echo "Docker socket available - Docker-based MCP servers can run containers"
-else
-    echo "Docker socket not available - Docker-based MCP servers may not work"
-fi
-
-# Run the application
-cd /config
-exec "$@"
-EOF
-
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Switch to non-root user
