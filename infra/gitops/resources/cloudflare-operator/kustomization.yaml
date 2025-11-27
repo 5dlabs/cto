@@ -8,3 +8,18 @@ namespace: infra
 
 resources:
   - https://github.com/adyanth/cloudflare-operator.git/config/default?ref=v0.13.1
+
+patches:
+  # Patch leader election namespace to use 'infra' instead of hardcoded 'cloudflare-operator-system'
+  - target:
+      kind: Deployment
+      name: cloudflare-operator-controller-manager
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/args
+        value:
+          - --leader-elect
+          - --leader-election-namespace=infra
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=:8443
+          - --metrics-secure=true
