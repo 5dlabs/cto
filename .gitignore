@@ -111,3 +111,6 @@ dist/
 # Task files
 # tasks.json
 # tasks/ 
+
+# Secrets backup - never commit
+secrets-backup-*/

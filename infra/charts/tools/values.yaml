@@ -186,8 +186,13 @@ config:
       name: "Kubernetes"
       description: "Kubernetes cluster management and Helm operations"
       transport: "sse"
-      url: "http://k8s-mcp-k8s-mcp-server.mcp.svc.cluster.local:8080/sse"
+      # Points to the k8s-mcp deployment within this chart
+      url: "http://tools-k8s-mcp.cto.svc.cluster.local:8080/sse"
       workingDirectory: "/tmp"
+      enabled: true  # Used to conditionally create kubeconfig initContainer
+      secretRef:
+        name: "tools-kubernetes-secrets"
+        keys: []
 
     # --- Databases ---
     postgres:
@@ -245,14 +250,6 @@ config:
       description: "AI-native UI component library for building chat interfaces, AI applications, and streaming UIs"
       transport: "http"
       url: "https://registry.ai-sdk.dev/api/mcp"
-      workingDirectory: "/tmp"
-
-    # --- Documentation ---
-    agent-docs:
-      name: "Agent Docs"
-      description: "Agent documentation and knowledge base server"
-      transport: "http"
-      url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80/mcp"
       workingDirectory: "/tmp"
 
     # --- Blockchain ---
@@ -327,3 +324,44 @@ monitoring:
     labels: {}
     interval: 30s
     scrapeTimeout: 10s
+
+# =============================================================================
+# Standalone MCP Server Deployments
+# =============================================================================
+# Additional MCP servers that run as separate deployments within this chart.
+# Each server gets its own Deployment and Service. Add more servers here as needed.
+
+mcpServers:
+  k8s:
+    enabled: true
+    name: "k8s-mcp"
+    image:
+      repository: ginnux/k8s-mcp-server
+      tag: latest
+      pullPolicy: IfNotPresent
+    replicas: 1
+    service:
+      port: 8080
+      targetPort: 8080
+    env:
+      - name: SERVER_MODE
+        value: "sse"
+      - name: SERVER_PORT
+        value: "8080"
+      - name: KUBECONFIG
+        value: "/home/appuser/.kube/config"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    # Use kubeconfig secret from Vault
+    kubeconfigSecret:
+      enabled: true
+      name: "tools-kubernetes-secrets"
+      # Secret should have a key named KUBECONFIG containing the kubeconfig file
+    serviceAccount:
+      create: true
+      name: "k8s-mcp"

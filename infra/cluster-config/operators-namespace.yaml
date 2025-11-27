@@ -1,0 +1,11 @@
+---
+# Consolidated namespace for all platform operators
+# Replaces: cnpg-system, redis-operator, ngrok-operator, vault-secrets-operator
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: operators
+  labels:
+    app.kubernetes.io/name: operators
+    app.kubernetes.io/part-of: platform
+

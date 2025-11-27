@@ -1931,19 +1931,19 @@ if command -v codex >/dev/null 2>&1; then
   # Check for critical servers based on agent role
   {{#if (eq github_app "rex")}}
   # Rex needs: Context7, GitHub, Brave Search
-  REQUIRED_SERVERS=("doc-server")
+  REQUIRED_SERVERS=("context7")
   {{else if (eq github_app "blaze")}}
   # Blaze needs: Context7, shadcn, GitHub
-  REQUIRED_SERVERS=("doc-server")
+  REQUIRED_SERVERS=("context7" "shadcn")
   {{else if (eq github_app "cleo")}}
   # Cleo needs: Context7, GitHub
-  REQUIRED_SERVERS=("doc-server")
+  REQUIRED_SERVERS=("context7")
   {{else if (eq github_app "tess")}}
   # Tess needs: Context7, Kubernetes, GitHub
-  REQUIRED_SERVERS=("doc-server")
+  REQUIRED_SERVERS=("context7" "kubernetes")
   {{else}}
   # Default: Basic tools
-  REQUIRED_SERVERS=("doc-server")
+  REQUIRED_SERVERS=("context7")
   {{/if}}
   
   echo ""

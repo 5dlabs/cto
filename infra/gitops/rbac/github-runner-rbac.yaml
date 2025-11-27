@@ -26,5 +26,5 @@ roleRef:
   name: github-runner-argocd-access
 subjects:
 - kind: ServiceAccount
-  name: github-runner
-  namespace: arc-systems
+  name: k8s-runner-gha-rs-no-permission
+  namespace: arc-runners

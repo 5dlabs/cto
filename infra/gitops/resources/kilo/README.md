@@ -125,7 +125,7 @@ sudo wg-quick up ./wg0.conf
 
 ```bash
 # Test access to a cluster service
-curl http://doc-server-agent-docs-server.mcp.svc.cluster.local
+curl http://tools.cto.svc.cluster.local/health
 
 # Or ping a pod IP
 ping 10.244.x.x
