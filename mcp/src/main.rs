@@ -1409,7 +1409,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                 "workflow_phase": wf_phase,
                 "stage": prog.stage,
                 "configmap_status": prog.status.to_string(),
-                "argo_url": format!("https://argo.5dlabs.com/workflows/automation/{}", wf_name),
+                "argo_url": format!("https://argo.5dlabs.com/workflows/cto/{}", wf_name),
             }))
         }
         (Some(prog), None) => {
@@ -1434,7 +1434,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                 "workflow_name": wf_name,
                 "workflow_phase": wf_phase,
                 "message": "Workflow active but no progress tracking (legacy workflow)",
-                "argo_url": format!("https://argo.5dlabs.com/workflows/automation/{}", wf_name),
+                "argo_url": format!("https://argo.5dlabs.com/workflows/cto/{}", wf_name),
             }))
         }
         (None, None) => {
@@ -2501,8 +2501,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                         eprintln!(
                                             "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
                                         );
-                                        let _ = run_argo_cli(&["stop", name, "-n", "automation"]);
-                                        let _ = run_argo_cli(&["delete", name, "-n", "automation"]);
+                                        let _ = run_argo_cli(&["stop", name, "-n", "cto"]);
+                                        let _ = run_argo_cli(&["delete", name, "-n", "cto"]);
                                     }
                                     None => {
                                         eprintln!(
