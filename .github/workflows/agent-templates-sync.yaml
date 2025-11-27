@@ -34,6 +34,15 @@ jobs:
 
       - name: Restart controller deployment
         run: |
+          # Skip restart on feature branches - ArgoCD only syncs from main
+          # and the deployment may not exist or have a different name
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "ℹ️  Skipping deployment restart on feature branch"
+            echo "   ArgoCD will handle the restart when merged to main"
+            exit 0
+          fi
+          
+          # On main branch, restart the controller to pick up new ConfigMaps
           kubectl rollout restart deployment/controller -n cto
           kubectl rollout status deployment/controller -n cto --timeout=120s
       
