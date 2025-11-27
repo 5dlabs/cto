@@ -5,7 +5,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: atlas-pr-monitor
-  namespace: argo
+  namespace: automation
   labels:
     task: "7"
     type: stage-management

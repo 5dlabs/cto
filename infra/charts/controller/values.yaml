@@ -73,7 +73,7 @@ argo:
     # Gate the controller chart's Sensor creation; default disabled to avoid duplicates
     enabled: false
     # Namespace for the Sensor if enabled; typically keep Sensors in the argo ns
-    namespace: "argo"
+    namespace: "automation"
 
 # Cleanup configuration (controller-based event-driven cleanup)
 cleanup:

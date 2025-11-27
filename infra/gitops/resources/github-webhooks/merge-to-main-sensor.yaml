@@ -4,7 +4,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: play-workflow-pr-merged
-  namespace: argo
+  namespace: automation
 spec:
   replicas: 1
   deploymentStrategy:

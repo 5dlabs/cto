@@ -5,7 +5,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultConnection
 metadata:
   name: vault-connection
-  namespace: operators
+  namespace: infra
   labels:
     app.kubernetes.io/name: vault-connection
     app.kubernetes.io/part-of: platform

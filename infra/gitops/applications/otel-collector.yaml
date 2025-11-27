@@ -210,7 +210,7 @@ spec:
                   port: 4317
   destination:
     server: https://kubernetes.default.svc
-    namespace: telemetry
+    namespace: observability
   syncPolicy:
     automated:
       prune: true

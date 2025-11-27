@@ -16,7 +16,7 @@ kind: Workflow
 metadata:
   # Deterministic name based on task ID for correlation
   name: play-task-3-workflow
-  namespace: argo
+  namespace: automation
   labels:
     workflow-type: play-orchestration
     task-id: "3"
@@ -56,7 +56,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   name: play-task-4-workflow
-  namespace: argo
+  namespace: automation
   labels:
     workflow-type: play-orchestration
     task-id: "4"

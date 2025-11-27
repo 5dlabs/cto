@@ -3,7 +3,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: public-gateway
-  namespace: argo
+  namespace: automation
   annotations:
     # TEMPORARILY REDUCED: Only keeping GitHub webhook endpoint to reduce Ngrok costs
     external-dns.alpha.kubernetes.io/hostname: "github.public.5dlabs.ai"

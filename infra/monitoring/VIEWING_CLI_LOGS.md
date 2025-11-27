@@ -23,7 +23,7 @@ The Victoria Logs datasource should be automatically configured. If not, add it 
 2. Add data source → Prometheus
 3. Configure:
    - **Name**: Victoria Logs
-   - **URL**: `http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/select/logsql`
+   - **URL**: `http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/select/logsql`
    - **HTTP Method**: POST
 
 ## Querying CLI Container Logs
@@ -147,7 +147,7 @@ All logs include the following Kubernetes metadata fields:
 
 2. Test connectivity from Grafana pod:
    ```bash
-   kubectl exec -n telemetry deployment/grafana -- wget -qO- http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/
+   kubectl exec -n telemetry deployment/grafana -- wget -qO- http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/
    ```
 
 ## Log Retention

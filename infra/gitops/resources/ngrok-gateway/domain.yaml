@@ -13,7 +13,7 @@ apiVersion: ingress.k8s.ngrok.com/v1alpha1
 kind: Domain
 metadata:
   name: github-public-5dlabs-ai
-  namespace: argo
+  namespace: automation
 spec:
   domain: "github.public.5dlabs.ai"
 # TEMPORARILY DISABLED: Additional domains commented out for cost optimization

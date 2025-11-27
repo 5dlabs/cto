@@ -5,7 +5,7 @@ exporters:
   # Victoria Logs Elasticsearch exporter
   elasticsearch/victorialogs:
     endpoints:
-      - http://victoria-logs-victoria-logs-single-server.telemetry.svc.cluster.local:9428/insert/elasticsearch/_bulk
+      - http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/insert/elasticsearch/_bulk
     tls:
       insecure: true
     logs_index: logs

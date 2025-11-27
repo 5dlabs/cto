@@ -16,7 +16,7 @@ spec:
       include: 'bolt-preview-sensor.yaml'
   destination:
     server: https://kubernetes.default.svc
-    namespace: argo
+    namespace: automation
   syncPolicy:
     automated:
       prune: true

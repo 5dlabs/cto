@@ -4,7 +4,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: play-workflow-pr-created
-  namespace: argo
+  namespace: automation
 spec:
   replicas: 1
   deploymentStrategy:
@@ -560,7 +560,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: implementation-agent-remediation
-  namespace: argo
+  namespace: automation
 spec:
   replicas: 1
   deploymentStrategy:
@@ -755,7 +755,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: play-workflow-ready-for-security
-  namespace: argo
+  namespace: automation
 spec:
   replicas: 1
   deploymentStrategy:
@@ -1102,7 +1102,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: play-workflow-ready-for-qa
-  namespace: argo
+  namespace: automation
 spec:
   replicas: 1
   deploymentStrategy:
