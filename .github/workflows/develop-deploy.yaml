@@ -467,8 +467,8 @@ jobs:
       - name: Verify deployment
         run: |
           echo "🔍 Deployment verification..."
-          kubectl get pods -n agent-platform -o wide
-          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=controller -n agent-platform --timeout=120s || true
+          kubectl get pods -n cto -o wide
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=controller -n cto --timeout=120s || true
 
           echo ""
           echo "✅ Deployment complete!"
