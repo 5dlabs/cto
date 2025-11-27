@@ -42,7 +42,14 @@ spec:
             - "3000"
           env:
             - name: MCPDOCS_DATABASE_URL
+              {{- if .Values.database.useSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName | default "rustdocs-mcp-secrets" }}
+                  key: {{ .Values.database.secretKey | default "MCPDOCS_DATABASE_URL" }}
+              {{- else }}
               value: {{ .Values.database.url | quote }}
+              {{- end }}
             - name: EMBEDDING_MODEL
               value: {{ .Values.embedding.model | default "text-embedding-3-large" | quote }}
             - name: EMBEDDING_PROVIDER
