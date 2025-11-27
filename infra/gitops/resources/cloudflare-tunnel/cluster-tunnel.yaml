@@ -1,0 +1,44 @@
+---
+# ClusterTunnel: Main Cloudflare Tunnel for CTO Platform
+# This creates a cluster-wide tunnel that can be referenced by TunnelBindings
+# across all namespaces.
+#
+# The operator will:
+# 1. Create the tunnel in Cloudflare
+# 2. Deploy cloudflared pods (replicas controlled by 'size')
+# 3. Manage the tunnel configuration
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: ClusterTunnel
+metadata:
+  name: cto-main
+  labels:
+    app.kubernetes.io/name: cto-main-tunnel
+    app.kubernetes.io/part-of: platform
+spec:
+  # Reference to the secret containing Cloudflare API credentials
+  # Must have CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID keys
+  cloudflare:
+    accountId:
+      secretKeyRef:
+        name: cloudflare-api-credentials
+        namespace: cloudflare-operator-system
+        key: CLOUDFLARE_ACCOUNT_ID
+    apiToken:
+      secretKeyRef:
+        name: cloudflare-api-credentials
+        namespace: cloudflare-operator-system
+        key: CLOUDFLARE_API_TOKEN
+    # Domain for DNS records
+    domain: 5dlabs.ai
+
+  # Number of cloudflared replicas for HA
+  size: 2
+
+  # Image configuration (optional - defaults to latest cloudflared)
+  image: cloudflare/cloudflared:latest
+
+  # Enable fallback traffic (catch-all for unmatched hostnames)
+  noTlsVerify: false
+
+  # Origin request configuration
+  originCaPool: ""
