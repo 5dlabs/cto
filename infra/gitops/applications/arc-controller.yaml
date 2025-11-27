@@ -18,9 +18,9 @@ spec:
   project: platform
 
   source:
-    repoURL: https://github.com/actions/actions-runner-controller
-    targetRevision: gha-runner-scale-set-controller-0.13.0
-    path: charts/gha-runner-scale-set-controller
+    repoURL: oci://ghcr.io/actions/actions-runner-controller-charts
+    chart: gha-runner-scale-set-controller
+    targetRevision: 0.12.1
 
     helm:
       values: |
@@ -30,7 +30,7 @@ spec:
         # Image configuration (use official image)
         image:
           repository: ghcr.io/actions/gha-runner-scale-set-controller
-          tag: "0.13.0"
+          tag: "0.12.1"
           pullPolicy: IfNotPresent
 
         # Service account
