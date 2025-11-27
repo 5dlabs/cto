@@ -101,7 +101,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: telemetry
+    namespace: observability
   syncPolicy:
     automated:
       prune: true

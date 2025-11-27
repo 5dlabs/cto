@@ -5,7 +5,7 @@ apiVersion: secrets.hashicorp.com/v1beta1
 kind: VaultAuth
 metadata:
   name: vault-auth
-  namespace: operators
+  namespace: infra
   labels:
     app.kubernetes.io/name: vault-auth
     app.kubernetes.io/part-of: platform

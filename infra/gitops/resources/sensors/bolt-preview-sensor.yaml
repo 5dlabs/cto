@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: bolt-preview-deployment
-  namespace: argo
+  namespace: automation
 spec:
   template:
     serviceAccountName: argo-events-sa
@@ -100,7 +100,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: bolt-preview-cleanup
-  namespace: argo
+  namespace: automation
 spec:
   template:
     serviceAccountName: argo-events-sa
@@ -177,7 +177,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: bolt-preview-strategy
-  namespace: argo
+  namespace: automation
 data:
   strategy.md: |
     # Bolt Preview Deployment Strategy

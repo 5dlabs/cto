@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: claude-code-alerting-rules
-  namespace: telemetry
+  namespace: observability
   labels:
     app: alerting
     component: rules

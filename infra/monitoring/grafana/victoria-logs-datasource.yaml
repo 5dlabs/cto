@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-victoria-logs-datasource
-  namespace: telemetry
+  namespace: observability
   labels:
     grafana_datasource: "1"
 data:

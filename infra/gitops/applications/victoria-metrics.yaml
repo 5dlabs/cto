@@ -59,11 +59,11 @@ spec:
                     - targets:
                         - otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:8889
                       labels:
-                        namespace: telemetry
+                        namespace: observability
                         service: otel-collector
   destination:
     server: https://kubernetes.default.svc
-    namespace: telemetry
+    namespace: observability
   syncPolicy:
     automated:
       prune: true

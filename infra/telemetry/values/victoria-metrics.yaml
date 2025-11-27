@@ -73,7 +73,7 @@ server:
             - targets:
                 - otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:8889
               labels:
-                namespace: telemetry
+                namespace: observability
                 service: otel-collector
 
         # Scrape Claude Code metrics from OTLP collector's Prometheus endpoint

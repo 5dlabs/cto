@@ -66,29 +66,29 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: trader
       server: https://kubernetes.default.svc
-    - namespace: argo
+    - namespace: automation
       server: https://kubernetes.default.svc
     - namespace: argocd
       server: https://kubernetes.default.svc
-    - namespace: telemetry
+    # Observability - metrics, logs, traces
+    - namespace: observability
       server: https://kubernetes.default.svc
-    - namespace: arc-systems
-      server: https://kubernetes.default.svc
+    # CI/CD runners
     - namespace: arc-runners
       server: https://kubernetes.default.svc
-    - namespace: external-dns
-      server: https://kubernetes.default.svc
+    # System namespaces
     - namespace: kube-system
       server: https://kubernetes.default.svc
     - namespace: default
       server: https://kubernetes.default.svc
+    # Data layer
     - namespace: databases
       server: https://kubernetes.default.svc
-    # HashiCorp Vault namespace
+    # Security - secrets management
     - namespace: vault
       server: https://kubernetes.default.svc
-    # Consolidated operators namespace (cnpg, redis, ngrok, vault-secrets-operator)
-    - namespace: operators
+    # Infrastructure - operators, ingress, DNS, certs
+    - namespace: infra
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist

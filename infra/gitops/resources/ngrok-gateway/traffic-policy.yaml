@@ -3,7 +3,7 @@ apiVersion: ngrok.k8s.ngrok.com/v1alpha1
 kind: NgrokTrafficPolicy
 metadata:
   name: security-policy
-  namespace: argo
+  namespace: automation
 spec:
   policy:
     on_http_request:
