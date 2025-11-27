@@ -651,11 +651,11 @@ else
         echo "✅ Copying prompt.md..."
         cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
 
-        echo "✅ Copying client-config.json..."
-        if [ -f "$TASK_DIR/client-config.json" ]; then
-            cp "$TASK_DIR/client-config.json" "$TASK_WORKSPACE/client-config.json" && echo "✓ client-config.json copied to task workspace" || echo "❌ client-config.json copy failed"
+        echo "✅ Copying tools-config.json..."
+        if [ -f "$TASK_DIR/tools-config.json" ]; then
+            cp "$TASK_DIR/tools-config.json" "$TASK_WORKSPACE/tools-config.json" && echo "✓ tools-config.json copied to task workspace" || echo "❌ tools-config.json copy failed"
         else
-            echo "⚠️ client-config.json not found - MCP client may not be configured"
+            echo "⚠️ tools-config.json not found - MCP client may not be configured"
         fi
 
         echo "✅ Copying tools-guide.md..."
@@ -777,9 +777,9 @@ echo "🔑 CRITICAL: Gemini will be launched from this directory"
 # Ensure client-config fallback is available now that GEMINI_WORK_DIR is known
 if declare -F ensure_default_client_config >/dev/null 2>&1; then
     ensure_default_client_config \
-        "$GEMINI_WORK_DIR/client-config.json" \
-        "$TASK_WORKSPACE/client-config.json" \
-        "/workspace/$WORKSPACE_DIR/client-config.json"
+        "$GEMINI_WORK_DIR/tools-config.json" \
+        "$TASK_WORKSPACE/tools-config.json" \
+        "/workspace/$WORKSPACE_DIR/tools-config.json"
 fi
 
 # Working directory setup completed above
@@ -841,12 +841,12 @@ if [ -d "/task-files" ]; then
           fi
         fi
 
-  # Copy client-config.json to workspace root for MCP configuration
-  if [ -f "/task-files/client-config.json" ]; then
-    cp /task-files/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
-    echo "✓ Copied client-config.json to workspace root for MCP configuration"
+  # Copy tools-config.json to workspace root for MCP configuration
+  if [ -f "/task-files/tools-config.json" ]; then
+    cp /task-files/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true
+    echo "✓ Copied tools-config.json to workspace root for MCP configuration"
   else
-    echo "⚠️ client-config.json not found in task-files, using defaults"
+    echo "⚠️ tools-config.json not found in task-files, using defaults"
   fi
 
   # Copy all other markdown files (excluding GEMINI.md and CLAUDE.md)
@@ -943,11 +943,11 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
                 cp "$GEMINI_WORK_DIR/task/task.txt" "$GEMINI_WORK_DIR/task/task.md" && echo "✓ task.txt copied as task.md" || echo "❌ task.txt copy failed"
             fi
 
-            # Move client-config.json to Gemini working directory (not in task/ subdirectory)
-            if [ -f "$GEMINI_WORK_DIR/task/client-config.json" ]; then
-                mv "$GEMINI_WORK_DIR/task/client-config.json" "$GEMINI_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Gemini working directory" || echo "❌ client-config.json move failed"
+            # Move tools-config.json to Gemini working directory (not in task/ subdirectory)
+            if [ -f "$GEMINI_WORK_DIR/task/tools-config.json" ]; then
+                mv "$GEMINI_WORK_DIR/task/tools-config.json" "$GEMINI_WORK_DIR/tools-config.json" && echo "✓ tools-config.json moved to Gemini working directory" || echo "❌ tools-config.json move failed"
             else
-                echo "⚠️ client-config.json not found - MCP client may not be configured"
+                echo "⚠️ tools-config.json not found - MCP client may not be configured"
             fi
 
             echo "✓ Task {{task_id}} files copied from preserved temporary location"
@@ -973,10 +973,10 @@ else
     echo "✓ Task documentation copied from docs repository during multi-repo setup"
 fi
 
-# Verify client-config.json is available in Gemini's working directory
+# Verify tools-config.json is available in Gemini's working directory
 echo "=== TOOLS CONFIG SETUP ==="
-WORKSPACE_CFG="$GEMINI_WORK_DIR/client-config.json"
-SOURCE_CFG="/task-files/client-config.json"
+WORKSPACE_CFG="$GEMINI_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
 
 # Helper to check non-empty JSON object
 is_valid_cfg() {
@@ -991,13 +991,13 @@ if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
 if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
 
 if $SRC_OK; then
-  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
 elif $WS_OK; then
-  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
 else
-  echo "❌ No valid client-config.json found (both source and workspace empty/invalid). Aborting."
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid). Aborting."
   if [ -f "$SOURCE_CFG" ]; then
     echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
   else

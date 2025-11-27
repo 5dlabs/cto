@@ -265,9 +265,9 @@ attempt_task_recovery() {
     return 1
 }
 
-# Ensure a usable client-config.json exists even if task assets omitted it
-# Usage: ensure_default_client_config "/path/to/client-config.json"
-DEFAULT_CLIENT_CONFIG_PATH="${DEFAULT_CLIENT_CONFIG_PATH:-/agent-templates/code_client-config.json}"
+# Ensure a usable tools-config.json exists even if task assets omitted it
+# Usage: ensure_default_client_config "/path/to/tools-config.json"
+DEFAULT_CLIENT_CONFIG_PATH="${DEFAULT_CLIENT_CONFIG_PATH:-/agent-templates/code_tools-config.json}"
 
 ensure_default_client_config() {
     local dest_file="$1"
@@ -280,7 +280,7 @@ ensure_default_client_config() {
     fi
 
     if [ -f "$dest_file" ] && [ -s "$dest_file" ]; then
-        echo "✓ client-config.json already present at $dest_file"
+        echo "✓ tools-config.json already present at $dest_file"
         return 0
     fi
 
@@ -291,14 +291,14 @@ ensure_default_client_config() {
     for source_file in "${fallback_sources[@]}"; do
         [ -n "$source_file" ] || continue
         if [ -f "$source_file" ] && [ -s "$source_file" ]; then
-            if safe_copy_file "$source_file" "$dest_file" "client-config.json fallback source ($source_file)"; then
-                echo "🛠️ Restored client-config.json from $source_file"
+            if safe_copy_file "$source_file" "$dest_file" "tools-config.json fallback source ($source_file)"; then
+                echo "🛠️ Restored tools-config.json from $source_file"
                 return 0
             fi
         fi
     done
 
-    echo "⚠️ No fallback client-config.json source available; leaving unset"
+    echo "⚠️ No fallback tools-config.json source available; leaving unset"
     return 1
 }
 

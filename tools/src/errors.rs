@@ -259,7 +259,7 @@ impl ErrorContext {
 
             BridgeError::ConfigurationError { reason } => {
                 format!(
-                    "⚙️ Configuration issue: {reason}. Please check your servers-config.json file."
+                    "⚙️ Configuration issue: {reason}. Please check your mcp-servers.json file."
                 )
             }
 

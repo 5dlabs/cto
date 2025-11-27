@@ -554,30 +554,30 @@ export GITHUB_USER="{{github_app}}"
 export GITHUB_APP="{{github_app}}"
 
 # Optional: copy agent-centric Tools client config (base from Helm/controller)
-if [ -f "/task-files/client-config.json" ]; then
-  echo "🔍 DEBUG: Source /task-files/client-config.json summary (pre-copy):"
+if [ -f "/task-files/tools-config.json" ]; then
+  echo "🔍 DEBUG: Source /task-files/tools-config.json summary (pre-copy):"
   (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
-     "/task-files/client-config.json" 2>/dev/null \
-   || { echo -n "raw="; head -c 200 "/task-files/client-config.json"; echo; })
+     "/task-files/tools-config.json" 2>/dev/null \
+   || { echo -n "raw="; head -c 200 "/task-files/tools-config.json"; echo; })
 
-  cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" \
-    && echo "✓ client-config.json copied to Claude working directory" \
-    || echo "❌ client-config.json copy failed"
-  cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true \
-    && echo "✓ client-config.json copied to workspace root" \
-    || echo "❌ client-config.json copy to workspace failed"
+  cp "/task-files/tools-config.json" "$CLAUDE_WORK_DIR/tools-config.json" \
+    && echo "✓ tools-config.json copied to Claude working directory" \
+    || echo "❌ tools-config.json copy failed"
+  cp \$FACTORY_WORK_DIR/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true \
+    && echo "✓ tools-config.json copied to workspace root" \
+    || echo "❌ tools-config.json copy to workspace failed"
 
-  if [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
-    echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/client-config.json summary (post-copy):"
+  if [ -f "$CLAUDE_WORK_DIR/tools-config.json" ]; then
+    echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/tools-config.json summary (post-copy):"
     (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
-       "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null \
-     || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/client-config.json"; echo; })
+       "$CLAUDE_WORK_DIR/tools-config.json" 2>/dev/null \
+     || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/tools-config.json"; echo; })
     # Harden file to catch unexpected overwrites (diagnostic)
-    chmod a-w "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null || true
-    echo "🔒 DEBUG: Made $CLAUDE_WORK_DIR/client-config.json read-only to detect overwrites"
+    chmod a-w "$CLAUDE_WORK_DIR/tools-config.json" 2>/dev/null || true
+    echo "🔒 DEBUG: Made $CLAUDE_WORK_DIR/tools-config.json read-only to detect overwrites"
   fi
 else
-  echo "⚠️ client-config.json not found - MCP client may not be configured"
+  echo "⚠️ tools-config.json not found - MCP client may not be configured"
 fi
 
 # MCP configuration already handled above with path fixes
@@ -592,8 +592,8 @@ echo "✓ ConfigMap files copied to $CLAUDE_WORK_DIR"
 # Append repo-level clientConfig from cto-config.json if present (append-only, generic)
 CTO_CANDIDATES=("$CLAUDE_WORK_DIR/cto-config.json" "/workspace/cto-config.json")
 for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
-  if [ -f "$CFG_PATH" ] && [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
-    echo "🔧 Merging repo cto-config.json clientConfig into client-config.json (append-only)"
+  if [ -f "$CFG_PATH" ] && [ -f "$CLAUDE_WORK_DIR/tools-config.json" ]; then
+    echo "🔧 Merging repo cto-config.json clientConfig into tools-config.json (append-only)"
     AGENT_KEY=$(echo "{{github_app}}" | sed 's/^5DLabs-//' | tr 'A-Z' 'a-z')
     TMP_MERGE="/tmp/client-config.merged.json"
     if jq --arg ak "$AGENT_KEY" -s '
@@ -612,16 +612,16 @@ for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
       (.[0] as $base | .[1] as $repo |
        ($repo.agents[$ak].clientConfig // {}) as $extra |
        append_only_merge($base; $extra)
-      )' "$CLAUDE_WORK_DIR/client-config.json" "$CFG_PATH" > "$TMP_MERGE"; then
-      mv "$TMP_MERGE" "$CLAUDE_WORK_DIR/client-config.json"
-      cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true 2>/dev/null || true
+      )' "$CLAUDE_WORK_DIR/tools-config.json" "$CFG_PATH" > "$TMP_MERGE"; then
+      mv "$TMP_MERGE" "$CLAUDE_WORK_DIR/tools-config.json"
+      cp \$FACTORY_WORK_DIR/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true 2>/dev/null || true
       echo "✓ Appended repo clientConfig for agent: $AGENT_KEY"
-      echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/client-config.json summary (post-merge):"
+      echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/tools-config.json summary (post-merge):"
       (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
-         "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null \
-       || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/client-config.json"; echo; })
+         "$CLAUDE_WORK_DIR/tools-config.json" 2>/dev/null \
+       || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/tools-config.json"; echo; })
     else
-      echo "⚠️ Failed to merge repo cto-config.json clientConfig into client-config.json"
+      echo "⚠️ Failed to merge repo cto-config.json clientConfig into tools-config.json"
     fi
     break
   fi
@@ -656,12 +656,12 @@ echo '=== CONFIG DIAGNOSTICS ==='
 echo "Working directory: $CLAUDE_WORK_DIR"
 echo "Listing /task-files (ConfigMap mount):"
 ls -la /task-files | sed 's/^/[task-files] /'
-echo "MCP_CLIENT_CONFIG: ${MCP_CLIENT_CONFIG:-<unset>}"
-if [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
-  echo "[client-config] path: $CLAUDE_WORK_DIR/client-config.json"
-  echo "[client-config] summary:"; jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null || echo "  (not valid JSON)"
+echo "MCP_TOOLS_CONFIG: ${MCP_TOOLS_CONFIG:-<unset>}"
+if [ -f "$CLAUDE_WORK_DIR/tools-config.json" ]; then
+  echo "[client-config] path: $CLAUDE_WORK_DIR/tools-config.json"
+  echo "[client-config] summary:"; jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLAUDE_WORK_DIR/tools-config.json" 2>/dev/null || echo "  (not valid JSON)"
 else
-  echo "[client-config] MISSING at $CLAUDE_WORK_DIR/client-config.json"
+  echo "[client-config] MISSING at $CLAUDE_WORK_DIR/tools-config.json"
 fi
 # Check MCP files in both locations
 echo "[mcp] Checking MCP configuration files..."
@@ -685,10 +685,10 @@ echo "[mcp]   2. Project scope (working dir): $CLAUDE_WORK_DIR/.mcp.json"
 echo "[mcp]   3. User scope: ~/.config/claude-code/.mcp.json"
 echo '=== END CONFIG DIAGNOSTICS ==='
 
-# Verify/Select client-config.json for runtime
+# Verify/Select tools-config.json for runtime
 echo "=== TOOLS CONFIG SETUP ==="
-WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
-SOURCE_CFG="/task-files/client-config.json"
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
 
 # Helper to check non-empty JSON object
 is_valid_cfg() {
@@ -703,13 +703,13 @@ if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
 if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
 
 if $SRC_OK; then
-  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
 elif $WS_OK; then
-  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
 else
-  echo "❌ No valid client-config.json found (both source and workspace empty/invalid). Aborting."
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid). Aborting."
   if [ -f "$SOURCE_CFG" ]; then
     echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
   else
@@ -755,10 +755,10 @@ else
 fi
 
 # 2) Validate local server commands defined in MCP client config
-if [ -f "$MCP_CLIENT_CONFIG" ]; then
+if [ -f "$MCP_TOOLS_CONFIG" ]; then
   # Iterate known local servers and ensure their commands exist (if specified)
   for srv in filesystem git; do
-    CMD=$(jq -r --arg s "$srv" '.localServers[$s].command // empty' "$MCP_CLIENT_CONFIG" 2>/dev/null || true)
+    CMD=$(jq -r --arg s "$srv" '.localServers[$s].command // empty' "$MCP_TOOLS_CONFIG" 2>/dev/null || true)
     if [ -n "$CMD" ]; then
       if ! command -v "$CMD" >/dev/null 2>&1; then
         echo "❌ Local MCP server '$srv' requires command '$CMD' not found in PATH. Aborting."
@@ -768,13 +768,13 @@ if [ -f "$MCP_CLIENT_CONFIG" ]; then
     fi
   done
 else
-  echo "⚠️ MCP_CLIENT_CONFIG not found for local server validation"
+  echo "⚠️ MCP_TOOLS_CONFIG not found for local server validation"
 fi
 
 # 3) Announce remote tools list for visibility
-if [ -f "$MCP_CLIENT_CONFIG" ]; then
+if [ -f "$MCP_TOOLS_CONFIG" ]; then
   echo -n "🔧 Remote tools configured: "
-  jq -r '(.remoteTools // []) | join(", ")' "$MCP_CLIENT_CONFIG" 2>/dev/null | sed 's/^$/<none>/'
+  jq -r '(.remoteTools // []) | join(", ")' "$MCP_TOOLS_CONFIG" 2>/dev/null | sed 's/^$/<none>/'
 fi
 
 echo '=== WORKSPACE VALIDATION ==='
@@ -877,14 +877,14 @@ else
     echo "🔍 DEBUG: MCP file check: MISSING at $(pwd)/.mcp.json"
 fi
 
-# DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
-echo "🔍 DEBUG: MCP_CLIENT_CONFIG is set to: '$MCP_CLIENT_CONFIG'"
-if [ -f "$MCP_CLIENT_CONFIG" ]; then
-    echo "🔍 DEBUG: MCP_CLIENT_CONFIG file exists and is readable"
+# DEBUG: Print MCP_TOOLS_CONFIG for troubleshooting client config issues
+echo "🔍 DEBUG: MCP_TOOLS_CONFIG is set to: '$MCP_TOOLS_CONFIG'"
+if [ -f "$MCP_TOOLS_CONFIG" ]; then
+    echo "🔍 DEBUG: MCP_TOOLS_CONFIG file exists and is readable"
     echo "🔍 DEBUG: First few lines of client config:"
-    head -10 "$MCP_CLIENT_CONFIG" 2>/dev/null || echo "Could not read client config file"
+    head -10 "$MCP_TOOLS_CONFIG" 2>/dev/null || echo "Could not read client config file"
 else
-    echo "🔍 DEBUG: MCP_CLIENT_CONFIG file does NOT exist or is not readable"
+    echo "🔍 DEBUG: MCP_TOOLS_CONFIG file does NOT exist or is not readable"
 fi
 echo ""
 

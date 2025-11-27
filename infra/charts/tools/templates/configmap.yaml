@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "tools.labels" . | nindent 4 }}
 data:
-  servers-config.json: |
+  mcp-servers.json: |
     {{- if .Values.config.servers }}
     {
       "servers": {
@@ -37,6 +37,9 @@ data:
           {{- if $serverConfig.url }}
           "url": {{ $serverConfig.url | quote }},
           {{- end }}
+          {{- if $serverConfig.local }}
+          "local": true,
+          {{- end }}
           {{- if $serverConfig.env }}
           "env": {{ $serverConfig.env | toJson }}
           {{- else }}
@@ -47,5 +50,5 @@ data:
       }
     }
     {{- else }}
-    {{- .Files.Get "config/servers-config.json" | nindent 4 }}
+    {{- .Files.Get "config/mcp-servers.json" | nindent 4 }}
     {{- end }}

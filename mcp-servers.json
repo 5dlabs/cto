@@ -1,0 +1,41 @@
+{
+  "servers": {
+    "brave-search": {
+      "name": "Brave Search",
+      "description": "Web search using Brave's privacy-focused search engine",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@anthropics/brave-search-mcp"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "context7": {
+      "name": "Context7",
+      "description": "Library documentation search and retrieval for up-to-date API references",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@context7/mcp"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "github": {
+      "name": "GitHub",
+      "description": "GitHub integration for repository management, issues, pull requests, and more",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@anthropics/github-mcp"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "rust-tools": {
+      "name": "Rust Development Tools",
+      "description": "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development",
+      "transport": "stdio",
+      "command": "/home/node/.cargo/bin/cursor-rust-tools",
+      "args": ["--no-ui"],
+      "workingDirectory": "/workspace",
+      "local": true,
+      "env": {}
+    }
+  }
+}

@@ -60,6 +60,9 @@ pub struct ServerConfig {
     /// Supports: "project_root", absolute paths like "/usr/local/bin", or relative paths
     #[serde(rename = "workingDirectory", default)]
     pub working_directory: Option<String>,
+    /// Whether this is a local server (runs in agent container, not proxied through tools server)
+    #[serde(default)]
+    pub local: bool,
 }
 
 /// Root configuration structure
@@ -124,9 +127,9 @@ pub struct SystemConfigManager {
 impl SystemConfigManager {
     pub fn new(project_dir: Option<PathBuf>) -> Result<Self> {
         let config_path = if let Some(dir) = project_dir {
-            dir.join("servers-config.json")
+            dir.join("mcp-servers.json")
         } else {
-            PathBuf::from("servers-config.json")
+            PathBuf::from("mcp-servers.json")
         };
 
         let config = if config_path.exists() {

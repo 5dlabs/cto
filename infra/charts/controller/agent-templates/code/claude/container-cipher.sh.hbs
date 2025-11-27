@@ -1396,10 +1396,10 @@ else
   echo "⚠️ Enterprise settings not found, Claude will use defaults"
 fi
 
-# Verify client-config.json is available and valid
+# Verify tools-config.json is available and valid
 echo "=== TOOLS CONFIG SETUP ==="
-WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
-SOURCE_CFG="/task-files/client-config.json"
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
 
 # Helper to check non-empty JSON object
 is_valid_cfg() {
@@ -1504,13 +1504,13 @@ update_coderun_status() {
   fi
 }
 
-# Copy client-config.json from task files first
-if [ -f "/task-files/client-config.json" ]; then
-  cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-  cp \$CLAUDE_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
-  echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
+# Copy tools-config.json from task files first
+if [ -f "/task-files/tools-config.json" ]; then
+  cp /task-files/tools-config.json "$CLAUDE_WORK_DIR/tools-config.json"
+  cp \$CLAUDE_WORK_DIR/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true
+  echo "✓ tools-config.json copied from ConfigMap to both working directory and workspace root"
 else
-  echo "⚠️ client-config.json not found in task-files"
+  echo "⚠️ tools-config.json not found in task-files"
 fi
 
 SRC_OK=false
@@ -1519,13 +1519,13 @@ if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
 if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
 
 if $SRC_OK; then
-  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
 elif $WS_OK; then
-  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
 else
-  echo "❌ No valid client-config.json found (both source and workspace empty/invalid). Aborting."
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid). Aborting."
   if [ -f "$SOURCE_CFG" ]; then
     echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
   else
