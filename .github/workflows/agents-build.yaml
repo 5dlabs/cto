@@ -75,13 +75,19 @@ jobs:
           # Query GitHub API for latest tools release (tags matching tools-v*)
           TOOLS_VERSION=$(gh release list --limit 20 | grep -oE 'tools-v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/tools-v//' || echo "")
           if [ -z "$TOOLS_VERSION" ]; then
-            # Fallback to version from Cargo.toml if no release exists yet
-            TOOLS_VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-            echo "⚠️ No tools release found, using Cargo.toml version: $TOOLS_VERSION"
+            echo "⚠️ No tools-v* release found, tools client will be skipped"
+            echo "version=skip" >> $GITHUB_OUTPUT
           else
-            echo "📦 Latest tools release: $TOOLS_VERSION"
+            # Verify the release asset actually exists (use -L to follow GitHub's redirects)
+            RELEASE_URL="https://github.com/5dlabs/cto/releases/download/tools-v${TOOLS_VERSION}/tools-installer.sh"
+            if curl -L --output /dev/null --silent --head --fail "$RELEASE_URL"; then
+              echo "📦 Latest tools release: $TOOLS_VERSION (verified)"
+              echo "version=$TOOLS_VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ Tools release tools-v${TOOLS_VERSION} found but installer asset missing, skipping"
+              echo "version=skip" >> $GITHUB_OUTPUT
+            fi
           fi
-          echo "version=$TOOLS_VERSION" >> $GITHUB_OUTPUT
 
       - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
