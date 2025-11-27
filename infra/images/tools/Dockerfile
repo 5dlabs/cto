@@ -40,14 +40,14 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 # Create symbolic links for Python
 RUN ln -sf python3 /usr/bin/python
 # Install UV and uvx for Python package management
-# hadolint ignore=DL3059,SC1091
+# hadolint ignore=DL3059,DL4006,SC1091
 RUN curl -LsSf https://astral.sh/uv/install.sh | bash && \
     (mv /root/.local/bin/uv /usr/local/bin/ && mv /root/.local/bin/uvx /usr/local/bin/) 2>/dev/null || \
     (mv /root/.cargo/bin/uv /usr/local/bin/ && mv /root/.cargo/bin/uvx /usr/local/bin/) 2>/dev/null || \
     echo "UV and uvx installed successfully"
 
 # Install minimal Rust toolchain
-# hadolint ignore=DL3059
+# hadolint ignore=DL3059,DL4006
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
 
 # Copy the prebuilt server binary from CI/CD artifacts
@@ -55,6 +55,7 @@ COPY target/release/tools-server /usr/local/bin/tools-server
 RUN chmod +x /usr/local/bin/tools-server
 
 # Create non-root user (use a different UID since 1000 exists)
+# hadolint ignore=DL3059
 RUN useradd -m -u 1001 -s /bin/bash mcp
 
 # Create directories for configs and npm cache
