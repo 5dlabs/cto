@@ -1,0 +1,31 @@
+---
+# TunnelBinding: GitHub Webhooks
+# Routes GitHub webhook traffic to the Argo Events EventSource
+#
+# Traffic flow:
+# github.public.5dlabs.ai/github/webhook
+#   -> Cloudflare Edge
+#   -> cto-main tunnel
+#   -> github-eventsource-svc:12000
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: github-webhooks
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: github-webhooks
+    app.kubernetes.io/part-of: platform
+spec:
+  # Reference to the ClusterTunnel
+  tunnelRef:
+    kind: ClusterTunnel
+    name: cto-main
+
+  # Frontend configuration (public-facing)
+  subjects:
+    - name: github-eventsource-svc
+      spec:
+        fqdn: github.public.5dlabs.ai
+        path: /github/webhook
+        protocol: http
+        target: github-eventsource-svc:12000
