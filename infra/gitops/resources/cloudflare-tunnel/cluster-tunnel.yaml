@@ -5,9 +5,9 @@
 #
 # The operator will:
 # 1. Create the tunnel in Cloudflare
-# 2. Deploy cloudflared pods (replicas controlled by 'size')
+# 2. Deploy cloudflared pods
 # 3. Manage the tunnel configuration
-apiVersion: networking.cfargotunnel.com/v1alpha1
+apiVersion: networking.cfargotunnel.com/v1alpha2
 kind: ClusterTunnel
 metadata:
   name: cto-main
@@ -15,30 +15,18 @@ metadata:
     app.kubernetes.io/name: cto-main-tunnel
     app.kubernetes.io/part-of: platform
 spec:
-  # Reference to the secret containing Cloudflare API credentials
-  # Must have CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID keys
+  # Cloudflare credentials configuration
   cloudflare:
-    accountId:
-      secretKeyRef:
-        name: cloudflare-api-credentials
-        namespace: cloudflare-operator-system
-        key: CLOUDFLARE_ACCOUNT_ID
-    apiToken:
-      secretKeyRef:
-        name: cloudflare-api-credentials
-        namespace: cloudflare-operator-system
-        key: CLOUDFLARE_API_TOKEN
+    # Secret containing CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+    secret: cloudflare-api-credentials
+    # Account ID from secret (key name)
+    accountId: CLOUDFLARE_ACCOUNT_ID
     # Domain for DNS records
     domain: 5dlabs.ai
 
-  # Number of cloudflared replicas for HA
-  size: 2
+  # Create a new tunnel with this name
+  newTunnel:
+    name: cto-main
 
-  # Image configuration (optional - defaults to latest cloudflared)
-  image: cloudflare/cloudflared:latest
-
-  # Enable fallback traffic (catch-all for unmatched hostnames)
-  noTlsVerify: false
-
-  # Origin request configuration
-  originCaPool: ""
+  # Fallback for unmatched requests
+  fallbackTarget: http_status:404
