@@ -1,8 +1,8 @@
 //! Play Monitor CLI
 //!
-//! A simple CLI tool for monitoring play workflows and retrieving failure logs.
-//! Uses Argo Workflows CLI for efficient event-driven monitoring.
-//! Used by Cursor agent for E2E feedback loop automation.
+//! A comprehensive CLI tool for monitoring play workflows and all platform resources.
+//! Uses kubectl --watch for real-time streaming of workflows, CRDs, pods, and sensors.
+//! Emits unified JSON events for Cursor agent E2E feedback loop automation.
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -11,8 +11,12 @@ use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::io::Write as IoWrite;
+use std::path::PathBuf;
 use std::process::Command;
-use tracing::debug;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command as AsyncCommand;
+use tokio::sync::mpsc;
+use tracing::{debug, warn};
 
 /// Play workflow monitoring CLI for E2E feedback loop
 #[derive(Parser)]
@@ -31,9 +35,17 @@ struct Cli {
     #[arg(long, default_value = "argo", global = true)]
     namespace: String,
 
+    /// Agent platform namespace for CRDs and pods
+    #[arg(long, default_value = "agent-platform", global = true)]
+    agent_namespace: String,
+
     /// Enable verbose output
     #[arg(short, long, global = true)]
     verbose: bool,
+
+    /// Output file for JSONL events (in addition to stdout)
+    #[arg(long, global = true)]
+    output_file: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Default, clap::ValueEnum)]
@@ -45,7 +57,7 @@ enum OutputFormat {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// [PRIMARY] Full E2E loop: start play, monitor, remediate until completion
+    /// [PRIMARY] Full E2E loop: start play, monitor all resources until completion
     Full {
         /// Task ID for the play
         #[arg(long)]
@@ -55,8 +67,8 @@ enum Commands {
         #[arg(long, default_value = "cto-config.json")]
         config: String,
 
-        /// Poll interval in seconds
-        #[arg(long, default_value = "10")]
+        /// Poll interval in seconds (for GitHub state polling)
+        #[arg(long, default_value = "30")]
         interval: u64,
 
         /// Max consecutive failures before stopping (0 = unlimited)
@@ -66,8 +78,38 @@ enum Commands {
         /// Workflow template name
         #[arg(long, default_value = "play-workflow-template")]
         template: String,
+
+        /// GitHub repository for PR state polling (e.g., 5dlabs/cto-parallel-test)
+        #[arg(long)]
+        repository: Option<String>,
     },
-    /// Monitor an existing play workflow - emits JSON events
+    /// Monitor an existing play workflow using kubectl --watch streams
+    Watch {
+        /// Task ID to filter resources by (matches task-id label)
+        #[arg(long)]
+        task_id: String,
+
+        /// GitHub repository for PR state polling (e.g., 5dlabs/cto-parallel-test)
+        #[arg(long)]
+        repository: Option<String>,
+
+        /// Poll interval in seconds (for GitHub state polling)
+        #[arg(long, default_value = "30")]
+        github_interval: u64,
+
+        /// Fetch logs automatically on failure
+        #[arg(long, default_value = "true")]
+        fetch_logs: bool,
+
+        /// Max consecutive failures before stopping (0 = unlimited)
+        #[arg(long, default_value = "5")]
+        max_failures: u32,
+
+        /// Tail lines for logs on failure
+        #[arg(long, default_value = "500")]
+        log_tail: u32,
+    },
+    /// [LEGACY] Monitor using polling instead of watch streams
     Loop {
         /// Play workflow name (e.g., play-42, play-task-123)
         #[arg(long)]
@@ -344,21 +386,81 @@ struct WorkflowStatus {
 }
 
 // =============================================================================
-// Loop Events - JSON events emitted by the loop command
+// Loop Events - JSON events emitted by the monitor
 // =============================================================================
 
-/// Events emitted by the loop command
+/// Resource type for watch events
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceType {
+    Workflow,
+    CodeRun,
+    DocsRun,
+    Sensor,
+    Pod,
+}
+
+impl std::fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Workflow => write!(f, "workflow"),
+            Self::CodeRun => write!(f, "coderun"),
+            Self::DocsRun => write!(f, "docsrun"),
+            Self::Sensor => write!(f, "sensor"),
+            Self::Pod => write!(f, "pod"),
+        }
+    }
+}
+
+/// Resource change action
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceAction {
+    Added,
+    Modified,
+    Deleted,
+}
+
+/// GitHub PR state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PullRequestState {
+    pub number: u64,
+    pub state: String,
+    pub title: String,
+    pub mergeable: Option<bool>,
+    pub draft: bool,
+    pub labels: Vec<String>,
+    pub reviews: Vec<ReviewState>,
+    pub checks: Vec<CheckState>,
+}
+
+/// GitHub review state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewState {
+    pub author: String,
+    pub state: String,
+}
+
+/// GitHub check state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckState {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+}
+
+/// Events emitted by the monitor
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "event_type", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 enum LoopEvent {
-    /// Loop has started monitoring
+    /// Monitor has started
     Started {
-        play_id: String,
-        interval_seconds: u64,
+        task_id: String,
+        watching: Vec<String>,
         timestamp: DateTime<Utc>,
     },
-    /// Current workflow status update
+    /// Current workflow status update (legacy compatibility)
     Status {
         play_id: String,
         workflow_phase: String,
@@ -388,12 +490,45 @@ enum LoopEvent {
         duration_seconds: i64,
         timestamp: DateTime<Utc>,
     },
-    /// Loop stopped (max failures reached or user interrupt)
+    /// Monitor stopped (max failures reached or user interrupt)
     Stopped {
         play_id: String,
         reason: String,
         timestamp: DateTime<Utc>,
     },
+    /// Resource change from kubectl --watch
+    Resource {
+        task_id: String,
+        resource_type: ResourceType,
+        action: ResourceAction,
+        name: String,
+        namespace: String,
+        phase: Option<String>,
+        labels: Option<std::collections::HashMap<String, String>>,
+        message: Option<String>,
+        timestamp: DateTime<Utc>,
+    },
+    /// GitHub PR state update
+    Github {
+        task_id: String,
+        repository: String,
+        pull_request: Option<PullRequestState>,
+        timestamp: DateTime<Utc>,
+    },
+    /// Sensor health/activity event
+    SensorHealth {
+        task_id: String,
+        sensors: Vec<SensorState>,
+        timestamp: DateTime<Utc>,
+    },
+}
+
+/// Sensor state from watch
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SensorState {
+    pub name: String,
+    pub status: String,
+    pub last_triggered: Option<String>,
 }
 
 // =============================================================================
@@ -456,6 +591,7 @@ struct RunResponse {
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -466,6 +602,9 @@ async fn main() -> Result<()> {
             .init();
     }
 
+    // Create event emitter with optional file output
+    let emitter = EventEmitter::new(cli.output_file.clone());
+
     match cli.command {
         Commands::Full {
             task_id,
@@ -473,14 +612,39 @@ async fn main() -> Result<()> {
             interval,
             max_failures,
             template,
+            repository,
         } => {
-            run_full_loop(
+            run_full_watch(
                 &task_id,
                 &config,
                 &cli.namespace,
+                &cli.agent_namespace,
                 interval,
                 max_failures,
                 &template,
+                repository.as_deref(),
+                &emitter,
+            )
+            .await?;
+        }
+        Commands::Watch {
+            task_id,
+            repository,
+            github_interval,
+            fetch_logs,
+            max_failures,
+            log_tail,
+        } => {
+            run_multi_watch(
+                &task_id,
+                &cli.namespace,
+                &cli.agent_namespace,
+                repository.as_deref(),
+                github_interval,
+                fetch_logs,
+                max_failures,
+                log_tail,
+                &emitter,
             )
             .await?;
         }
@@ -710,107 +874,9 @@ fn calculate_duration(started: Option<&str>, finished: Option<&str>) -> Option<i
 // Main Loop: Event-driven workflow monitoring
 // =============================================================================
 
-/// Run the full E2E loop: load config, start workflow, monitor until completion
-#[allow(clippy::too_many_arguments)]
-async fn run_full_loop(
-    task_id: &str,
-    config_path: &str,
-    namespace: &str,
-    interval: u64,
-    max_failures: u32,
-    template: &str,
-) -> Result<()> {
-    // Step 1: Read and parse cto-config.json
-    let config_content = std::fs::read_to_string(config_path)
-        .with_context(|| format!("Failed to read config file: {config_path}"))?;
+// Legacy run_full_loop removed - use run_full_watch instead
 
-    let config: CtoConfig = serde_json::from_str(&config_content)
-        .with_context(|| format!("Failed to parse config file: {config_path}"))?;
-
-    let play = &config.defaults.play;
-
-    // Emit config loaded event
-    emit_event(&LoopEvent::Started {
-        play_id: format!("play-{task_id}"),
-        interval_seconds: interval,
-        timestamp: Utc::now(),
-    })?;
-
-    println!(
-        "{}",
-        format!(
-            "Loaded config: repo={}, impl={}, quality={}, testing={}",
-            play.repository, play.implementation_agent, play.quality_agent, play.testing_agent
-        )
-        .cyan()
-    );
-
-    // Step 2: Submit the workflow with config values
-    println!(
-        "{}",
-        format!("Submitting play workflow for task {task_id}...").cyan()
-    );
-
-    let output = Command::new("argo")
-        .args([
-            "submit",
-            "--from",
-            &format!("workflowtemplate/{template}"),
-            "-n",
-            namespace,
-            "-p",
-            &format!("task-id={task_id}"),
-            "-p",
-            &format!("repository={}", play.repository),
-            "-p",
-            &format!("implementation-agent={}", play.implementation_agent),
-            "-p",
-            &format!("quality-agent={}", play.quality_agent),
-            "-p",
-            &format!("testing-agent={}", play.testing_agent),
-            "-o",
-            "json",
-        ])
-        .output()
-        .context("Failed to submit workflow via argo CLI")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("Failed to submit workflow: {stderr}"));
-    }
-
-    // Parse workflow name from output
-    let workflow_json: serde_json::Value =
-        serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
-
-    let workflow_name = workflow_json["metadata"]["name"]
-        .as_str()
-        .map(ToString::to_string)
-        .ok_or_else(|| anyhow::anyhow!("Failed to get workflow name from submission response"))?;
-
-    println!(
-        "{}",
-        format!("✓ Workflow submitted: {workflow_name}").green()
-    );
-
-    // Step 3: Start monitoring loop
-    println!(
-        "{}",
-        format!("Starting monitoring loop for {workflow_name}...").cyan()
-    );
-
-    run_loop(
-        &workflow_name,
-        namespace,
-        interval,
-        true, // fetch_logs
-        max_failures,
-        500, // log_tail
-    )
-    .await
-}
-
-/// Run the monitoring loop - emits JSON events
+/// Run the monitoring loop - emits JSON events (legacy polling mode)
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 async fn run_loop(
     play_id: &str,
@@ -822,8 +888,8 @@ async fn run_loop(
 ) -> Result<()> {
     // Emit started event
     emit_event(&LoopEvent::Started {
-        play_id: play_id.to_string(),
-        interval_seconds: interval,
+        task_id: play_id.to_string(),
+        watching: vec![format!("workflow/{play_id} (polling mode)")],
         timestamp: Utc::now(),
     })?;
 
@@ -1027,6 +1093,700 @@ fn emit_event(event: &LoopEvent) -> Result<()> {
     println!("{json}");
     std::io::stdout().flush()?;
     Ok(())
+}
+
+// =============================================================================
+// Event Emitter - handles stdout and optional file output
+// =============================================================================
+
+/// Event emitter that writes to stdout and optionally to a file
+#[derive(Clone)]
+struct EventEmitter {
+    output_file: Option<PathBuf>,
+}
+
+impl EventEmitter {
+    fn new(output_file: Option<PathBuf>) -> Self {
+        Self { output_file }
+    }
+
+    fn emit(&self, event: &LoopEvent) -> Result<()> {
+        let json = serde_json::to_string(event)?;
+
+        // Always write to stdout
+        println!("{json}");
+        std::io::stdout().flush()?;
+
+        // Optionally write to file (JSONL format)
+        if let Some(ref path) = self.output_file {
+            use std::fs::OpenOptions;
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .with_context(|| format!("Failed to open output file: {}", path.display()))?;
+            writeln!(file, "{json}")?;
+        }
+
+        Ok(())
+    }
+}
+
+// =============================================================================
+// Multi-Watch Infrastructure
+// =============================================================================
+
+/// Message from a watch stream
+#[derive(Debug)]
+#[allow(dead_code)] // Error variant reserved for future use
+enum WatchMessage {
+    Resource {
+        resource_type: ResourceType,
+        action: ResourceAction,
+        name: String,
+        namespace: String,
+        phase: Option<String>,
+        labels: Option<std::collections::HashMap<String, String>>,
+        message: Option<String>,
+    },
+    GitHub {
+        task_id: String,
+        repository: String,
+        pull_request: Option<PullRequestState>,
+    },
+    Error {
+        resource_type: ResourceType,
+        error: String,
+    },
+    Closed {
+        resource_type: ResourceType,
+    },
+}
+
+/// Spawn a kubectl watch process and send events to the channel
+fn spawn_watch(
+    resource_type: ResourceType,
+    namespace: &str,
+    label_selector: Option<&str>,
+    tx: &mpsc::Sender<WatchMessage>,
+) -> Result<tokio::process::Child> {
+    let resource_name = match resource_type {
+        ResourceType::Workflow => "workflows.argoproj.io",
+        ResourceType::CodeRun => "coderuns.agents.platform",
+        ResourceType::DocsRun => "docsruns.agents.platform",
+        ResourceType::Sensor => "sensors.argoproj.io",
+        ResourceType::Pod => "pods",
+    };
+
+    let mut args = vec![
+        "get".to_string(),
+        resource_name.to_string(),
+        "-n".to_string(),
+        namespace.to_string(),
+        "--watch".to_string(),
+        "--request-timeout=0".to_string(), // Disable timeout to keep watch open indefinitely
+        "-o".to_string(),
+        "json".to_string(),
+    ];
+
+    if let Some(selector) = label_selector {
+        args.push("-l".to_string());
+        args.push(selector.to_string());
+    }
+
+    debug!("Spawning watch: kubectl {}", args.join(" "));
+
+    let mut child = AsyncCommand::new("kubectl")
+        .args(&args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("Failed to spawn kubectl watch for {resource_type}"))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .context("Failed to capture stdout from kubectl")?;
+
+    let rt = resource_type;
+    let tx_clone = tx.clone();
+
+    // Spawn a task to read stdout and parse JSON
+    // kubectl --watch -o json outputs pretty-printed multi-line JSON objects
+    // We need to accumulate lines until we have a complete JSON object
+    tokio::spawn(async move {
+        let reader = BufReader::new(stdout);
+        let mut lines = reader.lines();
+
+        let mut json_buffer = String::new();
+        let mut brace_depth: i32 = 0;
+        let mut in_object = false;
+
+        while let Ok(Some(line)) = lines.next_line().await {
+            let trimmed = line.trim();
+
+            // Track brace depth to find complete JSON objects
+            for ch in trimmed.chars() {
+                match ch {
+                    '{' => {
+                        brace_depth += 1;
+                        in_object = true;
+                    }
+                    '}' => {
+                        brace_depth -= 1;
+                    }
+                    _ => {}
+                }
+            }
+
+            if in_object {
+                json_buffer.push_str(&line);
+                json_buffer.push('\n');
+            }
+
+            // When brace depth returns to 0, we have a complete object
+            if in_object && brace_depth == 0 {
+                match parse_watch_line(&json_buffer, rt) {
+                    Ok(msg) => {
+                        if tx_clone.send(msg).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to parse watch JSON for {}: {}", rt, e);
+                    }
+                }
+                json_buffer.clear();
+                in_object = false;
+            }
+        }
+
+        // Watch closed
+        let _ = tx_clone
+            .send(WatchMessage::Closed { resource_type: rt })
+            .await;
+    });
+
+    Ok(child)
+}
+
+/// Parse a JSON line from kubectl --watch output
+fn parse_watch_line(line: &str, resource_type: ResourceType) -> Result<WatchMessage> {
+    let json: serde_json::Value =
+        serde_json::from_str(line).context("Invalid JSON from kubectl watch")?;
+
+    let metadata = &json["metadata"];
+    let name = metadata["name"].as_str().unwrap_or("unknown").to_string();
+    let namespace = metadata["namespace"]
+        .as_str()
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Parse labels
+    let labels = metadata["labels"].as_object().map(|obj| {
+        obj.iter()
+            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+            .collect()
+    });
+
+    // Determine action from resource version changes (simplified)
+    // kubectl --watch outputs the full object, we track if it's new or modified
+    let action = if metadata["deletionTimestamp"].is_string() {
+        ResourceAction::Deleted
+    } else {
+        // We can't easily distinguish Added vs Modified without tracking state
+        // For now, treat all as Modified (the consumer can track first-seen)
+        ResourceAction::Modified
+    };
+
+    // Get phase from status
+    let phase = json["status"]["phase"].as_str().map(ToString::to_string);
+
+    // Get message from status
+    let message = json["status"]["message"].as_str().map(ToString::to_string);
+
+    Ok(WatchMessage::Resource {
+        resource_type,
+        action,
+        name,
+        namespace,
+        phase,
+        labels,
+        message,
+    })
+}
+
+/// Run the full E2E monitor with multi-watch streams
+#[allow(clippy::too_many_arguments)]
+async fn run_full_watch(
+    task_id: &str,
+    config_path: &str,
+    argo_namespace: &str,
+    agent_namespace: &str,
+    github_interval: u64,
+    max_failures: u32,
+    template: &str,
+    repository_override: Option<&str>,
+    emitter: &EventEmitter,
+) -> Result<()> {
+    // Step 1: Read and parse cto-config.json
+    let config_content = std::fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read config file: {config_path}"))?;
+
+    let config: CtoConfig = serde_json::from_str(&config_content)
+        .with_context(|| format!("Failed to parse config file: {config_path}"))?;
+
+    let play = &config.defaults.play;
+    let repository = repository_override.unwrap_or(&play.repository);
+
+    println!(
+        "{}",
+        format!(
+            "Loaded config: repo={}, impl={}, quality={}, testing={}",
+            repository, play.implementation_agent, play.quality_agent, play.testing_agent
+        )
+        .cyan()
+    );
+
+    // Step 2: Submit the workflow with config values
+    println!(
+        "{}",
+        format!("Submitting play workflow for task {task_id}...").cyan()
+    );
+
+    let output = Command::new("argo")
+        .args([
+            "submit",
+            "--from",
+            &format!("workflowtemplate/{template}"),
+            "-n",
+            argo_namespace,
+            "-p",
+            &format!("task-id={task_id}"),
+            "-p",
+            &format!("repository={repository}"),
+            "-p",
+            &format!("implementation-agent={}", play.implementation_agent),
+            "-p",
+            &format!("quality-agent={}", play.quality_agent),
+            "-p",
+            &format!("testing-agent={}", play.testing_agent),
+            "-o",
+            "json",
+        ])
+        .output()
+        .context("Failed to submit workflow via argo CLI")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("Failed to submit workflow: {stderr}"));
+    }
+
+    // Parse workflow name from output
+    let workflow_json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
+
+    let workflow_name = workflow_json["metadata"]["name"]
+        .as_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| anyhow::anyhow!("Failed to get workflow name from submission response"))?;
+
+    println!(
+        "{}",
+        format!("✓ Workflow submitted: {workflow_name}").green()
+    );
+
+    // Step 3: Start multi-watch monitoring
+    println!(
+        "{}",
+        format!("Starting multi-watch monitoring for task {task_id}...").cyan()
+    );
+
+    run_multi_watch(
+        task_id,
+        argo_namespace,
+        agent_namespace,
+        Some(repository),
+        github_interval,
+        true, // fetch_logs
+        max_failures,
+        500, // log_tail
+        emitter,
+    )
+    .await
+}
+
+/// Run multi-watch monitoring for all resources
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+async fn run_multi_watch(
+    task_id: &str,
+    argo_namespace: &str,
+    agent_namespace: &str,
+    repository: Option<&str>,
+    github_interval: u64,
+    fetch_logs: bool,
+    max_failures: u32,
+    log_tail: u32,
+    emitter: &EventEmitter,
+) -> Result<()> {
+    let label_selector = format!("task-id={task_id}");
+
+    // Create channel for watch events
+    let (tx, mut rx) = mpsc::channel::<WatchMessage>(100);
+
+    // Spawn all watch processes
+    let children = vec![
+        // Watch workflows in argo namespace
+        spawn_watch(
+            ResourceType::Workflow,
+            argo_namespace,
+            Some(&label_selector),
+            &tx,
+        )?,
+        // Watch CodeRuns in agent-platform namespace
+        spawn_watch(
+            ResourceType::CodeRun,
+            agent_namespace,
+            Some(&label_selector),
+            &tx,
+        )?,
+        // Watch DocsRuns in agent-platform namespace
+        spawn_watch(
+            ResourceType::DocsRun,
+            agent_namespace,
+            Some(&label_selector),
+            &tx,
+        )?,
+        // Watch Sensors in argo namespace (no label filter - watch all)
+        spawn_watch(ResourceType::Sensor, argo_namespace, None, &tx)?,
+        // Watch Pods in agent-platform namespace
+        spawn_watch(
+            ResourceType::Pod,
+            agent_namespace,
+            Some(&label_selector),
+            &tx,
+        )?,
+    ];
+
+    // Emit started event
+    emitter.emit(&LoopEvent::Started {
+        task_id: task_id.to_string(),
+        watching: vec![
+            format!("workflows.argoproj.io (ns: {argo_namespace})"),
+            format!("coderuns.agents.platform (ns: {agent_namespace})"),
+            format!("docsruns.agents.platform (ns: {agent_namespace})"),
+            format!("sensors.argoproj.io (ns: {argo_namespace})"),
+            format!("pods (ns: {agent_namespace})"),
+        ],
+        timestamp: Utc::now(),
+    })?;
+
+    // Spawn GitHub polling task if repository is specified
+    let github_tx = tx.clone();
+    let github_repo = repository.map(ToString::to_string);
+    let github_task_id = task_id.to_string();
+
+    let github_handle = if github_repo.is_some() {
+        Some(tokio::spawn(async move {
+            poll_github_state(
+                &github_task_id,
+                github_repo.as_deref(),
+                github_interval,
+                github_tx,
+            )
+            .await;
+        }))
+    } else {
+        None
+    };
+
+    // Track state for failure detection
+    let mut consecutive_failures: u32 = 0;
+    let mut workflow_completed = false;
+    let mut last_workflow_phase = String::new();
+
+    // Process events from all watches
+    while let Some(msg) = rx.recv().await {
+        match msg {
+            WatchMessage::Resource {
+                resource_type,
+                action,
+                name,
+                namespace,
+                phase,
+                labels,
+                message,
+            } => {
+                // Emit resource event
+                emitter.emit(&LoopEvent::Resource {
+                    task_id: task_id.to_string(),
+                    resource_type,
+                    action: action.clone(),
+                    name: name.clone(),
+                    namespace: namespace.clone(),
+                    phase: phase.clone(),
+                    labels: labels.clone(),
+                    message: message.clone(),
+                    timestamp: Utc::now(),
+                })?;
+
+                // Check for workflow completion/failure
+                // NOTE: Only workflow state changes affect the consecutive_failures counter
+                if resource_type == ResourceType::Workflow {
+                    if let Some(ref p) = phase {
+                        if p != &last_workflow_phase {
+                            last_workflow_phase.clone_from(p);
+
+                            if p == "Succeeded" {
+                                // Reset failure counter on workflow success
+                                consecutive_failures = 0;
+                                emitter.emit(&LoopEvent::Completed {
+                                    play_id: name.clone(),
+                                    duration_seconds: 0, // TODO: calculate from timestamps
+                                    timestamp: Utc::now(),
+                                })?;
+                                workflow_completed = true;
+                            } else if p == "Running" {
+                                // Reset failure counter when workflow is running again
+                                // (e.g., after a retry)
+                                consecutive_failures = 0;
+                            } else if p == "Failed" || p == "Error" {
+                                consecutive_failures += 1;
+
+                                // Fetch logs on failure
+                                let logs = if fetch_logs {
+                                    get_step_logs(&name, &namespace, log_tail).ok()
+                                } else {
+                                    None
+                                };
+
+                                emitter.emit(&LoopEvent::Failure {
+                                    play_id: name.clone(),
+                                    stage: None,
+                                    failed_step: None,
+                                    logs,
+                                    consecutive_failures,
+                                    timestamp: Utc::now(),
+                                })?;
+
+                                if max_failures > 0 && consecutive_failures >= max_failures {
+                                    emitter.emit(&LoopEvent::Stopped {
+                                        play_id: name.clone(),
+                                        reason: format!(
+                                            "Max consecutive failures reached ({max_failures})"
+                                        ),
+                                        timestamp: Utc::now(),
+                                    })?;
+                                    workflow_completed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Emit informational failure events for pod failures
+                // NOTE: Pod/CRD failures are informational but don't affect the
+                // consecutive_failures counter - only workflow state changes do.
+                // The workflow will eventually transition to Failed if pods fail,
+                // which is when the counter should increment.
+                if resource_type == ResourceType::Pod {
+                    if let Some(ref p) = phase {
+                        if p == "Failed" {
+                            let logs = if fetch_logs {
+                                get_step_logs(&name, &namespace, log_tail).ok()
+                            } else {
+                                None
+                            };
+
+                            // Emit failure event for visibility, but don't increment
+                            // consecutive_failures - that's tracked by workflow state only
+                            emitter.emit(&LoopEvent::Failure {
+                                play_id: task_id.to_string(),
+                                stage: None,
+                                failed_step: Some(WorkflowStep {
+                                    id: name.clone(),
+                                    name: name.clone(),
+                                    step_type: "Pod".to_string(),
+                                    phase: p.clone(),
+                                    pod_name: Some(name.clone()),
+                                    exit_code: None,
+                                    message: message.clone(),
+                                    started_at: None,
+                                    finished_at: None,
+                                }),
+                                logs,
+                                // Report current count but don't increment for pods
+                                consecutive_failures,
+                                timestamp: Utc::now(),
+                            })?;
+                        }
+                    }
+                }
+            }
+            WatchMessage::GitHub {
+                task_id: gh_task_id,
+                repository,
+                pull_request,
+            } => {
+                // Emit GitHub event
+                emitter.emit(&LoopEvent::Github {
+                    task_id: gh_task_id,
+                    repository,
+                    pull_request,
+                    timestamp: Utc::now(),
+                })?;
+            }
+            WatchMessage::Error {
+                resource_type,
+                error,
+            } => {
+                warn!("Watch error for {}: {}", resource_type, error);
+            }
+            WatchMessage::Closed { resource_type } => {
+                warn!("Watch closed for {}", resource_type);
+                // Could restart the watch here if needed
+            }
+        }
+
+        if workflow_completed {
+            break;
+        }
+    }
+
+    // Cleanup
+    for mut child in children {
+        let _ = child.kill().await;
+    }
+
+    if let Some(handle) = github_handle {
+        handle.abort();
+    }
+
+    Ok(())
+}
+
+/// Poll GitHub for PR state and send events through the channel
+async fn poll_github_state(
+    task_id: &str,
+    repository: Option<&str>,
+    interval: u64,
+    tx: mpsc::Sender<WatchMessage>,
+) {
+    let Some(repo) = repository else {
+        return;
+    };
+
+    loop {
+        // Use gh CLI to get PR state (poll immediately, then sleep)
+        let pr_state = get_github_pr_state(repo, task_id).await;
+
+        match pr_state {
+            Ok(state) => {
+                // Send GitHub event through the channel
+                let msg = WatchMessage::GitHub {
+                    task_id: task_id.to_string(),
+                    repository: repo.to_string(),
+                    pull_request: state.clone(),
+                };
+
+                if tx.send(msg).await.is_err() {
+                    // Channel closed, exit the polling loop
+                    debug!("GitHub polling channel closed, stopping");
+                    break;
+                }
+
+                if let Some(ref pr) = state {
+                    debug!(
+                        "GitHub PR #{} state: {} (mergeable: {:?})",
+                        pr.number, pr.state, pr.mergeable
+                    );
+                }
+            }
+            Err(e) => {
+                warn!("Failed to get GitHub PR state: {}", e);
+            }
+        }
+
+        // Sleep after polling, so first event is immediate
+        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+    }
+}
+
+/// Get GitHub PR state using gh CLI
+async fn get_github_pr_state(repository: &str, task_id: &str) -> Result<Option<PullRequestState>> {
+    // List PRs with the task label
+    let output = AsyncCommand::new("gh")
+        .args([
+            "pr",
+            "list",
+            "-R",
+            repository,
+            "-l",
+            &format!("task-{task_id}"),
+            "--json",
+            "number,state,title,mergeable,isDraft,labels,reviews,statusCheckRollup",
+        ])
+        .output()
+        .await?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let prs: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)?;
+
+    if let Some(pr) = prs.first() {
+        let labels: Vec<String> = pr["labels"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|l| l["name"].as_str().map(ToString::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let reviews: Vec<ReviewState> = pr["reviews"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|r| {
+                        Some(ReviewState {
+                            author: r["author"]["login"].as_str()?.to_string(),
+                            state: r["state"].as_str()?.to_string(),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let checks: Vec<CheckState> = pr["statusCheckRollup"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|c| {
+                        Some(CheckState {
+                            name: c["name"].as_str()?.to_string(),
+                            status: c["status"].as_str()?.to_string(),
+                            conclusion: c["conclusion"].as_str().map(ToString::to_string),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        return Ok(Some(PullRequestState {
+            number: pr["number"].as_u64().unwrap_or(0),
+            state: pr["state"].as_str().unwrap_or("unknown").to_string(),
+            title: pr["title"].as_str().unwrap_or("").to_string(),
+            mergeable: pr["mergeable"].as_str().map(|s| s == "MERGEABLE"),
+            draft: pr["isDraft"].as_bool().unwrap_or(false),
+            labels,
+            reviews,
+            checks,
+        }));
+    }
+
+    Ok(None)
 }
 
 // =============================================================================
