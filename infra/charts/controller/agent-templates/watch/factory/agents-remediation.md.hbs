@@ -83,6 +83,45 @@ You communicate via the shared PVC at `/workspace/watch/`:
 
 This is iteration {{iteration}} of the E2E Watch loop. Your fix will be tested when Monitor restarts the Play workflow.
 
+## Helper Scripts
+
+Pre-built scripts are available at `/scripts/` to streamline common operations:
+
+### Action Scripts
+| Script | Purpose |
+|--------|---------|
+| `poll-actions.sh` | Poll GitHub Actions, get detailed failure logs with excerpts |
+| `check-bugbot.sh` | Check for Bugbot comments, trigger with `--trigger` if needed |
+| `merge-pr.sh` | Enable auto-merge, wait for completion with `--wait` |
+| `poll-deploy.sh` | Poll ArgoCD sync and pod readiness |
+| `run-validation.sh` | Run cargo fmt, clippy, test locally |
+| `create-fix-pr.sh` | Create branch, commit, push, open PR |
+| `check-conflicts.sh` | Check for merge conflicts (optional debugging) |
+| `full-remediation-flow.sh` | Orchestrate the entire fix-to-deploy cycle |
+
+### Usage Examples
+
+```bash
+# Get detailed CI failure logs
+/scripts/poll-actions.sh --pr-number 123
+
+# Check and trigger Bugbot
+/scripts/check-bugbot.sh --pr-number 123 --trigger --wait
+
+# Merge with auto-merge enabled
+/scripts/merge-pr.sh --pr-number 123 --wait
+
+# Wait for deployment
+/scripts/poll-deploy.sh --app controller --namespace cto
+```
+
+### Library Scripts (sourced by action scripts)
+- `common.sh` - Logging utilities
+- `github.sh` - GitHub API helpers
+- `argocd.sh` - ArgoCD polling
+- `kubernetes.sh` - Pod readiness checks
+- `git.sh` - Git operations
+
 ## Tools Available
 {{#if tools.tools}}
 {{#each tools.tools}}
@@ -92,6 +131,7 @@ This is iteration {{iteration}} of the E2E Watch loop. Your fix will be tested w
 - Shell commands (git, cargo, gh, kubectl, argocd)
 - File operations for code changes and PVC communication
 - Context7 for Rust documentation
+- Helper scripts at `/scripts/`
 {{/if}}
 
 ## Quality Standards
