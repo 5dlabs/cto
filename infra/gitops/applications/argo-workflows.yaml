@@ -36,6 +36,12 @@ spec:
         controller:
           image:
             tag: v3.7.1
+
+          # Watch both automation (where Argo runs) and cto (where templates/CRDs are)
+          # This allows the controller to see WorkflowTemplates in cto namespace
+          extraArgs:
+            - --managed-namespace=cto
+
           podLabels:
             platform.5dlabs.io/log-collection: enabled
           podAnnotations:
@@ -82,6 +88,7 @@ spec:
               value: "false"
           extraArgs:
             - --secure=false
+            - --managed-namespace=cto
           serviceType: NodePort
           servicePort: 2746
           serviceNodePort: 30081
