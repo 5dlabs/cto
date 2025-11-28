@@ -44,7 +44,7 @@ fi
 
 # Step 2: Clippy (pedantic per project rules)
 log_step "Running cargo clippy (pedantic)..."
-if ! cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic; then
+if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic; then
   log_error "Clippy check failed"
   exit 1
 fi
