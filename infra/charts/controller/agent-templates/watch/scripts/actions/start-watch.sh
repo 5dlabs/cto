@@ -38,7 +38,7 @@ log_info "Monitor Agent: $MONITOR_AGENT"
 log_info "Monitor Model: $MONITOR_MODEL"
 
 # Create the Monitor CodeRun
-# Use || to handle failure gracefully with set -e
+# Use if ! to handle failure gracefully with set -e
 if ! cat <<EOF | kubectl apply -f -
 apiVersion: agents.platform/v1alpha1
 kind: CodeRun
