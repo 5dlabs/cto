@@ -284,13 +284,16 @@ struct McpServerConnection {
 struct ServerConnectionPool {
     connections: Arc<RwLock<HashMap<String, Arc<Mutex<McpServerConnection>>>>>,
     config_manager: Arc<RwLock<ConfigManager>>,
+    // HTTP session IDs for StreamableHTTP servers (server_name -> Mcp-Session-Id)
+    http_sessions: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl ServerConnectionPool {
-    fn new(config_manager: Arc<RwLock<ConfigManager>>) -> Self {
+    fn new(config_manager: Arc<RwLock<ConfigManager>>, http_sessions: Arc<RwLock<HashMap<String, String>>>) -> Self {
         Self {
             connections: Arc::new(RwLock::new(HashMap::new())),
             config_manager,
+            http_sessions,
         }
     }
 
@@ -717,20 +720,55 @@ impl ServerConnectionPool {
                     }
                 });
 
-                // Send HTTP POST request with proper Accept headers
-                let response = client
+                // Get session ID if available for StreamableHTTP
+                let session_id = {
+                    let sessions = self.http_sessions.read().await;
+                    sessions.get(server_name).cloned()
+                };
+
+                // Send HTTP POST request with proper Accept headers and session ID
+                let mut request_builder = client
                     .post(url)
-                    .header("Accept", "application/json,text/event-stream")
+                    .header("Accept", "application/json,text/event-stream");
+
+                if let Some(ref sid) = session_id {
+                    tracing::info!("🔑 [{}] Including Mcp-Session-Id in request", server_name);
+                    request_builder = request_builder.header("Mcp-Session-Id", sid);
+                }
+
+                let response = request_builder
                     .json(&request_body)
                     .send()
                     .await
                     .map_err(|e| anyhow::anyhow!("HTTP request failed: {e}"))?;
+
+                // Handle StreamableHTTP session errors
+                let status = response.status();
+                if status == reqwest::StatusCode::NOT_FOUND {
+                    // 404 = Session expired, need to re-initialize
+                    tracing::warn!("⚠️ [{server_name}] Session expired (404), clearing session ID");
+                    let mut sessions = self.http_sessions.write().await;
+                    sessions.remove(server_name);
+                    return Err(anyhow::anyhow!(
+                        "StreamableHTTP session expired for '{server_name}'. Please retry the request."
+                    ));
+                }
 
                 // Parse response - handle both JSON and SSE formats
                 let response_text = response
                     .text()
                     .await
                     .map_err(|e| anyhow::anyhow!("Failed to read HTTP response: {e}"))?;
+
+                // Check for 400 errors that might indicate session issues
+                if status == reqwest::StatusCode::BAD_REQUEST
+                    && (response_text.contains("session") || response_text.contains("Session"))
+                {
+                    tracing::warn!("⚠️ [{server_name}] Bad request, possibly missing session: {response_text}");
+                    return Err(anyhow::anyhow!(
+                        "StreamableHTTP session required for '{server_name}': {response_text}"
+                    ));
+                }
 
                 // Check if response is SSE format (like Solana)
                 let response_json: Value = if response_text.starts_with("event:") {
@@ -837,6 +875,8 @@ pub struct BridgeState {
     connection_pool: Arc<ServerConnectionPool>,
     // Current working directory for user context (per-request)
     current_working_dir: Arc<RwLock<Option<std::path::PathBuf>>>,
+    // HTTP session IDs for StreamableHTTP servers (server_name -> Mcp-Session-Id)
+    http_sessions: Arc<RwLock<HashMap<String, String>>>,
 }
 
 // JSON-RPC 2.0 message types
@@ -885,7 +925,8 @@ impl BridgeState {
         }
 
         let system_config_manager = Arc::new(RwLock::new(system_config_manager_instance));
-        let connection_pool = Arc::new(ServerConnectionPool::new(system_config_manager.clone()));
+        let http_sessions = Arc::new(RwLock::new(HashMap::new()));
+        let connection_pool = Arc::new(ServerConnectionPool::new(system_config_manager.clone(), http_sessions.clone()));
 
         // Create the state
         let state = Self {
@@ -893,6 +934,7 @@ impl BridgeState {
             available_tools: Arc::new(RwLock::new(HashMap::new())),
             connection_pool,
             current_working_dir: Arc::new(RwLock::new(None)),
+            http_sessions,
         };
 
         Ok(state)
@@ -1528,6 +1570,24 @@ impl BridgeState {
                     init_response.status()
                 );
 
+                // Extract Mcp-Session-Id header for StreamableHTTP session management
+                let mcp_session_id = init_response
+                    .headers()
+                    .get("Mcp-Session-Id")
+                    .and_then(|v| v.to_str().ok())
+                    .map(String::from);
+
+                if let Some(ref sid) = mcp_session_id {
+                    tracing::info!(
+                        "🔑 [{}] Received Mcp-Session-Id: {}",
+                        server_name,
+                        sid
+                    );
+                    // Store session ID for future requests
+                    let mut sessions = self.http_sessions.write().await;
+                    sessions.insert(server_name.to_string(), sid.clone());
+                }
+
                 // Get tools list
                 let tools_request = json!({
                     "jsonrpc": "2.0",
@@ -1541,9 +1601,17 @@ impl BridgeState {
                     server_name,
                     message_url
                 );
-                let tools_response = client
+
+                // Build request with session ID if available
+                let mut request_builder = client
                     .post(&message_url)
-                    .header("Accept", "application/json,text/event-stream")
+                    .header("Accept", "application/json,text/event-stream");
+
+                if let Some(ref sid) = mcp_session_id {
+                    request_builder = request_builder.header("Mcp-Session-Id", sid);
+                }
+
+                let tools_response = request_builder
                     .json(&tools_request)
                     .send()
                     .await
