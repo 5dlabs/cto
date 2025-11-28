@@ -73,10 +73,10 @@ spec:
 
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
       - SkipDryRunOnMissingResource=true
-      - Replace=true
 
     retry:
       limit: 5
@@ -102,12 +102,6 @@ spec:
       kind: Secret
       jsonPointers:
         - /data
-    # Ignore last-applied-configuration annotation on large ConfigMaps to prevent 262KB limit errors
-    - group: ""
-      kind: ConfigMap
-      name: controller-agent-templates-claude
-      jsonPointers:
-        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
 
   # Revision history
   revisionHistoryLimit: 10

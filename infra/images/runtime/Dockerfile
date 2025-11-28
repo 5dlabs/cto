@@ -329,6 +329,18 @@ RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
       echo "⏭️ Skipping tools client installation (no release available)"; \
     fi
 
+# Install play-monitor from CTO monorepo release (skip if version is "skip" or empty)
+ARG PLAY_MONITOR_VERSION=skip
+RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
+      echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION}..." && \
+      curl --proto '=https' --tlsv1.2 -LsSf \
+        "https://github.com/5dlabs/cto/releases/download/play-monitor-v${PLAY_MONITOR_VERSION}/play-monitor-installer.sh" | \
+        sh && \
+      mv ~/.cargo/bin/play-monitor /usr/local/bin/play-monitor; \
+    else \
+      echo "⏭️ Skipping play-monitor installation (no release available)"; \
+    fi
+
 # Install TaskMaster globally (stable release)
 RUN npm install -g task-master-ai@0.26.0
 
