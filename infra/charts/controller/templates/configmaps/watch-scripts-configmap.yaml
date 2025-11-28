@@ -25,6 +25,8 @@ data:
   # Action scripts
   poll-ci.sh: |
 {{ .Files.Get "agent-templates/watch/scripts/actions/poll-ci.sh" | indent 4 }}
+  poll-actions.sh: |
+{{ .Files.Get "agent-templates/watch/scripts/actions/poll-actions.sh" | indent 4 }}
   check-bugbot.sh: |
 {{ .Files.Get "agent-templates/watch/scripts/actions/check-bugbot.sh" | indent 4 }}
   merge-pr.sh: |

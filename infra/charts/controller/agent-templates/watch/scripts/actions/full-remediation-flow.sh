@@ -1,16 +1,18 @@
 #!/bin/bash
-# Full remediation flow: validate → PR → CI → merge → deploy
+# Full remediation flow: validate → PR → CI → bugbot → merge → deploy
 # Usage: full-remediation-flow.sh --task-id 42 --title "fix: description"
 #
-# This orchestrates the entire fix-to-deployment cycle:
+# This orchestrates the entire fix-to-deployment cycle with iteration:
 # 1. Run local validation (fmt, clippy, test)
 # 2. Create PR with fix
-# 3. Wait for CI to pass
-# 4. Check for bug-bot issues
-# 5. Merge PR
-# 6. Wait for ArgoCD sync + pod readiness
+# 3. Poll GitHub Actions for completion
+# 4. If CI fails → get logs, exit 1 (agent should fix and retry)
+# 5. Trigger and check Bugbot
+# 6. If Bugbot issues → exit 1 (agent should fix and retry)
+# 7. Enable auto-merge and wait
+# 8. Wait for ArgoCD sync + pod readiness
 #
-# Exit: 0 if fully deployed, 1 if any step fails
+# Exit: 0 if fully deployed, 1 if any step fails (with details for retry)
 
 set -euo pipefail
 
@@ -26,6 +28,7 @@ repo="${GITHUB_REPO:-5dlabs/cto}"
 argocd_app="${ARGOCD_APP:-controller}"
 controller_ns="${CONTROLLER_NAMESPACE:-cto}"
 controller_selector="${CONTROLLER_LABEL:-app=agent-controller}"
+branch=""  # Will be set after PR creation
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -37,6 +40,8 @@ while [ $# -gt 0 ]; do
     --argocd-app) argocd_app="$2"; shift 2 ;;
     --namespace) controller_ns="$2"; shift 2 ;;
     --selector) controller_selector="$2"; shift 2 ;;
+    --branch) branch="$2"; shift 2 ;;  # For retries
+    --pr-number) pr_number="$2"; shift 2 ;;  # For retries
     *) log_error "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -74,63 +79,88 @@ if ! "$SCRIPT_DIR/run-validation.sh" --repo-dir "$repo_dir" --fix; then
 fi
 
 # ============================================================================
-# Phase 2: Create PR
+# Phase 2: Create PR (or use existing if retrying)
 # ============================================================================
 log_info ""
 log_info "📝 PHASE 2: Create Pull Request"
 log_info "----------------------------------------"
 
-pr_number=$("$SCRIPT_DIR/create-fix-pr.sh" \
-  --task-id "$task_id" \
-  --title "$title" \
-  --body "$body" \
-  --repo-dir "$repo_dir" \
-  --repo "$repo")
-
-if [ -z "$pr_number" ]; then
-  log_error "Failed to create PR"
-  exit 1
+if [ -z "${pr_number:-}" ]; then
+  pr_number=$("$SCRIPT_DIR/create-fix-pr.sh" \
+    --task-id "$task_id" \
+    --title "$title" \
+    --body "$body" \
+    --repo-dir "$repo_dir" \
+    --repo "$repo")
+  
+  if [ -z "$pr_number" ]; then
+    log_error "Failed to create PR"
+    exit 1
+  fi
+  
+  log_success "PR #$pr_number created"
+else
+  log_info "Using existing PR #$pr_number"
+  # Push any new fixes
+  git push origin HEAD 2>/dev/null || true
 fi
 
-log_success "PR #$pr_number created"
+# Get branch name from PR if not set
+if [ -z "$branch" ]; then
+  branch=$(gh pr view "$pr_number" --repo "$repo" --json headRefName -q '.headRefName')
+fi
 
 # ============================================================================
-# Phase 3: Wait for CI
+# Phase 3: Poll GitHub Actions for Completion
 # ============================================================================
 log_info ""
-log_info "🔄 PHASE 3: Wait for CI Checks"
+log_info "🔄 PHASE 3: Wait for GitHub Actions"
 log_info "----------------------------------------"
 
-if ! "$SCRIPT_DIR/poll-ci.sh" --pr-number "$pr_number" --repo "$repo" --timeout 1800; then
-  log_error "CI checks failed"
+if ! "$SCRIPT_DIR/poll-actions.sh" --branch "$branch" --pr-number "$pr_number" --repo "$repo" --timeout 1800; then
+  log_error "GitHub Actions failed - see failure report above"
+  log_info ""
+  log_info "Failure details saved to: $WATCH_WORKSPACE/action-failures.json"
+  log_info "Agent should analyze failures and push fixes, then retry"
   exit 1
 fi
 
+log_success "All GitHub Actions passed"
+
 # ============================================================================
-# Phase 4: Check Bug-Bot
+# Phase 4: Trigger and Check Bugbot
 # ============================================================================
 log_info ""
-log_info "🐛 PHASE 4: Check for Bug-Bot Issues"
+log_info "🐛 PHASE 4: Check Bugbot"
 log_info "----------------------------------------"
 
-if ! "$SCRIPT_DIR/check-bugbot.sh" --pr-number "$pr_number" --repo "$repo" --wait; then
-  log_warn "Bug-bot found issues - these need to be addressed"
-  # In a full implementation, the agent would read bugbot-issues.json and make additional fixes
-  # For now, we fail and let the outer loop retry
+# Trigger bugbot if needed, wait for it, then check for issues
+if ! "$SCRIPT_DIR/check-bugbot.sh" --pr-number "$pr_number" --repo "$repo" --trigger --wait; then
+  log_warn "Bugbot found issues that need to be addressed"
+  log_info ""
+  log_info "Bugbot issues saved to: $WATCH_WORKSPACE/bugbot-issues.json"
+  log_info "Agent should address issues and push fixes, then retry"
+  log_info ""
+  log_info "To retry after fixing, run:"
+  log_info "  $0 --task-id $task_id --title \"$title\" --pr-number $pr_number --branch $branch"
   exit 1
 fi
 
+log_success "No Bugbot issues"
+
 # ============================================================================
-# Phase 5: Merge PR
+# Phase 5: Enable Auto-Merge and Wait
 # ============================================================================
 log_info ""
 log_info "🔀 PHASE 5: Merge Pull Request"
 log_info "----------------------------------------"
 
-if ! "$SCRIPT_DIR/merge-pr.sh" --pr-number "$pr_number" --repo "$repo"; then
+if ! "$SCRIPT_DIR/merge-pr.sh" --pr-number "$pr_number" --repo "$repo" --wait --timeout 600; then
   log_error "Failed to merge PR"
   exit 1
 fi
+
+log_success "PR #$pr_number merged"
 
 # ============================================================================
 # Phase 6: Wait for Deployment
@@ -158,6 +188,10 @@ log_info "=========================================="
 log_info "PR #$pr_number merged and deployed"
 log_info "Ready for next Monitor iteration"
 log_info "=========================================="
+
+# Clean up issue files on success
+rm -f "$WATCH_WORKSPACE/action-failures.json" 2>/dev/null || true
+rm -f "$WATCH_WORKSPACE/bugbot-issues.json" 2>/dev/null || true
 
 exit 0
 
