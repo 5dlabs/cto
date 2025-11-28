@@ -2972,6 +2972,20 @@ async fn client_config_endpoint(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize tracing subscriber for logging
+    // Uses RUST_LOG env var for filtering (e.g., RUST_LOG=info,tools=trace)
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("tools=info".parse().unwrap())
+                .add_directive("kube=warn".parse().unwrap()),
+        )
+        .with_target(true)
+        .with_thread_ids(false)
+        .with_file(false)
+        .with_line_number(false)
+        .init();
+
     let args = Args::parse();
 
     // Default project_dir to current directory if not specified
