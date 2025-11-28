@@ -1,0 +1,330 @@
+---
+# Unified Binaries Release Workflow
+#
+# Builds and releases all CTO platform CLI tools:
+# - cto-mcp: MCP server for Argo Workflows integration
+# - tools-server/tools-client: Dynamic MCP tool management
+# - play-monitor: E2E workflow monitoring
+#
+# Cross-platform builds via cargo-dist (macOS, Linux, Windows)
+# Docker images for tools-server (Kubernetes deployment)
+#
+# Trigger options:
+# - Tag push: v*.*.* for unified releases
+# - workflow_dispatch for manual releases
+
+name: Binaries Release
+
+permissions:
+  contents: write
+  packages: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.2.0)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+  CARGO_DIST_VERSION: "0.28.2"
+
+jobs:
+  # Determine release parameters
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      publishing: ${{ steps.version.outputs.publishing }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version and tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            TAG="v${VERSION}"
+            PUBLISHING="true"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+            PUBLISHING="true"
+          else
+            VERSION="0.0.0-dev"
+            TAG=""
+            PUBLISHING="false"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "publishing=$PUBLISHING" >> "$GITHUB_OUTPUT"
+
+          echo "## Release Plan" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "- **Publishing:** $PUBLISHING" >> $GITHUB_STEP_SUMMARY
+
+      - name: Install cargo-dist
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/axodotdev/cargo-dist/releases/download/v${{ env.CARGO_DIST_VERSION }}/cargo-dist-installer.sh | sh
+
+      - name: Upload cargo-dist binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-dist-bin
+          path: ~/.cargo/bin/dist
+
+  # Build binaries for each package/platform combination
+  build-binaries:
+    needs: plan
+    if: needs.plan.outputs.publishing == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - name: cto-mcp
+            binary: cto-mcp
+            dir: mcp
+          - name: tools
+            binary: tools-server
+            dir: tools
+          - name: play-monitor
+            binary: play-monitor
+            dir: monitor
+        target:
+          - os: ubuntu-22.04
+            triple: x86_64-unknown-linux-gnu
+            suffix: linux-x86_64
+          - os: ubuntu-22.04
+            triple: aarch64-unknown-linux-gnu
+            suffix: linux-aarch64
+            cross: true
+          - os: macos-14
+            triple: aarch64-apple-darwin
+            suffix: darwin-aarch64
+          - os: macos-13
+            triple: x86_64-apple-darwin
+            suffix: darwin-x86_64
+          - os: windows-latest
+            triple: x86_64-pc-windows-msvc
+            suffix: windows-x86_64
+            ext: .exe
+        exclude:
+          # play-monitor doesn't need Windows builds
+          - package:
+              name: play-monitor
+            target:
+              os: windows-latest
+    runs-on: ${{ matrix.target.os }}
+    name: build-${{ matrix.package.dir }}-${{ matrix.target.suffix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target.triple }}
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target.cross && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cross-compilation
+        if: matrix.target.cross
+        run: |
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "binaries-${{ matrix.target.triple }}"
+
+      - name: Build binary
+        run: |
+          cargo build --release --package ${{ matrix.package.name }} --target ${{ matrix.target.triple }}
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          BINARY_NAME="${{ matrix.package.binary }}${{ matrix.target.ext || '' }}"
+          SOURCE="target/${{ matrix.target.triple }}/release/$BINARY_NAME"
+          DEST="dist/${{ matrix.package.binary }}-${{ matrix.target.suffix }}${{ matrix.target.ext || '' }}"
+
+          cp "$SOURCE" "$DEST"
+          chmod +x "$DEST" 2>/dev/null || true
+
+          echo "Built: $DEST"
+          ls -lh "$DEST"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.package.name }}-${{ matrix.target.suffix }}
+          path: dist/
+
+  # Build tools Docker image
+  build-docker:
+    needs: [plan, build-binaries]
+    if: needs.plan.outputs.publishing == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux x86_64 tools binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-tools-linux-x86_64
+          path: artifacts/
+
+      - name: Prepare binary for Docker
+        run: |
+          cp artifacts/tools-server-linux-x86_64 infra/images/tools/tools-server-linux
+          chmod +x infra/images/tools/tools-server-linux
+          ls -lh infra/images/tools/tools-server-linux
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./infra/images/tools
+          file: ./infra/images/tools/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ needs.plan.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker summary
+        run: |
+          echo "## 🐳 Tools Docker Image" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Create GitHub Release with all artifacts
+  release:
+    needs: [plan, build-binaries, build-docker]
+    if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' }}
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: artifacts/
+          merge-multiple: true
+
+      - name: List artifacts
+        run: |
+          echo "📦 Release artifacts:"
+          ls -lhR artifacts/
+
+      - name: Create checksums
+        working-directory: artifacts
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Generate release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## CTO Platform Binaries v${{ needs.plan.outputs.version }}
+
+          This release includes the following CLI tools:
+
+          ### 📦 cto-mcp
+          MCP server for Argo Workflows integration in AI development workflows.
+
+          ### 🔧 tools-server / tools-client  
+          Dynamic MCP (Model Context Protocol) tool management and proxy server.
+
+          ### 📊 play-monitor
+          E2E workflow monitoring CLI for the play feedback loop.
+
+          ---
+
+          ### Installation
+
+          **Shell installer (macOS/Linux):**
+          ```bash
+          # Install cto-mcp
+          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/cto-mcp-installer.sh | sh
+
+          # Install tools
+          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/tools-installer.sh | sh
+
+          # Install play-monitor
+          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/play-monitor-installer.sh | sh
+          ```
+
+          **Docker (tools-server only):**
+          ```bash
+          docker pull ghcr.io/5dlabs/tools:${{ needs.plan.outputs.version }}
+          ```
+
+          **Manual download:**
+          Download the appropriate binary for your platform from the assets below.
+
+          | Platform | cto-mcp | tools-server | play-monitor |
+          |----------|---------|--------------|--------------|
+          | Linux x86_64 | ✅ | ✅ | ✅ |
+          | Linux ARM64 | ✅ | ✅ | ✅ |
+          | macOS x86_64 | ✅ | ✅ | ✅ |
+          | macOS ARM64 | ✅ | ✅ | ✅ |
+          | Windows x86_64 | ✅ | ✅ | ❌ |
+          EOF
+
+      - name: Create or update release
+        run: |
+          # Check if release exists
+          if gh release view "${{ needs.plan.outputs.tag }}" > /dev/null 2>&1; then
+            echo "Updating existing release..."
+            gh release upload "${{ needs.plan.outputs.tag }}" artifacts/* --clobber
+          else
+            echo "Creating new release..."
+            gh release create "${{ needs.plan.outputs.tag }}" \
+              --title "CTO Platform v${{ needs.plan.outputs.version }}" \
+              --notes-file release-notes.md \
+              artifacts/*
+          fi
+
+      - name: Release summary
+        run: |
+          echo "## 🎉 Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ needs.plan.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://github.com/${{ github.repository }}/releases/tag/${{ needs.plan.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Binaries" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -1 artifacts/*.txt 2>/dev/null || true
+          ls -1 artifacts/ | grep -v '.txt' | while read f; do
+            echo "- \`$f\`" >> $GITHUB_STEP_SUMMARY
+          done
