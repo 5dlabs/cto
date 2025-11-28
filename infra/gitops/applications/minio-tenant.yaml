@@ -11,6 +11,9 @@ metadata:
   labels:
     app.kubernetes.io/name: minio-screenshots
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy after vault-config (wave 2) creates the credentials secret
+    argocd.argoproj.io/sync-wave: "3"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

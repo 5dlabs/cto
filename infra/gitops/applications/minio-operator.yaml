@@ -11,6 +11,9 @@ metadata:
   labels:
     app.kubernetes.io/name: minio-operator
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy with vault-config (wave 2) - operator doesn't need secrets
+    argocd.argoproj.io/sync-wave: "2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
