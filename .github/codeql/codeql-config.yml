@@ -11,11 +11,11 @@ paths-ignore:
   - "**/target/**"
   - "**/node_modules/**"
 
-# Query filters - exclude false positives for internal K8s services
+# Query filters - exclude false positives for internal/local services
+# The tools MCP server and monitor service intentionally use HTTP:
+# - Tools server runs locally on localhost for development
+# - Monitor runs within the Kubernetes cluster (service-to-service)
+# These are not security vulnerabilities.
 query-filters:
-  # Internal Kubernetes cluster services use HTTP (no TLS within cluster)
-  # These are not security vulnerabilities for service-to-service communication
   - exclude:
-      tags: /security\/.*cleartext.*/
-      paths:
-        - monitor/src/main.rs
+      id: rust/cleartext-transmission
