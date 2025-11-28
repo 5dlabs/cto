@@ -150,11 +150,11 @@ impl AnthropicProvider {
 
 #[async_trait]
 impl AIProvider for AnthropicProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "anthropic"
     }
 
-    fn api_key_env_var(&self) -> &str {
+    fn api_key_env_var(&self) -> &'static str {
         "ANTHROPIC_API_KEY"
     }
 

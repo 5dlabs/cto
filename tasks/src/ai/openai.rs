@@ -153,11 +153,11 @@ impl OpenAIProvider {
 
 #[async_trait]
 impl AIProvider for OpenAIProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "openai"
     }
 
-    fn api_key_env_var(&self) -> &str {
+    fn api_key_env_var(&self) -> &'static str {
         "OPENAI_API_KEY"
     }
 

@@ -114,10 +114,10 @@ pub struct ProviderConfig {
 #[async_trait]
 pub trait AIProvider: Send + Sync {
     /// Get the provider name (e.g., "anthropic", "openai").
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Get the environment variable name for the API key.
-    fn api_key_env_var(&self) -> &str;
+    fn api_key_env_var(&self) -> &'static str;
 
     /// Check if the provider is configured (has API key).
     fn is_configured(&self) -> bool;

@@ -396,7 +396,8 @@ impl AIDomain {
         let options = GenerateOptions {
             temperature: Some(0.7),
             max_tokens: Some(8000),
-            json_mode: true,
+            // In append mode, we want plain text; otherwise JSON for structured response
+            json_mode: !append_mode,
             ..Default::default()
         };
 
