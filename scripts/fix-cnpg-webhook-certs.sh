@@ -42,6 +42,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Detect the correct md5 command for the platform
+if command -v md5sum &> /dev/null; then
+    MD5_CMD="md5sum"
+elif command -v md5 &> /dev/null; then
+    MD5_CMD="md5"
+else
+    echo "ERROR: Neither md5sum (Linux) nor md5 (macOS) command found"
+    exit 1
+fi
+
 echo "=== CNPG Webhook Certificate Fix ==="
 echo "Namespace: ${NAMESPACE}"
 echo ""
@@ -62,9 +72,9 @@ if [[ -z "${NEW_CA}" ]]; then
 fi
 
 echo "Current CA bundle hashes:"
-echo "  Secret CA:            $(echo "${NEW_CA}" | base64 -d | md5)"
-echo "  Mutating webhook CA:  $(kubectl get mutatingwebhookconfiguration cnpg-mutating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null | base64 -d | md5 || echo 'not found')"
-echo "  Validating webhook CA: $(kubectl get validatingwebhookconfiguration cnpg-validating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null | base64 -d | md5 || echo 'not found')"
+echo "  Secret CA:            $(echo "${NEW_CA}" | base64 -d | ${MD5_CMD})"
+echo "  Mutating webhook CA:  $(kubectl get mutatingwebhookconfiguration cnpg-mutating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null | base64 -d | ${MD5_CMD} || echo 'not found')"
+echo "  Validating webhook CA: $(kubectl get validatingwebhookconfiguration cnpg-validating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null | base64 -d | ${MD5_CMD} || echo 'not found')"
 echo ""
 
 # Check if fix is needed
@@ -116,8 +126,8 @@ echo ""
 echo "=== Verification ==="
 if [[ -z "${DRY_RUN}" ]]; then
     echo "New CA bundle hashes:"
-    echo "  Mutating webhook CA:  $(kubectl get mutatingwebhookconfiguration cnpg-mutating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | base64 -d | md5)"
-    echo "  Validating webhook CA: $(kubectl get validatingwebhookconfiguration cnpg-validating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | base64 -d | md5)"
+    echo "  Mutating webhook CA:  $(kubectl get mutatingwebhookconfiguration cnpg-mutating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | base64 -d | ${MD5_CMD})"
+    echo "  Validating webhook CA: $(kubectl get validatingwebhookconfiguration cnpg-validating-webhook-configuration -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | base64 -d | ${MD5_CMD})"
     echo ""
     echo "Testing webhook connectivity..."
     if kubectl apply --dry-run=server -f - <<EOF 2>&1

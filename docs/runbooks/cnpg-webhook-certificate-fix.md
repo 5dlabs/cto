@@ -34,14 +34,17 @@ Verify the CA bundles don't match:
 
 ```bash
 # Check if CA in webhook config matches CA in secret
+# Note: Use 'md5sum' on Linux or 'md5' on macOS
+MD5_CMD=$(command -v md5sum || command -v md5)
+
 echo "Secret CA:" && \
 kubectl get secret cnpg-ca-secret -n infra \
-    -o jsonpath='{.data.ca\.crt}' | base64 -d | md5
+    -o jsonpath='{.data.ca\.crt}' | base64 -d | ${MD5_CMD}
 
 echo "Mutating webhook CA:" && \
 kubectl get mutatingwebhookconfiguration \
     cnpg-mutating-webhook-configuration \
-    -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | base64 -d | md5
+    -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | base64 -d | ${MD5_CMD}
 ```
 
 If the hashes differ, the webhooks have stale certificates.
