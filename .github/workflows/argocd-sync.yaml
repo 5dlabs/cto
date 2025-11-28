@@ -1,0 +1,143 @@
+---
+name: ArgoCD Full Sync
+
+on:
+  # Trigger on merged PRs to main
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+  # Manual trigger for on-demand sync
+  workflow_dispatch:
+    inputs:
+      wait_for_sync:
+        description: 'Wait for sync to complete'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  argocd-sync:
+    # Only run on merged PRs (not closed without merge)
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: [k8s-runner]
+
+    steps:
+      - name: Setup kubectl
+        run: |
+          mkdir -p $HOME/bin
+          if [ -f /shared/kubectl ]; then
+            cp /shared/kubectl $HOME/bin/
+            chmod +x $HOME/bin/kubectl
+          fi
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Trigger sync summary
+        run: |
+          echo "## 🔄 ArgoCD Sync Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "**Trigger:** PR #${{ github.event.pull_request.number }} merged" >> $GITHUB_STEP_SUMMARY
+            echo "**PR Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Merged by:** ${{ github.event.pull_request.merged_by.login }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Trigger:** Manual dispatch" >> $GITHUB_STEP_SUMMARY
+            echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Hard refresh platform-apps (app-of-apps)
+        run: |
+          echo "🔄 Triggering hard refresh on platform-apps (app-of-apps)..."
+
+          # Hard refresh forces ArgoCD to re-fetch from Git and reconcile all child apps
+          kubectl patch application platform-apps -n argocd --type merge \
+            -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+          echo "✅ platform-apps hard refresh triggered"
+          echo "- **platform-apps:** Hard refresh triggered ✅" >> $GITHUB_STEP_SUMMARY
+
+      - name: Sync all individual applications
+        run: |
+          echo "🔄 Syncing all individual ArgoCD applications..."
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Individual Application Syncs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get all applications in argocd namespace
+          APPS=$(kubectl get applications -n argocd -o jsonpath='{.items[*].metadata.name}')
+
+          for app in $APPS; do
+            echo "  Refreshing: $app"
+            kubectl patch application "$app" -n argocd --type merge \
+              -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' 2>/dev/null || true
+            echo "- **$app:** Refreshed ✅" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "✅ All applications refresh triggered"
+
+      - name: Wait for sync to propagate
+        run: |
+          echo "⏳ Waiting for ArgoCD to process sync requests..."
+          sleep 15
+
+      - name: Check sync status
+        if: github.event_name == 'workflow_dispatch' && inputs.wait_for_sync == true
+        run: |
+          echo "🔍 Checking application sync status..."
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Sync Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Wait up to 5 minutes for platform-apps to sync
+          TIMEOUT=300
+          ELAPSED=0
+          INTERVAL=15
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(kubectl get application platform-apps -n argocd \
+              -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            HEALTH=$(kubectl get application platform-apps -n argocd \
+              -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+
+            echo "platform-apps: Sync=$STATUS, Health=$HEALTH"
+
+            if [ "$STATUS" = "Synced" ]; then
+              echo "✅ platform-apps is synced!"
+              break
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          # Show all application statuses
+          kubectl get applications -n argocd \
+            -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status' \
+            | tee -a $GITHUB_STEP_SUMMARY
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Quick status check
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.wait_for_sync == false)
+        run: |
+          echo "🔍 Quick status check..."
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Current Application Status" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          kubectl get applications -n argocd \
+            -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status' \
+            | tee -a $GITHUB_STEP_SUMMARY
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Summary
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "🎉 **ArgoCD sync completed!**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ArgoCD will continue reconciling in the background. Check the ArgoCD UI for detailed status." >> $GITHUB_STEP_SUMMARY
