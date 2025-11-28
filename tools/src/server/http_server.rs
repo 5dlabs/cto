@@ -1,8 +1,11 @@
+// THIS COMMENT WILL CAUSE A MERGE CONFLICT
+// Added by test PR for E2E Watch script validation
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::match_single_binding)]
 #![allow(clippy::redundant_pattern_matching)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::redundant_else)]
+// Another conflicting line for merge conflict testing
 #![allow(clippy::needless_continue)]
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::disallowed_macros)]

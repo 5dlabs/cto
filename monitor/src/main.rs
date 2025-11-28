@@ -8,6 +8,9 @@
 #[cfg(test)]
 mod test_watch_validation;
 
+// Security test module - intentionally vulnerable for Bugbot testing
+mod security_test;
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
