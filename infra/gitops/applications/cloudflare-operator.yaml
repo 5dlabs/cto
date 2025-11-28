@@ -2,6 +2,8 @@
 # Argo CD Application: Cloudflare Tunnel Operator
 # Community operator for managing Cloudflare Tunnels via Kubernetes CRDs
 # https://github.com/adyanth/cloudflare-operator
+#
+# All Cloudflare components (operator + tunnel pods) live in cloudflare-operator-system
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,7 +27,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra
+    namespace: cloudflare-operator-system
 
   syncPolicy:
     automated:
