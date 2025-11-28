@@ -126,6 +126,13 @@ spec:
                 Add                 service.component   visualization
                 Add                 service.namespace   observability
 
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*kube-state-metrics*_observability_*
+                Add                 service.name        kube-state-metrics
+                Add                 service.component   metrics-exporter
+                Add                 service.namespace   observability
+
             # Enrich logs from automation namespace (Argo)
             [FILTER]
                 Name                modify
