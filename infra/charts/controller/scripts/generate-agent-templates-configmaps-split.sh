@@ -13,7 +13,7 @@ cd "$CHART_DIR"
 echo "Generating split ConfigMaps from agent templates..."
 
 # Define CLI types and shared resources
-CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration")
+CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration" "watch")
 SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/" "shared/")
 
 generate_configmap() {
@@ -57,6 +57,9 @@ HEADER_EOF
       files_list=$(find "agent-templates/code/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     elif [ "$filter" = "claude-docs" ]; then
       files_list=$(find "agent-templates/docs/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    elif [ "$filter" = "watch" ]; then
+      # Watch templates: include all watch/ subdirectories (factory, claude) and shared acceptance criteria
+      files_list=$(find "agent-templates/watch" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     else
       files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     fi
