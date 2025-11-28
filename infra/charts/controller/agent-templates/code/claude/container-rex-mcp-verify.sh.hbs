@@ -1,0 +1,59 @@
+#!/bin/sh
+# Rex MCP Server Verification - Checks server availability after PR merge
+set -e
+
+echo "═══ MCP SERVER VERIFICATION ═══"
+echo "Key: ${MCP_SERVER_KEY:-unknown} | PR: ${PR_NUMBER:-unknown} | Action: ${MCP_SERVER_ACTION:-add}"
+
+[ -z "$MCP_SERVER_KEY" ] && { echo "❌ MCP_SERVER_KEY not set"; exit 1; }
+
+# GitHub App auth for PR comments
+if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+    TEMP_KEY="/tmp/gh-key.pem"; printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"; chmod 600 "$TEMP_KEY"
+    JWT_H=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    NOW=$(date +%s); EXP=$((NOW + 600))
+    JWT_P=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT_S=$(printf '%s.%s' "$JWT_H" "$JWT_P" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT="$JWT_H.$JWT_P.$JWT_S"
+    INST=$(curl -sL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/5dlabs/cto/installation" | jq -r '.id')
+    [ "$INST" = "null" ] && INST=$(curl -sL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/5dlabs/installation" | jq -r '.id')
+    GITHUB_TOKEN=$(curl -sX POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/$INST/access_tokens" | jq -r '.token')
+    rm -f "$TEMP_KEY"; export GITHUB_TOKEN
+    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
+fi
+
+echo "⏳ Waiting for deployment..."
+WAITED=0; MAX=300
+while [ $WAITED -lt $MAX ]; do
+    READY=$(kubectl get deployment cto-tools -n cto -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+    [ "$READY" -gt 0 ] && break
+    sleep 10; WAITED=$((WAITED + 10))
+done
+sleep 15
+
+echo "🔍 Checking server availability..."
+FOUND=false
+for i in 1 2 3 4 5 6; do
+    CM=$(kubectl get configmap tools-config -n cto -o json 2>/dev/null || echo "{}")
+    echo "$CM" | jq -r '.data["config.yaml"] // ""' | grep -q "${MCP_SERVER_KEY}:" && { FOUND=true; break; }
+    [ $i -lt 6 ] && sleep 20
+done
+
+if [ "$FOUND" = "true" ]; then
+    MSG="✅ MCP server \`${MCP_SERVER_KEY}\` is available (${MCP_SERVER_ACTION})"
+    [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ] && {
+        gh pr comment "$PR_NUMBER" -R "5dlabs/cto" --body "$MSG" 2>/dev/null || true
+        gh pr edit "$PR_NUMBER" -R "5dlabs/cto" --add-label "mcp-server-verified" 2>/dev/null || true
+    }
+else
+    MSG="⚠️ MCP server \`${MCP_SERVER_KEY}\` verification pending - may still be syncing"
+    [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ] && {
+        gh pr comment "$PR_NUMBER" -R "5dlabs/cto" --body "$MSG" 2>/dev/null || true
+        gh pr edit "$PR_NUMBER" -R "5dlabs/cto" --add-label "mcp-server-pending" 2>/dev/null || true
+    }
+fi
+
+echo "$MSG"
+touch /workspace/.agent_done
+curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1 || true
+exit 0
