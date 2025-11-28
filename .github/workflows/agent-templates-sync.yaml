@@ -30,7 +30,7 @@ jobs:
         run: cd infra/charts/controller && ./scripts/generate-agent-templates-configmaps-split.sh
 
       - name: Render and apply ConfigMap to cluster
-        run: ./scripts/apply-agent-templates-configmap.sh
+        run: RELEASE_NAME=cto-controller ./scripts/apply-agent-templates-configmap.sh
 
       - name: Restart controller deployment
         run: |
@@ -43,8 +43,9 @@ jobs:
           fi
           
           # On main branch, restart the controller to pick up new ConfigMaps
-          kubectl rollout restart deployment/controller -n cto
-          kubectl rollout status deployment/controller -n cto --timeout=120s
+          # Deployment name is "cto-controller" (ArgoCD uses app name as Helm release name)
+          kubectl rollout restart deployment/cto-controller -n cto
+          kubectl rollout status deployment/cto-controller -n cto --timeout=120s
       
       - name: Verify ConfigMaps updated
         run: |
@@ -67,18 +68,18 @@ jobs:
           # Verify ConfigMaps exist (don't check specific content as it varies by PR)
           echo "Checking ConfigMaps exist..."
           
-          for cm in shared claude codex cursor factory opencode; do
-            if kubectl get configmap "controller-agent-templates-$cm" -n cto >/dev/null 2>&1; then
-              echo "✅ ConfigMap controller-agent-templates-$cm exists"
+          for cm in shared claude-code claude-docs codex cursor factory opencode integration; do
+            if kubectl get configmap "cto-controller-agent-templates-$cm" -n cto >/dev/null 2>&1; then
+              echo "✅ ConfigMap cto-controller-agent-templates-$cm exists"
             else
-              echo "❌ ConfigMap controller-agent-templates-$cm NOT FOUND"
+              echo "❌ ConfigMap cto-controller-agent-templates-$cm NOT FOUND"
               exit 1
             fi
           done
           
           # Verify ConfigMaps have content
           echo "Verifying ConfigMaps have content..."
-          CURSOR_SIZE=$(kubectl get configmap controller-agent-templates-cursor -n cto -o jsonpath='{.binaryData}' | wc -c)
+          CURSOR_SIZE=$(kubectl get configmap cto-controller-agent-templates-cursor -n cto -o jsonpath='{.binaryData}' | wc -c)
           if [ "$CURSOR_SIZE" -gt 1000 ]; then
             echo "✅ Cursor ConfigMap has content ($CURSOR_SIZE bytes)"
           else

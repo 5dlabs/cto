@@ -102,6 +102,17 @@ spec:
       kind: Secret
       jsonPointers:
         - /data
+    # Ignore last-applied-configuration annotation on large ConfigMaps to prevent 262KB limit errors
+    - group: ""
+      kind: ConfigMap
+      name: cto-controller-agent-templates-claude-code
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+    - group: ""
+      kind: ConfigMap
+      name: cto-controller-agent-templates-claude-docs
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
 
   # Revision history
   revisionHistoryLimit: 10
