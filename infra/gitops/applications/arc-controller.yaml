@@ -40,6 +40,14 @@ spec:
           create: true
           name: arc-gha-rs-controller
 
+        # Pod labels for log collection
+        podLabels:
+          app.kubernetes.io/component: runner-controller
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: arc-controller
+
         # Resource limits
         resources:
           requests:

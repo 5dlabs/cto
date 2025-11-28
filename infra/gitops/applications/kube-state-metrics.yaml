@@ -52,10 +52,15 @@ spec:
             prometheus.io/scrape: "true"
             prometheus.io/port: "8080"
 
-        # Pod labels for service discovery
+        # Pod labels for service discovery and log collection
+        podLabels:
+          app.kubernetes.io/component: metrics-exporter
+          platform.5dlabs.io/log-collection: enabled
         podAnnotations:
           prometheus.io/scrape: "true"
           prometheus.io/port: "8080"
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: kube-state-metrics
 
         # Security context
         securityContext:

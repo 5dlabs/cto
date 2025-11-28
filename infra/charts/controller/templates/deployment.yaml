@@ -5,6 +5,8 @@ metadata:
   name: {{ include "controller.fullname" . }}
   labels:
     {{- include "controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+    platform.5dlabs.io/log-collection: enabled
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -22,11 +24,16 @@ spec:
         # Template checksums using file hashes to avoid annotation size limits
         # This triggers pod restart when agent templates change
         templates/version: "{{ .Values.templatesVersion | default "v1" }}"
+        # Telemetry annotations for log collection
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: "agent-controller"
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
         {{- include "controller.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+        platform.5dlabs.io/log-collection: enabled
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

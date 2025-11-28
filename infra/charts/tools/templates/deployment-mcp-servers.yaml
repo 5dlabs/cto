@@ -23,6 +23,10 @@ spec:
       labels:
         {{- include "tools.labels" $ | nindent 8 }}
         app.kubernetes.io/component: {{ $server.name }}
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: mcp-{{ $server.name }}
     spec:
       {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:

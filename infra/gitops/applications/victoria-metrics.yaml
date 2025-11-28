@@ -29,6 +29,13 @@ spec:
             runAsUser: 1000
             runAsGroup: 1000
             runAsNonRoot: true
+          # Pod labels/annotations for log collection
+          podLabels:
+            app.kubernetes.io/component: metrics
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: victoria-metrics
           # Scrape configuration for metrics collection
           scrape:
             enabled: true
@@ -70,5 +77,5 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - RespectIgnoreDifferences=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
