@@ -31,13 +31,17 @@ struct Cli {
     #[arg(long, default_value = "json", global = true)]
     format: OutputFormat,
 
-    /// Argo namespace for workflows
-    #[arg(long, default_value = "argo", global = true)]
+    /// Namespace for workflows (where Argo WorkflowTemplates and Workflows run)
+    #[arg(long, default_value = "cto", global = true)]
     namespace: String,
 
-    /// Agent platform namespace for CRDs and pods
-    #[arg(long, default_value = "agent-platform", global = true)]
+    /// Namespace for agent CRDs and pods (CodeRuns, DocsRuns, Pods)
+    #[arg(long, default_value = "cto", global = true)]
     agent_namespace: String,
+
+    /// Namespace for Argo Events sensors (where Sensors run)
+    #[arg(long, default_value = "automation", global = true)]
+    sensor_namespace: String,
 
     /// Enable verbose output
     #[arg(short, long, global = true)]
@@ -619,6 +623,7 @@ async fn main() -> Result<()> {
                 &config,
                 &cli.namespace,
                 &cli.agent_namespace,
+                &cli.sensor_namespace,
                 interval,
                 max_failures,
                 &template,
@@ -639,6 +644,7 @@ async fn main() -> Result<()> {
                 &task_id,
                 &cli.namespace,
                 &cli.agent_namespace,
+                &cli.sensor_namespace,
                 repository.as_deref(),
                 github_interval,
                 fetch_logs,
@@ -1323,6 +1329,7 @@ async fn run_full_watch(
     config_path: &str,
     argo_namespace: &str,
     agent_namespace: &str,
+    sensor_namespace: &str,
     github_interval: u64,
     max_failures: u32,
     template: &str,
@@ -1406,6 +1413,7 @@ async fn run_full_watch(
         task_id,
         argo_namespace,
         agent_namespace,
+        sensor_namespace,
         Some(repository),
         github_interval,
         true, // fetch_logs
@@ -1422,6 +1430,7 @@ async fn run_multi_watch(
     task_id: &str,
     argo_namespace: &str,
     agent_namespace: &str,
+    sensor_namespace: &str,
     repository: Option<&str>,
     github_interval: u64,
     fetch_logs: bool,
@@ -1436,30 +1445,30 @@ async fn run_multi_watch(
 
     // Spawn all watch processes
     let children = vec![
-        // Watch workflows in argo namespace
+        // Watch workflows in cto namespace (where WorkflowTemplates are deployed)
         spawn_watch(
             ResourceType::Workflow,
             argo_namespace,
             Some(&label_selector),
             &tx,
         )?,
-        // Watch CodeRuns in agent-platform namespace
+        // Watch CodeRuns in cto namespace
         spawn_watch(
             ResourceType::CodeRun,
             agent_namespace,
             Some(&label_selector),
             &tx,
         )?,
-        // Watch DocsRuns in agent-platform namespace
+        // Watch DocsRuns in cto namespace
         spawn_watch(
             ResourceType::DocsRun,
             agent_namespace,
             Some(&label_selector),
             &tx,
         )?,
-        // Watch Sensors in argo namespace (no label filter - watch all)
-        spawn_watch(ResourceType::Sensor, argo_namespace, None, &tx)?,
-        // Watch Pods in agent-platform namespace
+        // Watch Sensors in automation namespace (where Argo Events runs)
+        spawn_watch(ResourceType::Sensor, sensor_namespace, None, &tx)?,
+        // Watch Pods in cto namespace
         spawn_watch(
             ResourceType::Pod,
             agent_namespace,
@@ -1475,7 +1484,7 @@ async fn run_multi_watch(
             format!("workflows.argoproj.io (ns: {argo_namespace})"),
             format!("coderuns.agents.platform (ns: {agent_namespace})"),
             format!("docsruns.agents.platform (ns: {agent_namespace})"),
-            format!("sensors.argoproj.io (ns: {argo_namespace})"),
+            format!("sensors.argoproj.io (ns: {sensor_namespace})"),
             format!("pods (ns: {agent_namespace})"),
         ],
         timestamp: Utc::now(),

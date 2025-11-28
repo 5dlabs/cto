@@ -67,7 +67,7 @@ spec:
                 logs.platform.5dlabs.io/service: minio-screenshots
 
           # Mount existing secret for credentials
-          configuration:
+          configSecret:
             name: minio-screenshots-credentials
 
           # Expose via ClusterIP for internal access
