@@ -64,10 +64,11 @@ spec:
           namespace: "infra"
 
         # Force persistent runner behavior with explicit configuration
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing resources
         template:
           metadata:
             labels:
-              app.kubernetes.io/component: github-runner
               platform.5dlabs.io/log-collection: enabled
             annotations:
               logs.platform.5dlabs.io/collect: "true"

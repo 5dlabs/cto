@@ -20,10 +20,11 @@ spec:
           create: true
           name: argo-events-sa
         singleNamespace: true
+        # Note: Don't override app.kubernetes.io/component in podLabels - it's part of the
+        # selector and can't be changed on existing Deployments
         controller:
           replicas: 1
           podLabels:
-            app.kubernetes.io/component: event-controller
             platform.5dlabs.io/log-collection: enabled
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"

@@ -73,8 +73,9 @@ spec:
         replicaCount: 1
 
         # Pod labels for log collection
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing Deployments
         podLabels:
-          app.kubernetes.io/component: dns
           platform.5dlabs.io/log-collection: enabled
         podAnnotations:
           logs.platform.5dlabs.io/collect: "true"
