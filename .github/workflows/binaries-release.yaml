@@ -189,7 +189,7 @@ jobs:
       - name: Download Linux x86_64 tools binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-tools-linux-x86_64
+          name: binary-tools-server-linux-x86_64
           path: artifacts/
 
       - name: Prepare binary for Docker
