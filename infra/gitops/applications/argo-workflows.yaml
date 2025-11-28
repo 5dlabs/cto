@@ -109,7 +109,9 @@ spec:
 
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
 
     retry:
       limit: 3

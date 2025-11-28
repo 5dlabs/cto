@@ -73,10 +73,10 @@ spec:
 
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
       - SkipDryRunOnMissingResource=true
-      - Replace=true
 
     retry:
       limit: 5

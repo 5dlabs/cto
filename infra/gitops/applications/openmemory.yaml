@@ -55,6 +55,7 @@ spec:
       # Note: allowEmpty defaults to false, not specified to avoid OutOfSync
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
     retry:
