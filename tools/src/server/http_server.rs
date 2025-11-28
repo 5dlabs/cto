@@ -82,7 +82,7 @@ struct Args {
     #[arg(short = 'P', long = "port", default_value = "3000")]
     port: u16,
 
-    /// Project directory containing servers-config.json
+    /// Project directory containing mcp-servers.json
     #[arg(short = 'p', long = "project-dir")]
     project_dir: Option<std::path::PathBuf>,
 
@@ -928,29 +928,22 @@ impl BridgeState {
             );
         }
 
-        // Get local tool servers from ConfigMap if available
-        let local_servers = match Client::try_default().await {
-            Ok(client) => self
-                .read_local_tools_config(&client)
-                .await
-                .unwrap_or_default(),
-            Err(_) => HashMap::new(),
-        };
-
-        // Add local servers to system configuration temporarily for discovery
-        if !local_servers.is_empty() {
-            let mut config_manager = self.system_config_manager.write().await;
-            let config = config_manager.get_config_mut();
-            for (name, config_data) in &local_servers {
-                tracing::info!("📝 Adding local server '{}' to configuration", name);
-                config.servers.insert(name.clone(), config_data.clone());
-            }
-        }
-
-        // Get all configured servers (including the newly added local ones)
+        // Get all configured servers, excluding local servers (they run in agent containers)
         let all_servers = {
             let config_manager = self.system_config_manager.read().await;
-            config_manager.get_servers().clone()
+            config_manager
+                .get_servers()
+                .iter()
+                .filter(|(name, config)| {
+                    if config.local {
+                        tracing::info!("⏭️ [{}] Skipping local server (runs in agent container)", name);
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<HashMap<_, _>>()
         };
 
         // Convert to vector for async operations
@@ -1122,17 +1115,25 @@ impl BridgeState {
         let namespace = get_current_namespace();
         tracing::info!("📍 Detected namespace: {}", namespace);
 
-        // Get server configurations for descriptions
-        let servers = {
+        // Get server configurations, split into local and remote by the local field
+        let (remote_servers, local_servers) = {
             let config_manager = self.system_config_manager.read().await;
-            config_manager.get_servers().clone()
+            let all_servers = config_manager.get_servers().clone();
+            let local: HashMap<_, _> = all_servers
+                .iter()
+                .filter(|(_, config)| config.local)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            let remote: HashMap<_, _> = all_servers
+                .iter()
+                .filter(|(_, config)| !config.local)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            (remote, local)
         };
 
-        // Read local tools configuration from ConfigMap
-        let local_servers = self.read_local_tools_config(&client).await?;
-
         // Build the tool catalog
-        let catalog = self.build_tool_catalog(tools, &servers, &local_servers);
+        let catalog = self.build_tool_catalog(tools, &remote_servers, &local_servers);
 
         // Convert to JSON
         let catalog_json = serde_json::to_string_pretty(&catalog)?;
@@ -1164,52 +1165,6 @@ impl BridgeState {
         tracing::info!("✅ Created/Updated tool catalog ConfigMap");
 
         Ok(())
-    }
-
-    /// Read local tools configuration from ConfigMap
-    async fn read_local_tools_config(
-        &self,
-        client: &Client,
-    ) -> anyhow::Result<HashMap<String, ServerConfig>> {
-        let namespace = get_current_namespace();
-        let api: Api<ConfigMap> = Api::namespaced(client.clone(), &namespace);
-
-        match api.get("tools-local-tools").await {
-            Ok(cm) => {
-                tracing::info!("✅ Loaded local tools config from namespace: {}", namespace);
-                if let Some(data) = cm.data {
-                    if let Some(config_json) = data.get("local-tools-config.json") {
-                        // Parse using the same structure as servers config
-                        let config: serde_json::Value = serde_json::from_str(config_json)?;
-                        if let Some(servers_obj) = config.get("servers").and_then(|s| s.as_object())
-                        {
-                            let mut servers = HashMap::new();
-                            for (name, value) in servers_obj {
-                                if let Ok(server_config) =
-                                    serde_json::from_value::<ServerConfig>(value.clone())
-                                {
-                                    servers.insert(name.clone(), server_config);
-                                }
-                            }
-                            tracing::info!(
-                                "✅ Loaded {} local tool servers from ConfigMap",
-                                servers.len()
-                            );
-                            return Ok(servers);
-                        }
-                    }
-                }
-                tracing::info!("⚠️ Local tools ConfigMap found but no valid data");
-                Ok(HashMap::new())
-            }
-            Err(e) => {
-                tracing::info!(
-                    "⚠️ Local tools ConfigMap not found: {}. No local tools will be included.",
-                    e
-                );
-                Ok(HashMap::new())
-            }
-        }
     }
 
     /// Build the tool catalog structure

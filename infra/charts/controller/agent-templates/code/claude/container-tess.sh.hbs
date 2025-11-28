@@ -740,10 +740,10 @@ echo "=== ENTERPRISE MANAGED SETTINGS ==="
 echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
 echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
 
-# Verify client-config.json is available and valid
+# Verify tools-config.json is available and valid
 echo "=== TOOLS CONFIG SETUP ==="
-WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
-SOURCE_CFG="/task-files/client-config.json"
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
 
 # Helper to check non-empty JSON object
 is_valid_cfg() {
@@ -848,12 +848,12 @@ update_coderun_status() {
   fi
 }
 
-# Copy client-config.json from task files first
+# Copy tools-config.json from task files first
 
-# Generate client-config.json from cto-config.json in the cloned repository
-echo "🔧 Generating client-config.json from cto-config.json..."
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
 CTO_CONFIG_PATH="$CLAUDE_WORK_DIR/cto-config.json"
-CLIENT_CONFIG_PATH="$CLAUDE_WORK_DIR/client-config.json"
+CLIENT_CONFIG_PATH="$CLAUDE_WORK_DIR/tools-config.json"
 
 if [ -f "$CTO_CONFIG_PATH" ]; then
   echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
@@ -869,7 +869,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
     jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
   fi
   
-  # Extract tools configuration and generate client-config.json
+  # Extract tools configuration and generate tools-config.json
   if command -v jq >/dev/null 2>&1; then
     # First check if agent exists in cto-config.json
     if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
@@ -885,8 +885,8 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
       TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
       
       if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
-        echo "✅ Generated client-config.json from cto-config.json"
-        echo "🔍 DEBUG: Generated client-config.json contents:"
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
         jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
       else
         echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
@@ -896,7 +896,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
       echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
     fi
   else
-    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
   fi
 else
   echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
@@ -904,16 +904,16 @@ fi
 
 # Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
 if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
-  echo "📋 client-config.json not generated, using ConfigMap fallback..."
-  if [ -f "/task-files/client-config.json" ]; then
-    cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-    cp /task-files/client-config.json "/workspace/client-config.json"
-    echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
+  echo "📋 tools-config.json not generated, using ConfigMap fallback..."
+  if [ -f "/task-files/tools-config.json" ]; then
+    cp /task-files/tools-config.json "$CLAUDE_WORK_DIR/tools-config.json"
+    cp /task-files/tools-config.json "/workspace/tools-config.json"
+    echo "✓ tools-config.json copied from ConfigMap to both working directory and workspace root"
   else
-    echo "⚠️ client-config.json not found in task-files"
+    echo "⚠️ tools-config.json not found in task-files"
   fi
 else
-  echo "✓ Using dynamically generated client-config.json from cto-config.json"
+  echo "✓ Using dynamically generated tools-config.json from cto-config.json"
 fi
 
 SRC_OK=false
@@ -922,13 +922,13 @@ if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
 if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
 
 if $SRC_OK; then
-  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
 elif $WS_OK; then
-  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
 else
-  echo "❌ No valid client-config.json found (both source and workspace empty/invalid)."
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid)."
   if [ -f "$SOURCE_CFG" ]; then
     echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
   else
@@ -939,11 +939,11 @@ else
   else
     echo "   Workspace missing: $WORKSPACE_CFG"
   fi
-  soft_abort "No valid client-config.json available" 1
+  soft_abort "No valid tools-config.json available" 1
   # Minimal fallback client-config to allow execution to proceed
-  printf '{"remoteTools":[],"localServers":{}}' > "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null || true
-  export MCP_CLIENT_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
-  echo "✓ Created minimal fallback client-config.json at $MCP_CLIENT_CONFIG"
+  printf '{"remoteTools":[],"localServers":{}}' > "$CLAUDE_WORK_DIR/tools-config.json" 2>/dev/null || true
+  export MCP_TOOLS_CONFIG="$CLAUDE_WORK_DIR/tools-config.json"
+  echo "✓ Created minimal fallback tools-config.json at $MCP_TOOLS_CONFIG"
 fi
 
 # Create initial CLAUDE.md if needed

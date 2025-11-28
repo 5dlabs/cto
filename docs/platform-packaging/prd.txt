@@ -1,885 +1,805 @@
-<context>
-# Overview
-The Platform Packaging project transforms the CTO platform from an organization-specific deployment into a generic, distributable product that can be installed on any developer's workstation or team infrastructure. This involves creating an automated installer, abstracting all hardcoded values, and providing multiple installation profiles for different use cases.
-
-# Core Features
-## Automated Installation System
-- **Interactive CLI Wizard**: Step-by-step setup with progress indicators
-- **Profile-Based Installation**: Minimal, Standard, and Production profiles
-- **Dependency Management**: Automatic detection and installation of prerequisites
-- **Validation System**: Comprehensive health checks and troubleshooting
-
-## Configuration Abstraction
-- **Template System**: Replace all hardcoded 5D Labs references
-- **Dynamic Configuration**: Runtime configuration based on user input
-- **Multi-Environment Support**: Development, staging, and production configurations
-- **Secret Management**: Secure handling of API keys and credentials
-
-## Distribution Channels
-- **Homebrew Integration**: One-command installation on macOS/Linux
-- **Direct Downloads**: Platform-specific binaries with assets
-- **Docker Images**: Containerized installation option
-- **GitHub Releases**: Automated release management
-
-# User Experience
-## User Personas
-- **Individual Developers**: Need quick setup for local development
-- **DevOps Teams**: Require production-ready deployment automation
-- **Platform Engineers**: Want customization and integration capabilities
-- **Enterprise Teams**: Need security, compliance, and scalability features
-
-## Key User Flows
-1. **Quick Start**: Download → Run installer → Start developing in 5 minutes
-2. **Team Setup**: Configure GitHub integration → Deploy to shared infrastructure → Invite team members
-3. **Production Deployment**: Customize configuration → Deploy with monitoring → Scale as needed
-4. **Upgrade Path**: Seamless migration from development to production profiles
-</context>
-
-<PRD>
-# Technical Architecture
-
-## System Components
-
-### Core Infrastructure
-- **CLI Framework**: Interactive installer with progress tracking
-- **Template Engine**: Dynamic configuration generation
-- **Cluster Provisioner**: Kubernetes cluster setup and management
-- **Component Installer**: ArgoCD, Argo Workflows, and platform components
-- **Validation Engine**: Health checks and troubleshooting
-
-### Installation Profiles
-```yaml
-Installation Profiles:
-  Minimal:
-    - Single-node k3s cluster
-    - Core platform components only
-    - Local development focus
-    - 8GB RAM requirement
-    
-  Standard:
-    - Multi-node cluster support
-    - Full monitoring stack
-    - Database operators
-    - 16GB RAM requirement
-    
-  Production:
-    - High availability setup
-    - Enterprise security features
-    - Backup and disaster recovery
-    - 32GB+ RAM requirement
-```
-
-## Data Models
-
-### Platform Configuration Schema
-```rust
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PlatformConfig {
-    pub version: String,
-    pub profile: InstallationProfile,
-    pub platform: PlatformSettings,
-    pub github: GitHubIntegration,
-    pub registry: RegistryConfig,
-    pub agents: HashMap<String, AgentConfig>,
-    pub features: FeatureFlags,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PlatformSettings {
-    pub name: String,
-    pub domain: Option<String>,
-    pub namespace: String,
-    pub ingress_type: IngressType,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GitHubIntegration {
-    pub organization: String,
-    pub repository: String,
-    pub apps: HashMap<String, GitHubAppConfig>,
-    pub webhook_secret: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RegistryConfig {
-    pub r#type: RegistryType,
-    pub url: String,
-    pub namespace: String,
-    pub username: Option<String>,
-    pub password: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AgentConfig {
-    pub enabled: bool,
-    pub github_app_id: Option<String>,
-    pub resources: ResourceRequirements,
-    pub features: HashMap<String, bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FeatureFlags {
-    pub monitoring: bool,
-    pub databases: bool,
-    pub mail_notifications: bool,
-    pub backup: bool,
-    pub high_availability: bool,
-}
-```
-
-### Installation Profile Schema
-```rust
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InstallationProfile {
-    pub name: String,
-    pub description: String,
-    pub components: Vec<Component>,
-    pub features: FeatureFlags,
-    pub resource_requirements: ResourceRequirements,
-    pub estimated_install_time: Duration,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Component {
-    pub name: String,
-    pub category: ComponentCategory,
-    pub required: bool,
-    pub dependencies: Vec<String>,
-    pub install_order: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ComponentCategory {
-    Core,
-    Orchestration,
-    Monitoring,
-    Database,
-    Security,
-    Optional,
-}
-```
-
-## APIs and Integrations
-
-### CLI Installer Implementation
-```rust
-// cmd/cto/main.go
-use clap::{App, Arg, SubCommand};
-use indicatif::{ProgressBar, ProgressStyle};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let matches = App::new("cto")
-        .version(env!("CARGO_PKG_VERSION"))
-        .about("Multi-Agent Development Platform")
-        .subcommand(SubCommand::with_name("install")
-            .about("Install the platform")
-            .arg(Arg::with_name("profile")
-                .short("p")
-                .long("profile")
-                .value_name("PROFILE")
-                .help("Installation profile (minimal, standard, production)")
-                .takes_value(true))
-            .arg(Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .value_name("FILE")
-                .help("Configuration file path")
-                .takes_value(true)))
-        .subcommand(SubCommand::with_name("status")
-            .about("Show platform status"))
-        .subcommand(SubCommand::with_name("upgrade")
-            .about("Upgrade platform components"))
-        .get_matches();
-
-    match matches.subcommand() {
-        ("install", Some(args)) => {
-            let installer = Installer::new()?;
-            installer.run(args).await?;
-        }
-        ("status", _) => {
-            let status = StatusChecker::new()?;
-            status.show()?;
-        }
-        ("upgrade", _) => {
-            let upgrader = Upgrader::new()?;
-            upgrader.upgrade().await?;
-        }
-        _ => {
-            println!("{}", matches.usage());
-        }
-    }
-
-    Ok(())
-}
-
-// pkg/installer/installer.go
-pub struct Installer {
-    config: PlatformConfig,
-    progress: ProgressBar,
-    validator: PrerequisitesValidator,
-    cluster_provisioner: ClusterProvisioner,
-    component_installer: ComponentInstaller,
-}
-
-impl Installer {
-    pub async fn run(&self, args: &ArgMatches) -> Result<()> {
-        // Step 1: Validate prerequisites
-        self.progress.set_message("Checking prerequisites...");
-        self.validator.validate()?;
-
-        // Step 2: Load or create configuration
-        self.progress.set_message("Loading configuration...");
-        let config = self.load_config(args)?;
-
-        // Step 3: Provision Kubernetes cluster
-        self.progress.set_message("Setting up Kubernetes cluster...");
-        self.cluster_provisioner.provision(&config).await?;
-
-        // Step 4: Install core components
-        self.progress.set_message("Installing core components...");
-        self.component_installer.install_core(&config).await?;
-
-        // Step 5: Configure GitHub integration
-        self.progress.set_message("Setting up GitHub integration...");
-        self.setup_github_integration(&config).await?;
-
-        // Step 6: Install optional features
-        if config.features.monitoring || config.features.databases {
-            self.progress.set_message("Installing optional features...");
-            self.component_installer.install_optional(&config).await?;
-        }
-
-        // Step 7: Run validation tests
-        self.progress.set_message("Running validation tests...");
-        self.run_validation_tests(&config).await?;
-
-        // Step 8: Display access information
-        self.show_access_info(&config)?;
-
-        Ok(())
-    }
-
-    async fn setup_github_integration(&self, config: &PlatformConfig) -> Result<()> {
-        let github_manager = GitHubManager::new(&config.github)?;
-
-        // Create GitHub Apps for each agent
-        for (agent_name, agent_config) in &config.agents {
-            if agent_config.enabled {
-                let app = github_manager.create_app(agent_name).await?;
-                println!("✓ Created GitHub App for {} (ID: {})", agent_name, app.id);
-            }
-        }
-
-        // Configure webhooks
-        github_manager.setup_webhooks(&config).await?;
-
-        Ok(())
-    }
-}
-```
-
-### Template Engine Implementation
-```rust
-// pkg/templates/engine.rs
-use handlebars::{Handlebars, Context, Template};
-use serde_json::Value;
-
-pub struct TemplateEngine {
-    handlebars: Handlebars,
-    templates: HashMap<String, String>,
-}
-
-impl TemplateEngine {
-    pub fn new() -> Result<Self> {
-        let mut handlebars = Handlebars::new();
-        
-        // Register custom helpers
-        handlebars.register_helper("env", Box::new(env_helper));
-        handlebars.register_helper("secret", Box::new(secret_helper));
-        handlebars.register_helper("random", Box::new(random_helper));
-        
-        Ok(Self {
-            handlebars,
-            templates: HashMap::new(),
-        })
-    }
-
-    pub fn render_template(&self, template_name: &str, data: &Value) -> Result<String> {
-        let template = self.templates.get(template_name)
-            .ok_or_else(|| anyhow!("Template not found: {}", template_name))?;
-        
-        self.handlebars.render_template(template, data)
-            .map_err(|e| anyhow!("Template render error: {}", e))
-    }
-
-    pub fn render_kubernetes_manifest(&self, manifest: &str, config: &PlatformConfig) -> Result<String> {
-        let data = serde_json::to_value(config)?;
-        self.render_template(manifest, &data)
-    }
-}
-
-// Custom helpers
-fn env_helper(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &mut dyn Output) -> Result<(), RenderError> {
-    let var_name = h.param(0)
-        .and_then(|v| v.value().as_str())
-        .ok_or_else(|| RenderError::new("Environment variable name required"))?;
-    
-    let value = std::env::var(var_name)
-        .unwrap_or_else(|_| format!("${{{}}}", var_name));
-    
-    out.write(&value)?;
-    Ok(())
-}
-```
-
-### Cluster Provisioner Implementation
-```rust
-// pkg/cluster/provisioner.rs
-pub trait ClusterProvisioner {
-    async fn provision(&self, config: &PlatformConfig) -> Result<()>;
-    async fn validate(&self) -> Result<()>;
-    async fn destroy(&self) -> Result<()>;
-}
-
-pub struct K3sProvisioner {
-    config: K3sConfig,
-}
-
-impl ClusterProvisioner for K3sProvisioner {
-    async fn provision(&self, config: &PlatformConfig) -> Result<()> {
-        let install_script = format!(r#"
-#!/bin/bash
-set -e
-
-# Install k3s
-curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={} sh -s - \
-    --disable traefik \
-    --write-kubeconfig-mode 644 \
-    --node-label cto=true
-
-# Wait for cluster to be ready
-kubectl wait --for=condition=Ready nodes --all --timeout=300s
-
-# Install local path provisioner
-kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-kubectl patch storageclass local-path -p '{{"metadata": {{"annotations":{{"storageclass.kubernetes.io/is-default-class": "true"}}}}}}'
-"#, self.config.k3s_version);
-
-        // Execute installation script
-        let output = Command::new("bash")
-            .arg("-c")
-            .arg(&install_script)
-            .output()
-            .await?;
-
-        if !output.status.success() {
-            return Err(anyhow!("K3s installation failed: {}", 
-                String::from_utf8_lossy(&output.stderr)));
-        }
-
-        Ok(())
-    }
-}
-
-pub struct KindProvisioner {
-    config: KindConfig,
-}
-
-impl ClusterProvisioner for KindProvisioner {
-    async fn provision(&self, config: &PlatformConfig) -> Result<()> {
-        let kind_config = format!(r#"
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-name: cto
-nodes:
-- role: control-plane
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 80
-  - containerPort: 443
-    hostPort: 443
-  - containerPort: 8080
-    hostPort: 8080
-  - containerPort: 2746
-    hostPort: 2746
-  - containerPort: 3000
-    hostPort: 3000
-"#);
-
-        // Create kind cluster
-        let output = Command::new("kind")
-            .arg("create")
-            .arg("cluster")
-            .arg("--config")
-            .arg("-")
-            .arg("--name")
-            .arg("cto")
-            .stdin(Stdio::piped())
-            .output()
-            .await?;
-
-        if !output.status.success() {
-            return Err(anyhow!("Kind cluster creation failed: {}", 
-                String::from_utf8_lossy(&output.stderr)));
-        }
-
-        Ok(())
-    }
-}
-```
-
-## Infrastructure Requirements
-
-### Prerequisites Validation
-```rust
-// pkg/validator/prerequisites.rs
-pub struct PrerequisitesValidator {
-    requirements: Vec<Requirement>,
-}
-
-#[derive(Debug)]
-pub struct Requirement {
-    pub name: String,
-    pub check: Box<dyn Fn() -> Result<bool>>,
-    pub install_instructions: String,
-    pub critical: bool,
-}
-
-impl PrerequisitesValidator {
-    pub fn new() -> Self {
-        let mut validator = Self {
-            requirements: Vec::new(),
-        };
-
-        // Add standard requirements
-        validator.add_requirement(Requirement {
-            name: "Docker".to_string(),
-            check: Box::new(|| {
-                Command::new("docker")
-                    .arg("--version")
-                    .output()
-                    .map(|_| true)
-                    .map_err(|_| anyhow!("Docker not found"))
-            }),
-            install_instructions: "Install Docker from https://docker.com".to_string(),
-            critical: true,
-        });
-
-        validator.add_requirement(Requirement {
-            name: "kubectl".to_string(),
-            check: Box::new(|| {
-                Command::new("kubectl")
-                    .arg("version")
-                    .arg("--client")
-                    .output()
-                    .map(|_| true)
-                    .map_err(|_| anyhow!("kubectl not found"))
-            }),
-            install_instructions: "Install kubectl from https://kubernetes.io/docs/tasks/tools/".to_string(),
-            critical: true,
-        });
-
-        validator.add_requirement(Requirement {
-            name: "System Resources".to_string(),
-            check: Box::new(|| {
-                let mem_info = sysinfo::System::new_all();
-                let total_memory = mem_info.total_memory();
-                
-                if total_memory < 8 * 1024 * 1024 * 1024 { // 8GB
-                    return Err(anyhow!("Insufficient memory: {}MB (need 8GB)", total_memory / 1024 / 1024));
-                }
-                
-                Ok(true)
-            }),
-            install_instructions: "Upgrade system memory to at least 8GB".to_string(),
-            critical: true,
-        });
-
-        validator
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        let mut failures = Vec::new();
-
-        for requirement in &self.requirements {
-            match (requirement.check)() {
-                Ok(true) => {
-                    println!("✓ {}", requirement.name);
-                }
-                Ok(false) | Err(_) => {
-                    println!("✗ {}", requirement.name);
-                    failures.push(requirement);
-                }
-            }
-        }
-
-        if !failures.is_empty() {
-            println!("\nPrerequisites not met:");
-            for failure in &failures {
-                println!("  - {}: {}", failure.name, failure.install_instructions);
-            }
-            
-            if failures.iter().any(|f| f.critical) {
-                return Err(anyhow!("Critical prerequisites not met"));
-            }
-        }
-
-        Ok(())
-    }
-}
-```
-
-### Component Installation System
-```rust
-// pkg/components/installer.rs
-pub struct ComponentInstaller {
-    kube_client: kubernetes::Client,
-    helm_client: helm::Client,
-    template_engine: TemplateEngine,
-}
-
-impl ComponentInstaller {
-    pub async fn install_core(&self, config: &PlatformConfig) -> Result<()> {
-        let components = vec![
-            Component::new("argocd", "ArgoCD", ComponentCategory::Core),
-            Component::new("argo-workflows", "Argo Workflows", ComponentCategory::Core),
-            Component::new("argo-events", "Argo Events", ComponentCategory::Core),
-            Component::new("controller", "Multi-Agent Controller", ComponentCategory::Core),
-        ];
-
-        for component in components {
-            self.install_component(&component, config).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn install_optional(&self, config: &PlatformConfig) -> Result<()> {
-        if config.features.monitoring {
-            self.install_monitoring_stack(config).await?;
-        }
-
-        if config.features.databases {
-            self.install_database_operators(config).await?;
-        }
-
-        if config.features.backup {
-            self.install_backup_system(config).await?;
-        }
-
-        Ok(())
-    }
-
-    async fn install_component(&self, component: &Component, config: &PlatformConfig) -> Result<()> {
-        println!("Installing {}...", component.display_name);
-
-        // Render component manifests
-        let manifests = self.template_engine.render_component_manifests(component, config)?;
-
-        // Apply to cluster
-        for manifest in manifests {
-            self.kube_client.apply(&manifest).await?;
-        }
-
-        // Wait for component to be ready
-        self.wait_for_component_ready(component).await?;
-
-        println!("✓ {} installed successfully", component.display_name);
-        Ok(())
-    }
-}
-```
-
-## Distribution Strategy
-
-### Build System
-```bash
-#!/bin/bash
-# build-release.sh
-
-VERSION=${1:-"0.1.0"}
-PLATFORMS=("darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64" "windows/amd64")
-
-# Build binaries
-for PLATFORM in "${PLATFORMS[@]}"; do
-    GOOS=${PLATFORM%/*}
-    GOARCH=${PLATFORM#*/}
-    
-    echo "Building for $GOOS/$GOARCH..."
-    
-    env GOOS=$GOOS GOARCH=$GOARCH go build \
-        -ldflags "-X main.Version=$VERSION" \
-        -o "dist/cto-${GOOS}-${GOARCH}" \
-        ./cmd/cto
-done
-
-# Package with assets
-for PLATFORM in "${PLATFORMS[@]}"; do
-    GOOS=${PLATFORM%/*}
-    GOARCH=${PLATFORM#*/}
-    
-    tar -czf "dist/cto-${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
-        -C dist "cto-${GOOS}-${GOARCH}" \
-        -C .. templates/ scripts/ config/
-done
-
-# Create checksums
-cd dist
-sha256sum cto-${VERSION}-*.tar.gz > SHA256SUMS
-```
-
-### Homebrew Integration
-```ruby
-# Formula/cto.rb
-class AgentPlatform < Formula
-  desc "Multi-Agent Software Development Orchestration Platform"
-  homepage "https://github.com/yourusername/cto"
-  version "0.1.0"
-  
-  if OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-darwin-arm64.tar.gz"
-    sha256 "xxx"
-  elsif OS.mac?
-    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-darwin-amd64.tar.gz"
-    sha256 "xxx"
-  elsif OS.linux?
-    url "https://github.com/yourusername/cto/releases/download/v#{version}/cto-#{version}-linux-amd64.tar.gz"
-    sha256 "xxx"
-  end
-  
-  depends_on "kubectl"
-  depends_on "helm"
-  
-  def install
-    bin.install "cto"
-    (share/"cto").install "templates", "scripts", "config"
-  end
-  
-  def post_install
-    (var/"cto").mkpath
-    (etc/"cto").mkpath
-  end
-  
-  test do
-    assert_match version.to_s, shell_output("#{bin}/cto version")
-  end
-end
-```
-
-# Development Roadmap
-
-## Phase 1: Core Abstraction (Days 1-3)
-### Template System Development
-- Create Handlebars templates for all Kubernetes manifests
-- Abstract all hardcoded values (5D Labs, GitHub Apps, etc.)
-- Build configuration schema and validation
-- Implement template rendering engine
-
-### CLI Framework
-- Set up Cobra CLI framework
-- Implement interactive wizard with Bubble Tea
-- Add progress indicators and logging
-- Create configuration management commands
-
-### Deliverables
-- Working template system
-- Basic CLI with install command
-- Configuration validation
-- Template test suite
-
-## Phase 2: Installation Engine (Days 4-6)
-### Cluster Provisioning
-- Implement k3s, kind, and minikube provisioners
-- Add prerequisite validation system
-- Create cluster health checks
-- Build cleanup and rollback mechanisms
-
-### Component Installation
-- Develop component installer framework
-- Implement ArgoCD, Argo Workflows installation
-- Add monitoring stack installation
-- Create database operator installation
-
-### Deliverables
-- Working cluster provisioners
-- Component installation system
-- Health check framework
-- Installation validation tests
-
-## Phase 3: GitHub Integration (Days 7-8)
-### GitHub App Automation
-- Implement GitHub App creation via API
-- Add webhook configuration automation
-- Create credential management system
-- Build GitHub integration validation
-
-### Webhook Management
-- Implement tunnel provider integration
-- Add webhook URL management
-- Create webhook delivery testing
-- Build webhook troubleshooting tools
-
-### Deliverables
-- Automated GitHub App creation
-- Webhook configuration system
-- Credential storage and management
-- GitHub integration tests
-
-## Phase 4: Distribution (Days 9-10)
-### Build and Package
-- Create cross-platform build system
-- Implement asset packaging
-- Add version management
-- Create release automation
-
-### Distribution Channels
-- Set up Homebrew formula
-- Create direct download system
-- Implement Docker image builds
-- Add GitHub release automation
-
-### Deliverables
-- Cross-platform binaries
-- Homebrew integration
-- Docker images
-- Release automation
-
-# Risks and Mitigations
-
-## Technical Challenges
-
-### Template Complexity
-**Risk**: Complex templates may be difficult to maintain and debug
-**Mitigation**: Comprehensive testing, clear documentation, template validation
-
-### Cluster Provisioning
-**Risk**: Different Kubernetes distributions may have compatibility issues
-**Mitigation**: Extensive testing on multiple platforms, fallback mechanisms
-
-### GitHub API Limits
-**Risk**: Rate limiting during automated GitHub App creation
-**Mitigation**: Implement retry logic, batch operations, user guidance
-
-## Resource Constraints
-
-### Testing Coverage
-**Challenge**: Testing on multiple platforms and configurations
-**Approach**: Automated CI/CD, cloud-based testing, community testing
-
-### Documentation
-**Challenge**: Comprehensive documentation for all installation paths
-**Approach**: Interactive help, video tutorials, troubleshooting guides
-
-## Minimum Viable Product Definition
-
-### MVP Scope
-- Basic CLI installer with minimal profile
-- k3s cluster provisioning
-- Core component installation
-- Simple GitHub integration
-- Basic validation system
-
-### MVP Success Criteria
-- Successfully install platform on fresh system
-- All core components functional
-- GitHub webhooks working
-- Clear upgrade path to full features
-
-# Appendix
-
-## Configuration Examples
-
-### Minimal Profile
-```yaml
-# config.yaml
-version: "0.1.0"
-profile: minimal
-
-platform:
-  name: my-dev-platform
-  namespace: cto
-
-github:
-  organization: myusername
-  repository: test-repo
-
-registry:
-  type: local
-  
-agents:
-  rex:
-    enabled: true
-    
-features:
-  monitoring: false
-  databases: false
-```
-
-### Production Profile
-```yaml
-# config.yaml
-version: "0.1.0"
-profile: production
-
-platform:
-  name: enterprise-platform
-  domain: agents.company.com
-  namespace: cto
-
-github:
-  organization: company-org
-  repository: platform-test
-  apps:
-    rex:
-      id: "${REX_APP_ID}"
-      client_id: "${REX_CLIENT_ID}"
-      private_key_path: "/secrets/rex.pem"
-    cleo:
-      id: "${CLEO_APP_ID}"
-      client_id: "${CLEO_CLIENT_ID}"
-      private_key_path: "/secrets/cleo.pem"
-    tess:
-      id: "${TESS_APP_ID}"
-      client_id: "${TESS_CLIENT_ID}"
-      private_key_path: "/secrets/tess.pem"
-
-registry:
-  type: ecr
-  url: xxx.dkr.ecr.us-west-2.amazonaws.com
-  namespace: company
-
-agents:
-  rex:
-    enabled: true
-    resources:
-      cpu: 4
-      memory: 8Gi
-  cleo:
-    enabled: true
-    resources:
-      cpu: 2
-      memory: 4Gi
-  tess:
-    enabled: true
-    resources:
-      cpu: 2
-      memory: 4Gi
-    features:
-      kubernetes_testing: true
-
-features:
-  monitoring: true
-  databases: true
-  mail_notifications: true
-  backup: true
-  high_availability: true
-```
+# CTO Platform-in-a-Box: Product Requirements Document
+
+## Executive Summary
+
+The CTO Platform-in-a-Box is a productized, distributable version of the 5D Labs CTO
+platform delivered as a bootable ISO image. It enables organizations to deploy a complete
+cloud-native development platform on bare-metal hardware with minimal technical expertise.
+
+**Vision**: "Engineering team infrastructure on a USB key"
+
+**Target Users**: Development teams and small-to-medium organizations who want on-premises
+cloud infrastructure without dedicated DevOps staff.
+
+---
+
+## Problem Statement
+
+Organizations face significant challenges deploying modern cloud-native infrastructure:
+
+1. **Complexity**: Kubernetes, GitOps, secrets management, observability - each requires
+   deep expertise to deploy and maintain correctly.
+
+2. **Cloud Costs**: Public cloud costs escalate quickly, especially for compute-intensive
+   workloads. Many organizations have underutilized on-premises hardware.
+
+3. **Compliance**: Some industries require on-premises data processing and cannot use
+   public cloud services.
+
+4. **DevOps Scarcity**: Skilled infrastructure engineers are expensive and hard to find.
+   Small teams often lack the expertise to build reliable platforms.
+
+---
+
+## Solution
+
+A productized platform delivered through multiple tiers to serve different customer segments:
+
+### Tier 1: CTO Appliance (MVP)
+A bootable ISO that installs a complete, production-ready platform on bare-metal servers:
+
+- Boot from USB/ISO
+- Follow simple setup wizard (5-10 minutes)
+- Platform installs and configures automatically (15-30 minutes)
+- Access dashboard and start deploying applications
+- **No Kubernetes knowledge required**
+
+### Tier 2: CTO Enterprise (Post-MVP)
+Scalable multi-node clusters for growing organizations:
+
+- Start with Appliance, scale to enterprise
+- Add nodes via simple enrollment process
+- High availability control plane
+- Distributed storage across nodes
+- Enterprise support and SLAs
+
+### Tier 3: CTO Platform (Post-MVP)
+Helm charts and operators for teams with existing Kubernetes:
+
+- Bring your own Kubernetes (any distribution)
+- Install CTO platform components only
+- Full GitOps integration
+- For DevOps-savvy teams
+- Lower price point (no infrastructure management)
+
+---
+
+## Target Personas
+
+### Tier 1 (Appliance) Personas
+
+**Primary: Technical Founder / Lead Developer**
+- Has development experience but limited infrastructure expertise
+- Wants to focus on product, not operations
+- Budget-conscious, prefers CapEx over OpEx
+- Comfortable with basic server hardware
+
+**Secondary: Small IT Team**
+- Manages on-premises infrastructure for a company
+- Familiar with basic Linux administration
+- Looking to modernize without massive learning curve
+- Needs vendor support option
+
+### Tier 2 (Enterprise) Personas
+
+**Primary: Growing Startup / Scale-up**
+- Started with Appliance, now needs to scale
+- Team has grown, reliability is critical
+- Needs HA but still wants managed simplicity
+- May have compliance requirements
+
+**Secondary: Enterprise Edge Deployment**
+- Deploying standardized infrastructure to multiple locations
+- Needs consistent, repeatable deployments
+- Values air-gapped capability
+- Requires enterprise support and SLAs
+
+### Tier 3 (Platform-Only) Personas
+
+**Primary: DevOps Team with Existing K8s**
+- Already running Kubernetes (cloud or on-prem)
+- Has infrastructure expertise in-house
+- Wants the CTO agent capabilities without re-platforming
+- Comfortable with Helm and GitOps
+
+**Secondary: Cloud-Native Consultancy**
+- Implementing CTO for clients
+- Clients have varied infrastructure
+- Needs flexibility in deployment options
+- Values documentation and support
+
+---
+
+## MVP Scope (v1.0)
+
+### In Scope
+
+#### Installation Experience
+- Bootable ISO image (UEFI and Legacy BIOS support)
+- Web-based setup wizard accessible during installation
+- DHCP networking by default with static IP option
+- Single-node deployment (control plane + worker on same node)
+- Progress indicator with status updates
+- Automatic hardware detection and configuration
+
+#### Platform Components
+- Talos Linux (immutable, API-driven operating system)
+- Kubernetes (version bundled with Talos)
+- ArgoCD (GitOps continuous deployment)
+- Vault (secrets management with auto-unseal)
+- CNPG (PostgreSQL operator for databases)
+- MinIO (S3-compatible object storage)
+- Cert-Manager (automatic TLS certificates)
+- Ingress-NGINX (ingress controller)
+- Longhorn (distributed block storage for persistence)
+- Prometheus + Grafana + Loki (observability stack)
+
+#### CTO Platform Features
+- Agent controller and workflow engine
+- MCP server integration
+- Pre-configured coding agents (Rex, Blaze, etc.)
+- GitHub integration for repositories
+
+#### Agent Configuration (BYOK - Bring Your Own Keys)
+- **CLI Agnostic**: Support for multiple coding CLIs
+  - Cursor CLI
+  - Claude Code (claude)
+  - Windsurf
+  - Aider
+  - Continue
+  - Future CLIs as they emerge
+- **Model Agnostic**: User selects preferred models
+  - OpenAI (GPT-4, GPT-4o, etc.)
+  - Anthropic (Claude Sonnet, Opus, etc.)
+  - Google (Gemini)
+  - Local/Self-Hosted models:
+    - Ollama (easy local deployment)
+    - vLLM (high-performance inference)
+    - llama.cpp (CPU-friendly)
+    - Text Generation Inference (HuggingFace)
+  - Open-source models:
+    - Llama 3.x / Code Llama
+    - Mistral / Mixtral / Codestral
+    - DeepSeek Coder
+    - Qwen 2.5 Coder
+    - StarCoder 2
+    - ChatGLM / GLM-4
+  - Custom endpoints (OpenAI-compatible API)
+- **Bring Your Own Keys**: Users provide their own API keys
+  - Stored securely in Vault
+  - Per-agent key configuration
+  - Key rotation support
+- **Configuration UI**: Dashboard for agent setup
+  - Select CLI per agent
+  - Select model per agent
+  - Configure API keys
+  - Test connectivity
+- **Dynamic Updates**: CLI/model catalog pulled from GitHub
+  - New CLIs added without platform update
+  - Model list stays current
+  - Community contributions possible
+- **Local Model Hosting** (Stretch Goal / v1.2):
+  - One-click Ollama deployment on the platform
+  - GPU passthrough for acceleration (when available)
+  - Model download/management UI
+  - Perfect for air-gapped deployments
+  - Code never leaves the server
+  - Cost savings for high-volume usage
+  - Guardian agent can use local models too
+
+#### Updates & Maintenance
+- OTA (Over-The-Air) update operator
+- Automatic security patches within maintenance windows
+- Manual update option for air-gapped deployments
+- Automatic backups to MinIO
+- Health monitoring and alerting
+
+#### Platform Guardian Agent (Self-Healing)
+The platform includes a dedicated maintenance agent that keeps the environment healthy
+without requiring infrastructure expertise from users.
+
+**Continuous Monitoring:**
+- Cluster health (nodes, pods, services)
+- Certificate expiration (auto-renewal)
+- Storage capacity and cleanup
+- Resource utilization (CPU, memory, disk)
+- Network connectivity
+- Backup verification
+- Security posture
+
+**Automatic Remediation:**
+- Restart failed services
+- Clean up orphaned resources
+- Rotate expiring certificates
+- Scale resources during pressure
+- Clear filled logs/temp storage
+- Reconnect dropped integrations
+- Apply safe security patches
+
+**Proactive Detection:**
+- Predict storage exhaustion before it happens
+- Identify resource contention patterns
+- Detect configuration drift
+- Flag deprecated API usage before upgrades
+- Monitor for security vulnerabilities
+
+**Phone-Home Reporting (opt-in):**
+- Anonymous health telemetry to 5D Labs
+- Early warning of common issues
+- Aggregate data improves platform for all users
+- Critical alerts can trigger proactive support
+- No sensitive data transmitted (code, secrets, etc.)
+
+**User Experience:**
+- Dashboard shows platform health score
+- Plain-English explanations of issues
+- "Guardian handled X issues this week" summary
+- Escalation to human only when necessary
+- No SSH, no kubectl required for routine maintenance
+
+#### Security
+- Cryptographic license validation (offline-capable)
+- TLS everywhere by default
+- Automatic certificate rotation
+- Network policies enabled
+- Secrets encrypted at rest
+
+### Out of Scope (Future Versions)
+
+**Tier 2: CTO Enterprise (v1.1-v1.3)**
+- Multi-node cluster deployment (v1.1)
+- Node enrollment and discovery (v1.1)
+- High-availability control plane (v1.1)
+- Distributed storage with Longhorn replication (v1.1)
+- ARM64 architecture support (v1.2)
+- GPU workload support (v1.2)
+- External storage integration (NFS, iSCSI) (v1.2)
+- LDAP/Active Directory integration (v1.2)
+- Multi-cluster management (v1.3)
+
+**Tier 3: CTO Platform (v1.1+)**
+- Helm chart distribution for existing Kubernetes (v1.1)
+- Compatibility testing with major K8s distributions (v1.1)
+  - EKS, GKE, AKS
+  - k3s, RKE2, OpenShift
+  - Vanilla kubeadm clusters
+- Minimal dependency installation mode (v1.2)
+- Migration path from Platform to Appliance (v1.3)
+
+**Agent Customization (v1.2+)**
+- Custom agent builder UI (v1.2)
+- User-defined agent templates (v1.2)
+- Custom workflow creation (v1.3)
+- Agent sharing/export (v1.3)
+- Community agent marketplace (v2.0)
+
+**Service Add-ons (v1.1+)**
+- Optional services installable via UI
+- See "AWS Services Matrix" appendix below
+
+**Other Future Features**
+- Custom branding/white-label (v2.0)
+- Marketplace for add-ons (v2.0)
+- Multi-tenant support (v2.0)
+
+---
+
+## Hardware Requirements
+
+### MVP: Certified Hardware (v1.0)
+
+For MVP, we focus on **one or two certified server configurations** to ensure
+a consistent, tested experience. This is the "it just works" path.
+
+**Primary Certified Platform: Dell PowerEdge R660/R760**
+- Most popular enterprise server line
+- Wide availability (new and refurbished)
+- Well-documented, good driver support
+- Dell iDRAC for remote management
+
+**Certified Configuration:**
+- CPU: Intel Xeon Silver 4410Y (12 cores) or better
+- RAM: 64 GB DDR5 ECC (expandable)
+- Storage: 2x 960GB NVMe SSD (BOSS-N1 boot + data)
+- Network: Broadcom 10GbE dual-port
+- Boot: UEFI with Secure Boot
+- RAID: PERC H965i in HBA mode (passthrough)
+
+**Alternative Certified Platform: HPE ProLiant DL360 Gen11**
+- Similar specs to Dell
+- For customers with HPE preference/contracts
+
+### General Requirements (for non-certified hardware)
+
+Users can run on non-certified hardware at their own risk.
+Community-reported compatible hardware will be documented.
+
+**Minimum:**
+- CPU: 8 cores (x86_64, Intel Xeon or AMD EPYC class)
+- RAM: 32 GB ECC
+- Storage: 500 GB NVMe SSD
+- Network: 1 Gbps Ethernet
+- Boot: UEFI preferred, Legacy BIOS supported
+
+**Recommended:**
+- CPU: 16+ cores
+- RAM: 64+ GB ECC
+- Storage: 1+ TB NVMe SSD
+- Network: 10 Gbps Ethernet
+- Boot: UEFI with Secure Boot
+
+### Hardware Compatibility Roadmap
+
+| Version | Hardware Support |
+|---------|------------------|
+| v1.0 (MVP) | Dell PowerEdge R660/R760, HPE DL360 Gen11 |
+| v1.1 | Supermicro SYS series, Lenovo ThinkSystem |
+| v1.2 | Intel NUC (dev/small teams), Mini PCs |
+| v1.3 | ARM64 servers (Ampere, AWS Graviton-compatible) |
+| v1.4 | GPU servers (NVIDIA A100/H100, RTX 4090) |
+| v2.0 | Community-contributed hardware profiles |
+
+### Why Certified Hardware?
+
+1. **Guaranteed Experience**: We test every release on certified hardware
+2. **Faster Support**: Issues on certified hardware get priority
+3. **Driver Confidence**: No surprises with network/storage drivers
+4. **Documentation**: Step-by-step guides specific to your hardware
+5. **Refurbished Option**: Dell R650/R750 (previous gen) available cheap
+
+### Storage Notes
+- Hardware RAID controllers should be in HBA/passthrough mode
+- NVMe drives preferred for performance
+- Minimum 20% free space required for upgrades and operations
+- BOSS cards (Dell) or M.2 boot devices work well
+
+---
+
+## User Experience Requirements
+
+### Setup Wizard Screens
+
+1. **Welcome**
+   - Product branding and version
+   - EULA acceptance
+   - Language selection (English initially, i18n later)
+
+2. **License**
+   - License key entry field
+   - "Request trial" link
+   - Offline validation (no internet required)
+
+3. **Organization Setup**
+   - Organization name
+   - Admin email address
+   - Admin password (with strength indicator)
+
+4. **Network Configuration**
+   - Auto-detected settings shown (DHCP)
+   - Option to configure static IP
+   - Hostname configuration
+   - DNS settings (use DHCP or custom)
+
+5. **Storage Configuration**
+   - Detected disks shown
+   - Select installation target
+   - Warning if existing data will be erased
+   - Partition allocation (OS, Data, Swap)
+
+6. **Domain & Access** (Optional)
+   - Custom domain configuration
+   - Let's Encrypt email for auto-certificates
+ Or: use self-signed certificates
+
+7. **Features** (Optional)
+ Enable/disable optional components
+   - Configure resource allocation
+   - Set maintenance window
+
+8. **Review & Install**
+   - Summary of all settings
+   - Edit buttons to go back
+   - "Install" button with confirmation
+
+allation Progress
+
+- Clear progress bar with percentage
+- Current step indicator (1 of 10, etc.)
+- Expandable log view for advanced users
+ted time remaining
+- Clear error messages if something fails
+" and "Get Help" options on failure
+
+### Post-Installation
+
+- Automatic redirect to platform dashboard
+login wizard for additional setup
+- Quick-start guide overlay
+- Link to documentation
+
+---
+
+## Technical Requirements
+
+### ISO Builder
+- Automated CI/CD pipeline (GitHub Actions)
+ucible builds
+- Versioned releases
+- Signed ISOs for integrity verification
+- Two variants:
+  - Connected (~2 GB): Pulls images during install
+  - Air-gapped (~30 GB): All images bundled
+
+### Bootstrap Environment
+- Minimal Linux environment running in RAM
+bedded web server (port 80/443)
+- mDNS advertisement (cto-setup.local)
+- Console UI fallback if web inaccessible
+rdware detection utilities
+ing tools
+
+### Talos Configuration
+nerated machine config from wizard inputs
+- Single-node optimizations:
+e tolerations for workloads
+Appropriate resource reservations
+  - Local path provisioner enabled
+- Networking: Cilium CNI with defaults
+
+### OTA Update Operator
+- Kubernetes operator pattern
+- CRD for update configuration
+- Checks update server periodically
+- Respects maintenance windows
+es before upgrade
+- Rolling updates with health checks
+- Automatic rollback on failure
+- Notification hooks (email, webhook)
+
+### License System
+- Ed25519 signature verification
+- License file contains:
+  - Customer identifier
+e and expiration dates
+  - Feature flags
+  - Node limit
+  - Support tier
+- Public key embedded in installer
+e validation (no phone-home required)
+- Optional phone-home for:
+te checks
+  - Usage analytics (opt-in)
+  - Support ticket creation
+
+---
 
 ## Success Metrics
-- Installation success rate: >95%
-- Time to first task: <5 minutes
-- Configuration complexity: <10 interactive prompts
-- Upgrade success rate: >99%
-- Community adoption: 100+ installations
-</PRD>
+
+allation Success
+- Target: 95% of installations complete without support
+: Telemetry from successful/failed installs (opt-in)
+
+### Time to Value
+- Target: Working platform in < 45 minutes from boot
+- Metric: Time from first boot to dashboard access
+
+### User Satisfaction
+- Target: NPS > 50
+- Metric: Post-installation survey
+
+### Support Burden
+- Target: < 0.5 support tickets per installation
+- Metric: Support ticket tracking
+
+
+
+## Risks and Mitigations
+
+| Risk | Impact | Likelihood | Mitigation |
+|------|--------|------------|------------|
+| Hardware compatibility issues | High | Medium | Maintain tested HCL, clear requirements |
+| Complex networking environments | Medium | High | Good defaults, advanced config options |
+| Update failures brick system | Critical | Low | Automatic rollback, backup before update |
+| License bypass attempts | Medium | Medium | Code obfuscation, feature flags server-side |
+| Competition from Harvester/Rancher | Medium | Medium | Focus on DX and agent features |
+
+---
+
+## Timeline (Estimated)
+
+### Phase 1: Foundation (4-6 weeks)
+O builder pipeline
+- Bootstrap environment with basic wizard
+- Talos installation automation
+sic platform deployment (ArgoCD, core services)
+
+### Phase 2: Polish (3-4 weeks)
+- Full wizard implementation
+- License system integration
+- OTA update operator
+- Observability stack
+
+### Phase 3: Hardening (2-3 weeks)
+- Security audit
+- Hardware compatibility testing
+- Documentation
+- Beta program
+
+### Phase 4: Launch (2 weeks)
+- Marketing site
+- Pricing/licensing portal
+- Support infrastructure
+- Public release
+
+---
+
+## Open Questions
+
+1. **Pricing model**: Per-node subscription? One-time license? Fre tier?
+
+2. **Support tiers**: What levels of support to offer? Community, Pro, Enterprise?
+
+3. **Telemetry**: What data to collect? How to ensure user privacy?
+
+4. **Updates frequency**: How often to release updates? LTS v rolling?
+
+5. **Multi-node timeline**: When to prioritize multi-node support?
+
+6. **Partner hardware**: Should we partner with hardware vendors for certified bundles?
+
+---
+
+## Appendix: Competitive Analysis
+
+### Harvester (SUSE)
+- Pros: Full HCI, VM support via KubeVirt, open source
+- Cons: Opinionated, complex, VM-focused not container-native
+rentiation**: Simpler, developer-focused, agent-first
+- **Tier 2 differentiation**: Container-native vs VM-centric approach
+
+### Rancher
+- Pros: Multi-cluster management, large community
+- Cons: Management layer only, doesn't provide the infrastructure
+- **Tier 1/2 differentiation**: Complete platform, not just management
+- **Tier 3 differentiation**: Agent capabilities beyond basic management
+
+### k3s / k0s
+- Pros: Lightweight, easy to install
+- Cons: DIY - no platform components included
+- **Tier 1 differentiation**: Batteries-included, zero-config to production
+- **Tier 3 differentiation**: Full platform stack vs bare Kubernetes
+
+### OpenStack
+- Pros: Mature, comprehensive IaaS
+- Cons: Complex, heavyweight, requires dedicated team
+- **All tiers differentiation**: Simplicity, Kubernetes-native, modern stack
+
+### Talos + Sidero/Omni
+- Pros: Same base OS, bare-metal provisioning
+- Cons: Infrastructure only, no application platform
+- **Tier 1 differentiation**: Full platform stack included
+- **Tier 2 differentiation**: Simpler than Sidero, integrated platform
+
+### Portainer / Lens
+- Pros: Good UI for K8s management
+- Cons: UI layer only, no platform capabilities
+- **All tiers differentiation**: AI agents, GitOps-native, full platform
+
+### Coder / Gitpod
+- Pros: Developer environments
+- Cons: Cloud-focused, no self-hosted bare-metal story
+- **Tier 1/2 differentiation**: Own your infrastructure + AI agents
+- **Tier 3 differentiation**: Complements rather than competes
+
+### Our Unique Value Proposition
+1. **AI Agent-First**: Purpose-built for agentic workflows
+2. **True Bare-Metal**: Real on-premises ownership, not cloud dependency
+3. **Appliance Simplicity**: Consumer-grade experience for enterprise infrastructure
+4. **Growth Path**: Single-node to enterprise without re-platforming
+5. **Flexibility**: From USB-install to existing-K8s, meet customers where they are
+6. **Built-in SRE**: Guardian Agent maintains the platform automatically
+   - No competitor offers self-healing infrastructure for self-hosted
+   - Bridges gap between "managed service" reliability and "self-hosted" control
+   - Users get reliability without needing infrastructure expertise
+   - Phone-home telemetry (opt-in) enables proactive support
+
+---
+
+## Appendix: AWS Services → Open Source Alternatives Matrix
+
+The platform can offer optional add-on services that replicate AWS functionality.
+This creates a "self-hosted AWS" experience with open-source alternatives.
+
+### Legend
+- ✅ **Included** = Part of base platform
+- 🎯 **Priority** = High-value add-on for v1.x
+- 📦 **Add-on** = Available as optional install
+- 🔮 **Future** = Planned for later versions
+
+---
+
+### Compute
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| EC2 | Virtual machines | Kubernetes (bare metal) | ✅ Included |
+| Lambda | Serverless functions | OpenFaaS, Knative, Fission | 🎯 Priority |
+| ECS/EKS | Container orchestration | Kubernetes | ✅ Included |
+| Fargate | Serverless containers | Virtual Kubelet | 🔮 Future |
+| Batch | Batch processing | Argo Workflows, Volcano | 📦 Add-on |
+
+### Storage
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| S3 | Object storage | MinIO | ✅ Included |
+| EBS | Block storage | Longhorn | ✅ Included |
+| EFS | File storage (NFS) | NFS, Rook-CephFS | 📦 Add-on |
+| FSx | High-perf file systems | BeeGFS, Lustre | 🔮 Future |
+| Glacier | Archive storage | MinIO tiering | 🔮 Future |
+
+### Database
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| RDS (Postgres) | Managed PostgreSQL | CNPG (CloudNativePG) | ✅ Included |
+| RDS (MySQL) | Managed MySQL | MySQL Operator, Vitess | 📦 Add-on |
+| Aurora | High-perf relational | CockroachDB, TiDB | 📦 Add-on |
+| DynamoDB | NoSQL key-value | ScyllaDB, Cassandra, FoundationDB | 🎯 Priority |
+| ElastiCache (Redis) | In-memory cache | Redis, Dragonfly, KeyDB | 🎯 Priority |
+| ElastiCache (Memcached) | Distributed cache | Memcached | 📦 Add-on |
+| DocumentDB | Document database | MongoDB, FerretDB | 📦 Add-on |
+| Neptune | Graph database | Neo4j, JanusGraph, DGraph | 📦 Add-on |
+| Timestream | Time-series DB | TimescaleDB, InfluxDB, QuestDB | 🎯 Priority |
+| QLDB | Ledger database | immudb | 🔮 Future |
+| Keyspaces | Cassandra-compatible | Apache Cassandra, ScyllaDB | 📦 Add-on |
+
+### Messaging & Streaming
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| SQS | Message queue | RabbitMQ, NATS | 🎯 Priority |
+| SNS | Pub/sub notifications | NATS, Apache Kafka | 🎯 Priority |
+| Kinesis | Data streaming | Apache Kafka, Redpanda | 🎯 Priority |
+| EventBridge | Event bus | NATS JetStream, Knative Eventing | 📦 Add-on |
+| MQ | Message broker | RabbitMQ, ActiveMQ Artemis | 📦 Add-on |
+| MSK | Managed Kafka | Strimzi (Kafka Operator) | 📦 Add-on |
+
+### Analytics & Big Data
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| Athena | SQL query service | Trino, Presto, DuckDB | 📦 Add-on |
+| Redshift | Data warehouse | ClickHouse, Apache Druid | 🎯 Priority |
+| EMR | Big data processing | Apache Spark on K8s | 📦 Add-on |
+| Glue | ETL service | Apache Airflow, Dagster | 📦 Add-on |
+| QuickSight | BI dashboards | Apache Superset, Metabase | 📦 Add-on |
+| OpenSearch | Search & analytics | OpenSearch, Elasticsearch | 🎯 Priority |
+
+### Machine Learning & AI
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| SageMaker | ML platform | Kubeflow, MLflow | 📦 Add-on |
+| Bedrock | Foundation models | Ollama + open models | 🎯 Priority |
+| Rekognition | Image analysis | OpenCV, YOLO | 🔮 Future |
+| Comprehend | NLP | HuggingFace Transformers | 🔮 Future |
+| Transcribe | Speech-to-text | Whisper | 📦 Add-on |
+| Polly | Text-to-speech | Coqui TTS | 🔮 Future |
+
+### Networking
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| Route 53 | DNS | CoreDNS, ExternalDNS, PowerDNS | ✅ Included |
+| CloudFront | CDN | Varnish, Nginx caching | 📦 Add-on |
+| API Gateway | API management | Kong, Apache APISIX, Traefik | 🎯 Priority |
+| ELB/ALB | Load balancing | MetalLB, Ingress-NGINX | ✅ Included |
+| VPC | Virtual network | Cilium, Calico | ✅ Included |
+| Direct Connect | Dedicated connection | N/A (physical) | N/A |
+| VPN | Virtual private network | WireGuard, OpenVPN | 📦 Add-on |
+
+### Security & Identity
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| IAM | Identity management | Keycloak, Authentik | 🎯 Priority |
+| Cognito | User authentication | Keycloak, Authentik, Authelia | 🎯 Priority |
+| Secrets Manager | Secrets storage | Vault | ✅ Included |
+| KMS | Key management | Vault Transit | ✅ Included |
+| Certificate Manager | TLS certs | cert-manager | ✅ Included |
+| WAF | Web firewall | ModSecurity, Coraza | 📦 Add-on |
+| GuardDuty | Threat detection | Falco | 📦 Add-on |
+| Inspector | Vulnerability scanning | Trivy, Grype | 📦 Add-on |
+| Security Hub | Security posture | Kubescape, Polaris | 📦 Add-on |
+
+### Developer Tools
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| CodeCommit | Git repos | Gitea, Forgejo, GitLab | 📦 Add-on |
+| CodeBuild | CI builds | Tekton, Drone, Woodpecker | 📦 Add-on |
+| CodePipeline | CI/CD pipelines | ArgoCD, Tekton Pipelines | ✅ Included |
+| CodeArtifact | Package registry | Harbor, Nexus, Gitea | 📦 Add-on |
+| CodeDeploy | Deployment | ArgoCD, Flux | ✅ Included |
+| Cloud9 | Cloud IDE | code-server, OpenVSCode | 📦 Add-on |
+| CloudFormation | IaC | Crossplane, Pulumi | 📦 Add-on |
+
+### Application Integration
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| Step Functions | Workflow orchestration | Temporal, Argo Workflows | 🎯 Priority |
+| AppSync | GraphQL API | Hasura, PostGraphile | 📦 Add-on |
+| AppFlow | Data integration | Airbyte | 📦 Add-on |
+| EventBridge Scheduler | Task scheduling | Kubernetes CronJobs | ✅ Included |
+
+### Observability
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| CloudWatch Metrics | Metrics | Prometheus | ✅ Included |
+| CloudWatch Logs | Logging | Loki | ✅ Included |
+| CloudWatch Alarms | Alerting | Alertmanager | ✅ Included |
+| X-Ray | Distributed tracing | Jaeger, Tempo | 🎯 Priority |
+| CloudWatch Dashboards | Visualization | Grafana | ✅ Included |
+
+### Migration & Transfer
+
+| AWS Service | Description | Open Source Alternative | Status |
+|-------------|-------------|------------------------|--------|
+| DMS | Database migration | pgloader, Debezium | 📦 Add-on |
+| Transfer Family | SFTP/FTPS | OpenSSH, ProFTPD | 📦 Add-on |
+
+---
+
+### Priority Add-ons for v1.x
+
+Based on common use cases, these are the highest-value add-ons to prioritize:
+
+1. **Redis/Dragonfly** - Caching is universal
+2. **NATS/RabbitMQ** - Pub/sub and queuing
+3. **Apache Kafka/Redpanda** - Event streaming
+4. **Keycloak** - SSO/Identity (enterprise requirement)
+5. **OpenFaaS** - Serverless functions
+6. **ClickHouse** - Analytics/data warehouse
+7. **Temporal** - Workflow orchestration
+8. **Kong/APISIX** - API gateway
+9. **Ollama** - Local LLM hosting
+10. **Jaeger/Tempo** - Distributed tracing
+
+### Add-on Installation UX
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Service Marketplace                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  🔴 Redis           │  │  🐰 RabbitMQ        │              │
+│  │  In-memory cache    │  │  Message broker     │              │
+│  │  ⭐⭐⭐⭐⭐ Popular   │  │  ⭐⭐⭐⭐ Popular    │              │
+│  │                     │  │                     │              │
+│  │  [Install]          │  │  [Install]          │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                  │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  📊 ClickHouse      │  │  🔐 Keycloak        │              │
+│  │  Analytics DB       │  │  Identity/SSO       │              │
+│  │  ⭐⭐⭐⭐            │  │  ⭐⭐⭐⭐⭐ Popular   │              │
+│  │                     │  │                     │              │
+│  │  [Install]          │  │  [Install]          │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                  │
+│  Categories: [All] [Database] [Messaging] [Analytics] [ML]      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2025-11-27 | 5D Labs | Initial draft from brainstorming session |

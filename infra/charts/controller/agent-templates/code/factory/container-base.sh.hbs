@@ -950,7 +950,7 @@ done
 MANAGED_PATHS=(
   ".mcp.json"
   "AGENTS.md"
-  "client-config.json"
+  "tools-config.json"
   "coding-guidelines.md"
   "github-guidelines.md"
   ".factory"
@@ -1387,10 +1387,10 @@ if [ -f /task-files/github-guidelines.md ]; then
 fi
 
 
-# Generate client-config.json from cto-config.json in the cloned repository
-echo "🔧 Generating client-config.json from cto-config.json..."
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
 CTO_CONFIG_PATH="$FACTORY_WORK_DIR/cto-config.json"
-CLIENT_CONFIG_PATH="$FACTORY_WORK_DIR/client-config.json"
+CLIENT_CONFIG_PATH="$FACTORY_WORK_DIR/tools-config.json"
 
 if [ -f "$CTO_CONFIG_PATH" ]; then
   echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
@@ -1406,7 +1406,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
     jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
   fi
   
-  # Extract tools configuration and generate client-config.json
+  # Extract tools configuration and generate tools-config.json
   if command -v jq >/dev/null 2>&1; then
     # First check if agent exists in cto-config.json
     if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
@@ -1422,8 +1422,8 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
       TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
       
       if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
-        echo "✅ Generated client-config.json from cto-config.json"
-        echo "🔍 DEBUG: Generated client-config.json contents:"
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
         jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
       else
         echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
@@ -1433,7 +1433,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
       echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
     fi
   else
-    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
   fi
 else
   echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
@@ -1441,17 +1441,17 @@ fi
 
 # Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
 if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
-  echo "📋 client-config.json not generated, using ConfigMap fallback..."
-  if [ -f /task-files/client-config.json ]; then
-    cp /task-files/client-config.json "FACTORY_WORK_DIR/"
-    echo "✓ Copied client-config.json to working directory"
+  echo "📋 tools-config.json not generated, using ConfigMap fallback..."
+  if [ -f /task-files/tools-config.json ]; then
+    cp /task-files/tools-config.json "FACTORY_WORK_DIR/"
+    echo "✓ Copied tools-config.json to working directory"
   fi
 else
-  echo "✓ Using dynamically generated client-config.json from cto-config.json"
+  echo "✓ Using dynamically generated tools-config.json from cto-config.json"
 fi
 
 if declare -F ensure_default_client_config >/dev/null 2>&1; then
-  ensure_default_client_config "$FACTORY_WORK_DIR/client-config.json"
+  ensure_default_client_config "$FACTORY_WORK_DIR/tools-config.json"
 fi
 
 if [ -f /task-files/mcp.json ]; then
@@ -1474,12 +1474,12 @@ else
   echo "⚠️ factory-cli-config.json not provided; using existing global Factory config"
 fi
 
-if [ ! -f "$FACTORY_WORK_DIR/client-config.json" ]; then
-  echo "❌ client-config.json missing from workspace; required for MCP/tools"
+if [ ! -f "$FACTORY_WORK_DIR/tools-config.json" ]; then
+  echo "❌ tools-config.json missing from workspace; required for MCP/tools"
   exit 1
 fi
 
-cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true 2>/dev/null || true
+cp \$FACTORY_WORK_DIR/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true 2>/dev/null || true
 
 echo "=== MCP PRECHECKS ==="
 if ! command -v tools >/dev/null 2>&1; then
@@ -1524,7 +1524,7 @@ echo "✓ Tools endpoint check completed"
 
 if command -v jq >/dev/null 2>&1; then
   echo "[client-config] summary:"
-  if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null; then
+  if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$FACTORY_WORK_DIR/tools-config.json" 2>/dev/null; then
     echo "  (not valid JSON)"
   fi
 else
@@ -1607,7 +1607,7 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
   echo "Common issues:"
   echo "  - Tools server not reachable"
   echo "  - MCP servers not initialized properly"
-  echo "  - client-config.json misconfigured"
+  echo "  - tools-config.json misconfigured"
   echo ""
   echo "Full tool list:"
   droid exec --list-tools 2>&1 || echo "Failed to list tools"
@@ -1629,18 +1629,18 @@ echo "════════════════════════�
 echo ""
 
 # -------------------------------------------------------------------------
-# LIST 1: Tools configured in client-config.json
+# LIST 1: Tools configured in tools-config.json
 # -------------------------------------------------------------------------
-echo "📋 LIST 1: CONFIGURED TOOLS (from client-config.json)"
+echo "📋 LIST 1: CONFIGURED TOOLS (from tools-config.json)"
 echo "────────────────────────────────────────────────────────────────"
 
 CONFIGURED_TOOLS_FILE="/tmp/configured-tools.txt"
 rm -f "$CONFIGURED_TOOLS_FILE"
 touch "$CONFIGURED_TOOLS_FILE"
 
-if [ -f "$FACTORY_WORK_DIR/client-config.json" ] && command -v jq >/dev/null 2>&1; then
+if [ -f "$FACTORY_WORK_DIR/tools-config.json" ] && command -v jq >/dev/null 2>&1; then
   # Extract remote tools
-  REMOTE_TOOLS=$(jq -r '.remoteTools[]? // empty' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null | sort)
+  REMOTE_TOOLS=$(jq -r '.remoteTools[]? // empty' "$FACTORY_WORK_DIR/tools-config.json" 2>/dev/null | sort)
   if [ -n "$REMOTE_TOOLS" ]; then
     echo "$REMOTE_TOOLS" >> "$CONFIGURED_TOOLS_FILE"
     REMOTE_COUNT=$(echo "$REMOTE_TOOLS" | wc -l | tr -d ' ')
@@ -1653,12 +1653,12 @@ if [ -f "$FACTORY_WORK_DIR/client-config.json" ] && command -v jq >/dev/null 2>&
   fi
   
   # Extract local server tools
-  LOCAL_SERVERS=$(jq -r '.localServers | keys[]? // empty' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
+  LOCAL_SERVERS=$(jq -r '.localServers | keys[]? // empty' "$FACTORY_WORK_DIR/tools-config.json" 2>/dev/null)
   if [ -n "$LOCAL_SERVERS" ]; then
     echo ""
     echo "Local server tools:"
     echo "$LOCAL_SERVERS" | while read -r server; do
-      TOOLS=$(jq -r ".localServers[\"$server\"].tools[]? // empty" "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
+      TOOLS=$(jq -r ".localServers[\"$server\"].tools[]? // empty" "$FACTORY_WORK_DIR/tools-config.json" 2>/dev/null)
       if [ -n "$TOOLS" ]; then
         echo "$TOOLS" >> "$CONFIGURED_TOOLS_FILE"
         TOOL_COUNT=$(echo "$TOOLS" | wc -l | tr -d ' ')
@@ -1674,7 +1674,7 @@ if [ -f "$FACTORY_WORK_DIR/client-config.json" ] && command -v jq >/dev/null 2>&
   echo ""
   echo "📊 Total configured: $TOTAL_CONFIGURED"
 else
-  echo "⚠️ Cannot read client-config.json (file missing or jq unavailable)"
+  echo "⚠️ Cannot read tools-config.json (file missing or jq unavailable)"
   TOTAL_CONFIGURED=0
 fi
 

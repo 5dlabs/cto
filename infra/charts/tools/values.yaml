@@ -227,11 +227,25 @@ config:
       url: "https://mcp.solana.com/mcp"
       workingDirectory: "/tmp"
 
-# Local tools configuration (client-side tools available in agent containers)
-# NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
-# which breaks MCP protocol validation in Cursor and other clients
-localTools:
-  servers:
+    # --- Social ---
+    reddit:
+      name: "Reddit"
+      description: "Reddit content fetching and analysis via uvx"
+      transport: "stdio"
+      command: "uvx"
+      args: ["--from", "git+https://github.com/adhikasp/mcp-reddit.git", "mcp-reddit"]
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-reddit-secrets"
+        keys:
+          - "REDDIT_CLIENT_ID"
+          - "REDDIT_CLIENT_SECRET"
+          - "REDDIT_USERNAME"
+          - "REDDIT_PASSWORD"
+
+    # --- Local Servers (run in agent containers, not proxied) ---
+    # NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
+    # which breaks MCP protocol validation in Cursor and other clients
     rust-tools:
       name: "Rust Development Tools"
       description: "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development"
@@ -239,6 +253,7 @@ localTools:
       command: "/home/node/.cargo/bin/cursor-rust-tools"
       args: ["--no-ui"]
       workingDirectory: "/workspace"
+      local: true
 
 # Persistence for temporary files and caches
 persistence:

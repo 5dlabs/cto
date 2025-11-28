@@ -115,3 +115,6 @@ dist/
 # Secrets backup - never commit
 secrets-backup-*/
 huddle/
+
+# Platform packaging docs (private business documents)
+docs/platform-packaging/

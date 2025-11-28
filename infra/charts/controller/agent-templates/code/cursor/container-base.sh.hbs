@@ -844,7 +844,7 @@ echo "=== BRANCH SETUP ==="
 MANAGED_PATHS=(
   ".mcp.json"
   "AGENTS.md"
-  "client-config.json"
+  "tools-config.json"
   "coding-guidelines.md"
   "github-guidelines.md"
   "task"
@@ -1194,10 +1194,10 @@ if [ -f /task-files/github-guidelines.md ]; then
 fi
 
 
-# Generate client-config.json from cto-config.json in the cloned repository
-echo "🔧 Generating client-config.json from cto-config.json..."
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
 CTO_CONFIG_PATH="$CURSOR_WORK_DIR/cto-config.json"
-CLIENT_CONFIG_PATH="$CURSOR_WORK_DIR/client-config.json"
+CLIENT_CONFIG_PATH="$CURSOR_WORK_DIR/tools-config.json"
 
 if [ -f "$CTO_CONFIG_PATH" ]; then
   echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
@@ -1213,7 +1213,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
     jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
   fi
   
-  # Extract tools configuration and generate client-config.json
+  # Extract tools configuration and generate tools-config.json
   if command -v jq >/dev/null 2>&1; then
     # First check if agent exists in cto-config.json
     if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
@@ -1229,8 +1229,8 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
       TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
       
       if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
-        echo "✅ Generated client-config.json from cto-config.json"
-        echo "🔍 DEBUG: Generated client-config.json contents:"
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
         jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
       else
         echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
@@ -1240,7 +1240,7 @@ if [ -f "$CTO_CONFIG_PATH" ]; then
       echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
     fi
   else
-    echo "⚠️ jq not available; cannot generate client-config.json from cto-config.json"
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
   fi
 else
   echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
@@ -1248,13 +1248,13 @@ fi
 
 # Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
 if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
-  echo "📋 client-config.json not generated, using ConfigMap fallback..."
-  if [ -f /task-files/client-config.json ]; then
-    cp -f /task-files/client-config.json "$CURSOR_WORK_DIR/"
-    echo "✓ Copied client-config.json to working directory"
+  echo "📋 tools-config.json not generated, using ConfigMap fallback..."
+  if [ -f /task-files/tools-config.json ]; then
+    cp -f /task-files/tools-config.json "$CURSOR_WORK_DIR/"
+    echo "✓ Copied tools-config.json to working directory"
   fi
 else
-  echo "✓ Using dynamically generated client-config.json from cto-config.json"
+  echo "✓ Using dynamically generated tools-config.json from cto-config.json"
 fi
 
 if [ -f /task-files/mcp.json ]; then
@@ -1288,12 +1288,12 @@ else
 fi
 
 if declare -F ensure_default_client_config >/dev/null 2>&1; then
-  ensure_default_client_config "$CURSOR_WORK_DIR/client-config.json" "$REPO_ROOT/client-config.json" "/workspace/$REPO_NAME/client-config.json"
+  ensure_default_client_config "$CURSOR_WORK_DIR/tools-config.json" "$REPO_ROOT/tools-config.json" "/workspace/$REPO_NAME/tools-config.json"
 fi
 
-# Check if client-config.json exists in working directory
-if [ ! -f "$CURSOR_WORK_DIR/client-config.json" ]; then
-  echo "❌ client-config.json missing from workspace; required for MCP/tools"
+# Check if tools-config.json exists in working directory
+if [ ! -f "$CURSOR_WORK_DIR/tools-config.json" ]; then
+  echo "❌ tools-config.json missing from workspace; required for MCP/tools"
   exit 1
 fi
 
@@ -1303,9 +1303,9 @@ if ! command -v tools >/dev/null 2>&1; then
   exit 1
 fi
 
-WORKSPACE_CFG="$MCP_CLIENT_CONFIG"
-SOURCE_CFG="/task-files/client-config.json"
-TARGET_CFG="${MCP_CLIENT_CONFIG:-$TASK_WORKSPACE/client-config.json}"
+WORKSPACE_CFG="$MCP_TOOLS_CONFIG"
+SOURCE_CFG="/task-files/tools-config.json"
+TARGET_CFG="${MCP_TOOLS_CONFIG:-$TASK_WORKSPACE/tools-config.json}"
 
 is_valid_cfg() {
   local path="$1"
@@ -1333,7 +1333,7 @@ elif is_valid_cfg "$SOURCE_CFG"; then
   fi
   echo "✓ Restored MCP client config from source: $TARGET_CFG"
 else
-  echo "❌ No valid client-config.json available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
+  echo "❌ No valid tools-config.json available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
   if [ -f "$WORKSPACE_CFG" ]; then
     echo "   Workspace contents preview:"; head -c 200 "$WORKSPACE_CFG" 2>/dev/null || echo "   <unreadable>"
   fi
@@ -1343,8 +1343,8 @@ else
   exit 1
 fi
 
-MCP_CLIENT_CONFIG="$TARGET_CFG"
-export MCP_CLIENT_CONFIG
+MCP_TOOLS_CONFIG="$TARGET_CFG"
+export MCP_TOOLS_CONFIG
 
 TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
 TOOLS_URL="${TOOLS_URL%/}"
@@ -1383,7 +1383,7 @@ echo "✓ Tools endpoint check completed"
 
 if command -v jq >/dev/null 2>&1; then
   echo "[client-config] summary:"
-  if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$MCP_CLIENT_CONFIG" 2>/dev/null; then
+  if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$MCP_TOOLS_CONFIG" 2>/dev/null; then
     echo "  (not valid JSON)"
   fi
 else

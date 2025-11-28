@@ -12,10 +12,9 @@ rules:
     resources: ["configmaps"]
     verbs: ["get", "list"]
   # Create/update the tool catalog ConfigMap
-  # NOTE: Both naming conventions supported during transition from toolman to tools image
   - apiGroups: [""]
     resources: ["configmaps"]
-    resourceNames: ["tools-tool-catalog", "toolman-tool-catalog"]
+    resourceNames: ["tools-tool-catalog"]
     verbs: ["update", "patch"]
   # Create the ConfigMap if it doesn't exist
   - apiGroups: [""]
