@@ -243,44 +243,26 @@ config:
     firecrawl:
       name: "Firecrawl"
       description: "Web scraping, crawling, and content extraction with search capabilities"
-      transport: "http"
-      # URL format: https://mcp.firecrawl.dev/{API_KEY}/v2/mcp - API key injected at runtime
-      url: "https://mcp.firecrawl.dev/v2/mcp"
+      transport: "stdio"
+      # Use the firecrawl-mcp npm package (same as local Cursor setup)
+      command: "npx"
+      args: ["-y", "firecrawl-mcp"]
       workingDirectory: "/tmp"
+      env: {}
       secretRef:
         name: "tools-firecrawl-secrets"
         keys:
           - "FIRECRAWL_API_KEY"
 
     # --- Cloudflare ---
+    # Note: Only cloudflare-docs works headless. The other Cloudflare MCP servers
+    # (bindings, observability, radar) require interactive OAuth via browser,
+    # which doesn't work in headless server environments.
     cloudflare-docs:
       name: "Cloudflare Documentation"
       description: "Up-to-date reference information on Cloudflare products and APIs"
       transport: "http"
       url: "https://docs.mcp.cloudflare.com/mcp"
-      workingDirectory: "/tmp"
-
-    cloudflare-bindings:
-      name: "Cloudflare Workers Bindings"
-      description: "Build Workers applications with storage, AI, and compute primitives"
-      transport: "http"
-      # Auth handled by Cloudflare's remote MCP endpoint, not local env vars
-      url: "https://bindings.mcp.cloudflare.com/mcp"
-      workingDirectory: "/tmp"
-
-    cloudflare-observability:
-      name: "Cloudflare Observability"
-      description: "Debug and get insight into your application's logs and analytics"
-      transport: "http"
-      # Auth handled by Cloudflare's remote MCP endpoint, not local env vars
-      url: "https://observability.mcp.cloudflare.com/mcp"
-      workingDirectory: "/tmp"
-
-    cloudflare-radar:
-      name: "Cloudflare Radar"
-      description: "Global Internet traffic insights, trends, URL scans, and utilities"
-      transport: "http"
-      url: "https://radar.mcp.cloudflare.com/mcp"
       workingDirectory: "/tmp"
 
     # --- Observability ---
