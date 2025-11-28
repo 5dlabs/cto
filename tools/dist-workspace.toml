@@ -19,4 +19,9 @@ hosting = "github"
 install-updater = false
 # Allow manual customizations to release.yml
 allow-dirty = ["ci"]
+# Tag namespace - only respond to tags starting with "tools" (e.g., tools-v0.2.0)
+# This also means the generated CI would be named tools-release.yml
+tag-namespace = "tools"
+# Use .tar.gz for unix archives to match what the workflow expects
+unix-archive = ".tar.gz"
 
