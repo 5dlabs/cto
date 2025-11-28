@@ -40,6 +40,14 @@ spec:
             tag: "1.21.0"
             pullPolicy: IfNotPresent
 
+          # Pod labels for log collection
+          extraLabels:
+            app.kubernetes.io/component: secrets
+            platform.5dlabs.io/log-collection: enabled
+          annotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: vault
+
           standalone:
             enabled: true
             config: |

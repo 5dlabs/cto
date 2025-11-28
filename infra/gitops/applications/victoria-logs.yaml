@@ -28,6 +28,13 @@ spec:
             fsGroup: 2000
             runAsUser: 1000
             runAsGroup: 1000
+          # Pod labels/annotations for log collection
+          podLabels:
+            app.kubernetes.io/component: logging
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: victoria-logs
   destination:
     server: https://kubernetes.default.svc
     namespace: observability

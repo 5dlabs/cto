@@ -32,6 +32,14 @@ spec:
             type: NodePort
             # Don't specify nodePorts - use existing allocated ports
 
+          # Pod labels for log collection
+          podLabels:
+            app.kubernetes.io/component: ingress
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: ingress-nginx
+
           # Resource limits
           resources:
             requests:

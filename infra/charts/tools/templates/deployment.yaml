@@ -4,6 +4,8 @@ metadata:
   name: {{ include "tools.fullname" . }}
   labels:
     {{- include "tools.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools
+    platform.5dlabs.io/log-collection: enabled
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -13,12 +15,17 @@ spec:
       {{- include "tools.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        # Telemetry annotations for log collection
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: "tools-mcp"
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "tools.labels" . | nindent 8 }}
+        app.kubernetes.io/component: tools
+        platform.5dlabs.io/log-collection: enabled
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

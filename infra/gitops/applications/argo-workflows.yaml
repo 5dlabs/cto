@@ -26,10 +26,19 @@ spec:
     helm:
       valueFiles: []
       values: |
+        # Pod labels for log collection
+        commonLabels:
+          platform.5dlabs.io/log-collection: enabled
+
         # Use v3.7.1 stable release
         controller:
           image:
             tag: v3.7.1
+          podLabels:
+            app.kubernetes.io/component: workflow-controller
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: argo-workflow-controller
 
           # Hard limits on workflow retention (regardless of TTL)
           # Once limit is reached, oldest workflows are deleted
@@ -75,6 +84,11 @@ spec:
           servicePort: 2746
           serviceNodePort: 30081
           servicePortName: http
+          podLabels:
+            app.kubernetes.io/component: workflow-server
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: argo-workflow-server
         executor:
           image:
             tag: v3.7.1
