@@ -85,9 +85,9 @@ This is iteration {{iteration}} of the E2E Watch loop. Your fix will be tested w
 
 ## Helper Scripts
 
-Pre-built scripts are available at `/scripts/` to streamline common operations:
+Pre-built scripts are available at `/workspace/scripts/` to streamline common operations:
 
-### Action Scripts
+### Action Scripts (in `/workspace/scripts/actions/`)
 | Script | Purpose |
 |--------|---------|
 | `poll-actions.sh` | Poll GitHub Actions, get detailed failure logs with excerpts |
@@ -103,19 +103,19 @@ Pre-built scripts are available at `/scripts/` to streamline common operations:
 
 ```bash
 # Get detailed CI failure logs
-/scripts/poll-actions.sh --pr-number 123
+/workspace/scripts/actions/poll-actions.sh --pr-number 123
 
 # Check and trigger Bugbot
-/scripts/check-bugbot.sh --pr-number 123 --trigger --wait
+/workspace/scripts/actions/check-bugbot.sh --pr-number 123 --trigger --wait
 
 # Merge with auto-merge enabled
-/scripts/merge-pr.sh --pr-number 123 --wait
+/workspace/scripts/actions/merge-pr.sh --pr-number 123 --wait
 
 # Wait for deployment
-/scripts/poll-deploy.sh --app controller --namespace cto
+/workspace/scripts/actions/poll-deploy.sh --app controller --namespace cto
 ```
 
-### Library Scripts (sourced by action scripts)
+### Library Scripts (in `/workspace/scripts/lib/`, sourced by action scripts)
 - `common.sh` - Logging utilities
 - `github.sh` - GitHub API helpers
 - `argocd.sh` - ArgoCD polling
