@@ -34,14 +34,14 @@ gh_create_pr() {
   done
   
   local pr_url
+  # gh pr create outputs the PR URL directly to stdout (doesn't support --json)
   pr_url=$(gh pr create \
     --repo "$GITHUB_REPO" \
     --head "$branch" \
     --base main \
     --title "$title" \
     --body "$body" \
-    "${label_args[@]}" \
-    --json url -q '.url')
+    "${label_args[@]}")
   
   if [ -z "$pr_url" ]; then
     log_error "Failed to create PR"

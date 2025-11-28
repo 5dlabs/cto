@@ -1,12 +1,13 @@
 #!/bin/bash
 # Merge a PR after all checks pass
-# Usage: merge-pr.sh --pr-number 123 [--repo 5dlabs/cto] [--method squash]
+# Usage: merge-pr.sh --pr-number 123 [--repo 5dlabs/cto] [--method squash] [--wait] [--timeout 600]
 #
 # This script:
-# 1. Verifies all CI checks passed
-# 2. Checks for bug-bot issues (fails if found)
-# 3. Verifies PR is mergeable
-# 4. Merges the PR
+# 1. Optionally waits for CI checks to complete (--wait)
+# 2. Verifies all CI checks passed
+# 3. Checks for bug-bot issues (fails if found)
+# 4. Verifies PR is mergeable
+# 5. Merges the PR
 
 set -euo pipefail
 
@@ -18,12 +19,16 @@ source "$SCRIPT_DIR/../lib/github.sh"
 pr_number=""
 repo="${GITHUB_REPO:-5dlabs/cto}"
 method="squash"
+wait_for_ci="false"
+timeout="1800"  # 30 minutes default
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --pr-number) pr_number="$2"; shift 2 ;;
     --repo) repo="$2"; shift 2 ;;
     --method) method="$2"; shift 2 ;;
+    --wait) wait_for_ci="true"; shift ;;
+    --timeout) timeout="$2"; shift 2 ;;
     *) log_error "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -36,6 +41,15 @@ fi
 export GITHUB_REPO="$repo"
 
 log_info "Preparing to merge PR #$pr_number"
+
+# Step 0: Wait for CI if requested
+if [ "$wait_for_ci" = "true" ]; then
+  log_step "Waiting for CI checks to complete (timeout: ${timeout}s)..."
+  if ! gh_wait_checks_complete "$pr_number" "$timeout"; then
+    log_error "Timed out waiting for CI checks"
+    exit 1
+  fi
+fi
 
 # Step 1: Verify all CI checks passed
 log_step "Verifying CI checks..."
