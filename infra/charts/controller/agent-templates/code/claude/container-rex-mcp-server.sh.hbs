@@ -1,0 +1,74 @@
+#!/bin/sh
+# Rex MCP Server Management - Handles add/remove/update operations
+set -e
+
+echo "═══ MCP SERVER MANAGEMENT ═══"
+echo "Task: ${MCP_SERVER_TASK:-unknown} | Key: ${MCP_SERVER_KEY:-unknown}"
+
+[ -z "$MCP_SERVER_TASK" ] && { echo "❌ MCP_SERVER_TASK not set"; exit 1; }
+[ -z "$MCP_SERVER_KEY" ] && { echo "❌ MCP_SERVER_KEY not set"; exit 1; }
+
+# Source shared functions if available
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+[ -f "/root/.cargo/env" ] && . "/root/.cargo/env"
+
+export GIT_TERMINAL_PROMPT=0
+
+# GitHub App auth (shared pattern)
+if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+    TEMP_KEY="/tmp/gh-key.pem"; printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"; chmod 600 "$TEMP_KEY"
+    JWT_H=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    NOW=$(date +%s); EXP=$((NOW + 600))
+    JWT_P=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT_S=$(printf '%s.%s' "$JWT_H" "$JWT_P" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT="$JWT_H.$JWT_P.$JWT_S"
+    INST=$(curl -sL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/5dlabs/cto/installation" | jq -r '.id')
+    [ "$INST" = "null" ] && INST=$(curl -sL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/5dlabs/installation" | jq -r '.id')
+    GITHUB_TOKEN=$(curl -sX POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/$INST/access_tokens" | jq -r '.token')
+    rm -f "$TEMP_KEY"; export GITHUB_TOKEN
+    git config --global credential.helper store; echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+    echo "$GITHUB_TOKEN" | gh auth login --with-token
+fi
+
+git config --global --add safe.directory /workspace
+git config --global user.name "{{github_app}} Agent"
+git config --global user.email "{{github_app}}[bot]@users.noreply.github.com"
+
+cd /workspace
+[ -d "cto" ] && { cd cto; git fetch origin main; git checkout main; git reset --hard origin/main; } || { git clone https://github.com/5dlabs/cto.git cto; cd cto; }
+
+BRANCH="feat/mcp-server-${MCP_SERVER_TASK}-${MCP_SERVER_KEY}"
+git checkout -b "$BRANCH" origin/main
+
+README=""
+[ -n "$MCP_SERVER_README_B64" ] && README=$(echo "$MCP_SERVER_README_B64" | base64 -d)
+
+case "$MCP_SERVER_TASK" in
+    add) PROMPT="Add MCP server '${MCP_SERVER_KEY}' from ${MCP_SERVER_GITHUB_URL}. README:\n${README}\n\nUpdate infra/charts/tools/values.yaml, validate with helm template, create PR with labels: mcp-server-add, mcp-server-key-${MCP_SERVER_KEY}. ${SKIP_MERGE:-false} = true means don't merge." ;;
+    remove) PROMPT="Remove MCP server '${MCP_SERVER_KEY}' from infra/charts/tools/values.yaml. Create PR with labels: mcp-server-remove, mcp-server-key-${MCP_SERVER_KEY}." ;;
+    update) PROMPT="Update MCP server '${MCP_SERVER_KEY}'. ${MCP_SERVER_GITHUB_URL:+URL: $MCP_SERVER_GITHUB_URL}${README:+ README: $README}\n\nUpdate config in infra/charts/tools/values.yaml if needed. Create PR with labels: mcp-server-update, mcp-server-key-${MCP_SERVER_KEY}." ;;
+    *) echo "❌ Unknown task: $MCP_SERVER_TASK"; exit 1 ;;
+esac
+
+mkdir -p task; printf '%s' "$PROMPT" > task/prompt.md
+
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json"
+[ -f "/task-files/mcp.json" ] && { cp /task-files/mcp.json .mcp.json; CLAUDE_CMD="$CLAUDE_CMD --mcp-config .mcp.json"; }
+[ -f "/etc/claude-code/managed-settings.json" ] && { mkdir -p /etc/claude-code-writable; cp /etc/claude-code/managed-settings.json /etc/claude-code-writable/; export CLAUDE_CODE_SETTINGS_DIR="/etc/claude-code-writable"; }
+
+FIFO="/workspace/agent-input.jsonl"; rm -f "$FIFO"; mkfifo "$FIFO"; chmod 666 "$FIFO"
+$CLAUDE_CMD < "$FIFO" & PID=$!
+MSG=$(printf '%s' "$PROMPT" | jq -Rs .)
+printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$MSG" > "$FIFO" &
+wait $PID; rm -f "$FIFO"
+
+PR=$(gh pr list -R "5dlabs/cto" --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+if [ -z "$PR" ] || [ "$PR" = "null" ]; then
+    echo "❌ No PR created"
+    exit 1
+fi
+echo "✅ PR #${PR}: https://github.com/5dlabs/cto/pull/${PR}"
+
+touch /workspace/.agent_done
+curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1 || true
+exit 0

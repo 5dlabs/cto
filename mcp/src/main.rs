@@ -2946,6 +2946,24 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
+                Ok("add_mcp_server") => Some(handle_add_mcp_server(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("remove_mcp_server") => Some(handle_remove_mcp_server(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("update_mcp_server") => Some(handle_update_mcp_server(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
                 Ok(unknown) => Some(Err(anyhow!("Unknown tool: {unknown}"))),
                 Err(e) => Some(Err(e)),
             }
@@ -3301,6 +3319,224 @@ fn handle_add_docs_tool(arguments: &std::collections::HashMap<String, Value>) ->
         .unwrap_or(50);
 
     doc_proxy::handle_add_docs(url, doc_type, query, limit)
+}
+
+/// Create a CodeRun for MCP server management tasks
+fn create_mcp_server_coderun(
+    task_type: &str,
+    server_key: &str,
+    github_url: Option<&str>,
+    readme_content: Option<&str>,
+    skip_merge: bool,
+) -> Result<String> {
+    let kubectl_cmd = find_command("kubectl");
+
+    // Build environment variables for the CodeRun
+    let mut env_map = serde_json::Map::new();
+    env_map.insert("MCP_SERVER_TASK".to_string(), json!(task_type));
+    env_map.insert("MCP_SERVER_KEY".to_string(), json!(server_key));
+    env_map.insert("SKIP_MERGE".to_string(), json!(skip_merge.to_string()));
+
+    if let Some(url) = github_url {
+        env_map.insert("MCP_SERVER_GITHUB_URL".to_string(), json!(url));
+    }
+
+    if let Some(readme) = readme_content {
+        // Base64 encode the README content to avoid YAML escaping issues
+        let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, readme);
+        env_map.insert("MCP_SERVER_README_B64".to_string(), json!(encoded));
+    }
+
+    // Build the CodeRun manifest
+    let coderun = json!({
+        "apiVersion": "agents.platform/v1",
+        "kind": "CodeRun",
+        "metadata": {
+            "generateName": format!("coderun-mcp-{}-", task_type),
+            "namespace": "cto",
+            "labels": {
+                "agent": "rex",
+                "task-type": format!("mcp-server-{}", task_type),
+                "mcp-server-key": server_key
+            }
+        },
+        "spec": {
+            "taskId": 0,
+            "service": "cto",
+            "repositoryUrl": "https://github.com/5dlabs/cto",
+            "docsRepositoryUrl": "https://github.com/5dlabs/cto",
+            "model": "claude-sonnet-4-5-20250929",
+            "githubApp": "5DLabs-Rex",
+            "continueSession": false,
+            "overwriteMemory": true,
+            "env": env_map
+        }
+    });
+
+    // Write to temp file and apply
+    let coderun_json = serde_json::to_string_pretty(&coderun)?;
+    let mut temp_file = NamedTempFile::new()?;
+    temp_file.write_all(coderun_json.as_bytes())?;
+    temp_file.flush()?;
+
+    let output = Command::new(&kubectl_cmd)
+        .args([
+            "create",
+            "-f",
+            temp_file.path().to_str().unwrap(),
+            "-o",
+            "jsonpath={.metadata.name}",
+        ])
+        .output()
+        .map_err(|e| anyhow!("Failed to execute kubectl: {e}"))?;
+
+    if output.status.success() {
+        let name = String::from_utf8(output.stdout)?.trim().to_string();
+        Ok(name)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("Failed to create CodeRun: {stderr}"))
+    }
+}
+
+fn handle_add_mcp_server(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let github_url = arguments
+        .get("github_url")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("github_url is required"))?;
+
+    let skip_merge = arguments
+        .get("skip_merge")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    // Parse and validate GitHub URL
+    let (_org, repo) = doc_proxy::parse_github_url(github_url)?;
+    let server_key = doc_proxy::derive_server_key(&repo);
+
+    eprintln!("📦 Adding MCP server from {github_url}");
+    eprintln!("   Derived server key: {server_key}");
+
+    // Fetch README via Firecrawl
+    eprintln!("📄 Fetching README from GitHub...");
+    let readme_content = match doc_proxy::scrape_readme(github_url) {
+        Ok(content) => {
+            eprintln!("   ✅ README fetched ({} chars)", content.len());
+            Some(content)
+        }
+        Err(e) => {
+            eprintln!("   ⚠️ Could not fetch README: {e}");
+            eprintln!("   Rex will attempt to fetch it directly");
+            None
+        }
+    };
+
+    // Create CodeRun for Rex
+    eprintln!("🚀 Creating CodeRun for Rex...");
+    let coderun_name = create_mcp_server_coderun(
+        "add",
+        &server_key,
+        Some(github_url),
+        readme_content.as_deref(),
+        skip_merge,
+    )?;
+
+    eprintln!("   ✅ CodeRun created: {coderun_name}");
+
+    Ok(json!({
+        "success": true,
+        "message": "CodeRun created - Rex will analyze README, update values.yaml, and create PR",
+        "coderun_name": coderun_name,
+        "github_url": github_url,
+        "server_key": server_key,
+        "skip_merge": skip_merge,
+        "note": "Monitor the CodeRun for progress. After PR merge, a verification CodeRun will automatically confirm the server is available."
+    }))
+}
+
+fn handle_remove_mcp_server(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let server_key = arguments
+        .get("server_key")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("server_key is required"))?;
+
+    let skip_merge = arguments
+        .get("skip_merge")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    eprintln!("🗑️ Removing MCP server: {server_key}");
+
+    // Create CodeRun for Rex
+    eprintln!("🚀 Creating CodeRun for Rex...");
+    let coderun_name = create_mcp_server_coderun("remove", server_key, None, None, skip_merge)?;
+
+    eprintln!("   ✅ CodeRun created: {coderun_name}");
+
+    Ok(json!({
+        "success": true,
+        "message": "CodeRun created - Rex will remove server from values.yaml and create PR",
+        "coderun_name": coderun_name,
+        "server_key": server_key,
+        "skip_merge": skip_merge,
+        "note": "Monitor the CodeRun for progress."
+    }))
+}
+
+fn handle_update_mcp_server(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let server_key = arguments
+        .get("server_key")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("server_key is required"))?;
+
+    let github_url = arguments.get("github_url").and_then(|v| v.as_str());
+
+    let skip_merge = arguments
+        .get("skip_merge")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    eprintln!("🔄 Updating MCP server: {server_key}");
+
+    // Fetch README if GitHub URL provided
+    let readme_content = if let Some(url) = github_url {
+        eprintln!("📄 Fetching README from {url}...");
+        match doc_proxy::scrape_readme(url) {
+            Ok(content) => {
+                eprintln!("   ✅ README fetched ({} chars)", content.len());
+                Some(content)
+            }
+            Err(e) => {
+                eprintln!("   ⚠️ Could not fetch README: {e}");
+                None
+            }
+        }
+    } else {
+        eprintln!("   ℹ️ No GitHub URL provided - Rex will use existing config");
+        None
+    };
+
+    // Create CodeRun for Rex
+    eprintln!("🚀 Creating CodeRun for Rex...");
+    let coderun_name = create_mcp_server_coderun(
+        "update",
+        server_key,
+        github_url,
+        readme_content.as_deref(),
+        skip_merge,
+    )?;
+
+    eprintln!("   ✅ CodeRun created: {coderun_name}");
+
+    Ok(json!({
+        "success": true,
+        "message": "CodeRun created - Rex will update server configuration and create PR if changes needed",
+        "coderun_name": coderun_name,
+        "server_key": server_key,
+        "github_url": github_url,
+        "skip_merge": skip_merge,
+        "note": "Monitor the CodeRun for progress."
+    }))
 }
 
 #[allow(clippy::disallowed_macros)]

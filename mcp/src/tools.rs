@@ -12,7 +12,10 @@ pub fn get_tool_schemas() -> Value {
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_add_docs_schema()
+            get_add_docs_schema(),
+            get_add_mcp_server_schema(),
+            get_remove_mcp_server_schema(),
+            get_update_mcp_server_schema()
         ]
     })
 }
@@ -28,7 +31,10 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_add_docs_schema()
+            get_add_docs_schema(),
+            get_add_mcp_server_schema(),
+            get_remove_mcp_server_schema(),
+            get_update_mcp_server_schema()
         ]
     })
 }
@@ -300,6 +306,73 @@ fn get_add_docs_schema() -> Value {
                 }
             },
             "required": ["url", "type"]
+        }
+    })
+}
+
+fn get_add_mcp_server_schema() -> Value {
+    json!({
+        "name": "add_mcp_server",
+        "description": "Add a new MCP server to the platform from a GitHub repository. Fetches the README, creates a CodeRun for Rex to analyze and update values.yaml, creates PR, and auto-merges after CI passes. A verification CodeRun will automatically run after merge to confirm the server is available.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "github_url": {
+                    "type": "string",
+                    "description": "GitHub repository URL for the MCP server (e.g., https://github.com/anthropics/github-mcp, https://github.com/modelcontextprotocol/server-slack)"
+                },
+                "skip_merge": {
+                    "type": "boolean",
+                    "description": "If true, create PR but don't auto-merge. Useful for review before deployment. Default: false"
+                }
+            },
+            "required": ["github_url"]
+        }
+    })
+}
+
+fn get_remove_mcp_server_schema() -> Value {
+    json!({
+        "name": "remove_mcp_server",
+        "description": "Remove an MCP server from the platform. Creates a CodeRun for Rex to remove the server from values.yaml, creates PR, and auto-merges after CI passes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "server_key": {
+                    "type": "string",
+                    "description": "The server key to remove (e.g., 'github', 'slack', 'brave-search'). Use list_mcp_servers or check the tools config to see available servers."
+                },
+                "skip_merge": {
+                    "type": "boolean",
+                    "description": "If true, create PR but don't auto-merge. Default: false"
+                }
+            },
+            "required": ["server_key"]
+        }
+    })
+}
+
+fn get_update_mcp_server_schema() -> Value {
+    json!({
+        "name": "update_mcp_server",
+        "description": "Update an existing MCP server configuration. Re-fetches README from GitHub and creates a CodeRun for Rex to update values.yaml if changes are needed.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "server_key": {
+                    "type": "string",
+                    "description": "The server key to update (e.g., 'github', 'slack')"
+                },
+                "github_url": {
+                    "type": "string",
+                    "description": "Optional: Override GitHub URL if different from original or if original URL is not stored"
+                },
+                "skip_merge": {
+                    "type": "boolean",
+                    "description": "If true, create PR but don't auto-merge. Default: false"
+                }
+            },
+            "required": ["server_key"]
         }
     })
 }
