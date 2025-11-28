@@ -289,7 +289,10 @@ struct ServerConnectionPool {
 }
 
 impl ServerConnectionPool {
-    fn new(config_manager: Arc<RwLock<ConfigManager>>, http_sessions: Arc<RwLock<HashMap<String, String>>>) -> Self {
+    fn new(
+        config_manager: Arc<RwLock<ConfigManager>>,
+        http_sessions: Arc<RwLock<HashMap<String, String>>>,
+    ) -> Self {
         Self {
             connections: Arc::new(RwLock::new(HashMap::new())),
             config_manager,
@@ -764,7 +767,9 @@ impl ServerConnectionPool {
                 if status == reqwest::StatusCode::BAD_REQUEST
                     && (response_text.contains("session") || response_text.contains("Session"))
                 {
-                    tracing::warn!("⚠️ [{server_name}] Bad request, possibly missing session: {response_text}");
+                    tracing::warn!(
+                        "⚠️ [{server_name}] Bad request, possibly missing session: {response_text}"
+                    );
                     return Err(anyhow::anyhow!(
                         "StreamableHTTP session required for '{server_name}': {response_text}"
                     ));
@@ -926,7 +931,10 @@ impl BridgeState {
 
         let system_config_manager = Arc::new(RwLock::new(system_config_manager_instance));
         let http_sessions = Arc::new(RwLock::new(HashMap::new()));
-        let connection_pool = Arc::new(ServerConnectionPool::new(system_config_manager.clone(), http_sessions.clone()));
+        let connection_pool = Arc::new(ServerConnectionPool::new(
+            system_config_manager.clone(),
+            http_sessions.clone(),
+        ));
 
         // Create the state
         let state = Self {
@@ -1578,11 +1586,7 @@ impl BridgeState {
                     .map(String::from);
 
                 if let Some(ref sid) = mcp_session_id {
-                    tracing::info!(
-                        "🔑 [{}] Received Mcp-Session-Id: {}",
-                        server_name,
-                        sid
-                    );
+                    tracing::info!("🔑 [{}] Received Mcp-Session-Id: {}", server_name, sid);
                     // Store session ID for future requests
                     let mut sessions = self.http_sessions.write().await;
                     sessions.insert(server_name.to_string(), sid.clone());
