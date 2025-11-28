@@ -288,8 +288,9 @@ config:
       name: "Grafana"
       description: "Grafana dashboards, Prometheus queries, Loki logs, alerting, and observability"
       transport: "stdio"
-      command: "npx"
-      args: ["-y", "mcp-grafana"]
+      # Docker image from https://github.com/grafana/mcp-grafana
+      command: "docker"
+      args: ["run", "--rm", "-i", "--network", "host", "-e", "GRAFANA_URL", "-e", "GRAFANA_SERVICE_ACCOUNT_TOKEN", "mcp/grafana", "-t", "stdio"]
       workingDirectory: "/tmp"
       env:
         # In-cluster Grafana URL
@@ -297,15 +298,16 @@ config:
       secretRef:
         name: "tools-grafana-secrets"
         keys:
-          - "GRAFANA_USERNAME"
-          - "GRAFANA_PASSWORD"
+          # mcp-grafana uses GRAFANA_SERVICE_ACCOUNT_TOKEN for auth
+          - "GRAFANA_SERVICE_ACCOUNT_TOKEN"
 
     victoriametrics:
       name: "VictoriaMetrics"
       description: "VictoriaMetrics monitoring - metrics queries, analysis, alerting rules, and documentation"
       transport: "stdio"
-      command: "npx"
-      args: ["-y", "mcp-victoriametrics"]
+      # Docker image from https://github.com/VictoriaMetrics-Community/mcp-victoriametrics
+      command: "docker"
+      args: ["run", "--rm", "-i", "--network", "host", "-e", "VM_INSTANCE_ENTRYPOINT", "-e", "VM_INSTANCE_TYPE", "ghcr.io/victoriametrics-community/mcp-victoriametrics"]
       workingDirectory: "/tmp"
       env:
         # In-cluster VictoriaMetrics URL - no auth needed for in-cluster access
