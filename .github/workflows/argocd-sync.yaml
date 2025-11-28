@@ -68,6 +68,7 @@ jobs:
           echo "- **platform-apps:** Sync triggered ✅" >> $GITHUB_STEP_SUMMARY
 
       - name: Wait for platform-apps to sync
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.wait_for_sync == true)
         run: |
           echo "⏳ Waiting for platform-apps to sync..."
           TIMEOUT="${{ inputs.sync_timeout || 300 }}"
@@ -125,13 +126,13 @@ jobs:
           echo "✅ All applications sync triggered"
 
       - name: Wait for all apps to sync
-        if: github.event_name == 'workflow_dispatch' && inputs.wait_for_sync == true
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.wait_for_sync == true)
         run: |
           echo "⏳ Waiting for all applications to sync..."
           TIMEOUT="${{ inputs.sync_timeout || 300 }}"
 
-          # Get all apps
-          APPS=$(kubectl get applications -n argocd -o jsonpath='{.items[*].metadata.name}')
+          # Get all apps (excluding platform-apps which was already waited for)
+          APPS=$(kubectl get applications -n argocd -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep -v '^platform-apps$')
 
           for app in $APPS; do
             echo "  Waiting for $app..."
