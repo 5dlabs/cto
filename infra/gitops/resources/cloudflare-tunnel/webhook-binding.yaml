@@ -22,6 +22,9 @@ tunnelRef:
 subjects:
   - name: github-eventsource-svc
     spec:
+      # Public hostname for GitHub webhooks
       fqdn: github-webhooks.5dlabs.ai
+      # Path matching
       path: /github/webhook
+      # Target service (must include protocol)
       target: http://github-eventsource-svc.automation.svc:12000
