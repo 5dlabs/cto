@@ -93,7 +93,7 @@ tenant:
     - name: screenshots
 ```
 
-**Internal Endpoint**: `http://minio.minio-screenshots.svc.cluster.local`
+**Internal Endpoint**: `http://screenshots.minio-screenshots.svc.cluster.local`
 
 **Console**: `http://screenshots-console.minio-screenshots.svc.cluster.local:9090`
 
@@ -263,7 +263,7 @@ echo "https://screenshots.5dlabs.io/${KEY}"
 
 ```bash
 # After tenant deployment, configure via mc (MinIO Client)
-mc alias set minio http://minio.minio-screenshots.svc.cluster.local:80 $ACCESS_KEY $SECRET_KEY
+mc alias set minio http://screenshots.minio-screenshots.svc.cluster.local $ACCESS_KEY $SECRET_KEY
 
 # Create bucket (if not auto-created by tenant)
 mc mb minio/screenshots
@@ -285,7 +285,7 @@ export MINIO_ROOT_PASSWORD=<secure-password>"
 
 # MinIO client credentials for tools server (in cto namespace)
 vault kv put secret/tools-minio \
-  MINIO_ENDPOINT=http://minio.minio-screenshots.svc.cluster.local:80 \
+  MINIO_ENDPOINT=http://screenshots.minio-screenshots.svc.cluster.local \
   MINIO_ACCESS_KEY=screenshots-uploader \
   MINIO_SECRET_KEY=<secure-password> \
   MINIO_BUCKET=screenshots \
@@ -303,7 +303,7 @@ Add to existing tunnel config (`infra/gitops/resources/cloudflare-tunnel/`):
 ```yaml
 # Add to cluster-tunnel.yaml ingress rules
 - hostname: screenshots.5dlabs.io
-  service: http://minio.minio-screenshots.svc.cluster.local:80
+  service: http://screenshots.minio-screenshots.svc.cluster.local
 ```
 
 **Option B: Ingress + Cert-Manager**

@@ -1,7 +1,7 @@
 ---
 # MinIO Tenant - Screenshot storage for headless visual testing
 # Single-node tenant optimized for small artifacts (screenshots)
-# S3-compatible API at minio.minio-screenshots.svc.cluster.local
+# S3-compatible API at screenshots.minio-screenshots.svc.cluster.local
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
