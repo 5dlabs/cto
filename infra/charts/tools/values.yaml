@@ -29,6 +29,8 @@ serviceAccount:
 # RBAC configuration
 rbac:
   create: true
+  # Enable cluster-wide permissions for kubernetes and argocd MCP servers
+  clusterWide: true
 
 podAnnotations: {}
 podLabels: {}
