@@ -39,5 +39,7 @@ data:
 {{ .Files.Get "agent-templates/watch/scripts/actions/create-fix-pr.sh" | indent 4 }}
   full-remediation-flow.sh: |
 {{ .Files.Get "agent-templates/watch/scripts/actions/full-remediation-flow.sh" | indent 4 }}
+  check-conflicts.sh: |
+{{ .Files.Get "agent-templates/watch/scripts/actions/check-conflicts.sh" | indent 4 }}
 {{- end }}
 

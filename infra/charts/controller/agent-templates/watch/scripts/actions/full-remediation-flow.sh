@@ -128,10 +128,34 @@ fi
 log_success "All GitHub Actions passed"
 
 # ============================================================================
-# Phase 4: Trigger and Check Bugbot
+# Phase 4: Check for Merge Conflicts
 # ============================================================================
 log_info ""
-log_info "🐛 PHASE 4: Check Bugbot"
+log_info "🔀 PHASE 4: Check Merge Conflicts"
+log_info "----------------------------------------"
+
+if ! "$SCRIPT_DIR/check-conflicts.sh" --pr-number "$pr_number" --repo "$repo" --repo-dir "$repo_dir"; then
+  log_error "Merge conflicts detected"
+  log_info ""
+  log_info "Conflict report saved to: $WATCH_WORKSPACE/merge-conflicts.json"
+  log_info "Agent should:"
+  log_info "  1. Fetch latest main: git fetch origin main"
+  log_info "  2. Rebase: git rebase origin/main"
+  log_info "  3. Resolve conflicts manually"
+  log_info "  4. Push: git push --force-with-lease"
+  log_info ""
+  log_info "To retry after resolving, run:"
+  log_info "  $0 --task-id $task_id --title \"$title\" --pr-number $pr_number --branch $branch"
+  exit 1
+fi
+
+log_success "No merge conflicts"
+
+# ============================================================================
+# Phase 5: Trigger and Check Bugbot
+# ============================================================================
+log_info ""
+log_info "🐛 PHASE 5: Check Bugbot"
 log_info "----------------------------------------"
 
 # Trigger bugbot if needed, wait for it, then check for issues
@@ -149,10 +173,10 @@ fi
 log_success "No Bugbot issues"
 
 # ============================================================================
-# Phase 5: Enable Auto-Merge and Wait
+# Phase 6: Enable Auto-Merge and Wait
 # ============================================================================
 log_info ""
-log_info "🔀 PHASE 5: Merge Pull Request"
+log_info "✅ PHASE 6: Merge Pull Request"
 log_info "----------------------------------------"
 
 if ! "$SCRIPT_DIR/merge-pr.sh" --pr-number "$pr_number" --repo "$repo" --wait --timeout 600; then
@@ -163,10 +187,10 @@ fi
 log_success "PR #$pr_number merged"
 
 # ============================================================================
-# Phase 6: Wait for Deployment
+# Phase 7: Wait for Deployment
 # ============================================================================
 log_info ""
-log_info "🚀 PHASE 6: Wait for Deployment"
+log_info "🚀 PHASE 7: Wait for Deployment"
 log_info "----------------------------------------"
 
 if ! "$SCRIPT_DIR/poll-deploy.sh" \
