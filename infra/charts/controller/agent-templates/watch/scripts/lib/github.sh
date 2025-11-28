@@ -156,7 +156,7 @@ gh_wait_checks_complete() {
 gh_get_check_status() {
   local pr_number="$1"
   
-  gh pr checks "$pr_number" --repo "$GITHUB_REPO" --json name,state,conclusion 2>&1
+  gh pr checks "$pr_number" --repo "$GITHUB_REPO" --json name,state,bucket 2>&1
 }
 
 # Check if all checks passed
@@ -165,10 +165,11 @@ gh_all_checks_passed() {
   local pr_number="$1"
   
   local failed
+  # Use 'bucket' field: pass, fail, pending, skipping
   failed=$(gh pr checks "$pr_number" \
     --repo "$GITHUB_REPO" \
-    --json conclusion \
-    -q '[.[] | select(.conclusion != "SUCCESS" and .conclusion != "SKIPPED" and .conclusion != null)] | length')
+    --json bucket \
+    -q '[.[] | select(.bucket == "fail")] | length')
   
   [ "$failed" = "0" ]
 }
