@@ -92,6 +92,7 @@ spec:
         - /spec/conversion
         - /spec/preserveUnknownFields
         - /metadata/annotations
+    # Ignore CA bundle differences - these are dynamically managed by the operator
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       name: cnpg-mutating-webhook-configuration
@@ -112,4 +113,3 @@ spec:
 
   # Revision history
   revisionHistoryLimit: 5
-
