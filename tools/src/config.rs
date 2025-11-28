@@ -275,6 +275,7 @@ impl SystemConfigManager {
     }
 
     /// Sync file to disk for durability
+    #[allow(unused_variables)]
     fn sync_file(&self, file_path: &PathBuf) -> Result<()> {
         use std::fs::File;
 
