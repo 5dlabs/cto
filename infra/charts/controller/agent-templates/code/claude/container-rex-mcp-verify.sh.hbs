@@ -39,19 +39,29 @@ for i in 1 2 3 4 5 6; do
     [ $i -lt 6 ] && sleep 20
 done
 
-if [ "$FOUND" = "true" ]; then
-    MSG="✅ MCP server \`${MCP_SERVER_KEY}\` is available (${MCP_SERVER_ACTION})"
-    [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ] && {
-        gh pr comment "$PR_NUMBER" -R "5dlabs/cto" --body "$MSG" 2>/dev/null || true
-        gh pr edit "$PR_NUMBER" -R "5dlabs/cto" --add-label "mcp-server-verified" 2>/dev/null || true
-    }
+# For remove action, success means server NOT found; for add/update, success means server IS found
+if [ "$MCP_SERVER_ACTION" = "remove" ]; then
+    if [ "$FOUND" = "false" ]; then
+        MSG="✅ MCP server \`${MCP_SERVER_KEY}\` successfully removed"
+        LABEL="mcp-server-verified"
+    else
+        MSG="⚠️ MCP server \`${MCP_SERVER_KEY}\` still present - removal may be pending sync"
+        LABEL="mcp-server-pending"
+    fi
 else
-    MSG="⚠️ MCP server \`${MCP_SERVER_KEY}\` verification pending - may still be syncing"
-    [ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ] && {
-        gh pr comment "$PR_NUMBER" -R "5dlabs/cto" --body "$MSG" 2>/dev/null || true
-        gh pr edit "$PR_NUMBER" -R "5dlabs/cto" --add-label "mcp-server-pending" 2>/dev/null || true
-    }
+    if [ "$FOUND" = "true" ]; then
+        MSG="✅ MCP server \`${MCP_SERVER_KEY}\` is available (${MCP_SERVER_ACTION})"
+        LABEL="mcp-server-verified"
+    else
+        MSG="⚠️ MCP server \`${MCP_SERVER_KEY}\` verification pending - may still be syncing"
+        LABEL="mcp-server-pending"
+    fi
 fi
+
+[ -n "$PR_NUMBER" ] && [ -n "$GITHUB_TOKEN" ] && {
+    gh pr comment "$PR_NUMBER" -R "5dlabs/cto" --body "$MSG" 2>/dev/null || true
+    gh pr edit "$PR_NUMBER" -R "5dlabs/cto" --add-label "$LABEL" 2>/dev/null || true
+}
 
 echo "$MSG"
 touch /workspace/.agent_done
