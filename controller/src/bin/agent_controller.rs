@@ -108,6 +108,10 @@ async fn verify_required_configmaps(
             format!("{cm_prefix}-agent-templates-shared"),
             "Shared agent utilities",
         ),
+        (
+            format!("{cm_prefix}-agent-templates-watch"),
+            "E2E Watch agent templates",
+        ),
     ];
 
     let mut missing = Vec::new();

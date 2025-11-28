@@ -485,21 +485,38 @@ impl<'a> CodeResourceManager<'a> {
         // This allows Atlas/Bolt to access integration templates from /agent-templates
         let shared_templates_cm_name = format!("{cm_prefix}-agent-templates-shared");
         let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
+        let watch_templates_cm_name = format!("{cm_prefix}-agent-templates-watch");
+
+        // Check if this is a Watch workflow (service contains "watch")
+        let is_watch_workflow = code_run.spec.service.to_lowercase().contains("watch");
+
+        // Build projected volume sources - always include shared and integration
+        let mut projected_sources = vec![
+            json!({
+                "configMap": {
+                    "name": shared_templates_cm_name
+                }
+            }),
+            json!({
+                "configMap": {
+                    "name": integration_templates_cm_name
+                }
+            }),
+        ];
+
+        // Add watch templates for watch workflows
+        if is_watch_workflow {
+            projected_sources.push(json!({
+                "configMap": {
+                    "name": watch_templates_cm_name
+                }
+            }));
+        }
+
         volumes.push(json!({
             "name": "agent-templates-shared",
             "projected": {
-                "sources": [
-                    {
-                        "configMap": {
-                            "name": shared_templates_cm_name
-                        }
-                    },
-                    {
-                        "configMap": {
-                            "name": integration_templates_cm_name
-                        }
-                    }
-                ]
+                "sources": projected_sources
             }
         }));
         volume_mounts.push(json!({
@@ -747,10 +764,11 @@ impl<'a> CodeResourceManager<'a> {
         final_env_vars.extend(critical_env_vars);
 
         // Add Docker environment variable if Docker is enabled
+        // Socket is at /var/run/docker/docker.sock to avoid overwriting /var/run/secrets
         if enable_docker {
             final_env_vars.push(json!({
                 "name": "DOCKER_HOST",
-                "value": "unix:///var/run/docker.sock"
+                "value": "unix:///var/run/docker/docker.sock"
             }));
         }
 
