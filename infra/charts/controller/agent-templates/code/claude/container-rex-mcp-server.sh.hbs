@@ -63,7 +63,10 @@ printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text"
 wait $PID; rm -f "$FIFO"
 
 PR=$(gh pr list -R "5dlabs/cto" --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
-[ -z "$PR" ] && { echo "❌ No PR created"; exit 1; }
+if [ -z "$PR" ] || [ "$PR" = "null" ]; then
+    echo "❌ No PR created"
+    exit 1
+fi
 echo "✅ PR #${PR}: https://github.com/5dlabs/cto/pull/${PR}"
 
 touch /workspace/.agent_done
