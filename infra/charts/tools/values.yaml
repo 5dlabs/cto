@@ -223,6 +223,14 @@ config:
       url: "https://registry.ai-sdk.dev/api/mcp"
       workingDirectory: "/tmp"
 
+    # --- Database ---
+    pg-aiguide:
+      name: "PostgreSQL AI Guide"
+      description: "AI-optimized PostgreSQL expertise with semantic search over official docs and best-practice skills"
+      transport: "http"
+      url: "https://mcp.tigerdata.com/docs"
+      workingDirectory: "/tmp"
+
     # --- Blockchain ---
     solana:
       name: "Solana"
@@ -231,17 +239,126 @@ config:
       url: "https://mcp.solana.com/mcp"
       workingDirectory: "/tmp"
 
-    # --- Local Servers (run in agent containers, not proxied) ---
-    # NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
-    # which breaks MCP protocol validation in Cursor and other clients
-    rust-tools:
-      name: "Rust Development Tools"
-      description: "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development"
+    # --- Web Scraping ---
+    firecrawl:
+      name: "Firecrawl"
+      description: "Web scraping, crawling, and content extraction with search capabilities"
+      transport: "http"
+      # URL format: https://mcp.firecrawl.dev/{API_KEY}/v2/mcp - API key injected at runtime
+      url: "https://mcp.firecrawl.dev/v2/mcp"
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-firecrawl-secrets"
+        keys:
+          - "FIRECRAWL_API_KEY"
+
+    # --- Cloudflare ---
+    cloudflare-docs:
+      name: "Cloudflare Documentation"
+      description: "Up-to-date reference information on Cloudflare products and APIs"
+      transport: "http"
+      url: "https://docs.mcp.cloudflare.com/mcp"
+      workingDirectory: "/tmp"
+
+    cloudflare-bindings:
+      name: "Cloudflare Workers Bindings"
+      description: "Build Workers applications with storage, AI, and compute primitives"
+      transport: "http"
+      url: "https://bindings.mcp.cloudflare.com/mcp"
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-cloudflare-secrets"
+        keys:
+          - "CLOUDFLARE_API_TOKEN"
+
+    cloudflare-observability:
+      name: "Cloudflare Observability"
+      description: "Debug and get insight into your application's logs and analytics"
+      transport: "http"
+      url: "https://observability.mcp.cloudflare.com/mcp"
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-cloudflare-secrets"
+        keys:
+          - "CLOUDFLARE_API_TOKEN"
+
+    cloudflare-radar:
+      name: "Cloudflare Radar"
+      description: "Global Internet traffic insights, trends, URL scans, and utilities"
+      transport: "http"
+      url: "https://radar.mcp.cloudflare.com/mcp"
+      workingDirectory: "/tmp"
+
+    # --- Observability ---
+    grafana:
+      name: "Grafana"
+      description: "Grafana dashboards, Prometheus queries, Loki logs, alerting, and observability"
       transport: "stdio"
-      command: "/home/node/.cargo/bin/cursor-rust-tools"
-      args: ["--no-ui"]
-      workingDirectory: "/workspace"
-      local: true
+      command: "npx"
+      args: ["-y", "mcp-grafana"]
+      workingDirectory: "/tmp"
+      env:
+        # In-cluster Grafana URL
+        GRAFANA_URL: "http://grafana.observability.svc.cluster.local:80"
+      secretRef:
+        name: "tools-grafana-secrets"
+        keys:
+          - "GRAFANA_USERNAME"
+          - "GRAFANA_PASSWORD"
+
+    victoriametrics:
+      name: "VictoriaMetrics"
+      description: "VictoriaMetrics monitoring - metrics queries, analysis, alerting rules, and documentation"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "mcp-victoriametrics"]
+      workingDirectory: "/tmp"
+      env:
+        # In-cluster VictoriaMetrics URL - no auth needed for in-cluster access
+        VM_INSTANCE_ENTRYPOINT: "http://victoria-metrics-victoria-metrics-single-server.observability.svc.cluster.local:8428"
+        VM_INSTANCE_TYPE: "single"
+
+    # --- GitOps ---
+    argocd:
+      name: "Argo CD"
+      description: "Argo CD GitOps - application management, sync operations, resource trees, and deployment logs"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "argocd-mcp@latest", "stdio"]
+      workingDirectory: "/tmp"
+      env:
+        # In-cluster ArgoCD URL
+        ARGOCD_BASE_URL: "https://argocd-server.argocd.svc.cluster.local"
+        # Skip TLS verification for in-cluster self-signed certs
+        NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      secretRef:
+        name: "tools-argocd-secrets"
+        keys:
+          - "ARGOCD_API_TOKEN"
+
+    # --- AI Image Generation ---
+    nano-banana:
+      name: "Nano Banana"
+      description: "AI image generation and editing using Google Gemini 2.5 Flash - generate, edit, and iterate on images"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "nano-banana-mcp"]
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-gemini-secrets"
+        keys:
+          - "GEMINI_API_KEY"
+
+    # --- Secrets Management ---
+    # NOTE: Vault MCP server requires its own deployment - see infra/charts/tools/templates/vault-mcp-server.yaml
+    # It runs in HTTP mode and tools server proxies to it
+    vault:
+      name: "HashiCorp Vault"
+      description: "Vault secrets management - read/write secrets, manage mounts, PKI certificates"
+      transport: "http"
+      # In-cluster Vault MCP server URL (deployed separately)
+      url: "http://vault-mcp-server.cto.svc.cluster.local:8080/mcp"
+      workingDirectory: "/tmp"
 
 # Persistence for temporary files and caches
 persistence:
@@ -256,6 +373,12 @@ secretRefs:
   - name: tools-brave-search-secrets
   - name: tools-context7-secrets
   - name: tools-github-secrets
+  - name: tools-firecrawl-secrets
+  - name: tools-cloudflare-secrets
+  - name: tools-grafana-secrets
+  - name: tools-argocd-secrets
+  - name: tools-gemini-secrets
+  # Note: tools-vault-secrets is used by vault-mcp-server deployment, not tools server
 
 # Network policy
 networkPolicy:
