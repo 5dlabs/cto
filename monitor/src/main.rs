@@ -4,6 +4,9 @@
 //! Uses kubectl --watch for real-time streaming of workflows, CRDs, pods, and sensors.
 //! Emits unified JSON events for Cursor agent E2E feedback loop automation.
 
+// Conflict trigger: This line will conflict with PR #1773
+// Added to test merge conflict detection in E2E Watch scripts
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
