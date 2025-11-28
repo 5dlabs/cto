@@ -135,7 +135,9 @@ spec:
                 max_interval: 30s
                 max_elapsed_time: 300s
               headers:
-                VL-Stream-Fields: "cluster.name,deployment.environment,service.name,service.namespace"
+                # Stream fields for efficient Victoria Logs indexing
+                # These fields are used for log partitioning and fast queries
+                VL-Stream-Fields: "cluster.name,platform.name,service.name,service.component,service.namespace,kubernetes.namespace_name,kubernetes.pod_name,kubernetes.container_name"
 
             # Debug exporter for troubleshooting
             debug:
@@ -171,11 +173,18 @@ spec:
                 level: detailed
                 address: 0.0.0.0:8890
 
-        # Pod annotations for monitoring
+        # Pod labels for log collection
+        podLabels:
+          app.kubernetes.io/component: telemetry
+          platform.5dlabs.io/log-collection: enabled
+
+        # Pod annotations for monitoring and log collection
         podAnnotations:
           prometheus.io/scrape: "true"
           prometheus.io/port: "8889"
           prometheus.io/path: "/metrics"
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: otel-collector
 
         # Liveness and readiness probes
         livenessProbe:

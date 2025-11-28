@@ -19,6 +19,11 @@ spec:
       labels:
         app.kubernetes.io/name: kilo
         app.kubernetes.io/part-of: kilo
+        app.kubernetes.io/component: vpn
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: kilo
     spec:
       serviceAccountName: kilo
       hostNetwork: true

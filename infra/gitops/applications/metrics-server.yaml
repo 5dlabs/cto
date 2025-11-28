@@ -79,11 +79,18 @@ spec:
             maxUnavailable: 0
             maxSurge: 1
 
+        # Pod labels for log collection
+        podLabels:
+          app.kubernetes.io/component: metrics-server
+          platform.5dlabs.io/log-collection: enabled
+
         # Pod annotations for monitoring (for documentation - endpoint discovery is used)
         podAnnotations:
           prometheus.io/scrape: "true"
           prometheus.io/port: "4443"
           prometheus.io/scheme: "https"
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: metrics-server
 
         # Affinity for pod distribution
         affinity:

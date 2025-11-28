@@ -22,6 +22,12 @@ spec:
         singleNamespace: true
         controller:
           replicas: 1
+          podLabels:
+            app.kubernetes.io/component: event-controller
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: argo-events-controller
         gateway:
           enabled: true
         sensor:

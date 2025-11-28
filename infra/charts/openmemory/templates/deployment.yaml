@@ -4,6 +4,8 @@ metadata:
   name: {{ include "openmemory.fullname" . }}
   labels:
     {{- include "openmemory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: memory
+    platform.5dlabs.io/log-collection: enabled
 spec:
   replicas: {{ .Values.replicaCount }}
   strategy:
@@ -15,8 +17,13 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Telemetry annotations for log collection
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: "openmemory"
       labels:
         {{- include "openmemory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: memory
+        platform.5dlabs.io/log-collection: enabled
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

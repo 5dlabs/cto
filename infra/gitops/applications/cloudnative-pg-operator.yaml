@@ -37,6 +37,14 @@ spec:
             INHERITED_ANNOTATIONS: "*"
             INHERITED_LABELS: "*"
 
+        # Pod labels for log collection
+        podLabels:
+          app.kubernetes.io/component: postgres-operator
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: cloudnative-pg-operator
+
         # Operator resources
         resources:
           requests:

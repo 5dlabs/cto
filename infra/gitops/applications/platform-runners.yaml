@@ -65,6 +65,13 @@ spec:
 
         # Force persistent runner behavior with explicit configuration
         template:
+          metadata:
+            labels:
+              app.kubernetes.io/component: github-runner
+              platform.5dlabs.io/log-collection: enabled
+            annotations:
+              logs.platform.5dlabs.io/collect: "true"
+              logs.platform.5dlabs.io/service: github-runner
           spec:
             restartPolicy: OnFailure
             activeDeadlineSeconds: 3600

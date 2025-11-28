@@ -72,6 +72,14 @@ spec:
         # Deployment configuration
         replicaCount: 1
 
+        # Pod labels for log collection
+        podLabels:
+          app.kubernetes.io/component: dns
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: external-dns
+
         # Resource limits
         resources:
           limits:

@@ -31,6 +31,14 @@ spec:
           enabled: true
           keep: true
 
+        # Pod labels for log collection (controller)
+        podLabels:
+          app.kubernetes.io/component: certificates
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: cert-manager
+
         # Resource limits
         resources:
           requests:
@@ -42,6 +50,12 @@ spec:
 
         # Webhook configuration
         webhook:
+          podLabels:
+            app.kubernetes.io/component: certificates-webhook
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: cert-manager-webhook
           resources:
             requests:
               cpu: 25m
@@ -52,6 +66,12 @@ spec:
 
         # CA Injector
         cainjector:
+          podLabels:
+            app.kubernetes.io/component: certificates-cainjector
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: cert-manager-cainjector
           resources:
             requests:
               cpu: 25m
