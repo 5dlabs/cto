@@ -91,13 +91,13 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - name: mcp
+          - name: cto-mcp
             binary: cto-mcp
             dir: mcp
           - name: tools
             binary: tools-server
             dir: tools
-          - name: monitor
+          - name: play-monitor
             binary: play-monitor
             dir: monitor
         target:
@@ -121,11 +121,11 @@ jobs:
         exclude:
           # play-monitor doesn't need Windows builds
           - package:
-              name: monitor
+              name: play-monitor
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}
-    name: build-${{ matrix.package.name }}-${{ matrix.target.suffix }}
+    name: build-${{ matrix.package.dir }}-${{ matrix.target.suffix }}
     steps:
       - uses: actions/checkout@v4
 
