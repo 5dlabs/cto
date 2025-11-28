@@ -269,8 +269,7 @@ impl SystemConfigManager {
         for (server_name, server_config) in &parsed_config.servers {
             if server_config.command.is_empty() {
                 return Err(anyhow::anyhow!(
-                    "Configuration validation failed: server '{}' has empty command",
-                    server_name
+                    "Configuration validation failed: server '{server_name}' has empty command"
                 ));
             }
         }
@@ -305,9 +304,8 @@ impl SystemConfigManager {
 
     /// Cleanup old backup files, keeping only the 5 most recent
     fn cleanup_old_backups(&self) -> Result<()> {
-        let parent_dir = match self.config_path.parent() {
-            Some(dir) => dir,
-            None => return Ok(()), // Can't clean up if no parent directory
+        let Some(parent_dir) = self.config_path.parent() else {
+            return Ok(()); // Can't clean up if no parent directory
         };
 
         let config_filename = self.config_path.file_name().unwrap().to_string_lossy();
@@ -346,9 +344,8 @@ impl SystemConfigManager {
 
     /// Cleanup orphaned temporary files on startup
     pub fn cleanup_temp_files(&self) -> Result<()> {
-        let parent_dir = match self.config_path.parent() {
-            Some(dir) => dir,
-            None => return Ok(()),
+        let Some(parent_dir) = self.config_path.parent() else {
+            return Ok(());
         };
 
         let config_filename = self.config_path.file_name().unwrap().to_string_lossy();

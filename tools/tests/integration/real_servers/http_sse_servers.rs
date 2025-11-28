@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::Result;
 use serde_json::json;
@@ -90,7 +86,7 @@ impl HttpSseTestClient {
         let response = self.send_request("initialize", init_params).await?;
 
         if let Some(error) = response.get("error") {
-            return Err(anyhow::anyhow!("Initialize failed: {}", error));
+            return Err(anyhow::anyhow!("Initialize failed: {error}"));
         }
 
         response
@@ -103,7 +99,7 @@ impl HttpSseTestClient {
         let response = self.send_request("tools/list", json!({})).await?;
 
         if let Some(error) = response.get("error") {
-            return Err(anyhow::anyhow!("List tools failed: {}", error));
+            return Err(anyhow::anyhow!("List tools failed: {error}"));
         }
 
         response
@@ -125,7 +121,7 @@ impl HttpSseTestClient {
         let response = self.send_request("tools/call", params).await?;
 
         if let Some(error) = response.get("error") {
-            return Err(anyhow::anyhow!("Tool call failed: {}", error));
+            return Err(anyhow::anyhow!("Tool call failed: {error}"));
         }
 
         response
@@ -160,7 +156,7 @@ impl HttpSseTestClient {
         if content_type.contains("text/event-stream") {
             println!("✅ SSE endpoint has correct content type");
         } else {
-            println!("⚠️  SSE endpoint content type: {}", content_type);
+            println!("⚠️  SSE endpoint content type: {content_type}");
         }
 
         Ok(())
@@ -198,7 +194,7 @@ async fn test_generic_http_sse_server() -> Result<()> {
     crate::setup_integration_tests();
 
     let server_url = get_remote_server_url();
-    println!("Testing HTTP/SSE server at: {}", server_url);
+    println!("Testing HTTP/SSE server at: {server_url}");
 
     let client = HttpSseTestClient::new(server_url.clone());
 
@@ -211,7 +207,7 @@ async fn test_generic_http_sse_server() -> Result<()> {
             println!("✅ Basic connectivity test passed");
         }
         Ok(Err(e)) => {
-            println!("❌ Basic connectivity test failed: {}", e);
+            println!("❌ Basic connectivity test failed: {e}");
             return Ok(()); // Skip test if server is not reachable
         }
         Err(_) => {
@@ -229,7 +225,7 @@ async fn test_generic_http_sse_server() -> Result<()> {
             println!("✅ SSE endpoint test passed");
         }
         Ok(Err(e)) => {
-            println!("❌ SSE endpoint test failed: {}", e);
+            println!("❌ SSE endpoint test failed: {e}");
         }
         Err(_) => {
             println!("❌ SSE endpoint test timed out");
@@ -242,23 +238,23 @@ async fn test_generic_http_sse_server() -> Result<()> {
 
     match init_result {
         Ok(Ok(response)) => {
-            println!("✅ MCP initialization successful: {}", response);
+            println!("✅ MCP initialization successful: {response}");
 
             // Validate initialization response
             if let Some(protocol_version) = response.get("protocolVersion") {
-                println!("Protocol version: {}", protocol_version);
+                println!("Protocol version: {protocol_version}");
             }
 
             if let Some(capabilities) = response.get("capabilities") {
-                println!("Server capabilities: {}", capabilities);
+                println!("Server capabilities: {capabilities}");
             }
 
             if let Some(server_info) = response.get("serverInfo") {
-                println!("Server info: {}", server_info);
+                println!("Server info: {server_info}");
             }
         }
         Ok(Err(e)) => {
-            println!("❌ MCP initialization failed: {}", e);
+            println!("❌ MCP initialization failed: {e}");
             return Ok(()); // Skip remaining tests if initialization fails
         }
         Err(_) => {
@@ -273,21 +269,21 @@ async fn test_generic_http_sse_server() -> Result<()> {
 
     match tools_result {
         Ok(Ok(response)) => {
-            println!("✅ Tools listing successful: {}", response);
+            println!("✅ Tools listing successful: {response}");
 
             // Validate tools response
             if let Some(tools) = response.get("tools").and_then(|t| t.as_array()) {
                 println!("Available tools:");
                 for tool in tools {
                     if let Some(name) = tool.get("name") {
-                        println!("  - {}", name);
+                        println!("  - {name}");
                     }
                 }
 
                 // Test calling a tool if available
                 if let Some(first_tool) = tools.first() {
                     if let Some(tool_name) = first_tool.get("name").and_then(|n| n.as_str()) {
-                        println!("Testing tool call: {}", tool_name);
+                        println!("Testing tool call: {tool_name}");
 
                         let tool_result = timeout(
                             Duration::from_secs(15),
@@ -297,10 +293,10 @@ async fn test_generic_http_sse_server() -> Result<()> {
 
                         match tool_result {
                             Ok(Ok(response)) => {
-                                println!("✅ Tool call successful: {}", response);
+                                println!("✅ Tool call successful: {response}");
                             }
                             Ok(Err(e)) => {
-                                println!("❌ Tool call failed: {}", e);
+                                println!("❌ Tool call failed: {e}");
                             }
                             Err(_) => {
                                 println!("❌ Tool call timed out");
@@ -311,7 +307,7 @@ async fn test_generic_http_sse_server() -> Result<()> {
             }
         }
         Ok(Err(e)) => {
-            println!("❌ Tools listing failed: {}", e);
+            println!("❌ Tools listing failed: {e}");
         }
         Err(_) => {
             println!("❌ Tools listing timed out");
@@ -344,15 +340,14 @@ async fn test_http_sse_error_handling() -> Result<()> {
         Ok(Ok(response)) => {
             if let Some(error) = response.get("error") {
                 println!(
-                    "✅ Server correctly returned error for invalid method: {}",
-                    error
+                    "✅ Server correctly returned error for invalid method: {error}"
                 );
             } else {
                 println!("⚠️  Server should have returned error for invalid method");
             }
         }
         Ok(Err(e)) => {
-            println!("✅ Server correctly handled invalid method: {}", e);
+            println!("✅ Server correctly handled invalid method: {e}");
         }
         Err(_) => {
             println!("❌ Invalid method test timed out");
@@ -370,12 +365,11 @@ async fn test_http_sse_error_handling() -> Result<()> {
     match invalid_tool_result {
         Ok(Ok(response)) => {
             println!(
-                "⚠️  Server should have failed for non-existent tool: {}",
-                response
+                "⚠️  Server should have failed for non-existent tool: {response}"
             );
         }
         Ok(Err(e)) => {
-            println!("✅ Server correctly handled invalid tool call: {}", e);
+            println!("✅ Server correctly handled invalid tool call: {e}");
         }
         Err(_) => {
             println!("❌ Invalid tool call test timed out");
@@ -417,23 +411,23 @@ async fn test_http_sse_performance() -> Result<()> {
     for handle in handles {
         match handle.await {
             Ok((i, Ok(_), duration)) => {
-                println!("✅ Request {} completed in {:?}", i, duration);
+                println!("✅ Request {i} completed in {duration:?}");
                 successful_requests += 1;
                 total_duration += duration;
             }
             Ok((i, Err(e), duration)) => {
-                println!("❌ Request {} failed in {:?}: {}", i, duration, e);
+                println!("❌ Request {i} failed in {duration:?}: {e}");
             }
             Err(e) => {
-                println!("❌ Request failed to complete: {}", e);
+                println!("❌ Request failed to complete: {e}");
             }
         }
     }
 
     if successful_requests > 0 {
         let average_duration = total_duration / successful_requests;
-        println!("✅ Average request duration: {:?}", average_duration);
-        println!("✅ Successful requests: {}/5", successful_requests);
+        println!("✅ Average request duration: {average_duration:?}");
+        println!("✅ Successful requests: {successful_requests}/5");
     }
 
     println!("✅ HTTP/SSE performance test completed");
@@ -456,6 +450,6 @@ mod tests {
     async fn test_remote_server_url() {
         let url = get_remote_server_url();
         assert!(url.starts_with("http"));
-        println!("✅ Remote server URL test passed: {}", url);
+        println!("✅ Remote server URL test passed: {url}");
     }
 }

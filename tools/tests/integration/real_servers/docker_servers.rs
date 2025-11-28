@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::Result;
 use serde_json::json;
@@ -39,7 +35,7 @@ async fn test_fetch_server_docker() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start Docker fetch server: {}", e);
+            println!("Failed to start Docker fetch server: {e}");
             return Ok(());
         }
     };
@@ -70,7 +66,7 @@ async fn test_fetch_server_docker() -> Result<()> {
 
     match fetch_result {
         Ok(response) => {
-            println!("✅ Docker HTTP GET fetch successful: {}", response);
+            println!("✅ Docker HTTP GET fetch successful: {response}");
             // Verify the response contains expected fields
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {
@@ -81,7 +77,7 @@ async fn test_fetch_server_docker() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ Docker HTTP GET fetch failed: {}", e);
+            println!("❌ Docker HTTP GET fetch failed: {e}");
         }
     }
 
@@ -105,7 +101,7 @@ async fn test_fetch_server_docker() -> Result<()> {
 
     match post_result {
         Ok(response) => {
-            println!("✅ Docker HTTP POST fetch successful: {}", response);
+            println!("✅ Docker HTTP POST fetch successful: {response}");
             // Verify the response contains our posted data
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {
@@ -116,7 +112,7 @@ async fn test_fetch_server_docker() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ Docker HTTP POST fetch failed: {}", e);
+            println!("❌ Docker HTTP POST fetch failed: {e}");
         }
     }
 
@@ -139,8 +135,7 @@ async fn test_fetch_server_docker() -> Result<()> {
         }
         Err(e) => {
             println!(
-                "✅ Docker server correctly blocked access to host file system: {}",
-                e
+                "✅ Docker server correctly blocked access to host file system: {e}"
             );
         }
     }
@@ -169,7 +164,7 @@ async fn test_docker_mcp_server_lifecycle() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start Docker server: {}", e);
+            println!("Failed to start Docker server: {e}");
             return Ok(());
         }
     };
@@ -180,10 +175,10 @@ async fn test_docker_mcp_server_lifecycle() -> Result<()> {
 
     match init_result {
         Ok(response) => {
-            println!("✅ Docker server initialization successful: {}", response);
+            println!("✅ Docker server initialization successful: {response}");
         }
         Err(e) => {
-            println!("❌ Docker server initialization failed: {}", e);
+            println!("❌ Docker server initialization failed: {e}");
         }
     }
 
@@ -193,10 +188,10 @@ async fn test_docker_mcp_server_lifecycle() -> Result<()> {
 
     match tools_result {
         Ok(response) => {
-            println!("✅ Docker server tools listing successful: {}", response);
+            println!("✅ Docker server tools listing successful: {response}");
         }
         Err(e) => {
-            println!("❌ Docker server tools listing failed: {}", e);
+            println!("❌ Docker server tools listing failed: {e}");
         }
     }
 
@@ -209,7 +204,7 @@ async fn test_docker_mcp_server_lifecycle() -> Result<()> {
             println!("✅ Docker server shutdown successful");
         }
         Err(e) => {
-            println!("❌ Docker server shutdown failed: {}", e);
+            println!("❌ Docker server shutdown failed: {e}");
         }
     }
 
@@ -236,7 +231,7 @@ async fn test_docker_networking() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start Docker server for networking test: {}", e);
+            println!("Failed to start Docker server for networking test: {e}");
             return Ok(());
         }
     };
@@ -255,8 +250,7 @@ async fn test_docker_networking() -> Result<()> {
     match network_result {
         Ok(response) => {
             println!(
-                "✅ Docker server can access external networks: {}",
-                response
+                "✅ Docker server can access external networks: {response}"
             );
             // Verify we got an IP address response
             if let Some(content) = response.get("content") {
@@ -268,7 +262,7 @@ async fn test_docker_networking() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ Docker server cannot access external networks: {}", e);
+            println!("❌ Docker server cannot access external networks: {e}");
         }
     }
 
@@ -285,10 +279,10 @@ async fn test_docker_networking() -> Result<()> {
 
     match dns_result {
         Ok(response) => {
-            println!("✅ Docker server DNS resolution works: {}", response);
+            println!("✅ Docker server DNS resolution works: {response}");
         }
         Err(e) => {
-            println!("❌ Docker server DNS resolution failed: {}", e);
+            println!("❌ Docker server DNS resolution failed: {e}");
         }
     }
 
@@ -318,7 +312,7 @@ async fn test_docker_resource_limits() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start Docker server with resource limits: {}", e);
+            println!("Failed to start Docker server with resource limits: {e}");
             return Ok(());
         }
     };
@@ -336,10 +330,10 @@ async fn test_docker_resource_limits() -> Result<()> {
 
     match limited_result {
         Ok(response) => {
-            println!("✅ Docker server works with resource limits: {}", response);
+            println!("✅ Docker server works with resource limits: {response}");
         }
         Err(e) => {
-            println!("❌ Docker server fails with resource limits: {}", e);
+            println!("❌ Docker server fails with resource limits: {e}");
         }
     }
 

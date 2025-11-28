@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::Result;
 use std::env;
@@ -34,13 +30,12 @@ impl TestEnvironment {
     pub fn new() -> Result<Self> {
         // Check if we're running in Docker test environment
         if let Ok(docker_test_dir) = env::var("MCP_TEST_DATA_DIR") {
-            println!("Using Docker test environment: {}", docker_test_dir);
+            println!("Using Docker test environment: {docker_test_dir}");
 
             // Verify the test data directory exists
             if !Path::new(&docker_test_dir).exists() {
                 return Err(anyhow::anyhow!(
-                    "Docker test data directory does not exist: {}",
-                    docker_test_dir
+                    "Docker test data directory does not exist: {docker_test_dir}"
                 ));
             }
 
@@ -91,8 +86,7 @@ impl TestEnvironment {
 pub async fn skip_if_not_available(runtime: &str) -> Result<()> {
     if !crate::common::server_lifecycle::check_runtime_available(runtime).await {
         return Err(anyhow::anyhow!(
-            "Runtime {} not available, skipping test",
-            runtime
+            "Runtime {runtime} not available, skipping test"
         ));
     }
     Ok(())
@@ -134,8 +128,7 @@ pub async fn wait_for_server_output(
 
         if start_time.elapsed() > timeout_duration {
             return Err(anyhow::anyhow!(
-                "Timeout waiting for server output: {}",
-                expected_output
+                "Timeout waiting for server output: {expected_output}"
             ));
         }
 
@@ -242,14 +235,14 @@ impl TestResults {
         if !self.failed.is_empty() {
             println!("\nFailed tests:");
             for (test, error) in &self.failed {
-                println!("  ❌ {}: {}", test, error);
+                println!("  ❌ {test}: {error}");
             }
         }
 
         if !self.skipped.is_empty() {
             println!("\nSkipped tests:");
             for test in &self.skipped {
-                println!("  ⏭️  {}", test);
+                println!("  ⏭️  {test}");
             }
         }
 
@@ -276,9 +269,9 @@ mod tests {
         assert!(timeout > 0);
 
         let is_ci = is_ci_environment();
-        println!("Running in CI: {}", is_ci);
+        println!("Running in CI: {is_ci}");
 
         let remote_url = get_remote_server_url();
-        println!("Remote server URL: {}", remote_url);
+        println!("Remote server URL: {remote_url}");
     }
 }

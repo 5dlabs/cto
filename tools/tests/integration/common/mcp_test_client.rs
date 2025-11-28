@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -194,7 +190,7 @@ impl McpTestClient {
         let response = self.send_request("initialize", init_params).await?;
 
         if let Some(error) = response.error {
-            return Err(anyhow::anyhow!("Initialize failed: {}", error));
+            return Err(anyhow::anyhow!("Initialize failed: {error}"));
         }
 
         // Send initialized notification
@@ -210,7 +206,7 @@ impl McpTestClient {
         let response = self.send_request("tools/list", json!({})).await?;
 
         if let Some(error) = response.error {
-            return Err(anyhow::anyhow!("List tools failed: {}", error));
+            return Err(anyhow::anyhow!("List tools failed: {error}"));
         }
 
         response
@@ -227,7 +223,7 @@ impl McpTestClient {
         let response = self.send_request("tools/call", params).await?;
 
         if let Some(error) = response.error {
-            return Err(anyhow::anyhow!("Tool call failed: {}", error));
+            return Err(anyhow::anyhow!("Tool call failed: {error}"));
         }
 
         response
@@ -239,7 +235,7 @@ impl McpTestClient {
         let response = self.send_request("ping", json!({})).await?;
 
         if let Some(error) = response.error {
-            return Err(anyhow::anyhow!("Ping failed: {}", error));
+            return Err(anyhow::anyhow!("Ping failed: {error}"));
         }
 
         Ok(())
