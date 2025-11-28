@@ -3321,7 +3321,7 @@ fn handle_add_docs_tool(arguments: &std::collections::HashMap<String, Value>) ->
     doc_proxy::handle_add_docs(url, doc_type, query, limit)
 }
 
-/// Create a CodeRun for MCP server management tasks
+/// Create a `CodeRun` for MCP server management tasks
 fn create_mcp_server_coderun(
     task_type: &str,
     server_key: &str,
@@ -3407,7 +3407,7 @@ fn handle_add_mcp_server(arguments: &std::collections::HashMap<String, Value>) -
 
     let skip_merge = arguments
         .get("skip_merge")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
 
     // Parse and validate GitHub URL
@@ -3462,7 +3462,7 @@ fn handle_remove_mcp_server(arguments: &std::collections::HashMap<String, Value>
 
     let skip_merge = arguments
         .get("skip_merge")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
 
     eprintln!("🗑️ Removing MCP server: {server_key}");
@@ -3493,7 +3493,7 @@ fn handle_update_mcp_server(arguments: &std::collections::HashMap<String, Value>
 
     let skip_merge = arguments
         .get("skip_merge")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
 
     eprintln!("🔄 Updating MCP server: {server_key}");
