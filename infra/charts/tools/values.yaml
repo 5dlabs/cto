@@ -307,10 +307,8 @@ config:
       args: ["-y", "argocd-mcp@latest", "stdio"]
       workingDirectory: "/tmp"
       env:
-        # In-cluster ArgoCD URL
-        ARGOCD_BASE_URL: "https://argocd-server.argocd.svc.cluster.local"
-        # Skip TLS verification for in-cluster self-signed certs
-        NODE_TLS_REJECT_UNAUTHORIZED: "0"
+        # In-cluster ArgoCD URL (HTTP for internal cluster communication)
+        ARGOCD_BASE_URL: "http://argocd-server.argocd.svc.cluster.local"
       secretRef:
         name: "tools-argocd-secrets"
         keys:
