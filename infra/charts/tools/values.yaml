@@ -336,6 +336,30 @@ config:
         keys:
           - "ARGOCD_API_TOKEN"
 
+    # --- AI Image Generation ---
+    nano-banana:
+      name: "Nano Banana"
+      description: "AI image generation and editing using Google Gemini 2.5 Flash - generate, edit, and iterate on images"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "nano-banana-mcp"]
+      workingDirectory: "/tmp"
+      secretRef:
+        name: "tools-gemini-secrets"
+        keys:
+          - "GEMINI_API_KEY"
+
+    # --- Secrets Management ---
+    # NOTE: Vault MCP server requires its own deployment - see infra/charts/tools/templates/vault-mcp-server.yaml
+    # It runs in HTTP mode and tools server proxies to it
+    vault:
+      name: "HashiCorp Vault"
+      description: "Vault secrets management - read/write secrets, manage mounts, PKI certificates"
+      transport: "http"
+      # In-cluster Vault MCP server URL (deployed separately)
+      url: "http://vault-mcp-server.cto.svc.cluster.local:8080/mcp"
+      workingDirectory: "/tmp"
+
 # Persistence for temporary files and caches
 persistence:
   enabled: true
@@ -353,6 +377,8 @@ secretRefs:
   - name: tools-cloudflare-secrets
   - name: tools-grafana-secrets
   - name: tools-argocd-secrets
+  - name: tools-gemini-secrets
+  # Note: tools-vault-secrets is used by vault-mcp-server deployment, not tools server
 
 # Network policy
 networkPolicy:

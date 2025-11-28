@@ -60,9 +60,6 @@ pub struct ServerConfig {
     /// Supports: "project_root", absolute paths like "/usr/local/bin", or relative paths
     #[serde(rename = "workingDirectory", default)]
     pub working_directory: Option<String>,
-    /// Whether this is a local server (runs in agent container, not proxied through tools server)
-    #[serde(default)]
-    pub local: bool,
 }
 
 /// Root configuration structure

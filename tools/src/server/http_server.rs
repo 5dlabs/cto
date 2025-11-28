@@ -108,21 +108,11 @@ struct Tool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ToolCatalog {
     last_updated: String,
-    local: HashMap<String, LocalServerInfo>,
-    remote: HashMap<String, RemoteServerInfo>,
+    servers: HashMap<String, ServerInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct LocalServerInfo {
-    description: String,
-    command: String,
-    args: Vec<String>,
-    working_directory: String,
-    tools: Vec<ToolInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct RemoteServerInfo {
+struct ServerInfo {
     description: String,
     endpoint: String,
     tools: Vec<ToolInfo>,
@@ -928,23 +918,12 @@ impl BridgeState {
             );
         }
 
-        // Get all configured servers, excluding local servers (they run in agent containers)
+        // Get all configured servers
         let all_servers = {
             let config_manager = self.system_config_manager.read().await;
             config_manager
                 .get_servers()
                 .iter()
-                .filter(|(name, config)| {
-                    if config.local {
-                        tracing::info!(
-                            "⏭️ [{}] Skipping local server (runs in agent container)",
-                            name
-                        );
-                        false
-                    } else {
-                        true
-                    }
-                })
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect::<HashMap<_, _>>()
         };
@@ -1118,25 +1097,14 @@ impl BridgeState {
         let namespace = get_current_namespace();
         tracing::info!("📍 Detected namespace: {}", namespace);
 
-        // Get server configurations, split into local and remote by the local field
-        let (remote_servers, local_servers) = {
+        // Get server configurations
+        let servers = {
             let config_manager = self.system_config_manager.read().await;
-            let all_servers = config_manager.get_servers().clone();
-            let local: HashMap<_, _> = all_servers
-                .iter()
-                .filter(|(_, config)| config.local)
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            let remote: HashMap<_, _> = all_servers
-                .iter()
-                .filter(|(_, config)| !config.local)
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            (remote, local)
+            config_manager.get_servers().clone()
         };
 
         // Build the tool catalog
-        let catalog = self.build_tool_catalog(tools, &remote_servers, &local_servers);
+        let catalog = self.build_tool_catalog(tools, &servers);
 
         // Convert to JSON
         let catalog_json = serde_json::to_string_pretty(&catalog)?;
@@ -1175,10 +1143,8 @@ impl BridgeState {
         &self,
         tools: &HashMap<String, Tool>,
         servers: &HashMap<String, ServerConfig>,
-        local_servers: &HashMap<String, ServerConfig>,
     ) -> ToolCatalog {
-        let mut local = HashMap::new();
-        let mut remote = HashMap::new();
+        let mut catalog_servers = HashMap::new();
 
         // Group tools by server
         let mut server_tools: HashMap<String, Vec<&Tool>> = HashMap::new();
@@ -1189,50 +1155,8 @@ impl BridgeState {
                 .push(tool);
         }
 
-        // Build local server info from discovered tools
-        for (server_name, server_config) in local_servers {
-            if let Some(tools) = server_tools.get(server_name) {
-                let tool_infos: Vec<ToolInfo> = tools
-                    .iter()
-                    .map(|tool| ToolInfo {
-                        name: tool.name.clone(),
-                        description: tool.description.clone(),
-                        category: self.infer_category(&tool.name, &tool.description),
-                        use_cases: self.infer_use_cases(&tool.name, &tool.description),
-                        input_schema: Some(tool.input_schema.clone()),
-                    })
-                    .collect();
-
-                if !tool_infos.is_empty() {
-                    local.insert(
-                        server_name.clone(),
-                        LocalServerInfo {
-                            description: server_config.description.clone().unwrap_or_else(|| {
-                                server_config
-                                    .name
-                                    .clone()
-                                    .unwrap_or_else(|| server_name.clone())
-                            }),
-                            command: server_config.command.clone(),
-                            args: server_config.args.clone(),
-                            working_directory: server_config
-                                .working_directory
-                                .clone()
-                                .unwrap_or_else(|| "project_root".to_string()),
-                            tools: tool_infos,
-                        },
-                    );
-                }
-            }
-        }
-
-        // Build remote server info
+        // Build server info for all configured servers
         for (server_name, server_config) in servers {
-            // Skip if this is also in local servers (avoid duplicates)
-            if local_servers.contains_key(server_name) {
-                continue;
-            }
-
             if let Some(tools) = server_tools.get(server_name) {
                 let tool_infos: Vec<ToolInfo> = tools
                     .iter()
@@ -1247,15 +1171,15 @@ impl BridgeState {
 
                 let endpoint = server_config.url.clone().unwrap_or_else(|| {
                     if server_config.transport == "stdio" {
-                        "stdio".to_string()
+                        "stdio (proxied)".to_string()
                     } else {
                         "unknown".to_string()
                     }
                 });
 
-                remote.insert(
+                catalog_servers.insert(
                     server_name.clone(),
-                    RemoteServerInfo {
+                    ServerInfo {
                         description: server_config.description.clone().unwrap_or_else(|| {
                             server_config
                                 .name
@@ -1271,8 +1195,7 @@ impl BridgeState {
 
         ToolCatalog {
             last_updated: chrono::Utc::now().to_rfc3339(),
-            local,
-            remote,
+            servers: catalog_servers,
         }
     }
 
