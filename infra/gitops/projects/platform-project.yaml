@@ -130,6 +130,16 @@ spec:
     # Kilo WireGuard VPN CRDs
     - group: 'kilo.squat.ai'
       kind: '*'
+    # Cloudflare Tunnel operator CRDs (ClusterTunnel is cluster-scoped)
+    - group: 'networking.cfargotunnel.com'
+      kind: '*'
+    # MinIO Operator CRDs
+    - group: 'minio.min.io'
+      kind: '*'
+    - group: 'sts.min.io'
+      kind: '*'
+    - group: 'job.min.io'
+      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
