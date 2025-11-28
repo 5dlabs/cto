@@ -231,22 +231,6 @@ config:
       url: "https://mcp.solana.com/mcp"
       workingDirectory: "/tmp"
 
-    # --- Social ---
-    reddit:
-      name: "Reddit"
-      description: "Reddit content fetching and analysis via uvx"
-      transport: "stdio"
-      command: "uvx"
-      args: ["--from", "git+https://github.com/adhikasp/mcp-reddit.git", "mcp-reddit"]
-      workingDirectory: "/tmp"
-      secretRef:
-        name: "tools-reddit-secrets"
-        keys:
-          - "REDDIT_CLIENT_ID"
-          - "REDDIT_CLIENT_SECRET"
-          - "REDDIT_USERNAME"
-          - "REDDIT_PASSWORD"
-
     # --- Local Servers (run in agent containers, not proxied) ---
     # NOTE: filesystem server removed - its inputSchema lacks required "type": "object"
     # which breaks MCP protocol validation in Cursor and other clients
@@ -270,7 +254,6 @@ persistence:
 # Secret store integration (Vault Secrets Operator syncs these)
 secretRefs:
   - name: tools-brave-search-secrets
-  - name: tools-reddit-secrets
   - name: tools-context7-secrets
   - name: tools-github-secrets
 
