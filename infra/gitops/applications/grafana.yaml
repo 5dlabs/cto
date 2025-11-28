@@ -97,6 +97,11 @@ spec:
           runAsUser: 472
           fsGroup: 472
 
+        # Disable init container that tries to chown - PVC already has correct ownership
+        # The init-chown-data container fails on Talos due to security restrictions
+        initChownData:
+          enabled: false
+
         # Environment variables
         env:
           GF_EXPLORE_ENABLED: "true"
