@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::Result;
 use serde_json::json;
@@ -39,7 +35,7 @@ async fn test_fetch_server_uvx() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start UVX fetch server: {}", e);
+            println!("Failed to start UVX fetch server: {e}");
             return Ok(());
         }
     };
@@ -70,7 +66,7 @@ async fn test_fetch_server_uvx() -> Result<()> {
 
     match fetch_result {
         Ok(response) => {
-            println!("✅ HTTP GET fetch successful: {}", response);
+            println!("✅ HTTP GET fetch successful: {response}");
             // Verify the response contains expected fields
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {
@@ -81,7 +77,7 @@ async fn test_fetch_server_uvx() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ HTTP GET fetch failed: {}", e);
+            println!("❌ HTTP GET fetch failed: {e}");
         }
     }
 
@@ -105,7 +101,7 @@ async fn test_fetch_server_uvx() -> Result<()> {
 
     match post_result {
         Ok(response) => {
-            println!("✅ HTTP POST fetch successful: {}", response);
+            println!("✅ HTTP POST fetch successful: {response}");
             // Verify the response contains our posted data (if successful)
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {
@@ -117,15 +113,14 @@ async fn test_fetch_server_uvx() -> Result<()> {
                         println!("✅ HTTP POST response validated (success or expected error)");
                     } else {
                         println!(
-                            "⚠️ HTTP POST response unexpected but not failing test: {}",
-                            response_text
+                            "⚠️ HTTP POST response unexpected but not failing test: {response_text}"
                         );
                     }
                 }
             }
         }
         Err(e) => {
-            println!("❌ HTTP POST fetch failed: {}", e);
+            println!("❌ HTTP POST fetch failed: {e}");
         }
     }
 
@@ -146,7 +141,7 @@ async fn test_fetch_server_uvx() -> Result<()> {
 
     match headers_result {
         Ok(response) => {
-            println!("✅ HTTP fetch with custom headers successful: {}", response);
+            println!("✅ HTTP fetch with custom headers successful: {response}");
             // Verify our custom headers were sent (or at least that we got a response)
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {
@@ -157,15 +152,14 @@ async fn test_fetch_server_uvx() -> Result<()> {
                         println!("✅ Custom headers validated (header found or headers endpoint working)");
                     } else {
                         println!(
-                            "⚠️ Custom headers test - unexpected response but not failing: {}",
-                            response_text
+                            "⚠️ Custom headers test - unexpected response but not failing: {response_text}"
                         );
                     }
                 }
             }
         }
         Err(e) => {
-            println!("❌ HTTP fetch with custom headers failed: {}", e);
+            println!("❌ HTTP fetch with custom headers failed: {e}");
         }
     }
 
@@ -185,7 +179,7 @@ async fn test_fetch_server_uvx() -> Result<()> {
             println!("⚠️  Expected error for invalid URL, but got success");
         }
         Err(e) => {
-            println!("✅ Correctly handled invalid URL error: {}", e);
+            println!("✅ Correctly handled invalid URL error: {e}");
         }
     }
 

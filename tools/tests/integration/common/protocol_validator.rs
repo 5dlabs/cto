@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
@@ -40,7 +36,7 @@ impl ProtocolValidator {
 
         // Validate basic response structure
         if let Some(protocol_version) = response.get("protocolVersion") {
-            println!("Protocol version: {}", protocol_version);
+            println!("Protocol version: {protocol_version}");
         } else {
             return Err(anyhow::anyhow!(
                 "Missing protocolVersion in initialize response"
@@ -48,7 +44,7 @@ impl ProtocolValidator {
         }
 
         if let Some(capabilities) = response.get("capabilities") {
-            println!("Server capabilities: {}", capabilities);
+            println!("Server capabilities: {capabilities}");
         } else {
             return Err(anyhow::anyhow!(
                 "Missing capabilities in initialize response"
@@ -56,7 +52,7 @@ impl ProtocolValidator {
         }
 
         if let Some(server_info) = response.get("serverInfo") {
-            println!("Server info: {}", server_info);
+            println!("Server info: {server_info}");
         }
 
         Ok(response)
@@ -76,14 +72,14 @@ impl ProtocolValidator {
         for tool in tools {
             if let Some(name) = tool.get("name").and_then(|n| n.as_str()) {
                 tool_names.push(name.to_string());
-                println!("Found tool: {}", name);
+                println!("Found tool: {name}");
 
                 // Validate tool structure
                 if tool.get("description").is_none() {
-                    println!("Warning: Tool {} missing description", name);
+                    println!("Warning: Tool {name} missing description");
                 }
                 if tool.get("inputSchema").is_none() {
-                    println!("Warning: Tool {} missing inputSchema", name);
+                    println!("Warning: Tool {name} missing inputSchema");
                 }
             }
         }
@@ -100,12 +96,12 @@ impl ProtocolValidator {
         tool_name: &str,
         args: Value,
     ) -> Result<Value> {
-        println!("Validating tool call: {} with args: {}", tool_name, args);
+        println!("Validating tool call: {tool_name} with args: {args}");
 
         let response = server
             .call_tool(tool_name, args)
             .await
-            .context(format!("Failed to call tool: {}", tool_name))?;
+            .context(format!("Failed to call tool: {tool_name}"))?;
 
         // Validate response structure
         if response.get("content").is_none() {
@@ -141,8 +137,7 @@ impl ProtocolValidator {
         if let Ok(response) = result {
             if let Some(error) = response.error {
                 println!(
-                    "Correct: Server returned error for invalid method: {}",
-                    error
+                    "Correct: Server returned error for invalid method: {error}"
                 );
             } else {
                 println!("Warning: Server should have returned error for invalid method");
@@ -166,7 +161,7 @@ impl ProtocolValidator {
                     .to_string();
             }
             Err(e) => {
-                report.add_error(format!("Initialization failed: {}", e));
+                report.add_error(format!("Initialization failed: {e}"));
             }
         }
 
@@ -177,7 +172,7 @@ impl ProtocolValidator {
                 report.available_tools = tools;
             }
             Err(e) => {
-                report.add_error(format!("Tool listing failed: {}", e));
+                report.add_error(format!("Tool listing failed: {e}"));
             }
         }
 
@@ -187,7 +182,7 @@ impl ProtocolValidator {
                 report.error_handling_passed = true;
             }
             Err(e) => {
-                report.add_error(format!("Error handling validation failed: {}", e));
+                report.add_error(format!("Error handling validation failed: {e}"));
             }
         }
 
@@ -195,7 +190,7 @@ impl ProtocolValidator {
         let stderr_output = server.get_stderr().await;
         for line in stderr_output {
             if line.contains("error") || line.contains("ERROR") || line.contains("failed") {
-                report.add_warning(format!("Stderr: {}", line));
+                report.add_warning(format!("Stderr: {line}"));
             }
         }
 
@@ -276,14 +271,14 @@ impl ValidationReport {
         if !self.errors.is_empty() {
             println!("Errors:");
             for error in &self.errors {
-                println!("  ❌ {}", error);
+                println!("  ❌ {error}");
             }
         }
 
         if !self.warnings.is_empty() {
             println!("Warnings:");
             for warning in &self.warnings {
-                println!("  ⚠️  {}", warning);
+                println!("  ⚠️  {warning}");
             }
         }
 
@@ -317,8 +312,8 @@ impl CommonTestScenarios {
             .await;
 
         match read_result {
-            Ok(response) => println!("File read successful: {}", response),
-            Err(e) => println!("File read failed (expected if file doesn't exist): {}", e),
+            Ok(response) => println!("File read successful: {response}"),
+            Err(e) => println!("File read failed (expected if file doesn't exist): {e}"),
         }
 
         // Test listing directory
@@ -332,8 +327,8 @@ impl CommonTestScenarios {
             .await;
 
         match list_result {
-            Ok(response) => println!("Directory listing successful: {}", response),
-            Err(e) => println!("Directory listing failed: {}", e),
+            Ok(response) => println!("Directory listing successful: {response}"),
+            Err(e) => println!("Directory listing failed: {e}"),
         }
 
         Ok(())
@@ -354,8 +349,8 @@ impl CommonTestScenarios {
             .await;
 
         match fetch_result {
-            Ok(response) => println!("Fetch successful: {}", response),
-            Err(e) => println!("Fetch failed: {}", e),
+            Ok(response) => println!("Fetch successful: {response}"),
+            Err(e) => println!("Fetch failed: {e}"),
         }
 
         Ok(())

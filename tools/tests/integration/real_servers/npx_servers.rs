@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 
 use anyhow::Result;
 use serde_json::json;
@@ -49,8 +45,8 @@ async fn test_filesystem_server_npx() -> Result<()> {
     let actual_test_files_dir = test_data_dir.clone();
 
     // Ensure test files exist in the actual test directory
-    println!("NPX server configured for directory: {}", test_data_dir);
-    println!("Actual test files directory: {}", actual_test_files_dir);
+    println!("NPX server configured for directory: {test_data_dir}");
+    println!("Actual test files directory: {actual_test_files_dir}");
 
     // Create test files in the actual test directory AND ensure its parent exists
     std::fs::create_dir_all(&actual_test_files_dir)?;
@@ -59,11 +55,11 @@ async fn test_filesystem_server_npx() -> Result<()> {
     if let Some(parent) = std::path::Path::new(&actual_test_files_dir).parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let test_file_path = format!("{}/test.txt", actual_test_files_dir);
-    let test_json_path = format!("{}/test.json", actual_test_files_dir);
+    let test_file_path = format!("{actual_test_files_dir}/test.txt");
+    let test_json_path = format!("{actual_test_files_dir}/test.json");
 
     if !std::path::Path::new(&test_file_path).exists() {
-        println!("Creating test files in: {}", actual_test_files_dir);
+        println!("Creating test files in: {actual_test_files_dir}");
         std::fs::write(
             &test_file_path,
             "This is a test file for MCP server integration tests.\n",
@@ -83,7 +79,7 @@ async fn test_filesystem_server_npx() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start filesystem server: {}", e);
+            println!("Failed to start filesystem server: {e}");
             return Ok(());
         }
     };
@@ -100,12 +96,12 @@ async fn test_filesystem_server_npx() -> Result<()> {
 
     // Test specific filesystem operations
     println!("Testing filesystem operations...");
-    println!("NPX server configured for directory: {}", test_data_dir);
-    println!("TestEnvironment directory: {}", test_dir);
+    println!("NPX server configured for directory: {test_data_dir}");
+    println!("TestEnvironment directory: {test_dir}");
 
     // Use relative file paths since the server runs in the test directory
     let test_file_path = "test.txt";
-    println!("Attempting to read file: {}", test_file_path);
+    println!("Attempting to read file: {test_file_path}");
 
     // Debug: Check what directories exist
     println!("🔍 Debugging directory structure:");
@@ -123,14 +119,14 @@ async fn test_filesystem_server_npx() -> Result<()> {
     }
 
     // Verify the file exists before trying to read it
-    let full_test_file_path = format!("{}/{}", test_data_dir, test_file_path);
+    let full_test_file_path = format!("{test_data_dir}/{test_file_path}");
     if std::path::Path::new(&full_test_file_path).exists() {
-        println!("✅ Test file exists at: {}", full_test_file_path);
+        println!("✅ Test file exists at: {full_test_file_path}");
     } else {
-        println!("❌ Test file does not exist at: {}", full_test_file_path);
+        println!("❌ Test file does not exist at: {full_test_file_path}");
         // List directory contents for debugging
         if let Ok(entries) = std::fs::read_dir(&test_data_dir) {
-            println!("Directory contents of {}:", test_data_dir);
+            println!("Directory contents of {test_data_dir}:");
             for entry in entries.flatten() {
                 println!("  - {}", entry.file_name().to_string_lossy());
             }
@@ -149,7 +145,7 @@ async fn test_filesystem_server_npx() -> Result<()> {
 
     match read_result {
         Ok(response) => {
-            println!("✅ File read successful: {}", response);
+            println!("✅ File read successful: {response}");
 
             // Check if this is an error response
             if let Some(is_error) = response.get("isError") {
@@ -171,7 +167,7 @@ async fn test_filesystem_server_npx() -> Result<()> {
                     if content_text.contains("This is a test file") {
                         println!("✅ File content validated");
                     } else {
-                        println!("⚠️  File content unexpected: {}", content_text);
+                        println!("⚠️  File content unexpected: {content_text}");
                         // Don't fail the test, just warn about unexpected content
                     }
                 } else {
@@ -182,7 +178,7 @@ async fn test_filesystem_server_npx() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ File read failed: {}", e);
+            println!("❌ File read failed: {e}");
         }
     }
 
@@ -198,7 +194,7 @@ async fn test_filesystem_server_npx() -> Result<()> {
 
     match list_result {
         Ok(response) => {
-            println!("✅ Directory listing successful: {}", response);
+            println!("✅ Directory listing successful: {response}");
             // Verify our test files are listed
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {
@@ -209,7 +205,7 @@ async fn test_filesystem_server_npx() -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ Directory listing failed: {}", e);
+            println!("❌ Directory listing failed: {e}");
         }
     }
 
@@ -226,10 +222,10 @@ async fn test_filesystem_server_npx() -> Result<()> {
 
     match create_result {
         Ok(response) => {
-            println!("✅ File creation successful: {}", response);
+            println!("✅ File creation successful: {response}");
         }
         Err(e) => {
-            println!("❌ File creation failed: {}", e);
+            println!("❌ File creation failed: {e}");
         }
     }
 
@@ -256,8 +252,7 @@ async fn test_brave_search_server_npx() -> Result<()> {
         Ok(server) => server,
         Err(e) => {
             println!(
-                "Failed to start brave search server (expected without API key): {}",
-                e
+                "Failed to start brave search server (expected without API key): {e}"
             );
             return Ok(());
         }
@@ -297,7 +292,7 @@ async fn test_memory_server_npx() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!("Failed to start memory server: {}", e);
+            println!("Failed to start memory server: {e}");
             return Ok(());
         }
     };
@@ -324,10 +319,10 @@ async fn test_memory_server_npx() -> Result<()> {
 
         match store_result {
             Ok(response) => {
-                println!("✅ Memory storage successful: {}", response);
+                println!("✅ Memory storage successful: {response}");
             }
             Err(e) => {
-                println!("❌ Memory storage failed: {}", e);
+                println!("❌ Memory storage failed: {e}");
             }
         }
 
@@ -343,10 +338,10 @@ async fn test_memory_server_npx() -> Result<()> {
 
         match search_result {
             Ok(response) => {
-                println!("✅ Memory search successful: {}", response);
+                println!("✅ Memory search successful: {response}");
             }
             Err(e) => {
-                println!("❌ Memory search failed: {}", e);
+                println!("❌ Memory search failed: {e}");
             }
         }
     } else {
@@ -376,8 +371,7 @@ async fn test_postgres_server_npx() -> Result<()> {
         Ok(server) => server,
         Err(e) => {
             println!(
-                "Failed to start postgres server (expected without DB): {}",
-                e
+                "Failed to start postgres server (expected without DB): {e}"
             );
             return Ok(());
         }

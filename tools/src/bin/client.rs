@@ -1,3 +1,5 @@
+// Clippy pedantic configuration for tools-client binary
+#![warn(clippy::pedantic)]
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::disallowed_macros)]
 

@@ -1,5 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
-
 use crate::config::ClientConfig;
 use anyhow::Result;
 use serde_json::{json, Value};
@@ -232,13 +230,13 @@ impl McpClient {
             // Use provided working directory, canonicalized
             std::path::Path::new(dir)
                 .canonicalize()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| dir.clone())
+                .map_or_else(|_| dir.clone(), |p| p.to_string_lossy().to_string())
         } else {
             // Fall back to current working directory
             std::env::current_dir()
-                .map(|d| d.canonicalize().unwrap_or(d).to_string_lossy().to_string())
-                .unwrap_or_else(|_| "unknown".to_string())
+                .map_or_else(|_| "unknown".to_string(), |d| {
+                    d.canonicalize().unwrap_or(d).to_string_lossy().to_string()
+                })
         };
 
         tracing::debug!("[Bridge] Sending working directory: {current_dir}");
@@ -339,7 +337,7 @@ impl McpClient {
                 let original_name = tool
                     .get("name")
                     .and_then(|n| n.as_str())
-                    .map(|s| s.to_string());
+                    .map(std::string::ToString::to_string);
                 if let Some(name) = &original_name {
                     if name.contains('-') {
                         let sanitized_name = name.replace('-', "_");
@@ -453,12 +451,12 @@ impl McpClient {
         let current_dir = if let Some(ref dir) = self.working_dir {
             std::path::Path::new(dir)
                 .canonicalize()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| dir.clone())
+                .map_or_else(|_| dir.clone(), |p| p.to_string_lossy().to_string())
         } else {
-            std::env::current_dir()
-                .map(|d| d.canonicalize().unwrap_or(d).to_string_lossy().to_string())
-                .unwrap_or_else(|_| "unknown".to_string())
+            std::env::current_dir().map_or_else(
+                |_| "unknown".to_string(),
+                |d| d.canonicalize().unwrap_or(d).to_string_lossy().to_string(),
+            )
         };
 
         let response = self
@@ -685,11 +683,11 @@ impl McpClient {
             );
 
             let stdin = process.stdin.as_mut().ok_or_else(|| {
-                anyhow::anyhow!("No stdin available for server '{}'", server_name)
+                anyhow::anyhow!("No stdin available for server '{server_name}'")
             })?;
 
             let stdout = process.stdout.as_mut().ok_or_else(|| {
-                anyhow::anyhow!("No stdout available for server '{}'", server_name)
+                anyhow::anyhow!("No stdout available for server '{server_name}'")
             })?;
 
             // Step 1: Send initialize request
@@ -709,7 +707,7 @@ impl McpClient {
                 }
             });
 
-            let request_line = format!("{}\n", initialize_request);
+            let request_line = format!("{initialize_request}\n");
             tracing::debug!(
                 "[Bridge] 📤 Sending initialize request to {}: {}",
                 server_name,
@@ -721,22 +719,18 @@ impl McpClient {
                 .await
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to send initialize request to '{}': {}",
-                        server_name,
-                        e
+                        "Failed to send initialize request to '{server_name}': {e}"
                     )
                 })?;
             stdin.flush().await.map_err(|e| {
-                anyhow::anyhow!("Failed to flush stdin for '{}': {}", server_name, e)
+                anyhow::anyhow!("Failed to flush stdin for '{server_name}': {e}")
             })?;
 
             // Step 2: Read initialize response
             let mut response_line = String::new();
             stdout.read_line(&mut response_line).await.map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to read initialize response from '{}': {}",
-                    server_name,
-                    e
+                    "Failed to read initialize response from '{server_name}': {e}"
                 )
             })?;
 
@@ -748,9 +742,7 @@ impl McpClient {
 
             let response: Value = serde_json::from_str(&response_line).map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to parse initialize response from '{}': {}",
-                    server_name,
-                    e
+                    "Failed to parse initialize response from '{server_name}': {e}"
                 )
             })?;
 
@@ -769,7 +761,7 @@ impl McpClient {
                 "method": "notifications/initialized"
             });
 
-            let notification_line = format!("{}\n", initialized_notification);
+            let notification_line = format!("{initialized_notification}\n");
             tracing::debug!(
                 "[Bridge] 📤 Sending initialized notification to {}",
                 server_name
@@ -780,16 +772,12 @@ impl McpClient {
                 .await
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to send initialized notification to '{}': {}",
-                        server_name,
-                        e
+                        "Failed to send initialized notification to '{server_name}': {e}"
                     )
                 })?;
             stdin.flush().await.map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to flush stdin after notification for '{}': {}",
-                    server_name,
-                    e
+                    "Failed to flush stdin after notification for '{server_name}': {e}"
                 )
             })?;
 
@@ -801,7 +789,7 @@ impl McpClient {
                 "params": {}
             });
 
-            let tools_request_line = format!("{}\n", tools_list_request);
+            let tools_request_line = format!("{tools_list_request}\n");
             tracing::debug!("[Bridge] 📤 Sending tools/list request to {}", server_name);
 
             stdin
@@ -809,16 +797,12 @@ impl McpClient {
                 .await
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to send tools/list request to '{}': {}",
-                        server_name,
-                        e
+                        "Failed to send tools/list request to '{server_name}': {e}"
                     )
                 })?;
             stdin.flush().await.map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to flush stdin after tools request for '{}': {}",
-                    server_name,
-                    e
+                    "Failed to flush stdin after tools request for '{server_name}': {e}"
                 )
             })?;
 
@@ -829,9 +813,7 @@ impl McpClient {
                 .await
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to read tools/list response from '{}': {}",
-                        server_name,
-                        e
+                        "Failed to read tools/list response from '{server_name}': {e}"
                     )
                 })?;
 
@@ -844,9 +826,7 @@ impl McpClient {
             let tools_response: Value =
                 serde_json::from_str(&tools_response_line).map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to parse tools/list response from '{}': {}",
-                        server_name,
-                        e
+                        "Failed to parse tools/list response from '{server_name}': {e}"
                     )
                 })?;
 
@@ -878,7 +858,7 @@ impl McpClient {
 
             let tool_names: Vec<String> = tool_schemas
                 .iter()
-                .filter_map(|tool| tool.get("name")?.as_str().map(|s| s.to_string()))
+                .filter_map(|tool| tool.get("name")?.as_str().map(std::string::ToString::to_string))
                 .collect();
 
             tracing::debug!(
@@ -889,7 +869,7 @@ impl McpClient {
             tracing::debug!("[Bridge] 🔍 Discovered tools: {:?}", tool_names);
             Ok(tool_schemas)
         } else {
-            Err(anyhow::anyhow!("Local server '{}' not found", server_name))
+            Err(anyhow::anyhow!("Local server '{server_name}' not found"))
         }
     }
 
@@ -910,11 +890,11 @@ impl McpClient {
             );
 
             let stdin = process.stdin.as_mut().ok_or_else(|| {
-                anyhow::anyhow!("No stdin available for server '{}'", server_name)
+                anyhow::anyhow!("No stdin available for server '{server_name}'")
             })?;
 
             let stdout = process.stdout.as_mut().ok_or_else(|| {
-                anyhow::anyhow!("No stdout available for server '{}'", server_name)
+                anyhow::anyhow!("No stdout available for server '{server_name}'")
             })?;
 
             // Create tools/call JSON-RPC request
@@ -929,7 +909,7 @@ impl McpClient {
                 }
             });
 
-            let request_line = format!("{}\n", tools_call_request);
+            let request_line = format!("{tools_call_request}\n");
             tracing::debug!(
                 "[Bridge] 📤 Sending tools/call request to {}: {}",
                 server_name,
@@ -942,22 +922,18 @@ impl McpClient {
                 .await
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to send tools/call request to '{}': {}",
-                        server_name,
-                        e
+                        "Failed to send tools/call request to '{server_name}': {e}"
                     )
                 })?;
             stdin.flush().await.map_err(|e| {
-                anyhow::anyhow!("Failed to flush stdin for '{}': {}", server_name, e)
+                anyhow::anyhow!("Failed to flush stdin for '{server_name}': {e}")
             })?;
 
             // Read the response
             let mut response_line = String::new();
             stdout.read_line(&mut response_line).await.map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to read tools/call response from '{}': {}",
-                    server_name,
-                    e
+                    "Failed to read tools/call response from '{server_name}': {e}"
                 )
             })?;
 
@@ -970,30 +946,26 @@ impl McpClient {
             // Parse the JSON-RPC response
             let response: Value = serde_json::from_str(&response_line).map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to parse tools/call response from '{}': {}",
-                    server_name,
-                    e
+                    "Failed to parse tools/call response from '{server_name}': {e}"
                 )
             })?;
 
             // Check for JSON-RPC error
             if let Some(error) = response.get("error") {
                 return Err(anyhow::anyhow!(
-                    "Tool execution failed on '{}': {}",
-                    server_name,
-                    error
+                    "Tool execution failed on '{server_name}': {error}"
                 ));
             }
 
             // Return the result
             let result = response.get("result").cloned().ok_or_else(|| {
-                anyhow::anyhow!("No result in tools/call response from '{}'", server_name)
+                anyhow::anyhow!("No result in tools/call response from '{server_name}'")
             })?;
 
             tracing::debug!("[Bridge] ✅ Tool execution successful on {}", server_name);
             Ok(result)
         } else {
-            Err(anyhow::anyhow!("Local server '{}' not found", server_name))
+            Err(anyhow::anyhow!("Local server '{server_name}' not found"))
         }
     }
 

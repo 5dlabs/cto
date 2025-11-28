@@ -1,35 +1,46 @@
-#![allow(clippy::uninlined_format_args)]
+// =============================================================================
+// Clippy Configuration for tools-server binary
+// =============================================================================
+// This binary uses clippy::pedantic. These allows match the library configuration
+// in lib.rs and are necessary because binaries have their own crate root.
+#![warn(clippy::pedantic)]
+
+// Documentation (to be addressed separately)
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::doc_markdown)]
+
+// API Design Choices
+#![allow(clippy::unused_self)]
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::must_use_candidate)]
+
+// Code Style
+#![allow(clippy::similar_names)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::struct_field_names)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::match_same_arms)]
+#![allow(clippy::option_if_let_else)]
+
+// Cast Safety
+#![allow(clippy::cast_possible_truncation)]
+
+// Minor Style
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::needless_continue)]
+#![allow(clippy::struct_excessive_bools)]
+
+// Binary-specific allows
 #![allow(clippy::match_single_binding)]
 #![allow(clippy::redundant_pattern_matching)]
 #![allow(clippy::too_many_arguments)]
-#![allow(clippy::redundant_else)]
-#![allow(clippy::needless_continue)]
-#![allow(clippy::doc_markdown)]
-#![allow(clippy::disallowed_macros)]
-#![allow(clippy::similar_names)]
-#![allow(clippy::too_many_lines)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
 #![allow(clippy::used_underscore_binding)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::items_after_statements)]
-#![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::ignored_unit_patterns)]
-#![allow(clippy::unused_self)]
-#![allow(clippy::struct_excessive_bools)]
-#![allow(clippy::must_use_candidate)]
-#![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::match_same_arms)]
-#![allow(clippy::if_not_else)]
-#![allow(clippy::cast_lossless)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::manual_let_else)]
-#![allow(clippy::struct_field_names)]
 #![allow(clippy::single_match)]
-#![allow(clippy::option_if_let_else)]
-#![allow(clippy::single_match_else)]
 #![allow(clippy::explicit_iter_loop)]
-#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::disallowed_macros)]
 
 use anyhow::Result;
 use axum::{
@@ -214,18 +225,17 @@ fn parse_tool_name_with_servers(
                         server_name: original_server.clone(),
                         tool_name: tool.original_tool_name.clone(),
                     });
-                } else {
-                    // Fallback: If tool not found in HashMap, log a warning and use parsed name
-                    // This should not happen in normal operation
-                    tracing::debug!(
-                        "⚠️ Tool '{}' not found in available_tools HashMap. Using parsed name as fallback.",
-                        tool_name
-                    );
-                    return Ok(ParsedTool {
-                        server_name: original_server.clone(),
-                        tool_name: _potential_tool.to_string(),
-                    });
                 }
+                // Fallback: If tool not found in HashMap, log a warning and use parsed name
+                // This should not happen in normal operation
+                tracing::debug!(
+                    "⚠️ Tool '{}' not found in available_tools HashMap. Using parsed name as fallback.",
+                    tool_name
+                );
+                return Ok(ParsedTool {
+                    server_name: original_server.clone(),
+                    tool_name: _potential_tool.to_string(),
+                });
             }
         }
     }
@@ -343,8 +353,7 @@ impl ServerConnectionPool {
 
             if start_time.elapsed() >= timeout {
                 return Err(anyhow::anyhow!(
-                    "Docker not ready after {} seconds. Docker-based MCP servers may not work.",
-                    timeout_secs
+                    "Docker not ready after {timeout_secs} seconds. Docker-based MCP servers may not work."
                 ));
             }
 
@@ -383,7 +392,7 @@ impl ServerConnectionPool {
                 .get_servers()
                 .get(server_name)
                 .ok_or_else(|| {
-                    anyhow::anyhow!("Server '{}' not found in configuration", server_name)
+                    anyhow::anyhow!("Server '{server_name}' not found in configuration")
                 })?
                 .clone(); // Clone to avoid borrowing across await points
             let project_dir = servers
@@ -409,11 +418,10 @@ impl ServerConnectionPool {
             .stderr(Stdio::piped());
 
         // Set working directory (default to project directory if not specified)
-        let working_dir = config
-            .working_directory
-            .as_ref()
-            .map(|wd| resolve_working_directory(wd, &project_dir))
-            .unwrap_or_else(|| project_dir.clone());
+        let working_dir = config.working_directory.as_ref().map_or_else(
+            || project_dir.clone(),
+            |wd| resolve_working_directory(wd, &project_dir),
+        );
         cmd.current_dir(&working_dir);
         tracing::info!(
             "🔍 [{}] Setting working directory: {}",
@@ -442,16 +450,16 @@ impl ServerConnectionPool {
 
         let mut process = cmd
             .spawn()
-            .map_err(|e| anyhow::anyhow!("Failed to spawn server '{}': {}", server_name, e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to spawn server '{server_name}': {e}"))?;
 
         let stdin = process
             .stdin
             .take()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get stdin for server '{}'", server_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Failed to get stdin for server '{server_name}'"))?;
         let stdout = process
             .stdout
             .take()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get stdout for server '{}'", server_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Failed to get stdout for server '{server_name}'"))?;
 
         let stdout_reader = BufReader::new(stdout);
 
@@ -596,13 +604,13 @@ impl ServerConnectionPool {
         conn.stdin
             .write_all(request_msg.as_bytes())
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send request: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send request: {e}"))?;
 
         // GROK'S FIX: Flush after write to ensure data is sent
         conn.stdin
             .flush()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to flush stdin: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to flush stdin: {e}"))?;
 
         Ok(())
     }
@@ -619,13 +627,13 @@ impl ServerConnectionPool {
         conn.stdin
             .write_all(notification_msg.as_bytes())
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send notification: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send notification: {e}"))?;
 
         // GROK'S FIX: Flush after write to ensure data is sent
         conn.stdin
             .flush()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to flush stdin: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to flush stdin: {e}"))?;
 
         Ok(())
     }
@@ -645,8 +653,7 @@ impl ServerConnectionPool {
             attempts += 1;
             if attempts > MAX_READ_ATTEMPTS {
                 return Err(anyhow::anyhow!(
-                    "Maximum read attempts ({}) exceeded while waiting for valid response",
-                    MAX_READ_ATTEMPTS
+                    "Maximum read attempts ({MAX_READ_ATTEMPTS}) exceeded while waiting for valid response"
                 ));
             }
             line.clear();
@@ -656,7 +663,7 @@ impl ServerConnectionPool {
             )
             .await
             .map_err(|_| anyhow::anyhow!("Timeout reading response"))?
-            .map_err(|e| anyhow::anyhow!("Failed to read response: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to read response: {e}"))?;
 
             if bytes_read == 0 {
                 return Err(anyhow::anyhow!("Server connection closed"));
@@ -699,7 +706,7 @@ impl ServerConnectionPool {
         let server_config = config_manager
             .get_servers()
             .get(server_name)
-            .ok_or_else(|| anyhow::anyhow!("Server '{}' not found", server_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Server '{server_name}' not found"))?;
 
         // Handle HTTP and SSE transports
         if server_config.transport == "http" || server_config.transport == "sse" {
@@ -714,9 +721,9 @@ impl ServerConnectionPool {
                     // Use SSE bidirectional communication
                     return call_tool_via_sse(&client, server_name, url, tool_name, arguments)
                         .await;
-                } else {
-                    // Direct HTTP endpoint (like Solana)
-                    let request_body = json!({
+                }
+                // Direct HTTP endpoint (like Solana)
+                let request_body = json!({
                         "jsonrpc": "2.0",
                         "id": 1,
                         "method": "tools/call",
@@ -733,13 +740,13 @@ impl ServerConnectionPool {
                         .json(&request_body)
                         .send()
                         .await
-                        .map_err(|e| anyhow::anyhow!("HTTP request failed: {}", e))?;
+                        .map_err(|e| anyhow::anyhow!("HTTP request failed: {e}"))?;
 
                     // Parse response - handle both JSON and SSE formats
                     let response_text = response
                         .text()
                         .await
-                        .map_err(|e| anyhow::anyhow!("Failed to read HTTP response: {}", e))?;
+                        .map_err(|e| anyhow::anyhow!("Failed to read HTTP response: {e}"))?;
 
                     // Check if response is SSE format (like Solana)
                     let response_json: Value = if response_text.starts_with("event:") {
@@ -748,7 +755,7 @@ impl ServerConnectionPool {
                         for line in response_text.lines() {
                             if let Some(data) = line.strip_prefix("data: ") {
                                 return serde_json::from_str(data).map_err(|e| {
-                                    anyhow::anyhow!("Failed to parse SSE data as JSON: {}", e)
+                                    anyhow::anyhow!("Failed to parse SSE data as JSON: {e}")
                                 });
                             }
                         }
@@ -757,15 +764,13 @@ impl ServerConnectionPool {
                         // Direct JSON format
                         tracing::info!("📡 [{}] Detected JSON response format", server_name);
                         serde_json::from_str(&response_text)
-                            .map_err(|e| anyhow::anyhow!("Failed to parse JSON response: {}", e))?
+                            .map_err(|e| anyhow::anyhow!("Failed to parse JSON response: {e}"))?
                     };
 
                     tracing::info!("📨 Received HTTP response from server {}", server_name);
                     return Ok(response_json);
-                }
-            } else {
-                return Err(anyhow::anyhow!("HTTP transport requires 'url' field"));
             }
+            return Err(anyhow::anyhow!("HTTP transport requires 'url' field"));
         }
 
         // Original stdio logic
@@ -781,7 +786,7 @@ impl ServerConnectionPool {
             let connections = self.connections.read().await;
             connections
                 .get(server_name)
-                .ok_or_else(|| anyhow::anyhow!("Server '{}' connection not found", server_name))?
+                .ok_or_else(|| anyhow::anyhow!("Server '{server_name}' connection not found"))?
                 .clone()
         };
 
@@ -1072,7 +1077,7 @@ impl BridgeState {
                         // We must use the sanitized name as the HashMap key so lookups work
                         let sanitized_tool_name = tool.name.replace('-', "_");
                         let prefixed_name =
-                            format!("{}_{}", normalized_server_name, sanitized_tool_name);
+                            format!("{normalized_server_name}_{sanitized_tool_name}");
                         all_tools.insert(prefixed_name, tool);
                     }
                 }
@@ -1431,7 +1436,7 @@ impl BridgeState {
                     .send_request(connection.clone(), tools_request)
                     .await
                 {
-                    return Err(anyhow::anyhow!("Failed to send tools/list request: {}", e));
+                    return Err(anyhow::anyhow!("Failed to send tools/list request: {e}"));
                 }
 
                 // Read response
@@ -1440,15 +1445,14 @@ impl BridgeState {
                         return self.parse_tools_response(server_name, response);
                     }
                     Err(e) => {
-                        return Err(anyhow::anyhow!("Failed to read tools/list response: {}", e));
+                        return Err(anyhow::anyhow!("Failed to read tools/list response: {e}"));
                     }
                 }
-            } else {
-                tracing::info!(
-                    "🔄 [{}] No existing connection found, will spawn temporary process",
-                    server_name
-                );
             }
+            tracing::info!(
+                "🔄 [{}] No existing connection found, will spawn temporary process",
+                server_name
+            );
         }
 
         // Handle HTTP and SSE transports
@@ -1501,7 +1505,7 @@ impl BridgeState {
                             {
                                 Ok(Some(Ok(chunk))) => String::from_utf8_lossy(&chunk).to_string(),
                                 Ok(Some(Err(e))) => {
-                                    return Err(anyhow::anyhow!("Failed to read SSE chunk: {}", e))
+                                    return Err(anyhow::anyhow!("Failed to read SSE chunk: {e}"))
                                 }
                                 Ok(None) => {
                                     return Err(anyhow::anyhow!(
@@ -1536,7 +1540,7 @@ impl BridgeState {
                             // Construct the message URL
                             let base_url = url.trim_end_matches("/sse").trim_end_matches('/');
                             let message_url =
-                                format!("{}/message?sessionId={}", base_url, session_id);
+                                format!("{base_url}/message?sessionId={session_id}");
                             tracing::info!("🔗 [{}] SSE session ID: {}", server_name, session_id);
                             tracing::info!("🎯 [{}] SSE message URL: {}", server_name, message_url);
                             (message_url, session_id)
@@ -1600,7 +1604,7 @@ impl BridgeState {
                     .json(&init_request)
                     .send()
                     .await
-                    .map_err(|e| anyhow::anyhow!("HTTP init request failed: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("HTTP init request failed: {e}"))?;
 
                 tracing::info!(
                     "📥 [{}] Initialize response status: {}",
@@ -1627,7 +1631,7 @@ impl BridgeState {
                     .json(&tools_request)
                     .send()
                     .await
-                    .map_err(|e| anyhow::anyhow!("HTTP tools request failed: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("HTTP tools request failed: {e}"))?;
 
                 tracing::info!(
                     "📥 [{}] Tools response status: {}",
@@ -1637,7 +1641,7 @@ impl BridgeState {
                 let response_text = tools_response
                     .text()
                     .await
-                    .map_err(|e| anyhow::anyhow!("Failed to get response text: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to get response text: {e}"))?;
                 tracing::info!("🔍 [{}] Raw tools response: {}", server_name, response_text);
 
                 // Handle SSE format responses (both direct HTTP endpoints like Solana and SSE endpoints)
@@ -1657,7 +1661,13 @@ impl BridgeState {
                         .filter(|line| line.starts_with("data: "))
                         .collect();
 
-                    if !data_lines.is_empty() {
+                    if data_lines.is_empty() {
+                        tracing::info!(
+                            "⚠️ [{}] SSE format detected but no data lines found",
+                            server_name
+                        );
+                        response_text
+                    } else {
                         // Concatenate all data lines and remove "data: " prefix
                         let combined_data = data_lines
                             .iter()
@@ -1670,19 +1680,13 @@ impl BridgeState {
                             combined_data
                         );
                         combined_data
-                    } else {
-                        tracing::info!(
-                            "⚠️ [{}] SSE format detected but no data lines found",
-                            server_name
-                        );
-                        response_text
                     }
                 } else {
                     response_text
                 };
 
                 let response_json: Value = serde_json::from_str(&json_content)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse tools response: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to parse tools response: {e}"))?;
 
                 tracing::info!(
                     "🔍 [{}] Tools response JSON: {}",
@@ -1729,9 +1733,8 @@ impl BridgeState {
                 }
 
                 return Ok(Vec::new());
-            } else {
-                return Err(anyhow::anyhow!("HTTP transport requires 'url' field"));
             }
+            return Err(anyhow::anyhow!("HTTP transport requires 'url' field"));
         }
 
         // Original stdio discovery logic
@@ -1808,11 +1811,10 @@ impl BridgeState {
             .get_config_path()
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
-        let working_dir = config
-            .working_directory
-            .as_ref()
-            .map(|wd| resolve_working_directory(wd, project_dir))
-            .unwrap_or_else(|| project_dir.to_path_buf());
+        let working_dir = config.working_directory.as_ref().map_or_else(
+            || project_dir.to_path_buf(),
+            |wd| resolve_working_directory(wd, project_dir),
+        );
         cmd.current_dir(&working_dir);
         tracing::info!(
             "🔍 [{}] Setting working directory: {}",
@@ -1988,17 +1990,16 @@ impl BridgeState {
                                 start_time.elapsed()
                             );
                             break;
-                        } else {
-                            tracing::info!(
-                                "🔍 [{}] Init line is not JSON, continuing... (elapsed: {:?})",
-                                server_name,
-                                start_time.elapsed()
-                            );
-                            init_attempts += 1;
-                            if init_attempts >= max_init_attempts {
-                                tracing::info!("⚠️ [{}] No JSON init response found after {} attempts, but continuing anyway... (elapsed: {:?})", server_name, max_init_attempts, start_time.elapsed());
-                                break; // Continue without valid init response
-                            }
+                        }
+                        tracing::info!(
+                            "🔍 [{}] Init line is not JSON, continuing... (elapsed: {:?})",
+                            server_name,
+                            start_time.elapsed()
+                        );
+                        init_attempts += 1;
+                        if init_attempts >= max_init_attempts {
+                            tracing::info!("⚠️ [{}] No JSON init response found after {} attempts, but continuing anyway... (elapsed: {:?})", server_name, max_init_attempts, start_time.elapsed());
+                            break; // Continue without valid init response
                         }
                     }
                     Err(e) => {
@@ -2139,17 +2140,16 @@ impl BridgeState {
                                 start_time.elapsed()
                             );
                             break;
-                        } else {
-                            tracing::info!(
-                                "🔍 [{}] Tools line is not JSON, continuing... (elapsed: {:?})",
-                                server_name,
-                                start_time.elapsed()
-                            );
-                            tools_attempts += 1;
-                            if tools_attempts >= max_tools_attempts {
-                                tracing::info!("❌ [{}] Too many non-JSON tools lines after {} attempts, giving up (elapsed: {:?})", server_name, max_tools_attempts, start_time.elapsed());
-                                return Ok(Vec::new());
-                            }
+                        }
+                        tracing::info!(
+                            "🔍 [{}] Tools line is not JSON, continuing... (elapsed: {:?})",
+                            server_name,
+                            start_time.elapsed()
+                        );
+                        tools_attempts += 1;
+                        if tools_attempts >= max_tools_attempts {
+                            tracing::info!("❌ [{}] Too many non-JSON tools lines after {} attempts, giving up (elapsed: {:?})", server_name, max_tools_attempts, start_time.elapsed());
+                            return Ok(Vec::new());
                         }
                     }
                     Err(e) => {
@@ -2277,7 +2277,7 @@ async fn discover_tools_via_sse(
         .header("Accept", "text/event-stream")
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to connect to SSE endpoint: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to connect to SSE endpoint: {e}"))?;
 
     let mut body = sse_response.bytes_stream();
 
@@ -2323,7 +2323,7 @@ async fn discover_tools_via_sse(
                     ));
                 }
             }
-            Ok(Some(Err(e))) => return Err(anyhow::anyhow!("SSE stream error: {}", e)),
+            Ok(Some(Err(e))) => return Err(anyhow::anyhow!("SSE stream error: {e}")),
             Ok(None) => return Err(anyhow::anyhow!("SSE stream ended unexpectedly")),
             Err(_) => return Err(anyhow::anyhow!("Timeout waiting for SSE session data")),
         }
@@ -2333,7 +2333,7 @@ async fn discover_tools_via_sse(
 
     // Step 2: Prepare message endpoint
     let base_url = sse_url.trim_end_matches("/sse").trim_end_matches('/');
-    let message_url = format!("{}/message?sessionId={}", base_url, session_id);
+    let message_url = format!("{base_url}/message?sessionId={session_id}");
 
     // Step 3: Start listening for responses in background task
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -2505,7 +2505,7 @@ async fn discover_tools_via_sse(
         .json(&init_request)
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to send initialize: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to send initialize: {e}"))?;
 
     // Wait for initialize response
     let _init_response = timeout(Duration::from_secs(10), rx.recv())
@@ -2528,7 +2528,7 @@ async fn discover_tools_via_sse(
         .json(&initialized_notification)
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to send initialized: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to send initialized: {e}"))?;
 
     // 4c. Send tools/list request
     tracing::info!("📤 [{}] Sending tools/list request", server_name);
@@ -2545,7 +2545,7 @@ async fn discover_tools_via_sse(
         .json(&tools_request)
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to send tools/list: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to send tools/list: {e}"))?;
 
     // Wait for tools/list response
     let tools_response = timeout(Duration::from_secs(10), rx.recv())
@@ -2939,7 +2939,7 @@ async fn client_config_endpoint(
     // Build server configurations
     let mut servers_config = json!({});
 
-    for (server_name, server_config) in servers.iter() {
+    for (server_name, server_config) in servers {
         let tools = tools_by_server
             .get(server_name)
             .cloned()
@@ -3004,7 +3004,7 @@ async fn main() -> Result<()> {
         let servers = config_manager.get_servers();
         let mut all_discovered_tools = std::collections::HashMap::new();
 
-        for (server_name, config) in servers.iter() {
+        for (server_name, config) in servers {
             tracing::info!("🔍 Discovering tools from server: {}", server_name);
             match state.discover_server_tools(server_name, config).await {
                 Ok(tools) => {
@@ -3030,7 +3030,7 @@ async fn main() -> Result<()> {
         let export_data = serde_json::json!({
             "export_timestamp": chrono::Utc::now().to_rfc3339(),
             "total_servers": servers.len(),
-            "total_tools_discovered": all_discovered_tools.values().map(|tools| tools.len()).sum::<usize>(),
+            "total_tools_discovered": all_discovered_tools.values().map(std::vec::Vec::len).sum::<usize>(),
             "servers": all_discovered_tools.iter().map(|(server_name, tools)| {
                 let config = servers.get(server_name).unwrap();
                 serde_json::json!({
@@ -3135,7 +3135,7 @@ async fn call_tool_via_sse(
         .header("Accept", "text/event-stream")
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to connect to SSE endpoint: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to connect to SSE endpoint: {e}"))?;
 
     let mut body = sse_response.bytes_stream();
 
@@ -3181,7 +3181,7 @@ async fn call_tool_via_sse(
                     ));
                 }
             }
-            Ok(Some(Err(e))) => return Err(anyhow::anyhow!("SSE stream error: {}", e)),
+            Ok(Some(Err(e))) => return Err(anyhow::anyhow!("SSE stream error: {e}")),
             Ok(None) => return Err(anyhow::anyhow!("SSE stream ended unexpectedly")),
             Err(_) => return Err(anyhow::anyhow!("Timeout waiting for SSE session data")),
         }
@@ -3191,7 +3191,7 @@ async fn call_tool_via_sse(
 
     // Step 2: Prepare message endpoint
     let base_url = sse_url.trim_end_matches("/sse").trim_end_matches('/');
-    let message_url = format!("{}/message?sessionId={}", base_url, session_id);
+    let message_url = format!("{base_url}/message?sessionId={session_id}");
 
     // Step 3: Start listening for responses in background task
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -3361,7 +3361,7 @@ async fn call_tool_via_sse(
         .json(&initialize_request)
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to send initialize request: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to send initialize request: {e}"))?;
 
     if !init_response.status().is_success() {
         return Err(anyhow::anyhow!(
@@ -3391,7 +3391,7 @@ async fn call_tool_via_sse(
         .json(&initialized_notification)
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to send initialized notification: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to send initialized notification: {e}"))?;
 
     if !notif_response.status().is_success() {
         return Err(anyhow::anyhow!(
@@ -3420,7 +3420,7 @@ async fn call_tool_via_sse(
         .json(&tool_call_request)
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to send tool call request: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to send tool call request: {e}"))?;
 
     if !call_response.status().is_success() {
         return Err(anyhow::anyhow!(
@@ -3537,7 +3537,7 @@ mod tests {
         // Very long names
         let long_server = "a".repeat(100);
         let long_tool = "b".repeat(100);
-        let long_name = format!("{}_{}", long_server, long_tool);
+        let long_name = format!("{long_server}_{long_tool}");
         let result = parse_tool_name(&long_name).unwrap();
         assert_eq!(
             result,

@@ -3,21 +3,17 @@
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::map_unwrap_or)]
-#![allow(clippy::redundant_closure_for_method_calls)]
 #![allow(clippy::trivially_copy_pass_by_ref)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::option_if_let_else)]
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::redundant_else)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::disallowed_macros)]
@@ -127,7 +123,7 @@ impl ToolsServerTest {
 
             match timeout(Duration::from_secs(2), self.client.get(&url).send()).await {
                 Ok(Ok(response)) if response.status().is_success() => {
-                    println!("✅ Server ready after {} attempts", attempt);
+                    println!("✅ Server ready after {attempt} attempts");
                     return Ok(());
                 }
                 Ok(Ok(response)) => {
@@ -138,10 +134,10 @@ impl ToolsServerTest {
                     );
                 }
                 Ok(Err(e)) => {
-                    println!("⏳ Attempt {}: Request error: {}", attempt, e);
+                    println!("⏳ Attempt {attempt}: Request error: {e}");
                 }
                 Err(_) => {
-                    println!("⏳ Attempt {}: Timeout", attempt);
+                    println!("⏳ Attempt {attempt}: Timeout");
                 }
             }
 
@@ -151,8 +147,7 @@ impl ToolsServerTest {
         }
 
         Err(anyhow::anyhow!(
-            "Server failed to become ready after {} attempts",
-            max_attempts
+            "Server failed to become ready after {max_attempts} attempts"
         ))
     }
 
@@ -280,7 +275,7 @@ impl ToolsServerTest {
         let tool_names: Vec<String> = tools
             .iter()
             .filter_map(|tool| tool["name"].as_str())
-            .map(|name| name.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         println!(
@@ -307,7 +302,7 @@ impl ToolsServerTest {
             .find(|tool| tool.starts_with("memory_"))
             .ok_or_else(|| anyhow::anyhow!("No memory tools found for testing"))?;
 
-        println!("🔧 Testing tool forwarding with tool: {}", memory_tool);
+        println!("🔧 Testing tool forwarding with tool: {memory_tool}");
 
         let url = format!("http://localhost:{}/mcp", self.server_port);
 
@@ -347,12 +342,11 @@ impl ToolsServerTest {
 
         // Check if we got a result (success) or error (expected for some tools)
         if let Some(result) = tool_response.get("result") {
-            println!("✅ Tool forwarding successful - got result: {}", result);
+            println!("✅ Tool forwarding successful - got result: {result}");
         } else if let Some(error) = tool_response.get("error") {
             // Some tools might return errors with empty args, which is fine
             println!(
-                "✅ Tool forwarding successful - got expected error: {}",
-                error
+                "✅ Tool forwarding successful - got expected error: {error}"
             );
         } else {
             return Err(anyhow::anyhow!(
@@ -360,7 +354,7 @@ impl ToolsServerTest {
             ));
         }
 
-        println!("✅ Tool forwarding test passed for: {}", memory_tool);
+        println!("✅ Tool forwarding test passed for: {memory_tool}");
         Ok(())
     }
 

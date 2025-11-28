@@ -115,9 +115,9 @@ impl ServerHealthStatus {
             self.average_response_time = response_time;
         } else {
             let total_time =
-                self.average_response_time.as_millis() * (self.successful_requests - 1) as u128;
+                self.average_response_time.as_millis() * u128::from(self.successful_requests - 1);
             let new_average =
-                (total_time + response_time.as_millis()) / self.successful_requests as u128;
+                (total_time + response_time.as_millis()) / u128::from(self.successful_requests);
             self.average_response_time = Duration::from_millis(new_average as u64);
         }
     }
@@ -132,13 +132,10 @@ impl ServerHealthStatus {
         // Update health status based on failure pattern
         if self.consecutive_failures >= 3 {
             self.health = ServerHealth::Unresponsive {
-                last_response: self
-                    .last_successful_check
-                    .map(|instant| {
-                        chrono::Utc::now()
-                            - chrono::Duration::from_std(instant.elapsed()).unwrap_or_default()
-                    })
-                    .unwrap_or_else(chrono::Utc::now),
+                last_response: self.last_successful_check.map_or_else(chrono::Utc::now, |instant| {
+                    chrono::Utc::now()
+                        - chrono::Duration::from_std(instant.elapsed()).unwrap_or_default()
+                }),
             };
         }
     }

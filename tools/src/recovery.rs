@@ -288,13 +288,10 @@ impl ServerRecoveryManager {
             connections.get(server_name).cloned()
         };
 
-        let mut connection_info = match connection_info {
-            Some(info) => info,
-            None => {
-                return Err(Box::new(ErrorContext::new(BridgeError::ServerNotFound {
-                    name: server_name.to_string(),
-                })));
-            }
+        let Some(mut connection_info) = connection_info else {
+            return Err(Box::new(ErrorContext::new(BridgeError::ServerNotFound {
+                name: server_name.to_string(),
+            })));
         };
 
         // Calculate backoff delay
