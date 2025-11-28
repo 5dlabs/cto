@@ -96,19 +96,26 @@ spec:
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+            {{- /* Build deduplicated map of env vars from server secretRefs */ -}}
+            {{- $envSecrets := dict }}
             {{- if .Values.config.servers }}
             {{- range $serverName, $serverConfig := .Values.config.servers }}
               {{- if $serverConfig.secretRef }}
-                {{- range $serverConfig.secretRef.keys }}
-            - name: {{ . }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $serverConfig.secretRef.name }}
-                  key: {{ . }}
-                  optional: true
+                {{- range $key := $serverConfig.secretRef.keys }}
+                  {{- if not (hasKey $envSecrets $key) }}
+                    {{- $_ := set $envSecrets $key $serverConfig.secretRef.name }}
+                  {{- end }}
                 {{- end }}
               {{- end }}
             {{- end }}
+            {{- end }}
+            {{- range $key, $secretName := $envSecrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $key }}
+                  optional: true
             {{- end }}
           volumeMounts:
             {{- range .Values.volumeMounts }}

@@ -264,23 +264,17 @@ config:
       name: "Cloudflare Workers Bindings"
       description: "Build Workers applications with storage, AI, and compute primitives"
       transport: "http"
+      # Auth handled by Cloudflare's remote MCP endpoint, not local env vars
       url: "https://bindings.mcp.cloudflare.com/mcp"
       workingDirectory: "/tmp"
-      secretRef:
-        name: "tools-cloudflare-secrets"
-        keys:
-          - "CLOUDFLARE_API_TOKEN"
 
     cloudflare-observability:
       name: "Cloudflare Observability"
       description: "Debug and get insight into your application's logs and analytics"
       transport: "http"
+      # Auth handled by Cloudflare's remote MCP endpoint, not local env vars
       url: "https://observability.mcp.cloudflare.com/mcp"
       workingDirectory: "/tmp"
-      secretRef:
-        name: "tools-cloudflare-secrets"
-        keys:
-          - "CLOUDFLARE_API_TOKEN"
 
     cloudflare-radar:
       name: "Cloudflare Radar"
@@ -374,11 +368,11 @@ secretRefs:
   - name: tools-context7-secrets
   - name: tools-github-secrets
   - name: tools-firecrawl-secrets
-  - name: tools-cloudflare-secrets
   - name: tools-grafana-secrets
   - name: tools-argocd-secrets
   - name: tools-gemini-secrets
   # Note: tools-vault-secrets is used by vault-mcp-server deployment, not tools server
+  # Note: tools-cloudflare-secrets removed - HTTP MCP servers auth at remote endpoint
 
 # Network policy
 networkPolicy:
