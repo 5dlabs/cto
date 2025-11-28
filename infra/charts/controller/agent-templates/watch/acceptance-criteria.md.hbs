@@ -1,0 +1,87 @@
+# E2E Watch Acceptance Criteria - Task {{task_id}}
+
+## Overview
+
+This document defines what constitutes a successful Play workflow run for Task {{task_id}}.
+The Monitor Agent evaluates results against these criteria to determine if the Watch loop should end.
+
+## Required Criteria (Must ALL Pass)
+
+### 1. Workflow Completion
+- [ ] Play workflow reaches "Succeeded" status
+- [ ] All stages complete without terminal failures
+- [ ] No pods in CrashLoopBackOff or Error state
+
+### 2. Implementation Stage (Rex/Blaze)
+- [ ] Implementation PR created successfully
+- [ ] Code compiles without errors (`cargo build` passes)
+- [ ] Feature branch pushed to remote
+
+### 3. Quality Stage (Cleo)
+- [ ] `cargo fmt --all -- --check` passes
+- [ ] `cargo clippy --workspace --all-targets -- -D warnings` passes
+- [ ] No new lint warnings introduced
+
+### 4. Testing Stage (Tess)
+- [ ] All existing tests pass (`cargo test --workspace`)
+- [ ] No test regressions
+- [ ] Coverage maintained or improved
+
+### 5. Security Stage (Cipher)
+- [ ] Security scan completes without critical findings
+- [ ] No high-severity vulnerabilities in dependencies
+- [ ] Secrets scanning passes
+
+### 6. Integration Stage (Atlas)
+- [ ] PR merged to main branch
+- [ ] No merge conflicts
+- [ ] CI passes on main after merge
+
+## Optional Criteria (Nice to Have)
+
+These are tracked but don't block success:
+
+- [ ] Test coverage ≥ 95%
+- [ ] Performance benchmarks within thresholds
+- [ ] Documentation updated
+- [ ] All Bugbot comments resolved
+
+## Failure Indicators
+
+The Monitor Agent should report failure if ANY of these occur:
+
+### Critical Failures (Require Remediation)
+- Workflow enters "Failed" or "Error" state
+- Any stage pod exits with non-zero code
+- Compilation errors in any stage
+- Test failures in Tess stage
+- Clippy errors (not warnings) in Cleo stage
+- Critical security findings in Cipher stage
+- Merge conflicts in Atlas stage
+
+### Transient Failures (May Self-Resolve)
+- Pod restarts (up to 3 times)
+- Network timeouts (will retry)
+- Resource quota exceeded (may need wait)
+
+## Evaluation Checklist
+
+When evaluating a completed workflow:
+
+1. **Check workflow status**: `argo get <workflow> -n argo -o json | jq '.status.phase'`
+2. **Check all pods succeeded**: `kubectl get pods -n agent-platform -l task-id={{task_id}} -o json | jq '.items[].status.phase'`
+3. **Check PR merged**: `gh pr view -R {{repository_url}} --json state | jq '.state'`
+4. **Check no errors in logs**: `argo logs <workflow> -n argo | grep -i error`
+
+## Definition of Done
+
+**The E2E Watch loop ends successfully when:**
+
+1. ✅ Play workflow status is "Succeeded"
+2. ✅ Implementation PR is merged to main
+3. ✅ All quality gates passed (fmt, clippy, test)
+4. ✅ No critical security findings
+5. ✅ No errors in any stage logs
+
+**If ANY required criterion fails, the Remediation Agent must fix the issue before the loop can end.**
+

@@ -2843,6 +2843,10 @@ impl CodeTemplateGenerator {
 
     fn get_factory_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let service = &code_run.spec.service;
+
+        // Check if this is a Watch workflow (service contains "watch")
+        let is_watch = service.to_lowercase().contains("watch");
 
         // Check if this is a remediation cycle
         let retry_count = code_run
@@ -2852,6 +2856,17 @@ impl CodeTemplateGenerator {
             .unwrap_or(0);
 
         let is_remediation = retry_count > 0;
+
+        // Watch-specific templates take precedence
+        if is_watch {
+            return match github_app {
+                "5DLabs-Rex" | "5DLabs-Rex-Remediation" => {
+                    "watch/factory/container-watch-remediation.sh.hbs".to_string()
+                }
+                // Morgan and all others use the monitor template
+                _ => "watch/factory/container-watch-monitor.sh.hbs".to_string(),
+            };
+        }
 
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
@@ -2875,6 +2890,22 @@ impl CodeTemplateGenerator {
 
     fn get_factory_memory_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let service = &code_run.spec.service;
+
+        // Check if this is a Watch workflow (service contains "watch")
+        let is_watch = service.to_lowercase().contains("watch");
+
+        // Watch-specific templates take precedence
+        if is_watch {
+            return match github_app {
+                "5DLabs-Rex" | "5DLabs-Rex-Remediation" => {
+                    "watch/factory/agents-watch-remediation.md.hbs".to_string()
+                }
+                // Morgan and all others use the monitor template
+                _ => "watch/factory/agents-watch-monitor.md.hbs".to_string(),
+            };
+        }
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
