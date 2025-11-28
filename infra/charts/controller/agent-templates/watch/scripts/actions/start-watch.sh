@@ -38,7 +38,8 @@ log_info "Monitor Agent: $MONITOR_AGENT"
 log_info "Monitor Model: $MONITOR_MODEL"
 
 # Create the Monitor CodeRun
-cat <<EOF | kubectl apply -f -
+# Use if ! to handle failure gracefully with set -e
+if ! cat <<EOF | kubectl apply -f -
 apiVersion: agents.platform/v1alpha1
 kind: CodeRun
 metadata:
@@ -58,22 +59,21 @@ spec:
     iteration: 1
     watchMode: true
 EOF
-
-if [ $? -eq 0 ]; then
-    log_success "Created Monitor CodeRun: $CODERUN_NAME"
-    log_info "Watch loop started. Monitor agent will:"
-    log_info "  1. Submit Play workflow"
-    log_info "  2. Evaluate results against acceptance criteria"
-    log_info "  3. If issues found → Create Remediation CodeRun"
-    log_info "  4. Loop continues until success"
-    log_info ""
-    log_info "To follow progress:"
-    log_info "  kubectl logs -f -l task-id=${TASK_ID} -n ${NAMESPACE}"
-    log_info "  kubectl get coderuns -l task-id=${TASK_ID} -n ${NAMESPACE} -w"
-else
+then
     log_error "Failed to create Monitor CodeRun"
     exit 1
 fi
+
+log_success "Created Monitor CodeRun: $CODERUN_NAME"
+log_info "Watch loop started. Monitor agent will:"
+log_info "  1. Submit Play workflow"
+log_info "  2. Evaluate results against acceptance criteria"
+log_info "  3. If issues found → Create Remediation CodeRun"
+log_info "  4. Loop continues until success"
+log_info ""
+log_info "To follow progress:"
+log_info "  kubectl logs -f -l task-id=${TASK_ID} -n ${NAMESPACE}"
+log_info "  kubectl get coderuns -l task-id=${TASK_ID} -n ${NAMESPACE} -w"
 
 echo "$CODERUN_NAME"
 
