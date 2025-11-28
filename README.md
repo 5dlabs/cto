@@ -429,7 +429,7 @@ cto-mcp --help   # MCP server for any CLI
 
 **What you get:**
 - `cto-mcp` - MCP server that integrates with any CLI
-- Multi-platform support (Linux x64/ARM64, macOS Intel/Apple Silicon, Windows x64)
+- Multi-platform support (Linux x64/ARM64, macOS Intel/Apple Silicon)
 - Automatic installation to system PATH
 
 ---
