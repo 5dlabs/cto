@@ -47,11 +47,8 @@ impl Default for AddTaskContext {
 
 /// Get the add-task template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "add-task",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Generate a new task based on description")
+    PromptTemplate::new("add-task", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Generate a new task based on description")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are a helpful assistant that creates well-structured tasks for a software development project. Generate a single new task based on the user's description, adhering strictly to the provided JSON schema.
@@ -100,4 +97,3 @@ Return your answer as a single JSON object matching the schema precisely:
       
 Make sure the details and test strategy are comprehensive and specific{{#if use_research}}, incorporating current best practices from your research{{/if}}. DO NOT include the task ID in the title.
 {{#if context_from_args}}{{context_from_args}}{{/if}}"#;
-

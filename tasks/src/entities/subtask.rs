@@ -41,18 +41,10 @@ pub struct Subtask {
     #[serde(default, rename = "testStrategy")]
     pub test_strategy: String,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "createdAt"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "createdAt")]
     pub created_at: Option<DateTime<Utc>>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "updatedAt"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "updatedAt")]
     pub updated_at: Option<DateTime<Utc>>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,4 +115,3 @@ mod tests {
         assert!(subtask.updated_at.is_some());
     }
 }
-

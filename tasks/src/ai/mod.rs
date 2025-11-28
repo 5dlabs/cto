@@ -6,9 +6,9 @@
 //! - Structured response schemas
 //! - Provider registry for dynamic provider management
 
+pub mod prompts;
 pub mod provider;
 pub mod registry;
-pub mod prompts;
 pub mod schemas;
 
 // Provider implementations
@@ -16,8 +16,9 @@ pub mod anthropic;
 pub mod openai;
 
 // Re-exports
-pub use provider::{AIProvider, AIMessage, AIRole, AIResponse, GenerateOptions, TokenUsage, parse_ai_response};
+pub use prompts::{PromptManager, PromptTemplate};
+pub use provider::{
+    parse_ai_response, AIMessage, AIProvider, AIResponse, AIRole, GenerateOptions, TokenUsage,
+};
 pub use registry::ProviderRegistry;
-pub use prompts::{PromptTemplate, PromptManager};
 pub use schemas::*;
-

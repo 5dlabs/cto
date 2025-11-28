@@ -172,9 +172,10 @@ impl AIProvider for AnthropicProvider {
         messages: &[AIMessage],
         options: &GenerateOptions,
     ) -> TasksResult<AIResponse> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| {
-            TasksError::Ai("ANTHROPIC_API_KEY not set".to_string())
-        })?;
+        let api_key = self
+            .api_key
+            .as_ref()
+            .ok_or_else(|| TasksError::Ai("ANTHROPIC_API_KEY not set".to_string()))?;
 
         let (system, converted_messages) = self.convert_messages(messages);
 
@@ -287,7 +288,7 @@ mod tests {
         ];
 
         let (system, converted) = provider.convert_messages(&messages);
-        
+
         assert_eq!(system, Some("You are a helpful assistant".to_string()));
         assert_eq!(converted.len(), 3);
         assert_eq!(converted[0].role, "user");
@@ -295,4 +296,3 @@ mod tests {
         assert_eq!(converted[2].role, "user");
     }
 }
-

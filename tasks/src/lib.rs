@@ -12,7 +12,6 @@
 #![allow(clippy::wildcard_imports)]
 #![allow(clippy::module_inception)]
 #![allow(clippy::uninlined_format_args)]
-#![allow(clippy::unnecessary_literal_bound)]
 #![allow(clippy::unused_self)]
 #![allow(clippy::if_not_else)]
 #![allow(clippy::map_unwrap_or)]
@@ -68,7 +67,6 @@ pub use storage::{FileStorage, Storage};
 
 // Re-export AI types
 pub use ai::{
-    AIProvider, AIMessage, AIRole, AIResponse, GenerateOptions, TokenUsage,
-    ProviderRegistry, PromptTemplate, PromptManager,
+    AIMessage, AIProvider, AIResponse, AIRole, GenerateOptions, PromptManager, PromptTemplate,
+    ProviderRegistry, TokenUsage,
 };
-

@@ -44,11 +44,8 @@ impl Default for UpdateTaskContext {
 
 /// Get the update-task template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "update-task",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Update a single task with new information")
+    PromptTemplate::new("update-task", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Update a single task with new information")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping to update a software development task based on new context.{{#if use_research}} You have access to current best practices and latest technical information to provide research-backed updates.{{/if}}
@@ -96,4 +93,3 @@ IMPORTANT: {{#if use_research}}Preserve any subtasks marked as "done" or "comple
 Return the complete updated task{{#if use_research}} with research-backed improvements{{/if}}.
 
 IMPORTANT: Your response must be a JSON object with a single property named "task" containing the updated task object."#;
-

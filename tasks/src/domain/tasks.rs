@@ -172,12 +172,13 @@ impl TasksDomain {
     ) -> TasksResult<()> {
         let mut tasks = self.storage.load_tasks(tag).await?;
 
-        let current_idx = tasks
-            .iter()
-            .position(|t| t.id == task_id)
-            .ok_or_else(|| TasksError::TaskNotFound {
-                task_id: task_id.to_string(),
-            })?;
+        let current_idx =
+            tasks
+                .iter()
+                .position(|t| t.id == task_id)
+                .ok_or_else(|| TasksError::TaskNotFound {
+                    task_id: task_id.to_string(),
+                })?;
 
         let task = tasks.remove(current_idx);
         let insert_idx = new_position.min(tasks.len());
@@ -205,8 +206,14 @@ mod tests {
     async fn test_add_and_list_tasks() {
         let (_temp, domain) = setup().await;
 
-        domain.add_task("Task 1", "Description 1", None).await.unwrap();
-        domain.add_task("Task 2", "Description 2", None).await.unwrap();
+        domain
+            .add_task("Task 1", "Description 1", None)
+            .await
+            .unwrap();
+        domain
+            .add_task("Task 2", "Description 2", None)
+            .await
+            .unwrap();
 
         let tasks = domain.list_tasks(None, None).await.unwrap();
         assert_eq!(tasks.len(), 2);
@@ -216,7 +223,10 @@ mod tests {
     async fn test_next_task() {
         let (_temp, domain) = setup().await;
 
-        domain.add_task("Task 1", "Description 1", None).await.unwrap();
+        domain
+            .add_task("Task 1", "Description 1", None)
+            .await
+            .unwrap();
 
         let next = domain.next_task(None).await.unwrap();
         assert!(next.is_some());
@@ -227,11 +237,16 @@ mod tests {
     async fn test_set_status() {
         let (_temp, domain) = setup().await;
 
-        let task = domain.add_task("Task 1", "Description 1", None).await.unwrap();
-        domain.set_status(&task.id, TaskStatus::InProgress, None).await.unwrap();
+        let task = domain
+            .add_task("Task 1", "Description 1", None)
+            .await
+            .unwrap();
+        domain
+            .set_status(&task.id, TaskStatus::InProgress, None)
+            .await
+            .unwrap();
 
         let updated = domain.get_task(&task.id, None).await.unwrap();
         assert_eq!(updated.status, TaskStatus::InProgress);
     }
 }
-

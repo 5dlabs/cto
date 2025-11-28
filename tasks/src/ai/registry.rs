@@ -8,9 +8,9 @@ use std::sync::{Arc, RwLock};
 
 use crate::errors::{TasksError, TasksResult};
 
-use super::provider::AIProvider;
 use super::anthropic::AnthropicProvider;
 use super::openai::OpenAIProvider;
+use super::provider::AIProvider;
 
 /// Singleton registry for AI providers.
 pub struct ProviderRegistry {
@@ -63,7 +63,10 @@ impl ProviderRegistry {
     /// Get a provider that supports a specific model.
     pub fn get_for_model(&self, model: &str) -> Option<Arc<dyn AIProvider>> {
         let providers = self.providers.read().unwrap();
-        providers.values().find(|p| p.supports_model(model)).cloned()
+        providers
+            .values()
+            .find(|p| p.supports_model(model))
+            .cloned()
     }
 
     /// Check if a provider is registered.
@@ -81,7 +84,11 @@ impl ProviderRegistry {
     /// Get all configured providers.
     pub fn configured_providers(&self) -> Vec<Arc<dyn AIProvider>> {
         let providers = self.providers.read().unwrap();
-        providers.values().filter(|p| p.is_configured()).cloned().collect()
+        providers
+            .values()
+            .filter(|p| p.is_configured())
+            .cloned()
+            .collect()
     }
 
     /// Remove a provider.
@@ -98,16 +105,16 @@ impl ProviderRegistry {
 
     /// Get a provider, returning an error if not found.
     pub fn require(&self, name: &str) -> TasksResult<Arc<dyn AIProvider>> {
-        self.get(name).ok_or_else(|| {
-            TasksError::Ai(format!("Provider '{name}' not found"))
-        })
+        self.get(name)
+            .ok_or_else(|| TasksError::Ai(format!("Provider '{name}' not found")))
     }
 
     /// Get any configured provider, returning an error if none available.
     pub fn require_any(&self) -> TasksResult<Arc<dyn AIProvider>> {
         self.get_configured().ok_or_else(|| {
             TasksError::Ai(
-                "No AI provider is configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY".to_string()
+                "No AI provider is configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY"
+                    .to_string(),
             )
         })
     }
@@ -140,10 +147,9 @@ mod tests {
     #[test]
     fn test_provider_registration() {
         let registry = ProviderRegistry::new();
-        
+
         // Create a mock provider (in real tests, we'd use a mock)
         // For now, just test the registry structure works
         assert!(!registry.has_provider("test"));
     }
 }
-

@@ -43,12 +43,12 @@ impl ConfigDomain {
         }
 
         let content = serde_json::to_string_pretty(config)?;
-        fs::write(&self.config_path, content).await.map_err(|e| {
-            TasksError::FileWriteError {
+        fs::write(&self.config_path, content)
+            .await
+            .map_err(|e| TasksError::FileWriteError {
                 path: self.config_path.display().to_string(),
                 reason: e.to_string(),
-            }
-        })
+            })
     }
 
     /// Get model configuration
@@ -140,4 +140,3 @@ mod tests {
         assert_eq!(models.main.unwrap().provider, "openai");
     }
 }
-

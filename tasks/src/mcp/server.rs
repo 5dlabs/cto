@@ -437,10 +437,7 @@ impl McpServer {
             };
         };
 
-        let tool_name = params
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
         let result = match tool_name {
@@ -651,8 +648,14 @@ impl McpServer {
             .get("content")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'content' parameter")?;
-        let num_tasks = args.get("numTasks").and_then(|v| v.as_i64()).map(|n| n as i32);
-        let research = args.get("research").and_then(|v| v.as_bool()).unwrap_or(false);
+        let num_tasks = args
+            .get("numTasks")
+            .and_then(|v| v.as_i64())
+            .map(|n| n as i32);
+        let research = args
+            .get("research")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let model = args.get("model").and_then(|v| v.as_str());
         let tag = args.get("tag").and_then(|v| v.as_str());
 
@@ -685,7 +688,10 @@ impl McpServer {
             .and_then(|v| v.as_str())
             .ok_or("Missing 'id' parameter")?;
         let num = args.get("num").and_then(|v| v.as_i64()).map(|n| n as i32);
-        let research = args.get("research").and_then(|v| v.as_bool()).unwrap_or(false);
+        let research = args
+            .get("research")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
         let model = args.get("model").and_then(|v| v.as_str());
         let tag = args.get("tag").and_then(|v| v.as_str());
@@ -735,7 +741,10 @@ impl McpServer {
             .and_then(|v| v.as_i64())
             .map(|n| n as i32)
             .unwrap_or(5);
-        let research = args.get("research").and_then(|v| v.as_bool()).unwrap_or(false);
+        let research = args
+            .get("research")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let model = args.get("model").and_then(|v| v.as_str());
         let tag = args.get("tag").and_then(|v| v.as_str());
 
@@ -755,14 +764,18 @@ impl McpServer {
             .await
             .map_err(|e| e.to_string())?;
 
-        let needing_expansion: Vec<_> = report.tasks_needing_expansion().iter().map(|a| {
-            json!({
-                "taskId": a.task_id,
-                "title": a.task_title,
-                "score": a.complexity_score,
-                "recommendedSubtasks": a.recommended_subtasks
+        let needing_expansion: Vec<_> = report
+            .tasks_needing_expansion()
+            .iter()
+            .map(|a| {
+                json!({
+                    "taskId": a.task_id,
+                    "title": a.task_title,
+                    "score": a.complexity_score,
+                    "recommendedSubtasks": a.recommended_subtasks
+                })
             })
-        }).collect();
+            .collect();
 
         Ok(format!(
             "Analyzed {} tasks. {} need expansion (threshold: {}). Tokens: {} in, {} out.\n\nTasks needing expansion:\n{}",
@@ -780,13 +793,22 @@ impl McpServer {
             .get("prompt")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'prompt' parameter")?;
-        let priority = args.get("priority").and_then(|v| v.as_str()).map(|p| {
-            p.parse::<TaskPriority>().unwrap_or(TaskPriority::Medium)
-        });
-        let dependencies = args.get("dependencies").and_then(|v| v.as_array()).map(|arr| {
-            arr.iter().filter_map(|v| v.as_i64().map(|n| n as i32)).collect()
-        });
-        let research = args.get("research").and_then(|v| v.as_bool()).unwrap_or(false);
+        let priority = args
+            .get("priority")
+            .and_then(|v| v.as_str())
+            .map(|p| p.parse::<TaskPriority>().unwrap_or(TaskPriority::Medium));
+        let dependencies = args
+            .get("dependencies")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_i64().map(|n| n as i32))
+                    .collect()
+            });
+        let research = args
+            .get("research")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let model = args.get("model").and_then(|v| v.as_str());
         let tag = args.get("tag").and_then(|v| v.as_str());
 
@@ -820,8 +842,14 @@ impl McpServer {
             .get("prompt")
             .and_then(|v| v.as_str())
             .ok_or("Missing 'prompt' parameter")?;
-        let append = args.get("append").and_then(|v| v.as_bool()).unwrap_or(false);
-        let research = args.get("research").and_then(|v| v.as_bool()).unwrap_or(false);
+        let append = args
+            .get("append")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let research = args
+            .get("research")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let model = args.get("model").and_then(|v| v.as_str());
         let tag = args.get("tag").and_then(|v| v.as_str());
 
@@ -896,7 +924,11 @@ async fn main() {
                         data: None,
                     }),
                 };
-                let _ = writeln!(stdout, "{}", serde_json::to_string(&error_response).unwrap());
+                let _ = writeln!(
+                    stdout,
+                    "{}",
+                    serde_json::to_string(&error_response).unwrap()
+                );
                 let _ = stdout.flush();
                 continue;
             }
@@ -907,4 +939,3 @@ async fn main() {
         let _ = stdout.flush();
     }
 }
-

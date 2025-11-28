@@ -38,11 +38,8 @@ impl Default for UpdateTasksContext {
 
 /// Get the update-tasks template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "update-tasks",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Batch update multiple tasks based on new context")
+    PromptTemplate::new("update-tasks", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Batch update multiple tasks based on new context")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping to update multiple software development tasks based on new context or implementation changes.{{#if use_research}} You have access to current best practices and latest technical information to provide research-backed updates.{{/if}}
@@ -81,4 +78,3 @@ Incorporate current best practices, latest stable versions, and proven approache
 {{/if}}
 
 Return ALL tasks (modified and unmodified) as a JSON object with a "tasks" property containing an array of task objects."#;
-

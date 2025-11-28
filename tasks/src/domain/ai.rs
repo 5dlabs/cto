@@ -9,19 +9,18 @@
 use std::sync::Arc;
 
 use crate::ai::{
-    AIMessage, AIProvider, GenerateOptions, PromptManager, ProviderRegistry,
     parse_ai_response,
     prompts::{
-        AddTaskContext, AnalyzeComplexityContext, ExpandTaskContext, ParsePrdContext,
-        TaskSummary, UpdateSubtaskContext, UpdateTaskContext, UpdateTasksContext,
+        AddTaskContext, AnalyzeComplexityContext, ExpandTaskContext, ParsePrdContext, TaskSummary,
+        UpdateSubtaskContext, UpdateTaskContext, UpdateTasksContext,
     },
     schemas::{
         AddTaskResponse, AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse,
-        GeneratedTask, ParsePrdResponse, UpdateTaskResponse, UpdateTasksResponse,
+        GeneratedSubtask, GeneratedTask, ParsePrdResponse, UpdateTaskResponse, UpdateTasksResponse,
     },
-    TokenUsage,
+    AIMessage, AIProvider, GenerateOptions, PromptManager, ProviderRegistry, TokenUsage,
 };
-use crate::entities::{Task, TaskPriority, TaskStatus, Subtask};
+use crate::entities::{Subtask, Task, TaskPriority, TaskStatus};
 use crate::errors::{TasksError, TasksResult};
 use crate::storage::Storage;
 
@@ -54,11 +53,11 @@ impl AIDomain {
     /// Get a configured provider or return an error.
     fn get_provider(&self, model: Option<&str>) -> TasksResult<Arc<dyn AIProvider>> {
         if let Some(model) = model {
-            self.registry.get_for_model(model).ok_or_else(|| {
-                TasksError::ModelNotSupported {
+            self.registry
+                .get_for_model(model)
+                .ok_or_else(|| TasksError::ModelNotSupported {
                     model: model.to_string(),
-                }
-            })
+                })
         } else {
             self.registry.require_any()
         }
@@ -104,9 +103,10 @@ impl AIDomain {
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("parse-prd").ok_or_else(|| {
-            TasksError::Ai("parse-prd template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("parse-prd")
+            .ok_or_else(|| TasksError::Ai("parse-prd template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -119,7 +119,9 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
         let parsed: ParsePrdResponse = parse_ai_response(&response)?;
 
         // Convert generated tasks to Task entities
@@ -148,11 +150,13 @@ impl AIDomain {
         // Get expansion prompt from complexity report if available
         let (expansion_prompt, recommended_count, reasoning) = complexity_report
             .and_then(|r| r.get_task_analysis(task.id.parse().ok()?))
-            .map_or((None, None, None), |a| (
-                Some(a.expansion_prompt.clone()),
-                Some(a.recommended_subtasks),
-                Some(a.reasoning.clone()),
-            ));
+            .map_or((None, None, None), |a| {
+                (
+                    Some(a.expansion_prompt.clone()),
+                    Some(a.recommended_subtasks),
+                    Some(a.reasoning.clone()),
+                )
+            });
 
         let count = subtask_count.or(recommended_count).unwrap_or(5);
 
@@ -172,9 +176,10 @@ impl AIDomain {
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("expand-task").ok_or_else(|| {
-            TasksError::Ai("expand-task template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("expand-task")
+            .ok_or_else(|| TasksError::Ai("expand-task template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -187,7 +192,9 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
         let parsed: ExpandTaskResponse = parse_ai_response(&response)?;
 
         // Convert to Subtask entities
@@ -196,12 +203,7 @@ impl AIDomain {
             .subtasks
             .into_iter()
             .map(|gs| {
-                let mut subtask = Subtask::new(
-                    gs.id as u32,
-                    &task.id,
-                    gs.title,
-                    gs.description,
-                );
+                let mut subtask = Subtask::new(gs.id as u32, &task.id, gs.title, gs.description);
                 subtask.status = gs.status.unwrap_or(TaskStatus::Pending);
                 subtask.dependencies = gs.dependencies.into_iter().map(|d| d.to_string()).collect();
                 subtask.details = gs.details.unwrap_or_default();
@@ -238,9 +240,10 @@ impl AIDomain {
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("analyze-complexity").ok_or_else(|| {
-            TasksError::Ai("analyze-complexity template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("analyze-complexity")
+            .ok_or_else(|| TasksError::Ai("analyze-complexity template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -253,7 +256,9 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
         let parsed: AnalyzeComplexityResponse = parse_ai_response(&response)?;
 
         let report = ComplexityReport::new(
@@ -309,15 +314,17 @@ impl AIDomain {
                 serde_json::to_string_pretty(&tasks_summary).unwrap_or_default()
             ),
             context_from_args: String::new(),
-            priority: priority.map_or_else(|| "medium".to_string(), |p| format!("{p:?}").to_lowercase()),
+            priority: priority
+                .map_or_else(|| "medium".to_string(), |p| format!("{p:?}").to_lowercase()),
             dependencies: dependencies.unwrap_or_default(),
             use_research: research,
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("add-task").ok_or_else(|| {
-            TasksError::Ai("add-task template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("add-task")
+            .ok_or_else(|| TasksError::Ai("add-task template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -330,17 +337,19 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
         let parsed: AddTaskResponse = parse_ai_response(&response)?;
 
-        let mut task = Task::new(
-            next_id.to_string(),
-            parsed.title,
-            parsed.description,
-        );
+        let mut task = Task::new(next_id.to_string(), parsed.title, parsed.description);
         task.details = parsed.details;
         task.test_strategy = parsed.test_strategy;
-        task.dependencies = parsed.dependencies.into_iter().map(|d| d.to_string()).collect();
+        task.dependencies = parsed
+            .dependencies
+            .into_iter()
+            .map(|d| d.to_string())
+            .collect();
         task.priority = priority.unwrap_or(TaskPriority::Medium);
 
         Ok((task, response.usage))
@@ -375,9 +384,10 @@ impl AIDomain {
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("update-task").ok_or_else(|| {
-            TasksError::Ai("update-task template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("update-task")
+            .ok_or_else(|| TasksError::Ai("update-task template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -390,21 +400,27 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
 
         if append_mode {
             // In append mode, the AI returns just the text to append
             let new_details = response.text.trim();
             let mut updated_task = task.clone();
-            
+
             // Append with timestamp
             let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M UTC");
-            let separator = if updated_task.details.is_empty() { "" } else { "\n\n---\n\n" };
+            let separator = if updated_task.details.is_empty() {
+                ""
+            } else {
+                "\n\n---\n\n"
+            };
             updated_task.details = format!(
                 "{}{}[{}] {}",
                 updated_task.details, separator, timestamp, new_details
             );
-            
+
             Ok((updated_task, response.usage))
         } else {
             let parsed: UpdateTaskResponse = parse_ai_response(&response)?;
@@ -439,9 +455,10 @@ impl AIDomain {
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("update-subtask").ok_or_else(|| {
-            TasksError::Ai("update-subtask template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("update-subtask")
+            .ok_or_else(|| TasksError::Ai("update-subtask template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -453,7 +470,9 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
 
         // The response is plain text to append
         Ok((response.text.trim().to_string(), response.usage))
@@ -489,9 +508,10 @@ impl AIDomain {
             project_root: String::new(),
         };
 
-        let template = self.prompts.get("update-tasks").ok_or_else(|| {
-            TasksError::Ai("update-tasks template not found".to_string())
-        })?;
+        let template = self
+            .prompts
+            .get("update-tasks")
+            .ok_or_else(|| TasksError::Ai("update-tasks template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
 
@@ -504,7 +524,9 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider.generate_text(model_id, &messages, &options).await?;
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
         let parsed: UpdateTasksResponse = parse_ai_response(&response)?;
 
         let tasks: Vec<Task> = parsed
@@ -517,9 +539,16 @@ impl AIDomain {
     }
 
     /// Convert a generated task to a Task entity.
+    #[allow(clippy::cast_sign_loss)]
     fn generated_task_to_task(gt: GeneratedTask) -> Task {
+        let task_id = gt.id.to_string();
+        let subtasks = gt
+            .subtasks
+            .into_iter()
+            .map(|gs| Self::generated_subtask_to_subtask(gs, &task_id))
+            .collect();
         Task {
-            id: gt.id.to_string(),
+            id: task_id,
             title: gt.title,
             description: gt.description,
             status: gt.status.unwrap_or(TaskStatus::Pending),
@@ -527,7 +556,7 @@ impl AIDomain {
             dependencies: gt.dependencies.into_iter().map(|d| d.to_string()).collect(),
             details: gt.details.unwrap_or_default(),
             test_strategy: gt.test_strategy.unwrap_or_default(),
-            subtasks: Vec::new(),
+            subtasks,
             created_at: None,
             updated_at: None,
             effort: None,
@@ -536,6 +565,17 @@ impl AIDomain {
             assignee: None,
             complexity: None,
         }
+    }
+
+    /// Convert a generated subtask to a Subtask entity.
+    #[allow(clippy::cast_sign_loss)]
+    fn generated_subtask_to_subtask(gs: GeneratedSubtask, parent_id: &str) -> Subtask {
+        let mut subtask = Subtask::new(gs.id as u32, parent_id, gs.title, gs.description);
+        subtask.status = gs.status.unwrap_or(TaskStatus::Pending);
+        subtask.dependencies = gs.dependencies.into_iter().map(|d| d.to_string()).collect();
+        subtask.details = gs.details.unwrap_or_default();
+        subtask.test_strategy = gs.test_strategy.unwrap_or_default();
+        subtask
     }
 }
 
@@ -560,6 +600,7 @@ mod tests {
             priority: Some(TaskPriority::High),
             dependencies: vec![],
             status: Some(TaskStatus::Pending),
+            subtasks: vec![],
         };
 
         let task = AIDomain::generated_task_to_task(generated);
@@ -568,5 +609,50 @@ mod tests {
         assert_eq!(task.title, "Test task");
         assert_eq!(task.priority, TaskPriority::High);
     }
-}
 
+    #[test]
+    fn test_generated_task_with_subtasks_conversion() {
+        let generated = GeneratedTask {
+            id: 1,
+            title: "Test task".to_string(),
+            description: "Test description".to_string(),
+            details: Some("Test details".to_string()),
+            test_strategy: Some("Test strategy".to_string()),
+            priority: Some(TaskPriority::High),
+            dependencies: vec![],
+            status: Some(TaskStatus::Pending),
+            subtasks: vec![
+                GeneratedSubtask {
+                    id: 1,
+                    title: "Subtask 1".to_string(),
+                    description: "First subtask".to_string(),
+                    details: Some("Subtask details".to_string()),
+                    test_strategy: Some("Subtask test".to_string()),
+                    dependencies: vec![],
+                    status: Some(TaskStatus::Pending),
+                },
+                GeneratedSubtask {
+                    id: 2,
+                    title: "Subtask 2".to_string(),
+                    description: "Second subtask".to_string(),
+                    details: None,
+                    test_strategy: None,
+                    dependencies: vec![1],
+                    status: None,
+                },
+            ],
+        };
+
+        let task = AIDomain::generated_task_to_task(generated);
+
+        assert_eq!(task.id, "1");
+        assert_eq!(task.subtasks.len(), 2);
+        assert_eq!(task.subtasks[0].id, 1);
+        assert_eq!(task.subtasks[0].title, "Subtask 1");
+        assert_eq!(task.subtasks[0].parent_id, "1");
+        assert_eq!(task.subtasks[0].details, "Subtask details");
+        assert_eq!(task.subtasks[1].id, 2);
+        assert_eq!(task.subtasks[1].title, "Subtask 2");
+        assert_eq!(task.subtasks[1].dependencies, vec!["1"]);
+    }
+}

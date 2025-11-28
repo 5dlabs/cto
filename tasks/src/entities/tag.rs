@@ -75,11 +75,7 @@ pub struct TagMetadata {
     pub created: Option<DateTime<Utc>>,
 
     /// Last update timestamp
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "updatedAt"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "updatedAt")]
     pub updated_at: Option<DateTime<Utc>>,
 
     /// Tag description
@@ -213,4 +209,3 @@ mod tests {
         assert!((stats.completion_percent() - 0.0).abs() < 0.001);
     }
 }
-

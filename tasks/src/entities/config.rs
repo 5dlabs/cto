@@ -56,11 +56,7 @@ pub struct ModelSettings {
     pub temperature: f32,
 
     /// Optional base URL override
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "baseURL"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "baseURL")]
     pub base_url: Option<String>,
 }
 
@@ -232,4 +228,3 @@ mod tests {
         assert!(state.last_switched.is_some());
     }
 }
-

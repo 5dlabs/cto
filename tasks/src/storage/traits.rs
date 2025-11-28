@@ -101,4 +101,3 @@ pub trait Storage: Send + Sync {
     /// Set current active tag
     async fn set_current_tag(&self, tag: &str) -> TasksResult<()>;
 }
-

@@ -150,11 +150,7 @@ impl DependencyDomain {
     }
 
     /// Check if adding a dependency would create a cycle
-    fn would_create_cycle(
-        tasks: &[Task],
-        task_id: &str,
-        depends_on: &str,
-    ) -> bool {
+    fn would_create_cycle(tasks: &[Task], task_id: &str, depends_on: &str) -> bool {
         // Build dependency graph
         let mut graph: HashMap<&str, Vec<&str>> = HashMap::new();
         for task in tasks {
@@ -165,10 +161,7 @@ impl DependencyDomain {
         }
 
         // Temporarily add the new dependency
-        graph
-            .entry(task_id)
-            .or_default()
-            .push(depends_on);
+        graph.entry(task_id).or_default().push(depends_on);
 
         // Check if depends_on can reach task_id (which would mean a cycle)
         let mut visited = HashSet::new();
@@ -270,12 +263,13 @@ impl DependencyDomain {
         tag: Option<&str>,
     ) -> TasksResult<Vec<Task>> {
         let tasks = self.storage.load_tasks(tag).await?;
-        let task = tasks
-            .iter()
-            .find(|t| t.id == task_id)
-            .ok_or_else(|| TasksError::TaskNotFound {
-                task_id: task_id.to_string(),
-            })?;
+        let task =
+            tasks
+                .iter()
+                .find(|t| t.id == task_id)
+                .ok_or_else(|| TasksError::TaskNotFound {
+                    task_id: task_id.to_string(),
+                })?;
 
         let dep_ids: Vec<String> = task.dependencies.clone();
         Ok(tasks
@@ -367,4 +361,3 @@ mod tests {
         assert!(result.is_valid);
     }
 }
-

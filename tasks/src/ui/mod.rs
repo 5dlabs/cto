@@ -152,11 +152,7 @@ pub fn display_task_details(task: &Task) {
 
     println!("{}: {}", "Title".bold(), task.title);
     println!("{}: {}", "Status".bold(), status_colored(task.status));
-    println!(
-        "{}: {}",
-        "Priority".bold(),
-        priority_colored(task.priority)
-    );
+    println!("{}: {}", "Priority".bold(), priority_colored(task.priority));
 
     if !task.dependencies.is_empty() {
         println!(
@@ -231,4 +227,3 @@ pub fn print_info(message: &str) {
 pub fn print_warning(message: &str) {
     println!("{} {}", "⚠".yellow().bold(), message);
 }
-

@@ -176,18 +176,10 @@ pub struct Task {
     pub subtasks: Vec<Subtask>,
 
     // Optional enhanced properties
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "createdAt"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "createdAt")]
     pub created_at: Option<DateTime<Utc>>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "updatedAt"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "updatedAt")]
     pub updated_at: Option<DateTime<Utc>>,
 
     /// Estimated effort (hours or story points)
@@ -420,4 +412,3 @@ mod tests {
         assert!(result.is_err());
     }
 }
-

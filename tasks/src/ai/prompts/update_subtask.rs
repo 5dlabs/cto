@@ -41,11 +41,8 @@ impl Default for UpdateSubtaskContext {
 
 /// Get the update-subtask template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "update-subtask",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Append timestamped notes to a subtask")
+    PromptTemplate::new("update-subtask", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Append timestamped notes to a subtask")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping to append additional information to a software development subtask. You will be provided with the subtask's existing details, context, and a user request string.
@@ -75,4 +72,3 @@ Based on the User Request and all the Subtask Context (including current subtask
 
 {{gathered_context}}
 {{/if}}"#;
-

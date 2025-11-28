@@ -175,9 +175,10 @@ impl AIProvider for OpenAIProvider {
         messages: &[AIMessage],
         options: &GenerateOptions,
     ) -> TasksResult<AIResponse> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| {
-            TasksError::Ai("OPENAI_API_KEY not set".to_string())
-        })?;
+        let api_key = self
+            .api_key
+            .as_ref()
+            .ok_or_else(|| TasksError::Ai("OPENAI_API_KEY not set".to_string()))?;
 
         let converted_messages = self.convert_messages(messages);
 
@@ -294,11 +295,10 @@ mod tests {
         ];
 
         let converted = provider.convert_messages(&messages);
-        
+
         assert_eq!(converted.len(), 3);
         assert_eq!(converted[0].role, "system");
         assert_eq!(converted[1].role, "user");
         assert_eq!(converted[2].role, "assistant");
     }
 }
-

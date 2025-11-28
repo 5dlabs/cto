@@ -5,4 +5,3 @@ mod traits;
 
 pub use file::FileStorage;
 pub use traits::{Storage, UpdateStatusResult};
-

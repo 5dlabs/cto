@@ -143,12 +143,10 @@ pub trait AIProvider: Send + Sync {
 ///
 /// This is a standalone function rather than a trait method because
 /// generic methods are not dyn-compatible.
-pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(
-    response: &AIResponse,
-) -> TasksResult<T> {
+pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(response: &AIResponse) -> TasksResult<T> {
     // Try to extract JSON from the response text
     let text = response.text.trim();
-    
+
     // Sometimes the AI wraps JSON in markdown code blocks
     let json_text = if text.starts_with("```json") {
         text.strip_prefix("```json")
@@ -164,10 +162,8 @@ pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(
         text
     };
 
-    serde_json::from_str(json_text).map_err(|e| {
-        crate::errors::TasksError::AiResponseParseError {
-            reason: format!("Failed to parse AI response as JSON: {e}. Response: {text}"),
-        }
+    serde_json::from_str(json_text).map_err(|e| crate::errors::TasksError::AiResponseParseError {
+        reason: format!("Failed to parse AI response as JSON: {e}. Response: {text}"),
     })
 }
 
@@ -206,4 +202,3 @@ impl MessageBuilder {
         self.messages
     }
 }
-

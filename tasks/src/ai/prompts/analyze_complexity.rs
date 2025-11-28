@@ -35,11 +35,8 @@ impl Default for AnalyzeComplexityContext {
 
 /// Get the analyze-complexity template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "analyze-complexity",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Analyze task complexity and generate expansion recommendations")
+    PromptTemplate::new("analyze-complexity", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Analyze task complexity and generate expansion recommendations")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an expert software architect and project manager analyzing task complexity. Your analysis should consider implementation effort, technical challenges, dependencies, and testing requirements.
@@ -64,4 +61,3 @@ Tasks:
 
 {{gathered_context}}
 {{/if}}";
-

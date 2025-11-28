@@ -105,4 +105,3 @@ mod tests {
         assert_eq!(domain.current_tag().await.unwrap(), "feature-1");
     }
 }
-

@@ -12,21 +12,21 @@ use std::collections::HashMap;
 use crate::errors::{TasksError, TasksResult};
 
 // Template modules
-mod parse_prd;
-mod expand_task;
-mod analyze_complexity;
 mod add_task;
-mod update_task;
+mod analyze_complexity;
+mod expand_task;
+mod parse_prd;
 mod update_subtask;
+mod update_task;
 mod update_tasks;
 
 // Re-export context types (not the template() functions to avoid ambiguity)
-pub use parse_prd::ParsePrdContext;
-pub use expand_task::{ExpandTaskContext, TaskSummary};
-pub use analyze_complexity::AnalyzeComplexityContext;
 pub use add_task::AddTaskContext;
-pub use update_task::UpdateTaskContext;
+pub use analyze_complexity::AnalyzeComplexityContext;
+pub use expand_task::{ExpandTaskContext, TaskSummary};
+pub use parse_prd::ParsePrdContext;
 pub use update_subtask::UpdateSubtaskContext;
+pub use update_task::UpdateTaskContext;
 pub use update_tasks::UpdateTasksContext;
 
 /// A prompt template with system and user messages.
@@ -46,11 +46,7 @@ pub struct PromptTemplate {
 
 impl PromptTemplate {
     /// Create a new prompt template.
-    pub fn new(
-        id: impl Into<String>,
-        system: impl Into<String>,
-        user: impl Into<String>,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, system: impl Into<String>, user: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             version: "1.0.0".to_string(),
@@ -69,11 +65,11 @@ impl PromptTemplate {
     /// Render the template with the given context.
     pub fn render<T: Serialize>(&self, context: &T) -> TasksResult<(String, String)> {
         let mut handlebars = create_handlebars();
-        
+
         handlebars
             .register_template_string("system", &self.system)
             .map_err(|e| TasksError::Ai(format!("Invalid system template: {e}")))?;
-        
+
         handlebars
             .register_template_string("user", &self.user)
             .map_err(|e| TasksError::Ai(format!("Invalid user template: {e}")))?;
@@ -81,7 +77,7 @@ impl PromptTemplate {
         let system = handlebars
             .render("system", context)
             .map_err(|e| TasksError::Ai(format!("Failed to render system prompt: {e}")))?;
-        
+
         let user = handlebars
             .render("user", context)
             .map_err(|e| TasksError::Ai(format!("Failed to render user prompt: {e}")))?;
@@ -93,62 +89,65 @@ impl PromptTemplate {
 /// Create a Handlebars instance with custom helpers.
 fn create_handlebars() -> Handlebars<'static> {
     let mut handlebars = Handlebars::new();
-    
+
     // Disable HTML escaping for prompts
     handlebars.register_escape_fn(handlebars::no_escape);
-    
+
     // Register custom helpers
-    
+
     // Helper: {{#if (gt numTasks 0)}}
     handlebars.register_helper(
         "gt",
-        Box::new(|h: &handlebars::Helper,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext,
-                  out: &mut dyn handlebars::Output| {
-            let a = h.param(0)
-                .and_then(|v| v.value().as_i64())
-                .unwrap_or(0);
-            let b = h.param(1)
-                .and_then(|v| v.value().as_i64())
-                .unwrap_or(0);
-            out.write(if a > b { "true" } else { "" })?;
-            Ok(())
-        }),
+        Box::new(
+            |h: &handlebars::Helper,
+             _: &Handlebars,
+             _: &handlebars::Context,
+             _: &mut handlebars::RenderContext,
+             out: &mut dyn handlebars::Output| {
+                let a = h.param(0).and_then(|v| v.value().as_i64()).unwrap_or(0);
+                let b = h.param(1).and_then(|v| v.value().as_i64()).unwrap_or(0);
+                out.write(if a > b { "true" } else { "" })?;
+                Ok(())
+            },
+        ),
     );
 
     // Helper: {{#if (not value)}}
     handlebars.register_helper(
         "not",
-        Box::new(|h: &handlebars::Helper,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext,
-                  out: &mut dyn handlebars::Output| {
-            let value = h.param(0)
-                .map(|v| v.value().as_bool().unwrap_or(false))
-                .unwrap_or(false);
-            out.write(if !value { "true" } else { "" })?;
-            Ok(())
-        }),
+        Box::new(
+            |h: &handlebars::Helper,
+             _: &Handlebars,
+             _: &handlebars::Context,
+             _: &mut handlebars::RenderContext,
+             out: &mut dyn handlebars::Output| {
+                let value = h
+                    .param(0)
+                    .map(|v| v.value().as_bool().unwrap_or(false))
+                    .unwrap_or(false);
+                out.write(if !value { "true" } else { "" })?;
+                Ok(())
+            },
+        ),
     );
 
     // Helper: {{{json value}}}
     handlebars.register_helper(
         "json",
-        Box::new(|h: &handlebars::Helper,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext,
-                  out: &mut dyn handlebars::Output| {
-            if let Some(param) = h.param(0) {
-                let json = serde_json::to_string_pretty(param.value())
-                    .unwrap_or_else(|_| "null".to_string());
-                out.write(&json)?;
-            }
-            Ok(())
-        }),
+        Box::new(
+            |h: &handlebars::Helper,
+             _: &Handlebars,
+             _: &handlebars::Context,
+             _: &mut handlebars::RenderContext,
+             out: &mut dyn handlebars::Output| {
+                if let Some(param) = h.param(0) {
+                    let json = serde_json::to_string_pretty(param.value())
+                        .unwrap_or_else(|_| "null".to_string());
+                    out.write(&json)?;
+                }
+                Ok(())
+            },
+        ),
     );
 
     handlebars
@@ -190,9 +189,9 @@ impl PromptManager {
 
     /// Render a template with context.
     pub fn render<T: Serialize>(&self, id: &str, context: &T) -> TasksResult<(String, String)> {
-        let template = self.get(id).ok_or_else(|| {
-            TasksError::Ai(format!("Template '{}' not found", id))
-        })?;
+        let template = self
+            .get(id)
+            .ok_or_else(|| TasksError::Ai(format!("Template '{}' not found", id)))?;
         template.render(context)
     }
 
@@ -228,18 +227,14 @@ mod tests {
         });
 
         let (system, user) = template.render(&context).unwrap();
-        
+
         assert_eq!(system, "You are a helpful assistant");
         assert_eq!(user, "Research: Hello world");
     }
 
     #[test]
     fn test_json_helper() {
-        let template = PromptTemplate::new(
-            "test",
-            "System",
-            "Tasks: {{{json tasks}}}",
-        );
+        let template = PromptTemplate::new("test", "System", "Tasks: {{{json tasks}}}");
 
         let context = json!({
             "tasks": [
@@ -249,7 +244,7 @@ mod tests {
         });
 
         let (_, user) = template.render(&context).unwrap();
-        
+
         assert!(user.contains("\"id\": 1"));
         assert!(user.contains("\"title\": \"Task 1\""));
     }
@@ -257,11 +252,10 @@ mod tests {
     #[test]
     fn test_prompt_manager() {
         let manager = PromptManager::new();
-        
+
         // Should have default templates registered
         assert!(manager.get("parse-prd").is_some());
         assert!(manager.get("expand-task").is_some());
         assert!(manager.get("analyze-complexity").is_some());
     }
 }
-

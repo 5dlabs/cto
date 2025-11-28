@@ -41,6 +41,9 @@ pub struct GeneratedTask {
     /// Task status
     #[serde(default)]
     pub status: Option<TaskStatus>,
+    /// Subtasks
+    #[serde(default)]
+    pub subtasks: Vec<GeneratedSubtask>,
 }
 
 /// Response from expand-task command.
@@ -194,7 +197,9 @@ impl ComplexityReport {
 
     /// Get the analysis for a specific task.
     pub fn get_task_analysis(&self, task_id: i32) -> Option<&TaskComplexityAnalysis> {
-        self.complexity_analysis.iter().find(|a| a.task_id == task_id)
+        self.complexity_analysis
+            .iter()
+            .find(|a| a.task_id == task_id)
     }
 }
 
@@ -266,10 +271,9 @@ mod tests {
         ];
 
         let report = ComplexityReport::new("tasks.json", "claude-3", 5, analysis);
-        
+
         let needing_expansion = report.tasks_needing_expansion();
         assert_eq!(needing_expansion.len(), 1);
         assert_eq!(needing_expansion[0].task_id, 2);
     }
 }
-

@@ -201,7 +201,6 @@ enum Commands {
     },
 
     // =========== AI-Powered Commands ===========
-
     /// Parse a PRD file and generate tasks
     ParsePrd {
         /// Path to the PRD file
@@ -640,9 +639,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             check_initialized(&tasks_domain).await?;
 
             let desc = description.unwrap_or_default();
-            let mut task = tasks_domain
-                .add_task(&title, &desc, tag.as_deref())
-                .await?;
+            let mut task = tasks_domain.add_task(&title, &desc, tag.as_deref()).await?;
 
             // Set priority if provided
             if let Some(p) = priority {
@@ -702,7 +699,9 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             // Convert 1-based to 0-based
             let position = to.saturating_sub(1);
-            tasks_domain.move_task(&id, position, tag.as_deref()).await?;
+            tasks_domain
+                .move_task(&id, position, tag.as_deref())
+                .await?;
             ui::print_success(&format!("Moved task {id} to position {to}"));
         }
 
@@ -837,12 +836,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 println!();
 
                 if let Some(main) = models.main {
-                    println!(
-                        "  {}: {}:{}",
-                        "Main".cyan(),
-                        main.provider,
-                        main.model_id
-                    );
+                    println!("  {}: {}:{}", "Main".cyan(), main.provider, main.model_id);
                 } else {
                     println!("  {}: {}", "Main".cyan(), "not set".dimmed());
                 }
@@ -891,7 +885,6 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
         }
 
         // =========== AI-Powered Command Handlers ===========
-
         Commands::ParsePrd {
             file,
             num_tasks,
@@ -904,12 +897,13 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             let ai_domain = AIDomain::new(Arc::clone(&storage) as Arc<dyn tasks::storage::Storage>);
 
             // Read PRD file
-            let prd_content = tokio::fs::read_to_string(&file)
-                .await
-                .map_err(|e| TasksError::FileReadError {
-                    path: file.display().to_string(),
-                    reason: e.to_string(),
-                })?;
+            let prd_content =
+                tokio::fs::read_to_string(&file)
+                    .await
+                    .map_err(|e| TasksError::FileReadError {
+                        path: file.display().to_string(),
+                        reason: e.to_string(),
+                    })?;
 
             ui::print_info(&format!("Parsing PRD: {}", file.display()));
             ui::print_info("This may take a moment...");
@@ -926,7 +920,9 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             // Save tasks
             for task in &tasks {
-                tasks_domain.add_task_full(task.clone(), tag.as_deref()).await?;
+                tasks_domain
+                    .add_task_full(task.clone(), tag.as_deref())
+                    .await?;
             }
 
             ui::print_success(&format!("Generated {} tasks from PRD", tasks.len()));
@@ -980,7 +976,14 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             };
 
             let (subtasks, usage) = ai_domain
-                .expand_task(&task, num, research, None, complexity_report.as_ref(), model.as_deref())
+                .expand_task(
+                    &task,
+                    num,
+                    research,
+                    None,
+                    complexity_report.as_ref(),
+                    model.as_deref(),
+                )
                 .await?;
 
             task.subtasks = subtasks;
@@ -1043,7 +1046,14 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 ui::print_info(&format!("Expanding: {} - {}", task.id, task.title));
 
                 match ai_domain
-                    .expand_task(&task, num, research, None, complexity_report.as_ref(), model.as_deref())
+                    .expand_task(
+                        &task,
+                        num,
+                        research,
+                        None,
+                        complexity_report.as_ref(),
+                        model.as_deref(),
+                    )
                     .await
                 {
                     Ok((subtasks, usage)) => {
@@ -1060,7 +1070,10 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             }
 
             ui::print_success(&format!("Expanded {} task(s)", expanded_count));
-            ui::print_info(&format!("Total tokens: {} in, {} out", total_input, total_output));
+            ui::print_info(&format!(
+                "Total tokens: {} in, {} out",
+                total_input, total_output
+            ));
         }
 
         Commands::AnalyzeComplexity {
@@ -1089,19 +1102,21 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 .await?;
 
             // Save report
-            let output_path = output.unwrap_or_else(|| {
-                project_path.join(".tasks").join("complexity-report.json")
-            });
+            let output_path = output
+                .unwrap_or_else(|| project_path.join(".tasks").join("complexity-report.json"));
 
             let report_json = serde_json::to_string_pretty(&report)?;
-            tokio::fs::write(&output_path, &report_json).await.map_err(|e| {
-                TasksError::FileWriteError {
+            tokio::fs::write(&output_path, &report_json)
+                .await
+                .map_err(|e| TasksError::FileWriteError {
                     path: output_path.display().to_string(),
                     reason: e.to_string(),
-                }
-            })?;
+                })?;
 
-            ui::print_success(&format!("Saved complexity report to: {}", output_path.display()));
+            ui::print_success(&format!(
+                "Saved complexity report to: {}",
+                output_path.display()
+            ));
             ui::print_info(&format!(
                 "Tokens used: {} in, {} out",
                 usage.input_tokens, usage.output_tokens
@@ -1130,9 +1145,8 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
         Commands::ComplexityReport { file } => {
             check_initialized(&tasks_domain).await?;
 
-            let report_path = file.unwrap_or_else(|| {
-                project_path.join(".tasks").join("complexity-report.json")
-            });
+            let report_path =
+                file.unwrap_or_else(|| project_path.join(".tasks").join("complexity-report.json"));
 
             if !report_path.exists() {
                 ui::print_error(&format!(
@@ -1176,9 +1190,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
                 println!(
                     "Task {}: {} [{}]",
-                    analysis.task_id,
-                    analysis.task_title,
-                    score_display
+                    analysis.task_id, analysis.task_title, score_display
                 );
                 println!("  Reasoning: {}", analysis.reasoning);
                 if analysis.complexity_score >= report.meta.threshold {
@@ -1223,7 +1235,9 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 .add_task(&prompt, priority_enum, deps, research, model.as_deref())
                 .await?;
 
-            tasks_domain.add_task_full(task.clone(), tag.as_deref()).await?;
+            tasks_domain
+                .add_task_full(task.clone(), tag.as_deref())
+                .await?;
 
             ui::print_success(&format!("Created task {} - {}", task.id, task.title));
             ui::print_info(&format!(
@@ -1285,7 +1299,9 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 .update_task(&task, &prompt, append, research, model.as_deref())
                 .await?;
 
-            tasks_domain.update_task(&updated_task, tag.as_deref()).await?;
+            tasks_domain
+                .update_task(&updated_task, tag.as_deref())
+                .await?;
 
             ui::print_success(&format!("Updated task {}", id));
             ui::print_info(&format!(
@@ -1314,7 +1330,9 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             }
 
             let task_id = parts[0];
-            let subtask_id: u32 = parts[1].parse().map_err(|_| TasksError::InvalidId { id: id.clone() })?;
+            let subtask_id: u32 = parts[1]
+                .parse()
+                .map_err(|_| TasksError::InvalidId { id: id.clone() })?;
 
             let mut task = tasks_domain.get_task(task_id, tag.as_deref()).await?;
 
@@ -1328,7 +1346,10 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 })?
                 .clone();
 
-            ui::print_info(&format!("Updating subtask: {}.{} - {}", task_id, subtask_id, subtask.title));
+            ui::print_info(&format!(
+                "Updating subtask: {}.{} - {}",
+                task_id, subtask_id, subtask.title
+            ));
             ui::print_info("This may take a moment...");
 
             let (new_content, usage) = ai_domain
@@ -1338,7 +1359,11 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             // Update the subtask details
             if let Some(s) = task.subtasks.iter_mut().find(|s| s.id == subtask_id) {
                 let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M UTC");
-                let separator = if s.details.is_empty() { "" } else { "\n\n---\n\n" };
+                let separator = if s.details.is_empty() {
+                    ""
+                } else {
+                    "\n\n---\n\n"
+                };
                 s.details = format!("{}{}[{}] {}", s.details, separator, timestamp, new_content);
             }
 
@@ -1378,4 +1403,3 @@ fn parse_model_string(s: &str) -> Result<tasks::entities::ModelSettings, TasksEr
         base_url: None,
     })
 }
-

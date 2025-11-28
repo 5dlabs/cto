@@ -74,11 +74,8 @@ impl Default for ExpandTaskContext {
 
 /// Get the expand-task template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "expand-task",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Break down a task into detailed subtasks")
+    PromptTemplate::new("expand-task", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Break down a task into detailed subtasks")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping with task breakdown for software development. Break down high-level tasks into specific, actionable subtasks that can be implemented sequentially.{{#if use_research}}
@@ -114,4 +111,3 @@ Complexity Analysis Reasoning: {{complexity_reasoning_context}}{{/if}}{{#if gath
 {{gathered_context}}{{/if}}
 
 CRITICAL: You MUST use sequential IDs starting from {{next_subtask_id}}. The first subtask MUST have id={{next_subtask_id}}, the second MUST have id={{next_subtask_id}}+1, and so on. Do NOT use parent task ID in subtask numbering!";
-

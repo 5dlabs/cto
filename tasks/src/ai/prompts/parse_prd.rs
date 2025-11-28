@@ -41,11 +41,8 @@ impl Default for ParsePrdContext {
 
 /// Get the parse-prd template.
 pub fn template() -> PromptTemplate {
-    PromptTemplate::new(
-        "parse-prd",
-        SYSTEM_PROMPT,
-        USER_PROMPT,
-    ).with_description("Parse a Product Requirements Document into structured tasks")
+    PromptTemplate::new("parse-prd", SYSTEM_PROMPT, USER_PROMPT)
+        .with_description("Parse a Product Requirements Document into structured tasks")
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an AI assistant specialized in analyzing Product Requirements Documents (PRDs) and generating a structured, logically ordered, dependency-aware and sequenced list of development tasks in JSON format.{{#if research}}
@@ -98,4 +95,3 @@ Remember to thoroughly research current best practices and technologies before t
 {{prd_content}}
 
 IMPORTANT: Your response must be a JSON object with a "tasks" property containing an array of task objects. You may optionally include a "metadata" object. Do not include any other properties."#;
-

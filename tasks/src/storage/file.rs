@@ -85,12 +85,12 @@ impl FileStorage {
         }
 
         let content = serde_json::to_string_pretty(data)?;
-        fs::write(&self.tasks_file, content).await.map_err(|e| {
-            TasksError::FileWriteError {
+        fs::write(&self.tasks_file, content)
+            .await
+            .map_err(|e| TasksError::FileWriteError {
                 path: self.tasks_file.display().to_string(),
                 reason: e.to_string(),
-            }
-        })
+            })
     }
 
     /// Read the state file
@@ -107,12 +107,12 @@ impl FileStorage {
     /// Write the state file
     async fn write_state(&self, state: &RuntimeState) -> TasksResult<()> {
         let content = serde_json::to_string_pretty(state)?;
-        fs::write(&self.state_file, content).await.map_err(|e| {
-            TasksError::FileWriteError {
+        fs::write(&self.state_file, content)
+            .await
+            .map_err(|e| TasksError::FileWriteError {
                 path: self.state_file.display().to_string(),
                 reason: e.to_string(),
-            }
-        })
+            })
     }
 
     /// Detect format of tasks.json (legacy vs tagged)
@@ -451,9 +451,10 @@ impl Storage for FileStorage {
         match Self::detect_format(&data) {
             TasksFormat::Standard => Ok(vec!["master".to_string()]),
             TasksFormat::Tagged => {
-                let tags: Vec<String> = data
-                    .as_object()
-                    .map_or_else(|| vec!["master".to_string()], |o| o.keys().cloned().collect());
+                let tags: Vec<String> = data.as_object().map_or_else(
+                    || vec!["master".to_string()],
+                    |o| o.keys().cloned().collect(),
+                );
                 Ok(tags)
             }
         }
@@ -735,4 +736,3 @@ mod tests {
         assert_eq!(storage.next_task_id(None).await.unwrap(), "6");
     }
 }
-
