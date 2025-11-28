@@ -936,7 +936,10 @@ impl BridgeState {
                 .iter()
                 .filter(|(name, config)| {
                     if config.local {
-                        tracing::info!("⏭️ [{}] Skipping local server (runs in agent container)", name);
+                        tracing::info!(
+                            "⏭️ [{}] Skipping local server (runs in agent container)",
+                            name
+                        );
                         false
                     } else {
                         true
