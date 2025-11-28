@@ -97,6 +97,9 @@ jobs:
           - name: tools
             binary: tools-server
             dir: tools
+          - name: tools
+            binary: tools-client
+            dir: tools
           - name: play-monitor
             binary: play-monitor
             dir: monitor
@@ -125,7 +128,7 @@ jobs:
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}
-    name: build-${{ matrix.package.dir }}-${{ matrix.target.suffix }}
+    name: build-${{ matrix.package.binary }}-${{ matrix.target.suffix }}
     steps:
       - uses: actions/checkout@v4
 
@@ -172,7 +175,7 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.package.name }}-${{ matrix.target.suffix }}
+          name: binary-${{ matrix.package.binary }}-${{ matrix.target.suffix }}
           path: dist/
 
   # Build tools Docker image
@@ -292,13 +295,13 @@ jobs:
           **Manual download:**
           Download the appropriate binary for your platform from the assets below.
 
-          | Platform | cto-mcp | tools-server | play-monitor |
-          |----------|---------|--------------|--------------|
-          | Linux x86_64 | ✅ | ✅ | ✅ |
-          | Linux ARM64 | ✅ | ✅ | ✅ |
-          | macOS x86_64 | ✅ | ✅ | ✅ |
-          | macOS ARM64 | ✅ | ✅ | ✅ |
-          | Windows x86_64 | ✅ | ✅ | ❌ |
+          | Platform | cto-mcp | tools-server | tools-client | play-monitor |
+          |----------|---------|--------------|--------------|--------------|
+          | Linux x86_64 | ✅ | ✅ | ✅ | ✅ |
+          | Linux ARM64 | ✅ | ✅ | ✅ | ✅ |
+          | macOS x86_64 | ✅ | ✅ | ✅ | ✅ |
+          | macOS ARM64 | ✅ | ✅ | ✅ | ✅ |
+          | Windows x86_64 | ✅ | ✅ | ✅ | ❌ |
           EOF
 
       - name: Create or update release
