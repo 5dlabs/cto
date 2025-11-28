@@ -303,7 +303,9 @@ monitoring:
 
 mcpServers:
   k8s:
-    enabled: true
+    # Disabled - now using npx kubernetes-mcp-server@latest via stdio transport
+    # from the main tools container (see config.servers.kubernetes)
+    enabled: false
     name: "k8s-mcp"
     image:
       repository: ginnux/k8s-mcp-server
