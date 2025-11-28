@@ -74,6 +74,7 @@ jobs:
           TIMEOUT="${{ inputs.sync_timeout || 300 }}"
           ELAPSED=0
           INTERVAL=10
+          SEEN_RUNNING=false
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
             STATUS=$(kubectl get application platform-apps -n argocd \
@@ -85,8 +86,16 @@ jobs:
 
             echo "  platform-apps: Sync=$STATUS, Health=$HEALTH, Operation=$OP_PHASE"
 
-            # Check if sync is complete (Synced or no active operation)
-            if [ "$STATUS" = "Synced" ] && [ "$OP_PHASE" != "Running" ]; then
+            # Track if we've seen the operation start (avoids race condition)
+            if [ "$OP_PHASE" = "Running" ]; then
+              SEEN_RUNNING=true
+            fi
+
+            # Only consider complete if we've seen it running first, or operation explicitly succeeded
+            if [ "$OP_PHASE" = "Succeeded" ] && [ "$STATUS" = "Synced" ]; then
+              echo "✅ platform-apps sync succeeded!"
+              break
+            elif [ "$SEEN_RUNNING" = "true" ] && [ "$OP_PHASE" != "Running" ] && [ "$STATUS" = "Synced" ]; then
               echo "✅ platform-apps is synced!"
               break
             fi
@@ -138,6 +147,7 @@ jobs:
             echo "  Waiting for $app..."
             ELAPSED=0
             INTERVAL=10
+            SEEN_RUNNING=false
 
             while [ $ELAPSED -lt $TIMEOUT ]; do
               STATUS=$(kubectl get application "$app" -n argocd \
@@ -145,7 +155,16 @@ jobs:
               OP_PHASE=$(kubectl get application "$app" -n argocd \
                 -o jsonpath='{.status.operationState.phase}' 2>/dev/null || echo "")
 
-              if [ "$STATUS" = "Synced" ] && [ "$OP_PHASE" != "Running" ]; then
+              # Track if we've seen the operation start (avoids race condition)
+              if [ "$OP_PHASE" = "Running" ]; then
+                SEEN_RUNNING=true
+              fi
+
+              # Only consider complete if we've seen it running first, or operation explicitly succeeded
+              if [ "$OP_PHASE" = "Succeeded" ] && [ "$STATUS" = "Synced" ]; then
+                echo "    ✅ $app sync succeeded"
+                break
+              elif [ "$SEEN_RUNNING" = "true" ] && [ "$OP_PHASE" != "Running" ] && [ "$STATUS" = "Synced" ]; then
                 echo "    ✅ $app synced"
                 break
               fi
