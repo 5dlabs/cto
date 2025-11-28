@@ -27,7 +27,7 @@ spec:
       values: |
         operator:
           replicaCount: 1
-          
+
           image:
             repository: quay.io/minio/operator
             tag: v7.1.1
@@ -45,7 +45,7 @@ spec:
           podLabels:
             app.kubernetes.io/component: storage
             platform.5dlabs.io/log-collection: enabled
-          
+
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: minio-operator

@@ -35,7 +35,7 @@ spec:
         # Tenant name and namespace
         tenant:
           name: screenshots
-          
+
           image:
             repository: quay.io/minio/minio
             tag: RELEASE.2024-11-07T00-52-20Z
@@ -48,7 +48,7 @@ spec:
               volumesPerServer: 1
               size: 10Gi
               storageClassName: local-path
-              
+
               resources:
                 requests:
                   cpu: 100m
@@ -61,7 +61,7 @@ spec:
               labels:
                 app.kubernetes.io/component: storage
                 platform.5dlabs.io/log-collection: enabled
-              
+
               annotations:
                 logs.platform.5dlabs.io/collect: "true"
                 logs.platform.5dlabs.io/service: minio-screenshots
