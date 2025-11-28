@@ -120,6 +120,9 @@ env:
     value: "/config"
   - name: RUST_LOG
     value: "info,kube=debug,tools=trace"
+  # KUBECONFIG for kubernetes-mcp-server (npx) - set by initContainer
+  - name: KUBECONFIG
+    value: "/data/.kube/config"
   - name: CONTEXT7_API_KEY
     valueFrom:
       secretKeyRef:
@@ -184,15 +187,16 @@ config:
 
     kubernetes:
       name: "Kubernetes"
-      description: "Kubernetes cluster management and Helm operations"
-      transport: "sse"
-      # Points to the k8s-mcp deployment within this chart (service name: cto-tools-k8s-mcp)
-      url: "http://cto-tools-k8s-mcp.cto.svc.cluster.local:8080/sse"
+      description: "Kubernetes cluster management and Helm operations via containers/kubernetes-mcp-server"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "kubernetes-mcp-server@latest"]
       workingDirectory: "/tmp"
       enabled: true  # Used to conditionally create kubeconfig initContainer
       secretRef:
         name: "tools-kubernetes-secrets"
         keys: []
+      # The server uses KUBECONFIG env var automatically when set
 
     # --- Development Tools ---
     github:
@@ -299,7 +303,9 @@ monitoring:
 
 mcpServers:
   k8s:
-    enabled: true
+    # Disabled - now using npx kubernetes-mcp-server@latest via stdio transport
+    # from the main tools container (see config.servers.kubernetes)
+    enabled: false
     name: "k8s-mcp"
     image:
       repository: ginnux/k8s-mcp-server
