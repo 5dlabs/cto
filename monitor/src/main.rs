@@ -4,6 +4,10 @@
 //! Uses kubectl --watch for real-time streaming of workflows, CRDs, pods, and sensors.
 //! Emits unified JSON events for Cursor agent E2E feedback loop automation.
 
+// Test module for E2E Watch script validation (intentionally has issues)
+#[cfg(test)]
+mod test_watch_validation;
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
