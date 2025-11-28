@@ -31,11 +31,13 @@ spec:
           platform.5dlabs.io/log-collection: enabled
 
         # Use v3.7.1 stable release
+        # Note: Don't override app.kubernetes.io/component in podLabels - it's part of the
+        # selector and can't be changed on existing Deployments
         controller:
           image:
             tag: v3.7.1
           podLabels:
-            app.kubernetes.io/component: workflow-controller
+            platform.5dlabs.io/log-collection: enabled
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: argo-workflow-controller
@@ -85,7 +87,7 @@ spec:
           serviceNodePort: 30081
           servicePortName: http
           podLabels:
-            app.kubernetes.io/component: workflow-server
+            platform.5dlabs.io/log-collection: enabled
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: argo-workflow-server
