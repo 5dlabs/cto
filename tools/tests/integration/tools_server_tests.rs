@@ -345,9 +345,7 @@ impl ToolsServerTest {
             println!("✅ Tool forwarding successful - got result: {result}");
         } else if let Some(error) = tool_response.get("error") {
             // Some tools might return errors with empty args, which is fine
-            println!(
-                "✅ Tool forwarding successful - got expected error: {error}"
-            );
+            println!("✅ Tool forwarding successful - got expected error: {error}");
         } else {
             return Err(anyhow::anyhow!(
                 "Tool response missing both result and error"

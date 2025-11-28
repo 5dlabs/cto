@@ -251,9 +251,7 @@ async fn test_brave_search_server_npx() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!(
-                "Failed to start brave search server (expected without API key): {e}"
-            );
+            println!("Failed to start brave search server (expected without API key): {e}");
             return Ok(());
         }
     };
@@ -370,9 +368,7 @@ async fn test_postgres_server_npx() -> Result<()> {
     let mut server = match TestServer::start(config).await {
         Ok(server) => server,
         Err(e) => {
-            println!(
-                "Failed to start postgres server (expected without DB): {e}"
-            );
+            println!("Failed to start postgres server (expected without DB): {e}");
             return Ok(());
         }
     };

@@ -134,9 +134,7 @@ async fn test_fetch_server_docker() -> Result<()> {
             );
         }
         Err(e) => {
-            println!(
-                "✅ Docker server correctly blocked access to host file system: {e}"
-            );
+            println!("✅ Docker server correctly blocked access to host file system: {e}");
         }
     }
 
@@ -249,9 +247,7 @@ async fn test_docker_networking() -> Result<()> {
 
     match network_result {
         Ok(response) => {
-            println!(
-                "✅ Docker server can access external networks: {response}"
-            );
+            println!("✅ Docker server can access external networks: {response}");
             // Verify we got an IP address response
             if let Some(content) = response.get("content") {
                 if let Some(text) = content.get(0).and_then(|c| c.get("text")) {

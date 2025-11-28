@@ -11,7 +11,6 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::doc_markdown)]
-
 // -----------------------------------------------------------------------------
 // API Design Choices: Intentional for consistency and future extensibility
 // -----------------------------------------------------------------------------
@@ -24,7 +23,6 @@
 // Not all functions need #[must_use]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::return_self_not_must_use)]
-
 // -----------------------------------------------------------------------------
 // Code Style: Acceptable pedantic style choices
 // -----------------------------------------------------------------------------
@@ -46,7 +44,6 @@
 #![allow(clippy::match_bool)]
 // Allow option_if_let_else for readability in some cases
 #![allow(clippy::option_if_let_else)]
-
 // -----------------------------------------------------------------------------
 // Cast Safety: Casts are intentional and checked at runtime where needed
 // -----------------------------------------------------------------------------
@@ -54,7 +51,6 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_wrap)]
-
 // -----------------------------------------------------------------------------
 // Minor Style: Low-impact style preferences
 // -----------------------------------------------------------------------------
@@ -69,7 +65,6 @@
 #![allow(clippy::unnested_or_patterns)]
 #![allow(clippy::unreadable_literal)]
 #![allow(clippy::assigning_clones)]
-
 // -----------------------------------------------------------------------------
 // Disallowed Items: Configuration-based restrictions (clippy.toml)
 // -----------------------------------------------------------------------------

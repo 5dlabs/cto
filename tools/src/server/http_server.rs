@@ -4,18 +4,15 @@
 // This binary uses clippy::pedantic. These allows match the library configuration
 // in lib.rs and are necessary because binaries have their own crate root.
 #![warn(clippy::pedantic)]
-
 // Documentation (to be addressed separately)
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::doc_markdown)]
-
 // API Design Choices
 #![allow(clippy::unused_self)]
 #![allow(clippy::unnecessary_wraps)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::must_use_candidate)]
-
 // Code Style
 #![allow(clippy::similar_names)]
 #![allow(clippy::too_many_lines)]
@@ -23,15 +20,12 @@
 #![allow(clippy::single_match_else)]
 #![allow(clippy::match_same_arms)]
 #![allow(clippy::option_if_let_else)]
-
 // Cast Safety
 #![allow(clippy::cast_possible_truncation)]
-
 // Minor Style
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::needless_continue)]
 #![allow(clippy::struct_excessive_bools)]
-
 // Binary-specific allows
 #![allow(clippy::match_single_binding)]
 #![allow(clippy::redundant_pattern_matching)]
@@ -714,51 +708,51 @@ impl ServerConnectionPool {
                 }
                 // Direct HTTP endpoint (like Solana)
                 let request_body = json!({
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "tools/call",
-                        "params": {
-                            "name": tool_name,
-                            "arguments": arguments
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {
+                        "name": tool_name,
+                        "arguments": arguments
+                    }
+                });
+
+                // Send HTTP POST request with proper Accept headers
+                let response = client
+                    .post(url)
+                    .header("Accept", "application/json,text/event-stream")
+                    .json(&request_body)
+                    .send()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("HTTP request failed: {e}"))?;
+
+                // Parse response - handle both JSON and SSE formats
+                let response_text = response
+                    .text()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to read HTTP response: {e}"))?;
+
+                // Check if response is SSE format (like Solana)
+                let response_json: Value = if response_text.starts_with("event:") {
+                    // SSE format: extract JSON from "data:" line
+                    tracing::info!("📡 [{}] Detected SSE response format", server_name);
+                    for line in response_text.lines() {
+                        if let Some(data) = line.strip_prefix("data: ") {
+                            return serde_json::from_str(data).map_err(|e| {
+                                anyhow::anyhow!("Failed to parse SSE data as JSON: {e}")
+                            });
                         }
-                    });
+                    }
+                    return Err(anyhow::anyhow!("No data line found in SSE response"));
+                } else {
+                    // Direct JSON format
+                    tracing::info!("📡 [{}] Detected JSON response format", server_name);
+                    serde_json::from_str(&response_text)
+                        .map_err(|e| anyhow::anyhow!("Failed to parse JSON response: {e}"))?
+                };
 
-                    // Send HTTP POST request with proper Accept headers
-                    let response = client
-                        .post(url)
-                        .header("Accept", "application/json,text/event-stream")
-                        .json(&request_body)
-                        .send()
-                        .await
-                        .map_err(|e| anyhow::anyhow!("HTTP request failed: {e}"))?;
-
-                    // Parse response - handle both JSON and SSE formats
-                    let response_text = response
-                        .text()
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to read HTTP response: {e}"))?;
-
-                    // Check if response is SSE format (like Solana)
-                    let response_json: Value = if response_text.starts_with("event:") {
-                        // SSE format: extract JSON from "data:" line
-                        tracing::info!("📡 [{}] Detected SSE response format", server_name);
-                        for line in response_text.lines() {
-                            if let Some(data) = line.strip_prefix("data: ") {
-                                return serde_json::from_str(data).map_err(|e| {
-                                    anyhow::anyhow!("Failed to parse SSE data as JSON: {e}")
-                                });
-                            }
-                        }
-                        return Err(anyhow::anyhow!("No data line found in SSE response"));
-                    } else {
-                        // Direct JSON format
-                        tracing::info!("📡 [{}] Detected JSON response format", server_name);
-                        serde_json::from_str(&response_text)
-                            .map_err(|e| anyhow::anyhow!("Failed to parse JSON response: {e}"))?
-                    };
-
-                    tracing::info!("📨 Received HTTP response from server {}", server_name);
-                    return Ok(response_json);
+                tracing::info!("📨 Received HTTP response from server {}", server_name);
+                return Ok(response_json);
             }
             return Err(anyhow::anyhow!("HTTP transport requires 'url' field"));
         }
@@ -1462,8 +1456,7 @@ impl BridgeState {
 
                             // Construct the message URL
                             let base_url = url.trim_end_matches("/sse").trim_end_matches('/');
-                            let message_url =
-                                format!("{base_url}/message?sessionId={session_id}");
+                            let message_url = format!("{base_url}/message?sessionId={session_id}");
                             tracing::info!("🔗 [{}] SSE session ID: {}", server_name, session_id);
                             tracing::info!("🎯 [{}] SSE message URL: {}", server_name, message_url);
                             (message_url, session_id)

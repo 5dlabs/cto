@@ -136,9 +136,7 @@ impl ProtocolValidator {
             .await;
         if let Ok(response) = result {
             if let Some(error) = response.error {
-                println!(
-                    "Correct: Server returned error for invalid method: {error}"
-                );
+                println!("Correct: Server returned error for invalid method: {error}");
             } else {
                 println!("Warning: Server should have returned error for invalid method");
             }

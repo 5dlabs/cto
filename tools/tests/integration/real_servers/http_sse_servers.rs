@@ -339,9 +339,7 @@ async fn test_http_sse_error_handling() -> Result<()> {
     match invalid_result {
         Ok(Ok(response)) => {
             if let Some(error) = response.get("error") {
-                println!(
-                    "✅ Server correctly returned error for invalid method: {error}"
-                );
+                println!("✅ Server correctly returned error for invalid method: {error}");
             } else {
                 println!("⚠️  Server should have returned error for invalid method");
             }
@@ -364,9 +362,7 @@ async fn test_http_sse_error_handling() -> Result<()> {
 
     match invalid_tool_result {
         Ok(Ok(response)) => {
-            println!(
-                "⚠️  Server should have failed for non-existent tool: {response}"
-            );
+            println!("⚠️  Server should have failed for non-existent tool: {response}");
         }
         Ok(Err(e)) => {
             println!("✅ Server correctly handled invalid tool call: {e}");

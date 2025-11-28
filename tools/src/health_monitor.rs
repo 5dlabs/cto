@@ -132,10 +132,13 @@ impl ServerHealthStatus {
         // Update health status based on failure pattern
         if self.consecutive_failures >= 3 {
             self.health = ServerHealth::Unresponsive {
-                last_response: self.last_successful_check.map_or_else(chrono::Utc::now, |instant| {
-                    chrono::Utc::now()
-                        - chrono::Duration::from_std(instant.elapsed()).unwrap_or_default()
-                }),
+                last_response: self.last_successful_check.map_or_else(
+                    chrono::Utc::now,
+                    |instant| {
+                        chrono::Utc::now()
+                            - chrono::Duration::from_std(instant.elapsed()).unwrap_or_default()
+                    },
+                ),
             };
         }
     }
