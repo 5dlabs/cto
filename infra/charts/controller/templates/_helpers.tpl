@@ -155,6 +155,9 @@ Define projected volume for agent templates (merges all ConfigMaps)
     - configMap:
         name: {{ include "controller.fullname" . }}-agent-templates-integration
         optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-watch
+        optional: true
 {{- end }}
 
 {{/*
