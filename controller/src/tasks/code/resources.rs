@@ -271,7 +271,7 @@ impl<'a> CodeResourceManager<'a> {
             .uid
             .as_deref()
             .map_or("nouid", |uid| &uid[..8]);
-        let task_id = code_run.spec.task_id;
+        let task_id = code_run.spec.task_id.unwrap_or(0);
         let service_name = code_run.spec.service.replace('_', "-");
         let context_version = code_run.spec.context_version;
 
@@ -851,7 +851,7 @@ impl<'a> CodeResourceManager<'a> {
                          exit 1; \
                        fi; \
                        sleep 5; \
-                     done", code_run.spec.task_id)
+                     done", code_run.spec.task_id.unwrap_or(0))
                 ],
                 "securityContext": {
                     "privileged": true,
@@ -1185,8 +1185,11 @@ impl<'a> CodeResourceManager<'a> {
         );
 
         // Code-specific labels
-        labels.insert("task-type".to_string(), "code".to_string());
-        labels.insert("task-id".to_string(), code_run.spec.task_id.to_string());
+        labels.insert("task-type".to_string(), code_run.spec.run_type.clone());
+        labels.insert(
+            "task-id".to_string(),
+            code_run.spec.task_id.map_or("0".to_string(), |id| id.to_string()),
+        );
 
         // Add PR number label if available in env for better pod correlation
         if let Some(pr_number) = code_run.spec.env.get("PR_NUMBER") {

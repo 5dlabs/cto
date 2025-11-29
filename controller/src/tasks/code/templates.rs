@@ -364,10 +364,10 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -428,7 +428,7 @@ impl CodeTemplateGenerator {
             })?;
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let cli_settings = cli_config
             .get("settings")
@@ -439,7 +439,7 @@ impl CodeTemplateGenerator {
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": model,
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -670,10 +670,10 @@ impl CodeTemplateGenerator {
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -734,7 +734,7 @@ impl CodeTemplateGenerator {
 
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let cli_settings = cli_config
             .get("settings")
@@ -745,7 +745,7 @@ impl CodeTemplateGenerator {
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": render_settings.model,
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -873,7 +873,7 @@ impl CodeTemplateGenerator {
             .unwrap_or(0);
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -999,7 +999,7 @@ impl CodeTemplateGenerator {
             .to_string();
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -1137,7 +1137,7 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let cli_model = code_run
             .spec
@@ -1146,7 +1146,7 @@ impl CodeTemplateGenerator {
             .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -1199,7 +1199,7 @@ impl CodeTemplateGenerator {
             })?;
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let cli_settings = cli_config
             .get("settings")
@@ -1218,7 +1218,7 @@ impl CodeTemplateGenerator {
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": model,
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2017,10 +2017,10 @@ impl CodeTemplateGenerator {
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2076,7 +2076,7 @@ impl CodeTemplateGenerator {
             })?;
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let cli_settings = cli_config
             .get("settings")
@@ -2094,7 +2094,7 @@ impl CodeTemplateGenerator {
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": model,
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2191,7 +2191,7 @@ impl CodeTemplateGenerator {
             )
         };
 
-        let correlation_id = format!("task-{}", code_run.spec.task_id);
+        let correlation_id = format!("task-{}", code_run.spec.task_id.unwrap_or(0));
 
         let context = json!({
             "metadata": {
@@ -2257,7 +2257,7 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         // Parse continue_session from spec or env
         let continue_session = code_run.spec.continue_session
@@ -2274,7 +2274,7 @@ impl CodeTemplateGenerator {
             .unwrap_or(0);
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2326,7 +2326,7 @@ impl CodeTemplateGenerator {
             })?;
 
         let workflow_name = extract_workflow_name(code_run)
-            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0)));
 
         let cli_settings = cli_config
             .get("settings")
@@ -2405,7 +2405,7 @@ impl CodeTemplateGenerator {
             .to_string();
 
         let context = json!({
-            "task_id": code_run.spec.task_id,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2552,7 +2552,7 @@ impl CodeTemplateGenerator {
                                             }
 
                                             let context = json!({
-                                                "task_id": code_run.spec.task_id,
+                                                "task_id": code_run.spec.task_id.unwrap_or(0),
                                                 "service": code_run.spec.service,
                                                 "repository_url": code_run.spec.repository_url,
                                                 "docs_repository_url": code_run.spec.docs_repository_url,
@@ -2618,9 +2618,21 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
-    /// Select the appropriate container template based on the `github_app` field
+    /// Select the appropriate container template based on `run_type` and `github_app`
     fn get_agent_container_template(code_run: &CodeRun) -> String {
+        let run_type = code_run.spec.run_type.as_str();
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a documentation or intake run type
+        if run_type == "documentation" || run_type == "intake" {
+            // For docs/intake runs, use the docs-specific template based on CLI
+            // The intake templates are in intake/{cli}/ directory
+            debug!(
+                "Using {} template for run_type: {}",
+                run_type, run_type
+            );
+            return "intake/claude/container.sh.hbs".to_string();
+        }
 
         // Check if this is a remediation cycle (retry > 0)
         let retry_count = code_run
@@ -2660,7 +2672,13 @@ impl CodeTemplateGenerator {
     }
 
     fn get_codex_container_template(code_run: &CodeRun) -> String {
+        let run_type = code_run.spec.run_type.as_str();
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // For docs/intake runs, use the intake-specific template
+        if run_type == "documentation" || run_type == "intake" {
+            return "intake/codex/container.sh.hbs".to_string();
+        }
 
         // Check if this is a remediation cycle
         let retry_count = code_run
@@ -2788,7 +2806,13 @@ impl CodeTemplateGenerator {
     }
 
     fn get_cursor_container_template(code_run: &CodeRun) -> String {
+        let run_type = code_run.spec.run_type.as_str();
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // For docs/intake runs, use the intake-specific template
+        if run_type == "documentation" || run_type == "intake" {
+            return "intake/cursor/container.sh.hbs".to_string();
+        }
 
         // Check if this is a remediation cycle
         let retry_count = code_run
@@ -3066,8 +3090,9 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 1,
+                task_id: Some(1),
                 service: "test-service".to_string(),
                 repository_url: "https://github.com/test/repo".to_string(),
                 docs_repository_url: "https://github.com/test/docs".to_string(),

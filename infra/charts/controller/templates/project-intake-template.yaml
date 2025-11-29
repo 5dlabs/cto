@@ -1,7 +1,9 @@
 {{- if .Values.argo.enabled }}
 ---
-# Argo Workflow Template for Project Intake
-# This template processes new project PRDs and generates TaskMaster tasks
+# Argo Workflow Template for Unified Project Intake
+# This template processes new project PRDs, generates TaskMaster tasks,
+# enriches context via Firecrawl, and creates comprehensive documentation
+# in a single operation.
 
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -55,6 +57,19 @@ spec:
       - name: analyze-complexity
         description: "Whether to analyze task complexity - REQUIRED from client"
         # NO DEFAULT - must be provided by MCP client
+      # Unified intake parameters (docs generation)
+      - name: docs-model
+        description: "Model for documentation generation - defaults to primary model"
+        value: ""
+      - name: enrich-context
+        description: "Whether to enrich context via Firecrawl - defaults to true"
+        value: "true"
+      - name: include-codebase
+        description: "Whether to include existing codebase context - defaults to false"
+        value: "false"
+      - name: cli
+        description: "CLI to use for documentation generation (claude, cursor, codex)"
+        value: "claude"
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
@@ -159,7 +174,7 @@ spec:
         image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
         imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
         command: ["/bin/bash"]
-        args: ["/agent-templates/intake_intake.sh"]
+        args: ["/agent-templates/intake_unified-intake.sh"]
         workingDir: /workspace
         volumeMounts:
           - name: intake-files
@@ -229,6 +244,16 @@ spec:
             value: "{{`{{workflow.parameters.expand-tasks}}`}}"
           - name: ANALYZE_COMPLEXITY
             value: "{{`{{workflow.parameters.analyze-complexity}}`}}"
+          # Unified intake: docs generation parameters
+          - name: DOCS_MODEL
+            value: "{{`{{workflow.parameters.docs-model}}`}}"
+          - name: ENRICH_CONTEXT
+            value: "{{`{{workflow.parameters.enrich-context}}`}}"
+          - name: INCLUDE_CODEBASE
+            value: "{{`{{workflow.parameters.include-codebase}}`}}"
+          # CLI for documentation generation phase
+          - name: CLI
+            value: "{{`{{workflow.parameters.cli}}`}}"
       volumes:
         - name: intake-files
           configMap:

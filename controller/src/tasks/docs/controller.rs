@@ -1,3 +1,6 @@
+// Allow deprecated DocsRun usage for backwards compatibility
+#![allow(deprecated)]
+
 use super::resources::DocsResourceManager;
 use crate::crds::DocsRun;
 use crate::tasks::cleanup;

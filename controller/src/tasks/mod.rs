@@ -1,3 +1,5 @@
+// DocsRun is deprecated - use CodeRun with runType: "documentation" instead
+#[allow(deprecated)]
 use crate::crds::{CodeRun, DocsRun};
 use futures::StreamExt;
 use k8s_openapi::api::batch::v1::Job;

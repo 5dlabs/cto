@@ -19,6 +19,11 @@ pub struct SecretEnvVar {
     pub secret_key: String,
 }
 
+/// Default function for `run_type` field
+fn default_run_type() -> String {
+    "implementation".to_string()
+}
+
 /// Default function for `context_version` field
 fn default_context_version() -> u32 {
     1
@@ -79,15 +84,20 @@ pub struct CLIConfig {
 #[kube(group = "agents.platform", version = "v1", kind = "CodeRun")]
 #[kube(namespaced)]
 #[kube(status = "CodeRunStatus")]
+#[kube(printcolumn = r#"{"name":"Type","type":"string","jsonPath":".spec.runType"}"#)]
 #[kube(printcolumn = r#"{"name":"Task","type":"integer","jsonPath":".spec.taskId"}"#)]
 #[kube(printcolumn = r#"{"name":"Service","type":"string","jsonPath":".spec.service"}"#)]
 #[kube(printcolumn = r#"{"name":"Model","type":"string","jsonPath":".spec.model"}"#)]
 #[kube(printcolumn = r#"{"name":"Phase","type":"string","jsonPath":".status.phase"}"#)]
 #[kube(printcolumn = r#"{"name":"Age","type":"date","jsonPath":".metadata.creationTimestamp"}"#)]
 pub struct CodeRunSpec {
-    /// Task ID to implement
-    #[serde(rename = "taskId")]
-    pub task_id: u32,
+    /// Type of run: "implementation" (default), "documentation", "intake"
+    #[serde(default = "default_run_type", rename = "runType")]
+    pub run_type: String,
+
+    /// Task ID to implement (required for implementation, optional for docs/intake)
+    #[serde(rename = "taskId", default)]
+    pub task_id: Option<u32>,
 
     /// Target service name
     pub service: String,

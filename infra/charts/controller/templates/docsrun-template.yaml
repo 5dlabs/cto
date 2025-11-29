@@ -1,8 +1,19 @@
 {{- if .Values.argo.enabled }}
 ---
-# Argo Workflow Template for DocsRun Tasks
-# This template creates DocsRun CRDs and lets the existing controller handle execution
-
+# =============================================================================
+# DEPRECATION NOTICE
+# =============================================================================
+# This workflow template is DEPRECATED and will be removed in a future release.
+#
+# Use the unified intake workflow or CodeRun with runType: "documentation" instead.
+# The unified intake handles both PRD parsing and documentation generation.
+#
+# Migration path:
+#   1. Use project-intake workflow for new project setup
+#   2. Use CodeRun with runType: "documentation" for standalone docs generation
+#
+# This template is kept for backwards compatibility but logs deprecation warnings.
+# =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -12,6 +23,9 @@ metadata:
     app.kubernetes.io/name: docsrun-template
     app.kubernetes.io/part-of: platform
     agents.platform/template-type: docsrun
+  annotations:
+    deprecated: "true"
+    deprecation-notice: "Use project-intake workflow or CodeRun with runType: documentation"
 spec:
   # Define input parameters that match the MCP server interface
   # Note: 'default' values are for documentation/IDE hints only - MCP server always provides explicit values

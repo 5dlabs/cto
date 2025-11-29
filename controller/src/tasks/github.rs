@@ -11,7 +11,7 @@ pub async fn check_github_for_pr_by_branch(
     code_run: &CodeRun,
     github_token: Option<&str>,
 ) -> Result<Option<String>> {
-    let task_id = code_run.spec.task_id;
+    let task_id = code_run.spec.task_id.unwrap_or(0);
 
     info!(
         "Checking GitHub API for PR containing branch pattern: task-{}",

@@ -16,8 +16,8 @@ pub fn extract_workflow_name(code_run: &CodeRun) -> Result<String> {
         }
     }
 
-    // Fallback: construct from task ID
-    let task_id = code_run.spec.task_id;
+    // Fallback: construct from task ID (use 0 for docs/intake runs without task ID)
+    let task_id = code_run.spec.task_id.unwrap_or(0);
     Ok(format!("play-task-{task_id}-workflow"))
 }
 
@@ -340,8 +340,9 @@ mod tests {
                 ..Default::default()
             },
             spec: crate::crds::coderun::CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 5,
+                task_id: Some(5),
                 service: "test".to_string(),
                 repository_url: "test".to_string(),
                 docs_repository_url: "test".to_string(),
@@ -376,8 +377,9 @@ mod tests {
                 ..Default::default()
             },
             spec: crate::crds::coderun::CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 5,
+                task_id: Some(5),
                 service: "test".to_string(),
                 repository_url: "test".to_string(),
                 docs_repository_url: "test".to_string(),

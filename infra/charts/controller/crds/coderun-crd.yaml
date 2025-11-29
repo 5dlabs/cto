@@ -19,6 +19,9 @@ spec:
     subresources:
       status: {}
     additionalPrinterColumns:
+    - name: Type
+      type: string
+      jsonPath: .spec.runType
     - name: Task
       type: integer
       jsonPath: .spec.taskId
@@ -41,11 +44,19 @@ spec:
         properties:
           spec:
             type: object
-            required: ["taskId", "service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model", "githubApp"]
+            required: ["service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model", "githubApp"]
             properties:
+              runType:
+                type: string
+                default: "implementation"
+                description: "Type of run: implementation (default), documentation, or intake"
+                enum:
+                - implementation
+                - documentation
+                - intake
               taskId:
                 type: integer
-                description: "Task ID to implement"
+                description: "Task ID to implement (required for implementation runs, optional for docs/intake)"
               service:
                 type: string
                 description: "Target service name"

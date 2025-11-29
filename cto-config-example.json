@@ -2,7 +2,7 @@
   "version": "1.0",
   "defaults": {
     "docs": {
-      "model": "claude-opus-4-1-20250805",
+      "model": "claude-opus-4-5-20250929",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
@@ -21,17 +21,18 @@
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
       "primary": {
-        "model": "opus",
-        "provider": "claude-code"
+        "model": "claude-opus-4-5-20250929",
+        "provider": "anthropic"
       },
       "research": {
-        "model": "opus",
-        "provider": "claude-code"
+        "model": "claude-opus-4-5-20250929",
+        "provider": "anthropic"
       },
       "fallback": {
-        "model": "gpt-5",
-        "provider": "openai"
+        "model": "claude-sonnet-4-5-20250929",
+        "provider": "anthropic"
       }
     },
     "play": {

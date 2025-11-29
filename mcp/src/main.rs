@@ -94,10 +94,12 @@ struct WorkflowDefaults {
 struct DocsDefaults {
     model: String,
     #[serde(rename = "githubApp")]
+    #[allow(dead_code)] // Used for backwards compatibility, will be removed in future version
     github_app: String,
     #[serde(rename = "includeCodebase")]
     include_codebase: bool,
     #[serde(rename = "sourceBranch")]
+    #[allow(dead_code)] // Used for backwards compatibility, will be removed in future version
     source_branch: String,
 }
 
@@ -504,6 +506,7 @@ fn run_argo_cli(args: &[&str]) -> Result<String> {
 }
 
 /// Get the remote URL for the current git repository
+#[allow(dead_code)] // Deprecated: use get_git_repository_url_in_dir instead
 fn get_git_remote_url() -> Result<String> {
     let output = Command::new("git")
         .args(["remote", "get-url", "origin"])
@@ -617,6 +620,8 @@ fn validate_repository_url(repo_url: &str) -> Result<()> {
     Ok(())
 }
 
+/// DEPRECATED: Use handle_intake_workflow instead. This function is kept for backwards compatibility.
+#[allow(dead_code)]
 #[allow(clippy::disallowed_macros, clippy::too_many_lines)]
 fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let working_directory = arguments
@@ -2599,10 +2604,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 }
 
+/// Unified intake workflow - parses PRD, generates tasks, and creates documentation
+/// This replaces the separate intake_prd and docs workflows
 #[allow(clippy::disallowed_macros)]
 #[allow(clippy::too_many_lines)]
-fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
-    eprintln!("🚀 Processing project intake request");
+fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+    eprintln!("🚀 Processing unified intake request (PRD parsing + documentation generation)");
 
     // Get workspace directory from Cursor environment
     let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -2711,10 +2718,34 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
 
+    // Unified intake parameters (docs generation)
+    let enrich_context = arguments
+        .get("enrich_context")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true); // Default to true - auto-scrape URLs via Firecrawl
+    let include_codebase = arguments
+        .get("include_codebase")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(config.defaults.docs.include_codebase);
+    let docs_model = arguments
+        .get("model")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.docs.model);
+
+    // CLI for documentation generation
+    let cli = arguments
+        .get("cli")
+        .and_then(|v| v.as_str())
+        .unwrap_or("claude");
+
     eprintln!("🤖 Using GitHub App: {github_app}");
     eprintln!("🧠 Using Primary Model: {primary_model} ({primary_provider})");
     eprintln!("🔬 Using Research Model: {research_model} ({research_provider})");
     eprintln!("🛡️  Using Fallback Model: {fallback_model} ({fallback_provider})");
+    eprintln!("📚 Docs Model: {docs_model}");
+    eprintln!("🔗 Context Enrichment (Firecrawl): {enrich_context}");
+    eprintln!("📁 Include Codebase: {include_codebase}");
+    eprintln!("🖥️  CLI for Docs: {cli}");
 
     // Create a ConfigMap with the intake files to avoid YAML escaping issues
     let configmap_name = format!(
@@ -2725,7 +2756,7 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
 
     eprintln!("📦 Creating ConfigMap: {configmap_name}");
 
-    // Create ConfigMap with the intake content
+    // Create ConfigMap with the intake content (unified: PRD + docs generation)
     let config_json = serde_json::json!({
         "project_name": project_name,
         "repository_url": format!("https://github.com/{}", repository_name),
@@ -2739,7 +2770,12 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
         "model": primary_model, // Legacy compatibility
         "num_tasks": num_tasks,
         "expand_tasks": expand_tasks,
-        "analyze_complexity": analyze_complexity
+        "analyze_complexity": analyze_complexity,
+        // Unified intake: docs generation parameters
+        "docs_model": docs_model,
+        "enrich_context": enrich_context,
+        "include_codebase": include_codebase,
+        "cli": cli
     });
 
     // Create the ConfigMap using kubectl
@@ -2809,6 +2845,15 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
             &format!("expand-tasks={expand_tasks}"),
             "-p",
             &format!("analyze-complexity={analyze_complexity}"),
+            // Unified intake: docs generation parameters
+            "-p",
+            &format!("docs-model={docs_model}"),
+            "-p",
+            &format!("enrich-context={enrich_context}"),
+            "-p",
+            &format!("include-codebase={include_codebase}"),
+            "-p",
+            &format!("cli={cli}"),
             "--wait=false",
             "-o",
             "json",
@@ -2895,7 +2940,8 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                 .unwrap_or_default();
 
             match name {
-                Ok("docs") => Some(handle_docs_workflow(&arguments).map(|result| json!({
+                // Unified intake tool - combines PRD parsing and docs generation
+                Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -2908,12 +2954,6 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                     }]
                 }))),
                 Ok("play_status") => Some(handle_play_status(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -2940,7 +2980,7 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("add_docs") => Some(handle_add_docs_tool(&arguments).map(|result| json!({
+                Ok("docs_ingest") => Some(handle_docs_ingest_tool(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -3297,7 +3337,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     }
 }
 
-fn handle_add_docs_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
     let url = arguments
         .get("url")
         .and_then(|v| v.as_str())
