@@ -2728,12 +2728,25 @@ impl BridgeState {
                                 })
                             } else if tool_name == "tools_screenshot_upload" {
                                 // Handle screenshot upload to MinIO
-                                let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
+                                let arguments =
+                                    params.get("arguments").cloned().unwrap_or(json!({}));
 
-                                let file_path = arguments.get("file_path").and_then(serde_json::Value::as_str).unwrap_or("");
-                                let repo = arguments.get("repo").and_then(serde_json::Value::as_str).unwrap_or("");
-                                let pr_number = arguments.get("pr_number").and_then(serde_json::Value::as_u64).unwrap_or(0);
-                                let name = arguments.get("name").and_then(serde_json::Value::as_str).unwrap_or("screenshot");
+                                let file_path = arguments
+                                    .get("file_path")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("");
+                                let repo = arguments
+                                    .get("repo")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("");
+                                let pr_number = arguments
+                                    .get("pr_number")
+                                    .and_then(serde_json::Value::as_u64)
+                                    .unwrap_or(0);
+                                let name = arguments
+                                    .get("name")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("screenshot");
 
                                 // Validate required parameters
                                 if file_path.is_empty() || repo.is_empty() || pr_number == 0 {
@@ -2751,16 +2764,22 @@ impl BridgeState {
                                         .extension()
                                         .and_then(std::ffi::OsStr::to_str)
                                         .unwrap_or("png");
-                                    let key = format!("{repo}/pr-{pr_number}/{timestamp}-{name}.{extension}");
+                                    let key = format!(
+                                        "{repo}/pr-{pr_number}/{timestamp}-{name}.{extension}"
+                                    );
 
                                     // Get bucket from environment
-                                    let bucket = std::env::var("MINIO_BUCKET").unwrap_or_else(|_| "screenshots".to_string());
-                                    let endpoint = std::env::var("MINIO_ENDPOINT").unwrap_or_default();
+                                    let bucket = std::env::var("MINIO_BUCKET")
+                                        .unwrap_or_else(|_| "screenshots".to_string());
+                                    let endpoint =
+                                        std::env::var("MINIO_ENDPOINT").unwrap_or_default();
 
                                     // Upload using mc command
                                     let mc_dest = format!("minio/{bucket}/{key}");
 
-                                    tracing::info!("📸 Uploading screenshot: {file_path} -> {mc_dest}");
+                                    tracing::info!(
+                                        "📸 Uploading screenshot: {file_path} -> {mc_dest}"
+                                    );
 
                                     use tokio::process::Command;
                                     match Command::new("mc")
@@ -2771,8 +2790,11 @@ impl BridgeState {
                                         Ok(output) => {
                                             if output.status.success() {
                                                 // Construct internal URL (no public access for now)
-                                                let internal_url = format!("{endpoint}/{bucket}/{key}");
-                                                tracing::info!("✅ Screenshot uploaded: {internal_url}");
+                                                let internal_url =
+                                                    format!("{endpoint}/{bucket}/{key}");
+                                                tracing::info!(
+                                                    "✅ Screenshot uploaded: {internal_url}"
+                                                );
                                                 json!({
                                                     "content": [{
                                                         "type": "text",
@@ -2780,7 +2802,8 @@ impl BridgeState {
                                                     }]
                                                 })
                                             } else {
-                                                let stderr = String::from_utf8_lossy(&output.stderr);
+                                                let stderr =
+                                                    String::from_utf8_lossy(&output.stderr);
                                                 tracing::error!("❌ mc upload failed: {stderr}");
                                                 json!({
                                                     "content": [{
