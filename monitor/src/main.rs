@@ -86,6 +86,11 @@ enum Commands {
         /// GitHub repository for PR state polling (e.g., 5dlabs/cto-parallel-test)
         #[arg(long)]
         repository: Option<String>,
+
+        /// Enable self-healing mode with automatic remediation on failure
+        /// Requires remediation section in cto-config.json
+        #[arg(long)]
+        self_healing: bool,
     },
     /// Monitor an existing play workflow using kubectl --watch streams
     Watch {
@@ -284,6 +289,9 @@ struct CtoConfig {
 #[derive(Debug, Deserialize)]
 struct CtoDefaults {
     play: PlayConfig,
+    /// Remediation configuration for self-healing loop
+    #[serde(default)]
+    remediation: Option<RemediationConfig>,
 }
 
 /// Play workflow configuration
@@ -335,6 +343,340 @@ struct PlayConfig {
     /// Parallel execution
     #[serde(default)]
     parallel_execution: Option<bool>,
+}
+
+/// Remediation configuration for self-healing loop
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemediationConfig {
+    /// Repository to fix (platform repo, e.g., "5dlabs/cto")
+    repository: String,
+    /// Docs repository for context
+    #[serde(default)]
+    docs_repository: Option<String>,
+    /// Docs project directory
+    #[serde(default)]
+    docs_project_directory: Option<String>,
+    /// GitHub App for remediation agent
+    agent: String,
+    /// CLI tool (e.g., "claude", "codex")
+    cli: String,
+    /// Model to use (e.g., "claude-opus-4-5-20251101")
+    model: String,
+    /// Maximum remediation iterations before giving up
+    #[serde(default = "default_max_iterations")]
+    max_iterations: u32,
+    /// Template for remediation `CodeRun`
+    #[serde(default = "default_remediation_template")]
+    template: String,
+    /// Timeout for `ArgoCD` sync in seconds
+    #[serde(default = "default_sync_timeout")]
+    sync_timeout_secs: u64,
+}
+
+fn default_max_iterations() -> u32 {
+    3
+}
+
+fn default_remediation_template() -> String {
+    "rex-remediation".to_string()
+}
+
+fn default_sync_timeout() -> u64 {
+    300
+}
+
+/// Failure context captured when a failure is detected
+#[derive(Debug, Clone, Serialize)]
+struct FailureContext {
+    /// Name of the failed workflow
+    workflow_name: String,
+    /// Name of the failed resource (pod, coderun, etc.)
+    failed_resource: String,
+    /// Type of the failed resource
+    resource_type: String,
+    /// Phase/status when failure occurred
+    phase: String,
+    /// Error message if available
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_message: Option<String>,
+    /// Logs from the failed resource
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logs: Option<String>,
+    /// Container that failed (for pods)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    container: Option<String>,
+    /// Exit code if available
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exit_code: Option<i32>,
+    /// Timestamp of the failure
+    timestamp: DateTime<Utc>,
+}
+
+// =============================================================================
+// Remediation Functions - Self-healing loop support
+// =============================================================================
+
+/// Trigger remediation by creating a `CodeRun` for the remediation agent
+///
+/// Returns the name of the created `CodeRun`
+fn trigger_remediation(
+    config: &RemediationConfig,
+    failure: &FailureContext,
+    task_id: &str,
+    iteration: u32,
+    namespace: &str,
+) -> Result<String> {
+    let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let coderun_name = format!("remediation-t{task_id}-i{iteration}-{uid}");
+
+    // Serialize failure context to JSON for the agent
+    let failure_json =
+        serde_json::to_string(failure).context("Failed to serialize failure context")?;
+
+    // Create CodeRun YAML manifest
+    let coderun_yaml = format!(
+        r#"apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: {coderun_name}
+  namespace: {namespace}
+  labels:
+    task-id: "{task_id}"
+    remediation: "true"
+    iteration: "{iteration}"
+    agents.platform/type: remediation
+spec:
+  taskId: {task_id}
+  githubApp: "{agent}"
+  cli: "{cli}"
+  model: "{model}"
+  repository: "{repository}"
+  docsRepository: "{docs_repo}"
+  docsProjectDirectory: "{docs_dir}"
+  template: "{template}"
+  env:
+    - name: REMEDIATION_MODE
+      value: "true"
+    - name: FAILURE_CONTEXT
+      value: {failure_json_escaped}
+    - name: ORIGINAL_WORKFLOW
+      value: "{workflow_name}"
+    - name: FAILURE_TYPE
+      value: "{failure_type}"
+    - name: ITERATION
+      value: "{iteration}"
+    - name: MAX_ITERATIONS
+      value: "{max_iterations}"
+"#,
+        coderun_name = coderun_name,
+        namespace = namespace,
+        task_id = task_id,
+        iteration = iteration,
+        agent = config.agent,
+        cli = config.cli,
+        model = config.model,
+        repository = config.repository,
+        docs_repo = config
+            .docs_repository
+            .as_deref()
+            .unwrap_or(&config.repository),
+        docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs"),
+        template = config.template,
+        failure_json_escaped = serde_json::to_string(&failure_json)?,
+        workflow_name = failure.workflow_name,
+        failure_type = failure.resource_type,
+        max_iterations = config.max_iterations,
+    );
+
+    // Apply via kubectl
+    let mut child = Command::new("kubectl")
+        .args(["apply", "-f", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("Failed to spawn kubectl apply")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(coderun_yaml.as_bytes())
+            .context("Failed to write YAML to kubectl stdin")?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .context("Failed to wait for kubectl")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "Failed to create remediation CodeRun: {stderr}"
+        ));
+    }
+
+    println!(
+        "{}",
+        format!("Created remediation CodeRun: {coderun_name}").green()
+    );
+
+    Ok(coderun_name)
+}
+
+/// Wait for a `CodeRun` to complete (Succeeded or Failed)
+async fn wait_for_coderun(
+    coderun_name: &str,
+    namespace: &str,
+    timeout_secs: u64,
+) -> Result<(bool, Option<String>)> {
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+
+    loop {
+        if start.elapsed() > timeout {
+            return Ok((false, Some("Timeout waiting for CodeRun".to_string())));
+        }
+
+        let output = Command::new("kubectl")
+            .args([
+                "get",
+                "coderun",
+                coderun_name,
+                "-n",
+                namespace,
+                "-o",
+                "jsonpath={.status.phase}",
+            ])
+            .output()
+            .context("Failed to get CodeRun status")?;
+
+        let phase = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        match phase.as_str() {
+            "Succeeded" => return Ok((true, None)),
+            "Failed" => {
+                // Get failure message
+                let msg_output = Command::new("kubectl")
+                    .args([
+                        "get",
+                        "coderun",
+                        coderun_name,
+                        "-n",
+                        namespace,
+                        "-o",
+                        "jsonpath={.status.message}",
+                    ])
+                    .output()
+                    .ok();
+                let message = msg_output
+                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    .filter(|s| !s.is_empty());
+                return Ok((false, message));
+            }
+            _ => {
+                // Still running, wait and retry
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            }
+        }
+    }
+}
+
+/// Wait for `ArgoCD` to sync after a PR is merged
+///
+/// This polls the `ArgoCD` application status to detect when changes are deployed
+async fn wait_for_argocd_sync(
+    app_name: &str,
+    expected_commit: Option<&str>,
+    timeout_secs: u64,
+) -> Result<bool> {
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+
+    println!(
+        "{}",
+        format!("Waiting for ArgoCD sync (app: {app_name}, timeout: {timeout_secs}s)...").cyan()
+    );
+
+    loop {
+        if start.elapsed() > timeout {
+            warn!("Timeout waiting for ArgoCD sync");
+            return Ok(false);
+        }
+
+        // Get ArgoCD app status
+        let output = Command::new("kubectl")
+            .args(["get", "application", app_name, "-n", "argocd", "-o", "json"])
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                if let Ok(app) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+                    let sync_status = app["status"]["sync"]["status"]
+                        .as_str()
+                        .unwrap_or("Unknown");
+                    let health_status = app["status"]["health"]["status"]
+                        .as_str()
+                        .unwrap_or("Unknown");
+                    let revision = app["status"]["sync"]["revision"]
+                        .as_str()
+                        .unwrap_or("unknown");
+
+                    debug!(
+                        "ArgoCD app status: sync={}, health={}, revision={}",
+                        sync_status, health_status, revision
+                    );
+
+                    // Check if synced and healthy
+                    if sync_status == "Synced" && health_status == "Healthy" {
+                        // If we have an expected commit, verify it matches
+                        if let Some(expected) = expected_commit {
+                            if revision.starts_with(expected) || expected.starts_with(revision) {
+                                println!(
+                                    "{}",
+                                    format!("ArgoCD synced to commit: {revision}").green()
+                                );
+                                return Ok(true);
+                            }
+                        } else {
+                            // No specific commit expected, just need synced + healthy
+                            println!(
+                                "{}",
+                                format!("ArgoCD synced and healthy (revision: {revision})").green()
+                            );
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Wait before next poll
+        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+    }
+}
+
+/// Get the PR URL from a `CodeRun` after remediation completes
+fn get_coderun_pr_url(coderun_name: &str, namespace: &str) -> Option<String> {
+    let output = Command::new("kubectl")
+        .args([
+            "get",
+            "coderun",
+            coderun_name,
+            "-n",
+            namespace,
+            "-o",
+            "jsonpath={.status.outputs.pr-url}",
+        ])
+        .output()
+        .ok()?;
+
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if url.is_empty() {
+        None
+    } else {
+        Some(url)
+    }
 }
 
 // =============================================================================
@@ -646,19 +988,35 @@ async fn main() -> Result<()> {
             max_failures,
             template,
             repository,
+            self_healing,
         } => {
-            run_full_watch(
-                &task_id,
-                &config,
-                &cli.namespace,
-                &cli.agent_namespace,
-                interval,
-                max_failures,
-                &template,
-                repository.as_deref(),
-                &emitter,
-            )
-            .await?;
+            if self_healing {
+                // Run self-healing loop with automatic remediation
+                run_self_healing_loop(
+                    &task_id,
+                    &config,
+                    &cli.namespace,
+                    &cli.agent_namespace,
+                    interval,
+                    &template,
+                    &emitter,
+                )
+                .await?;
+            } else {
+                // Run regular full watch without remediation
+                run_full_watch(
+                    &task_id,
+                    &config,
+                    &cli.namespace,
+                    &cli.agent_namespace,
+                    interval,
+                    max_failures,
+                    &template,
+                    repository.as_deref(),
+                    &emitter,
+                )
+                .await?;
+            }
         }
         Commands::Watch {
             task_id,
@@ -678,6 +1036,7 @@ async fn main() -> Result<()> {
                 max_failures,
                 log_tail,
                 &emitter,
+                None, // No remediation for Watch command
             )
             .await?;
         }
@@ -1460,11 +1819,298 @@ async fn run_full_watch(
         max_failures,
         500, // log_tail
         emitter,
+        None, // No remediation config - use run_self_healing_loop for that
     )
     .await
 }
 
+/// Run self-healing E2E loop with automatic remediation
+///
+/// This is the main entry point for E2E testing with self-healing capabilities.
+/// On failure, it triggers a remediation agent to fix the issue, waits for
+/// `ArgoCD` sync, and retries the workflow.
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+async fn run_self_healing_loop(
+    task_id: &str,
+    config_path: &str,
+    argo_namespace: &str,
+    agent_namespace: &str,
+    github_interval: u64,
+    template: &str,
+    emitter: &EventEmitter,
+) -> Result<()> {
+    // Read config
+    let config_content = std::fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read config file: {config_path}"))?;
+
+    let config: CtoConfig = serde_json::from_str(&config_content)
+        .with_context(|| format!("Failed to parse config file: {config_path}"))?;
+
+    let play = &config.defaults.play;
+    let remediation_config = config.defaults.remediation.clone();
+
+    // Check if remediation is enabled
+    let Some(remediation) = remediation_config else {
+        println!(
+            "{}",
+            "Warning: No remediation config found - self-healing disabled".yellow()
+        );
+        // Fall back to regular full watch without remediation
+        return run_full_watch(
+            task_id,
+            config_path,
+            argo_namespace,
+            agent_namespace,
+            github_interval,
+            5, // max_failures
+            template,
+            None,
+            emitter,
+        )
+        .await;
+    };
+
+    println!(
+        "{}",
+        format!(
+            "Self-healing enabled: remediation repo={}, agent={}, max_iterations={}",
+            remediation.repository, remediation.agent, remediation.max_iterations
+        )
+        .cyan()
+    );
+
+    let repository = &play.repository;
+    let mut iteration: u32 = 0;
+    #[allow(unused_assignments)] // Set inside loop before first use
+    let mut current_workflow_name: Option<String> = None;
+
+    // Main self-healing loop
+    loop {
+        iteration += 1;
+
+        if iteration > remediation.max_iterations + 1 {
+            println!(
+                "{}",
+                format!(
+                    "Max remediation iterations ({}) exceeded - giving up",
+                    remediation.max_iterations
+                )
+                .red()
+            );
+            return Err(anyhow::anyhow!(
+                "Max remediation iterations exceeded without success"
+            ));
+        }
+
+        println!(
+            "{}",
+            format!(
+                "=== Self-Healing Loop Iteration {} (max: {}) ===",
+                iteration,
+                remediation.max_iterations + 1
+            )
+            .cyan()
+            .bold()
+        );
+
+        // Submit workflow
+        println!(
+            "{}",
+            format!("Submitting play workflow for task {task_id}...").cyan()
+        );
+
+        let output = Command::new("argo")
+            .args([
+                "submit",
+                "--from",
+                &format!("workflowtemplate/{template}"),
+                "-n",
+                argo_namespace,
+                "-p",
+                &format!("task-id={task_id}"),
+                "-p",
+                &format!("repository={repository}"),
+                "-p",
+                &format!("implementation-agent={}", play.implementation_agent),
+                "-p",
+                &format!("quality-agent={}", play.quality_agent),
+                "-p",
+                &format!("testing-agent={}", play.testing_agent),
+                "-o",
+                "json",
+            ])
+            .output()
+            .context("Failed to submit workflow via argo CLI")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Failed to submit workflow: {stderr}"));
+        }
+
+        let workflow_json: serde_json::Value =
+            serde_json::from_slice(&output.stdout).unwrap_or_else(|_| serde_json::json!({}));
+
+        let workflow_name = workflow_json["metadata"]["name"]
+            .as_str()
+            .map(ToString::to_string)
+            .ok_or_else(|| anyhow::anyhow!("Failed to get workflow name"))?;
+
+        current_workflow_name = Some(workflow_name.clone());
+
+        println!("{}", format!("Workflow submitted: {workflow_name}").green());
+
+        // Monitor workflow with remediation support
+        let result = run_multi_watch(
+            task_id,
+            argo_namespace,
+            agent_namespace,
+            Some(repository),
+            github_interval,
+            true,
+            1, // Stop on first failure for remediation
+            500,
+            emitter,
+            Some(remediation.clone()),
+        )
+        .await;
+
+        match result {
+            Ok(()) => {
+                // Success!
+                println!(
+                    "{}",
+                    format!("Workflow completed successfully on iteration {iteration}").green()
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                let error_msg = e.to_string();
+
+                // Check if this is a remediation-triggerable failure
+                if error_msg.contains("REMEDIATION_NEEDED:") {
+                    println!(
+                        "{}",
+                        format!(
+                            "Workflow failed, triggering remediation (iteration {iteration})..."
+                        )
+                        .yellow()
+                    );
+
+                    // Extract failure context from error
+                    let failure_context = FailureContext {
+                        workflow_name: workflow_name.clone(),
+                        failed_resource: current_workflow_name.clone().unwrap_or_default(),
+                        resource_type: "Workflow".to_string(),
+                        phase: "Failed".to_string(),
+                        error_message: Some(error_msg.clone()),
+                        logs: None, // TODO: extract from error
+                        container: None,
+                        exit_code: None,
+                        timestamp: Utc::now(),
+                    };
+
+                    // Trigger remediation
+                    let coderun_name = trigger_remediation(
+                        &remediation,
+                        &failure_context,
+                        task_id,
+                        iteration,
+                        agent_namespace,
+                    )?;
+
+                    // Wait for remediation CodeRun to complete
+                    println!(
+                        "{}",
+                        format!("Waiting for remediation CodeRun: {coderun_name}...").cyan()
+                    );
+
+                    let (success, message) =
+                        wait_for_coderun(&coderun_name, agent_namespace, 3600).await?;
+
+                    if !success {
+                        println!(
+                            "{}",
+                            format!(
+                                "Remediation CodeRun failed: {}",
+                                message.unwrap_or_default()
+                            )
+                            .red()
+                        );
+                        continue; // Try again
+                    }
+
+                    // Get PR URL from CodeRun
+                    if let Some(pr_url) = get_coderun_pr_url(&coderun_name, agent_namespace) {
+                        println!("{}", format!("Remediation PR created: {pr_url}").green());
+
+                        // Wait for PR to be merged and ArgoCD to sync
+                        println!("{}", "Waiting for PR merge and ArgoCD sync...".cyan());
+
+                        // Note: In production, we'd monitor the PR status and wait for merge
+                        // For now, we wait for ArgoCD to sync (which happens after merge)
+                        let synced = wait_for_argocd_sync(
+                            "cto-controller", // ArgoCD app name
+                            None,             // No specific commit
+                            remediation.sync_timeout_secs,
+                        )
+                        .await?;
+
+                        if !synced {
+                            println!(
+                                "{}",
+                                "Warning: ArgoCD sync timeout - retrying anyway".yellow()
+                            );
+                        }
+
+                        // Clean up old workflow before retry
+                        let _ = Command::new("argo")
+                            .args(["delete", &workflow_name, "-n", argo_namespace])
+                            .output();
+                    } else {
+                        println!(
+                            "{}",
+                            "Warning: No PR URL from remediation - agent may have fixed inline"
+                                .yellow()
+                        );
+
+                        // Still need to wait for ArgoCD to sync the inline fix
+                        println!("{}", "Waiting for ArgoCD to sync inline fix...".cyan());
+
+                        let synced = wait_for_argocd_sync(
+                            "cto-controller", // ArgoCD app name
+                            None,             // No specific commit
+                            remediation.sync_timeout_secs,
+                        )
+                        .await?;
+
+                        if !synced {
+                            println!(
+                                "{}",
+                                "Warning: ArgoCD sync timeout - retrying anyway".yellow()
+                            );
+                        }
+
+                        // Clean up old workflow before retry
+                        let _ = Command::new("argo")
+                            .args(["delete", &workflow_name, "-n", argo_namespace])
+                            .output();
+                    }
+
+                    // Continue to next iteration (retry workflow)
+                    continue;
+                }
+
+                // Non-remediation error - propagate
+                return Err(e);
+            }
+        }
+    }
+}
+
 /// Run multi-watch monitoring for all resources
+///
+/// If `remediation_config` is provided and a failure occurs, returns an error
+/// with prefix `REMEDIATION_NEEDED:` to signal the caller to trigger remediation.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 async fn run_multi_watch(
     task_id: &str,
@@ -1476,7 +2122,9 @@ async fn run_multi_watch(
     max_failures: u32,
     log_tail: u32,
     emitter: &EventEmitter,
+    remediation_config: Option<RemediationConfig>,
 ) -> Result<()> {
+    let remediation_enabled = remediation_config.is_some();
     let label_selector = format!("task-id={task_id}");
 
     // Create channel for watch events
@@ -1612,12 +2260,29 @@ async fn run_multi_watch(
                                     play_id: name.clone(),
                                     stage: None,
                                     failed_step: None,
-                                    logs,
+                                    logs: logs.clone(),
                                     consecutive_failures,
                                     timestamp: Utc::now(),
                                 })?;
 
                                 if max_failures > 0 && consecutive_failures >= max_failures {
+                                    // If remediation is enabled, return error to trigger remediation
+                                    if remediation_enabled {
+                                        // Cleanup watch processes before returning
+                                        for mut child in children {
+                                            let _ = child.kill().await;
+                                        }
+                                        if let Some(handle) = github_handle {
+                                            handle.abort();
+                                        }
+
+                                        return Err(anyhow::anyhow!(
+                                            "REMEDIATION_NEEDED: Workflow {} failed. Logs: {}",
+                                            name,
+                                            logs.unwrap_or_else(|| "No logs available".to_string())
+                                        ));
+                                    }
+
                                     emitter.emit(&LoopEvent::Stopped {
                                         play_id: name.clone(),
                                         reason: format!(

@@ -47,6 +47,17 @@
       "docsRepository": "5dlabs/cto-parallel-test",
       "docsProjectDirectory": "docs",
       "workingDirectory": "."
+    },
+    "remediation": {
+      "repository": "5dlabs/cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "docs",
+      "agent": "5DLabs-Rex",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "maxIterations": 3,
+      "template": "rex-remediation",
+      "syncTimeoutSecs": 300
     }
   },
   "agents": {
