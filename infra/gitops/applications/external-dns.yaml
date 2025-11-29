@@ -17,10 +17,6 @@ spec:
     - group: apps
       kind: Deployment
       jsonPointers:
-        - /spec/template/spec/securityContext/fsGroup
-        - /spec/template/spec/securityContext/runAsUser
-        - /spec/template/spec/securityContext/runAsGroup
-        - /spec/template/spec/containers/0/securityContext
         - /metadata/generation
         - /spec/revisionHistoryLimit
         - /status
@@ -90,11 +86,14 @@ spec:
             cpu: 100m
             memory: 512Mi
 
-        # Security context
-        securityContext:
+        # Pod-level security context (fsGroup goes here)
+        podSecurityContext:
           runAsNonRoot: true
           runAsUser: 65534
           fsGroup: 65534
+
+        # Container-level security context (capabilities go here)
+        securityContext:
           capabilities:
             drop:
               - ALL
