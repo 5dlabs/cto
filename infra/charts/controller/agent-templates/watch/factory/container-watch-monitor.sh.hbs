@@ -162,20 +162,18 @@ echo ""
 # 5. Evaluate against acceptance criteria
 # 6. Write issue report or exit success
 
-if [ -f "$CONFIG_PATH" ]; then
-  play-monitor monitor \
-    --iteration "$ITERATION" \
-    --config "$CONFIG_PATH" \
-    --namespace "$NAMESPACE"
-  EXIT_CODE=$?
-else
-  echo "⚠️ Config file not found at $CONFIG_PATH"
-  echo "   Running with defaults..."
-  play-monitor monitor \
-    --iteration "$ITERATION" \
-    --namespace "$NAMESPACE"
-  EXIT_CODE=$?
-fi
+# Pass all values as CLI args (values come from Handlebars context)
+play-monitor monitor \
+  --iteration "$ITERATION" \
+  --max-iterations "$MAX_ITERATIONS" \
+  --namespace "$NAMESPACE" \
+  --repository "{{repository_url}}" \
+  --service "{{service}}" \
+  --task-id "{{task_id}}" \
+  --docs-repository "{{docs_repository_url}}" \
+  --docs-project-directory "{{docs_project_directory}}"
+
+EXIT_CODE=$?
 
 # -------------------------------------------------------------------------
 # Completion
