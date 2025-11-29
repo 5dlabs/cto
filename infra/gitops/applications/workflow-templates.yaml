@@ -1,0 +1,46 @@
+---
+# ArgoCD Application for Argo WorkflowTemplates
+# Deploys workflow templates to automation namespace where Argo Workflows runs
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: workflow-templates
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: workflow-templates
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: HEAD
+    path: infra/charts/workflow-templates
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: automation
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+
+  revisionHistoryLimit: 5
+

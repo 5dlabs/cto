@@ -1,0 +1,76 @@
+[package]
+name = "tasks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "MIT"
+repository.workspace = true
+description = "Task management for AI-driven development workflows"
+keywords = ["tasks", "ai", "development", "workflow", "mcp"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "tasks"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tasks"
+path = "src/bin/cli.rs"
+
+[[bin]]
+name = "tasks-mcp"
+path = "src/mcp/server.rs"
+
+[dependencies]
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+colored = { workspace = true }
+dialoguer = { workspace = true }
+indicatif = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Table formatting
+comfy-table = "7.1"
+
+# HTTP client (for AI features)
+reqwest = { workspace = true, features = ["json"] }
+
+# Template engine for prompts
+handlebars = "6.0"
+
+# Regex for prompt processing
+regex = "1.10"
+
+# Base64 encoding (for API auth)
+base64 = "0.22"
+
+[features]
+default = ["ai"]
+ai = []
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"
+
