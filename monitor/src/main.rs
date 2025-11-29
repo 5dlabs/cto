@@ -610,6 +610,19 @@ struct RunResponse {
     error: Option<String>,
 }
 
+/// Configuration for running a play workflow
+struct RunWorkflowConfig<'a> {
+    task_id: &'a str,
+    repository: &'a str,
+    service: &'a str,
+    run_type: &'a str,
+    agent: &'a str,
+    agent_cli: &'a str,
+    model: &'a str,
+    template: &'a str,
+    namespace: &'a str,
+}
+
 #[tokio::main]
 #[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
@@ -719,17 +732,18 @@ async fn main() -> Result<()> {
             model,
             template,
         } => {
-            let result = run_workflow(
-                &task_id,
-                &repository,
-                &service,
-                &run_type,
-                &agent,
-                &agent_cli,
-                &model,
-                &template,
-                &cli.namespace,
-            )?;
+            let config = RunWorkflowConfig {
+                task_id: &task_id,
+                repository: &repository,
+                service: &service,
+                run_type: &run_type,
+                agent: &agent,
+                agent_cli: &agent_cli,
+                model: &model,
+                template: &template,
+                namespace: &cli.namespace,
+            };
+            let result = run_workflow(&config)?;
             output_result(&result, cli.format)?;
         }
         Commands::Memory { action } => {
@@ -2366,51 +2380,45 @@ fn count_deleted(output: &[u8]) -> i32 {
 }
 
 /// Run/submit a play workflow via Argo CLI
-fn run_workflow(
-    task_id: &str,
-    repository: &str,
-    service: &str,
-    run_type: &str,
-    agent: &str,
-    agent_cli: &str,
-    model: &str,
-    template: &str,
-    namespace: &str,
-) -> Result<RunResponse> {
+fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     println!(
         "{}",
-        format!("Submitting play workflow for task {task_id}...").cyan()
+        format!("Submitting play workflow for task {}...", config.task_id).cyan()
     );
 
     // Generate descriptive workflow name
     // Format: play-{run_type}-t{task_id}-{agent_short}-{cli}-{uid}
-    let agent_short = agent
+    let agent_short = config
+        .agent
         .strip_prefix("5DLabs-")
-        .unwrap_or(agent)
+        .unwrap_or(config.agent)
         .to_lowercase();
     let uid: String = uuid::Uuid::new_v4().to_string()[..8].to_string();
-    let workflow_name = format!("play-{run_type}-t{task_id}-{agent_short}-{agent_cli}-{uid}");
+    let workflow_name = format!(
+        "play-{}-t{}-{}-{}-{}",
+        config.run_type, config.task_id, agent_short, config.agent_cli, uid
+    );
 
     // Submit workflow using argo CLI
     let output = Command::new("argo")
         .args([
             "submit",
             "--from",
-            &format!("workflowtemplate/{template}"),
+            &format!("workflowtemplate/{}", config.template),
             "-n",
-            namespace,
+            config.namespace,
             "-p",
-            &format!("task-id={task_id}"),
+            &format!("task-id={}", config.task_id),
             "-p",
-            &format!("repository={repository}"),
+            &format!("repository={}", config.repository),
             "-p",
-            &format!("service={service}"),
+            &format!("service={}", config.service),
             "-p",
-            &format!("implementation-agent={agent}"),
+            &format!("implementation-agent={}", config.agent),
             "-p",
-            &format!("implementation-cli={agent_cli}"),
+            &format!("implementation-cli={}", config.agent_cli),
             "-p",
-            &format!("implementation-model={model}"),
+            &format!("implementation-model={}", config.model),
             "-p",
             "quality-agent=5DLabs-Cleo",
             "-p",
@@ -2436,8 +2444,8 @@ fn run_workflow(
         return Ok(RunResponse {
             success: false,
             workflow_name: None,
-            task_id: task_id.to_string(),
-            repository: repository.to_string(),
+            task_id: config.task_id.to_string(),
+            repository: config.repository.to_string(),
             timestamp: Utc::now(),
             error: Some(stderr.to_string()),
         });
@@ -2463,8 +2471,8 @@ fn run_workflow(
     Ok(RunResponse {
         success: true,
         workflow_name,
-        task_id: task_id.to_string(),
-        repository: repository.to_string(),
+        task_id: config.task_id.to_string(),
+        repository: config.repository.to_string(),
         timestamp: Utc::now(),
         error: None,
     })

@@ -137,6 +137,34 @@ env:
         name: tools-github-secrets
         key: GITHUB_PERSONAL_ACCESS_TOKEN
         optional: true
+  # MinIO credentials for screenshot uploads
+  - name: MINIO_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: tools-minio-secrets
+        key: MINIO_ENDPOINT
+        optional: true
+  - name: MINIO_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: tools-minio-secrets
+        key: MINIO_ACCESS_KEY
+        optional: true
+  - name: MINIO_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: tools-minio-secrets
+        key: MINIO_SECRET_KEY
+        optional: true
+  - name: MINIO_BUCKET
+    valueFrom:
+      secretKeyRef:
+        name: tools-minio-secrets
+        key: MINIO_BUCKET
+        optional: true
+  # MC_HOST_minio configures mc CLI alias via environment variable
+  # Format: MC_HOST_<alias>=https://ACCESS_KEY:SECRET_KEY@ENDPOINT
+  # This is set dynamically in the entrypoint script using the above credentials
 
 # Set working directory to writable location
 workingDir: "/tmp"
@@ -355,6 +383,7 @@ secretRefs:
   - name: tools-grafana-secrets
   - name: tools-argocd-secrets
   - name: tools-gemini-secrets
+  - name: tools-minio-secrets
   # Note: tools-vault-secrets is used by vault-mcp-server deployment, not tools server
   # Note: tools-cloudflare-secrets removed - HTTP MCP servers auth at remote endpoint
 
