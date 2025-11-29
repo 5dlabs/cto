@@ -172,11 +172,13 @@ All scripts are mounted at `/workspace/scripts/`:
 - `poll-actions.sh` - Get detailed GitHub Actions failure logs
 - `full-remediation-flow.sh` - Orchestrate the entire flow
 
-## Communication via Shared PVC
+## Communication via Dedicated Watch PVC
+
+You and the Monitor Agent share a **dedicated watch PVC** (`workspace-{{service}}-watch`) that is isolated from the Play workflow agents. This ensures clean communication without interference.
 
 Read from and write to `/workspace/watch/`:
 
-- `current-issue.md` - Issue to fix (read this first)
+- `current-issue.md` - Issue to fix (read this first, written by Monitor)
 - `status.md` - Update with your progress
 - `issue-history.md` - Append your resolution notes
 - `acceptance-criteria.md` - Reference for what success looks like
