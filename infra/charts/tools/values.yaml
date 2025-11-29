@@ -383,6 +383,7 @@ secretRefs:
   - name: tools-grafana-secrets
   - name: tools-argocd-secrets
   - name: tools-gemini-secrets
+  - name: tools-minio-secrets
   # Note: tools-vault-secrets is used by vault-mcp-server deployment, not tools server
   # Note: tools-cloudflare-secrets removed - HTTP MCP servers auth at remote endpoint
 

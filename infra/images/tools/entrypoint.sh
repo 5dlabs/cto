@@ -19,7 +19,7 @@ for i in $(seq 1 $WAIT_SECONDS); do
 done
 
 # Configure MinIO client (mc) alias via environment variable if credentials are set
-# MC_HOST_<alias> format: https://ACCESS_KEY:SECRET_KEY@ENDPOINT
+# MC_HOST_<alias> format: http://ACCESS_KEY:SECRET_KEY@ENDPOINT (using HTTP for internal cluster access)
 if [ -n "$MINIO_ENDPOINT" ] && [ -n "$MINIO_ACCESS_KEY" ] && [ -n "$MINIO_SECRET_KEY" ]; then
     # Remove protocol prefix for MC_HOST format
     MINIO_HOST="${MINIO_ENDPOINT#http://}"
