@@ -530,20 +530,6 @@ else
   echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
 fi
 
-# Fallback: copy from task-files if generation failed or cto-config.json not found
-    if [ -f "/task-files/tools-config.json" ]; then
-        cp "/task-files/tools-config.json" "$CLAUDE_WORK_DIR/tools-config.json" && echo "✓ tools-config.json copied to Claude working directory" || echo "❌ tools-config.json copy failed"
-        cp "$CLAUDE_WORK_DIR/tools-config.json" "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true && echo "✓ tools-config.json copied to workspace root" || echo "❌ tools-config.json copy to workspace failed"
-    else
-      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
-    fi
-  else
-    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
-  fi
-else
-  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
-fi
-
 # Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
     if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
         echo "📋 tools-config.json not generated, using ConfigMap fallback..."
