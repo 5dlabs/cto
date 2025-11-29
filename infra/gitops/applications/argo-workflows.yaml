@@ -37,11 +37,8 @@ spec:
           image:
             tag: v3.7.1
 
-          # Watch both automation (where Argo runs) and cto (where templates/CRDs are)
-          # Need both: automation for workflow execution, cto for templates
-          extraArgs:
-            - --managed-namespace=automation
-            - --managed-namespace=cto
+          # Cluster-scoped: watch all namespaces for workflows and templates
+          # Note: --managed-namespace only supports single value, so we use cluster-scope instead
 
           podLabels:
             platform.5dlabs.io/log-collection: enabled
@@ -89,8 +86,6 @@ spec:
               value: "false"
           extraArgs:
             - --secure=false
-            - --managed-namespace=automation
-            - --managed-namespace=cto
           serviceType: NodePort
           servicePort: 2746
           serviceNodePort: 30081
