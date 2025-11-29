@@ -620,7 +620,7 @@ fn validate_repository_url(repo_url: &str) -> Result<()> {
     Ok(())
 }
 
-/// DEPRECATED: Use handle_intake_workflow instead. This function is kept for backwards compatibility.
+/// DEPRECATED: Use `handle_intake_workflow` instead. This function is kept for backwards compatibility.
 #[allow(dead_code)]
 #[allow(clippy::disallowed_macros, clippy::too_many_lines)]
 fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
@@ -2605,7 +2605,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 }
 
 /// Unified intake workflow - parses PRD, generates tasks, and creates documentation
-/// This replaces the separate intake_prd and docs workflows
+/// This replaces the separate `intake_prd` and docs workflows
 #[allow(clippy::disallowed_macros)]
 #[allow(clippy::too_many_lines)]
 fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
@@ -2721,11 +2721,11 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Unified intake parameters (docs generation)
     let enrich_context = arguments
         .get("enrich_context")
-        .and_then(|v| v.as_bool())
+        .and_then(Value::as_bool)
         .unwrap_or(true); // Default to true - auto-scrape URLs via Firecrawl
     let include_codebase = arguments
         .get("include_codebase")
-        .and_then(|v| v.as_bool())
+        .and_then(Value::as_bool)
         .unwrap_or(config.defaults.docs.include_codebase);
     let docs_model = arguments
         .get("model")
