@@ -232,13 +232,33 @@ enum Commands {
         #[arg(long, default_value = "1")]
         iteration: u32,
 
+        /// Maximum iterations before giving up
+        #[arg(long, default_value = "3")]
+        max_iterations: u32,
+
+        /// Target repository (e.g., "5dlabs/cto-parallel-test")
+        #[arg(long)]
+        repository: String,
+
+        /// Service name
+        #[arg(long, default_value = "cto-parallel-test")]
+        service: String,
+
+        /// Task ID to run
+        #[arg(long, default_value = "1")]
+        task_id: String,
+
+        /// Docs repository URL
+        #[arg(long)]
+        docs_repository: Option<String>,
+
+        /// Docs project directory
+        #[arg(long, default_value = "docs")]
+        docs_project_directory: String,
+
         /// Path to acceptance criteria file
         #[arg(long, default_value = "/workspace/watch/acceptance-criteria.md")]
         criteria: String,
-
-        /// Path to config file
-        #[arg(long, default_value = "/workspace/config/cto-config.json")]
-        config: String,
     },
     /// [E2E] Run remediation logic (called inside Remediation pod)
     Remediate {
@@ -351,6 +371,21 @@ struct MonitorConfig {
 
 fn default_monitor_template() -> String {
     "watch/factory".to_string()
+}
+
+/// Parameters for monitor loop (passed from CLI args)
+#[derive(Debug)]
+#[allow(dead_code)] // criteria_path reserved for future use
+struct MonitorParams {
+    iteration: u32,
+    max_iterations: u32,
+    repository: String,
+    service: String,
+    task_id: String,
+    docs_repository: Option<String>,
+    docs_project_directory: String,
+    criteria_path: String,
+    namespace: String,
 }
 
 /// Play workflow configuration
@@ -600,13 +635,13 @@ fn create_monitor_coderun(
 
     let repository = &play_config.repository;
     let repository_url = format!("https://github.com/{repository}");
-    let service = play_config
-        .service
-        .as_deref()
-        .unwrap_or("cto-parallel-test");
+    let service = play_config.service.as_deref().unwrap_or("cto-parallel-test");
 
     // Get docs repository from play config
-    let docs_repository = play_config.docs_repository.as_deref().unwrap_or(repository);
+    let docs_repository = play_config
+        .docs_repository
+        .as_deref()
+        .unwrap_or(repository);
     let docs_repository_url = format!("https://github.com/{docs_repository}");
     let docs_project_directory = play_config
         .docs_project_directory
@@ -1281,7 +1316,10 @@ async fn main() -> Result<()> {
         }
         Commands::Start { config } => {
             // Start the E2E self-healing loop by creating a Monitor CodeRun
-            println!("{}", "Starting E2E self-healing loop...".cyan().bold());
+            println!(
+                "{}",
+                "Starting E2E self-healing loop...".cyan().bold()
+            );
 
             // Load config
             let config_content = std::fs::read_to_string(&config)
@@ -1319,11 +1357,27 @@ async fn main() -> Result<()> {
         }
         Commands::Monitor {
             iteration,
+            max_iterations,
+            repository,
+            service,
+            task_id,
+            docs_repository,
+            docs_project_directory,
             criteria,
-            config,
         } => {
             // This runs inside the Monitor pod
-            run_monitor_loop(iteration, &criteria, &config, &cli.namespace).await?;
+            let monitor_params = MonitorParams {
+                iteration,
+                max_iterations,
+                repository,
+                service,
+                task_id,
+                docs_repository,
+                docs_project_directory,
+                criteria_path: criteria,
+                namespace: cli.namespace.clone(),
+            };
+            run_monitor_loop(&monitor_params).await?;
         }
         Commands::Remediate {
             iteration,
@@ -3379,82 +3433,84 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
 ///
 /// This function:
 /// 1. Resets environment if iteration > 1
-/// 2. Submits Play workflow for task 1
+/// 2. Submits Play workflow for the specified task
 /// 3. Waits for workflow completion
 /// 4. Downloads and analyzes all logs
 /// 5. Evaluates against acceptance criteria
 /// 6. On success: exits 0 (ends loop)
 /// 7. On failure: writes issue to PVC, creates Remediation `CodeRun`, exits 1
 #[allow(clippy::too_many_lines)]
-async fn run_monitor_loop(
-    iteration: u32,
-    _criteria_path: &str,
-    config_path: &str,
-    namespace: &str,
-) -> Result<()> {
+async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     println!(
         "{}",
-        format!("=== Monitor Loop Iteration {iteration} ===")
-            .cyan()
-            .bold()
+        format!(
+            "=== Monitor Loop Iteration {} / {} ===",
+            params.iteration, params.max_iterations
+        )
+        .cyan()
+        .bold()
     );
 
-    // Load config
-    let config_content = std::fs::read_to_string(config_path)
-        .with_context(|| format!("Failed to read config: {config_path}"))?;
-    let config: CtoConfig = serde_json::from_str(&config_content)?;
-
-    let play_config = &config.defaults.play;
-    let repository = &play_config.repository;
+    println!(
+        "{}",
+        format!(
+            "Repository: {} | Service: {} | Task: {}",
+            params.repository, params.service, params.task_id
+        )
+        .dimmed()
+    );
 
     // Step 1: Reset environment if re-running (iteration > 1)
-    if iteration > 1 {
+    if params.iteration > 1 {
         println!(
             "{}",
             "Resetting environment from previous iteration...".yellow()
         );
         // Extract org/repo from repository string
-        let parts: Vec<&str> = repository.split('/').collect();
+        let parts: Vec<&str> = params.repository.split('/').collect();
         if parts.len() == 2 {
-            reset_environment(namespace, parts[0], parts[1], false, false, true)?;
+            reset_environment(&params.namespace, parts[0], parts[1], false, false, true)?;
         }
     }
 
-    // Step 2: Submit Play workflow for task 1
-    println!("{}", "Submitting Play workflow for task 1...".cyan());
+    // Step 2: Submit Play workflow
+    println!(
+        "{}",
+        format!("Submitting Play workflow for task {}...", params.task_id).cyan()
+    );
     let workflow_config = RunWorkflowConfig {
-        task_id: "1",
-        repository,
-        service: play_config
-            .service
-            .as_deref()
-            .unwrap_or("cto-parallel-test"),
+        task_id: &params.task_id,
+        repository: &params.repository,
+        service: &params.service,
         run_type: "e2e-monitor",
-        agent: &play_config.implementation_agent,
-        agent_cli: play_config.cli.as_deref().unwrap_or("codex"),
-        model: play_config.model.as_deref().unwrap_or("gpt-5-codex"),
+        agent: "5DLabs-Rex", // Default implementation agent
+        agent_cli: "factory",
+        model: "claude-opus-4-5-20251101",
         template: "play-workflow-template",
-        namespace,
+        namespace: &params.namespace,
     };
 
     let run_result = run_workflow(&workflow_config)?;
     let workflow_name = run_result.workflow_name.ok_or_else(|| {
-        anyhow::anyhow!(
-            "Failed to submit workflow: {}",
-            run_result.error.unwrap_or_default()
-        )
+        anyhow::anyhow!("Failed to submit workflow: {}", run_result.error.unwrap_or_default())
     })?;
 
-    println!("{}", format!("Workflow submitted: {workflow_name}").green());
+    println!(
+        "{}",
+        format!("Workflow submitted: {workflow_name}").green()
+    );
 
     // Step 3: Wait for workflow completion
     println!("{}", "Waiting for workflow completion...".cyan());
     let mut last_phase = String::new();
     loop {
-        let status = get_workflow_status(&workflow_name, namespace)?;
-
+        let status = get_workflow_status(&workflow_name, &params.namespace)?;
+        
         if status.phase != last_phase {
-            println!("{}", format!("Workflow phase: {}", status.phase).dimmed());
+            println!(
+                "{}",
+                format!("Workflow phase: {}", status.phase).dimmed()
+            );
             last_phase.clone_from(&status.phase);
         }
 
@@ -3484,7 +3540,7 @@ async fn run_monitor_loop(
 
     // Get logs using argo CLI
     let logs_output = Command::new("argo")
-        .args(["logs", &workflow_name, "-n", namespace])
+        .args(["logs", &workflow_name, "-n", &params.namespace])
         .output()
         .context("Failed to get workflow logs")?;
 
@@ -3492,11 +3548,8 @@ async fn run_monitor_loop(
     std::fs::write(format!("{logs_dir}/workflow-logs.txt"), all_logs.as_ref()).ok();
 
     // Step 5: Evaluate against acceptance criteria
-    println!(
-        "{}",
-        "Evaluating results against acceptance criteria...".cyan()
-    );
-    let final_status = get_workflow_status(&workflow_name, namespace)?;
+    println!("{}", "Evaluating results against acceptance criteria...".cyan());
+    let final_status = get_workflow_status(&workflow_name, &params.namespace)?;
 
     let mut issues: Vec<String> = Vec::new();
 
@@ -3511,22 +3564,11 @@ async fn run_monitor_loop(
 
     // Check for failed steps
     for step in &final_status.failed_steps {
-        issues.push(format!(
-            "Stage failed: {} - {}",
-            step.name,
-            step.message.as_deref().unwrap_or("no message")
-        ));
+        issues.push(format!("Stage failed: {} - {}", step.name, step.message.as_deref().unwrap_or("no message")));
     }
 
     // Check logs for critical errors
-    let error_patterns = [
-        "error[E",
-        "FAILED",
-        "panicked at",
-        "fatal:",
-        "OOMKilled",
-        "CrashLoopBackOff",
-    ];
+    let error_patterns = ["error[E", "FAILED", "panicked at", "fatal:", "OOMKilled", "CrashLoopBackOff"];
     for pattern in &error_patterns {
         if all_logs.contains(pattern) {
             issues.push(format!("Error pattern found in logs: {pattern}"));
@@ -3537,9 +3579,7 @@ async fn run_monitor_loop(
     if issues.is_empty() {
         println!(
             "{}",
-            "✅ All acceptance criteria met - E2E loop complete!"
-                .green()
-                .bold()
+            "✅ All acceptance criteria met - E2E loop complete!".green().bold()
         );
         std::process::exit(0);
     }
@@ -3551,7 +3591,7 @@ async fn run_monitor_loop(
     );
 
     let issue_report = format!(
-        r"# Issue Report - Iteration {iteration}
+        r"# Issue Report - Iteration {}
 
 ## Summary
 E2E workflow did not meet acceptance criteria.
@@ -3560,9 +3600,11 @@ E2E workflow did not meet acceptance criteria.
 {}
 
 ## Workflow Details
-- Name: {workflow_name}
+- Name: {}
 - Phase: {}
-- Repository: {repository}
+- Repository: {}
+- Service: {}
+- Task ID: {}
 
 ## Relevant Logs
 See /workspace/watch/logs/workflow-logs.txt for full logs.
@@ -3570,12 +3612,17 @@ See /workspace/watch/logs/workflow-logs.txt for full logs.
 ## Suggested Fix
 Analyze the errors above and fix the underlying issues in the CTO platform.
 ",
+        params.iteration,
         issues
             .iter()
             .map(|i| format!("- {i}"))
             .collect::<Vec<_>>()
             .join("\n"),
+        workflow_name,
         final_status.phase,
+        params.repository,
+        params.service,
+        params.task_id,
     );
 
     std::fs::write("/workspace/watch/current-issue.md", &issue_report)?;
@@ -3584,33 +3631,44 @@ Analyze the errors above and fix the underlying issues in the CTO platform.
         "Issue report written to /workspace/watch/current-issue.md".dimmed()
     );
 
-    // Create Remediation CodeRun
-    if let Some(remediation_config) = &config.defaults.remediation {
-        let failure = FailureContext {
-            workflow_name: workflow_name.clone(),
-            failed_resource: workflow_name,
-            resource_type: "workflow".to_string(),
-            phase: final_status.phase,
-            error_message: Some(issues.join("; ")),
-            logs: Some(all_logs.chars().take(5000).collect()),
-            container: None,
-            exit_code: None,
-            timestamp: Utc::now(),
-        };
+    // Create Remediation CodeRun using default config
+    // In the future, this could be passed as params
+    let remediation_config = RemediationConfig {
+        repository: params.repository.clone(),
+        docs_repository: params.docs_repository.clone(),
+        docs_project_directory: Some(params.docs_project_directory.clone()),
+        agent: "5DLabs-Rex".to_string(),
+        cli: "factory".to_string(),
+        model: "claude-opus-4-5-20251101".to_string(),
+        max_iterations: params.max_iterations,
+        template: "watch/factory".to_string(),
+        sync_timeout_secs: 300,
+    };
 
-        let coderun_name =
-            trigger_remediation(remediation_config, &failure, "1", iteration, namespace)?;
+    let failure = FailureContext {
+        workflow_name: workflow_name.clone(),
+        failed_resource: workflow_name,
+        resource_type: "workflow".to_string(),
+        phase: final_status.phase,
+        error_message: Some(issues.join("; ")),
+        logs: Some(all_logs.chars().take(5000).collect()),
+        container: None,
+        exit_code: None,
+        timestamp: Utc::now(),
+    };
 
-        println!(
-            "{}",
-            format!("Remediation CodeRun created: {coderun_name}").green()
-        );
-    } else {
-        println!(
-            "{}",
-            "Warning: No remediation config - cannot auto-remediate".yellow()
-        );
-    }
+    let coderun_name = trigger_remediation(
+        &remediation_config,
+        &failure,
+        &params.task_id,
+        params.iteration,
+        &params.namespace,
+    )?;
+
+    println!(
+        "{}",
+        format!("Remediation CodeRun created: {coderun_name}").green()
+    );
 
     std::process::exit(1);
 }
@@ -3696,10 +3754,9 @@ fn create_next_monitor_iteration(config_path: &str, iteration: u32, namespace: &
     let config_content = std::fs::read_to_string(config_path)?;
     let config: CtoConfig = serde_json::from_str(&config_content)?;
 
-    let monitor_config = config
-        .defaults
-        .monitor
-        .ok_or_else(|| anyhow::anyhow!("Missing monitor config"))?;
+    let monitor_config = config.defaults.monitor.ok_or_else(|| {
+        anyhow::anyhow!("Missing monitor config")
+    })?;
 
     let coderun_name = create_monitor_coderun(
         &monitor_config,
