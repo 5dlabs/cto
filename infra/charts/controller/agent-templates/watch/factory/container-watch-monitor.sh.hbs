@@ -187,15 +187,22 @@ echo ""
 # 5. Evaluate against acceptance criteria
 # 6. Write issue report or exit success
 
+# Extract org/repo from URL (e.g., "https://github.com/5dlabs/cto" -> "5dlabs/cto")
+REPO_URL="{{repository_url}}"
+REPO_ORG_NAME=$(echo "$REPO_URL" | sed -E 's|https?://github\.com/||' | sed 's|\.git$||')
+
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_REPO_ORG_NAME=$(echo "$DOCS_REPO_URL" | sed -E 's|https?://github\.com/||' | sed 's|\.git$||')
+
 # Pass all values as CLI args (values come from Handlebars context)
 play-monitor monitor \
   --iteration "$ITERATION" \
   --max-iterations "$MAX_ITERATIONS" \
   --namespace "$NAMESPACE" \
-  --repository "{{repository_url}}" \
+  --repository "$REPO_ORG_NAME" \
   --service "{{service}}" \
   --task-id "{{task_id}}" \
-  --docs-repository "{{docs_repository_url}}" \
+  --docs-repository "$DOCS_REPO_ORG_NAME" \
   --docs-project-directory "{{docs_project_directory}}"
 
 EXIT_CODE=$?
