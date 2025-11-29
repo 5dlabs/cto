@@ -56,6 +56,24 @@
       "testingMaxRetries": 5,
       "autoMerge": true,
       "parallelExecution": true
+    },
+    "monitor": {
+      "agent": "5DLabs-Morgan",
+      "cli": "factory",
+      "model": "glm-4.6",
+      "template": "watch/factory",
+      "maxIterations": 3
+    },
+    "remediation": {
+      "repository": "5dlabs/cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "docs",
+      "agent": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "claude-opus-4-5-20251101",
+      "maxIterations": 3,
+      "template": "watch/factory",
+      "syncTimeoutSecs": 300
     }
   },
   "agents": {
