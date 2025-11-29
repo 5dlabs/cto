@@ -878,6 +878,7 @@ impl CodeTemplateGenerator {
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_branch": code_run.spec.docs_branch,
+            "source_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
             "continue_session": Self::get_continue_session(code_run),
             "attempts": retry_count + 1,  // Current attempt number (1-indexed)
