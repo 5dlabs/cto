@@ -67,8 +67,8 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch = template_setting.starts_with("watch/")
-            || service_name.to_lowercase().contains("watch");
+        let is_watch =
+            template_setting.starts_with("watch/") || service_name.to_lowercase().contains("watch");
 
         // Get the appropriate PVC name
         let pvc_name = if is_watch {

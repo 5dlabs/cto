@@ -635,13 +635,13 @@ fn create_monitor_coderun(
 
     let repository = &play_config.repository;
     let repository_url = format!("https://github.com/{repository}");
-    let service = play_config.service.as_deref().unwrap_or("cto-parallel-test");
+    let service = play_config
+        .service
+        .as_deref()
+        .unwrap_or("cto-parallel-test");
 
     // Get docs repository from play config
-    let docs_repository = play_config
-        .docs_repository
-        .as_deref()
-        .unwrap_or(repository);
+    let docs_repository = play_config.docs_repository.as_deref().unwrap_or(repository);
     let docs_repository_url = format!("https://github.com/{docs_repository}");
     let docs_project_directory = play_config
         .docs_project_directory
@@ -1316,10 +1316,7 @@ async fn main() -> Result<()> {
         }
         Commands::Start { config } => {
             // Start the E2E self-healing loop by creating a Monitor CodeRun
-            println!(
-                "{}",
-                "Starting E2E self-healing loop...".cyan().bold()
-            );
+            println!("{}", "Starting E2E self-healing loop...".cyan().bold());
 
             // Load config
             let config_content = std::fs::read_to_string(&config)
@@ -3492,25 +3489,22 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
 
     let run_result = run_workflow(&workflow_config)?;
     let workflow_name = run_result.workflow_name.ok_or_else(|| {
-        anyhow::anyhow!("Failed to submit workflow: {}", run_result.error.unwrap_or_default())
+        anyhow::anyhow!(
+            "Failed to submit workflow: {}",
+            run_result.error.unwrap_or_default()
+        )
     })?;
 
-    println!(
-        "{}",
-        format!("Workflow submitted: {workflow_name}").green()
-    );
+    println!("{}", format!("Workflow submitted: {workflow_name}").green());
 
     // Step 3: Wait for workflow completion
     println!("{}", "Waiting for workflow completion...".cyan());
     let mut last_phase = String::new();
     loop {
         let status = get_workflow_status(&workflow_name, &params.namespace)?;
-        
+
         if status.phase != last_phase {
-            println!(
-                "{}",
-                format!("Workflow phase: {}", status.phase).dimmed()
-            );
+            println!("{}", format!("Workflow phase: {}", status.phase).dimmed());
             last_phase.clone_from(&status.phase);
         }
 
@@ -3548,7 +3542,10 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     std::fs::write(format!("{logs_dir}/workflow-logs.txt"), all_logs.as_ref()).ok();
 
     // Step 5: Evaluate against acceptance criteria
-    println!("{}", "Evaluating results against acceptance criteria...".cyan());
+    println!(
+        "{}",
+        "Evaluating results against acceptance criteria...".cyan()
+    );
     let final_status = get_workflow_status(&workflow_name, &params.namespace)?;
 
     let mut issues: Vec<String> = Vec::new();
@@ -3564,11 +3561,22 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
 
     // Check for failed steps
     for step in &final_status.failed_steps {
-        issues.push(format!("Stage failed: {} - {}", step.name, step.message.as_deref().unwrap_or("no message")));
+        issues.push(format!(
+            "Stage failed: {} - {}",
+            step.name,
+            step.message.as_deref().unwrap_or("no message")
+        ));
     }
 
     // Check logs for critical errors
-    let error_patterns = ["error[E", "FAILED", "panicked at", "fatal:", "OOMKilled", "CrashLoopBackOff"];
+    let error_patterns = [
+        "error[E",
+        "FAILED",
+        "panicked at",
+        "fatal:",
+        "OOMKilled",
+        "CrashLoopBackOff",
+    ];
     for pattern in &error_patterns {
         if all_logs.contains(pattern) {
             issues.push(format!("Error pattern found in logs: {pattern}"));
@@ -3579,7 +3587,9 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     if issues.is_empty() {
         println!(
             "{}",
-            "✅ All acceptance criteria met - E2E loop complete!".green().bold()
+            "✅ All acceptance criteria met - E2E loop complete!"
+                .green()
+                .bold()
         );
         std::process::exit(0);
     }
@@ -3754,9 +3764,10 @@ fn create_next_monitor_iteration(config_path: &str, iteration: u32, namespace: &
     let config_content = std::fs::read_to_string(config_path)?;
     let config: CtoConfig = serde_json::from_str(&config_content)?;
 
-    let monitor_config = config.defaults.monitor.ok_or_else(|| {
-        anyhow::anyhow!("Missing monitor config")
-    })?;
+    let monitor_config = config
+        .defaults
+        .monitor
+        .ok_or_else(|| anyhow::anyhow!("Missing monitor config"))?;
 
     let coderun_name = create_monitor_coderun(
         &monitor_config,
