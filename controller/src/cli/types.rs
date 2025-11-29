@@ -122,7 +122,7 @@ mod tests {
         let err = serde_json::from_str::<CLIType>("\"unknown\"").unwrap_err();
         assert!(err.to_string().contains("unknown variant"));
     }
-    
+
     #[test]
     fn deserializes_empty_string_defaults_to_claude() {
         let result = serde_json::from_str::<CLIType>("\"\"");
