@@ -223,7 +223,7 @@ enum Commands {
     /// [E2E] Start the self-healing E2E loop - creates Monitor `CodeRun` and exits
     Start {
         /// Path to cto-config.json
-        #[arg(long, default_value = "cto-config.json")]
+        #[arg(long, default_value = "monitor/cto-config.json")]
         config: String,
     },
     /// [E2E] Run monitor logic (called inside Monitor pod)
