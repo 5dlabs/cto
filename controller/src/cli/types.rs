@@ -63,7 +63,7 @@ impl CLIType {
         let normalized = value.trim().to_lowercase();
 
         match normalized.as_str() {
-            "claude" => Some(CLIType::Claude),
+            "" | "claude" => Some(CLIType::Claude),
             "codex" => Some(CLIType::Codex),
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),
@@ -121,6 +121,13 @@ mod tests {
     fn rejects_unknown_variants() {
         let err = serde_json::from_str::<CLIType>("\"unknown\"").unwrap_err();
         assert!(err.to_string().contains("unknown variant"));
+    }
+    
+    #[test]
+    fn deserializes_empty_string_defaults_to_claude() {
+        let result = serde_json::from_str::<CLIType>("\"\"");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), CLIType::Claude);
     }
 }
 
