@@ -2730,10 +2730,10 @@ impl BridgeState {
                                 // Handle screenshot upload to MinIO
                                 let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
-                                let file_path = arguments.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
-                                let repo = arguments.get("repo").and_then(|v| v.as_str()).unwrap_or("");
-                                let pr_number = arguments.get("pr_number").and_then(|v| v.as_u64()).unwrap_or(0);
-                                let name = arguments.get("name").and_then(|v| v.as_str()).unwrap_or("screenshot");
+                                let file_path = arguments.get("file_path").and_then(serde_json::Value::as_str).unwrap_or("");
+                                let repo = arguments.get("repo").and_then(serde_json::Value::as_str).unwrap_or("");
+                                let pr_number = arguments.get("pr_number").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                                let name = arguments.get("name").and_then(serde_json::Value::as_str).unwrap_or("screenshot");
 
                                 // Validate required parameters
                                 if file_path.is_empty() || repo.is_empty() || pr_number == 0 {
@@ -2747,16 +2747,16 @@ impl BridgeState {
                                 } else {
                                     // Build S3 key with timestamp
                                     let timestamp = Utc::now().format("%Y%m%d-%H%M%S");
-                                    let key = format!("{}/pr-{}/{}-{}.png", repo, pr_number, timestamp, name);
+                                    let key = format!("{repo}/pr-{pr_number}/{timestamp}-{name}.png");
 
                                     // Get bucket from environment
                                     let bucket = std::env::var("MINIO_BUCKET").unwrap_or_else(|_| "screenshots".to_string());
                                     let endpoint = std::env::var("MINIO_ENDPOINT").unwrap_or_default();
 
                                     // Upload using mc command
-                                    let mc_dest = format!("minio/{}/{}", bucket, key);
+                                    let mc_dest = format!("minio/{bucket}/{key}");
 
-                                    tracing::info!("📸 Uploading screenshot: {} -> {}", file_path, mc_dest);
+                                    tracing::info!("📸 Uploading screenshot: {file_path} -> {mc_dest}");
 
                                     use tokio::process::Command;
                                     match Command::new("mc")
@@ -2767,33 +2767,32 @@ impl BridgeState {
                                         Ok(output) => {
                                             if output.status.success() {
                                                 // Construct internal URL (no public access for now)
-                                                let internal_url = format!("{}/{}/{}", endpoint, bucket, key);
-                                                tracing::info!("✅ Screenshot uploaded: {}", internal_url);
+                                                let internal_url = format!("{endpoint}/{bucket}/{key}");
+                                                tracing::info!("✅ Screenshot uploaded: {internal_url}");
                                                 json!({
                                                     "content": [{
                                                         "type": "text",
-                                                        "text": format!("✅ Screenshot uploaded successfully!\n\n**File:** {}\n**Destination:** {}\n**Internal URL:** {}\n\n**Markdown for PR:**\n```markdown\n![{}]({})\n```",
-                                                            file_path, mc_dest, internal_url, name, internal_url)
+                                                        "text": format!("✅ Screenshot uploaded successfully!\n\n**File:** {file_path}\n**Destination:** {mc_dest}\n**Internal URL:** {internal_url}\n\n**Markdown for PR:**\n```markdown\n![{name}]({internal_url})\n```")
                                                     }]
                                                 })
                                             } else {
                                                 let stderr = String::from_utf8_lossy(&output.stderr);
-                                                tracing::error!("❌ mc upload failed: {}", stderr);
+                                                tracing::error!("❌ mc upload failed: {stderr}");
                                                 json!({
                                                     "content": [{
                                                         "type": "text",
-                                                        "text": format!("❌ Screenshot upload failed: {}", stderr)
+                                                        "text": format!("❌ Screenshot upload failed: {stderr}")
                                                     }],
                                                     "isError": true
                                                 })
                                             }
                                         }
                                         Err(e) => {
-                                            tracing::error!("❌ Failed to execute mc: {}", e);
+                                            tracing::error!("❌ Failed to execute mc: {e}");
                                             json!({
                                                 "content": [{
                                                     "type": "text",
-                                                    "text": format!("❌ Failed to execute mc command: {}\n\nEnsure mc is installed and configured with MinIO credentials.", e)
+                                                    "text": format!("❌ Failed to execute mc command: {e}\n\nEnsure mc is installed and configured with MinIO credentials.")
                                                 }],
                                                 "isError": true
                                             })
