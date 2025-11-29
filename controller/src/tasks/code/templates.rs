@@ -2855,8 +2855,8 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch = service.to_lowercase().contains("watch")
-            || template_setting.starts_with("watch/");
+        let is_watch =
+            service.to_lowercase().contains("watch") || template_setting.starts_with("watch/");
 
         // Check if this is a remediation cycle
         let retry_count = code_run
@@ -2912,8 +2912,8 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch = service.to_lowercase().contains("watch")
-            || template_setting.starts_with("watch/");
+        let is_watch =
+            service.to_lowercase().contains("watch") || template_setting.starts_with("watch/");
 
         // Watch-specific templates take precedence
         if is_watch {
