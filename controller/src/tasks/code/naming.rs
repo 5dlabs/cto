@@ -5,14 +5,20 @@ use std::hash::{Hash, Hasher};
 const MAX_K8S_NAME_LENGTH: usize = 63;
 const MAX_DNS_LABEL_LENGTH: usize = 63;
 const CODERUN_JOB_PREFIX: &str = "play-coderun-";
+const MONITOR_JOB_PREFIX: &str = "monitor-";
+const REMEDIATION_JOB_PREFIX: &str = "remediation-";
 
 pub struct ResourceNaming;
 
 impl ResourceNaming {
-    /// Generate job name with guaranteed length compliance
-    /// Format: pr{pr_number}-t{task_id}-{agent}-{cli}-{uid}-v{version}
-    /// or t{task_id}-{agent}-{cli}-{uid}-v{version} if no PR number
-    /// This is the single source of truth for job names
+    /// Generate job name with guaranteed length compliance.
+    ///
+    /// Format varies by type:
+    /// - Play: `play-coderun-pr{pr}-t{task_id}-{agent}-{cli}-{uid}-v{version}`
+    /// - Monitor: `monitor-t{task_id}-{agent}-{uid}-v{version}`
+    /// - Remediation: `remediation-t{task_id}-{agent}-{uid}-v{version}`
+    ///
+    /// This is the single source of truth for job names.
     #[must_use]
     pub fn job_name(code_run: &CodeRun) -> String {
         let uid_suffix = code_run
@@ -22,6 +28,45 @@ impl ResourceNaming {
             .map_or("unknown", |uid| &uid[..8]);
         let task_id = code_run.spec.task_id;
         let context_version = code_run.spec.context_version;
+
+        // Check if this is a watch CodeRun (monitor or remediation)
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let watch_role = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("watchRole"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_watch = template_setting.starts_with("watch/")
+            || code_run.spec.service.to_lowercase().contains("watch");
+
+        // Extract agent name if available
+        let agent = code_run
+            .spec
+            .github_app
+            .as_ref()
+            .and_then(|app| Self::extract_agent_name(app).ok())
+            .unwrap_or_else(|| "default".to_string());
+
+        // For watch CodeRuns, use simplified naming
+        if is_watch {
+            let prefix = if watch_role == "remediation" {
+                REMEDIATION_JOB_PREFIX
+            } else {
+                MONITOR_JOB_PREFIX
+            };
+            let base_name = format!("t{task_id}-{agent}-{uid_suffix}-v{context_version}");
+            let available = MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len());
+            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
+            return format!("{prefix}{trimmed}");
+        }
 
         // Extract PR number from labels first, then fall back to env var
         // This ensures we get PR number from both sensor-created CodeRuns (labels)
@@ -41,14 +86,6 @@ impl ResourceNaming {
                     .filter(|v| !v.is_empty() && *v != "0")
                     .cloned()
             });
-
-        // Extract agent name if available
-        let agent = code_run
-            .spec
-            .github_app
-            .as_ref()
-            .and_then(|app| Self::extract_agent_name(app).ok())
-            .unwrap_or_else(|| "default".to_string());
 
         // Extract CLI type if available
         let cli = code_run.spec.cli_config.as_ref().map_or_else(
