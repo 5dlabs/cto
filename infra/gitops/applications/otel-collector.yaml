@@ -138,6 +138,9 @@ spec:
                 # Stream fields for efficient Victoria Logs indexing
                 # These fields are used for log partitioning and fast queries
                 VL-Stream-Fields: "cluster.name,platform.name,service.name,service.component,service.namespace,kubernetes.namespace_name,kubernetes.pod_name,kubernetes.container_name"
+                # Tell Victoria Logs to use 'message' field as the log message
+                # This fixes "missing _msg field" warnings
+                VL-Msg-Field: "message"
 
             # Debug exporter for troubleshooting
             debug:
