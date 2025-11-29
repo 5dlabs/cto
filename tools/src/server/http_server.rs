@@ -2633,13 +2633,41 @@ impl BridgeState {
                     available_tools.len()
                 );
 
-                // Add built-in tools tools first
+                // Add built-in tools first
                 all_tools.push(json!({
                     "name": "tools_list_available_tools",
                     "description": "Get available tools and MCP client config file structure for automated config generation.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {}
+                    }
+                }));
+
+                // Screenshot upload tool for headless visual testing
+                all_tools.push(json!({
+                    "name": "tools_screenshot_upload",
+                    "description": "Upload a screenshot to MinIO storage and get a URL for embedding in PRs. Use after browser_take_screenshot to upload captures for visual documentation.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Path to the screenshot file (e.g., /tmp/playwright-output/screenshot.png)"
+                            },
+                            "repo": {
+                                "type": "string",
+                                "description": "Repository name in owner/repo format (e.g., 5dlabs/myproject)"
+                            },
+                            "pr_number": {
+                                "type": "integer",
+                                "description": "Pull request number"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Descriptive name for the screenshot (e.g., login-form, dashboard-view)"
+                            }
+                        },
+                        "required": ["file_path", "repo", "pr_number", "name"]
                     }
                 }));
 
@@ -2664,7 +2692,7 @@ impl BridgeState {
                 if let Some(params) = request.params {
                     if let Some(tool_name) = params.get("name").and_then(|v| v.as_str()) {
                         let result = {
-                            // Handle built-in tools tools first
+                            // Handle built-in tools first
                             if tool_name == "tools_list_available_tools" {
                                 // Generate config structure for agents
                                 let available_tools = self.available_tools.read().await;
@@ -2698,6 +2726,80 @@ impl BridgeState {
                                         "text": serde_json::to_string_pretty(&config_structure).unwrap_or_else(|_| "Error formatting config".to_string())
                                     }]
                                 })
+                            } else if tool_name == "tools_screenshot_upload" {
+                                // Handle screenshot upload to MinIO
+                                let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
+
+                                let file_path = arguments.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
+                                let repo = arguments.get("repo").and_then(|v| v.as_str()).unwrap_or("");
+                                let pr_number = arguments.get("pr_number").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let name = arguments.get("name").and_then(|v| v.as_str()).unwrap_or("screenshot");
+
+                                // Validate required parameters
+                                if file_path.is_empty() || repo.is_empty() || pr_number == 0 {
+                                    json!({
+                                        "content": [{
+                                            "type": "text",
+                                            "text": "❌ Missing required parameters. Required: file_path, repo, pr_number, name"
+                                        }],
+                                        "isError": true
+                                    })
+                                } else {
+                                    // Build S3 key with timestamp
+                                    let timestamp = Utc::now().format("%Y%m%d-%H%M%S");
+                                    let key = format!("{}/pr-{}/{}-{}.png", repo, pr_number, timestamp, name);
+
+                                    // Get bucket from environment
+                                    let bucket = std::env::var("MINIO_BUCKET").unwrap_or_else(|_| "screenshots".to_string());
+                                    let endpoint = std::env::var("MINIO_ENDPOINT").unwrap_or_default();
+
+                                    // Upload using mc command
+                                    let mc_dest = format!("minio/{}/{}", bucket, key);
+
+                                    tracing::info!("📸 Uploading screenshot: {} -> {}", file_path, mc_dest);
+
+                                    use tokio::process::Command;
+                                    match Command::new("mc")
+                                        .args(["cp", file_path, &mc_dest])
+                                        .output()
+                                        .await
+                                    {
+                                        Ok(output) => {
+                                            if output.status.success() {
+                                                // Construct internal URL (no public access for now)
+                                                let internal_url = format!("{}/{}/{}", endpoint, bucket, key);
+                                                tracing::info!("✅ Screenshot uploaded: {}", internal_url);
+                                                json!({
+                                                    "content": [{
+                                                        "type": "text",
+                                                        "text": format!("✅ Screenshot uploaded successfully!\n\n**File:** {}\n**Destination:** {}\n**Internal URL:** {}\n\n**Markdown for PR:**\n```markdown\n![{}]({})\n```",
+                                                            file_path, mc_dest, internal_url, name, internal_url)
+                                                    }]
+                                                })
+                                            } else {
+                                                let stderr = String::from_utf8_lossy(&output.stderr);
+                                                tracing::error!("❌ mc upload failed: {}", stderr);
+                                                json!({
+                                                    "content": [{
+                                                        "type": "text",
+                                                        "text": format!("❌ Screenshot upload failed: {}", stderr)
+                                                    }],
+                                                    "isError": true
+                                                })
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("❌ Failed to execute mc: {}", e);
+                                            json!({
+                                                "content": [{
+                                                    "type": "text",
+                                                    "text": format!("❌ Failed to execute mc command: {}\n\nEnsure mc is installed and configured with MinIO credentials.", e)
+                                                }],
+                                                "isError": true
+                                            })
+                                        }
+                                    }
+                                }
                             } else {
                                 // Parse prefixed tool name and forward to server
                                 let config_manager = self.system_config_manager.read().await;
