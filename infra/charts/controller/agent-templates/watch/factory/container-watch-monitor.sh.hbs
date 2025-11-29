@@ -42,56 +42,81 @@ echo "════════════════════════�
 echo ""
 
 # -------------------------------------------------------------------------
-# GitHub Authentication
+# GitHub Authentication (same pattern as factory/container-base.sh.hbs)
 # -------------------------------------------------------------------------
 echo "🔐 Authenticating with GitHub..."
 
-{{#if github_app_private_key}}
-# App-based authentication
-APP_ID="{{github_app_id}}"
-echo "$APP_ID" > /tmp/app_id
-echo '{{github_app_private_key}}' > /tmp/private_key.pem
+REPO_URL="{{repository_url}}"
 
-# Generate JWT and installation token
-JWT=$(python3 -c "
-import jwt
-import time
-import sys
-
-with open('/tmp/private_key.pem', 'r') as f:
-    private_key = f.read()
-
-app_id = open('/tmp/app_id').read().strip()
-now = int(time.time())
-payload = {
-    'iat': now - 60,
-    'exp': now + (10 * 60),
-    'iss': app_id
-}
-token = jwt.encode(payload, private_key, algorithm='RS256')
-print(token)
-")
-
-INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/app/installations" | jq -r '.[0].id')
-
-GH_TOKEN=$(curl -s -X POST \
-  -H "Authorization: Bearer $JWT" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
-
-echo "$GH_TOKEN" | gh auth login --with-token
-echo "✅ Authenticated with GitHub App"
-{{else}}
-# Use existing GH_TOKEN if available
-if [ -n "${GH_TOKEN:-}" ]; then
-  echo "$GH_TOKEN" | gh auth login --with-token
-  echo "✅ Authenticated with GH_TOKEN"
+if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+  echo "⚠️ Missing GitHub App credentials (GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID)"
+  echo "   Continuing without GitHub auth - some operations may fail"
 else
-  echo "⚠️ No GitHub credentials available"
+  TEMP_KEY_FILE="/tmp/github-app-key.pem"
+  printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
+  chmod 600 "$TEMP_KEY_FILE"
+
+  # Generate JWT
+  JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  NOW=$(date +%s)
+  EXP=$((NOW + 600))
+  JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+  rm -f "$TEMP_KEY_FILE"
+
+  # Parse repo URL to get owner/name
+  parse_repo() {
+    local input="$1"
+    if echo "$input" | grep -qE '^https://github.com/'; then
+      echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+    elif echo "$input" | grep -qE '^git@github.com:'; then
+      echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+    else
+      echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
+    fi
+  }
+
+  read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
+
+  # Get installation ID for this repo
+  INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+  if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+    # Try org-level installation
+    INSTALLATION_ID=$(curl -s -L \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+  fi
+
+  if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+    echo "⚠️ Could not find GitHub App installation for $REPO_OWNER/$REPO_NAME"
+  else
+    # Get installation access token
+    GITHUB_TOKEN=$(curl -s -X POST \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+    if [ "$GITHUB_TOKEN" != "null" ] && [ -n "$GITHUB_TOKEN" ]; then
+      export GITHUB_TOKEN
+      export GH_TOKEN="$GITHUB_TOKEN"
+      export GH_HOST="github.com"
+
+      # Authenticate gh CLI
+      printf '%s\n' "$GITHUB_TOKEN" | gh auth login --with-token --hostname github.com >/dev/null 2>&1 || true
+      gh auth setup-git >/dev/null 2>&1 || true
+
+      echo "✅ Authenticated with GitHub App (installation: $INSTALLATION_ID)"
+    else
+      echo "⚠️ Failed to get GitHub installation token"
+    fi
+  fi
 fi
-{{/if}}
 
 # -------------------------------------------------------------------------
 # Verify Tools
