@@ -431,8 +431,8 @@ fn trigger_remediation(
     let coderun_name = format!("remediation-t{task_id}-i{iteration}-{uid}");
 
     // Serialize failure context to JSON for the agent
-    let failure_json = serde_json::to_string(failure)
-        .context("Failed to serialize failure context")?;
+    let failure_json =
+        serde_json::to_string(failure).context("Failed to serialize failure context")?;
 
     // Create CodeRun YAML manifest
     let coderun_yaml = format!(
@@ -477,7 +477,10 @@ spec:
         cli = config.cli,
         model = config.model,
         repository = config.repository,
-        docs_repo = config.docs_repository.as_deref().unwrap_or(&config.repository),
+        docs_repo = config
+            .docs_repository
+            .as_deref()
+            .unwrap_or(&config.repository),
         docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs"),
         template = config.template,
         failure_json_escaped = serde_json::to_string(&failure_json)?,
@@ -502,7 +505,9 @@ spec:
             .context("Failed to write YAML to kubectl stdin")?;
     }
 
-    let output = child.wait_with_output().context("Failed to wait for kubectl")?;
+    let output = child
+        .wait_with_output()
+        .context("Failed to wait for kubectl")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -601,15 +606,7 @@ async fn wait_for_argocd_sync(
 
         // Get ArgoCD app status
         let output = Command::new("kubectl")
-            .args([
-                "get",
-                "application",
-                app_name,
-                "-n",
-                "argocd",
-                "-o",
-                "json",
-            ])
+            .args(["get", "application", app_name, "-n", "argocd", "-o", "json"])
             .output();
 
         if let Ok(output) = output {
@@ -1960,10 +1957,7 @@ async fn run_self_healing_loop(
 
         current_workflow_name = Some(workflow_name.clone());
 
-        println!(
-            "{}",
-            format!("Workflow submitted: {workflow_name}").green()
-        );
+        println!("{}", format!("Workflow submitted: {workflow_name}").green());
 
         // Monitor workflow with remediation support
         let result = run_multi_watch(
@@ -1996,8 +1990,10 @@ async fn run_self_healing_loop(
                 if error_msg.contains("REMEDIATION_NEEDED:") {
                     println!(
                         "{}",
-                        format!("Workflow failed, triggering remediation (iteration {iteration})...")
-                            .yellow()
+                        format!(
+                            "Workflow failed, triggering remediation (iteration {iteration})..."
+                        )
+                        .yellow()
                     );
 
                     // Extract failure context from error
@@ -2048,10 +2044,7 @@ async fn run_self_healing_loop(
                         println!("{}", format!("Remediation PR created: {pr_url}").green());
 
                         // Wait for PR to be merged and ArgoCD to sync
-                        println!(
-                            "{}",
-                            "Waiting for PR merge and ArgoCD sync...".cyan()
-                        );
+                        println!("{}", "Waiting for PR merge and ArgoCD sync...".cyan());
 
                         // Note: In production, we'd monitor the PR status and wait for merge
                         // For now, we wait for ArgoCD to sync (which happens after merge)
@@ -2079,6 +2072,28 @@ async fn run_self_healing_loop(
                             "Warning: No PR URL from remediation - agent may have fixed inline"
                                 .yellow()
                         );
+
+                        // Still need to wait for ArgoCD to sync the inline fix
+                        println!("{}", "Waiting for ArgoCD to sync inline fix...".cyan());
+
+                        let synced = wait_for_argocd_sync(
+                            "cto-controller", // ArgoCD app name
+                            None,             // No specific commit
+                            remediation.sync_timeout_secs,
+                        )
+                        .await?;
+
+                        if !synced {
+                            println!(
+                                "{}",
+                                "Warning: ArgoCD sync timeout - retrying anyway".yellow()
+                            );
+                        }
+
+                        // Clean up old workflow before retry
+                        let _ = Command::new("argo")
+                            .args(["delete", &workflow_name, "-n", argo_namespace])
+                            .output();
                     }
 
                     // Continue to next iteration (retry workflow)
