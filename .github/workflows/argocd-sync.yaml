@@ -60,9 +60,10 @@ jobs:
           # Wait a moment for refresh to process
           sleep 5
 
-          # Trigger actual sync operation
+          # Trigger actual sync operation with ServerSideApply to handle large CRDs
+          # (avoids 262144 byte annotation limit with kubectl.kubernetes.io/last-applied-configuration)
           kubectl patch application platform-apps -n argocd --type merge \
-            -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"prune":true}}}'
+            -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"prune":true,"syncOptions":["ServerSideApply=true"]}}}'
 
           echo "✅ platform-apps sync triggered"
           echo "- **platform-apps:** Sync triggered ✅" >> $GITHUB_STEP_SUMMARY
@@ -125,9 +126,10 @@ jobs:
             kubectl patch application "$app" -n argocd --type merge \
               -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' 2>/dev/null || true
 
-            # Trigger sync
+            # Trigger sync with ServerSideApply to handle large CRDs
+            # (avoids 262144 byte annotation limit with kubectl.kubernetes.io/last-applied-configuration)
             kubectl patch application "$app" -n argocd --type merge \
-              -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"prune":true}}}' 2>/dev/null || true
+              -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"prune":true,"syncOptions":["ServerSideApply=true"]}}}' 2>/dev/null || true
 
             echo "- **$app:** Sync triggered ✅" >> $GITHUB_STEP_SUMMARY
           done
