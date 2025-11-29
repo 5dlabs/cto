@@ -220,7 +220,7 @@ enum Commands {
         #[arg(long, default_value = "play-workflow-template")]
         template: String,
     },
-    /// [E2E] Start the self-healing E2E loop - creates Monitor CodeRun and exits
+    /// [E2E] Start the self-healing E2E loop - creates Monitor `CodeRun` and exits
     Start {
         /// Path to cto-config.json
         #[arg(long, default_value = "cto-config.json")]
@@ -586,9 +586,9 @@ spec:
     Ok(coderun_name)
 }
 
-/// Create a Monitor CodeRun to start/continue the E2E watch loop
+/// Create a Monitor `CodeRun` to start/continue the E2E watch loop
 ///
-/// Returns the name of the created CodeRun
+/// Returns the name of the created `CodeRun`
 fn create_monitor_coderun(
     config: &MonitorConfig,
     play_config: &PlayConfig,
@@ -1334,7 +1334,7 @@ async fn main() -> Result<()> {
             config,
         } => {
             // This runs inside the Remediation pod
-            run_remediation_loop(iteration, &issue_file, &config, &cli.namespace).await?;
+            run_remediation_loop(iteration, &issue_file, &config, &cli.namespace)?;
         }
         Commands::Memory { action } => {
             handle_memory_command(action).await?;
@@ -3387,7 +3387,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
 /// 4. Downloads and analyzes all logs
 /// 5. Evaluates against acceptance criteria
 /// 6. On success: exits 0 (ends loop)
-/// 7. On failure: writes issue to PVC, creates Remediation CodeRun, exits 1
+/// 7. On failure: writes issue to PVC, creates Remediation `CodeRun`, exits 1
 #[allow(clippy::too_many_lines)]
 async fn run_monitor_loop(
     iteration: u32,
@@ -3455,7 +3455,7 @@ async fn run_monitor_loop(
                 "{}",
                 format!("Workflow phase: {}", status.phase).dimmed()
             );
-            last_phase = status.phase.clone();
+            last_phase.clone_from(&status.phase);
         }
 
         match status.phase.as_str() {
@@ -3535,7 +3535,7 @@ async fn run_monitor_loop(
     );
 
     let issue_report = format!(
-        r#"# Issue Report - Iteration {iteration}
+        r"# Issue Report - Iteration {iteration}
 
 ## Summary
 E2E workflow did not meet acceptance criteria.
@@ -3553,7 +3553,7 @@ See /workspace/watch/logs/workflow-logs.txt for full logs.
 
 ## Suggested Fix
 Analyze the errors above and fix the underlying issues in the CTO platform.
-"#,
+",
         issues.iter().map(|i| format!("- {i}")).collect::<Vec<_>>().join("\n"),
         final_status.phase,
     );
@@ -3608,9 +3608,9 @@ Analyze the errors above and fix the underlying issues in the CTO platform.
 /// 6. Waits for CI
 /// 7. Checks Bugbot
 /// 8. Merges PR
-/// 9. Waits for ArgoCD sync
-/// 10. Creates new Monitor CodeRun
-async fn run_remediation_loop(
+/// 9. Waits for `ArgoCD` sync
+/// 10. Creates new Monitor `CodeRun`
+fn run_remediation_loop(
     iteration: u32,
     issue_file: &str,
     config_path: &str,
@@ -3671,7 +3671,7 @@ async fn run_remediation_loop(
     Ok(())
 }
 
-/// Create the next Monitor CodeRun after successful remediation
+/// Create the next Monitor `CodeRun` after successful remediation
 /// Called by the remediation agent after PR is merged and synced
 #[allow(dead_code)]
 fn create_next_monitor_iteration(config_path: &str, iteration: u32, namespace: &str) -> Result<()> {
