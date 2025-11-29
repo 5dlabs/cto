@@ -74,7 +74,8 @@ jobs:
           set -euo pipefail
           # Query GitHub API for latest unified release (tags matching v*.*.*)
           # This release contains both tools-client and play-monitor binaries
-          RELEASE_VERSION=$(gh release list --limit 20 | grep -oE '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || echo "")
+          # Extract version from tag column (3rd tab-separated column) which is the clean tag like v0.2.1
+          RELEASE_VERSION=$(gh release list --limit 20 | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || echo "")
           if [ -z "$RELEASE_VERSION" ]; then
             echo "⚠️ No v*.*.* release found, tools and play-monitor will be skipped"
             echo "tools_version=skip" >> $GITHUB_OUTPUT
