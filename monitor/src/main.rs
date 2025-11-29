@@ -32,12 +32,16 @@ struct Cli {
     format: OutputFormat,
 
     /// Argo namespace for workflows
-    #[arg(long, default_value = "argo", global = true)]
+    #[arg(long, default_value = "cto", global = true)]
     namespace: String,
 
     /// Agent platform namespace for CRDs and pods
-    #[arg(long, default_value = "agent-platform", global = true)]
+    #[arg(long, default_value = "cto", global = true)]
     agent_namespace: String,
+
+    /// Namespace for Argo Events sensors
+    #[arg(long, default_value = "automation", global = true)]
+    sensor_namespace: String,
 
     /// Enable verbose output
     #[arg(short, long, global = true)]
@@ -187,9 +191,25 @@ enum Commands {
         #[arg(long, default_value = "5dlabs/cto-parallel-test")]
         repository: String,
 
+        /// Service name (for PVC naming and labels)
+        #[arg(long, default_value = "cto-parallel-test")]
+        service: String,
+
+        /// Run type for workflow naming (e.g., monitor-test, diagnostic)
+        #[arg(long, default_value = "monitor-test")]
+        run_type: String,
+
         /// Implementation agent (Rex or Blaze)
         #[arg(long, default_value = "5DLabs-Rex")]
         agent: String,
+
+        /// Agent CLI type (claude, codex, cursor, opencode, etc.)
+        #[arg(long, default_value = "codex")]
+        cli: String,
+
+        /// Model to use
+        #[arg(long, default_value = "gpt-5-codex")]
+        model: String,
 
         /// Workflow template name
         #[arg(long, default_value = "play-workflow-template")]
@@ -692,10 +712,24 @@ async fn main() -> Result<()> {
         Commands::Run {
             task_id,
             repository,
+            service,
+            run_type,
             agent,
+            cli: agent_cli,
+            model,
             template,
         } => {
-            let result = run_workflow(&task_id, &repository, &agent, &template, &cli.namespace)?;
+            let result = run_workflow(
+                &task_id,
+                &repository,
+                &service,
+                &run_type,
+                &agent,
+                &agent_cli,
+                &model,
+                &template,
+                &cli.namespace,
+            )?;
             output_result(&result, cli.format)?;
         }
         Commands::Memory { action } => {
@@ -2335,7 +2369,11 @@ fn count_deleted(output: &[u8]) -> i32 {
 fn run_workflow(
     task_id: &str,
     repository: &str,
+    service: &str,
+    run_type: &str,
     agent: &str,
+    agent_cli: &str,
+    model: &str,
     template: &str,
     namespace: &str,
 ) -> Result<RunResponse> {
@@ -2343,6 +2381,15 @@ fn run_workflow(
         "{}",
         format!("Submitting play workflow for task {task_id}...").cyan()
     );
+
+    // Generate descriptive workflow name
+    // Format: play-{run_type}-t{task_id}-{agent_short}-{cli}-{uid}
+    let agent_short = agent
+        .strip_prefix("5DLabs-")
+        .unwrap_or(agent)
+        .to_lowercase();
+    let uid: String = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let workflow_name = format!("play-{run_type}-t{task_id}-{agent_short}-{agent_cli}-{uid}");
 
     // Submit workflow using argo CLI
     let output = Command::new("argo")
@@ -2357,11 +2404,27 @@ fn run_workflow(
             "-p",
             &format!("repository={repository}"),
             "-p",
+            &format!("service={service}"),
+            "-p",
             &format!("implementation-agent={agent}"),
+            "-p",
+            &format!("implementation-cli={agent_cli}"),
+            "-p",
+            &format!("implementation-model={model}"),
             "-p",
             "quality-agent=5DLabs-Cleo",
             "-p",
+            "quality-cli=claude",
+            "-p",
+            "quality-model=claude-sonnet-4-20250514",
+            "-p",
             "testing-agent=5DLabs-Tess",
+            "-p",
+            "testing-cli=claude",
+            "-p",
+            "testing-model=claude-sonnet-4-20250514",
+            "--name",
+            &workflow_name,
             "-o",
             "json",
         ])
