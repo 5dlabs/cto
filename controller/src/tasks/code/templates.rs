@@ -672,6 +672,27 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        // Extract watch-specific variables from env
+        let iteration = code_run
+            .spec
+            .env
+            .get("ITERATION")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(1);
+        let max_iterations = code_run
+            .spec
+            .env
+            .get("MAX_ITERATIONS")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(3);
+        let target_repository = code_run
+            .spec
+            .env
+            .get("TARGET_REPOSITORY")
+            .cloned()
+            .unwrap_or_default();
+        let namespace = code_run.metadata.namespace.as_deref().unwrap_or("cto");
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -693,6 +714,11 @@ impl CodeTemplateGenerator {
             "output_format": render_settings.output_format,
             "model_rotation": render_settings.model_rotation,
             "list_tools_on_start": render_settings.list_tools_on_start,
+            // Watch-specific context
+            "iteration": iteration,
+            "max_iterations": max_iterations,
+            "target_repository": target_repository,
+            "namespace": namespace,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
                 "model": render_settings.model,
@@ -741,6 +767,14 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
+        // Extract iteration from env or settings for watch workflows
+        let iteration = code_run
+            .spec
+            .env
+            .get("ITERATION")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(1);
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -758,6 +792,7 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": Self::determine_cli_type(code_run).to_string(),
+            "iteration": iteration,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
                 "model": render_settings.model,
@@ -2868,12 +2903,19 @@ impl CodeTemplateGenerator {
         let is_remediation = retry_count > 0;
 
         // Watch-specific templates take precedence
+        // Use watchRole from cli_config.settings to determine monitor vs remediation
         if is_watch {
-            return match github_app {
-                "5DLabs-Rex" | "5DLabs-Rex-Remediation" => {
-                    "watch/factory/container-watch-remediation.sh.hbs".to_string()
-                }
-                // Morgan and all others use the monitor template
+            let watch_role = code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .and_then(|c| c.settings.get("watchRole"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("monitor");
+
+            return match watch_role {
+                "remediation" => "watch/factory/container-watch-remediation.sh.hbs".to_string(),
+                // Default to monitor template
                 _ => "watch/factory/container-watch-monitor.sh.hbs".to_string(),
             };
         }
@@ -2916,12 +2958,19 @@ impl CodeTemplateGenerator {
             service.to_lowercase().contains("watch") || template_setting.starts_with("watch/");
 
         // Watch-specific templates take precedence
+        // Use watchRole from cli_config.settings to determine monitor vs remediation
         if is_watch {
-            return match github_app {
-                "5DLabs-Rex" | "5DLabs-Rex-Remediation" => {
-                    "watch/factory/agents-watch-remediation.md.hbs".to_string()
-                }
-                // Morgan and all others use the monitor template
+            let watch_role = code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .and_then(|c| c.settings.get("watchRole"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("monitor");
+
+            return match watch_role {
+                "remediation" => "watch/factory/agents-watch-remediation.md.hbs".to_string(),
+                // Default to monitor template
                 _ => "watch/factory/agents-watch-monitor.md.hbs".to_string(),
             };
         }
