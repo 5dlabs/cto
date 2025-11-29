@@ -416,27 +416,124 @@ $details
 $test_strategy
 TASK_MD
 
-    # Generate prompt.md
+    # Infer domain/persona from task title and description
+    # This enables principle #6: Role-Playing (Persona)
+    inferred_role="Senior Software Engineer"
+    if echo "$title $description" | grep -qiE 'frontend|ui|react|component|css|tailwind|design'; then
+        inferred_role="Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX"
+    elif echo "$title $description" | grep -qiE 'backend|api|server|database|rust|postgres'; then
+        inferred_role="Senior Backend Engineer with expertise in Rust, APIs, and database systems"
+    elif echo "$title $description" | grep -qiE 'devops|deploy|kubernetes|helm|infra|ci/cd'; then
+        inferred_role="Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD"
+    elif echo "$title $description" | grep -qiE 'test|qa|quality|validation'; then
+        inferred_role="Senior QA Engineer with expertise in test automation and quality assurance"
+    elif echo "$title $description" | grep -qiE 'security|auth|encryption|oauth'; then
+        inferred_role="Senior Security Engineer with expertise in authentication and secure coding"
+    elif echo "$title $description" | grep -qiE 'data|analytics|ml|ai|model'; then
+        inferred_role="Senior Data Engineer with expertise in data pipelines and analytics"
+    fi
+
+    # Generate prompt.md with Master Prompting 2026 framework
+    # Applies all 6 Core Principles:
+    # 1. Clarity & Specificity - Structured sections with clear constraints
+    # 2. Few-Shot Prompting - Example output format included
+    # 3. Chain of Thought - Step-by-step reasoning instructions
+    # 4. Iterative Refinement - Self-critique checklist
+    # 5. Context & Knowledge Leverage - Background and project context
+    # 6. Role-Playing (Persona) - Domain-specific expert persona
     cat > "$task_dir/prompt.md" << PROMPT_MD
 # Implementation Prompt for Task $task_id
 
-## Objective
-$title
+## Role (Persona)
+You are a $inferred_role. Your primary responsibility is implementing Task $task_id with production-quality code that follows best practices and project conventions.
 
-## Context
-$description
+## Context (Background)
+**Task Priority:** $priority
+**Dependencies:** ${dependencies:-None (this task can start immediately)}
+**Scope:** $description
 
-## Requirements
+This task is part of a larger project. Review the PRD and architecture documents in \`.taskmaster/docs/\` to understand the full context before implementing.
+
+## Task (Specific Instructions)
+**Objective:** $title
+
+### Requirements
 $details
+
+### Constraints & Formatting
+- **Code Style:** Match existing codebase patterns and conventions
+- **Output Format:** Pull request with clear, atomic commits
+- **Documentation:** Update relevant docs and inline comments
+- **Testing:** Include unit tests for new functionality
+- **PR Title Format:** \`feat(task-$task_id): $title\`
+
+## Steps (Chain of Thought)
+Think step-by-step before implementing. Do not skip steps:
+
+1. **Analyze Context**
+   - Review existing code patterns in the repository
+   - Identify files that need modification
+   - Check for existing utilities or patterns to reuse
+
+2. **Plan Implementation**
+   - Outline your approach before writing code
+   - Identify potential edge cases and error scenarios
+   - Consider backward compatibility if modifying existing code
+
+3. **Implement Solution**
+   - Write clean, well-documented code
+   - Follow the single responsibility principle
+   - Use meaningful variable and function names
+
+4. **Write Tests**
+   - Create tests that verify the acceptance criteria
+   - Include edge case coverage
+   - Ensure tests are deterministic and fast
+
+5. **Self-Review**
+   - Review your own code for issues before submitting
+   - Check for security vulnerabilities
+   - Verify all acceptance criteria are met
+
+6. **Submit PR**
+   - Create a comprehensive PR description
+   - Link to this task in the PR body
+   - Request review from appropriate team members
 
 ## Acceptance Criteria
 $test_strategy
 
-## Instructions
-1. Review the requirements above carefully
-2. Implement the solution following project conventions
-3. Write tests to verify acceptance criteria
-4. Submit a PR with your changes
+## Self-Critique Checklist (Iterative Refinement)
+Before submitting your PR, verify each item:
+
+- [ ] **Functionality:** Does the implementation meet all requirements?
+- [ ] **Edge Cases:** Are boundary conditions and error states handled?
+- [ ] **Security:** Are there any potential security vulnerabilities?
+- [ ] **Performance:** Is the solution efficient for expected scale?
+- [ ] **Maintainability:** Is the code readable and well-documented?
+- [ ] **Testing:** Do all tests pass? Is coverage adequate?
+- [ ] **Conventions:** Does the code follow project style guidelines?
+
+## Example Output (Few-Shot)
+Your PR should follow this structure:
+
+\`\`\`markdown
+## Summary
+Brief description of what this PR implements for Task $task_id.
+
+## Changes
+- List of specific changes made
+- Files modified/added
+
+## Testing
+- How the changes were tested
+- Test commands to verify
+
+## Checklist
+- [ ] Tests pass
+- [ ] Linting passes
+- [ ] Documentation updated
+\`\`\`
 PROMPT_MD
 
     # Generate acceptance-criteria.md
@@ -461,29 +558,71 @@ $test_strategy
 - [ ] Documentation updated
 AC_MD
 
-    # Generate task.xml
+    # Generate task.xml with Master Prompting 2026 framework
     cat > "$task_dir/task.xml" << TASK_XML
 <?xml version="1.0" encoding="UTF-8"?>
-<prompt>
-    <role>You are a senior software engineer implementing Task $task_id.</role>
+<prompt version="2026.1">
+    <!-- Principle #6: Role-Playing (Persona) -->
+    <role>
+        <persona>$inferred_role</persona>
+        <responsibility>Implement Task $task_id with production-quality code</responsibility>
+    </role>
+
+    <!-- Principle #5: Context & Knowledge Leverage -->
+    <context>
+        <background>Review .taskmaster/docs/ for full project context</background>
+        <priority>$priority</priority>
+        <dependencies>${dependencies:-None}</dependencies>
+    </context>
+
+    <!-- Principle #1: Clarity & Specificity -->
     <task>
         <id>$task_id</id>
         <title>$title</title>
         <description>$description</description>
-        <priority>$priority</priority>
-        <dependencies>$dependencies</dependencies>
     </task>
-    <implementation_details>
+
+    <requirements>
+        <details>
 $details
-    </implementation_details>
-    <test_strategy>
+        </details>
+        <constraints>
+            <item>Match existing codebase patterns</item>
+            <item>Include unit tests for new functionality</item>
+            <item>Update documentation as needed</item>
+            <item>PR title format: feat(task-$task_id): $title</item>
+        </constraints>
+    </requirements>
+
+    <!-- Principle #3: Chain of Thought -->
+    <steps reasoning="step-by-step">
+        <step order="1">Analyze existing code patterns and identify files to modify</step>
+        <step order="2">Plan implementation approach and identify edge cases</step>
+        <step order="3">Implement solution with clean, documented code</step>
+        <step order="4">Write tests to verify acceptance criteria</step>
+        <step order="5">Self-review for security and maintainability issues</step>
+        <step order="6">Submit PR with comprehensive description</step>
+    </steps>
+
+    <!-- Principle #4: Iterative Refinement -->
+    <acceptance_criteria>
 $test_strategy
-    </test_strategy>
-    <instructions>
-        Implement this task following project conventions.
-        Write tests to verify all acceptance criteria.
-        Create a pull request with your changes.
-    </instructions>
+    </acceptance_criteria>
+
+    <self_critique>
+        <check>Does implementation meet all requirements?</check>
+        <check>Are edge cases and error states handled?</check>
+        <check>Are there security vulnerabilities?</check>
+        <check>Is the code maintainable and documented?</check>
+        <check>Do all tests pass with adequate coverage?</check>
+    </self_critique>
+
+    <!-- Principle #2: Few-Shot Prompting -->
+    <example_output format="PR">
+        <summary>Brief description of Task $task_id implementation</summary>
+        <changes>List of specific changes made</changes>
+        <testing>How changes were verified</testing>
+    </example_output>
 </prompt>
 TASK_XML
 
@@ -616,5 +755,9 @@ echo "Location: $PROJECT_DIR"
 echo "Branch: $BRANCH_NAME"
 echo "Repository: $REPOSITORY_URL"
 echo "Tasks generated: $(jq '(.master.tasks // .tasks) | length' "$PROJECT_DIR/$TASKS_FILE")"
+
+
+
+
 
 
