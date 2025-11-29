@@ -2845,8 +2845,18 @@ impl CodeTemplateGenerator {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let service = &code_run.spec.service;
 
-        // Check if this is a Watch workflow (service contains "watch")
-        let is_watch = service.to_lowercase().contains("watch");
+        // Check if this is a Watch workflow:
+        // 1. Service name contains "watch", OR
+        // 2. cli_config.settings.template starts with "watch/"
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_watch = service.to_lowercase().contains("watch")
+            || template_setting.starts_with("watch/");
 
         // Check if this is a remediation cycle
         let retry_count = code_run
@@ -2892,8 +2902,18 @@ impl CodeTemplateGenerator {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let service = &code_run.spec.service;
 
-        // Check if this is a Watch workflow (service contains "watch")
-        let is_watch = service.to_lowercase().contains("watch");
+        // Check if this is a Watch workflow:
+        // 1. Service name contains "watch", OR
+        // 2. cli_config.settings.template starts with "watch/"
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_watch = service.to_lowercase().contains("watch")
+            || template_setting.starts_with("watch/");
 
         // Watch-specific templates take precedence
         if is_watch {
