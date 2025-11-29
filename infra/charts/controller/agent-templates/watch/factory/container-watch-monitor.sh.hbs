@@ -1,5 +1,194 @@
-{{> factory_container_base
-    agent_banner="🔍 Morgan E2E Watch Monitor starting"
-    agent_completion_message="✅ Morgan E2E Watch Monitor complete"
-    force_writes=true}}
+#!/bin/bash
+set -euo pipefail
 
+# =========================================================================
+# E2E Watch Monitor - Lightweight Container Script
+# =========================================================================
+# This script runs the monitor loop directly without the full factory setup.
+# The monitor's job is to submit Play workflows, watch them, and evaluate results.
+
+echo "🔍 Morgan E2E Watch Monitor starting"
+echo ""
+
+# -------------------------------------------------------------------------
+# Environment Setup
+# -------------------------------------------------------------------------
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+echo "PATH: $PATH"
+
+# -------------------------------------------------------------------------
+# Configuration
+# -------------------------------------------------------------------------
+ITERATION=${ITERATION:-1}
+MAX_ITERATIONS=${MAX_ITERATIONS:-5}
+CONFIG_PATH=${CONFIG_PATH:-"/workspace/config/cto-config.json"}
+NAMESPACE=${NAMESPACE:-"cto"}
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              E2E WATCH MONITOR CONFIGURATION                  ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "📍 Iteration: $ITERATION / $MAX_ITERATIONS"
+echo "🔧 Config: $CONFIG_PATH"
+echo "📂 Namespace: $NAMESPACE"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# -------------------------------------------------------------------------
+# GitHub Authentication
+# -------------------------------------------------------------------------
+echo "🔐 Authenticating with GitHub..."
+
+{{#if github_app_private_key}}
+# App-based authentication
+APP_ID="{{github_app_id}}"
+echo "$APP_ID" > /tmp/app_id
+echo '{{github_app_private_key}}' > /tmp/private_key.pem
+
+# Generate JWT and installation token
+JWT=$(python3 -c "
+import jwt
+import time
+import sys
+
+with open('/tmp/private_key.pem', 'r') as f:
+    private_key = f.read()
+
+app_id = open('/tmp/app_id').read().strip()
+now = int(time.time())
+payload = {
+    'iat': now - 60,
+    'exp': now + (10 * 60),
+    'iss': app_id
+}
+token = jwt.encode(payload, private_key, algorithm='RS256')
+print(token)
+")
+
+INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations" | jq -r '.[0].id')
+
+GH_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+echo "$GH_TOKEN" | gh auth login --with-token
+echo "✅ Authenticated with GitHub App"
+{{else}}
+# Use existing GH_TOKEN if available
+if [ -n "${GH_TOKEN:-}" ]; then
+  echo "$GH_TOKEN" | gh auth login --with-token
+  echo "✅ Authenticated with GH_TOKEN"
+else
+  echo "⚠️ No GitHub credentials available"
+fi
+{{/if}}
+
+# -------------------------------------------------------------------------
+# Verify Tools
+# -------------------------------------------------------------------------
+echo ""
+echo "🔍 Verifying required tools..."
+
+if ! command -v play-monitor &> /dev/null; then
+  echo "❌ play-monitor CLI not found in PATH"
+  echo "   Available in PATH: $(echo $PATH | tr ':' '\n' | head -5)"
+  exit 1
+fi
+echo "✅ play-monitor: $(play-monitor --version 2>/dev/null || echo 'available')"
+
+if ! command -v kubectl &> /dev/null; then
+  echo "⚠️ kubectl not found - some operations may fail"
+else
+  echo "✅ kubectl: $(kubectl version --client -o json 2>/dev/null | jq -r '.clientVersion.gitVersion' || echo 'available')"
+fi
+
+if ! command -v gh &> /dev/null; then
+  echo "⚠️ gh CLI not found - GitHub operations may fail"
+else
+  echo "✅ gh: $(gh --version | head -1)"
+fi
+
+# -------------------------------------------------------------------------
+# Setup Watch Directory
+# -------------------------------------------------------------------------
+WATCH_DIR="/workspace/watch"
+mkdir -p "$WATCH_DIR/logs"
+
+echo ""
+echo "📂 Watch directory: $WATCH_DIR"
+
+# Initialize status file
+cat > "$WATCH_DIR/status.md" << EOF
+# E2E Watch Status
+
+## Current State
+- Iteration: $ITERATION
+- Phase: Starting
+- Started: $(date -Iseconds)
+
+## Progress
+- [ ] Environment setup
+- [ ] Play workflow submitted
+- [ ] Monitoring stages
+- [ ] Evaluation complete
+EOF
+
+echo "✅ Status file initialized"
+
+# -------------------------------------------------------------------------
+# Run Monitor Loop
+# -------------------------------------------------------------------------
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              STARTING MONITOR LOOP                            ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# The play-monitor CLI handles:
+# 1. Reset (if iteration > 1)
+# 2. Submit Play workflow
+# 3. Watch for completion
+# 4. Download and analyze logs
+# 5. Evaluate against acceptance criteria
+# 6. Write issue report or exit success
+
+if [ -f "$CONFIG_PATH" ]; then
+  play-monitor monitor \
+    --iteration "$ITERATION" \
+    --config "$CONFIG_PATH" \
+    --namespace "$NAMESPACE"
+  EXIT_CODE=$?
+else
+  echo "⚠️ Config file not found at $CONFIG_PATH"
+  echo "   Running with defaults..."
+  play-monitor monitor \
+    --iteration "$ITERATION" \
+    --namespace "$NAMESPACE"
+  EXIT_CODE=$?
+fi
+
+# -------------------------------------------------------------------------
+# Completion
+# -------------------------------------------------------------------------
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $EXIT_CODE -eq 0 ]; then
+  echo "║    ✅ MONITOR COMPLETE - ALL CRITERIA PASSED                  ║"
+else
+  echo "║    ❌ MONITOR COMPLETE - ISSUES FOUND (triggering remediation)║"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+echo "✅ Morgan E2E Watch Monitor complete"
+exit $EXIT_CODE
