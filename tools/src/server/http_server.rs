@@ -2745,9 +2745,13 @@ impl BridgeState {
                                         "isError": true
                                     })
                                 } else {
-                                    // Build S3 key with timestamp
+                                    // Build S3 key with timestamp, preserving original file extension
                                     let timestamp = Utc::now().format("%Y%m%d-%H%M%S");
-                                    let key = format!("{repo}/pr-{pr_number}/{timestamp}-{name}.png");
+                                    let extension = std::path::Path::new(file_path)
+                                        .extension()
+                                        .and_then(std::ffi::OsStr::to_str)
+                                        .unwrap_or("png");
+                                    let key = format!("{repo}/pr-{pr_number}/{timestamp}-{name}.{extension}");
 
                                     // Get bucket from environment
                                     let bucket = std::env::var("MINIO_BUCKET").unwrap_or_else(|_| "screenshots".to_string());
