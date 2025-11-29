@@ -67,8 +67,13 @@ spec:
                 logs.platform.5dlabs.io/service: minio-screenshots
 
           # Mount existing secret for credentials
+          # Note: Both configuration.name AND configSecret are required
+          # See: https://github.com/minio/operator/issues/2280
           configuration:
             name: minio-screenshots-credentials
+          configSecret:
+            name: minio-screenshots-credentials
+            existingSecret: true
 
           # Expose via ClusterIP for internal access
           exposeServices:
