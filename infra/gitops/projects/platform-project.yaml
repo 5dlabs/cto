@@ -52,6 +52,8 @@ spec:
     - 'https://kubernetes.github.io/ingress-nginx'
     # Cert-Manager Helm chart repository
     - 'https://charts.jetstack.io'
+    # MinIO Operator Helm chart repository
+    - 'https://operator.min.io'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -92,6 +94,11 @@ spec:
     # Cloudflare Tunnel operator
     - namespace: cloudflare-operator-system
       server: https://kubernetes.default.svc
+    # MinIO Object Storage
+    - namespace: minio-operator
+      server: https://kubernetes.default.svc
+    - namespace: minio-screenshots
+      server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
   clusterResourceWhitelist:
@@ -129,6 +136,13 @@ spec:
       kind: '*'
     # Kilo WireGuard VPN CRDs
     - group: 'kilo.squat.ai'
+      kind: '*'
+    # MinIO Operator CRDs
+    - group: 'minio.min.io'
+      kind: '*'
+    - group: 'sts.min.io'
+      kind: '*'
+    - group: 'job.min.io'
       kind: '*'
 
   # Namespace resource whitelist
@@ -181,6 +195,13 @@ spec:
       kind: '*'
     # Kilo WireGuard VPN CRDs
     - group: 'kilo.squat.ai'
+      kind: '*'
+    # MinIO Operator CRDs
+    - group: 'minio.min.io'
+      kind: '*'
+    - group: 'sts.min.io'
+      kind: '*'
+    - group: 'job.min.io'
       kind: '*'
 
   # Roles for access control
