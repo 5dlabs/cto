@@ -54,12 +54,31 @@ impl<'a> CodeResourceManager<'a> {
         let code_run = self.populate_cli_config_if_needed(code_run);
         let code_run_ref = &*code_run;
 
-        // Determine PVC name based on agent classification
+        // Determine PVC name based on agent classification and CodeRun type
         let service_name = &code_run_ref.spec.service;
         let classifier = AgentClassifier::new();
 
-        // Get the appropriate PVC name based on agent type
-        let pvc_name = if let Some(github_app) = &code_run_ref.spec.github_app {
+        // Check if this is a watch CodeRun (Monitor or Remediation)
+        let template_setting = code_run_ref
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_watch =
+            template_setting.starts_with("watch/") || service_name.to_lowercase().contains("watch");
+
+        // Get the appropriate PVC name
+        let pvc_name = if is_watch {
+            // Watch CodeRuns (Monitor + Remediation) share a dedicated PVC
+            let watch_pvc = AgentClassifier::get_watch_pvc_name(service_name);
+            info!(
+                "👀 Watch CodeRun detected, using dedicated watch PVC: {}",
+                watch_pvc
+            );
+            watch_pvc
+        } else if let Some(github_app) = &code_run_ref.spec.github_app {
             match classifier.get_pvc_name(service_name, github_app) {
                 Ok(name) => {
                     // Log the agent classification for visibility
@@ -572,9 +591,24 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // PVC workspace volume for code (persistent across sessions)
-        // Use conditional naming based on agent classification
+        // Use conditional naming based on CodeRun type and agent classification
         let classifier = AgentClassifier::new();
-        let pvc_name = if let Some(github_app) = &code_run.spec.github_app {
+
+        // Check if this is a watch CodeRun
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_watch =
+            template_setting.starts_with("watch/") || code_run.spec.service.contains("watch");
+
+        let pvc_name = if is_watch {
+            // Watch CodeRuns share a dedicated PVC
+            AgentClassifier::get_watch_pvc_name(&code_run.spec.service)
+        } else if let Some(github_app) = &code_run.spec.github_app {
             match classifier.get_pvc_name(&code_run.spec.service, github_app) {
                 Ok(name) => name,
                 Err(e) => {

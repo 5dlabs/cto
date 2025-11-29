@@ -91,7 +91,9 @@ gh pr checks <pr-number> -R {{repository_url}}
 4. **Evaluate against criteria** in `/workspace/watch/acceptance-criteria.md`
 5. **Write results** to shared PVC
 
-## Communication via Shared PVC
+## Communication via Dedicated Watch PVC
+
+You and the Remediation Agent share a **dedicated watch PVC** (`workspace-{{service}}-watch`) that is isolated from the Play workflow agents. This ensures clean communication without interference.
 
 Write to `/workspace/watch/` for inter-agent communication:
 

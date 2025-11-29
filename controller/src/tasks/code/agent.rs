@@ -79,11 +79,36 @@ impl AgentClassifier {
         !self.is_implementation_agent(agent_name)
     }
 
-    /// Get the appropriate PVC name based on agent classification
+    /// Get the PVC name for watch CodeRuns (Monitor + Remediation pair).
+    ///
+    /// Watch agents share a dedicated PVC separate from play workflow agents.
+    /// This ensures clean isolation and prevents interference.
+    ///
+    /// # Returns
+    /// - `workspace-{service}-watch` (shared between Monitor and Remediation)
+    #[must_use]
+    pub fn get_watch_pvc_name(service: &str) -> String {
+        let pvc_name = format!("workspace-{service}-watch");
+
+        // Ensure PVC name doesn't exceed Kubernetes limits
+        if pvc_name.len() > 63 {
+            let prefix = "workspace-";
+            let suffix = "-watch";
+            let max_service_len = 63 - prefix.len() - suffix.len();
+            let truncated = &service[..max_service_len.min(service.len())];
+            format!("{prefix}{truncated}{suffix}")
+        } else {
+            pvc_name
+        }
+    }
+
+    /// Get the appropriate PVC name based on agent classification.
     ///
     /// # Returns
     /// - `workspace-{service}` for implementation agents (shared workspace)
     /// - `workspace-{service}-{agent}` for non-implementation agents (isolated workspace)
+    ///
+    /// Note: For watch CodeRuns, use `get_watch_pvc_name` instead.
     pub fn get_pvc_name(&self, service: &str, github_app: &str) -> Result<String, String> {
         let agent_name = self.extract_agent_name(github_app)?;
 
@@ -356,5 +381,30 @@ mod tests {
             classifier.get_pvc_name("cto", "5DLabs-Morgan").unwrap(),
             "workspace-cto"
         );
+    }
+
+    #[test]
+    fn test_watch_pvc_naming() {
+        // Watch PVC uses a dedicated name pattern
+        assert_eq!(
+            AgentClassifier::get_watch_pvc_name("cto"),
+            "workspace-cto-watch"
+        );
+
+        assert_eq!(
+            AgentClassifier::get_watch_pvc_name("my-service"),
+            "workspace-my-service-watch"
+        );
+    }
+
+    #[test]
+    fn test_watch_pvc_name_truncation() {
+        // Long service name that would exceed 63 chars
+        let long_service = "very-long-service-name-that-exceeds-kubernetes-limits-for-names";
+
+        let result = AgentClassifier::get_watch_pvc_name(long_service);
+        assert!(result.len() <= 63);
+        assert!(result.starts_with("workspace-"));
+        assert!(result.ends_with("-watch"));
     }
 }
