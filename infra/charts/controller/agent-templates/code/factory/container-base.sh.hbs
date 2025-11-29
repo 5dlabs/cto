@@ -38,6 +38,11 @@ echo "✓ Factory telemetry enabled: {{telemetry.otlpEndpoint}} ({{telemetry.otl
 {{/if}}
 
 # =========================================================================
+# WORKFLOW STAGE (default to implementation for standalone runs)
+# =========================================================================
+WORKFLOW_STAGE=${WORKFLOW_STAGE:-implementation}
+
+# =========================================================================
 # RETRY CONFIGURATION
 # =========================================================================
 MAX_RETRIES_CONFIG=${FACTORY_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
