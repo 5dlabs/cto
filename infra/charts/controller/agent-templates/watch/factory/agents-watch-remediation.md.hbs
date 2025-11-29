@@ -99,28 +99,56 @@ argocd app get agent-controller -o json | jq '.status.sync.status'
 kubectl rollout status deployment/agent-controller -n agent-platform
 ```
 
-### Phase 8: Restart Monitor
-After successful deployment, create a new Monitor CodeRun:
+### Phase 8: Restart Monitor Loop
+After successful deployment, create a new Monitor CodeRun to continue the E2E loop:
 
 ```bash
+# Use play-monitor to create the next Monitor CodeRun
+# This continues the self-healing loop with iteration + 1
 cat <<EOF | kubectl apply -f -
-apiVersion: agents.platform/v1alpha1
+apiVersion: agents.platform/v1
 kind: CodeRun
 metadata:
-  name: watch-monitor-{{task_id}}-$(date +%s)
-  namespace: agent-platform
+  name: e2e-monitor-i$(({{iteration}} + 1))-$(date +%s | cut -c6-13)
+  namespace: cto
   labels:
-    task-id: "{{task_id}}"
     watch-role: monitor
+    iteration: "$(({{iteration}} + 1))"
+    agents.platform/type: e2e-monitor
 spec:
-  taskId: "{{task_id}}"
-  service: "{{service}}"
-  repositoryUrl: "{{repository_url}}"
-  githubApp: "5DLabs-Morgan"
+  taskId: "1"
+  githubApp: "5DLabs-Rex"
+  cli: "factory"
   model: "glm-4-plus"
-  cliConfig:
-    iteration: $(({{iteration}} + 1))
+  repository: "{{repository_url}}"
+  service: "{{service}}"
+  template: "watch/factory"
+  role: watch-monitor
+  env:
+    - name: WATCH_MODE
+      value: "monitor"
+    - name: ITERATION
+      value: "$(({{iteration}} + 1))"
+    - name: MAX_ITERATIONS
+      value: "3"
 EOF
+```
+
+**CRITICAL**: This step restarts the autonomous loop. The new Monitor will re-evaluate the system.
+
+## play-monitor CLI
+
+The `play-monitor` binary provides additional utilities:
+
+```bash
+# Reset environment (delete old workflows, pods, PRs)
+play-monitor reset --repo cto-parallel-test --org 5dlabs --force
+
+# Check workflow status
+play-monitor status --play-id <workflow-name>
+
+# Get logs from a failed step
+play-monitor logs --play-id <workflow-name> --tail 500 --errors-only
 ```
 
 ## Helper Scripts Available

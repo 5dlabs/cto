@@ -31,22 +31,27 @@ Monitor each stage for failures and collect logs.
 
 ## Tools Available
 
-### play-monitor CLI
-The `play-monitor` binary provides monitoring capabilities:
+### play-monitor CLI (Primary Tool)
+The `play-monitor` binary provides all monitoring capabilities:
 
 ```bash
-# Submit a Play workflow
-play-monitor run --task-id {{task_id}} --repository {{repository_url}}
+# [RECOMMENDED] Run the full monitor loop - submits workflow, monitors, evaluates
+play-monitor monitor --iteration {{iteration}} --config /workspace/config/cto-config.json
+
+# Submit a Play workflow manually
+play-monitor run --task-id 1 --repository {{repository_url}}
 
 # Get workflow status
 play-monitor status --play-id <workflow-name>
 
-# Get logs from a workflow step
+# Get logs from a workflow step  
 play-monitor logs --play-id <workflow-name> --step <step-name> --tail 500
 
-# Full E2E monitoring (submit + watch)
-play-monitor full --task-id {{task_id}} --config cto-config.json
+# Reset environment (for re-runs)
+play-monitor reset --repo cto-parallel-test --org 5dlabs --force
 ```
+
+**IMPORTANT**: When this iteration > 1, run `play-monitor reset` first to clean up previous state.
 
 ### kubectl for Kubernetes resources
 ```bash

@@ -56,8 +56,15 @@
       "cli": "claude",
       "model": "claude-opus-4-5-20251101",
       "maxIterations": 3,
-      "template": "rex-remediation",
+      "template": "watch/factory",
       "syncTimeoutSecs": 300
+    },
+    "monitor": {
+      "agent": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "glm-4-plus",
+      "template": "watch/factory",
+      "maxIterations": 3
     }
   },
   "agents": {
