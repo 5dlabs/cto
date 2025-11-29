@@ -37,6 +37,12 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 
+# Install MinIO client (mc) for S3-compatible object storage operations
+# hadolint ignore=DL3059
+RUN curl -LO https://dl.min.io/client/mc/release/linux-arm64/mc && \
+    install -o root -g root -m 0755 mc /usr/local/bin/mc && \
+    rm mc
+
 # Create symbolic links for Python
 RUN ln -sf python3 /usr/bin/python
 # Install UV and uvx for Python package management

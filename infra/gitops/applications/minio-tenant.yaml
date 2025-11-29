@@ -19,12 +19,17 @@ metadata:
 spec:
   project: platform
 
-  # Ignore PVC volumeClaimTemplates diff - K8s normalizes these
+  # Ignore fields that get normalized/stripped by K8s or the MinIO operator
   ignoreDifferences:
     - group: apps
       kind: StatefulSet
       jsonPointers:
         - /spec/volumeClaimTemplates
+    # MinIO operator processes configSecret on creation then removes it from spec
+    - group: minio.min.io
+      kind: Tenant
+      jsonPointers:
+        - /spec/configSecret
 
   source:
     repoURL: https://operator.min.io
