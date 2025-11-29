@@ -1695,10 +1695,11 @@ TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
 TOOLS_URL="${TOOLS_URL%/}"
 
 # Query Tools for available tools via MCP protocol
+# Use || true to prevent script exit on DNS/network failure (set -e)
 TOOLS_RESPONSE=$(curl -sS --connect-timeout 10 --max-time 30 \
   -X POST "$TOOLS_URL" \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":"list-tools","method":"tools/list","params":{}}' 2>/dev/null)
+  -d '{"jsonrpc":"2.0","id":"list-tools","method":"tools/list","params":{}}' 2>/dev/null || true)
 
 if [ -n "$TOOLS_RESPONSE" ] && echo "$TOOLS_RESPONSE" | jq -e '.result.tools' >/dev/null 2>&1; then
   # Extract tool names from Tools response
