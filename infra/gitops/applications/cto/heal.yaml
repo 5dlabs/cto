@@ -116,8 +116,8 @@ spec:
           - name: GITHUB_TOKEN
             valueFrom:
               secretKeyRef:
-                name: cto-secrets
-                key: GITHUB_TOKEN
+                name: tools-github-secrets
+                key: GITHUB_PERSONAL_ACCESS_TOKEN
 
         envFrom: []
 
