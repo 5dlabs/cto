@@ -326,26 +326,40 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
-# Install tools client from CTO monorepo release (skip if version is "skip" or empty)
+# Install tools client from CTO monorepo unified release (skip if version is "skip" or empty)
+# Downloads binary directly from v*.*.* unified releases
 ARG TOOLS_VERSION=skip
 RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
-      echo "📦 Installing tools client v${TOOLS_VERSION}..." && \
-      curl --proto '=https' --tlsv1.2 -LsSf \
-        "https://github.com/5dlabs/cto/releases/download/tools-v${TOOLS_VERSION}/tools-installer.sh" | \
-        TOOLS_NO_MODIFY_PATH=1 sh && \
-      mv ~/.cargo/bin/tools-client /usr/local/bin/tools; \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing tools client v${TOOLS_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
+          "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/tools && \
+        echo "✅ tools client installed"; \
+      else \
+        echo "⏭️ Skipping tools client installation (unsupported architecture: ${ARCH})"; \
+      fi; \
     else \
       echo "⏭️ Skipping tools client installation (no release available)"; \
     fi
 
-# Install play-monitor from CTO monorepo release (skip if version is "skip" or empty)
+# Install play-monitor from CTO monorepo unified release (skip if version is "skip" or empty)
+# Downloads binary directly from v*.*.* unified releases
 ARG PLAY_MONITOR_VERSION=skip
 RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
-      echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION}..." && \
-      curl --proto '=https' --tlsv1.2 -LsSf \
-        "https://github.com/5dlabs/cto/releases/download/play-monitor-v${PLAY_MONITOR_VERSION}/play-monitor-installer.sh" | \
-        sh && \
-      mv ~/.cargo/bin/play-monitor /usr/local/bin/play-monitor; \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
+          "https://github.com/5dlabs/cto/releases/download/v${PLAY_MONITOR_VERSION}/play-monitor-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/play-monitor && \
+        echo "✅ play-monitor installed"; \
+      else \
+        echo "⏭️ Skipping play-monitor installation (unsupported architecture: ${ARCH})"; \
+      fi; \
     else \
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
