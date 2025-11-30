@@ -610,8 +610,8 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_heal =
-            template_setting.starts_with("heal/") || code_run.spec.service.contains("heal");
+        let is_heal = template_setting.starts_with("heal/")
+            || code_run.spec.service.to_lowercase().contains("heal");
 
         let pvc_name = if is_heal {
             // Heal CodeRuns share a dedicated PVC
