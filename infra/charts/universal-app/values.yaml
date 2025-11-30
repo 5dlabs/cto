@@ -10,6 +10,11 @@ image:
 imagePullSecrets:
   - name: ghcr-login-secret
 
+# Container command override (optional)
+command: []
+# Container arguments (optional)
+args: []
+
 nameOverride: ""
 fullnameOverride: ""
 
@@ -118,6 +123,12 @@ volumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
+
+# Extra sidecar containers
+extraContainers: []
+# - name: log-tailer
+#   image: busybox:latest
+#   command: ["tail", "-f", "/var/log/app.log"]
 
 nodeSelector: {}
 
