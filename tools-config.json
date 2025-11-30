@@ -21,7 +21,21 @@
     "openmemory_openmemory_store",
     "openmemory_openmemory_list",
     "openmemory_openmemory_reinforce",
-    "openmemory_openmemory_get"
+    "openmemory_openmemory_get",
+    "playwright_browser_navigate",
+    "playwright_browser_snapshot",
+    "playwright_browser_click",
+    "playwright_browser_type",
+    "playwright_browser_select_option",
+    "playwright_browser_hover",
+    "playwright_browser_take_screenshot",
+    "playwright_browser_wait_for",
+    "playwright_browser_press_key",
+    "playwright_browser_console_messages",
+    "playwright_browser_network_requests",
+    "playwright_browser_navigate_back",
+    "playwright_browser_resize",
+    "tools_screenshot_upload"
   ],
   "localServers": {}
 }

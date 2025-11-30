@@ -240,11 +240,11 @@ config:
     # --- UI Components ---
     shadcn:
       name: "shadcn/ui"
-      description: "shadcn/ui component library with source code and demos"
+      description: "Official shadcn/ui MCP server - browse, search, and install components from 60+ registries using natural language"
       transport: "stdio"
       command: "npx"
-      args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
-      workingDirectory: "/tmp"
+      args: ["-y", "shadcn@latest", "mcp"]
+      workingDirectory: "/workspace"
 
     ai-elements:
       name: "AI Elements"
@@ -252,6 +252,18 @@ config:
       transport: "http"
       url: "https://registry.ai-sdk.dev/api/mcp"
       workingDirectory: "/tmp"
+
+    # --- Browser Automation ---
+    playwright:
+      name: "Playwright Browser"
+      description: "Headless browser automation for visual testing - navigate, interact, screenshot. Use with tools_screenshot_upload to post visual previews to PRs."
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@playwright/mcp@latest"]
+      workingDirectory: "/tmp"
+      env:
+        # Screenshots saved to /tmp/playwright-output for upload_screenshot tool
+        PLAYWRIGHT_OUTPUT_DIR: "/tmp/playwright-output"
 
     # --- Database ---
     pg-aiguide:
@@ -355,6 +367,17 @@ config:
         keys:
           - "GEMINI_API_KEY"
 
+    # --- Authentication ---
+    better-auth:
+      name: "Better Auth"
+      description: "Framework-agnostic authentication - email/password, OAuth, 2FA, passkeys, multi-tenancy"
+      transport: "http"
+      # Remote MCP hosted by Chonkie
+      url: "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp"
+      workingDirectory: "/tmp"
+      # LLMs.txt for additional context
+      llmsTxt: "https://better-auth.com/llms.txt"
+
     # --- Secrets Management ---
     # NOTE: Vault MCP server requires its own deployment - see infra/charts/tools/templates/vault-mcp-server.yaml
     # It runs in HTTP mode and tools server proxies to it
@@ -365,6 +388,55 @@ config:
       # In-cluster Vault MCP server URL (deployed separately)
       url: "http://vault-mcp-server.cto.svc.cluster.local:8080/mcp"
       workingDirectory: "/tmp"
+
+# =============================================================================
+# LLMs.txt Registry - AI-Readable Documentation
+# =============================================================================
+# Centralized registry of llms.txt files for libraries/frameworks.
+# These can be conditionally included in agent prompts based on stack config.
+# Format: key matches stack option name in controller values.yaml
+
+llmsTxt:
+  # Frontend Frameworks
+  # Note: Next.js does not have an llms.txt - use Context7 instead
+  svelte:
+    url: "https://svelte.dev/llms.txt"
+    fullUrl: "https://svelte.dev/llms-full.txt"
+    mediumUrl: "https://svelte.dev/llms-medium.txt"
+    smallUrl: "https://svelte.dev/llms-small.txt"
+    description: "Svelte and SvelteKit documentation"
+  sveltekit:
+    url: "https://svelte.dev/docs/kit/llms.txt"
+    description: "SvelteKit routing, server routes, load functions"
+  
+  # Backend / API
+  elysia:
+    url: "https://elysiajs.com/llms.txt"
+    fullUrl: "https://elysiajs.com/llms-full.txt"
+    description: "Elysia.js type-safe API framework for Bun"
+  
+  # Authentication
+  betterAuth:
+    url: "https://better-auth.com/llms.txt"
+    description: "Better Auth - universal authentication framework"
+  
+  # Database
+  prisma:
+    url: "https://www.prisma.io/llms.txt"
+    description: "Prisma ORM - type-safe database access"
+  drizzle:
+    url: "https://orm.drizzle.team/llms.txt"
+    description: "Drizzle ORM - headless TypeScript ORM"
+  
+  # UI Components
+  shadcn:
+    url: "https://ui.shadcn.com/llms.txt"
+    description: "shadcn/ui component library"
+  
+  # Validation
+  zod:
+    url: "https://zod.dev/llms.txt"
+    description: "Zod TypeScript-first schema validation"
 
 # Persistence for temporary files and caches
 persistence:

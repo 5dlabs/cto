@@ -383,7 +383,34 @@ const form = useForm<UserFormValues>({
 <div className="md:hidden">
 ```
 
-### 5. Quality Verification (10 mins)
+### 5. Visual Verification (MANDATORY)
+
+**You MUST capture and post screenshots to the GitHub issue.**
+
+```bash
+# 1. Start dev server
+pnpm dev &
+DEV_PID=$!
+sleep 5
+
+# 2. Use Playwright tools:
+#    - playwright_browser_navigate: { "url": "http://localhost:3000" }
+#    - playwright_browser_take_screenshot: { "filename": "homepage.png", "fullPage": true }
+#    - playwright_browser_resize: { "width": 375, "height": 812 } (mobile)
+
+# 3. Upload to MinIO:
+#    - tools_screenshot_upload: { "file_path": "/tmp/playwright-output/homepage.png", "repo": "owner/repo", "pr_number": 123, "name": "homepage" }
+
+# 4. Post to GitHub issue:
+ISSUE_NUM=$(gh issue list --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null)
+gh issue comment "$ISSUE_NUM" --body "## 📸 Visual Preview\n![Homepage](URL)\n![Mobile](MOBILE_URL)"
+
+kill $DEV_PID
+```
+
+**Required:** Homepage, Mobile (375px), Desktop (1920px), Dark mode screenshots.
+
+### 6. Quality Verification (10 mins)
 ```bash
 # Type checking
 pnpm tsc --noEmit
@@ -462,6 +489,7 @@ Implemented by: {{github_app}}"
 - ✅ Production build succeeds
 - ✅ Responsive design (mobile/tablet/desktop)
 - ✅ WCAG AA accessible
+- ✅ Screenshots posted to GitHub issue
 - ✅ PR opened with issue link
 
 ## Tooling Snapshot
