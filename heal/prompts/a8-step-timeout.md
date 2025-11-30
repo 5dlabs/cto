@@ -24,7 +24,7 @@ A workflow step has exceeded its expected runtime.
 3. **Spawn remediation**:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a8 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A8-{{pod_name}}.md

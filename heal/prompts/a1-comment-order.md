@@ -28,7 +28,7 @@ An agent is running but a preceding agent in the workflow hasn't posted their ex
 3. **Spawn remediation** using the CLI:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a1 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A1-{{pod_name}}.md

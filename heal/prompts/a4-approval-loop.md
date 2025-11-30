@@ -24,7 +24,7 @@ An agent has posted multiple approval comments without the workflow advancing.
 3. **Spawn remediation**:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a4 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A4-{{pod_name}}.md

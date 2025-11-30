@@ -634,11 +634,13 @@ impl<'a> CodeResourceManager<'a> {
 
         // Mount cto-config ConfigMap for watch CodeRuns (monitor/remediation need it)
         // This must come AFTER workspace mount so it's not shadowed
+        // ConfigMap is optional - pod will start even if it doesn't exist
         if is_watch {
             volumes.push(json!({
                 "name": "cto-config",
                 "configMap": {
-                    "name": "cto-config"
+                    "name": "cto-config",
+                    "optional": true
                 }
             }));
             volume_mounts.push(json!({

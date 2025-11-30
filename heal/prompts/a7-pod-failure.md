@@ -23,7 +23,7 @@ A pod has entered Failed/Error/CrashLoopBackOff state.
 3. **Spawn remediation**:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a7 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A7-{{pod_name}}.md

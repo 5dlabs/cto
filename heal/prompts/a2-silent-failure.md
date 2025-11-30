@@ -23,7 +23,7 @@ A container terminated with non-zero exit code but pod is still "Running" (sidec
 3. **Spawn remediation**:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a2 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A2-{{pod_name}}.md

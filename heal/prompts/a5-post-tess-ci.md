@@ -26,7 +26,7 @@ CI checks are failing OR there's a merge conflict AFTER Tess approved the PR.
 3. **Spawn remediation**:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a5 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A5-{{pod_name}}.md

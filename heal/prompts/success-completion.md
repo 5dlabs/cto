@@ -26,7 +26,7 @@
 4. **If issues found**, spawn remediation:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert completion \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/completion/{{agent}}-{{pod_name}}.md

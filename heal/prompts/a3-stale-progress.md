@@ -25,7 +25,7 @@ An agent pod has been running but no new commits have been pushed to the feature
 3. **Spawn remediation**:
 
 ```bash
-play-monitor spawn-remediation \
+heal spawn-remediation \
   --alert a3 \
   --task-id {{task_id}} \
   --issue-file /workspace/watch/alerts/A3-{{pod_name}}.md
