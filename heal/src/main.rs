@@ -4443,9 +4443,7 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
 
         // Also check for completion (pod succeeded) - this is a proactive check, not an alert
         // Skip infrastructure pods (cronjobs, platform services)
-        if matches!(k8s_event, k8s::K8sEvent::PodSucceeded(_))
-            && !k8s::is_excluded_pod(&pod.name)
-        {
+        if matches!(k8s_event, k8s::K8sEvent::PodSucceeded(_)) && !k8s::is_excluded_pod(&pod.name) {
             println!(
                 "{}",
                 format!("✅ Pod {} succeeded - running completion check", pod.name).green()
