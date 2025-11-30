@@ -77,8 +77,17 @@ spec:
             cpu: 100m
             memory: 256Mi
 
-        livenessProbe: {}
-        readinessProbe: {}
+        # Heal is a watch loop, not an HTTP server - use exec probes
+        livenessProbe:
+          exec:
+            command: ["pgrep", "-f", "heal"]
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command: ["pgrep", "-f", "heal"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
 
         autoscaling:
           enabled: false
