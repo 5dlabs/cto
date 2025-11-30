@@ -195,6 +195,9 @@
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
       "model": "gpt-4o",
+      "features": {
+        "effectSolutions": false
+      },
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -288,7 +291,8 @@
     "defaults.play.testingMaxRetries": "Maximum retry attempts for testing agent (Tess)",
     "defaults.play.autoMerge": "Whether Tess should automatically merge PRs after approval (true/false)",
     "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
-    "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access"
+    "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access",
+    "agents.*.features.effectSolutions": "Enable Effect.ts integration - includes effect-solutions CLI instructions in agent prompts for idiomatic Effect TypeScript patterns"
   },
   "_usage_examples": {
     "minimal_task_call": "task(task_id=1, repository='https://github.com/org/repo')",

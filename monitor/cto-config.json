@@ -56,24 +56,6 @@
       "testingMaxRetries": 5,
       "autoMerge": true,
       "parallelExecution": true
-    },
-    "monitor": {
-      "agent": "5DLabs-Morgan",
-      "cli": "factory",
-      "model": "glm-4.6",
-      "template": "watch/factory",
-      "maxIterations": 3
-    },
-    "remediation": {
-      "repository": "5dlabs/cto",
-      "docsRepository": "5dlabs/cto",
-      "docsProjectDirectory": "docs",
-      "agent": "5DLabs-Rex",
-      "cli": "factory",
-      "model": "claude-opus-4-5-20251101",
-      "maxIterations": 3,
-      "template": "watch/factory",
-      "syncTimeoutSecs": 300
     }
   },
   "agents": {
@@ -106,7 +88,14 @@
           "github_add_issue_comment",
           "github_search_repositories"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     },
     "rex": {
@@ -150,6 +139,12 @@
               "openmemory_get",
               "openmemory_reinforce"
             ]
+          },
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
           }
         }
       }
@@ -182,7 +177,14 @@
           "github_create_pull_request_review",
           "github_get_file_contents"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     },
     "tess": {
@@ -229,7 +231,14 @@
           "github_create_pull_request_review",
           "github_get_pull_request_status"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     },
     "blaze": {
@@ -239,6 +248,9 @@
       "maxTokens": 64000,
       "temperature": 0.6,
       "reasoningEffort": "high",
+      "features": {
+        "effectSolutions": false
+      },
       "modelRotation": {
         "enabled": true,
         "models": [
@@ -274,7 +286,14 @@
           "github_create_branch",
           "github_get_file_contents"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     },
     "cipher": {
@@ -313,7 +332,14 @@
           "github_get_pull_request",
           "github_create_pull_request_review"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     },
     "atlas": {
@@ -346,7 +372,14 @@
           "github_create_branch",
           "github_list_commits"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     },
     "bolt": {
@@ -392,7 +425,14 @@
           "github_update_pull_request",
           "github_list_pull_requests"
         ],
-        "localServers": {}
+        "localServers": {
+          "morph": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["-y", "@morphllm/morphmcp"],
+            "tools": ["edit_file", "warp_grep"]
+          }
+        }
       }
     }
   }
