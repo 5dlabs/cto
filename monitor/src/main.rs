@@ -539,7 +539,24 @@ fn trigger_remediation(
     let failure_json =
         serde_json::to_string(failure).context("Failed to serialize failure context")?;
 
+    // Convert repository to URL format (CRD expects repositoryUrl)
+    let repository_url = format!("https://github.com/{}", config.repository);
+    let docs_repo = config
+        .docs_repository
+        .as_deref()
+        .unwrap_or(&config.repository);
+    let docs_repository_url = format!("https://github.com/{docs_repo}");
+    let docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs");
+
+    // Derive service from repository (e.g., "5dlabs/cto" -> "cto")
+    let service = config
+        .repository
+        .split('/')
+        .next_back()
+        .unwrap_or("cto");
+
     // Create CodeRun YAML manifest
+    // Uses correct CRD schema: repositoryUrl, cliConfig, env as map
     let coderun_yaml = format!(
         r#"apiVersion: agents.platform/v1
 kind: CodeRun
@@ -554,25 +571,25 @@ metadata:
 spec:
   taskId: {task_id}
   githubApp: "{agent}"
-  cli: "{cli}"
   model: "{model}"
-  repository: "{repository}"
-  docsRepository: "{docs_repo}"
+  repositoryUrl: "{repository_url}"
+  docsRepositoryUrl: "{docs_repository_url}"
   docsProjectDirectory: "{docs_dir}"
-  template: "{template}"
+  workingDirectory: "."
+  service: "{service}"
+  cliConfig:
+    cliType: "{cli}"
+    model: "{model}"
+    settings:
+      template: "{template}"
+      watchRole: "remediation"
   env:
-    - name: REMEDIATION_MODE
-      value: "true"
-    - name: FAILURE_CONTEXT
-      value: {failure_json_escaped}
-    - name: ORIGINAL_WORKFLOW
-      value: "{workflow_name}"
-    - name: FAILURE_TYPE
-      value: "{failure_type}"
-    - name: ITERATION
-      value: "{iteration}"
-    - name: MAX_ITERATIONS
-      value: "{max_iterations}"
+    REMEDIATION_MODE: "true"
+    FAILURE_CONTEXT: {failure_json_escaped}
+    ORIGINAL_WORKFLOW: "{workflow_name}"
+    FAILURE_TYPE: "{failure_type}"
+    ITERATION: "{iteration}"
+    MAX_ITERATIONS: "{max_iterations}"
 "#,
         coderun_name = coderun_name,
         namespace = namespace,
@@ -581,12 +598,10 @@ spec:
         agent = config.agent,
         cli = config.cli,
         model = config.model,
-        repository = config.repository,
-        docs_repo = config
-            .docs_repository
-            .as_deref()
-            .unwrap_or(&config.repository),
-        docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs"),
+        repository_url = repository_url,
+        docs_repository_url = docs_repository_url,
+        docs_dir = docs_dir,
+        service = service,
         template = config.template,
         failure_json_escaped = serde_json::to_string(&failure_json)?,
         workflow_name = failure.workflow_name,
