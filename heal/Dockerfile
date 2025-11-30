@@ -57,8 +57,8 @@ WORKDIR /app
 RUN echo "Checking installed tools..." && \
     which kubectl && kubectl version --client && \
     which gh && gh --version && \
-    which droid && droid --version || echo "droid version check" && \
-    which heal && heal --help | head -5 || true
+    (which droid && droid --version || echo "droid not available") && \
+    (which heal && heal --help | head -5 || true)
 
 # Default command
 ENTRYPOINT ["heal"]

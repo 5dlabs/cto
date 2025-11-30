@@ -649,7 +649,11 @@ impl<'a> CodeResourceManager<'a> {
             volumes.push(json!({
                 "name": "talos-kubeconfig",
                 "secret": {
-                    "secretName": "talos-kubeconfig"
+                    "secretName": "talos-kubeconfig",
+                    "items": [{
+                        "key": "kubeconfig",
+                        "path": "kubeconfig"
+                    }]
                 }
             }));
             volume_mounts.push(json!({
