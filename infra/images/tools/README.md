@@ -8,6 +8,11 @@ The Tools service is a dynamic MCP (Model Context Protocol) tool management and
 proxy server. It provides intelligent routing between local and remote MCP
 servers for AI development workflows.
 
+## Included Binaries
+
+- **tools-server** - Dynamic MCP tool management and proxy server
+- **cto-mcp** - MCP server for Argo Workflows integration in AI development workflows
+
 ## Building
 
 The image is built as part of the CTO release workflow. The binary is compiled

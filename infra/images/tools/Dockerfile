@@ -60,6 +60,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 COPY tools-server-linux /usr/local/bin/tools-server
 RUN chmod +x /usr/local/bin/tools-server
 
+# Copy the cto-mcp binary (MCP server for Argo Workflows integration)
+COPY cto-mcp-linux /usr/local/bin/cto-mcp
+RUN chmod +x /usr/local/bin/cto-mcp
+
 # Create non-root user (use a different UID since 1000 exists)
 # hadolint ignore=DL3059
 RUN useradd -m -u 1001 -s /bin/bash mcp
