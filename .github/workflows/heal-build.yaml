@@ -16,6 +16,7 @@ on:
       - develop
     paths:
       - 'heal/**'
+      - 'infra/images/heal/**'
       - '.github/workflows/heal-build.yaml'
 
   pull_request:
@@ -23,6 +24,7 @@ on:
       - main
     paths:
       - 'heal/**'
+      - 'infra/images/heal/**'
 
   workflow_dispatch:
     inputs:
@@ -86,8 +88,8 @@ jobs:
         id: build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
-          context: ./heal
-          file: ./heal/Dockerfile
+          context: .
+          file: ./infra/images/heal/Dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
