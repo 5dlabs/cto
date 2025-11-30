@@ -196,6 +196,7 @@ DOCS_REPO_ORG_NAME=$(echo "$DOCS_REPO_URL" | sed -E 's|https?://github\.com/||' 
 
 # Pass all values as CLI args (values come from Handlebars context)
 play-monitor monitor \
+  --config "$CONFIG_PATH" \
   --iteration "$ITERATION" \
   --max-iterations "$MAX_ITERATIONS" \
   --namespace "$NAMESPACE" \

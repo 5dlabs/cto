@@ -118,3 +118,6 @@ huddle/
 
 # Platform packaging docs (private business documents)
 docs/platform-packaging/
+
+# Documentation cache (build artifacts)
+.docs-cache/

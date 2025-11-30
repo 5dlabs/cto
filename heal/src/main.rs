@@ -4,11 +4,16 @@
 //! Uses kubectl --watch for real-time streaming of workflows, CRDs, pods, and sensors.
 //! Emits unified JSON events for Cursor agent E2E feedback loop automation.
 
+mod alerts;
+mod github;
+mod k8s;
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::io::Write as IoWrite;
 use std::path::PathBuf;
@@ -18,10 +23,10 @@ use tokio::process::Command as AsyncCommand;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
-/// Play workflow monitoring CLI for E2E feedback loop
+/// Self-healing platform monitor - detects issues and spawns remediation agents
 #[derive(Parser)]
-#[command(name = "play-monitor")]
-#[command(about = "Monitor play workflows and retrieve failure logs")]
+#[command(name = "heal")]
+#[command(about = "Self-healing platform monitor - detects issues and spawns remediation agents")]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]
@@ -186,47 +191,35 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
-    /// Run/submit a play workflow via Argo CLI
+    /// Run/submit a play workflow via Argo CLI (reads parameters from cto-config.json)
     Run {
+        /// Path to cto-config.json file (required for agent configurations)
+        #[arg(long, default_value = "cto-config.json")]
+        config: String,
+
         /// Task ID for the play
         #[arg(long)]
         task_id: String,
 
-        /// Repository to work on
-        #[arg(long, default_value = "5dlabs/cto-parallel-test")]
-        repository: String,
+        /// Repository to work on (overrides config if specified)
+        #[arg(long)]
+        repository: Option<String>,
 
-        /// Service name (for PVC naming and labels)
-        #[arg(long, default_value = "cto-parallel-test")]
-        service: String,
+        /// Service name (overrides config if specified)
+        #[arg(long)]
+        service: Option<String>,
 
-        /// Docs repository (defaults to repository if not specified)
+        /// Docs repository (overrides config if specified)
         #[arg(long)]
         docs_repository: Option<String>,
 
-        /// Docs project directory
-        #[arg(long, default_value = "docs")]
-        docs_project_directory: String,
+        /// Docs project directory (overrides config if specified)
+        #[arg(long)]
+        docs_project_directory: Option<String>,
 
         /// Run type for workflow naming (e.g., monitor-test, diagnostic)
         #[arg(long, default_value = "monitor-test")]
         run_type: String,
-
-        /// Implementation agent (Rex or Blaze)
-        #[arg(long, default_value = "5DLabs-Rex")]
-        agent: String,
-
-        /// Agent CLI type (claude, codex, cursor, opencode, etc.)
-        #[arg(long, default_value = "codex")]
-        cli: String,
-
-        /// Model to use
-        #[arg(long, default_value = "gpt-5-codex")]
-        model: String,
-
-        /// Workflow template name
-        #[arg(long, default_value = "play-workflow-template")]
-        template: String,
     },
     /// [E2E] Start the self-healing E2E loop - creates Monitor `CodeRun` and exits
     Start {
@@ -236,6 +229,10 @@ enum Commands {
     },
     /// [E2E] Run monitor logic (called inside Monitor pod)
     Monitor {
+        /// Path to cto-config.json (contains workflow parameters)
+        #[arg(long, default_value = "cto-config.json")]
+        config: String,
+
         /// Current iteration number (1 = first run)
         #[arg(long, default_value = "1")]
         iteration: u32,
@@ -244,25 +241,25 @@ enum Commands {
         #[arg(long, default_value = "3")]
         max_iterations: u32,
 
-        /// Target repository (e.g., "5dlabs/cto-parallel-test")
+        /// Target repository (e.g., "5dlabs/cto-parallel-test") - overrides config
         #[arg(long)]
-        repository: String,
+        repository: Option<String>,
 
-        /// Service name
-        #[arg(long, default_value = "cto-parallel-test")]
-        service: String,
+        /// Service name - overrides config
+        #[arg(long)]
+        service: Option<String>,
 
         /// Task ID to run
         #[arg(long, default_value = "1")]
         task_id: String,
 
-        /// Docs repository URL
+        /// Docs repository URL - overrides config
         #[arg(long)]
         docs_repository: Option<String>,
 
-        /// Docs project directory
-        #[arg(long, default_value = "docs")]
-        docs_project_directory: String,
+        /// Docs project directory - overrides config
+        #[arg(long)]
+        docs_project_directory: Option<String>,
 
         /// Path to acceptance criteria file
         #[arg(long, default_value = "/workspace/watch/acceptance-criteria.md")]
@@ -286,6 +283,54 @@ enum Commands {
     Memory {
         #[command(subcommand)]
         action: MemoryCommands,
+    },
+    /// [ALERTS] Watch for platform alerts and spawn Factory on detection
+    AlertWatch {
+        /// Namespace to watch for pods
+        #[arg(long, default_value = "agent-platform")]
+        namespace: String,
+        /// Path to prompts directory
+        #[arg(long, default_value = "monitor/prompts")]
+        prompts_dir: String,
+        /// Dry run - detect but don't spawn Factory
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// [ALERTS] Test an alert flow manually
+    TestAlert {
+        /// Alert ID to test (a1, a2, a3, a4, a5, a7, a8, completion)
+        #[arg(long)]
+        alert: String,
+        /// Pod name for context
+        #[arg(long, default_value = "test-pod-123")]
+        pod_name: String,
+        /// Task ID for context
+        #[arg(long, default_value = "test-task")]
+        task_id: String,
+        /// Agent name for context
+        #[arg(long, default_value = "rex")]
+        agent: String,
+        /// Path to prompts directory
+        #[arg(long, default_value = "monitor/prompts")]
+        prompts_dir: String,
+        /// Dry run - show prompt but don't spawn Factory
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// [ALERTS] Spawn a remediation agent for a detected issue
+    SpawnRemediation {
+        /// Alert type that triggered this (a1, a2, a7, completion, etc.)
+        #[arg(long)]
+        alert: String,
+        /// Task ID for the remediation
+        #[arg(long)]
+        task_id: String,
+        /// Path to issue file written by Factory
+        #[arg(long)]
+        issue_file: String,
+        /// Path to cto-config.json
+        #[arg(long, default_value = "cto-config.json")]
+        config: String,
     },
 }
 
@@ -345,6 +390,54 @@ enum MemoryCommands {
 #[derive(Debug, Deserialize)]
 struct CtoConfig {
     defaults: CtoDefaults,
+    /// Agent configurations (rex, cleo, tess, cipher, blaze, etc.)
+    #[serde(default)]
+    agents: std::collections::HashMap<String, AgentConfig>,
+}
+
+/// Agent configuration (from agents section of config)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentConfig {
+    /// GitHub App name (e.g., "5DLabs-Rex")
+    github_app: String,
+    /// CLI tool (e.g., "factory", "claude", "cursor")
+    #[serde(default)]
+    cli: String,
+    /// Model to use
+    #[serde(default)]
+    model: String,
+    /// Tools configuration
+    #[serde(default)]
+    tools: Option<AgentTools>,
+    /// Model rotation configuration
+    #[serde(default)]
+    model_rotation: Option<ModelRotationConfig>,
+    /// Max retries for this agent
+    #[serde(default)]
+    max_retries: Option<u32>,
+}
+
+/// Agent tools configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct AgentTools {
+    /// Remote MCP tools
+    #[serde(default)]
+    remote: Vec<String>,
+    /// Local MCP servers
+    #[serde(default, rename = "localServers")]
+    local_servers: serde_json::Value,
+}
+
+/// Model rotation configuration
+#[derive(Debug, Clone, Deserialize)]
+struct ModelRotationConfig {
+    /// Whether rotation is enabled
+    #[serde(default)]
+    enabled: bool,
+    /// List of models to rotate through
+    #[serde(default)]
+    models: Vec<String>,
 }
 
 /// Default configurations
@@ -375,10 +468,17 @@ struct MonitorConfig {
     /// Maximum iterations before giving up
     #[serde(default = "default_max_iterations")]
     max_iterations: u32,
+    /// Required kubectl context for creating monitor CodeRuns (ensures we deploy to Kind)
+    #[serde(default = "default_monitor_context")]
+    cluster_context: String,
 }
 
 fn default_monitor_template() -> String {
     "watch/factory".to_string()
+}
+
+fn default_monitor_context() -> String {
+    "kind-cto-dev".to_string()
 }
 
 /// Parameters for monitor loop (passed from CLI args)
@@ -394,6 +494,8 @@ struct MonitorParams {
     docs_project_directory: String,
     criteria_path: String,
     namespace: String,
+    /// Full CTO config for workflow submission
+    cto_config: CtoConfig,
 }
 
 /// Play workflow configuration
@@ -436,12 +538,21 @@ struct PlayConfig {
     /// Max retries for implementation
     #[serde(default)]
     implementation_max_retries: Option<u32>,
+    /// Max retries for frontend
+    #[serde(default)]
+    frontend_max_retries: Option<u32>,
     /// Max retries for quality
     #[serde(default)]
     quality_max_retries: Option<u32>,
+    /// Max retries for security
+    #[serde(default)]
+    security_max_retries: Option<u32>,
     /// Max retries for testing
     #[serde(default)]
     testing_max_retries: Option<u32>,
+    /// Max retries (general fallback)
+    #[serde(default)]
+    max_retries: Option<u32>,
     /// Auto merge
     #[serde(default)]
     auto_merge: Option<bool>,
@@ -649,6 +760,8 @@ fn create_monitor_coderun(
     iteration: u32,
     namespace: &str,
 ) -> Result<String> {
+    ensure_kube_context(&config.cluster_context)?;
+
     let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let coderun_name = format!("e2e-monitor-i{iteration}-{uid}");
 
@@ -750,6 +863,31 @@ spec:
     );
 
     Ok(coderun_name)
+}
+
+fn ensure_kube_context(expected: &str) -> Result<()> {
+    let output = Command::new("kubectl")
+        .args(["config", "current-context"])
+        .output()
+        .context("Failed to read current kubectl context. Is kubectl installed?")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "Unable to determine kubectl context: {stderr}"
+        ));
+    }
+
+    let current = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if current != expected {
+        return Err(anyhow::anyhow!(
+            "Monitor must be created from context '{expected}', but current context is '{current}'.\n\
+             Run `kubectl config use-context {expected}` before starting the monitor."
+        ));
+    }
+
+    Ok(())
 }
 
 /// Wait for a `CodeRun` to complete (Succeeded or Failed)
@@ -975,6 +1113,13 @@ struct WorkflowStatus {
     error: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct ContainerExitInfo {
+    container_name: String,
+    exit_code: Option<i32>,
+    reason: Option<String>,
+}
+
 // =============================================================================
 // Loop Events - JSON events emitted by the monitor
 // =============================================================================
@@ -1186,13 +1331,80 @@ struct RunWorkflowConfig<'a> {
     repository: &'a str,
     service: &'a str,
     run_type: &'a str,
-    agent: &'a str,
-    agent_cli: &'a str,
-    model: &'a str,
-    template: &'a str,
     namespace: &'a str,
     docs_repository: &'a str,
     docs_project_directory: &'a str,
+    /// Full CTO config for resolving agent configurations
+    cto_config: &'a CtoConfig,
+}
+
+/// Resolved agent parameters for workflow submission
+struct ResolvedAgent {
+    github_app: String,
+    cli: String,
+    model: String,
+    tools: String,
+    model_rotation: String,
+    max_retries: Option<u32>,
+}
+
+/// Helper to resolve agent configuration from config
+fn resolve_agent_config(
+    agent_name: &str,
+    agents: &std::collections::HashMap<String, AgentConfig>,
+    default_cli: &str,
+    default_model: &str,
+) -> ResolvedAgent {
+    // Find agent by github_app name (e.g., "5DLabs-Rex" -> looks for agent with that githubApp)
+    let agent_cfg = agents.values().find(|a| a.github_app == agent_name);
+
+    if let Some(cfg) = agent_cfg {
+        let cli = if cfg.cli.is_empty() {
+            default_cli.to_string()
+        } else {
+            cfg.cli.clone()
+        };
+        let model = if cfg.model.is_empty() {
+            default_model.to_string()
+        } else {
+            cfg.model.clone()
+        };
+        let tools = cfg
+            .tools
+            .as_ref()
+            .and_then(|t| serde_json::to_string(t).ok())
+            .unwrap_or_else(|| r#"{"remote":[],"localServers":{}}"#.to_string());
+        let model_rotation = cfg
+            .model_rotation
+            .as_ref()
+            .and_then(|mr| {
+                if mr.enabled && !mr.models.is_empty() {
+                    serde_json::to_string(&mr.models).ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "[]".to_string());
+
+        ResolvedAgent {
+            github_app: cfg.github_app.clone(),
+            cli,
+            model,
+            tools,
+            model_rotation,
+            max_retries: cfg.max_retries,
+        }
+    } else {
+        // Agent not found in config, use defaults
+        ResolvedAgent {
+            github_app: agent_name.to_string(),
+            cli: default_cli.to_string(),
+            model: default_model.to_string(),
+            tools: r#"{"remote":[],"localServers":{}}"#.to_string(),
+            model_rotation: "[]".to_string(),
+            max_retries: None,
+        }
+    }
 }
 
 #[tokio::main]
@@ -1312,32 +1524,48 @@ async fn main() -> Result<()> {
             output_result(&result, cli.format)?;
         }
         Commands::Run {
+            config,
             task_id,
             repository,
             service,
             docs_repository,
             docs_project_directory,
             run_type,
-            agent,
-            cli: agent_cli,
-            model,
-            template,
         } => {
-            let docs_repo = docs_repository.as_deref().unwrap_or(&repository);
-            let config = RunWorkflowConfig {
+            // Load config file for workflow parameters
+            let config_content = std::fs::read_to_string(&config)
+                .with_context(|| format!("Failed to read config file: {config}"))?;
+            let cto_config: CtoConfig = serde_json::from_str(&config_content)
+                .with_context(|| format!("Failed to parse config file: {config}"))?;
+
+            // Use CLI overrides or fall back to config values
+            let repo = repository
+                .as_deref()
+                .unwrap_or(&cto_config.defaults.play.repository);
+            let svc = service
+                .as_deref()
+                .or(cto_config.defaults.play.service.as_deref())
+                .unwrap_or("cto-parallel-test");
+            let docs_repo = docs_repository
+                .as_deref()
+                .or(cto_config.defaults.play.docs_repository.as_deref())
+                .unwrap_or(repo);
+            let docs_dir = docs_project_directory
+                .as_deref()
+                .or(cto_config.defaults.play.docs_project_directory.as_deref())
+                .unwrap_or("docs");
+
+            let workflow_config = RunWorkflowConfig {
                 task_id: &task_id,
-                repository: &repository,
-                service: &service,
+                repository: repo,
+                service: svc,
                 run_type: &run_type,
-                agent: &agent,
-                agent_cli: &agent_cli,
-                model: &model,
-                template: &template,
                 namespace: &cli.namespace,
                 docs_repository: docs_repo,
-                docs_project_directory: &docs_project_directory,
+                docs_project_directory: docs_dir,
+                cto_config: &cto_config,
             };
-            let result = run_workflow(&config)?;
+            let result = run_workflow(&workflow_config)?;
             output_result(&result, cli.format)?;
         }
         Commands::Start { config } => {
@@ -1379,6 +1607,7 @@ async fn main() -> Result<()> {
             );
         }
         Commands::Monitor {
+            config,
             iteration,
             max_iterations,
             repository,
@@ -1388,17 +1617,40 @@ async fn main() -> Result<()> {
             docs_project_directory,
             criteria,
         } => {
+            // Load config file for workflow parameters
+            let config_content = std::fs::read_to_string(&config)
+                .with_context(|| format!("Failed to read config file: {config}"))?;
+            let cto_config: CtoConfig = serde_json::from_str(&config_content)
+                .with_context(|| format!("Failed to parse config file: {config}"))?;
+
+            // Use CLI overrides or fall back to config values
+            let repo = repository
+                .as_deref()
+                .unwrap_or(&cto_config.defaults.play.repository)
+                .to_string();
+            let svc = service
+                .as_deref()
+                .or(cto_config.defaults.play.service.as_deref())
+                .unwrap_or("cto-parallel-test")
+                .to_string();
+            let docs_dir = docs_project_directory
+                .as_deref()
+                .or(cto_config.defaults.play.docs_project_directory.as_deref())
+                .unwrap_or("docs")
+                .to_string();
+
             // This runs inside the Monitor pod
             let monitor_params = MonitorParams {
                 iteration,
                 max_iterations,
-                repository,
-                service,
+                repository: repo,
+                service: svc,
                 task_id,
                 docs_repository,
-                docs_project_directory,
+                docs_project_directory: docs_dir,
                 criteria_path: criteria,
                 namespace: cli.namespace.clone(),
+                cto_config,
             };
             run_monitor_loop(&monitor_params).await?;
         }
@@ -1412,6 +1664,31 @@ async fn main() -> Result<()> {
         }
         Commands::Memory { action } => {
             handle_memory_command(action).await?;
+        }
+        Commands::AlertWatch {
+            namespace,
+            prompts_dir,
+            dry_run,
+        } => {
+            run_alert_watch(&namespace, &prompts_dir, dry_run).await?;
+        }
+        Commands::TestAlert {
+            alert,
+            pod_name,
+            task_id,
+            agent,
+            prompts_dir,
+            dry_run,
+        } => {
+            test_alert_flow(&alert, &pod_name, &task_id, &agent, &prompts_dir, dry_run).await?;
+        }
+        Commands::SpawnRemediation {
+            alert,
+            task_id,
+            issue_file,
+            config,
+        } => {
+            spawn_remediation_agent(&alert, &task_id, &issue_file, &config).await?;
         }
     }
 
@@ -1502,6 +1779,12 @@ fn parse_workflow_nodes(nodes: &serde_json::Value) -> (Vec<WorkflowStep>, Vec<Wo
 
     if let Some(nodes_obj) = nodes.as_object() {
         for (id, node) in nodes_obj {
+            let pod_name = node["podName"]
+                .as_str()
+                .or_else(|| node["id"].as_str())
+                .or_else(|| node["name"].as_str())
+                .map(ToString::to_string);
+
             let step = WorkflowStep {
                 id: id.clone(),
                 name: node["displayName"]
@@ -1511,7 +1794,7 @@ fn parse_workflow_nodes(nodes: &serde_json::Value) -> (Vec<WorkflowStep>, Vec<Wo
                     .to_string(),
                 step_type: node["type"].as_str().unwrap_or("Unknown").to_string(),
                 phase: node["phase"].as_str().unwrap_or("Unknown").to_string(),
-                pod_name: node["id"].as_str().map(ToString::to_string),
+                pod_name,
                 exit_code: node["outputs"]["exitCode"]
                     .as_str()
                     .and_then(|s| s.parse().ok()),
@@ -2960,6 +3243,102 @@ fn filter_error_logs(logs: &str) -> String {
         .join("\n")
 }
 
+fn capture_terminated_agent_logs(
+    status: &WorkflowStatus,
+    namespace: &str,
+    logs_dir: &str,
+    archived_pods: &mut HashSet<String>,
+) -> Result<Vec<(String, ContainerExitInfo)>> {
+    let mut findings = Vec::new();
+    for step in &status.steps {
+        if step.step_type != "Pod" || step.phase != "Running" {
+            continue;
+        }
+
+        let Some(pod_name) = step.pod_name.as_ref() else {
+            continue;
+        };
+
+        if archived_pods.contains(pod_name) {
+            continue;
+        }
+
+        if let Some(exit) = check_agent_container_exit(pod_name, namespace) {
+            println!(
+                "{}",
+                format!(
+                    "Detected terminated agent container '{}' (exit {:?}, reason {:?}) in pod {}. Archiving logs...",
+                    exit.container_name, exit.exit_code, exit.reason, pod_name
+                )
+                .yellow()
+            );
+
+            let logs =
+                get_step_logs(pod_name, namespace, 10_000).context("Failed to read pod logs")?;
+            let safe_name = step.name.replace(' ', "_");
+            let file_path = format!("{logs_dir}/{}_{}.log", safe_name, exit.container_name);
+            std::fs::write(&file_path, logs)
+                .with_context(|| format!("Failed to write logs to {}", file_path))?;
+            archived_pods.insert(pod_name.clone());
+            findings.push((step.name.clone(), exit));
+        }
+    }
+
+    Ok(findings)
+}
+
+fn check_agent_container_exit(pod_name: &str, namespace: &str) -> Option<ContainerExitInfo> {
+    let output = Command::new("kubectl")
+        .args(["get", "pod", pod_name, "-n", namespace, "-o", "json"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let pod: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    let statuses = pod["status"]["containerStatuses"].as_array()?;
+
+    let mut agent_exit: Option<ContainerExitInfo> = None;
+    let mut sidecar_running = false;
+
+    for status in statuses {
+        let name = status["name"].as_str().unwrap_or("");
+        let state = &status["state"];
+
+        if let Some(term) = state["terminated"].as_object() {
+            let exit_code = term
+                .get("exitCode")
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32);
+            let reason = term
+                .get("reason")
+                .and_then(|v| v.as_str())
+                .map(ToString::to_string);
+            if !name.contains("docker") {
+                agent_exit = Some(ContainerExitInfo {
+                    container_name: name.to_string(),
+                    exit_code,
+                    reason,
+                });
+            }
+        } else if state["running"].is_object()
+            && (name.contains("docker") || name == "docker-daemon")
+        {
+            sidecar_running = true;
+        }
+    }
+
+    if let Some(exit) = agent_exit {
+        if exit.exit_code.unwrap_or(0) != 0 || sidecar_running {
+            return Some(exit);
+        }
+    }
+
+    None
+}
+
 // =============================================================================
 // OpenMemory Verification Commands
 // =============================================================================
@@ -3252,13 +3631,13 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
     println!("  Initializing repository structure...");
 
     // Create temp directory and initialize repo
-    let temp_dir = std::env::temp_dir().join(format!("play-monitor-{repo}"));
+    let temp_dir = std::env::temp_dir().join(format!("heal-{repo}"));
     let _ = std::fs::remove_dir_all(&temp_dir);
     std::fs::create_dir_all(&temp_dir)?;
 
     // Create README
     let readme_content = format!(
-        "# {repo}\n\nE2E test repository for CTO platform.\n\nThis repo is managed by play-monitor."
+        "# {repo}\n\nE2E test repository for CTO platform.\n\nThis repo is managed by heal."
     );
     std::fs::write(temp_dir.join("README.md"), readme_content)?;
 
@@ -3349,7 +3728,7 @@ fn count_deleted(output: &[u8]) -> i32 {
     count
 }
 
-/// Run/submit a play workflow via Argo CLI
+/// Run/submit a play workflow via Argo CLI (reads all parameters from config)
 #[allow(clippy::too_many_lines)]
 fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     println!(
@@ -3357,79 +3736,178 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         format!("Submitting play workflow for task {}...", config.task_id).cyan()
     );
 
-    // Generate descriptive workflow name
-    // Format: play-{run_type}-t{task_id}-{agent_short}-{cli}-{uid}
-    let agent_short = config
-        .agent
+    let play_config = &config.cto_config.defaults.play;
+    let agents = &config.cto_config.agents;
+
+    // Default CLI and model from play config
+    let default_cli = play_config.cli.as_deref().unwrap_or("factory");
+    let default_model = play_config
+        .model
+        .as_deref()
+        .unwrap_or("claude-sonnet-4-20250514");
+
+    // Resolve all 5 agent stages from config
+    let impl_agent = resolve_agent_config(
+        &play_config.implementation_agent,
+        agents,
+        default_cli,
+        default_model,
+    );
+
+    let frontend_agent = if let Some(ref agent_name) = play_config.frontend_agent {
+        resolve_agent_config(agent_name, agents, default_cli, default_model)
+    } else {
+        // Default frontend agent if not configured
+        resolve_agent_config("5DLabs-Blaze", agents, default_cli, default_model)
+    };
+
+    let quality_agent =
+        resolve_agent_config(&play_config.quality_agent, agents, "claude", default_model);
+
+    let security_agent = if let Some(ref agent_name) = play_config.security_agent {
+        resolve_agent_config(agent_name, agents, "cursor", default_model)
+    } else {
+        // Default security agent if not configured
+        resolve_agent_config("5DLabs-Cipher", agents, "cursor", default_model)
+    };
+
+    let testing_agent =
+        resolve_agent_config(&play_config.testing_agent, agents, "claude", default_model);
+
+    // Get max retries from config with fallbacks
+    let default_retries = play_config.max_retries.unwrap_or(10);
+    let impl_max_retries = impl_agent
+        .max_retries
+        .or(play_config.implementation_max_retries)
+        .unwrap_or(default_retries);
+    let frontend_max_retries = frontend_agent
+        .max_retries
+        .or(play_config.frontend_max_retries)
+        .unwrap_or(default_retries);
+    let quality_max_retries = quality_agent
+        .max_retries
+        .or(play_config.quality_max_retries)
+        .unwrap_or(5);
+    let security_max_retries = security_agent
+        .max_retries
+        .or(play_config.security_max_retries)
+        .unwrap_or(2);
+    let testing_max_retries = testing_agent
+        .max_retries
+        .or(play_config.testing_max_retries)
+        .unwrap_or(5);
+
+    // Get other settings from config
+    let auto_merge = play_config.auto_merge.unwrap_or(false);
+    let parallel_execution = play_config.parallel_execution.unwrap_or(false);
+
+    // Select workflow template based on parallel_execution
+    let workflow_template = if parallel_execution {
+        println!("{}", "🚀 Using parallel execution mode".dimmed());
+        "workflowtemplate/play-project-workflow-template"
+    } else {
+        println!("{}", "🔄 Using sequential execution mode".dimmed());
+        "workflowtemplate/play-workflow-template"
+    };
+
+    // Generate workflow name
+    let agent_short = impl_agent
+        .github_app
         .strip_prefix("5DLabs-")
-        .unwrap_or(config.agent)
+        .unwrap_or(&impl_agent.github_app)
         .to_lowercase();
     let uid: String = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let workflow_name = format!(
         "play-{}-t{}-{}-{}-{}",
-        config.run_type, config.task_id, agent_short, config.agent_cli, uid
+        config.run_type, config.task_id, agent_short, impl_agent.cli, uid
     );
 
-    // Default tools configurations for each agent role
-    let implementation_tools = r#"{"remote":["brave_search_brave_web_search","context7_resolve_library_id","context7_get_library_docs","github_create_pull_request","github_push_files","github_create_branch","github_get_file_contents","github_create_or_update_file","github_list_commits"],"localServers":{}}"#;
-    let quality_tools = r#"{"remote":["brave_search_brave_web_search","github_get_pull_request","github_get_pull_request_files","github_get_pull_request_comments","github_add_pull_request_review_comment","github_create_pull_request_review","github_get_file_contents"],"localServers":{}}"#;
-    let testing_tools = r#"{"remote":["brave_search_brave_web_search","github_get_pull_request","github_get_pull_request_files","github_create_pull_request_review","github_get_pull_request_status"],"localServers":{}}"#;
+    // Build all parameters (matching MCP server format)
+    let params: Vec<String> = vec![
+        format!("task-id={}", config.task_id),
+        format!("repository={}", config.repository),
+        format!("service={}", config.service),
+        format!("docs-repository={}", config.docs_repository),
+        format!("docs-project-directory={}", config.docs_project_directory),
+        // Implementation agent
+        format!("implementation-agent={}", impl_agent.github_app),
+        format!("implementation-cli={}", impl_agent.cli),
+        format!("implementation-model={}", impl_agent.model),
+        format!("implementation-tools={}", impl_agent.tools),
+        format!(
+            "implementation-model-rotation={}",
+            impl_agent.model_rotation
+        ),
+        // Frontend agent
+        format!("frontend-agent={}", frontend_agent.github_app),
+        format!("frontend-cli={}", frontend_agent.cli),
+        format!("frontend-model={}", frontend_agent.model),
+        format!("frontend-tools={}", frontend_agent.tools),
+        format!("frontend-model-rotation={}", frontend_agent.model_rotation),
+        // Quality agent
+        format!("quality-agent={}", quality_agent.github_app),
+        format!("quality-cli={}", quality_agent.cli),
+        format!("quality-model={}", quality_agent.model),
+        format!("quality-tools={}", quality_agent.tools),
+        format!("quality-model-rotation={}", quality_agent.model_rotation),
+        // Security agent
+        format!("security-agent={}", security_agent.github_app),
+        format!("security-cli={}", security_agent.cli),
+        format!("security-model={}", security_agent.model),
+        format!("security-tools={}", security_agent.tools),
+        format!("security-model-rotation={}", security_agent.model_rotation),
+        // Testing agent
+        format!("testing-agent={}", testing_agent.github_app),
+        format!("testing-cli={}", testing_agent.cli),
+        format!("testing-model={}", testing_agent.model),
+        format!("testing-tools={}", testing_agent.tools),
+        format!("testing-model-rotation={}", testing_agent.model_rotation),
+        // Max retries
+        format!("implementation-max-retries={impl_max_retries}"),
+        format!("frontend-max-retries={frontend_max_retries}"),
+        format!("quality-max-retries={quality_max_retries}"),
+        format!("security-max-retries={security_max_retries}"),
+        format!("testing-max-retries={testing_max_retries}"),
+        format!("opencode-max-retries={default_retries}"),
+        // Other settings
+        format!("auto-merge={auto_merge}"),
+        format!("parallel-execution={parallel_execution}"),
+        "final-task=false".to_string(),
+        "task-requirements=".to_string(),
+    ];
 
-    // Submit workflow using argo CLI
-    let output = Command::new("argo")
-        .args([
-            "submit",
-            "--from",
-            &format!("workflowtemplate/{}", config.template),
-            "-n",
-            config.namespace,
-            "-p",
-            &format!("task-id={}", config.task_id),
-            "-p",
-            &format!("repository={}", config.repository),
-            "-p",
-            &format!("service={}", config.service),
-            "-p",
-            &format!("docs-repository={}", config.docs_repository),
-            "-p",
-            &format!("docs-project-directory={}", config.docs_project_directory),
-            "-p",
-            &format!("implementation-agent={}", config.agent),
-            "-p",
-            &format!("implementation-cli={}", config.agent_cli),
-            "-p",
-            &format!("implementation-model={}", config.model),
-            "-p",
-            &format!("implementation-tools={implementation_tools}"),
-            "-p",
-            "quality-agent=5DLabs-Cleo",
-            "-p",
-            "quality-cli=claude",
-            "-p",
-            "quality-model=claude-sonnet-4-20250514",
-            "-p",
-            &format!("quality-tools={quality_tools}"),
-            "-p",
-            "testing-agent=5DLabs-Tess",
-            "-p",
-            "testing-cli=claude",
-            "-p",
-            "testing-model=claude-sonnet-4-20250514",
-            "-p",
-            &format!("testing-tools={testing_tools}"),
-            "-p",
-            "implementation-max-retries=10",
-            "-p",
-            "quality-max-retries=5",
-            "-p",
-            "testing-max-retries=5",
-            "-p",
-            "auto-merge=true",
-            "--name",
-            &workflow_name,
-            "-o",
-            "json",
-        ])
+    // Build argo command
+    let mut cmd = Command::new("argo");
+
+    // Support ARGO_KUBECONFIG for hybrid cluster setups (Kind local + Talos remote)
+    if let Ok(kubeconfig) = std::env::var("ARGO_KUBECONFIG") {
+        cmd.arg("--kubeconfig").arg(&kubeconfig);
+    }
+
+    // Base args
+    cmd.args([
+        "submit",
+        "--from",
+        workflow_template,
+        "-n",
+        config.namespace,
+    ]);
+
+    // Add labels for workflow tracking (matches MCP server behavior)
+    let repo_label = format!("repository={}", config.repository.replace('/', "-"));
+    cmd.args(["-l", &repo_label]);
+    cmd.args(["-l", "workflow-type=play"]);
+    cmd.args(["-l", &format!("task-id={}", config.task_id)]);
+
+    // Add all parameters
+    for param in &params {
+        cmd.args(["-p", param]);
+    }
+
+    // Add workflow name and output format
+    cmd.args(["--name", &workflow_name, "-o", "json"]);
+
+    let output = cmd
         .output()
         .context("Failed to submit workflow via argo CLI")?;
 
@@ -3507,6 +3985,11 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
         .dimmed()
     );
 
+    let logs_dir = "/workspace/watch/logs";
+    std::fs::create_dir_all(logs_dir).ok();
+    let mut archived_pods: HashSet<String> = HashSet::new();
+    let mut detected_failures: Vec<String> = Vec::new();
+
     // Step 1: Reset environment if re-running (iteration > 1)
     if params.iteration > 1 {
         println!(
@@ -3536,13 +4019,10 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
         repository: &params.repository,
         service: &params.service,
         run_type: "e2e-monitor",
-        agent: "5DLabs-Rex", // Default implementation agent
-        agent_cli: "factory",
-        model: "claude-opus-4-5-20251101",
-        template: "play-workflow-template",
         namespace: &params.namespace,
         docs_repository: docs_repo,
         docs_project_directory: &params.docs_project_directory,
+        cto_config: &params.cto_config,
     };
 
     let run_result = run_workflow(&workflow_config)?;
@@ -3560,6 +4040,27 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     let mut last_phase = String::new();
     loop {
         let status = get_workflow_status(&workflow_name, &params.namespace)?;
+        let new_failures = capture_terminated_agent_logs(
+            &status,
+            &params.namespace,
+            logs_dir,
+            &mut archived_pods,
+        )?;
+        if !new_failures.is_empty() {
+            for (step_name, exit_info) in new_failures {
+                detected_failures.push(format!(
+                    "Stage {} failed early: container '{}' exited with code {:?} (reason: {:?})",
+                    step_name, exit_info.container_name, exit_info.exit_code, exit_info.reason
+                ));
+            }
+            println!(
+                "{}",
+                "Detected failed agent container while workflow still running. Triggering remediation."
+                    .red()
+                    .bold()
+            );
+            break;
+        }
 
         if status.phase != last_phase {
             println!("{}", format!("Workflow phase: {}", status.phase).dimmed());
@@ -3587,8 +4088,6 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
 
     // Step 4: Download logs from all stages
     println!("{}", "Downloading logs from all stages...".cyan());
-    let logs_dir = "/workspace/watch/logs";
-    std::fs::create_dir_all(logs_dir).ok();
 
     // Get logs using argo CLI
     let logs_output = Command::new("argo")
@@ -3606,7 +4105,7 @@ async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     );
     let final_status = get_workflow_status(&workflow_name, &params.namespace)?;
 
-    let mut issues: Vec<String> = Vec::new();
+    let mut issues: Vec<String> = detected_failures;
 
     // Check workflow phase
     if final_status.phase != "Succeeded" {
@@ -3784,7 +4283,7 @@ fn run_remediation_loop(
     // The agent will:
     // 1. Analyze the issue
     // 2. Make code changes
-    // 3. Run validation via play-monitor's helpers or shell scripts
+    // 3. Run validation via heal's helpers or shell scripts
     // 4. Create PR
     // 5. Wait for merge
     // 6. Trigger next iteration
@@ -3837,6 +4336,526 @@ fn create_next_monitor_iteration(config_path: &str, iteration: u32, namespace: &
     println!(
         "{}",
         format!("Next Monitor CodeRun created: {coderun_name}").green()
+    );
+
+    Ok(())
+}
+
+// =============================================================================
+// Alert System Functions
+// =============================================================================
+
+/// Watch for alerts and spawn Factory when detected
+async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> Result<()> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::process::Command as AsyncCommand;
+
+    println!(
+        "{}",
+        format!("Starting alert watch in namespace: {}", namespace).cyan()
+    );
+    println!(
+        "{}",
+        format!("Prompts directory: {}", prompts_dir).dimmed()
+    );
+    if dry_run {
+        println!("{}", "DRY RUN MODE - will detect but not spawn Factory".yellow());
+    }
+
+    // Initialize alert registry and default context
+    let registry = alerts::AlertRegistry::new();
+    let github_state = github::GitHubState::default();
+
+    // Start kubectl watch for pods
+    let mut child = AsyncCommand::new("kubectl")
+        .args([
+            "get", "pods",
+            "-n", namespace,
+            "-w",
+            "-o", "json",
+            "--output-watch-events",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("Failed to start kubectl watch")?;
+
+    let stdout = child.stdout.take().context("Failed to get stdout")?;
+    let reader = BufReader::new(stdout);
+    let mut lines = reader.lines();
+
+    println!("{}", "Watching for pod events...".green());
+
+    while let Some(line) = lines.next_line().await? {
+        // Parse the watch event JSON
+        let event_json: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        // Convert JSON to our Pod type
+        let pod = parse_pod_from_json(&event_json["object"], namespace);
+        let event_type = event_json["type"].as_str().unwrap_or("");
+
+        // Determine the K8sEvent type based on phase and event type
+        let k8s_event = match (pod.phase.as_str(), event_type) {
+            ("Failed", _) | ("Error", _) => k8s::K8sEvent::PodFailed(pod.clone()),
+            ("Succeeded", _) => k8s::K8sEvent::PodSucceeded(pod.clone()),
+            ("Running", "ADDED") => k8s::K8sEvent::PodRunning(pod.clone()),
+            ("Running", "MODIFIED") | (_, "MODIFIED") => k8s::K8sEvent::PodModified(pod.clone()),
+            _ => continue, // Skip other events
+        };
+
+        // Build alert context from pod labels
+        let task_id = pod.labels.get("task-id").cloned().unwrap_or_default();
+        let alert_ctx = alerts::AlertContext {
+            task_id: task_id.clone(),
+            repository: String::new(),
+            namespace: namespace.to_string(),
+            pr_number: None,
+            workflow_name: None,
+            config: alerts::types::AlertConfig::default(),
+        };
+
+        // Evaluate all alert handlers
+        let detected_alerts = registry.evaluate(&k8s_event, &github_state, &alert_ctx);
+
+        // Process each detected alert
+        for alert in detected_alerts {
+            println!(
+                "{}",
+                format!(
+                    "🚨 ALERT {}: {} [severity: {:?}]",
+                    alert.id.as_str(),
+                    alert.message,
+                    alert.severity
+                ).red()
+            );
+
+            // Handle the alert (load prompt, fetch logs, spawn Factory)
+            handle_detected_alert(&alert, &pod, namespace, prompts_dir, dry_run).await?;
+        }
+
+        // Also check for completion (pod succeeded) - this is a proactive check, not an alert
+        if matches!(k8s_event, k8s::K8sEvent::PodSucceeded(_)) {
+            println!(
+                "{}",
+                format!("✅ Pod {} succeeded - running completion check", pod.name).green()
+            );
+
+            handle_completion_check(&pod, namespace, prompts_dir, dry_run).await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Parse kubectl JSON output into our Pod type
+fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
+    let mut labels = std::collections::HashMap::new();
+    if let Some(obj) = json["metadata"]["labels"].as_object() {
+        for (k, v) in obj {
+            if let Some(s) = v.as_str() {
+                labels.insert(k.clone(), s.to_string());
+            }
+        }
+    }
+
+    let mut container_statuses = Vec::new();
+    if let Some(statuses) = json["status"]["containerStatuses"].as_array() {
+        for status in statuses {
+            let state = if status["state"]["terminated"].is_object() {
+                let terminated = &status["state"]["terminated"];
+                k8s::ContainerState::Terminated {
+                    exit_code: terminated["exitCode"].as_i64().unwrap_or(0) as i32,
+                    reason: terminated["reason"].as_str().map(|s| s.to_string()),
+                    finished_at: None,
+                }
+            } else if status["state"]["running"].is_object() {
+                k8s::ContainerState::Running
+            } else {
+                k8s::ContainerState::Waiting
+            };
+
+            container_statuses.push(k8s::ContainerStatus {
+                name: status["name"].as_str().unwrap_or("").to_string(),
+                state,
+                restart_count: status["restartCount"].as_i64().unwrap_or(0) as i32,
+            });
+        }
+    }
+
+    k8s::Pod {
+        name: json["metadata"]["name"].as_str().unwrap_or("unknown").to_string(),
+        namespace: namespace.to_string(),
+        phase: json["status"]["phase"].as_str().unwrap_or("Unknown").to_string(),
+        labels,
+        container_statuses,
+        started_at: None,
+    }
+}
+
+/// Handle a detected alert from the registry
+async fn handle_detected_alert(
+    alert: &alerts::Alert,
+    pod: &k8s::Pod,
+    namespace: &str,
+    prompts_dir: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let alert_id = alert.id.as_str().to_lowercase();
+    let task_id = alert.context.get("task_id").map(|s| s.as_str()).unwrap_or("unknown");
+    let agent = alert.context.get("agent").map(|s| s.as_str()).unwrap_or("unknown");
+
+    handle_alert(
+        &alert_id,
+        &pod.name,
+        task_id,
+        agent,
+        namespace,
+        &pod.phase,
+        prompts_dir,
+        dry_run,
+    )
+    .await
+}
+
+/// Handle completion check for a succeeded pod
+async fn handle_completion_check(
+    pod: &k8s::Pod,
+    namespace: &str,
+    prompts_dir: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let task_id = pod.labels.get("task-id").map(|s| s.as_str()).unwrap_or("unknown");
+    let agent = pod.labels.get("agent").map(|s| s.as_str()).unwrap_or("unknown");
+
+    handle_alert(
+        "completion",
+        &pod.name,
+        task_id,
+        agent,
+        namespace,
+        &pod.phase,
+        prompts_dir,
+        dry_run,
+    )
+    .await
+}
+
+/// Handle a detected alert by loading prompt and spawning Factory
+async fn handle_alert(
+    alert_id: &str,
+    pod_name: &str,
+    task_id: &str,
+    agent: &str,
+    namespace: &str,
+    phase: &str,
+    prompts_dir: &str,
+    dry_run: bool,
+) -> Result<()> {
+    // Map alert IDs to prompt filenames
+    let prompt_file = match alert_id {
+        "a1" => format!("{}/a1-comment-order.md", prompts_dir),
+        "a2" => format!("{}/a2-silent-failure.md", prompts_dir),
+        "a3" => format!("{}/a3-stale-progress.md", prompts_dir),
+        "a4" => format!("{}/a4-approval-loop.md", prompts_dir),
+        "a5" => format!("{}/a5-post-tess-ci.md", prompts_dir),
+        "a7" => format!("{}/a7-pod-failure.md", prompts_dir),
+        "a8" => format!("{}/a8-step-timeout.md", prompts_dir),
+        "completion" => format!("{}/success-completion.md", prompts_dir),
+        _ => {
+            println!("{}", format!("Unknown alert ID: {}", alert_id).red());
+            return Ok(());
+        }
+    };
+
+    // Load prompt template
+    let prompt_template = match std::fs::read_to_string(&prompt_file) {
+        Ok(content) => content,
+        Err(e) => {
+            println!(
+                "{}",
+                format!("Failed to load prompt {}: {}", prompt_file, e).red()
+            );
+            return Ok(());
+        }
+    };
+
+    // Fetch pod logs
+    let logs = get_pod_logs_for_alert(pod_name, namespace, 500).await;
+
+    // For completion checks, load agent-specific expected behaviors
+    let expected_behaviors = if alert_id == "completion" {
+        let expected_file = format!("{}/expected/{}.md", prompts_dir, agent.to_lowercase());
+        std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
+            format!("# Expected behaviors for {} not found", agent)
+        })
+    } else {
+        String::new()
+    };
+
+    // Render the prompt
+    let rendered = prompt_template
+        .replace("{{pod_name}}", pod_name)
+        .replace("{{namespace}}", namespace)
+        .replace("{{phase}}", phase)
+        .replace("{{task_id}}", task_id)
+        .replace("{{agent}}", agent)
+        .replace("{{logs}}", &logs)
+        .replace("{{expected_behaviors}}", &expected_behaviors)
+        .replace("{{duration}}", "N/A"); // TODO: Calculate actual duration
+
+    if dry_run {
+        println!("{}", "=".repeat(80).dimmed());
+        println!("{}", format!("RENDERED PROMPT FOR {}:", alert_id.to_uppercase()).cyan());
+        println!("{}", "=".repeat(80).dimmed());
+        println!("{}", rendered);
+        println!("{}", "=".repeat(80).dimmed());
+        return Ok(());
+    }
+
+    // Write prompt to temp file and spawn Factory
+    let prompt_path = format!("/tmp/alert-{}-{}.md", alert_id, pod_name);
+    std::fs::write(&prompt_path, &rendered)?;
+
+    spawn_factory_with_prompt(&prompt_path, pod_name, alert_id).await?;
+
+    Ok(())
+}
+
+/// Fetch recent logs for a pod
+async fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String {
+    let output = std::process::Command::new("kubectl")
+        .args([
+            "logs", pod_name,
+            "-n", namespace,
+            "--tail", &tail.to_string(),
+            "--all-containers",
+        ])
+        .output();
+
+    let logs = match output {
+        Ok(out) if out.status.success() => {
+            String::from_utf8_lossy(&out.stdout).to_string()
+        }
+        Ok(out) => {
+            format!(
+                "[Failed to fetch logs: {}]",
+                String::from_utf8_lossy(&out.stderr)
+            )
+        }
+        Err(e) => format!("[Error fetching logs: {}]", e),
+    };
+
+    // Redact secrets before returning
+    redact_secrets(&logs)
+}
+
+/// Redact sensitive information from logs to prevent secret leakage
+fn redact_secrets(text: &str) -> String {
+    use std::borrow::Cow;
+    
+    let mut result = Cow::Borrowed(text);
+    
+    // Patterns for common secret formats
+    let secret_patterns = [
+        // API keys with known prefixes
+        (r#"sk-ant-[a-zA-Z0-9_-]+"#, "[REDACTED_ANTHROPIC_KEY]"),
+        (r#"sk-proj-[a-zA-Z0-9_-]+"#, "[REDACTED_OPENAI_KEY]"),
+        (r#"ctx7sk-[a-zA-Z0-9-]+"#, "[REDACTED_CONTEXT7_KEY]"),
+        (r#"fk-[a-zA-Z0-9_-]+"#, "[REDACTED_FACTORY_KEY]"),
+        (r#"pplx-[a-zA-Z0-9]+"#, "[REDACTED_PERPLEXITY_KEY]"),
+        (r#"xai-[a-zA-Z0-9]+"#, "[REDACTED_XAI_KEY]"),
+        (r#"key_[a-f0-9]{64}"#, "[REDACTED_CURSOR_KEY]"),
+        (r#"AIzaSy[a-zA-Z0-9_-]+"#, "[REDACTED_GOOGLE_KEY]"),
+        // Generic patterns for JSON secret blocks
+        (r#""ANTHROPIC_API_KEY":"[^"]+""#, r#""ANTHROPIC_API_KEY":"[REDACTED]""#),
+        (r#""OPENAI_API_KEY":"[^"]+""#, r#""OPENAI_API_KEY":"[REDACTED]""#),
+        (r#""GEMINI_API_KEY":"[^"]+""#, r#""GEMINI_API_KEY":"[REDACTED]""#),
+        (r#""GOOGLE_API_KEY":"[^"]+""#, r#""GOOGLE_API_KEY":"[REDACTED]""#),
+        (r#""CONTEXT7_API_KEY":"[^"]+""#, r#""CONTEXT7_API_KEY":"[REDACTED]""#),
+        (r#""CURSOR_API_KEY":"[^"]+""#, r#""CURSOR_API_KEY":"[REDACTED]""#),
+        (r#""FACTORY_API_KEY":"[^"]+""#, r#""FACTORY_API_KEY":"[REDACTED]""#),
+        (r#""PERPLEXITY_API_KEY":"[^"]+""#, r#""PERPLEXITY_API_KEY":"[REDACTED]""#),
+        (r#""XAI_API_KEY":"[^"]+""#, r#""XAI_API_KEY":"[REDACTED]""#),
+        // Vault raw output blocks (entire _raw JSON)
+        (r#"_raw=\{[^}]+\}"#, "_raw={[REDACTED_VAULT_DATA]}"),
+    ];
+    
+    for (pattern, replacement) in secret_patterns {
+        if let Ok(re) = regex::Regex::new(pattern) {
+            result = Cow::Owned(re.replace_all(&result, replacement).to_string());
+        }
+    }
+    
+    result.into_owned()
+}
+
+/// Spawn Factory (droid exec) with the rendered prompt
+/// Output is written to /workspace/watch/logs/ for sidecar to tail
+async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: &str) -> Result<()> {
+    use tokio::process::Command as AsyncCommand;
+    use std::io::Write;
+
+    let prompt_content = std::fs::read_to_string(prompt_path)
+        .context("Failed to read prompt file")?;
+
+    // Create log directory and file
+    let log_dir = "/workspace/watch/logs";
+    std::fs::create_dir_all(log_dir).ok();
+    
+    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let safe_pod_name = pod_name.chars().take(50).collect::<String>();
+    let log_file = format!("{}/{}-{}-{}.log", log_dir, alert_id.to_uppercase(), safe_pod_name, timestamp);
+    
+    println!(
+        "{}",
+        format!("🚀 Spawning Factory for alert {} on pod {} → {}", alert_id, pod_name, log_file).cyan()
+    );
+
+    // Write header to log file
+    let mut file = std::fs::File::create(&log_file)
+        .context("Failed to create log file")?;
+    writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+    writeln!(file, "ALERT: {} | POD: {}", alert_id.to_uppercase(), pod_name)?;
+    writeln!(file, "TIME: {}", chrono::Utc::now().to_rfc3339())?;
+    writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+    writeln!(file, "")?;
+    writeln!(file, "=== PROMPT ===")?;
+    writeln!(file, "{}", prompt_content)?;
+    writeln!(file, "")?;
+    writeln!(file, "=== FACTORY OUTPUT ===")?;
+    drop(file); // Close before spawning
+
+    let output = AsyncCommand::new("droid")
+        .args([
+            "exec",
+            "--output-format", "text",
+            "--auto", "high",
+            &prompt_content,
+        ])
+        .output()
+        .await;
+
+    // Append output to log file
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&log_file)
+        .context("Failed to open log file for append")?;
+
+    match output {
+        Ok(out) => {
+            // Write stdout
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if !stdout.is_empty() {
+                writeln!(file, "{}", stdout)?;
+            }
+            
+            // Write stderr
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            if !stderr.is_empty() {
+                writeln!(file, "=== STDERR ===")?;
+                writeln!(file, "{}", stderr)?;
+            }
+            
+            // Write exit status
+            writeln!(file, "")?;
+            writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+            writeln!(file, "EXIT CODE: {:?}", out.status.code())?;
+            writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+
+            if out.status.success() {
+                println!("{}", format!("✅ Factory completed → {}", log_file).green());
+            } else {
+                println!(
+                    "{}",
+                    format!(
+                        "⚠️ Factory exited {:?} → {}",
+                        out.status.code(),
+                        log_file
+                    ).yellow()
+                );
+            }
+        }
+        Err(e) => {
+            writeln!(file, "ERROR: Failed to spawn: {}", e)?;
+            println!(
+                "{}",
+                format!("❌ Failed to spawn Factory: {}. Is 'droid' in PATH?", e).red()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Test an alert flow manually
+async fn test_alert_flow(
+    alert_id: &str,
+    pod_name: &str,
+    task_id: &str,
+    agent: &str,
+    prompts_dir: &str,
+    dry_run: bool,
+) -> Result<()> {
+    println!(
+        "{}",
+        format!("Testing alert flow for: {}", alert_id.to_uppercase()).cyan()
+    );
+
+    handle_alert(
+        alert_id,
+        pod_name,
+        task_id,
+        agent,
+        "test-namespace",
+        "Failed", // Simulated phase
+        prompts_dir,
+        dry_run,
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Spawn a remediation agent for a detected issue
+async fn spawn_remediation_agent(
+    alert: &str,
+    task_id: &str,
+    issue_file: &str,
+    config: &str,
+) -> Result<()> {
+    println!(
+        "{}",
+        format!(
+            "Spawning remediation agent for alert {} (task: {})",
+            alert, task_id
+        ).cyan()
+    );
+
+    // Read the issue file
+    let issue_content = std::fs::read_to_string(issue_file)
+        .context(format!("Failed to read issue file: {}", issue_file))?;
+
+    println!("{}", format!("Issue file: {}", issue_file).dimmed());
+    println!("{}", format!("Issue preview: {}...", &issue_content[..issue_content.len().min(200)]).dimmed());
+
+    // Load config to get remediation settings (will be used for CodeRun creation)
+    let _config_content = std::fs::read_to_string(config)
+        .context(format!("Failed to read config: {}", config))?;
+
+    // For now, create a CodeRun for remediation
+    // In production, this would create an actual CodeRun resource via kubectl
+    let coderun_name = format!("remediation-{}-{}", alert, task_id);
+
+    println!(
+        "{}",
+        format!("Would create CodeRun: {}", coderun_name).yellow()
+    );
+    println!(
+        "{}",
+        "TODO: Implement actual CodeRun creation for remediation".yellow()
     );
 
     Ok(())

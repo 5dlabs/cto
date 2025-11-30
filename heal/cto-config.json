@@ -56,6 +56,29 @@
       "testingMaxRetries": 5,
       "autoMerge": true,
       "parallelExecution": true
+    },
+    "docs_ingest": {
+      "model": "claude-opus-4-5-20251101",
+      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
+    },
+    "remediation": {
+      "repository": "5dlabs/cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "docs",
+      "agent": "5DLabs-Rex",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "maxIterations": 3,
+      "template": "watch/factory",
+      "syncTimeoutSecs": 300
+    },
+    "monitor": {
+      "agent": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "glm-4-plus",
+      "template": "watch/factory",
+      "clusterContext": "kind-cto-dev",
+      "maxIterations": 3
     }
   },
   "agents": {
@@ -88,14 +111,7 @@
           "github_add_issue_comment",
           "github_search_repositories"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "rex": {
@@ -126,27 +142,14 @@
           "github_create_branch",
           "github_get_file_contents",
           "github_create_or_update_file",
-          "github_list_commits"
+          "github_list_commits",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce"
         ],
-        "localServers": {
-          "openmemory": {
-            "enabled": true,
-            "url": "http://openmemory.cto.svc.cluster.local:8080/mcp",
-            "tools": [
-              "openmemory_query",
-              "openmemory_store",
-              "openmemory_list",
-              "openmemory_get",
-              "openmemory_reinforce"
-            ]
-          },
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "cleo": {
@@ -177,14 +180,7 @@
           "github_create_pull_request_review",
           "github_get_file_contents"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "tess": {
@@ -231,14 +227,7 @@
           "github_create_pull_request_review",
           "github_get_pull_request_status"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "blaze": {
@@ -248,9 +237,6 @@
       "maxTokens": 64000,
       "temperature": 0.6,
       "reasoningEffort": "high",
-      "features": {
-        "effectSolutions": false
-      },
       "modelRotation": {
         "enabled": true,
         "models": [
@@ -286,14 +272,7 @@
           "github_create_branch",
           "github_get_file_contents"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "cipher": {
@@ -332,14 +311,7 @@
           "github_get_pull_request",
           "github_create_pull_request_review"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "atlas": {
@@ -372,14 +344,7 @@
           "github_create_branch",
           "github_list_commits"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     },
     "bolt": {
@@ -425,14 +390,7 @@
           "github_update_pull_request",
           "github_list_pull_requests"
         ],
-        "localServers": {
-          "morph": {
-            "enabled": true,
-            "command": "npx",
-            "args": ["-y", "@morphllm/morphmcp"],
-            "tools": ["edit_file", "warp_grep"]
-          }
-        }
+        "localServers": {}
       }
     }
   }

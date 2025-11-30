@@ -1,0 +1,56 @@
+# Completion Check: {{agent}} Pod Succeeded
+
+## Context
+
+- **Pod Name**: {{pod_name}}
+- **Namespace**: {{namespace}}
+- **Agent**: {{agent}}
+- **Task ID**: {{task_id}}
+- **Duration**: {{duration}}
+
+## Expected Behaviors for {{agent}}
+
+{{expected_behaviors}}
+
+## Container Logs
+
+```
+{{logs}}
+```
+
+## Your Task
+
+1. **Verify success** - Did {{agent}} actually complete its job correctly?
+2. **Check patterns** - Match logs against the expected SUCCESS and FAILURE patterns above
+3. **Write analysis** to `/workspace/watch/completion/{{agent}}-{{pod_name}}.md`
+4. **If issues found**, spawn remediation:
+
+```bash
+play-monitor spawn-remediation \
+  --alert completion \
+  --task-id {{task_id}} \
+  --issue-file /workspace/watch/completion/{{agent}}-{{pod_name}}.md
+```
+
+## Analysis Template
+
+Write this to `/workspace/watch/completion/{{agent}}-{{pod_name}}.md`:
+
+```markdown
+# Completion Check: {{agent}} - {{pod_name}}
+
+## Status
+✅ VERIFIED | ⚠️ ISSUES FOUND | ❌ FAILED VERIFICATION
+
+## Pattern Matching
+
+| Pattern | Type | Found |
+|---------|------|-------|
+| ... | SUCCESS/FAILURE | ✅/❌ |
+
+## Issues Found (if any)
+[List problems discovered]
+
+## Remediation Required
+[None if verified, otherwise describe fix]
+```

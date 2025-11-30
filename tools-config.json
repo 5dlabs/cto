@@ -1,6 +1,5 @@
 {
   "remoteTools": [
-    "brave_search_brave_web_search",
     "context7_resolve_library_id",
     "context7_get_library_docs",
     "kubernetes_pods_log",
@@ -64,16 +63,7 @@
     "openmemory_openmemory_store",
     "openmemory_openmemory_list",
     "openmemory_openmemory_reinforce",
-    "openmemory_openmemory_get",
-    "shadcn_list_components",
-    "shadcn_get_component",
-    "shadcn_get_component_demo",
-    "shadcn_get_component_metadata",
-    "shadcn_list_blocks",
-    "shadcn_get_block",
-    "shadcn_get_directory_structure",
-    "ai_elements_get_ai_elements_components",
-    "ai_elements_get_ai_elements_component"
+    "openmemory_openmemory_get"
   ],
   "localServers": {}
 }

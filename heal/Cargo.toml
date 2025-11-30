@@ -1,15 +1,15 @@
 [package]
-name = "play-monitor"
+name = "heal"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Play workflow monitoring CLI for E2E feedback loop"
+description = "Self-healing platform monitor - detects issues and spawns remediation agents"
 homepage = "https://github.com/5dlabs/cto"
 
 [[bin]]
-name = "play-monitor"
+name = "heal"
 path = "src/main.rs"
 
 [dependencies]
@@ -40,6 +40,9 @@ uuid = { workspace = true }
 # Logging
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# Regex for secret redaction
+regex = "1"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

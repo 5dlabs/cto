@@ -3,8 +3,8 @@ resolver = "2"
 members = [
     "cli",
     "controller",
+    "heal",
     "mcp",
-    "monitor",
     "tasks",
     "tools",
 ]
