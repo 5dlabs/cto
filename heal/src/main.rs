@@ -4399,10 +4399,10 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
 
         // Determine the K8sEvent type based on phase and event type
         let k8s_event = match (pod.phase.as_str(), event_type) {
-            ("Failed", _) | ("Error", _) => k8s::K8sEvent::PodFailed(pod.clone()),
+            ("Failed" | "Error", _) => k8s::K8sEvent::PodFailed(pod.clone()),
             ("Succeeded", _) => k8s::K8sEvent::PodSucceeded(pod.clone()),
             ("Running", "ADDED") => k8s::K8sEvent::PodRunning(pod.clone()),
-            ("Running", "MODIFIED") | (_, "MODIFIED") => k8s::K8sEvent::PodModified(pod.clone()),
+            ("Running" | _, "MODIFIED") => k8s::K8sEvent::PodModified(pod.clone()),
             _ => continue, // Skip other events
         };
 

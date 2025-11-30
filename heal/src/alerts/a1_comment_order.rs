@@ -33,7 +33,7 @@ impl Handler {
         
         match current_pos {
             None => vec![], // Unknown agent, no requirement
-            Some(0) | Some(1) => vec![], // Rex/Blaze are first, no previous required
+            Some(0 | 1) => vec![], // Rex/Blaze are first, no previous required
             Some(pos) => {
                 // Return all agents that should come before this one
                 // For Cleo (pos 2), return Rex and Blaze (pos 0, 1)
