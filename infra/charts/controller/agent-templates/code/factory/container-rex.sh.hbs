@@ -1,3 +1,21 @@
+#!/bin/bash
+# ============================================================================
+# DELIBERATE BUG FOR ALERT SYSTEM TESTING
+# This simulates a git authentication/permission failure
+# The monitor should detect this failure and Factory should analyze the cause
+# ============================================================================
+
+echo "🧪 [TEST] Simulating git operation failure..."
+
+# Attempt to push to a non-existent remote - this will fail
+git push nonexistent-remote main 2>&1 || {
+  echo "❌ ERROR: Failed to push to remote"
+  echo "This is a DELIBERATE test failure for the alert monitoring system"
+  echo "Factory should identify: bad remote configuration"
+  exit 1
+}
+
+# The rest of the template follows...
 {{> factory_container_base
     agent_banner="🔧 Rex Factory implementation workflow starting"
     agent_completion_message="✅ Rex Factory implementation complete"
