@@ -13,7 +13,6 @@ spec:
   selector:
     matchLabels:
       {{- include "tools.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: tools
   template:
     metadata:
       annotations:

@@ -73,6 +73,10 @@ resources:
     cpu: 200m
     memory: 512Mi
 
+# Probes (disabled by default - tools server doesn't expose health endpoints yet)
+livenessProbe: {}
+readinessProbe: {}
+
 autoscaling:
   enabled: false
   minReplicas: 1
