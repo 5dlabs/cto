@@ -4661,14 +4661,14 @@ fn redact_secrets(text: &str) -> String {
     // Patterns for common secret formats
     let secret_patterns = [
         // API keys with known prefixes
-        (r#"sk-ant-[a-zA-Z0-9_-]+"#, "[REDACTED_ANTHROPIC_KEY]"),
-        (r#"sk-proj-[a-zA-Z0-9_-]+"#, "[REDACTED_OPENAI_KEY]"),
-        (r#"ctx7sk-[a-zA-Z0-9-]+"#, "[REDACTED_CONTEXT7_KEY]"),
-        (r#"fk-[a-zA-Z0-9_-]+"#, "[REDACTED_FACTORY_KEY]"),
-        (r#"pplx-[a-zA-Z0-9]+"#, "[REDACTED_PERPLEXITY_KEY]"),
-        (r#"xai-[a-zA-Z0-9]+"#, "[REDACTED_XAI_KEY]"),
-        (r#"key_[a-f0-9]{64}"#, "[REDACTED_CURSOR_KEY]"),
-        (r#"AIzaSy[a-zA-Z0-9_-]+"#, "[REDACTED_GOOGLE_KEY]"),
+        (r"sk-ant-[a-zA-Z0-9_-]+", "[REDACTED_ANTHROPIC_KEY]"),
+        (r"sk-proj-[a-zA-Z0-9_-]+", "[REDACTED_OPENAI_KEY]"),
+        (r"ctx7sk-[a-zA-Z0-9-]+", "[REDACTED_CONTEXT7_KEY]"),
+        (r"fk-[a-zA-Z0-9_-]+", "[REDACTED_FACTORY_KEY]"),
+        (r"pplx-[a-zA-Z0-9]+", "[REDACTED_PERPLEXITY_KEY]"),
+        (r"xai-[a-zA-Z0-9]+", "[REDACTED_XAI_KEY]"),
+        (r"key_[a-f0-9]{64}", "[REDACTED_CURSOR_KEY]"),
+        (r"AIzaSy[a-zA-Z0-9_-]+", "[REDACTED_GOOGLE_KEY]"),
         // Generic patterns for JSON secret blocks
         (r#""ANTHROPIC_API_KEY":"[^"]+""#, r#""ANTHROPIC_API_KEY":"[REDACTED]""#),
         (r#""OPENAI_API_KEY":"[^"]+""#, r#""OPENAI_API_KEY":"[REDACTED]""#),
@@ -4680,7 +4680,7 @@ fn redact_secrets(text: &str) -> String {
         (r#""PERPLEXITY_API_KEY":"[^"]+""#, r#""PERPLEXITY_API_KEY":"[REDACTED]""#),
         (r#""XAI_API_KEY":"[^"]+""#, r#""XAI_API_KEY":"[REDACTED]""#),
         // Vault raw output blocks (entire _raw JSON)
-        (r#"_raw=\{[^}]+\}"#, "_raw={[REDACTED_VAULT_DATA]}"),
+        (r"_raw=\{[^}]+\}", "_raw={[REDACTED_VAULT_DATA]}"),
     ];
     
     for (pattern, replacement) in secret_patterns {
