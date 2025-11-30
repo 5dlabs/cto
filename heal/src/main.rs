@@ -4346,25 +4346,6 @@ fn create_next_monitor_iteration(config_path: &str, iteration: u32, namespace: &
 // Alert System Functions
 // =============================================================================
 
-/// Pod name prefixes to exclude from alerts and completion checks.
-/// These are infrastructure pods that restart during deployments or CronJobs.
-const EXCLUDED_POD_PREFIXES: &[&str] = &[
-    "heal",
-    "cto-tools",
-    "cto-controller",
-    "vault-mcp-server",
-    "openmemory",
-    "event-cleaner",
-    "workspace-pvc-cleaner",
-];
-
-/// Check if a pod name should be excluded from alerts/completion checks
-fn is_excluded_pod(pod_name: &str) -> bool {
-    EXCLUDED_POD_PREFIXES
-        .iter()
-        .any(|prefix| pod_name.starts_with(prefix))
-}
-
 /// Watch for alerts and spawn Factory when detected
 async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> Result<()> {
     use tokio::io::{AsyncBufReadExt, BufReader};
@@ -4459,7 +4440,7 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         // Also check for completion (pod succeeded) - this is a proactive check, not an alert
         // Skip infrastructure pods (cronjobs, platform services)
         if matches!(k8s_event, k8s::K8sEvent::PodSucceeded(_))
-            && !is_excluded_pod(&pod.name)
+            && !k8s::is_excluded_pod(&pod.name)
         {
             println!(
                 "{}",

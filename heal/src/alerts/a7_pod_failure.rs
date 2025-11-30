@@ -5,26 +5,7 @@
 
 use super::types::{Alert, AlertContext, AlertHandler, AlertId, Severity};
 use crate::github::GitHubState;
-use crate::k8s::K8sEvent;
-
-/// Pod name prefixes to exclude from failure alerts.
-/// These are infrastructure pods that may restart during deployments.
-const EXCLUDED_POD_PREFIXES: &[&str] = &[
-    "heal",
-    "cto-tools",
-    "cto-controller",
-    "vault-mcp-server",
-    "openmemory",
-    "event-cleaner",
-    "workspace-pvc-cleaner",
-];
-
-/// Check if a pod name should be excluded from alerts
-fn is_excluded(pod_name: &str) -> bool {
-    EXCLUDED_POD_PREFIXES
-        .iter()
-        .any(|prefix| pod_name.starts_with(prefix))
-}
+use crate::k8s::{is_excluded_pod, K8sEvent};
 
 pub struct Handler;
 
@@ -58,7 +39,7 @@ impl AlertHandler for Handler {
         };
 
         // Skip excluded infrastructure pods
-        if is_excluded(&pod.name) {
+        if is_excluded_pod(&pod.name) {
             return None;
         }
 
