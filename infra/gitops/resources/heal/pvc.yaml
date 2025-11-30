@@ -1,6 +1,6 @@
 ---
 # PersistentVolumeClaim for heal workspace
-# Shared between heal monitor and Rex remediation agents
+# Used by heal monitor (local-path only supports ReadWriteOnce)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -12,7 +12,7 @@ metadata:
     app.kubernetes.io/component: storage
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   storageClassName: local-path
   resources:
     requests:
