@@ -1,10 +1,11 @@
 //! A7: Pod Failure
 //!
 //! Detects when any CTO pod enters Failed, Error, or `CrashLoopBackOff` state.
+//! Excludes infrastructure pods that restart during deployments.
 
 use super::types::{Alert, AlertContext, AlertHandler, AlertId, Severity};
 use crate::github::GitHubState;
-use crate::k8s::K8sEvent;
+use crate::k8s::{is_excluded_pod, K8sEvent};
 
 pub struct Handler;
 
@@ -36,6 +37,11 @@ impl AlertHandler for Handler {
             K8sEvent::PodModified(pod) if pod.phase == "Failed" || pod.phase == "Error" => pod,
             _ => return None,
         };
+
+        // Skip excluded infrastructure pods
+        if is_excluded_pod(&pod.name) {
+            return None;
+        }
 
         // Check for CrashLoopBackOff
         let restart_count: i32 = pod.container_statuses.iter().map(|c| c.restart_count).sum();
