@@ -354,6 +354,15 @@ config:
         keys:
           - "ARGOCD_API_TOKEN"
 
+    # --- CTO Platform ---
+    cto:
+      name: "CTO Platform"
+      description: "CTO MCP server - launch AI development workflows via Argo Workflows (intake, play, remediation)"
+      transport: "stdio"
+      command: "cto-mcp"
+      args: []
+      workingDirectory: "/tmp"
+
     # --- AI Image Generation ---
     nano-banana:
       name: "Nano Banana"
