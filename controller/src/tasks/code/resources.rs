@@ -639,33 +639,6 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/workspace"
         }));
 
-        // Mount cto-config ConfigMap for heal CodeRuns (remediation agents need it)
-        // This must come AFTER workspace mount so it's not shadowed
-        if is_heal {
-            volumes.push(json!({
-                "name": "cto-config",
-                "configMap": {
-                    "name": "cto-config"
-                }
-            }));
-            volume_mounts.push(json!({
-                "name": "cto-config",
-                "mountPath": "/workspace/config"
-            }));
-
-            volumes.push(json!({
-                "name": "talos-kubeconfig",
-                "secret": {
-                    "secretName": "talos-kubeconfig"
-                }
-            }));
-            volume_mounts.push(json!({
-                "name": "talos-kubeconfig",
-                "mountPath": "/workspace/talos",
-                "readOnly": true
-            }));
-        }
-
         // Docker-in-Docker volumes (enabled by default, can be disabled via enableDocker: false)
         let enable_docker = code_run.spec.enable_docker;
         if enable_docker {
@@ -831,18 +804,6 @@ impl<'a> CodeResourceManager<'a> {
 
         // Add critical system vars (these will override any duplicates due to deduplication logic)
         final_env_vars.extend(critical_env_vars);
-
-        if is_heal {
-            let talos_path = "/workspace/talos/kubeconfig";
-            final_env_vars.push(json!({
-                "name": "ARGO_KUBECONFIG",
-                "value": talos_path
-            }));
-            final_env_vars.push(json!({
-                "name": "KUBECONFIG",
-                "value": talos_path
-            }));
-        }
 
         // Add Docker environment variable if Docker is enabled
         // Socket is at /var/run/docker/docker.sock to avoid overwriting /var/run/secrets
