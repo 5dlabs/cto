@@ -30,7 +30,7 @@ impl Handler {
     fn expected_previous_agents(current_agent: &str) -> Vec<&'static str> {
         // Find position of current agent in the order
         let current_pos = AGENT_ORDER.iter().position(|&a| current_agent.contains(a));
-        
+
         match current_pos {
             // Unknown agent or Rex/Blaze (first agents) - no previous required
             None | Some(0 | 1) => vec![],

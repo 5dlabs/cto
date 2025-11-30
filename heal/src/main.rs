@@ -4355,12 +4355,12 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         "{}",
         format!("Starting alert watch in namespace: {namespace}").cyan()
     );
-    println!(
-        "{}",
-        format!("Prompts directory: {prompts_dir}").dimmed()
-    );
+    println!("{}", format!("Prompts directory: {prompts_dir}").dimmed());
     if dry_run {
-        println!("{}", "DRY RUN MODE - will detect but not spawn Factory".yellow());
+        println!(
+            "{}",
+            "DRY RUN MODE - will detect but not spawn Factory".yellow()
+        );
     }
 
     // Initialize alert registry and default context
@@ -4370,10 +4370,13 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
     // Start kubectl watch for pods
     let mut child = AsyncCommand::new("kubectl")
         .args([
-            "get", "pods",
-            "-n", namespace,
+            "get",
+            "pods",
+            "-n",
+            namespace,
             "-w",
-            "-o", "json",
+            "-o",
+            "json",
             "--output-watch-events",
         ])
         .stdout(std::process::Stdio::piped())
@@ -4430,7 +4433,8 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                     alert.id.as_str(),
                     alert.message,
                     alert.severity
-                ).red()
+                )
+                .red()
             );
 
             // Handle the alert (load prompt, fetch logs, spawn Factory)
@@ -4470,7 +4474,9 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
                 let terminated = &status["state"]["terminated"];
                 k8s::ContainerState::Terminated {
                     exit_code: terminated["exitCode"].as_i64().unwrap_or(0) as i32,
-                    reason: terminated["reason"].as_str().map(std::string::ToString::to_string),
+                    reason: terminated["reason"]
+                        .as_str()
+                        .map(std::string::ToString::to_string),
                     finished_at: None,
                 }
             } else if status["state"]["running"].is_object() {
@@ -4489,9 +4495,15 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
     }
 
     k8s::Pod {
-        name: json["metadata"]["name"].as_str().unwrap_or("unknown").to_string(),
+        name: json["metadata"]["name"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string(),
         namespace: namespace.to_string(),
-        phase: json["status"]["phase"].as_str().unwrap_or("Unknown").to_string(),
+        phase: json["status"]["phase"]
+            .as_str()
+            .unwrap_or("Unknown")
+            .to_string(),
         labels,
         container_statuses,
         started_at: None,
@@ -4507,7 +4519,10 @@ async fn handle_detected_alert(
     dry_run: bool,
 ) -> Result<()> {
     let alert_id = alert.id.as_str().to_lowercase();
-    let task_id = alert.context.get("task_id").map_or("unknown", String::as_str);
+    let task_id = alert
+        .context
+        .get("task_id")
+        .map_or("unknown", String::as_str);
     let agent = alert.context.get("agent").map_or("unknown", String::as_str);
 
     handle_alert(
@@ -4591,9 +4606,8 @@ async fn handle_alert(
     // For completion checks, load agent-specific expected behaviors
     let expected_behaviors = if alert_id == "completion" {
         let expected_file = format!("{}/expected/{}.md", prompts_dir, agent.to_lowercase());
-        std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
-            format!("# Expected behaviors for {agent} not found")
-        })
+        std::fs::read_to_string(&expected_file)
+            .unwrap_or_else(|_| format!("# Expected behaviors for {agent} not found"))
     } else {
         String::new()
     };
@@ -4611,7 +4625,10 @@ async fn handle_alert(
 
     if dry_run {
         println!("{}", "=".repeat(80).dimmed());
-        println!("{}", format!("RENDERED PROMPT FOR {}:", alert_id.to_uppercase()).cyan());
+        println!(
+            "{}",
+            format!("RENDERED PROMPT FOR {}:", alert_id.to_uppercase()).cyan()
+        );
         println!("{}", "=".repeat(80).dimmed());
         println!("{rendered}");
         println!("{}", "=".repeat(80).dimmed());
@@ -4631,17 +4648,18 @@ async fn handle_alert(
 fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String {
     let output = std::process::Command::new("kubectl")
         .args([
-            "logs", pod_name,
-            "-n", namespace,
-            "--tail", &tail.to_string(),
+            "logs",
+            pod_name,
+            "-n",
+            namespace,
+            "--tail",
+            &tail.to_string(),
             "--all-containers",
         ])
         .output();
 
     let logs = match output {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).to_string()
-        }
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).to_string(),
         Ok(out) => {
             format!(
                 "[Failed to fetch logs: {}]",
@@ -4658,9 +4676,9 @@ fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String 
 /// Redact sensitive information from logs to prevent secret leakage
 fn redact_secrets(text: &str) -> String {
     use std::borrow::Cow;
-    
+
     let mut result = Cow::Borrowed(text);
-    
+
     // Patterns for common secret formats
     let secret_patterns = [
         // API keys with known prefixes
@@ -4673,58 +4691,102 @@ fn redact_secrets(text: &str) -> String {
         (r"key_[a-f0-9]{64}", "[REDACTED_CURSOR_KEY]"),
         (r"AIzaSy[a-zA-Z0-9_-]+", "[REDACTED_GOOGLE_KEY]"),
         // Generic patterns for JSON secret blocks
-        (r#""ANTHROPIC_API_KEY":"[^"]+""#, r#""ANTHROPIC_API_KEY":"[REDACTED]""#),
-        (r#""OPENAI_API_KEY":"[^"]+""#, r#""OPENAI_API_KEY":"[REDACTED]""#),
-        (r#""GEMINI_API_KEY":"[^"]+""#, r#""GEMINI_API_KEY":"[REDACTED]""#),
-        (r#""GOOGLE_API_KEY":"[^"]+""#, r#""GOOGLE_API_KEY":"[REDACTED]""#),
-        (r#""CONTEXT7_API_KEY":"[^"]+""#, r#""CONTEXT7_API_KEY":"[REDACTED]""#),
-        (r#""CURSOR_API_KEY":"[^"]+""#, r#""CURSOR_API_KEY":"[REDACTED]""#),
-        (r#""FACTORY_API_KEY":"[^"]+""#, r#""FACTORY_API_KEY":"[REDACTED]""#),
-        (r#""PERPLEXITY_API_KEY":"[^"]+""#, r#""PERPLEXITY_API_KEY":"[REDACTED]""#),
+        (
+            r#""ANTHROPIC_API_KEY":"[^"]+""#,
+            r#""ANTHROPIC_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""OPENAI_API_KEY":"[^"]+""#,
+            r#""OPENAI_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""GEMINI_API_KEY":"[^"]+""#,
+            r#""GEMINI_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""GOOGLE_API_KEY":"[^"]+""#,
+            r#""GOOGLE_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""CONTEXT7_API_KEY":"[^"]+""#,
+            r#""CONTEXT7_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""CURSOR_API_KEY":"[^"]+""#,
+            r#""CURSOR_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""FACTORY_API_KEY":"[^"]+""#,
+            r#""FACTORY_API_KEY":"[REDACTED]""#,
+        ),
+        (
+            r#""PERPLEXITY_API_KEY":"[^"]+""#,
+            r#""PERPLEXITY_API_KEY":"[REDACTED]""#,
+        ),
         (r#""XAI_API_KEY":"[^"]+""#, r#""XAI_API_KEY":"[REDACTED]""#),
         // Vault raw output blocks (entire _raw JSON)
         (r"_raw=\{[^}]+\}", "_raw={[REDACTED_VAULT_DATA]}"),
     ];
-    
+
     for (pattern, replacement) in secret_patterns {
         if let Ok(re) = regex::Regex::new(pattern) {
             result = Cow::Owned(re.replace_all(&result, replacement).to_string());
         }
     }
-    
+
     result.into_owned()
 }
 
 /// Spawn Factory (droid exec) with the rendered prompt
 /// Output is written to /workspace/watch/logs/ for sidecar to tail
 #[allow(clippy::too_many_lines)] // Complex log handling requires all steps together
-async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: &str) -> Result<()> {
-    use tokio::process::Command as AsyncCommand;
+async fn spawn_factory_with_prompt(
+    prompt_path: &str,
+    pod_name: &str,
+    alert_id: &str,
+) -> Result<()> {
     use std::io::Write;
+    use tokio::process::Command as AsyncCommand;
 
-    let prompt_content = std::fs::read_to_string(prompt_path)
-        .context("Failed to read prompt file")?;
+    let prompt_content =
+        std::fs::read_to_string(prompt_path).context("Failed to read prompt file")?;
 
     // Create log directory and file
     let log_dir = "/workspace/watch/logs";
     std::fs::create_dir_all(log_dir).ok();
-    
+
     let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
     let safe_pod_name = pod_name.chars().take(50).collect::<String>();
-    let log_file = format!("{}/{}-{}-{}.log", log_dir, alert_id.to_uppercase(), safe_pod_name, timestamp);
-    
+    let log_file = format!(
+        "{}/{}-{}-{}.log",
+        log_dir,
+        alert_id.to_uppercase(),
+        safe_pod_name,
+        timestamp
+    );
+
     println!(
         "{}",
         format!("🚀 Spawning Factory for alert {alert_id} on pod {pod_name} → {log_file}").cyan()
     );
 
     // Write header to log file
-    let mut file = std::fs::File::create(&log_file)
-        .context("Failed to create log file")?;
-    writeln!(file, "═══════════════════════════════════════════════════════════════")?;
-    writeln!(file, "ALERT: {} | POD: {}", alert_id.to_uppercase(), pod_name)?;
+    let mut file = std::fs::File::create(&log_file).context("Failed to create log file")?;
+    writeln!(
+        file,
+        "═══════════════════════════════════════════════════════════════"
+    )?;
+    writeln!(
+        file,
+        "ALERT: {} | POD: {}",
+        alert_id.to_uppercase(),
+        pod_name
+    )?;
     writeln!(file, "TIME: {}", chrono::Utc::now().to_rfc3339())?;
-    writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+    writeln!(
+        file,
+        "═══════════════════════════════════════════════════════════════"
+    )?;
     writeln!(file)?;
     writeln!(file, "=== PROMPT ===")?;
     writeln!(file, "{prompt_content}")?;
@@ -4735,8 +4797,10 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
     let output = AsyncCommand::new("droid")
         .args([
             "exec",
-            "--output-format", "text",
-            "--auto", "high",
+            "--output-format",
+            "text",
+            "--auto",
+            "high",
             &prompt_content,
         ])
         .output()
@@ -4755,30 +4819,32 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
             if !stdout.is_empty() {
                 writeln!(file, "{stdout}")?;
             }
-            
+
             // Write stderr
             let stderr = String::from_utf8_lossy(&out.stderr);
             if !stderr.is_empty() {
                 writeln!(file, "=== STDERR ===")?;
                 writeln!(file, "{stderr}")?;
             }
-            
+
             // Write exit status
             writeln!(file)?;
-            writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+            writeln!(
+                file,
+                "═══════════════════════════════════════════════════════════════"
+            )?;
             writeln!(file, "EXIT CODE: {:?}", out.status.code())?;
-            writeln!(file, "═══════════════════════════════════════════════════════════════")?;
+            writeln!(
+                file,
+                "═══════════════════════════════════════════════════════════════"
+            )?;
 
             if out.status.success() {
                 println!("{}", format!("✅ Factory completed → {log_file}").green());
             } else {
                 println!(
                     "{}",
-                    format!(
-                        "⚠️ Factory exited {:?} → {}",
-                        out.status.code(),
-                        log_file
-                    ).yellow()
+                    format!("⚠️ Factory exited {:?} → {}", out.status.code(), log_file).yellow()
                 );
             }
         }
@@ -4840,11 +4906,18 @@ fn spawn_remediation_agent(
         .context(format!("Failed to read issue file: {issue_file}"))?;
 
     println!("{}", format!("Issue file: {issue_file}").dimmed());
-    println!("{}", format!("Issue preview: {}...", &issue_content[..issue_content.len().min(200)]).dimmed());
+    println!(
+        "{}",
+        format!(
+            "Issue preview: {}...",
+            &issue_content[..issue_content.len().min(200)]
+        )
+        .dimmed()
+    );
 
     // Load config to get remediation settings (will be used for CodeRun creation)
-    let _config_content = std::fs::read_to_string(config)
-        .context(format!("Failed to read config: {config}"))?;
+    let _config_content =
+        std::fs::read_to_string(config).context(format!("Failed to read config: {config}"))?;
 
     // For now, create a CodeRun for remediation
     // In production, this would create an actual CodeRun resource via kubectl

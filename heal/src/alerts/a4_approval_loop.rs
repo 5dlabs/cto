@@ -78,10 +78,7 @@ impl AlertHandler for Handler {
                     .with_severity(Severity::Warning)
                     .with_context("agent", agent.clone())
                     .with_context("approval_count", count.to_string())
-                    .with_context(
-                        "threshold",
-                        ctx.config.approval_loop_threshold.to_string(),
-                    ),
+                    .with_context("threshold", ctx.config.approval_loop_threshold.to_string()),
                 );
             }
         }

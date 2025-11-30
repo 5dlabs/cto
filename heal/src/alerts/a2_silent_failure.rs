@@ -44,9 +44,7 @@ impl AlertHandler for Handler {
         // Look for terminated containers with non-zero exit codes
         for container in &pod.container_statuses {
             if let ContainerState::Terminated {
-                exit_code,
-                reason,
-                ..
+                exit_code, reason, ..
             } = &container.state
             {
                 if *exit_code != 0 {
