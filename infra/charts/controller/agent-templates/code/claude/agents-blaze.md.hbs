@@ -368,6 +368,44 @@ Implemented by: {{github_app}}"
 
 **The "Closes #XXX" keyword automatically links the PR to the issue and will close it when merged.**
 
+{{#if features.effectSolutions}}
+## Effect.ts Integration
+
+This project uses Effect.ts. The `effect-solutions` CLI provides curated best practices for Effect TypeScript.
+
+### CLI Commands
+```bash
+effect-solutions list                              # List all available topics
+effect-solutions show <topic> [topic2...]          # Read one or more topics
+effect-solutions search <term>                     # Search topics by keyword
+```
+
+### Available Topics
+| Topic | Use Case |
+|-------|----------|
+| `basics` | Core patterns (Effect.gen, Effect.fn) |
+| `services-and-layers` | Context.Tag and Layer patterns for DI |
+| `data-modeling` | Schema.Class, branded types, pattern matching |
+| `error-handling` | Schema.TaggedError, defects, recovery |
+| `config` | Effect Config usage and layer patterns |
+| `testing` | Testing with @effect/vitest |
+| `cli` | Build CLIs with @effect/cli |
+
+### When to Query
+**Always run `effect-solutions show <topic>` before implementing:**
+- Services & dependency injection → `effect-solutions show services-and-layers`
+- Error handling with typed errors → `effect-solutions show error-handling`
+- Data modeling with Schema → `effect-solutions show data-modeling`
+- Config management → `effect-solutions show config`
+
+### Effect Language Service
+If setting up a new Effect project, also run:
+```bash
+effect-solutions show project-setup tsconfig
+```
+This covers the Effect Language Service (compile-time diagnostics) and recommended TypeScript settings.
+
+{{/if}}
 ## Definition of Done
 - ✅ All acceptance criteria satisfied
 - ✅ No TypeScript/ESLint errors
