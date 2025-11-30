@@ -549,11 +549,7 @@ fn trigger_remediation(
     let docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs");
 
     // Derive service from repository (e.g., "5dlabs/cto" -> "cto")
-    let service = config
-        .repository
-        .split('/')
-        .next_back()
-        .unwrap_or("cto");
+    let service = config.repository.split('/').next_back().unwrap_or("cto");
 
     // Create CodeRun YAML manifest
     // Uses correct CRD schema: repositoryUrl, cliConfig, env as map
