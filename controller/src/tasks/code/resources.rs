@@ -1188,7 +1188,10 @@ impl<'a> CodeResourceManager<'a> {
         labels.insert("task-type".to_string(), code_run.spec.run_type.clone());
         labels.insert(
             "task-id".to_string(),
-            code_run.spec.task_id.map_or("0".to_string(), |id| id.to_string()),
+            code_run
+                .spec
+                .task_id
+                .map_or("0".to_string(), |id| id.to_string()),
         );
 
         // Add PR number label if available in env for better pod correlation

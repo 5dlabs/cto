@@ -191,7 +191,6 @@ fn get_play_status_schema() -> Value {
     })
 }
 
-
 fn get_jobs_schema() -> Value {
     json!({
         "name": "jobs",
