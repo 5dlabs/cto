@@ -330,11 +330,17 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 # Downloads binary directly from v*.*.* unified releases
 ARG TOOLS_VERSION=skip
 RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
-      echo "📦 Installing tools client v${TOOLS_VERSION}..." && \
-      curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
-        "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-x86_64" && \
-      chmod +x /usr/local/bin/tools && \
-      echo "✅ tools client installed"; \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing tools client v${TOOLS_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
+          "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/tools && \
+        echo "✅ tools client installed"; \
+      else \
+        echo "⏭️ Skipping tools client installation (unsupported architecture: ${ARCH})"; \
+      fi; \
     else \
       echo "⏭️ Skipping tools client installation (no release available)"; \
     fi
@@ -343,11 +349,17 @@ RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
 # Downloads binary directly from v*.*.* unified releases
 ARG PLAY_MONITOR_VERSION=skip
 RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
-      echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION}..." && \
-      curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
-        "https://github.com/5dlabs/cto/releases/download/v${PLAY_MONITOR_VERSION}/play-monitor-linux-x86_64" && \
-      chmod +x /usr/local/bin/play-monitor && \
-      echo "✅ play-monitor installed"; \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
+          "https://github.com/5dlabs/cto/releases/download/v${PLAY_MONITOR_VERSION}/play-monitor-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/play-monitor && \
+        echo "✅ play-monitor installed"; \
+      else \
+        echo "⏭️ Skipping play-monitor installation (unsupported architecture: ${ARCH})"; \
+      fi; \
     else \
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
