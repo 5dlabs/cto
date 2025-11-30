@@ -104,10 +104,7 @@ impl AlertHandler for Handler {
         Some(
             Alert::new(
                 AlertId::A1,
-                format!(
-                    "{} is running but no PR comment from {}",
-                    current_agent, expected_str
-                ),
+                format!("{current_agent} is running but no PR comment from {expected_str}"),
             )
             .with_severity(Severity::Warning)
             .with_context("current_agent", current_agent.clone())

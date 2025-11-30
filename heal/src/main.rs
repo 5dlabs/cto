@@ -3278,7 +3278,7 @@ fn capture_terminated_agent_logs(
             let safe_name = step.name.replace(' ', "_");
             let file_path = format!("{logs_dir}/{}_{}.log", safe_name, exit.container_name);
             std::fs::write(&file_path, logs)
-                .with_context(|| format!("Failed to write logs to {}", file_path))?;
+                .with_context(|| format!("Failed to write logs to {file_path}"))?;
             archived_pods.insert(pod_name.clone());
             findings.push((step.name.clone(), exit));
         }
@@ -4353,11 +4353,11 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
 
     println!(
         "{}",
-        format!("Starting alert watch in namespace: {}", namespace).cyan()
+        format!("Starting alert watch in namespace: {namespace}").cyan()
     );
     println!(
         "{}",
-        format!("Prompts directory: {}", prompts_dir).dimmed()
+        format!("Prompts directory: {prompts_dir}").dimmed()
     );
     if dry_run {
         println!("{}", "DRY RUN MODE - will detect but not spawn Factory".yellow());
@@ -4559,16 +4559,16 @@ async fn handle_alert(
 ) -> Result<()> {
     // Map alert IDs to prompt filenames
     let prompt_file = match alert_id {
-        "a1" => format!("{}/a1-comment-order.md", prompts_dir),
-        "a2" => format!("{}/a2-silent-failure.md", prompts_dir),
-        "a3" => format!("{}/a3-stale-progress.md", prompts_dir),
-        "a4" => format!("{}/a4-approval-loop.md", prompts_dir),
-        "a5" => format!("{}/a5-post-tess-ci.md", prompts_dir),
-        "a7" => format!("{}/a7-pod-failure.md", prompts_dir),
-        "a8" => format!("{}/a8-step-timeout.md", prompts_dir),
-        "completion" => format!("{}/success-completion.md", prompts_dir),
+        "a1" => format!("{prompts_dir}/a1-comment-order.md"),
+        "a2" => format!("{prompts_dir}/a2-silent-failure.md"),
+        "a3" => format!("{prompts_dir}/a3-stale-progress.md"),
+        "a4" => format!("{prompts_dir}/a4-approval-loop.md"),
+        "a5" => format!("{prompts_dir}/a5-post-tess-ci.md"),
+        "a7" => format!("{prompts_dir}/a7-pod-failure.md"),
+        "a8" => format!("{prompts_dir}/a8-step-timeout.md"),
+        "completion" => format!("{prompts_dir}/success-completion.md"),
         _ => {
-            println!("{}", format!("Unknown alert ID: {}", alert_id).red());
+            println!("{}", format!("Unknown alert ID: {alert_id}").red());
             return Ok(());
         }
     };
@@ -4579,7 +4579,7 @@ async fn handle_alert(
         Err(e) => {
             println!(
                 "{}",
-                format!("Failed to load prompt {}: {}", prompt_file, e).red()
+                format!("Failed to load prompt {prompt_file}: {e}").red()
             );
             return Ok(());
         }
@@ -4592,7 +4592,7 @@ async fn handle_alert(
     let expected_behaviors = if alert_id == "completion" {
         let expected_file = format!("{}/expected/{}.md", prompts_dir, agent.to_lowercase());
         std::fs::read_to_string(&expected_file).unwrap_or_else(|_| {
-            format!("# Expected behaviors for {} not found", agent)
+            format!("# Expected behaviors for {agent} not found")
         })
     } else {
         String::new()
@@ -4613,13 +4613,13 @@ async fn handle_alert(
         println!("{}", "=".repeat(80).dimmed());
         println!("{}", format!("RENDERED PROMPT FOR {}:", alert_id.to_uppercase()).cyan());
         println!("{}", "=".repeat(80).dimmed());
-        println!("{}", rendered);
+        println!("{rendered}");
         println!("{}", "=".repeat(80).dimmed());
         return Ok(());
     }
 
     // Write prompt to temp file and spawn Factory
-    let prompt_path = format!("/tmp/alert-{}-{}.md", alert_id, pod_name);
+    let prompt_path = format!("/tmp/alert-{alert_id}-{pod_name}.md");
     std::fs::write(&prompt_path, &rendered)?;
 
     spawn_factory_with_prompt(&prompt_path, pod_name, alert_id).await?;
@@ -4648,7 +4648,7 @@ fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String 
                 String::from_utf8_lossy(&out.stderr)
             )
         }
-        Err(e) => format!("[Error fetching logs: {}]", e),
+        Err(e) => format!("[Error fetching logs: {e}]"),
     };
 
     // Redact secrets before returning
@@ -4697,6 +4697,7 @@ fn redact_secrets(text: &str) -> String {
 
 /// Spawn Factory (droid exec) with the rendered prompt
 /// Output is written to /workspace/watch/logs/ for sidecar to tail
+#[allow(clippy::too_many_lines)] // Complex log handling requires all steps together
 async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: &str) -> Result<()> {
     use tokio::process::Command as AsyncCommand;
     use std::io::Write;
@@ -4714,7 +4715,7 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
     
     println!(
         "{}",
-        format!("🚀 Spawning Factory for alert {} on pod {} → {}", alert_id, pod_name, log_file).cyan()
+        format!("🚀 Spawning Factory for alert {alert_id} on pod {pod_name} → {log_file}").cyan()
     );
 
     // Write header to log file
@@ -4726,7 +4727,7 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
     writeln!(file, "═══════════════════════════════════════════════════════════════")?;
     writeln!(file)?;
     writeln!(file, "=== PROMPT ===")?;
-    writeln!(file, "{}", prompt_content)?;
+    writeln!(file, "{prompt_content}")?;
     writeln!(file)?;
     writeln!(file, "=== FACTORY OUTPUT ===")?;
     drop(file); // Close before spawning
@@ -4752,14 +4753,14 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
             // Write stdout
             let stdout = String::from_utf8_lossy(&out.stdout);
             if !stdout.is_empty() {
-                writeln!(file, "{}", stdout)?;
+                writeln!(file, "{stdout}")?;
             }
             
             // Write stderr
             let stderr = String::from_utf8_lossy(&out.stderr);
             if !stderr.is_empty() {
                 writeln!(file, "=== STDERR ===")?;
-                writeln!(file, "{}", stderr)?;
+                writeln!(file, "{stderr}")?;
             }
             
             // Write exit status
@@ -4769,7 +4770,7 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
             writeln!(file, "═══════════════════════════════════════════════════════════════")?;
 
             if out.status.success() {
-                println!("{}", format!("✅ Factory completed → {}", log_file).green());
+                println!("{}", format!("✅ Factory completed → {log_file}").green());
             } else {
                 println!(
                     "{}",
@@ -4782,10 +4783,10 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
             }
         }
         Err(e) => {
-            writeln!(file, "ERROR: Failed to spawn: {}", e)?;
+            writeln!(file, "ERROR: Failed to spawn: {e}")?;
             println!(
                 "{}",
-                format!("❌ Failed to spawn Factory: {}. Is 'droid' in PATH?", e).red()
+                format!("❌ Failed to spawn Factory: {e}. Is 'droid' in PATH?").red()
             );
         }
     }
@@ -4831,30 +4832,27 @@ fn spawn_remediation_agent(
 ) -> Result<()> {
     println!(
         "{}",
-        format!(
-            "Spawning remediation agent for alert {} (task: {})",
-            alert, task_id
-        ).cyan()
+        format!("Spawning remediation agent for alert {alert} (task: {task_id})").cyan()
     );
 
     // Read the issue file
     let issue_content = std::fs::read_to_string(issue_file)
-        .context(format!("Failed to read issue file: {}", issue_file))?;
+        .context(format!("Failed to read issue file: {issue_file}"))?;
 
-    println!("{}", format!("Issue file: {}", issue_file).dimmed());
+    println!("{}", format!("Issue file: {issue_file}").dimmed());
     println!("{}", format!("Issue preview: {}...", &issue_content[..issue_content.len().min(200)]).dimmed());
 
     // Load config to get remediation settings (will be used for CodeRun creation)
     let _config_content = std::fs::read_to_string(config)
-        .context(format!("Failed to read config: {}", config))?;
+        .context(format!("Failed to read config: {config}"))?;
 
     // For now, create a CodeRun for remediation
     // In production, this would create an actual CodeRun resource via kubectl
-    let coderun_name = format!("remediation-{}-{}", alert, task_id);
+    let coderun_name = format!("remediation-{alert}-{task_id}");
 
     println!(
         "{}",
-        format!("Would create CodeRun: {}", coderun_name).yellow()
+        format!("Would create CodeRun: {coderun_name}").yellow()
     );
     println!(
         "{}",
