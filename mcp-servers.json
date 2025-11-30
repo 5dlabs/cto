@@ -1,5 +1,12 @@
 {
   "servers": {
+    "openmemory": {
+      "name": "OpenMemory",
+      "description": "Persistent memory system for storing, querying, and reinforcing memories across agent sessions",
+      "transport": "http",
+      "url": "http://openmemory.cto.svc.cluster.local:8080/mcp",
+      "env": {}
+    },
     "brave-search": {
       "name": "Brave Search",
       "description": "Web search using Brave's privacy-focused search engine",
