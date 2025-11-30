@@ -26,14 +26,14 @@ impl Handler {
         Self
     }
 
-    /// Get the expected previous agents for a given agent based on AGENT_ORDER
+    /// Get the expected previous agents for a given agent based on `AGENT_ORDER`
     fn expected_previous_agents(current_agent: &str) -> Vec<&'static str> {
         // Find position of current agent in the order
         let current_pos = AGENT_ORDER.iter().position(|&a| current_agent.contains(a));
         
         match current_pos {
-            None => vec![], // Unknown agent, no requirement
-            Some(0 | 1) => vec![], // Rex/Blaze are first, no previous required
+            // Unknown agent or Rex/Blaze (first agents) - no previous required
+            None | Some(0 | 1) => vec![],
             Some(pos) => {
                 // Return all agents that should come before this one
                 // For Cleo (pos 2), return Rex and Blaze (pos 0, 1)
@@ -81,9 +81,8 @@ impl AlertHandler for Handler {
         _ctx: &AlertContext,
     ) -> Option<Alert> {
         // Only check when a pod starts running
-        let pod = match event {
-            K8sEvent::PodRunning(pod) => pod,
-            _ => return None,
+        let K8sEvent::PodRunning(pod) = event else {
+            return None;
         };
 
         // Get the agent from pod labels
@@ -122,6 +121,7 @@ impl AlertHandler for Handler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alerts::types::AlertConfig;
     use crate::github::Comment;
     use crate::k8s::Pod;
 
@@ -148,7 +148,7 @@ mod tests {
             namespace: "agent-platform".into(),
             pr_number: Some(123),
             workflow_name: None,
-            config: Default::default(),
+            config: AlertConfig::default(),
         };
 
         let alert = handler.evaluate(&event, &github, &ctx);
@@ -183,7 +183,7 @@ mod tests {
             namespace: "agent-platform".into(),
             pr_number: Some(123),
             workflow_name: None,
-            config: Default::default(),
+            config: AlertConfig::default(),
         };
 
         let alert = handler.evaluate(&event, &github, &ctx);

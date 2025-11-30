@@ -20,7 +20,7 @@ pub enum AlertId {
 }
 
 impl AlertId {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::A1 => "A1",
             Self::A2 => "A2",
@@ -33,7 +33,7 @@ impl AlertId {
         }
     }
 
-    pub fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::A1 => "Agent Comment Order Mismatch",
             Self::A2 => "Silent Agent Failure",
@@ -118,8 +118,9 @@ impl Default for AlertConfig {
     }
 }
 
-/// Timeout thresholds for each agent type
+/// Timeout thresholds for each agent type (values in minutes)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_field_names)] // _mins suffix is intentional for clarity
 pub struct StepTimeouts {
     pub implementation_mins: u64, // Rex/Blaze
     pub quality_mins: u64,        // Cleo

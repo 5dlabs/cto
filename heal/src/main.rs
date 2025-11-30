@@ -468,7 +468,7 @@ struct MonitorConfig {
     /// Maximum iterations before giving up
     #[serde(default = "default_max_iterations")]
     max_iterations: u32,
-    /// Required kubectl context for creating monitor CodeRuns (ensures we deploy to Kind)
+    /// Required kubectl context for creating monitor `CodeRuns` (ensures we deploy to Kind)
     #[serde(default = "default_monitor_context")]
     cluster_context: String,
 }
@@ -1688,7 +1688,7 @@ async fn main() -> Result<()> {
             issue_file,
             config,
         } => {
-            spawn_remediation_agent(&alert, &task_id, &issue_file, &config).await?;
+            spawn_remediation_agent(&alert, &task_id, &issue_file, &config)?;
         }
     }
 
@@ -3308,9 +3308,10 @@ fn check_agent_container_exit(pod_name: &str, namespace: &str) -> Option<Contain
         let state = &status["state"];
 
         if let Some(term) = state["terminated"].as_object() {
+            #[allow(clippy::cast_possible_truncation)] // exit codes are always small i32 values
             let exit_code = term
                 .get("exitCode")
-                .and_then(|v| v.as_i64())
+                .and_then(serde_json::Value::as_i64)
                 .map(|v| v as i32);
             let reason = term
                 .get("reason")
@@ -4464,11 +4465,12 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
     let mut container_statuses = Vec::new();
     if let Some(statuses) = json["status"]["containerStatuses"].as_array() {
         for status in statuses {
+            #[allow(clippy::cast_possible_truncation)] // exit codes are small i32 values
             let state = if status["state"]["terminated"].is_object() {
                 let terminated = &status["state"]["terminated"];
                 k8s::ContainerState::Terminated {
                     exit_code: terminated["exitCode"].as_i64().unwrap_or(0) as i32,
-                    reason: terminated["reason"].as_str().map(|s| s.to_string()),
+                    reason: terminated["reason"].as_str().map(std::string::ToString::to_string),
                     finished_at: None,
                 }
             } else if status["state"]["running"].is_object() {
@@ -4477,6 +4479,7 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
                 k8s::ContainerState::Waiting
             };
 
+            #[allow(clippy::cast_possible_truncation)] // restart counts are small i32 values
             container_statuses.push(k8s::ContainerStatus {
                 name: status["name"].as_str().unwrap_or("").to_string(),
                 state,
@@ -4504,8 +4507,8 @@ async fn handle_detected_alert(
     dry_run: bool,
 ) -> Result<()> {
     let alert_id = alert.id.as_str().to_lowercase();
-    let task_id = alert.context.get("task_id").map(|s| s.as_str()).unwrap_or("unknown");
-    let agent = alert.context.get("agent").map(|s| s.as_str()).unwrap_or("unknown");
+    let task_id = alert.context.get("task_id").map_or("unknown", String::as_str);
+    let agent = alert.context.get("agent").map_or("unknown", String::as_str);
 
     handle_alert(
         &alert_id,
@@ -4527,8 +4530,8 @@ async fn handle_completion_check(
     prompts_dir: &str,
     dry_run: bool,
 ) -> Result<()> {
-    let task_id = pod.labels.get("task-id").map(|s| s.as_str()).unwrap_or("unknown");
-    let agent = pod.labels.get("agent").map(|s| s.as_str()).unwrap_or("unknown");
+    let task_id = pod.labels.get("task-id").map_or("unknown", String::as_str);
+    let agent = pod.labels.get("agent").map_or("unknown", String::as_str);
 
     handle_alert(
         "completion",
@@ -4583,7 +4586,7 @@ async fn handle_alert(
     };
 
     // Fetch pod logs
-    let logs = get_pod_logs_for_alert(pod_name, namespace, 500).await;
+    let logs = get_pod_logs_for_alert(pod_name, namespace, 500);
 
     // For completion checks, load agent-specific expected behaviors
     let expected_behaviors = if alert_id == "completion" {
@@ -4625,7 +4628,7 @@ async fn handle_alert(
 }
 
 /// Fetch recent logs for a pod
-async fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String {
+fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String {
     let output = std::process::Command::new("kubectl")
         .args([
             "logs", pod_name,
@@ -4820,7 +4823,7 @@ async fn test_alert_flow(
 }
 
 /// Spawn a remediation agent for a detected issue
-async fn spawn_remediation_agent(
+fn spawn_remediation_agent(
     alert: &str,
     task_id: &str,
     issue_file: &str,

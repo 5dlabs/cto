@@ -26,6 +26,7 @@ impl Handler {
             a if a.contains("Atlas") => ctx.config.step_timeouts.integration_mins,
             _ => ctx.config.step_timeouts.default_mins,
         };
+        #[allow(clippy::cast_possible_wrap)] // timeout mins are small config values, won't wrap
         Duration::minutes(mins as i64)
     }
 }
@@ -47,9 +48,8 @@ impl AlertHandler for Handler {
         _github: &GitHubState,
         ctx: &AlertContext,
     ) -> Option<Alert> {
-        let pod = match event {
-            K8sEvent::PodRunning(pod) | K8sEvent::PodModified(pod) => pod,
-            _ => return None,
+        let (K8sEvent::PodRunning(pod) | K8sEvent::PodModified(pod)) = event else {
+            return None;
         };
 
         // Check if pod is still running

@@ -34,14 +34,14 @@ impl AlertHandler for Handler {
         ctx: &AlertContext,
     ) -> Option<Alert> {
         // Only check when a pod is running
-        let pod = match event {
-            K8sEvent::PodRunning(pod) => pod,
-            _ => return None,
+        let K8sEvent::PodRunning(pod) = event else {
+            return None;
         };
 
         // Get the last commit time
         let last_commit = github.commits.last()?;
         let elapsed = Utc::now() - last_commit.committed_at;
+        #[allow(clippy::cast_possible_wrap)] // threshold_mins is a small config value, won't wrap
         let threshold = Duration::minutes(ctx.config.stale_progress_threshold_mins as i64);
 
         if elapsed > threshold {

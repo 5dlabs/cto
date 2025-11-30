@@ -32,9 +32,8 @@ impl AlertHandler for Handler {
         _github: &GitHubState,
         _ctx: &AlertContext,
     ) -> Option<Alert> {
-        let pod = match event {
-            K8sEvent::PodModified(pod) | K8sEvent::PodRunning(pod) => pod,
-            _ => return None,
+        let (K8sEvent::PodModified(pod) | K8sEvent::PodRunning(pod)) = event else {
+            return None;
         };
 
         // Only check pods that are still "Running"
@@ -77,6 +76,7 @@ impl AlertHandler for Handler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alerts::types::AlertConfig;
     use crate::k8s::{ContainerStatus, Pod};
 
     #[test]
@@ -112,7 +112,7 @@ mod tests {
             namespace: "agent-platform".into(),
             pr_number: None,
             workflow_name: None,
-            config: Default::default(),
+            config: AlertConfig::default(),
         };
 
         let alert = handler.evaluate(&event, &github, &ctx);
@@ -149,7 +149,7 @@ mod tests {
             namespace: "agent-platform".into(),
             pr_number: None,
             workflow_name: None,
-            config: Default::default(),
+            config: AlertConfig::default(),
         };
 
         let alert = handler.evaluate(&event, &github, &ctx);

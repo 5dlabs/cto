@@ -1,6 +1,6 @@
 //! A7: Pod Failure
 //!
-//! Detects when any CTO pod enters Failed, Error, or CrashLoopBackOff state.
+//! Detects when any CTO pod enters Failed, Error, or `CrashLoopBackOff` state.
 
 use super::types::{Alert, AlertContext, AlertHandler, AlertId, Severity};
 use crate::github::GitHubState;

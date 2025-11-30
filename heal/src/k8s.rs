@@ -19,7 +19,7 @@ pub enum K8sEvent {
     PodFailed(Pod),
     /// Workflow phase changed
     WorkflowPhaseChanged(Workflow),
-    /// CodeRun status changed
+    /// `CodeRun` status changed
     CodeRunChanged(CodeRun),
     /// GitHub state was updated (from poller)
     GitHubUpdate,
@@ -79,7 +79,7 @@ pub struct WorkflowNode {
     pub message: Option<String>,
 }
 
-/// Simplified CodeRun representation
+/// Simplified `CodeRun` representation
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CodeRun {
     pub name: String,
