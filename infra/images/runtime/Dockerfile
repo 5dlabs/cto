@@ -364,6 +364,26 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
 
+# Install cto-mcp from CTO monorepo unified release (skip if version is "skip" or empty)
+# Downloads binary directly from v*.*.* unified releases
+# cto-mcp is the MCP server for Argo Workflows integration in AI development workflows
+ARG CTO_MCP_VERSION=skip
+RUN if [ "$CTO_MCP_VERSION" != "skip" ] && [ -n "$CTO_MCP_VERSION" ]; then \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing cto-mcp v${CTO_MCP_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/cto-mcp \
+          "https://github.com/5dlabs/cto/releases/download/v${CTO_MCP_VERSION}/cto-mcp-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/cto-mcp && \
+        echo "✅ cto-mcp installed"; \
+      else \
+        echo "⏭️ Skipping cto-mcp installation (unsupported architecture: ${ARCH})"; \
+      fi; \
+    else \
+      echo "⏭️ Skipping cto-mcp installation (no release available)"; \
+    fi
+
 # Install TaskMaster globally (stable release)
 RUN npm install -g task-master-ai@0.26.0
 
