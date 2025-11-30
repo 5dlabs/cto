@@ -1,9 +1,30 @@
 //! `DocsRun` Custom Resource Definition for documentation generation
+//!
+//! # Deprecation Notice
+//!
+//! **This CRD is deprecated and will be removed in a future release.**
+//!
+//! Use `CodeRun` with `runType: "documentation"` instead. The CodeRun CRD provides
+//! a unified interface for all agent runs (implementation, documentation, intake)
+//! with full multi-CLI support.
+//!
+//! Migration path:
+//! - Replace DocsRun creation with CodeRun creation
+//! - Set `spec.runType: "documentation"`
+//! - Map DocsRun fields to CodeRun equivalents
+
+// Allow this module to define deprecated types without triggering warnings on the definition itself
+#![allow(deprecated)]
 
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// **DEPRECATED**: Use CodeRun with `runType: "documentation"` instead
+#[deprecated(
+    since = "0.3.0",
+    note = "Use CodeRun with runType: 'documentation' instead. DocsRun will be removed in v0.5.0."
+)]
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "agents.platform", version = "v1", kind = "DocsRun")]
 #[kube(namespaced)]

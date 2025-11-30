@@ -1,3 +1,6 @@
+// Allow deprecated DocsRun usage for backwards compatibility
+#![allow(deprecated)]
+
 use crate::crds::DocsRun;
 use crate::tasks::cleanup::{
     LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,

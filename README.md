@@ -60,7 +60,7 @@
 📖 **Superpower:** Explains complex things simply  
 💬 **Motto:** *"Knowledge shared is knowledge squared!"*
 
-**Morgan oversees project architecture, generates comprehensive documentation, and manages GitHub projects via `docs()` MCP calls, creating the foundation for all development work.**
+**Morgan oversees project architecture, generates comprehensive documentation, and manages GitHub projects via `intake()` MCP calls, creating the foundation for all development work.**
 
 </td>
 </tr>
@@ -219,7 +219,7 @@
 **Morgan** documents  
 requirements & architecture
 
-*via `docs()` MCP call*
+*via `intake()` MCP call*
 
 </td>
 <td align="center" width="33%">
@@ -281,13 +281,15 @@ Cleo reviews, Tess tests, Cipher secures
 
 The Cognitive Task Orchestrator provides powerful tools for AI-driven development:
 
-### **📝 Documentation Generation (`docs()`)**
-**Morgan** analyzes your Task Master projects and creates comprehensive documentation automatically.
+### **🚀 Unified Project Intake (`intake()`)**
+**Morgan** processes PRDs, generates tasks, and creates comprehensive documentation in a single operation.
 
-- Task breakdowns with acceptance criteria
-- Implementation prompts for other agents
-- Architecture documentation
-- Automatic GitHub PR submission
+- Parses PRD and generates TaskMaster task breakdown
+- Enriches context via Firecrawl (auto-scrapes referenced URLs)
+- Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)
+- Adds agent routing hints for frontend/backend tasks
+- Submits single PR with complete project structure
+- **Powered by Claude Opus 4.5** for superior task analysis
 
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
@@ -297,14 +299,6 @@ The Cognitive Task Orchestrator provides powerful tools for AI-driven developmen
 - **Phase 3 - Testing & Security**: Tess validates, Cipher secures
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
-
-### **🚀 Project Intake (`intake_prd()`)**
-Automatically process PRDs and create structured TaskMaster projects.
-
-- Reads project requirements and architecture
-- Generates comprehensive task breakdown
-- Creates TaskMaster structure with tasks.json
-- Submits project setup as GitHub PR
 
 ### **🔧 Workflow Management**
 Control and monitor your AI development workflows:
@@ -339,7 +333,7 @@ This is an integrated platform with crystal-clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-1. Any CLI calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
+1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
@@ -725,31 +719,33 @@ Each agent independently configured with its own CLI, model, and tool access.
 
 ## **🔧 MCP Tools Reference**
 
-The platform exposes 7 powerful MCP tools for AI-driven development:
+The platform exposes powerful MCP tools for AI-driven development:
 
-### 1. **`docs()` - Morgan's Documentation Magic**
-Analyzes your Task Master project and creates comprehensive documentation.
+### 1. **`intake()` - Unified Project Intake** ⭐ NEW
+Process PRDs, generate tasks, and create comprehensive documentation in one operation.
 
 ```javascript
-// Minimal call using config defaults
-docs({
-  working_directory: "projects/my-app"
+// Minimal call - handles everything
+intake({
+  project_name: "my-awesome-app"
 });
 
-// Override specific parameters if needed
-docs({
-  working_directory: "projects/my-app",
-  agent: "morgan",
-  model: "claude-opus-4-20250514",
-  include_codebase: true
+// Customize with options
+intake({
+  project_name: "my-awesome-app",
+  enrich_context: true,        // Auto-scrape URLs via Firecrawl
+  include_codebase: false,     // Include existing code context
+  model: "claude-opus-4-5-20250929"  // Opus 4.5 by default
 });
 ```
 
-**What Morgan does:**
-✅ Analyzes all tasks in your Task Master project  
-✅ Generates comprehensive documentation  
-✅ Creates implementation guidance for other agents  
-✅ Submits a GitHub PR with all documentation
+**What unified intake does:**
+✅ Parses PRD and generates TaskMaster task breakdown  
+✅ Enriches context by scraping URLs found in PRD (via Firecrawl)  
+✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)  
+✅ Adds agent routing hints for frontend/backend task assignment  
+✅ Submits single PR with complete project structure  
+✅ **Powered by Claude Opus 4.5** for superior task analysis
 
 ### 2. **`play()` - Multi-Agent Orchestration**
 Executes complex multi-agent workflows with event-driven coordination.
@@ -777,31 +773,7 @@ play({
 ✅ **Event-Driven**: Automatic phase transitions  
 ✅ **GitHub Integration**: PRs from each phase
 
-### 3. **`intake_prd()` - Project Intake Automation**
-Process PRDs and create structured TaskMaster projects.
-
-```javascript
-// Process a new project
-intake_prd({
-  project_name: "my-awesome-app"
-});
-
-// Customize models and agents
-intake_prd({
-  project_name: "my-awesome-app",
-  github_app: "5DLabs-Morgan",
-  primary_model: "claude-opus-4-20250514"
-});
-```
-
-**What intake does:**
-✅ Reads PRD from `{project_name}/intake/prd.txt`  
-✅ Analyzes requirements and architecture  
-✅ Generates comprehensive task breakdown  
-✅ Creates TaskMaster structure with tasks.json  
-✅ Submits project setup as GitHub PR
-
-### 4. **`jobs()` - Workflow Status**
+### 3. **`jobs()` - Workflow Status**
 List all running Argo workflows with simplified status info.
 
 ```javascript
@@ -821,7 +793,7 @@ jobs({
 
 **Returns:** List of active workflows with type, name, phase, and status
 
-### 5. **`stop_job()` - Workflow Control**
+### 4. **`stop_job()` - Workflow Control**
 Stop any running Argo workflow gracefully.
 
 ```javascript
@@ -841,7 +813,7 @@ stop_job({
 
 **Workflow types:** `intake`, `play`, `workflow`
 
-### 6. **`docs_ingest()` - Documentation Analysis**
+### 5. **`docs_ingest()` - Documentation Analysis**
 Intelligently analyze GitHub repos and ingest documentation.
 
 ```javascript
@@ -1039,11 +1011,10 @@ Common variables available in templates:
 ## **💡 Best Practices**
 
 1. **Configure `cto-config.json` first** to set up your agents, models, tool profiles, and repository defaults
-2. **Always generate docs first** to establish baseline documentation using `docs()`
+2. **Use `intake()` for new projects** to parse PRD, generate tasks, and create documentation in one operation
 3. **Choose the right tool for the job**:
-   - Use `docs()` for documentation generation
+   - Use `intake()` for new project setup from PRDs (handles docs automatically)
    - Use `play()` for full-cycle development (implementation → QA → testing)
-   - Use `intake_prd()` for new project setup from PRDs
    - Use `jobs()` / `stop_job()` for workflow management
 4. **Mix and match CLIs** - assign the best CLI to each agent based on task requirements
 5. **Customize tool access** - use the `tools` configuration to control agent capabilities
@@ -1100,7 +1071,7 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ## **🔗 Related Projects**
 
-- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `play()` and `intake_prd()` MCP tools.
+- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `play()` and `intake()` MCP tools.
 
 ---
 

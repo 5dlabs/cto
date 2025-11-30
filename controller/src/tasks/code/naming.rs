@@ -26,7 +26,7 @@ impl ResourceNaming {
             .uid
             .as_ref()
             .map_or("unknown", |uid| &uid[..8]);
-        let task_id = code_run.spec.task_id;
+        let task_id = code_run.spec.task_id.unwrap_or(0);
         let context_version = code_run.spec.context_version;
 
         // Check if this is a watch CodeRun (monitor or remediation)
@@ -257,8 +257,9 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 42,
+                task_id: Some(42),
                 service: "sample-service".to_string(),
                 repository_url: "https://github.com/example/repo.git".to_string(),
                 docs_repository_url: "https://github.com/example/docs.git".to_string(),
@@ -294,8 +295,9 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 42,
+                task_id: Some(42),
                 service: "sample-service".to_string(),
                 repository_url: "https://github.com/example/repo.git".to_string(),
                 docs_repository_url: "https://github.com/example/docs.git".to_string(),
@@ -330,8 +332,9 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 42,
+                task_id: Some(42),
                 service: "sample-service".to_string(),
                 repository_url: "https://github.com/example/repo.git".to_string(),
                 docs_repository_url: "https://github.com/example/docs.git".to_string(),
@@ -407,8 +410,9 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
                 cli_config: None,
-                task_id: 42,
+                task_id: Some(42),
                 service: "sample-service".to_string(),
                 repository_url: "https://github.com/example/repo.git".to_string(),
                 docs_repository_url: "https://github.com/example/docs.git".to_string(),

@@ -5,14 +5,13 @@ use std::collections::HashMap;
 pub fn get_tool_schemas() -> Value {
     json!({
         "tools": [
-            get_docs_schema(),
+            get_intake_schema(),
             get_play_schema(&HashMap::new()),
             get_play_status_schema(),
-            get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_add_docs_schema(),
+            get_docs_ingest_schema(),
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema()
@@ -24,14 +23,13 @@ pub fn get_tool_schemas() -> Value {
 pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "tools": [
-            get_docs_schema(),
+            get_intake_schema(),
             get_play_schema(agents),
             get_play_status_schema(),
-            get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_add_docs_schema(),
+            get_docs_ingest_schema(),
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema()
@@ -39,31 +37,47 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
     })
 }
 
-fn get_docs_schema() -> Value {
+/// Unified intake tool schema - combines PRD parsing and documentation generation
+fn get_intake_schema() -> Value {
     json!({
-        "name": "docs",
-        "description": "Initialize documentation for Task Master tasks using Claude",
+        "name": "intake",
+        "description": "Process a PRD to generate TaskMaster tasks and comprehensive documentation in a single operation. Parses PRD, generates task breakdowns, enriches context via Firecrawl, creates agent prompts, and submits a single PR with the complete project structure.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "working_directory": {
+                "project_name": {
                     "type": "string",
-                    "description": "Working directory containing .taskmaster folder (required). Use relative paths like 'projects/market-research'."
+                    "description": "Name of the project subdirectory (required). Will contain .taskmaster folder with tasks and documentation."
                 },
-                "agent": {
+                "prd_content": {
                     "type": "string",
-                    "description": "Agent name for task assignment (optional, uses workflow default if not specified)"
+                    "description": "PRD content as a string (optional). If not provided, reads from {project_name}/intake/prd.txt"
+                },
+                "architecture_content": {
+                    "type": "string",
+                    "description": "Architecture document content (optional). If not provided, reads from {project_name}/intake/architecture.md if it exists"
+                },
+                "enrich_context": {
+                    "type": "boolean",
+                    "description": "Auto-scrape URLs found in PRD via Firecrawl to enrich task context (optional, defaults to true)",
+                    "default": true
                 },
                 "model": {
                     "type": "string",
-                    "description": "Claude model to use (optional, defaults to configuration)"
+                    "description": "Claude model to use (optional, defaults to claude-opus-4-5-20250929)"
                 },
                 "include_codebase": {
                     "type": "boolean",
-                    "description": "Include existing codebase as markdown context (optional, defaults to false)"
+                    "description": "Include existing codebase as markdown context for documentation generation (optional, defaults to false)"
+                },
+                "cli": {
+                    "type": "string",
+                    "description": "CLI to use for documentation generation (optional, defaults to claude). Supports claude, cursor, codex.",
+                    "enum": ["claude", "cursor", "codex"],
+                    "default": "claude"
                 }
             },
-            "required": ["working_directory"]
+            "required": ["project_name"]
         }
     })
 }
@@ -177,59 +191,6 @@ fn get_play_status_schema() -> Value {
     })
 }
 
-fn get_intake_prd_schema() -> Value {
-    json!({
-        "name": "intake_prd",
-        "description": "Process a new project intake. Reads PRD from {project_name}/intake/prd.txt and optional architecture from {project_name}/intake/architecture.md. Auto-detects repository and branch from git. Creates TaskMaster structure in project subdirectory and submits PR.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "project_name": {
-                    "type": "string",
-                    "description": "Name of the project subdirectory containing intake files (required)"
-                },
-                "github_app": {
-                    "type": "string",
-                    "description": "GitHub App to use (optional, defaults to configuration)"
-                },
-                "primary_model": {
-                    "type": "string",
-                    "description": "Primary model for task generation (optional, defaults to configuration)"
-                },
-                "primary_provider": {
-                    "type": "string",
-                    "description": "Provider for primary model (e.g., anthropic, claude-code, openai)"
-                },
-                "research_model": {
-                    "type": "string",
-                    "description": "Model for research operations (optional, defaults to configuration)"
-                },
-                "research_provider": {
-                    "type": "string",
-                    "description": "Provider for research model (e.g., anthropic, claude-code, openai)"
-                },
-                "fallback_model": {
-                    "type": "string",
-                    "description": "Fallback model if primary fails (optional, defaults to configuration)"
-                },
-                "fallback_provider": {
-                    "type": "string",
-                    "description": "Provider for fallback model (e.g., anthropic, claude-code, openai)"
-                },
-                "prd_content": {
-                    "type": "string",
-                    "description": "PRD content (optional, overrides file reading)"
-                },
-                "architecture_content": {
-                    "type": "string",
-                    "description": "Architecture content (optional, overrides file reading)"
-                }
-            },
-            "required": ["project_name"]
-        }
-    })
-}
-
 fn get_jobs_schema() -> Value {
     json!({
         "name": "jobs",
@@ -279,9 +240,9 @@ fn get_input_schema() -> Value {
     })
 }
 
-fn get_add_docs_schema() -> Value {
+fn get_docs_ingest_schema() -> Value {
     json!({
-        "name": "add_docs",
+        "name": "docs_ingest",
         "description": "Ingest documentation from a URL using Firecrawl. Supports GitHub repositories (type: repo) and websites (type: scrape). Returns crawled/scraped content in markdown format.",
         "inputSchema": {
             "type": "object",

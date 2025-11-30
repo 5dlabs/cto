@@ -1,4 +1,13 @@
 #!/bin/bash
+# =============================================================================
+# DEPRECATED: This script is deprecated in favor of unified-intake.sh.hbs
+# =============================================================================
+# This script only handles PRD parsing and task generation.
+# Use unified-intake.sh.hbs instead, which combines PRD parsing, task generation,
+# context enrichment via Firecrawl, and documentation generation in one operation.
+#
+# This file will be removed in a future release.
+# =============================================================================
 set -e
 
 # Force output to be unbuffered
@@ -8,7 +17,8 @@ set -x  # Enable command tracing temporarily
 # Add error trap for debugging
 trap 'echo "❌ Error occurred at line $LINENO with exit code $?. Last command: $BASH_COMMAND"; exit 1' ERR
 
-echo "🚀 Starting Project Intake Process"
+echo "⚠️ DEPRECATED: This script is deprecated. Use unified-intake.sh.hbs instead."
+echo "🚀 Starting Project Intake Process (Legacy Mode)"
 echo "================================="
 
 # Debug: Show ALL environment variables related to our workflow

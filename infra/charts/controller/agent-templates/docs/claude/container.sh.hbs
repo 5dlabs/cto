@@ -1,6 +1,16 @@
 #!/bin/sh
+# =============================================================================
+# DEPRECATED: This script is deprecated in favor of unified-intake.sh.hbs
+# =============================================================================
+# This script only handles documentation generation for existing tasks.
+# Use unified-intake.sh.hbs instead, which combines PRD parsing, task generation,
+# context enrichment via Firecrawl, and documentation generation in one operation.
+#
+# This file will be removed in a future release.
+# =============================================================================
 
-echo 'Starting documentation generation...'
+echo '⚠️ DEPRECATED: This script is deprecated. Use unified-intake.sh.hbs instead.'
+echo 'Starting documentation generation (Legacy Mode)...'
 echo "📍 Docs container template version: $(date -u +%Y-%m-%d) - jq-only processing (no base64 decode)"
 
 # Disable interactive Git prompts globally

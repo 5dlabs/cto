@@ -33,6 +33,8 @@ pub mod remediation;
 pub mod tasks;
 
 // Re-export commonly used types
+// Note: DocsRun is deprecated - use CodeRun with runType: "documentation" instead
+#[allow(deprecated)]
 pub use crds::{CodeRun, CodeRunSpec, CodeRunStatus, DocsRun, DocsRunSpec, DocsRunStatus};
 pub use remediation::parse_feedback_comment;
 pub use tasks::config::ControllerConfig;

@@ -1,3 +1,6 @@
+// Allow deprecated DocsRun usage for backwards compatibility
+#![allow(deprecated)]
+
 use crate::crds::{DocsRun, DocsRunCondition};
 use crate::tasks::types::{Context, Result};
 use k8s_openapi::api::batch::v1::Job;

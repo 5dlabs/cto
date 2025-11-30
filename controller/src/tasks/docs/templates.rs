@@ -1,3 +1,8 @@
+// Allow deprecated DocsRun usage for backwards compatibility
+// This module provides templates for the deprecated DocsRun CRD
+// Users should migrate to CodeRun with runType: "documentation"
+#![allow(deprecated)]
+
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
