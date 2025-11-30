@@ -17,6 +17,8 @@ on:
       - 'infra/images/redis/**'
       - 'infra/images/builder/**'
       - 'infra/images/openmemory/**'
+      - 'infra/images/heal/**'
+      - 'heal/**'
       - '.github/workflows/infrastructure-build.yaml'
 
   workflow_dispatch:
@@ -27,7 +29,7 @@ on:
         default: false
         type: boolean
       image:
-        description: 'Specific image to build (postgresql, rust-builder, openmemory, or leave blank for all)'
+        description: 'Specific image to build (postgresql, rust-builder, openmemory, heal, or leave blank for all)'
         required: false
         type: string
 
@@ -67,6 +69,13 @@ jobs:
             file: ./infra/images/openmemory/Dockerfile
             version: "1.0.0"
             description: "OpenMemory long-term memory system for AI agents"
+          - id: heal
+            name: Heal Monitor
+            image: heal
+            context: .
+            file: ./infra/images/heal/Dockerfile
+            version: "latest"
+            description: "Self-healing platform monitor - detects issues and spawns remediation agents"
     steps:
       - uses: actions/checkout@v4
 
@@ -94,7 +103,12 @@ jobs:
         id: version
         run: |
           # Use directory hash for versioning to ensure rebuilds when content changes
-          VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
+          # For heal, check both source and Dockerfile directories
+          if [ "${{ matrix.id }}" = "heal" ]; then
+            VERSION=$(git log -1 --format="%h" -- heal/ infra/images/heal/)
+          else
+            VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 ${{ matrix.name }} version: $VERSION"
 
