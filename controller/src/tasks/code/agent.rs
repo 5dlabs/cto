@@ -376,10 +376,7 @@ mod tests {
     #[test]
     fn test_heal_pvc_naming() {
         // Heal PVC uses a static name shared with ArgoCD-managed heal deployment
-        assert_eq!(
-            AgentClassifier::get_heal_pvc_name("cto"),
-            "heal-workspace"
-        );
+        assert_eq!(AgentClassifier::get_heal_pvc_name("cto"), "heal-workspace");
 
         // Service name is ignored - always returns static PVC name
         assert_eq!(

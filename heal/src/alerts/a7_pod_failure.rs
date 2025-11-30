@@ -38,11 +38,7 @@ impl AlertHandler for Handler {
         };
 
         // Check for CrashLoopBackOff
-        let restart_count: i32 = pod
-            .container_statuses
-            .iter()
-            .map(|c| c.restart_count)
-            .sum();
+        let restart_count: i32 = pod.container_statuses.iter().map(|c| c.restart_count).sum();
 
         let is_crash_loop = restart_count > 3;
 
