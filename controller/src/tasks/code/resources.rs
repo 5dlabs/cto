@@ -515,7 +515,7 @@ impl<'a> CodeResourceManager<'a> {
                 .as_ref()
                 .and_then(|c| c.settings.get("template"))
                 .and_then(|v| v.as_str())
-                .map_or(false, |t| t.starts_with("heal/"));
+                .is_some_and(|t| t.starts_with("heal/"));
 
         // Build projected volume sources - always include shared and integration
         let mut projected_sources = vec![
