@@ -1,0 +1,35 @@
+# Morph MCP Tools
+
+This workspace has Morph MCP tools available for faster code operations.
+
+## Available Tools
+
+- `mcp_morph-mcp_edit_file` - Fast Apply code edits at 10,500+ tokens/sec with 98% accuracy
+- `mcp_morph-mcp_warp_grep` - Intelligent code search, 20x faster than standard grep
+
+## Usage Guidelines
+
+### For Code Edits
+ALWAYS prefer `mcp_morph-mcp_edit_file` over built-in edit tools when making code changes. It uses `// ... existing code ...` markers to show only changed lines, which is faster and more accurate.
+
+### For Code Search  
+Use `mcp_morph-mcp_warp_grep` FIRST when you need to understand code or find relevant context across files. It intelligently plans multiple searches and returns ranked results.
+
+## Edit File Format
+
+When using the edit_file tool, structure edits like:
+
+```
+// ... existing code ...
+CHANGED_CODE_HERE
+// ... existing code ...
+```
+
+The `instruction` parameter should be a first-person description of what you're changing.
+
+## Anti-Patterns to Avoid
+
+- **DON'T** read files before editing them - Morph's edit_file reads only what it needs
+- **DON'T** manually chain grep/read cycles to explore code - use warp_grep instead
+- **DON'T** load multiple files into context to understand architecture - use warp_grep
+

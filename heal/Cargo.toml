@@ -1,0 +1,72 @@
+[package]
+name = "heal"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Self-healing platform monitor - detects issues and spawns remediation agents"
+homepage = "https://github.com/5dlabs/cto"
+
+[[bin]]
+name = "heal"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { workspace = true }
+colored = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# HTTP Client for Victoria Logs API
+reqwest = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# UUID generation
+uuid = { workspace = true }
+
+# Text processing
+regex = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+doc_markdown = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+trivially_copy_pass_by_ref = "allow"
+redundant_closure_for_method_calls = "allow"
+struct_field_names = "allow"
+match_same_arms = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+unused_async = "allow"
+single_match_else = "allow"
+manual_let_else = "allow"
+uninlined_format_args = "allow"
+map_unwrap_or = "allow"
+too_many_arguments = "allow"
+
+[lints.rust]
+unexpected_cfgs = "allow"
+

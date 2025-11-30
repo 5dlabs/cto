@@ -1,0 +1,73 @@
+---
+# ArgoCD Application for Heal (Self-Healing Platform Monitor)
+# Deployed as a continuous Kubernetes deployment in the CTO namespace
+# Watches for pod failures and spawns Rex remediation agents via CodeRun CRDs
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-heal
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: heal
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/managed-by: cto-app-of-apps
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/charts/universal-app
+
+    helm:
+      valueFiles:
+        - ../../../heal/k8s/values.yaml
+
+      # Override values for GitOps deployment
+      parameters:
+        - name: fullnameOverride
+          value: heal
+        - name: image.repository
+          value: ghcr.io/5dlabs/heal
+        - name: image.tag
+          value: latest
+        - name: image.pullPolicy
+          value: Always
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 1s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+  revisionHistoryLimit: 10

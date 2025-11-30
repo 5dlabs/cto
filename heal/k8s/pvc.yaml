@@ -1,0 +1,21 @@
+---
+# PersistentVolumeClaim for heal workspace
+# Shared between heal deployment and Rex remediation CodeRuns
+# Stores: analysis reports, logs, remediation context
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: heal-workspace
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: heal
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: cto
+spec:
+  accessModes:
+    - ReadWriteMany  # Allow multiple pods to access (heal + remediation agents)
+  storageClassName: local-path  # Talos uses local-path-provisioner
+  resources:
+    requests:
+      storage: 5Gi

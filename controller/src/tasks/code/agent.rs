@@ -79,27 +79,17 @@ impl AgentClassifier {
         !self.is_implementation_agent(agent_name)
     }
 
-    /// Get the PVC name for watch CodeRuns (Monitor + Remediation pair).
+    /// Get the PVC name for heal CodeRuns (Remediation agents).
     ///
-    /// Watch agents share a dedicated PVC separate from play workflow agents.
-    /// This ensures clean isolation and prevents interference.
+    /// Heal agents share a dedicated PVC with the heal monitor deployment.
+    /// This is a static PVC managed by ArgoCD, not dynamically named per-service.
     ///
     /// # Returns
-    /// - `workspace-{service}-watch` (shared between Monitor and Remediation)
+    /// - `heal-workspace` (shared between Heal monitor deployment and Remediation CodeRuns)
     #[must_use]
-    pub fn get_watch_pvc_name(service: &str) -> String {
-        let pvc_name = format!("workspace-{service}-watch");
-
-        // Ensure PVC name doesn't exceed Kubernetes limits
-        if pvc_name.len() > 63 {
-            let prefix = "workspace-";
-            let suffix = "-watch";
-            let max_service_len = 63 - prefix.len() - suffix.len();
-            let truncated = &service[..max_service_len.min(service.len())];
-            format!("{prefix}{truncated}{suffix}")
-        } else {
-            pvc_name
-        }
+    pub fn get_heal_pvc_name(_service: &str) -> String {
+        // Static PVC name - matches the ArgoCD-managed heal deployment
+        "heal-workspace".to_string()
     }
 
     /// Get the appropriate PVC name based on agent classification.
@@ -108,7 +98,7 @@ impl AgentClassifier {
     /// - `workspace-{service}` for implementation agents (shared workspace)
     /// - `workspace-{service}-{agent}` for non-implementation agents (isolated workspace)
     ///
-    /// Note: For watch CodeRuns, use `get_watch_pvc_name` instead.
+    /// Note: For heal CodeRuns, use `get_heal_pvc_name` instead.
     pub fn get_pvc_name(&self, service: &str, github_app: &str) -> Result<String, String> {
         let agent_name = self.extract_agent_name(github_app)?;
 
@@ -384,27 +374,17 @@ mod tests {
     }
 
     #[test]
-    fn test_watch_pvc_naming() {
-        // Watch PVC uses a dedicated name pattern
+    fn test_heal_pvc_naming() {
+        // Heal PVC uses a static name shared with ArgoCD-managed heal deployment
         assert_eq!(
-            AgentClassifier::get_watch_pvc_name("cto"),
-            "workspace-cto-watch"
+            AgentClassifier::get_heal_pvc_name("cto"),
+            "heal-workspace"
         );
 
+        // Service name is ignored - always returns static PVC name
         assert_eq!(
-            AgentClassifier::get_watch_pvc_name("my-service"),
-            "workspace-my-service-watch"
+            AgentClassifier::get_heal_pvc_name("my-service"),
+            "heal-workspace"
         );
-    }
-
-    #[test]
-    fn test_watch_pvc_name_truncation() {
-        // Long service name that would exceed 63 chars
-        let long_service = "very-long-service-name-that-exceeds-kubernetes-limits-for-names";
-
-        let result = AgentClassifier::get_watch_pvc_name(long_service);
-        assert!(result.len() <= 63);
-        assert!(result.starts_with("workspace-"));
-        assert!(result.ends_with("-watch"));
     }
 }

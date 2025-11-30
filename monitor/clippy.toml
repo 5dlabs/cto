@@ -1,6 +1,0 @@
-# Clippy configuration for play-monitor CLI
-# CLI tools need println! for user output
-
-# No disallowed macros for CLI tools - println is expected
-disallowed-macros = []
-

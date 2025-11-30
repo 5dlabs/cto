@@ -1,0 +1,152 @@
+---
+# Heal - Self-Healing Platform Monitor
+# Helm values for universal-app chart deployment
+
+replicaCount: 1
+revisionHistoryLimit: 5
+
+image:
+  repository: ghcr.io/5dlabs/heal
+  pullPolicy: Always
+  tag: latest
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+nameOverride: ""
+fullnameOverride: "heal"
+
+serviceAccount:
+  create: false
+  automount: true
+  name: "cto"  # Use existing CTO service account with necessary RBAC
+
+podAnnotations:
+  logs.platform.5dlabs.io/collect: "true"
+  logs.platform.5dlabs.io/service: heal
+
+podLabels:
+  app.kubernetes.io/component: monitor
+  platform.5dlabs.io/log-collection: enabled
+
+podSecurityContext:
+  fsGroup: 65532
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: false  # Factory/droid may need root
+  runAsUser: 0
+
+# Disable service - heal is not a web server
+service:
+  type: ClusterIP
+  port: 8080
+
+# Disable ingress - heal is not exposed externally
+ingress:
+  enabled: false
+
+terminationGracePeriodSeconds: 30
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Disable probes - heal is a long-running watcher, not a web server
+livenessProbe: {}
+readinessProbe: {}
+
+autoscaling:
+  enabled: false
+
+# Shared PVC for heal analysis outputs and remediation agent inputs
+volumes:
+  - name: heal-workspace
+    persistentVolumeClaim:
+      claimName: heal-workspace
+  - name: prompts
+    configMap:
+      name: heal-prompts
+
+volumeMounts:
+  - name: heal-workspace
+    mountPath: /workspace/watch
+  - name: prompts
+    mountPath: /app/prompts
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+configureDefaultAffinity: false
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Environment variables
+env:
+  - name: LOG_LEVEL
+    value: "info"
+  - name: RUST_LOG
+    value: "heal=debug,info"
+  - name: ANTHROPIC_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: cto-secrets
+        key: ANTHROPIC_API_KEY
+
+envFrom: []
+
+configMap:
+  enabled: false
+
+persistence:
+  enabled: false  # Using explicit PVC instead
+
+networkPolicy:
+  enabled: false
+
+# Custom command and args for heal
+# Override the default entrypoint to run alert-watch
+command:
+  - "/usr/local/bin/heal"
+
+args:
+  - "alert-watch"
+  - "--namespace"
+  - "cto"
+  - "--prompts-dir"
+  - "/app/prompts"
+
+# Additional containers (sidecars)
+extraContainers:
+  - name: log-tailer
+    image: busybox:latest
+    command:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for log directory..."
+        mkdir -p /workspace/watch/logs
+        while true; do
+          if ls /workspace/watch/logs/*.log 1>/dev/null 2>&1; then
+            tail -F /workspace/watch/logs/*.log 2>/dev/null || sleep 5
+          else
+            echo "No logs yet, waiting..."
+            sleep 10
+          fi
+        done
+    volumeMounts:
+      - name: heal-workspace
+        mountPath: /workspace/watch

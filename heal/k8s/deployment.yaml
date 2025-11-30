@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heal
+  namespace: cto
+  labels:
+    app: heal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: heal
+  template:
+    metadata:
+      labels:
+        app: heal
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: heal
+        image: heal:local
+        imagePullPolicy: Never
+        command:
+        - heal
+        args:
+        - alert-watch
+        - --namespace
+        - cto
+        - --prompts-dir
+        - /app/prompts
+        # --dry-run removed for production - will spawn Factory on alerts
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubeconfig/config
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubeconfig
+          readOnly: true
+        - name: workspace
+          mountPath: /workspace/watch
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: talos-kubeconfig
+      - name: workspace
+        emptyDir: {}

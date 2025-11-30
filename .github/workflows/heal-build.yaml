@@ -1,0 +1,115 @@
+---
+# Heal Image Build Workflow
+#
+# Builds and pushes the heal (self-healing platform monitor) Docker image to GHCR.
+# Triggers on:
+# - Push to main/develop branches (when heal/ code changes)
+# - Manual dispatch
+# - Tag push matching heal-v*.*.*
+
+name: Heal Build
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'heal/**'
+      - '.github/workflows/heal-build.yaml'
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'heal/**'
+
+  workflow_dispatch:
+    inputs:
+      tag_override:
+        description: 'Override image tag (e.g., "dev", "test"). If empty, uses git SHA.'
+        required: false
+        default: ''
+        type: string
+
+  push:
+    tags:
+      - 'heal-v*.*.*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: 5dlabs/heal
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: [k8s-runner]
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Use tag override if provided
+            type=raw,value=${{ inputs.tag_override }},enable=${{ inputs.tag_override != '' }}
+            # Tag with version for releases
+            type=match,pattern=heal-v(.*),group=1
+            # Tag with SHA for branch pushes
+            type=sha,prefix=,format=short,enable=${{ github.ref_type != 'tag' && inputs.tag_override == '' }}
+            # Tag with 'latest' for main branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # Tag with 'dev' for develop branch
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./heal
+          file: ./heal/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          cache-from: |
+            type=local,src=/cache/buildx/heal
+          cache-to: |
+            type=local,dest=/cache/buildx/heal,mode=max
+
+      - name: Generate build summary
+        run: |
+          echo "## 🏥 Heal Image Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Note:** PR build - image not pushed" >> $GITHUB_STEP_SUMMARY
+          fi

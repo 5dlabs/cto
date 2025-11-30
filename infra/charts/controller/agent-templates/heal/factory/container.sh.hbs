@@ -1,0 +1,49 @@
+#!/bin/sh
+# Factory Heal Remediation - Rex
+# Executes remediation tasks identified by the heal monitoring system
+# Spawned via CodeRun CRD when heal detects issues requiring intervention
+
+set -e
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║            REX HEAL REMEDIATION (FACTORY) STARTING           ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "📋 Task ID: {{task_id}}"
+echo "🔧 Issue ID: ${ISSUE_ID:-unknown}"
+echo "📂 Repository: {{repository_url}}"
+
+# Source common utilities if available
+if [ -f /workspace/scripts/lib/common.sh ]; then
+    . /workspace/scripts/lib/common.sh
+fi
+
+# Verify issue context exists
+ISSUE_FILE=""
+if [ -n "${ISSUE_ID}" ] && [ -f "/workspace/watch/alerts/${ISSUE_ID}.md" ]; then
+    ISSUE_FILE="/workspace/watch/alerts/${ISSUE_ID}.md"
+    echo "📄 Issue context: ${ISSUE_FILE}"
+elif [ -f "/workspace/watch/current-issue.md" ]; then
+    ISSUE_FILE="/workspace/watch/current-issue.md"
+    echo "📄 Issue context: ${ISSUE_FILE}"
+else
+    echo "⚠️  No issue context found"
+    echo "    Checking for any pending issues..."
+    ls -la /workspace/watch/alerts/ 2>/dev/null || echo "    No alerts directory found"
+fi
+
+# Load agent prompt
+AGENT_PROMPT="/task-files/agents.md"
+if [ ! -f "${AGENT_PROMPT}" ]; then
+    echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+    exit 1
+fi
+
+echo "🚀 Starting Factory CLI (droid exec)..."
+
+# Run Factory with the heal remediation agent prompt
+exec droid exec \
+    --auto high \
+    --model "{{model}}" \
+    --output-format stream-json \
+    "$(cat ${AGENT_PROMPT})"

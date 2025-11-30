@@ -59,7 +59,7 @@ impl<'a> CodeResourceManager<'a> {
         let service_name = &code_run_ref.spec.service;
         let classifier = AgentClassifier::new();
 
-        // Check if this is a watch CodeRun (Monitor or Remediation)
+        // Check if this is a heal CodeRun (Remediation)
         let template_setting = code_run_ref
             .spec
             .cli_config
@@ -67,18 +67,18 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch =
-            template_setting.starts_with("watch/") || service_name.to_lowercase().contains("watch");
+        let is_heal =
+            template_setting.starts_with("heal/") || service_name.to_lowercase().contains("heal");
 
         // Get the appropriate PVC name
-        let pvc_name = if is_watch {
-            // Watch CodeRuns (Monitor + Remediation) share a dedicated PVC
-            let watch_pvc = AgentClassifier::get_watch_pvc_name(service_name);
+        let pvc_name = if is_heal {
+            // Heal CodeRuns (Remediation agents) share a dedicated PVC
+            let heal_pvc = AgentClassifier::get_heal_pvc_name(service_name);
             info!(
-                "👀 Watch CodeRun detected, using dedicated watch PVC: {}",
-                watch_pvc
+                "🏥 Heal CodeRun detected, using dedicated heal PVC: {}",
+                heal_pvc
             );
-            watch_pvc
+            heal_pvc
         } else if let Some(github_app) = &code_run_ref.spec.github_app {
             match classifier.get_pvc_name(service_name, github_app) {
                 Ok(name) => {
@@ -505,10 +505,17 @@ impl<'a> CodeResourceManager<'a> {
         // This allows Atlas/Bolt to access integration templates from /agent-templates
         let shared_templates_cm_name = format!("{cm_prefix}-agent-templates-shared");
         let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
-        let watch_templates_cm_name = format!("{cm_prefix}-agent-templates-watch");
+        let heal_templates_cm_name = format!("{cm_prefix}-agent-templates-heal");
 
-        // Check if this is a Watch workflow (service contains "watch")
-        let is_watch_workflow = code_run.spec.service.to_lowercase().contains("watch");
+        // Check if this is a Heal workflow (service contains "heal" or template starts with "heal/")
+        let is_heal_workflow = code_run.spec.service.to_lowercase().contains("heal")
+            || code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .and_then(|c| c.settings.get("template"))
+                .and_then(|v| v.as_str())
+                .map_or(false, |t| t.starts_with("heal/"));
 
         // Build projected volume sources - always include shared and integration
         let mut projected_sources = vec![
@@ -524,11 +531,11 @@ impl<'a> CodeResourceManager<'a> {
             }),
         ];
 
-        // Add watch templates for watch workflows
-        if is_watch_workflow {
+        // Add heal templates for heal workflows
+        if is_heal_workflow {
             projected_sources.push(json!({
                 "configMap": {
-                    "name": watch_templates_cm_name
+                    "name": heal_templates_cm_name
                 }
             }));
         }
@@ -595,7 +602,7 @@ impl<'a> CodeResourceManager<'a> {
         // Use conditional naming based on CodeRun type and agent classification
         let classifier = AgentClassifier::new();
 
-        // Check if this is a watch CodeRun
+        // Check if this is a heal CodeRun
         let template_setting = code_run
             .spec
             .cli_config
@@ -603,12 +610,12 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch =
-            template_setting.starts_with("watch/") || code_run.spec.service.contains("watch");
+        let is_heal =
+            template_setting.starts_with("heal/") || code_run.spec.service.contains("heal");
 
-        let pvc_name = if is_watch {
-            // Watch CodeRuns share a dedicated PVC
-            AgentClassifier::get_watch_pvc_name(&code_run.spec.service)
+        let pvc_name = if is_heal {
+            // Heal CodeRuns share a dedicated PVC
+            AgentClassifier::get_heal_pvc_name(&code_run.spec.service)
         } else if let Some(github_app) = &code_run.spec.github_app {
             match classifier.get_pvc_name(&code_run.spec.service, github_app) {
                 Ok(name) => name,
@@ -631,6 +638,33 @@ impl<'a> CodeResourceManager<'a> {
             "name": "workspace",
             "mountPath": "/workspace"
         }));
+
+        // Mount cto-config ConfigMap for heal CodeRuns (remediation agents need it)
+        // This must come AFTER workspace mount so it's not shadowed
+        if is_heal {
+            volumes.push(json!({
+                "name": "cto-config",
+                "configMap": {
+                    "name": "cto-config"
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "cto-config",
+                "mountPath": "/workspace/config"
+            }));
+
+            volumes.push(json!({
+                "name": "talos-kubeconfig",
+                "secret": {
+                    "secretName": "talos-kubeconfig"
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "talos-kubeconfig",
+                "mountPath": "/workspace/talos",
+                "readOnly": true
+            }));
+        }
 
         // Docker-in-Docker volumes (enabled by default, can be disabled via enableDocker: false)
         let enable_docker = code_run.spec.enable_docker;
@@ -797,6 +831,18 @@ impl<'a> CodeResourceManager<'a> {
 
         // Add critical system vars (these will override any duplicates due to deduplication logic)
         final_env_vars.extend(critical_env_vars);
+
+        if is_heal {
+            let talos_path = "/workspace/talos/kubeconfig";
+            final_env_vars.push(json!({
+                "name": "ARGO_KUBECONFIG",
+                "value": talos_path
+            }));
+            final_env_vars.push(json!({
+                "name": "KUBECONFIG",
+                "value": talos_path
+            }));
+        }
 
         // Add Docker environment variable if Docker is enabled
         // Socket is at /var/run/docker/docker.sock to avoid overwriting /var/run/secrets

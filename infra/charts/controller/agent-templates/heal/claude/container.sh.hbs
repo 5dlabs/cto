@@ -1,0 +1,33 @@
+#!/bin/sh
+# Claude Heal Remediation - Rex
+# Executes remediation tasks identified by the heal monitoring system
+# Spawned via CodeRun CRD when heal detects issues requiring intervention
+
+set -e
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║             REX HEAL REMEDIATION (CLAUDE) STARTING           ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "📋 Task ID: {{task_id}}"
+echo "🔧 Issue ID: ${ISSUE_ID:-unknown}"
+echo "📂 Repository: {{repository_url}}"
+
+# Source common utilities if available
+if [ -f /workspace/scripts/lib/common.sh ]; then
+    . /workspace/scripts/lib/common.sh
+fi
+
+# Verify issue context exists
+if [ ! -f "/workspace/watch/alerts/${ISSUE_ID}.md" ] && [ ! -f "/workspace/watch/current-issue.md" ]; then
+    echo "⚠️  No issue context found at /workspace/watch/alerts/ or /workspace/watch/current-issue.md"
+    echo "    Checking for any pending issues..."
+    ls -la /workspace/watch/alerts/ 2>/dev/null || echo "    No alerts directory found"
+fi
+
+# Run Claude with the heal remediation agent prompt
+exec claude \
+    --dangerously-skip-permissions \
+    --model "{{model}}" \
+    --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit" \
+    -p "$(cat /task-files/agents.md)"
