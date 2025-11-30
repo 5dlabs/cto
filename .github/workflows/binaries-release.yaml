@@ -192,11 +192,20 @@ jobs:
           name: binary-tools-server-linux-x86_64
           path: artifacts/
 
-      - name: Prepare binary for Docker
+      - name: Download Linux x86_64 cto-mcp binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-cto-mcp-linux-x86_64
+          path: artifacts/
+
+      - name: Prepare binaries for Docker
         run: |
           cp artifacts/tools-server-linux-x86_64 infra/images/tools/tools-server-linux
           chmod +x infra/images/tools/tools-server-linux
           ls -lh infra/images/tools/tools-server-linux
+          cp artifacts/cto-mcp-linux-x86_64 infra/images/tools/cto-mcp-linux
+          chmod +x infra/images/tools/cto-mcp-linux
+          ls -lh infra/images/tools/cto-mcp-linux
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
@@ -265,7 +274,7 @@ jobs:
           ### 📦 cto-mcp
           MCP server for Argo Workflows integration in AI development workflows.
 
-          ### 🔧 tools-server / tools-client  
+          ### 🔧 tools-server / tools-client
           Dynamic MCP (Model Context Protocol) tool management and proxy server.
 
           ### 📊 play-monitor

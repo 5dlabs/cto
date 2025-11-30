@@ -90,7 +90,7 @@ jobs:
               echo "⚠️ Release v${RELEASE_VERSION} found but tools-client asset missing, skipping tools"
               echo "tools_version=skip" >> $GITHUB_OUTPUT
             fi
-            
+
             # Verify the play-monitor binary exists in the release
             MONITOR_URL="https://github.com/5dlabs/cto/releases/download/v${RELEASE_VERSION}/play-monitor-linux-x86_64"
             if curl -L --output /dev/null --silent --head --fail "$MONITOR_URL"; then

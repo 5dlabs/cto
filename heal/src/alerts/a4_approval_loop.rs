@@ -73,10 +73,7 @@ impl AlertHandler for Handler {
                 return Some(
                     Alert::new(
                         AlertId::A4,
-                        format!(
-                            "{} has posted {} approvals - possible infinite loop",
-                            agent, count
-                        ),
+                        format!("{agent} has posted {count} approvals - possible infinite loop"),
                     )
                     .with_severity(Severity::Warning)
                     .with_context("agent", agent.clone())

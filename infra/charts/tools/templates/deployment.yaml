@@ -163,6 +163,8 @@ spec:
           configMap:
             {{- if eq .configMap.name "tools-config" }}
             name: {{ include "tools.configMapName" $ }}
+            {{- else if eq .configMap.name "cto-config" }}
+            name: {{ include "tools.fullname" $ }}-cto-config
             {{- else }}
             name: {{ .configMap.name }}
             {{- end }}

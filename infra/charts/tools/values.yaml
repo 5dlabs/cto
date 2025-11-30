@@ -84,6 +84,9 @@ volumes:
   - name: config
     configMap:
       name: tools-config
+  - name: cto-config
+    configMap:
+      name: cto-config
   - name: tmp
     emptyDir: {}
   - name: docker-sock-dir
@@ -98,6 +101,9 @@ volumes:
 volumeMounts:
   - name: config
     mountPath: /config
+    readOnly: true
+  - name: cto-config
+    mountPath: /cto
     readOnly: true
   - name: tmp
     mountPath: /tmp
@@ -354,6 +360,15 @@ config:
         keys:
           - "ARGOCD_API_TOKEN"
 
+    # --- CTO Platform ---
+    cto:
+      name: "CTO Platform"
+      description: "CTO MCP server - launch AI development workflows via Argo Workflows (intake, play, remediation)"
+      transport: "stdio"
+      command: "cto-mcp"
+      args: []
+      workingDirectory: "/cto"
+
     # --- AI Image Generation ---
     nano-banana:
       name: "Nano Banana"
@@ -522,3 +537,215 @@ mcpServers:
     serviceAccount:
       create: true
       name: "k8s-mcp"
+
+# =============================================================================
+# CTO Platform Configuration
+# =============================================================================
+# Configuration for cto-mcp server. This is mounted at /cto/cto-config.json
+# and used by the CTO MCP server for workflow defaults and agent configurations.
+
+ctoConfig:
+  version: "1.0"
+  defaults:
+    docs:
+      model: "claude-opus-4-1-20250805"
+      githubApp: "5DLabs-Morgan"
+      includeCodebase: false
+      sourceBranch: "main"
+    code:
+      model: "gpt-5-codex"
+      githubApp: "5DLabs-Rex"
+      continueSession: false
+      workingDirectory: "."
+      overwriteMemory: false
+      repository: "5dlabs/cto"
+      docsRepository: "5dlabs/cto"
+      docsProjectDirectory: "docs"
+      service: "cto"
+      cli: "codex"
+    intake:
+      githubApp: "5DLabs-Morgan"
+      primary:
+        model: "opus"
+        provider: "claude-code"
+      research:
+        model: "opus"
+        provider: "claude-code"
+      fallback:
+        model: "gpt-5"
+        provider: "openai"
+    play:
+      model: "claude-sonnet-4-20250514"
+      cli: "claude"
+      implementationAgent: "5DLabs-Rex"
+      frontendAgent: "5DLabs-Blaze"
+      qualityAgent: "5DLabs-Cleo"
+      securityAgent: "5DLabs-Cipher"
+      testingAgent: "5DLabs-Tess"
+      repository: "5dlabs/cto-parallel-test"
+      service: "cto-parallel-test"
+      docsRepository: "5dlabs/cto-parallel-test"
+      docsProjectDirectory: "docs"
+      workingDirectory: "."
+    remediation:
+      repository: "5dlabs/cto"
+      docsRepository: "5dlabs/cto"
+      docsProjectDirectory: "docs"
+      agent: "5DLabs-Rex"
+      cli: "claude"
+      model: "claude-opus-4-5-20251101"
+      maxIterations: 3
+      template: "watch/factory"
+      syncTimeoutSecs: 300
+    monitor:
+      agent: "5DLabs-Rex"
+      cli: "factory"
+      model: "glm-4-plus"
+      template: "watch/factory"
+      maxIterations: 3
+  agents:
+    morgan:
+      githubApp: "5DLabs-Morgan"
+      cli: "claude"
+      model: "claude-sonnet-4-20250514"
+      tools:
+        remote:
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_crawl"
+          - "firecrawl_map"
+          - "firecrawl_search"
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+        localServers: {}
+    rex:
+      githubApp: "5DLabs-Rex"
+      cli: "codex"
+      model: "gpt-5-codex"
+      tools:
+        remote:
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_crawl"
+          - "firecrawl_map"
+          - "firecrawl_search"
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+          - "github_create_pull_request"
+          - "github_push_files"
+          - "github_create_branch"
+          - "github_get_file_contents"
+        localServers: {}
+    cleo:
+      githubApp: "5DLabs-Cleo"
+      cli: "claude"
+      model: "claude-sonnet-4-20250514"
+      tools:
+        remote:
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_crawl"
+          - "firecrawl_map"
+          - "firecrawl_search"
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+          - "github_get_pull_request"
+          - "github_get_pull_request_files"
+          - "github_get_pull_request_comments"
+          - "github_add_pull_request_review_comment"
+          - "github_create_pull_request_review"
+          - "github_get_file_contents"
+        localServers: {}
+    tess:
+      githubApp: "5DLabs-Tess"
+      cli: "claude"
+      model: "claude-sonnet-4-20250514"
+      tools:
+        remote:
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_crawl"
+          - "firecrawl_map"
+          - "firecrawl_search"
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+          - "github_get_pull_request"
+          - "github_get_pull_request_files"
+          - "github_create_pull_request_review"
+          - "github_get_pull_request_status"
+          - "kubernetes_listResources"
+          - "kubernetes_getResource"
+          - "kubernetes_describeResource"
+          - "kubernetes_getPodsLogs"
+        localServers: {}
+    blaze:
+      githubApp: "5DLabs-Blaze"
+      cli: "codex"
+      model: "gpt-5-codex"
+      tools:
+        remote:
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_crawl"
+          - "firecrawl_map"
+          - "firecrawl_search"
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+          - "shadcn_list_components"
+          - "shadcn_get_component"
+          - "shadcn_get_component_demo"
+          - "shadcn_get_component_metadata"
+          - "shadcn_list_blocks"
+          - "shadcn_get_block"
+          - "shadcn_get_directory_structure"
+          - "ai_elements_get_ai_elements_components"
+          - "ai_elements_get_ai_elements_component"
+          - "github_create_pull_request"
+          - "github_push_files"
+          - "github_create_branch"
+          - "github_get_file_contents"
+        localServers: {}
+    cipher:
+      githubApp: "5DLabs-Cipher"
+      cli: "codex"
+      model: "gpt-5-codex"
+      tools:
+        remote:
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_crawl"
+          - "firecrawl_map"
+          - "firecrawl_search"
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+          - "github_list_code_scanning_alerts"
+          - "github_get_code_scanning_alert"
+          - "github_list_secret_scanning_alerts"
+          - "github_get_secret_scanning_alert"
+          - "github_get_pull_request"
+          - "github_create_pull_request_review"
+        localServers: {}
