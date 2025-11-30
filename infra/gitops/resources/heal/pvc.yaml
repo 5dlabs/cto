@@ -1,0 +1,19 @@
+---
+# PersistentVolumeClaim for heal workspace
+# Shared between heal monitor and Rex remediation agents
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: heal-workspace
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: heal-workspace
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
