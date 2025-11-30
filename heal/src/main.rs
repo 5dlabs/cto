@@ -332,6 +332,21 @@ enum Commands {
         #[arg(long, default_value = "cto-config.json")]
         config: String,
     },
+    /// [ALERTS] Fetch all logs for a pod (current, previous, events, describe)
+    FetchLogs {
+        /// Pod name to fetch logs for
+        #[arg(long)]
+        pod_name: String,
+        /// Namespace of the pod
+        #[arg(long, default_value = "cto")]
+        namespace: String,
+        /// Output directory for log files
+        #[arg(long, default_value = "/workspace/watch/logs")]
+        output_dir: String,
+        /// Tail lines per chunk (0 = all logs)
+        #[arg(long, default_value = "10000")]
+        tail: u32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1689,6 +1704,14 @@ async fn main() -> Result<()> {
             config,
         } => {
             spawn_remediation_agent(&alert, &task_id, &issue_file, &config)?;
+        }
+        Commands::FetchLogs {
+            pod_name,
+            namespace,
+            output_dir,
+            tail,
+        } => {
+            fetch_pod_logs(&pod_name, &namespace, &output_dir, tail)?;
         }
     }
 
@@ -4890,50 +4913,261 @@ async fn test_alert_flow(
     Ok(())
 }
 
-/// Spawn a remediation agent for a detected issue
+/// Spawn a remediation agent for a detected issue by creating a CodeRun CRD
 fn spawn_remediation_agent(
     alert: &str,
     task_id: &str,
     issue_file: &str,
-    config: &str,
+    _config: &str,
 ) -> Result<()> {
-    println!(
-        "{}",
-        format!("Spawning remediation agent for alert {alert} (task: {task_id})").cyan()
-    );
+    use std::io::Write as _;
 
-    // Read the issue file
-    let issue_content = std::fs::read_to_string(issue_file)
-        .context(format!("Failed to read issue file: {issue_file}"))?;
-
-    println!("{}", format!("Issue file: {issue_file}").dimmed());
+    println!("{}", "═".repeat(60).cyan());
     println!(
         "{}",
         format!(
-            "Issue preview: {}...",
-            &issue_content[..issue_content.len().min(200)]
-        )
-        .dimmed()
+            "🔧 SPAWN REMEDIATION: alert={} task={}",
+            alert, task_id
+        ).cyan().bold()
+    );
+    println!("{}", "═".repeat(60).cyan());
+
+    // Verify the issue file exists
+    println!("{}", format!("📄 Checking issue file: {}", issue_file).dimmed());
+    if !std::path::Path::new(issue_file).exists() {
+        println!("{}", format!("❌ Issue file not found: {}", issue_file).red());
+        return Err(anyhow::anyhow!("Issue file not found: {}", issue_file));
+    }
+    println!("{}", "   ✓ Issue file exists".green());
+
+    // Generate unique CodeRun name
+    let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let coderun_name = format!("remediation-{alert}-{uid}");
+
+    println!("{}", format!("🏷️  CodeRun name: {}", coderun_name).dimmed());
+    println!("{}", format!("⏰ Timestamp: {}", timestamp).dimmed());
+
+    // Generate a numeric task ID from the string (hash it to an int)
+    let task_id_numeric: u32 = task_id
+        .bytes()
+        .fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(u32::from(b)));
+
+    // Create CodeRun YAML manifest
+    // Uses heal/claude template which triggers controller to mount heal-workspace PVC
+    let coderun_yaml = format!(
+        r#"apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: {coderun_name}
+  namespace: cto
+  labels:
+    alert-type: "{alert}"
+    task-id: "{task_id}"
+    remediation: "true"
+    created-at: "{timestamp}"
+    agents.platform/type: heal-remediation
+spec:
+  taskId: {task_id_numeric}
+  githubApp: "rex"
+  model: "claude-sonnet-4-20250514"
+  repositoryUrl: "https://github.com/5dlabs/cto"
+  docsRepositoryUrl: "https://github.com/5dlabs/cto"
+  docsProjectDirectory: "docs"
+  workingDirectory: "."
+  service: "heal"
+  cliConfig:
+    cliType: "claude"
+    model: "claude-sonnet-4-20250514"
+    settings:
+      template: "heal/claude"
+  env:
+    ALERT_TYPE: "{alert}"
+    TASK_ID: "{task_id}"
+    ISSUE_FILE: "{issue_file}"
+    REMEDIATION_MODE: "true"
+"#,
+        coderun_name = coderun_name,
+        alert = alert,
+        task_id = task_id,
+        task_id_numeric = task_id_numeric,
+        timestamp = timestamp,
+        issue_file = issue_file,
     );
 
-    // Load config to get remediation settings (will be used for CodeRun creation)
-    let _config_content =
-        std::fs::read_to_string(config).context(format!("Failed to read config: {config}"))?;
+    println!("{}", "📝 Generated CodeRun YAML:".dimmed());
+    for line in coderun_yaml.lines().take(10) {
+        println!("   {}", line.dimmed());
+    }
+    println!("   {}", "...".dimmed());
 
-    // For now, create a CodeRun for remediation
-    // In production, this would create an actual CodeRun resource via kubectl
-    let coderun_name = format!("remediation-{alert}-{task_id}");
+    println!("{}", "🚀 Applying CodeRun via kubectl...".yellow());
 
+    // Apply via kubectl
+    let mut child = Command::new("kubectl")
+        .args(["apply", "-f", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("Failed to spawn kubectl apply")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(coderun_yaml.as_bytes())
+            .context("Failed to write YAML to kubectl stdin")?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .context("Failed to wait for kubectl")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("{}", format!("❌ kubectl apply failed: {}", stderr).red());
+        return Err(anyhow::anyhow!(
+            "Failed to create remediation CodeRun: {stderr}"
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    println!("{}", format!("   kubectl: {}", stdout.trim()).green());
+
+    println!("{}", "═".repeat(60).green());
     println!(
         "{}",
-        format!("Would create CodeRun: {coderun_name}").yellow()
+        format!("✅ CREATED: {} in namespace cto", coderun_name).green().bold()
     );
+    println!("{}", "═".repeat(60).green());
     println!(
         "{}",
-        "TODO: Implement actual CodeRun creation for remediation".yellow()
+        format!(
+            "👀 Monitor: kubectl get coderun {} -n cto -w",
+            coderun_name
+        ).dimmed()
     );
 
     Ok(())
+}
+
+/// Fetch all logs for a pod (current, previous, events, describe)
+fn fetch_pod_logs(
+    pod_name: &str,
+    namespace: &str,
+    output_dir: &str,
+    tail: u32,
+) -> Result<()> {
+    println!("{}", "═".repeat(60).cyan());
+    println!(
+        "{}",
+        format!("📥 FETCH LOGS: pod={} ns={}", pod_name, namespace).cyan().bold()
+    );
+    println!("{}", "═".repeat(60).cyan());
+
+    // Create output directory
+    println!("{}", format!("📁 Creating output dir: {}", output_dir).dimmed());
+    std::fs::create_dir_all(output_dir).context("Failed to create output directory")?;
+    println!("{}", "   ✓ Directory ready".green());
+
+    let tail_arg = if tail == 0 {
+        String::new()
+    } else {
+        format!("--tail={}", tail)
+    };
+
+    // 1. Fetch current logs
+    println!("{}", "─".repeat(40));
+    println!("{}", "📜 Fetching current logs...".yellow());
+    let current_log_file = format!("{}/{}-current.log", output_dir, pod_name);
+    let current_result = fetch_kubectl_output(
+        &["logs", pod_name, "-n", namespace, "--all-containers"]
+            .into_iter()
+            .chain(if tail > 0 { vec![&tail_arg as &str] } else { vec![] })
+            .collect::<Vec<_>>(),
+        &current_log_file,
+    );
+    match &current_result {
+        Ok(size) => println!("{}", format!("   ✓ Current logs: {} bytes → {}", size, current_log_file).green()),
+        Err(e) => println!("{}", format!("   ⚠ Current logs failed: {}", e).yellow()),
+    }
+
+    // 2. Fetch previous logs (may not exist)
+    println!("{}", "─".repeat(40));
+    println!("{}", "📜 Fetching previous logs...".yellow());
+    let previous_log_file = format!("{}/{}-previous.log", output_dir, pod_name);
+    let previous_result = fetch_kubectl_output(
+        &["logs", pod_name, "-n", namespace, "--all-containers", "--previous"]
+            .into_iter()
+            .chain(if tail > 0 { vec![&tail_arg as &str] } else { vec![] })
+            .collect::<Vec<_>>(),
+        &previous_log_file,
+    );
+    match &previous_result {
+        Ok(size) => println!("{}", format!("   ✓ Previous logs: {} bytes → {}", size, previous_log_file).green()),
+        Err(_) => println!("{}", "   ⚠ No previous logs (pod may not have restarted)".yellow()),
+    }
+
+    // 3. Fetch events
+    println!("{}", "─".repeat(40));
+    println!("{}", "📋 Fetching pod events...".yellow());
+    let events_file = format!("{}/{}-events.yaml", output_dir, pod_name);
+    let events_result = fetch_kubectl_output(
+        &[
+            "get", "events", "-n", namespace,
+            "--field-selector", &format!("involvedObject.name={}", pod_name),
+            "-o", "yaml",
+        ],
+        &events_file,
+    );
+    match &events_result {
+        Ok(size) => println!("{}", format!("   ✓ Events: {} bytes → {}", size, events_file).green()),
+        Err(e) => println!("{}", format!("   ⚠ Events failed: {}", e).yellow()),
+    }
+
+    // 4. Fetch describe
+    println!("{}", "─".repeat(40));
+    println!("{}", "📝 Fetching pod description...".yellow());
+    let describe_file = format!("{}/{}-describe.txt", output_dir, pod_name);
+    let describe_result = fetch_kubectl_output(
+        &["describe", "pod", pod_name, "-n", namespace],
+        &describe_file,
+    );
+    match &describe_result {
+        Ok(size) => println!("{}", format!("   ✓ Describe: {} bytes → {}", size, describe_file).green()),
+        Err(e) => println!("{}", format!("   ⚠ Describe failed: {}", e).yellow()),
+    }
+
+    // Summary
+    println!("{}", "═".repeat(60).green());
+    println!("{}", "✅ LOG FETCH COMPLETE".green().bold());
+    println!("{}", "═".repeat(60).green());
+    println!("{}", format!("📂 Output directory: {}", output_dir).dimmed());
+    println!("{}", "   Files created:".dimmed());
+    println!("{}", format!("   - {}-current.log", pod_name).dimmed());
+    println!("{}", format!("   - {}-previous.log", pod_name).dimmed());
+    println!("{}", format!("   - {}-events.yaml", pod_name).dimmed());
+    println!("{}", format!("   - {}-describe.txt", pod_name).dimmed());
+
+    Ok(())
+}
+
+/// Helper to run kubectl and save output to a file
+fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
+    let output = Command::new("kubectl")
+        .args(args)
+        .output()
+        .context("Failed to run kubectl")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("kubectl failed: {}", stderr));
+    }
+
+    let content = &output.stdout;
+    std::fs::write(output_file, content)
+        .context(format!("Failed to write to {}", output_file))?;
+
+    Ok(content.len())
 }
 
 #[cfg(test)]
