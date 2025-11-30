@@ -5,10 +5,11 @@ metadata:
   name: {{ include "tools.pvcName" . }}
   labels:
     {{- include "tools.labels" . | nindent 4 }}
-  {{- with .Values.persistence.annotations }}
   annotations:
+    argocd.argoproj.io/sync-options: Replace=false
+    {{- with .Values.persistence.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}
