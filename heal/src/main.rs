@@ -4721,10 +4721,10 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
     writeln!(file, "ALERT: {} | POD: {}", alert_id.to_uppercase(), pod_name)?;
     writeln!(file, "TIME: {}", chrono::Utc::now().to_rfc3339())?;
     writeln!(file, "═══════════════════════════════════════════════════════════════")?;
-    writeln!(file, "")?;
+    writeln!(file)?;
     writeln!(file, "=== PROMPT ===")?;
     writeln!(file, "{}", prompt_content)?;
-    writeln!(file, "")?;
+    writeln!(file)?;
     writeln!(file, "=== FACTORY OUTPUT ===")?;
     drop(file); // Close before spawning
 
@@ -4760,7 +4760,7 @@ async fn spawn_factory_with_prompt(prompt_path: &str, pod_name: &str, alert_id: 
             }
             
             // Write exit status
-            writeln!(file, "")?;
+            writeln!(file)?;
             writeln!(file, "═══════════════════════════════════════════════════════════════")?;
             writeln!(file, "EXIT CODE: {:?}", out.status.code())?;
             writeln!(file, "═══════════════════════════════════════════════════════════════")?;
