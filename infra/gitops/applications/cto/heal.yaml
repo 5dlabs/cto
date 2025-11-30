@@ -78,12 +78,15 @@ spec:
             memory: 256Mi
 
         # Heal is a watch loop, not an HTTP server - use exec probes
+        # Must nullify httpGet to prevent merge with chart defaults
         livenessProbe:
+          httpGet: null
           exec:
             command: ["pgrep", "-f", "heal"]
           initialDelaySeconds: 10
           periodSeconds: 30
         readinessProbe:
+          httpGet: null
           exec:
             command: ["pgrep", "-f", "heal"]
           initialDelaySeconds: 5
