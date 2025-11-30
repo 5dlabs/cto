@@ -274,7 +274,7 @@ jobs:
           ### 📦 cto-mcp
           MCP server for Argo Workflows integration in AI development workflows.
 
-          ### 🔧 tools-server / tools-client  
+          ### 🔧 tools-server / tools-client
           Dynamic MCP (Model Context Protocol) tool management and proxy server.
 
           ### 📊 play-monitor
