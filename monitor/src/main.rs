@@ -3350,6 +3350,7 @@ fn count_deleted(output: &[u8]) -> i32 {
 }
 
 /// Run/submit a play workflow via Argo CLI
+#[allow(clippy::too_many_lines)]
 fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     println!(
         "{}",
@@ -3368,6 +3369,11 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         "play-{}-t{}-{}-{}-{}",
         config.run_type, config.task_id, agent_short, config.agent_cli, uid
     );
+
+    // Default tools configurations for each agent role
+    let implementation_tools = r#"{"remote":["brave_search_brave_web_search","context7_resolve_library_id","context7_get_library_docs","github_create_pull_request","github_push_files","github_create_branch","github_get_file_contents","github_create_or_update_file","github_list_commits"],"localServers":{}}"#;
+    let quality_tools = r#"{"remote":["brave_search_brave_web_search","github_get_pull_request","github_get_pull_request_files","github_get_pull_request_comments","github_add_pull_request_review_comment","github_create_pull_request_review","github_get_file_contents"],"localServers":{}}"#;
+    let testing_tools = r#"{"remote":["brave_search_brave_web_search","github_get_pull_request","github_get_pull_request_files","github_create_pull_request_review","github_get_pull_request_status"],"localServers":{}}"#;
 
     // Submit workflow using argo CLI
     let output = Command::new("argo")
@@ -3394,17 +3400,31 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
             "-p",
             &format!("implementation-model={}", config.model),
             "-p",
+            &format!("implementation-tools={implementation_tools}"),
+            "-p",
             "quality-agent=5DLabs-Cleo",
             "-p",
             "quality-cli=claude",
             "-p",
             "quality-model=claude-sonnet-4-20250514",
             "-p",
+            &format!("quality-tools={quality_tools}"),
+            "-p",
             "testing-agent=5DLabs-Tess",
             "-p",
             "testing-cli=claude",
             "-p",
             "testing-model=claude-sonnet-4-20250514",
+            "-p",
+            &format!("testing-tools={testing_tools}"),
+            "-p",
+            "implementation-max-retries=10",
+            "-p",
+            "quality-max-retries=5",
+            "-p",
+            "testing-max-retries=5",
+            "-p",
+            "auto-merge=true",
             "--name",
             &workflow_name,
             "-o",
