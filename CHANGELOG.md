@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.13](https://github.com/5dlabs/cto/compare/v0.11.12...v0.11.13) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use jq instead of grep for JSON parsing ([#1939](https://github.com/5dlabs/cto/issues/1939)) ([7d39a3c](https://github.com/5dlabs/cto/commit/7d39a3cff874abf7eb5dcb93b1b4fc4ab7d0c7a4))
+
 ## [0.11.12](https://github.com/5dlabs/cto/compare/v0.11.11...v0.11.12) (2025-12-01)
 
 
