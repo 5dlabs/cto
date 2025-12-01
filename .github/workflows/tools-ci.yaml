@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'tools/**'
+      - 'mcp/**'
       - 'infra/images/tools/**'
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
@@ -13,6 +14,7 @@ on:
     branches: [main]
     paths:
       - 'tools/**'
+      - 'mcp/**'
       - 'infra/images/tools/**'
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
@@ -28,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tools: ${{ steps.filter.outputs.tools }}
+      mcp: ${{ steps.filter.outputs.mcp }}
       helm: ${{ steps.filter.outputs.helm }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
@@ -39,6 +42,9 @@ jobs:
             tools:
               - 'tools/**'
               - '!tools/**/*.md'
+            mcp:
+              - 'mcp/**'
+              - '!mcp/**/*.md'
             helm:
               - 'infra/charts/tools/**'
             docker:
@@ -335,7 +341,7 @@ jobs:
           sccache --stop-server 2>/dev/null || true
           sccache --start-server
 
-      - name: Build release binary
+      - name: Build release binaries
         env:
           CARGO_INCREMENTAL: "0"
           RUSTC_WRAPPER: "sccache"
@@ -346,10 +352,16 @@ jobs:
           echo "🔨 Building tools-server for linux/amd64..."
           cargo build -p tools --release --bin tools-server
 
-          # Copy binary to Docker context (matches release workflow pattern)
+          echo "🔨 Building cto-mcp for linux/amd64..."
+          cargo build -p cto-mcp --release --bin cto-mcp
+
+          # Copy binaries to Docker context (matches release workflow pattern)
           cp target/release/tools-server infra/images/tools/tools-server-linux
           chmod +x infra/images/tools/tools-server-linux
-          echo "✅ Binary copied to Docker context"
+          cp target/release/cto-mcp infra/images/tools/cto-mcp-linux
+          chmod +x infra/images/tools/cto-mcp-linux
+          echo "✅ Binaries copied to Docker context"
+          ls -lh infra/images/tools/*-linux
           echo "📊 Final sccache stats:"
           sccache --show-stats
 
