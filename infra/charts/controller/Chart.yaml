@@ -1,11 +1,11 @@
----
 apiVersion: v2
 name: controller
-description: A Helm chart for the Agent Platform Controller - manages Claude Code agents via TaskRun CRDs
+description: >-
+  A Helm chart for the Agent Platform Controller - manages Claude Code agents
+  via TaskRun CRDs
 type: application
 version: 0.1.1
-appVersion: "0.2.0"  # x-release-please-version
-
+appVersion: 0.2.1
 keywords:
   - controller
   - cto
@@ -13,13 +13,10 @@ keywords:
   - task-management
   - kubernetes
   - automation
-
 home: https://github.com/5dlabs/cto
 maintainers:
   - name: Platform Team
     email: platform@5dlabs.com
-
 sources:
   - https://github.com/5dlabs/cto
-
 dependencies: []
