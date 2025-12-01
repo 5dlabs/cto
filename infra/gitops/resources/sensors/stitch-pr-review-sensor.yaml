@@ -133,14 +133,15 @@ spec:
                             base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
                           JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
 
-                          # Get installation ID for the org
-                          INSTALL_ID=$(curl -s -H "Authorization: Bearer ${JWT}" \
+                          # Get installation ID for this repo (jq is available in Factory image)
+                          INSTALL_RESP=$(curl -s -H "Authorization: Bearer ${JWT}" \
                             -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/app/installations" | \
-                            grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+                            "https://api.github.com/repos/${REPO_SLUG}/installation")
+                          INSTALL_ID=$(echo "$INSTALL_RESP" | jq -r '.id')
 
-                          if [ -z "$INSTALL_ID" ]; then
+                          if [ -z "$INSTALL_ID" ] || [ "$INSTALL_ID" = "null" ]; then
                             echo "❌ Failed to get installation ID"
+                            echo "Response: $INSTALL_RESP"
                             exit 1
                           fi
                           echo "📍 Installation ID: $INSTALL_ID"
@@ -151,7 +152,7 @@ spec:
                             -H "Accept: application/vnd.github+json" \
                             "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens")
 
-                          export GH_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+                          export GH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
 
                           if [ -z "$GH_TOKEN" ]; then
                             echo "❌ Failed to generate installation token"
@@ -183,8 +184,8 @@ spec:
                               }
                             }")
 
-                          CHECK_RUN_ID=$(echo "$CHECK_RUN_RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
-                          if [ -z "$CHECK_RUN_ID" ]; then
+                          CHECK_RUN_ID=$(echo "$CHECK_RUN_RESPONSE" | jq -r '.id')
+                          if [ -z "$CHECK_RUN_ID" ] || [ "$CHECK_RUN_ID" = "null" ]; then
                             echo "⚠️ Failed to create check run (continuing anyway)"
                             echo "Response: $CHECK_RUN_RESPONSE"
                           else
