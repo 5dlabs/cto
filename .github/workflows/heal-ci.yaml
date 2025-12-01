@@ -171,7 +171,18 @@ jobs:
           echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
           export PATH="/home/runner/.cargo/bin:$PATH"
 
-          rustup default stable
+          # Use existing toolchain if available, retry on failure (handles concurrent cache issues)
+          if rustc --version 2>/dev/null; then
+            echo "✅ Rust already installed: $(rustc --version)"
+          else
+            for i in 1 2 3; do
+              rustup default stable && break
+              echo "⚠️ Rustup failed, retrying ($i/3)..."
+              sleep 5
+              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+            done
+          fi
+
           rustc --version
           cargo --version
           sccache --version || echo "⚠️ sccache not found"
