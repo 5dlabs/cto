@@ -53,7 +53,7 @@ jobs:
   # Rust linting (format + clippy pedantic) - uses k8s-runner for speed
   lint-rust:
     needs: changes
-    if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     outputs:
       format-needed: ${{ steps.format-check.outputs.format-needed }}
@@ -104,7 +104,10 @@ jobs:
           RUSTC_WRAPPER: "sccache"
         run: |
           echo "🔧 Checking cargo fmt..."
-          if ! cargo fmt -p tools -- --check; then
+          FMT_FAILED=false
+          cargo fmt -p tools -- --check || FMT_FAILED=true
+          cargo fmt -p cto-mcp -- --check || FMT_FAILED=true
+          if [ "$FMT_FAILED" = "true" ]; then
             echo "📝 Formatting issues detected"
             echo "format-needed=true" >> $GITHUB_OUTPUT
           else
@@ -120,13 +123,14 @@ jobs:
         run: |
           echo "🔍 Running clippy with pedantic warnings..."
           cargo clippy -p tools --all-targets -- -D warnings -W clippy::pedantic
+          cargo clippy -p cto-mcp --all-targets -- -D warnings -W clippy::pedantic
           echo "📊 Final sccache stats:"
           sccache --show-stats
 
   # Run tests - uses k8s-runner for speed
   test-rust:
     needs: changes
-    if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
@@ -171,13 +175,15 @@ jobs:
         run: |
           echo "🧪 Running all tools tests..."
           cargo test -p tools --all-targets
+          echo "🧪 Running all cto-mcp tests..."
+          cargo test -p cto-mcp --all-targets
           echo "📊 Final sccache stats:"
           sccache --show-stats
 
   # Build check (ensure it compiles for release) - uses k8s-runner for speed
   build-check:
     needs: changes
-    if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
@@ -229,6 +235,8 @@ jobs:
           echo "🔨 Building tools-server and tools-client..."
           cargo build -p tools --release --bin tools-server
           cargo build -p tools --release --bin tools-client
+          echo "🔨 Building cto-mcp..."
+          cargo build -p cto-mcp --release --bin cto-mcp
           echo "✅ Release build successful"
           echo "📊 Final sccache stats:"
           sccache --show-stats
@@ -275,7 +283,7 @@ jobs:
   # Security audit (non-blocking)
   security-audit:
     needs: changes
-    if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: ubuntu-22.04
     continue-on-error: true
     steps:
