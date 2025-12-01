@@ -11,7 +11,7 @@
     "service": "heal",
     "runType": "implementation",
     "enableDocker": false,
-    "remoteTools": "mcp_tools_github_*,mcp_tools_kubernetes_*",
+    "remoteTools": "mcp_tools_github_*,mcp_tools_kubernetes_*,mcp_tools_argocd_*",
     "localTools": "",
     "cliConfig": {
       "cliType": "claude",
