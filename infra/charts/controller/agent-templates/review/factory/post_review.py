@@ -3,11 +3,13 @@
 Stitch PR Review Poster
 
 Reads /tmp/review.json and posts inline review comments to GitHub.
+Uses position-based comments like Cursor Bot for accurate diff placement.
 Falls back to posting /tmp/review.md as a simple comment if JSON is not available.
 """
 
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -19,7 +21,61 @@ SEVERITY_EMOJI = {
 }
 
 
-def build_review_payload(review_data):
+def fetch_pr_diff(repo_slug, pr_number):
+    """Fetch the PR diff using gh CLI."""
+    result = subprocess.run(
+        ['gh', 'pr', 'diff', str(pr_number), '--repo', repo_slug],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(f"⚠️ Failed to fetch diff: {result.stderr}")
+        return None
+    return result.stdout
+
+
+def parse_diff_positions(diff_text):
+    """
+    Parse diff to build a map of file -> line -> position.
+    Position is 1-indexed from the start of each file's diff.
+    """
+    if not diff_text:
+        return {}
+    
+    positions = {}  # {filepath: {line_number: position}}
+    current_file = None
+    position = 0
+    current_new_line = 0
+    
+    for line in diff_text.split('\n'):
+        # New file in diff
+        if line.startswith('diff --git'):
+            # Extract filename from "diff --git a/path b/path"
+            match = re.search(r'b/(.+)$', line)
+            if match:
+                current_file = match.group(1)
+                positions[current_file] = {}
+                position = 0
+        
+        # Hunk header: @@ -old_start,old_count +new_start,new_count @@
+        elif line.startswith('@@') and current_file:
+            position += 1
+            match = re.search(r'\+(\d+)', line)
+            if match:
+                current_new_line = int(match.group(1))
+        
+        # Content lines
+        elif current_file and (line.startswith('+') or line.startswith('-') or line.startswith(' ')):
+            position += 1
+            
+            # Track line numbers for added/context lines (not removed)
+            if not line.startswith('-'):
+                positions[current_file][current_new_line] = position
+                current_new_line += 1
+    
+    return positions
+
+
+def build_review_payload(review_data, diff_positions):
     """Build GitHub PR Review API payload from review JSON."""
     comments = []
     
@@ -27,6 +83,8 @@ def build_review_payload(review_data):
         emoji = SEVERITY_EMOJI.get(finding.get('severity', 'info'), '🔵')
         title = finding.get('title', 'Issue')
         description = finding.get('description', '')
+        file_path = finding.get('file', '')
+        target_line = finding.get('end_line', finding.get('start_line', 1))
         
         # Build comment body
         body_parts = [
@@ -50,20 +108,29 @@ def build_review_payload(review_data):
             "*Reviewed by Stitch 🧵*"
         ])
         
+        if not file_path:
+            continue
+        
         comment = {
-            'path': finding.get('file', ''),
-            'line': finding.get('end_line', finding.get('start_line', 1)),
+            'path': file_path,
             'body': '\n'.join(body_parts)
         }
         
-        # Add start_line for multi-line comments
-        start = finding.get('start_line')
-        end = finding.get('end_line')
-        if start and end and start != end:
-            comment['start_line'] = start
+        # Try to use position (like Cursor Bot) if we have diff info
+        if file_path in diff_positions and target_line in diff_positions[file_path]:
+            comment['position'] = diff_positions[file_path][target_line]
+            print(f"  📍 {file_path}:{target_line} -> position {comment['position']}")
+        else:
+            # Fallback to line-based comment
+            comment['line'] = target_line
+            # Add start_line for multi-line comments
+            start = finding.get('start_line')
+            end = finding.get('end_line')
+            if start and end and start != end:
+                comment['start_line'] = start
+            print(f"  📍 {file_path}:{target_line} (line-based fallback)")
         
-        if comment['path']:
-            comments.append(comment)
+        comments.append(comment)
     
     # Build summary body
     summary_parts = [
@@ -146,7 +213,13 @@ def main():
             with open('/tmp/review.json', 'r') as f:
                 review_data = json.load(f)
             
-            payload = build_review_payload(review_data)
+            # Fetch PR diff to calculate positions (like Cursor Bot)
+            print("📥 Fetching PR diff for position calculation...")
+            diff_text = fetch_pr_diff(repo_slug, pr_number)
+            diff_positions = parse_diff_positions(diff_text)
+            print(f"📊 Parsed diff for {len(diff_positions)} files")
+            
+            payload = build_review_payload(review_data, diff_positions)
             
             print(f"📊 Found {len(payload['comments'])} inline comments")
             print(f"📋 Verdict: {payload['event']}")
