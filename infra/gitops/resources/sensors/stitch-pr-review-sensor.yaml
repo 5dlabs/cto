@@ -158,10 +158,49 @@ spec:
                           echo "✅ GitHub App token generated successfully"
                           echo ""
 
+                          # Create check run (in_progress)
+                          echo "📊 Creating check run..."
+                          OWNER=$(echo "$REPO_SLUG" | cut -d'/' -f1)
+                          REPO=$(echo "$REPO_SLUG" | cut -d'/' -f2)
+                          START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+                          CHECK_RUN_RESPONSE=$(curl -s -X POST \
+                            -H "Authorization: Bearer ${GH_TOKEN}" \
+                            -H "Accept: application/vnd.github+json" \
+                            -H "X-GitHub-Api-Version: 2022-11-28" \
+                            "https://api.github.com/repos/${REPO_SLUG}/check-runs" \
+                            -d "{
+                              \"name\": \"Stitch PR Review\",
+                              \"head_sha\": \"${HEAD_SHA}\",
+                              \"status\": \"in_progress\",
+                              \"started_at\": \"${START_TIME}\",
+                              \"output\": {
+                                \"title\": \"Stitch is reviewing your PR\",
+                                \"summary\": \"AI-powered code review in progress...\"
+                              }
+                            }")
+
+                          CHECK_RUN_ID=$(echo "$CHECK_RUN_RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+                          if [ -z "$CHECK_RUN_ID" ]; then
+                            echo "⚠️ Failed to create check run (continuing anyway)"
+                            echo "Response: $CHECK_RUN_RESPONSE"
+                          else
+                            echo "✅ Check run created: $CHECK_RUN_ID"
+                          fi
+                          echo ""
+
                           # Load agent prompt
                           AGENT_PROMPT="/task-files/agents.md"
                           if [ ! -f "${AGENT_PROMPT}" ]; then
                               echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+                              # Update check run to failure if it exists
+                              if [ -n "$CHECK_RUN_ID" ]; then
+                                curl -s -X PATCH \
+                                  -H "Authorization: Bearer ${GH_TOKEN}" \
+                                  -H "Accept: application/vnd.github+json" \
+                                  "https://api.github.com/repos/${REPO_SLUG}/check-runs/${CHECK_RUN_ID}" \
+                                  -d '{"status":"completed","conclusion":"failure"}'
+                              fi
                               exit 1
                           fi
 
@@ -171,11 +210,47 @@ spec:
                           echo ""
 
                           # Run Factory with the review agent prompt
-                          exec droid exec \
+                          # Capture exit code to update check run
+                          set +e
+                          droid exec \
                               --auto high \
                               --model "${MODEL}" \
                               --output-format stream-json \
                               "$(cat ${AGENT_PROMPT})"
+                          DROID_EXIT=$?
+                          set -e
+
+                          # Update check run with result
+                          END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                          if [ -n "$CHECK_RUN_ID" ]; then
+                            if [ $DROID_EXIT -eq 0 ]; then
+                              CONCLUSION="success"
+                              TITLE="Stitch review complete"
+                              SUMMARY="PR review completed successfully."
+                            else
+                              CONCLUSION="failure"
+                              TITLE="Stitch review failed"
+                              SUMMARY="PR review encountered an error."
+                            fi
+
+                            curl -s -X PATCH \
+                              -H "Authorization: Bearer ${GH_TOKEN}" \
+                              -H "Accept: application/vnd.github+json" \
+                              -H "X-GitHub-Api-Version: 2022-11-28" \
+                              "https://api.github.com/repos/${REPO_SLUG}/check-runs/${CHECK_RUN_ID}" \
+                              -d "{
+                                \"status\": \"completed\",
+                                \"conclusion\": \"${CONCLUSION}\",
+                                \"completed_at\": \"${END_TIME}\",
+                                \"output\": {
+                                  \"title\": \"${TITLE}\",
+                                  \"summary\": \"${SUMMARY}\"
+                                }
+                              }"
+                            echo "✅ Check run updated: ${CONCLUSION}"
+                          fi
+
+                          exit $DROID_EXIT
                       env:
                         - name: PR_NUMBER
                           value: "{{workflow.parameters.pr-number}}"
