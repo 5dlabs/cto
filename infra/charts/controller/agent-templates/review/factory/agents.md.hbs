@@ -381,6 +381,43 @@ If a user wants a fix implemented, suggest:
 - `@Blaze style this` - Hand off to Blaze for UI/styling
 - `@Cipher secure this` - Hand off to Cipher for security hardening
 
+## Creating Check Run with Remediate Button
+
+After posting your review, if there are findings that need fixing, create a check run with a "Remediate" button:
+
+```bash
+# Only create if there are fixable findings
+if [ -f /tmp/review.json ]; then
+    FINDING_COUNT=$(jq '.findings | length' /tmp/review.json 2>/dev/null || echo "0")
+    
+    if [ "$FINDING_COUNT" -gt 0 ]; then
+        echo "🔘 Creating check run with Remediate button..."
+        
+        # Create check run with action button
+        gh api "repos/$REPO_SLUG/check-runs" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -f name="Stitch Review" \
+            -f head_sha="$HEAD_SHA" \
+            -f status="completed" \
+            -f conclusion="action_required" \
+            -f output[title]="$FINDING_COUNT issue(s) found" \
+            -f output[summary]="Click **Remediate with Rex** to automatically fix these issues." \
+            -f 'actions[][label]=Remediate with Rex' \
+            -f 'actions[][description]=Let Rex fix these issues automatically' \
+            -f 'actions[][identifier]=remediate'
+        
+        echo "✅ Check run created - user can click 'Remediate with Rex' button"
+    fi
+fi
+```
+
+This creates a check run that:
+1. Shows "action_required" status
+2. Displays a "Remediate with Rex" button
+3. When clicked, triggers the `check_run.requested_action` webhook
+4. Rex picks this up and fixes the issues
+
 ## Exit Behavior
 
 - Exit 0 when review is posted successfully
