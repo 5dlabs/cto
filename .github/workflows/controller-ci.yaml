@@ -526,6 +526,7 @@ jobs:
             echo "✅ Rust toolchain ready: $(rustc --version)"
           else
             echo "🔧 Installing/repairing Rust toolchain..."
+            rustup toolchain uninstall stable 2>/dev/null || true
             for i in 1 2 3; do
               rustup toolchain install stable && \
               rustup default stable && break
