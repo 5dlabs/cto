@@ -44,26 +44,45 @@ jobs:
             docker:
               - 'infra/images/tools/**'
 
-  # Rust linting (format + clippy pedantic)
+  # Rust linting (format + clippy pedantic) - uses k8s-runner for speed
   lint-rust:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     outputs:
       format-needed: ${{ steps.format-check.outputs.format-needed }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
-        with:
-          workspaces: ". -> target"
-          shared-key: "rust-cache-tools-ci"
+
+      - name: Setup optimized Rust environment
+        run: |
+          echo "🚀 Setting up optimized Rust build environment..."
+          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          # Set up Rust toolchain
+          rustup default stable
+          rustup component add rustfmt clippy
+
+          # Verify tools
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
+          echo "📊 sccache stats:"
+          sccache --show-stats
 
       - name: Check formatting
         id: format-check
+        env:
+          RUSTC_WRAPPER: "sccache"
         run: |
           echo "🔧 Checking cargo fmt..."
           if ! cargo fmt -p tools -- --check; then
@@ -75,56 +94,99 @@ jobs:
           fi
 
       - name: Run Clippy (pedantic)
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
         run: |
           echo "🔍 Running clippy with pedantic warnings..."
           cargo clippy -p tools --all-targets -- -D warnings -W clippy::pedantic
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
 
-  # Run tests
+  # Run tests - uses k8s-runner for speed
   test-rust:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
-        with:
-          workspaces: ". -> target"
-          shared-key: "rust-cache-tools-ci"
 
-      - name: Run unit tests
+      - name: Setup optimized Rust environment
         run: |
-          echo "🧪 Running tools unit tests..."
-          cargo test -p tools --lib
+          echo "🚀 Setting up optimized Rust build environment..."
+          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          rustup default stable
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
 
       - name: Run all tests
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
         run: |
           echo "🧪 Running all tools tests..."
           cargo test -p tools --all-targets
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
 
-  # Build check (ensure it compiles for release)
+  # Build check (ensure it compiles for release) - uses k8s-runner for speed
   build-check:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
-        with:
-          workspaces: ". -> target"
-          shared-key: "rust-cache-tools-ci"
+
+      - name: Setup optimized Rust environment
+        run: |
+          echo "🚀 Setting up optimized Rust build environment..."
+          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          rustup default stable
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found"
+          mold --version || echo "⚠️ mold not found"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
+          echo "📊 Initial sccache stats:"
+          sccache --show-stats
 
       - name: Build release binaries
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
+          SCCACHE_IDLE_TIMEOUT: "0"
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
         run: |
           echo "🔨 Building tools-server and tools-client..."
           cargo build -p tools --release --bin tools-server
           cargo build -p tools --release --bin tools-client
           echo "✅ Release build successful"
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
 
   # Helm chart validation
   helm-lint:
@@ -201,20 +263,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
+      - name: Setup optimized Rust environment
+        run: |
+          echo "🚀 Setting up optimized Rust build environment..."
+          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          rustup default stable
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
 
       - name: Build release binary
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
         run: |
           echo "🔨 Building tools-server for linux/amd64..."
           cargo build -p tools --release --bin tools-server
-          
+
           # Copy binary to Docker context (matches release workflow pattern)
           cp target/release/tools-server infra/images/tools/tools-server-linux
           chmod +x infra/images/tools/tools-server-linux
           echo "✅ Binary copied to Docker context"
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
 
       - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
@@ -254,4 +338,3 @@ jobs:
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}\`" >> $GITHUB_STEP_SUMMARY
-
