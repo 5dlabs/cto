@@ -1716,15 +1716,8 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| "pull_request".to_string());
 
-        // Extract repo slug from repository URL
-        let repo_slug = code_run
-            .spec
-            .repository_url
-            .strip_prefix("https://github.com/")
-            .and_then(|s| s.strip_suffix(".git"))
-            .or_else(|| code_run.spec.repository_url.strip_prefix("https://github.com/"))
-            .unwrap_or(&code_run.spec.repository_url)
-            .to_string();
+        // Extract repo slug from repository URL (shared helper)
+        let repo_slug = Self::extract_repo_slug(&code_run.spec.repository_url);
 
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Stitch"),
@@ -1813,15 +1806,8 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_default();
 
-        // Extract repo slug from repository URL
-        let repo_slug = code_run
-            .spec
-            .repository_url
-            .strip_prefix("https://github.com/")
-            .and_then(|s| s.strip_suffix(".git"))
-            .or_else(|| code_run.spec.repository_url.strip_prefix("https://github.com/"))
-            .unwrap_or(&code_run.spec.repository_url)
-            .to_string();
+        // Extract repo slug from repository URL (shared helper)
+        let repo_slug = Self::extract_repo_slug(&code_run.spec.repository_url);
 
         // Extract review comment ID if triggered by review comment
         let review_comment_id = code_run
@@ -3371,6 +3357,21 @@ impl CodeTemplateGenerator {
                 "Failed to load code template {relative_path} (key: {configmap_key}): {e}"
             ))
         })
+    }
+
+    /// Extract repo slug (owner/repo) from a GitHub repository URL
+    ///
+    /// Handles various formats:
+    /// - `https://github.com/owner/repo.git` -> `owner/repo`
+    /// - `https://github.com/owner/repo` -> `owner/repo`
+    /// - Falls back to the original URL if no prefix match
+    fn extract_repo_slug(repository_url: &str) -> String {
+        repository_url
+            .strip_prefix("https://github.com/")
+            .and_then(|s| s.strip_suffix(".git"))
+            .or_else(|| repository_url.strip_prefix("https://github.com/"))
+            .unwrap_or(repository_url)
+            .to_string()
     }
 
     /// Register shared agent system prompt partials

@@ -34,16 +34,20 @@ This prevents duplicate review comments when PRs are synchronized (new commits p
 ### Step 0: Check for Existing Reviews (MANDATORY)
 ```bash
 # Check if Stitch has already reviewed this commit
+# Handle API errors gracefully to avoid silent failures
 EXISTING_REVIEWS=$(gh api "repos/$REPO_SLUG/pulls/$PR_NUMBER/reviews" \
-  --jq "[.[] | select(.user.login | test(\"stitch\"; \"i\")) | select(.commit_id == \"$HEAD_SHA\")] | length")
+  --jq "[.[] | select(.user.login | test(\"stitch\"; \"i\")) | select(.commit_id == \"$HEAD_SHA\")] | length" 2>/dev/null) || EXISTING_REVIEWS="error"
 
-if [ "$EXISTING_REVIEWS" -gt 0 ]; then
+if [ "$EXISTING_REVIEWS" = "error" ]; then
+    echo "⚠️ Failed to check for existing reviews (API error or rate limit)"
+    echo "   Proceeding with review - will rely on post-review dedup if needed"
+elif [ "$EXISTING_REVIEWS" -gt 0 ]; then
     echo "✅ Already reviewed commit $HEAD_SHA - skipping duplicate review"
     echo "📝 Found $EXISTING_REVIEWS existing Stitch review(s) for this commit"
     exit 0
+else
+    echo "🔍 No existing review found for commit $HEAD_SHA - proceeding with review"
 fi
-
-echo "🔍 No existing review found for commit $HEAD_SHA - proceeding with review"
 ```
 
 **If a review already exists for this exact commit SHA, EXIT IMMEDIATELY with code 0.**

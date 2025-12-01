@@ -66,30 +66,28 @@ impl ResourceNaming {
         // Check run type for review/remediate tasks
         let run_type = code_run.spec.run_type.as_str();
 
-        // Handle review tasks (Stitch PR Review)
+        // Handle review tasks (Stitch PR Review) and remediate tasks (Rex PR Remediation)
+        // Both use the same naming pattern: {prefix}pr{pr}-{agent}-{model}-{uid}-v{version}
         if run_type == "review" {
-            let prefix = REVIEW_JOB_PREFIX;
-            let base_name = if let Some(pr) = &pr_number {
-                format!("pr{pr}-{agent}-{model_short}-{uid_suffix}-v{context_version}")
-            } else {
-                format!("{agent}-{model_short}-{uid_suffix}-v{context_version}")
-            };
-            let available = MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len());
-            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
-            return format!("{prefix}{trimmed}");
+            return Self::generate_pr_task_job_name(
+                REVIEW_JOB_PREFIX,
+                pr_number.as_ref(),
+                &agent,
+                &model_short,
+                uid_suffix,
+                context_version,
+            );
         }
 
-        // Handle remediate tasks (Rex PR Remediation)
         if run_type == "remediate" {
-            let prefix = REMEDIATE_JOB_PREFIX;
-            let base_name = if let Some(pr) = &pr_number {
-                format!("pr{pr}-{agent}-{model_short}-{uid_suffix}-v{context_version}")
-            } else {
-                format!("{agent}-{model_short}-{uid_suffix}-v{context_version}")
-            };
-            let available = MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len());
-            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
-            return format!("{prefix}{trimmed}");
+            return Self::generate_pr_task_job_name(
+                REMEDIATE_JOB_PREFIX,
+                pr_number.as_ref(),
+                &agent,
+                &model_short,
+                uid_suffix,
+                context_version,
+            );
         }
 
         // Check if this is a watch CodeRun (monitor or remediation from heal)
@@ -140,6 +138,28 @@ impl ResourceNaming {
         let trimmed = Self::ensure_k8s_name_length(&base_name, available);
 
         format!("{CODERUN_JOB_PREFIX}{trimmed}")
+    }
+
+    /// Generate job name for PR-related tasks (review, remediate)
+    ///
+    /// Format: `{prefix}pr{pr}-{agent}-{model}-{uid}-v{version}`
+    /// or without PR: `{prefix}{agent}-{model}-{uid}-v{version}`
+    fn generate_pr_task_job_name(
+        prefix: &str,
+        pr_number: Option<&String>,
+        agent: &str,
+        model_short: &str,
+        uid_suffix: &str,
+        context_version: u32,
+    ) -> String {
+        let base_name = if let Some(pr) = pr_number {
+            format!("pr{pr}-{agent}-{model_short}-{uid_suffix}-v{context_version}")
+        } else {
+            format!("{agent}-{model_short}-{uid_suffix}-v{context_version}")
+        };
+        let available = MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len());
+        let trimmed = Self::ensure_k8s_name_length(&base_name, available);
+        format!("{prefix}{trimmed}")
     }
 
     /// Shorten model name for pod naming (e.g., "claude-opus-4-5-20251101" -> "opus45")

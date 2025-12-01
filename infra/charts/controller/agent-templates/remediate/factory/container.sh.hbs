@@ -29,6 +29,13 @@ export REPO_SLUG="{{repo_slug}}"
 
 echo "📦 Repository: $REPO_SLUG"
 
+# Pre-flight: Check for required tools
+# jq is critical for parsing CI alerts and review findings
+if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ Warning: jq not found - CI alert parsing will be limited"
+    echo "   Remediation will proceed but may miss exact file:line context"
+fi
+
 # Always fetch CI alerts for remediation context
 echo ""
 echo "📊 Fetching CI alerts for remediation context..."
@@ -103,6 +110,12 @@ export REVIEW_COMMENT_ID="{{review_comment_id}}"
 AGENT_PROMPT="/task-files/agents.md"
 if [ ! -f "${AGENT_PROMPT}" ]; then
     echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+    echo ""
+    echo "This usually means the agent-templates ConfigMap is not properly mounted."
+    echo "Please verify:"
+    echo "  1. The cto-controller-agent-templates-factory ConfigMap exists"
+    echo "  2. The ConfigMap contains remediate_factory_agents.md.hbs"
+    echo "  3. The volume mount is configured correctly in the CodeRun spec"
     exit 1
 fi
 

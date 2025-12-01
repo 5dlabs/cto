@@ -40,8 +40,7 @@ gh pr diff $PR_NUMBER --repo "$REPO_SLUG"
 
 ### Step 2: Check Out the PR Branch
 ```bash
-# Clone and checkout the PR branch
-git clone "$REPOSITORY_URL" /workspace/repo
+# Repository is already cloned to /workspace/repo by CodeRun
 cd /workspace/repo
 gh pr checkout $PR_NUMBER
 ```

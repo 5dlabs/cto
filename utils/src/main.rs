@@ -8,7 +8,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use utils::{AnnotationLevel, PrAlerts, PrComment};
+use utils::{AnnotationLevel, PrAlerts, PrComment, PrReviews};
 
 #[derive(Parser)]
 #[command(name = "utils")]
@@ -73,6 +73,25 @@ enum Commands {
         #[arg(short, long)]
         dry_run: bool,
     },
+
+    /// Fetch PR review comments from Bugbot and Stitch
+    Reviews {
+        /// Repository in owner/repo format
+        #[arg(short, long)]
+        repo: String,
+
+        /// Pull request number
+        #[arg(short, long)]
+        pr: u32,
+
+        /// Filter by author: bugbot, stitch, or username
+        #[arg(short, long)]
+        author: Option<String>,
+
+        /// Only show inline comments (with file:line)
+        #[arg(short, long)]
+        inline: bool,
+    },
 }
 
 #[tokio::main]
@@ -107,6 +126,14 @@ async fn main() -> Result<()> {
             dry_run,
         } => {
             run_post_alerts(&repo, pr, warnings, dry_run).await?;
+        }
+        Commands::Reviews {
+            repo,
+            pr,
+            author,
+            inline,
+        } => {
+            run_reviews(&repo, pr, author, inline, cli.format).await?;
         }
     }
 
@@ -218,6 +245,88 @@ async fn run_alerts(
                     if !ann.title.is_empty() {
                         println!("  Title: {}", ann.title);
                     }
+                    println!();
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_reviews(
+    repo: &str,
+    pr: u32,
+    author: Option<String>,
+    inline_only: bool,
+    format: OutputFormat,
+) -> Result<()> {
+    let (owner, repo_name) = utils::alerts::parse_repo(repo)?;
+    let client = PrReviews::new(owner, repo_name);
+
+    let comments = match author.as_deref() {
+        Some("bugbot") | Some("bug-bot") | Some("cursor") => client.fetch_bugbot(pr).await?,
+        Some("stitch") => client.fetch_stitch(pr).await?,
+        Some(author_name) => client.fetch_by_author(pr, author_name).await?,
+        None => client.fetch(pr).await?, // Default: Bugbot + Stitch
+    };
+
+    // Filter to inline only if requested
+    let comments: Vec<_> = if inline_only {
+        comments
+            .into_iter()
+            .filter(|c| c.line.is_some() && !c.path.is_empty())
+            .collect()
+    } else {
+        comments
+    };
+
+    match format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&comments)?);
+        }
+        OutputFormat::Text => {
+            if comments.is_empty() {
+                println!("No review comments found for PR #{pr}");
+            } else {
+                println!(
+                    "Review comments for PR #{pr} ({} total):\n",
+                    comments.len()
+                );
+                for comment in comments {
+                    // Header with author and location
+                    let location = if !comment.path.is_empty() && comment.line.is_some() {
+                        format!("{}:{}", comment.path, comment.line.unwrap())
+                    } else if !comment.path.is_empty() {
+                        comment.path.clone()
+                    } else {
+                        "general comment".to_string()
+                    };
+
+                    let source = if comment.is_bugbot {
+                        "🤖 Bugbot"
+                    } else if comment.is_stitch {
+                        "🧵 Stitch"
+                    } else {
+                        "👤"
+                    };
+
+                    println!("[{source}] @{} at {location}", comment.author);
+
+                    // Truncate body for display
+                    let body_preview: String = comment
+                        .body
+                        .lines()
+                        .take(3)
+                        .collect::<Vec<_>>()
+                        .join("\n  ");
+                    println!("  {body_preview}");
+
+                    // Show suggestion if present
+                    if let Some(suggestion) = &comment.suggestion {
+                        println!("  💡 Suggestion: {}", suggestion.lines().next().unwrap_or(""));
+                    }
+
                     println!();
                 }
             }

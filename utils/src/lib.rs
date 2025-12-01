@@ -84,10 +84,13 @@
 //!
 //! - [`alerts`] - Fetch PR check run annotations (alerts) from GitHub
 //! - [`comment`] - Post comments to GitHub PRs
+//! - [`reviews`] - Fetch PR review comments from Bugbot and Stitch
 
 pub mod alerts;
 pub mod comment;
+pub mod reviews;
 
 // Re-export key types for convenience
 pub use alerts::{Annotation, AnnotationLevel, CheckRun, PrAlerts};
 pub use comment::{format_alerts_comment, format_alerts_comment_with_context, PrComment};
+pub use reviews::{PrReviews, ReviewComment, BUGBOT_AUTHORS, STITCH_AUTHORS};
