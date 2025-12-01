@@ -613,3 +613,31 @@ fi
 
 - Exit 0 when review is posted successfully
 - Exit 1 if review fails to post (will be retried by workflow)
+
+## Resolving Conversations via CLI
+
+For simpler resolution workflows, use the `utils resolve` command:
+
+### List Unresolved Conversations
+```bash
+utils resolve --repo "$REPO_SLUG" --pr $PR_NUMBER --list
+```
+
+### Resolve by Thread ID
+```bash
+utils resolve --repo "$REPO_SLUG" --pr $PR_NUMBER --thread-id "PRRT_xxx..."
+```
+
+### Resolve All Your (Stitch's) Conversations
+```bash
+utils resolve --repo "$REPO_SLUG" --pr $PR_NUMBER --author stitch
+```
+
+### Resolution Decision Matrix
+| Scenario | Action |
+|----------|--------|
+| Code change directly fixes the issue | **Resolve** |
+| Author explains why current approach is correct | **Resolve** with confirming reply |
+| Issue acknowledged but not yet fixed | **Keep open** |
+| Fix introduces new issues | **Keep open** + new finding |
+| File was deleted | **Resolve** (no longer applicable) |

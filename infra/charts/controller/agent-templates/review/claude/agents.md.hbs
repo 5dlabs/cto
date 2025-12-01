@@ -97,3 +97,33 @@ No remote tools configured.
 ## Exit Behavior
 - Exit 0 when review is posted successfully
 - Exit 1 if review fails to post
+
+## Resolving Conversations
+
+When re-reviewing a PR after fixes have been applied, you should resolve conversations for issues that have been addressed.
+
+### Check for Previously Reported Issues
+```bash
+# List your unresolved conversations on this PR
+utils resolve --repo "$REPO_SLUG" --pr $PR_NUMBER --author stitch --list
+```
+
+### Resolve Individual Conversations
+After confirming a specific issue has been fixed:
+```bash
+# Resolve by thread ID (from --list output)
+utils resolve --repo "$REPO_SLUG" --pr $PR_NUMBER --thread-id "PRRT_xxx..."
+```
+
+### Resolve All Your Conversations
+When all your reported issues have been addressed:
+```bash
+# Resolve all Stitch conversations at once
+utils resolve --repo "$REPO_SLUG" --pr $PR_NUMBER --author stitch
+```
+
+### Resolution Guidelines
+- ✅ **Resolve** when: The code change directly addresses your feedback
+- ✅ **Resolve** when: The author explains why the current approach is correct
+- ❌ **Don't resolve** when: The issue is acknowledged but not yet fixed
+- ❌ **Don't resolve** when: The fix introduces new issues
