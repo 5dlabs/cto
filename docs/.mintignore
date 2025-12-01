@@ -1,0 +1,40 @@
+# Ignore files with MDX parsing issues
+CTO_PLATFORM_ENHANCEMENTS_OVERVIEW.md
+OPENMEMORY_INTEGRATION_STATUS.md
+agent-tool-verification.md
+adding-context7-to-agent-prompts.md
+docs-job-investigation.md
+CLUSTER_STATE_SNAPSHOT.md
+
+# Engineering docs with parsing issues
+engineering/CLI_AGNOSTIC_PLATFORM_PLAN.md
+engineering/ATLAS_POD_PROLIFERATION_FIX.md
+engineering/MORGAN_PM_IMPLEMENTATION_COMPLETE.md
+engineering/cipher-agent-implementation.md
+engineering/e2e-test-snapshot-*.md
+engineering/e2e-watch-agent-prompts.md
+engineering/github-projects-integration-design.md
+engineering/ATLAS_ADDITIONAL_ISSUES.md
+engineering/COMPREHENSIVE_FIX_SUMMARY.md
+engineering/MORGAN_AND_AGENT_FIXES_FINAL.md
+engineering/MORGAN_FIX_SUMMARY.md
+engineering/MORGAN_PM_FEATURE_COMPLETE.md
+engineering/PLAY_WORKFLOW_READINESS_ANALYSIS.md
+engineering/PR_PROJECT_LINKING_FIX.md
+engineering/RESOURCE_OPTIMIZATION_SUMMARY.md
+engineering/WORKFLOW_TESS_BOLT_FIXES.md
+engineering/session-summary-*.md
+
+# Platform packaging with issues
+platform-packaging/corporate-structure.md
+
+# Prompts with issues
+prompts/play-remediation-loop.md
+
+# Architecture with issues
+architecture/e2e-watch-system.md
+
+# Other generated/snapshot files
+END_TO_END_TEST_RESULTS.md
+
+
