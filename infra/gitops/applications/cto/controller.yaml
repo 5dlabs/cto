@@ -55,13 +55,13 @@ spec:
       parameters:
         - name: image.repository
           value: ghcr.io/5dlabs/controller
-        # Initial version - ArgoCD Image Updater will override this
-        # with the latest semver tag (e.g., v0.2.1)
+        # Use 'latest' until v0.10.0 is released
+        # ArgoCD Image Updater will override with semver tags (e.g., v0.10.1)
         - name: image.tag
-          value: v0.2.0
-        # IfNotPresent is safe now since we use immutable semver tags
+          value: latest
+        # Always pull when using 'latest' tag
         - name: image.pullPolicy
-          value: IfNotPresent
+          value: Always
 
         # Skip CRDs - managed by existing Helm release
 
