@@ -31,6 +31,8 @@ spec:
       eventSourceName: github
       eventName: org
       filters:
+        # Logical operator for combining filters (default is AND)
+        exprLogicalOperator: "and"
         data:
           - path: body.X-GitHub-Event
             type: string
@@ -42,6 +44,37 @@ spec:
               - opened
               - synchronize
               - reopened
+        # Expression filters to exclude automated PRs
+        exprs:
+          # Exclude bot users (github-actions, dependabot, renovate, etc.)
+          - expr: >-
+              !(
+                body.pull_request.user.login contains "[bot]" ||
+                body.pull_request.user.login == "github-actions" ||
+                body.pull_request.user.login == "dependabot" ||
+                body.pull_request.user.login == "renovate"
+              )
+            fields:
+              - name: body.pull_request.user.login
+                path: body.pull_request.user.login
+          # Exclude release-please branches
+          - expr: >-
+              !(body.pull_request.head.ref contains "release-please")
+            fields:
+              - name: body.pull_request.head.ref
+                path: body.pull_request.head.ref
+          # Exclude auto-release/dependency PR titles
+          - expr: >-
+              !(
+                body.pull_request.title startsWith "chore: release" ||
+                body.pull_request.title startsWith "chore(deps)" ||
+                body.pull_request.title startsWith "chore(release)" ||
+                body.pull_request.title contains "[skip review]" ||
+                body.pull_request.title contains "[no review]"
+              )
+            fields:
+              - name: body.pull_request.title
+                path: body.pull_request.title
   triggers:
     - template:
         name: stitch-review-coderun
