@@ -179,9 +179,8 @@ jobs:
             rustup toolchain uninstall stable 2>/dev/null || true
             for i in 1 2 3; do
               rustup toolchain install stable && \
+              rustup toolchain install stable && \
               rustup default stable && break
-              echo "⚠️ Rustup failed, retrying ($i/3)..."
-              sleep 5
               rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
             done
           fi
