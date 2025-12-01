@@ -4582,10 +4582,7 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         }
     });
 
-    println!(
-        "{}",
-        "Watching for pod and CodeRun events...".green()
-    );
+    println!("{}", "Watching for pod and CodeRun events...".green());
 
     // Process events from both watches
     while let Some(event) = rx.recv().await {
@@ -4765,10 +4762,7 @@ fn parse_coderun_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Co
             .as_str()
             .unwrap_or("Unknown")
             .to_string(),
-        agent: json["spec"]["githubApp"]
-            .as_str()
-            .unwrap_or("")
-            .to_string(),
+        agent: json["spec"]["githubApp"].as_str().unwrap_or("").to_string(),
         task_id: json["spec"]["taskId"]
             .as_str()
             .map(String::from)
@@ -4794,7 +4788,11 @@ async fn handle_coderun_alert(
     handle_alert(
         &alert_id,
         &coderun.name,
-        if task_id.is_empty() { "unknown" } else { task_id },
+        if task_id.is_empty() {
+            "unknown"
+        } else {
+            task_id
+        },
         if agent.is_empty() { "unknown" } else { agent },
         namespace,
         &coderun.phase,

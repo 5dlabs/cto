@@ -112,5 +112,4 @@ impl CodeRunTracker {
     pub fn remove(&mut self, name: &str) {
         self.first_seen.remove(name);
     }
-
 }
