@@ -189,20 +189,42 @@ kubectl get pods -n cto -l app=cto-controller
 kubectl logs -n cto -l app=cto-controller --tail=50
 ```
 
-**MCP Tool Validation (if available):**
+**MCP Tools Available:**
 
-1. **ArgoCD Status**: Check if the application is synced and healthy
-   - Use `argocd_get_application` to verify sync status
-   - Look for `status.sync.status = Synced` and `status.health.status = Healthy`
+1. **ArgoCD** (`argocd_*`): GitOps deployment validation
+   - `argocd_get_application` - Check sync status and health
+   - `argocd_sync_application` - Trigger manual sync if needed
+   - `argocd_get_application_events` - View deployment events
 
-2. **Kubernetes Validation**: Check pod status directly
-   - Use `kubernetes_pods_list` to get pods in namespace
-   - Use `kubernetes_pods_log` to check for errors
-   - Verify restart count is 0 or stable
+2. **Kubernetes** (`kubernetes_*`): Cluster management
+   - `kubernetes_pods_list` - Get pods in namespace
+   - `kubernetes_pods_log` - Check for errors in logs
+   - `kubernetes_events_list` - View cluster events
+   - `kubernetes_resources_get` - Get any K8s resource
 
-3. **Event Check**: Look for recent errors
-   - Use `kubernetes_events_list` to see recent cluster events
-   - Filter for Warning events related to your pod
+3. **GitHub** (`github_*`): Repository and PR management
+   - `github_create_pull_request` - Create PR
+   - `github_get_pull_request_status` - Check CI status
+   - `github_merge_pull_request` - Merge when ready
+   - `github_create_issue`, `github_update_issue` - Issue tracking
+
+4. **CTO** (`cto_*`): Platform workflow control
+   - `cto_jobs` - List running/recent jobs
+   - `cto_stop_job` - Stop a stuck job
+   - `cto_play_status` - Check workflow status
+
+5. **Grafana** (`grafana_*`): Monitoring and observability
+   - `grafana_query_loki_logs` - Search application logs
+   - `grafana_list_incidents` - View active incidents
+   - `grafana_get_alert_rule_by_uid` - Check alert status
+
+6. **Context7** (`context7_*`): Documentation lookup
+   - `context7_resolve_library_id` - Find library docs
+   - `context7_get_library_docs` - Get API references
+
+7. **Firecrawl** (`firecrawl_*`): Web research
+   - `firecrawl_search` - Search the web for solutions
+   - `firecrawl_scrape` - Read documentation pages
 
 ### Phase 8: Cleanup
 ```bash
