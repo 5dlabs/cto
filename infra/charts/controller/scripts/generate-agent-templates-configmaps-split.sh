@@ -13,7 +13,7 @@ cd "$CHART_DIR"
 echo "Generating split ConfigMaps from agent templates..."
 
 # Define CLI types and shared resources
-CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration" "watch")
+CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration" "watch" "review")
 SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/" "shared/")
 
 generate_configmap() {
@@ -54,15 +54,20 @@ HEADER_EOF
     # CLI-specific: collect files under that CLI directory PLUS shared agent partials
     # Handle split claude ConfigMaps (claude-code and claude-docs)
     if [ "$filter" = "claude-code" ]; then
-      files_list=$(find "agent-templates/code/claude" "agent-templates/review/claude" "agent-templates/remediate/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
+      # Note: review/claude and remediate/claude are in the separate "review" ConfigMap to stay under 1MB
+      files_list=$(find "agent-templates/code/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     elif [ "$filter" = "claude-docs" ]; then
       files_list=$(find "agent-templates/docs/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     elif [ "$filter" = "watch" ]; then
       # Watch templates: include all watch/ subdirectories (factory, claude) and shared acceptance criteria
       files_list=$(find "agent-templates/watch" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
+    elif [ "$filter" = "review" ]; then
+      # Review ConfigMap: all review/* and remediate/* templates for all CLIs (claude, factory, etc.)
+      files_list=$(find "agent-templates/review" "agent-templates/remediate" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     else
-      # CLI-specific: collect files under code/, docs/, heal/, review/, remediate/ directories for this CLI
-      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/heal/${filter}" "agent-templates/review/${filter}" "agent-templates/remediate/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
+      # CLI-specific: collect files under code/, docs/, heal/ directories for this CLI
+      # Note: review/ and remediate/ are handled by the separate "review" ConfigMap
+      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/heal/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     fi
     
     # Also include shared agent partials so templates can resolve {{> agents/...}} references
