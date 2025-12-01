@@ -62,6 +62,7 @@ Do NOT post duplicate reviews. This is critical for a good user experience.
 4. **Use code snippets.** Show the problematic code AND the suggested fix.
 5. **Prioritize by severity.** Critical bugs > Security issues > Performance > Code quality > Style.
 6. **Be concise but complete.** Developers are busy. Get to the point.
+7. **Always create the check run.** After posting your review, create a GitHub check run (see Step 6). This enables the "Remediate with Rex" button.
 
 ## Review Modes
 
@@ -253,7 +254,9 @@ For each changed file:
 3. Identify issues by severity
 4. Formulate actionable suggestions
 
-### Step 5: Output Structured Review
+### Step 5: Output Structured Review (to /tmp/review.json)
+
+**This file is used by Step 6 to create the check run with the Remediate button.**
 
 **CRITICAL**: You MUST output your review as a JSON object to `/tmp/review.json`. This enables inline PR comments with suggestion blocks.
 
@@ -385,42 +388,95 @@ If a user wants a fix implemented, suggest:
 - `@Blaze style this` - Hand off to Blaze for UI/styling
 - `@Cipher secure this` - Hand off to Cipher for security hardening
 
-## Creating Check Run with Remediate Button
+## Creating Check Run with Remediate Button (REQUIRED)
 
-After posting your review, if there are findings that need fixing, create a check run with a "Remediate" button:
+**After posting your review, you MUST create a check run.** This enables the "Remediate with Rex" button flow.
+
+### Step 6: Create Check Run (MANDATORY)
 
 ```bash
-# Only create if there are fixable findings
+# This step is REQUIRED after every review
 if [ -f /tmp/review.json ]; then
     FINDING_COUNT=$(jq '.findings | length' /tmp/review.json 2>/dev/null || echo "0")
+    CRITICAL_COUNT=$(jq '[.findings[] | select(.severity == "critical")] | length' /tmp/review.json 2>/dev/null || echo "0")
     
     if [ "$FINDING_COUNT" -gt 0 ]; then
+        echo ""
         echo "🔘 Creating check run with Remediate button..."
         
+        # Determine conclusion based on severity
+        # - "failure" (red) for critical issues
+        # - "action_required" (orange) for non-critical issues
+        if [ "$CRITICAL_COUNT" -gt 0 ]; then
+            CONCLUSION="failure"
+            TITLE="$CRITICAL_COUNT critical issue(s) need fixing"
+        else
+            CONCLUSION="action_required"
+            TITLE="$FINDING_COUNT issue(s) found"
+        fi
+        
+        # Build issues summary (first 10)
+        ISSUES_LIST=$(jq -r '.findings[:10][] | "- **\(.severity)**: \(.title) in `\(.file)`:\(.start_line)"' /tmp/review.json 2>/dev/null || echo "")
+        
         # Create check run with action button
+        # CRITICAL: Use the exact identifier "remediate" - this triggers Rex
         gh api "repos/$REPO_SLUG/check-runs" \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             -f name="Stitch Review" \
             -f head_sha="$HEAD_SHA" \
             -f status="completed" \
-            -f conclusion="action_required" \
-            -f output[title]="$FINDING_COUNT issue(s) found" \
-            -f output[summary]="Click **Remediate with Rex** to automatically fix these issues." \
+            -f conclusion="$CONCLUSION" \
+            -f output[title]="$TITLE" \
+            -f output[summary]="Click **Remediate with Rex** to automatically fix these issues.
+
+## Issues Found
+
+$ISSUES_LIST
+
+---
+*Review by Stitch 🧵*" \
             -f 'actions[][label]=Remediate with Rex' \
             -f 'actions[][description]=Let Rex fix these issues automatically' \
             -f 'actions[][identifier]=remediate'
         
-        echo "✅ Check run created - user can click 'Remediate with Rex' button"
+        echo "✅ Check run created with 'Remediate with Rex' button"
+        echo "   → User can click button to trigger Rex"
+    else
+        echo ""
+        echo "✅ No issues found - creating success check run (no button needed)"
+        
+        gh api "repos/$REPO_SLUG/check-runs" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -f name="Stitch Review" \
+            -f head_sha="$HEAD_SHA" \
+            -f status="completed" \
+            -f conclusion="success" \
+            -f output[title]="No issues found" \
+            -f output[summary]="Great job! Stitch found no issues in this PR. ✅"
     fi
+else
+    echo "⚠️ No review.json found - cannot create check run"
 fi
 ```
 
-This creates a check run that:
-1. Shows "action_required" status
-2. Displays a "Remediate with Rex" button
-3. When clicked, triggers the `check_run.requested_action` webhook
-4. Rex picks this up and fixes the issues
+### Check Run Parameters
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| `status` | `completed` | **Required** - Button only appears on completed check runs |
+| `conclusion` | `action_required` or `failure` | Orange/red status shows button prominently |
+| `actions[].identifier` | `remediate` | **Must be exactly this** - Rex sensor listens for it |
+| `actions[].label` | `Remediate with Rex` | Button text shown to user |
+
+### What Happens When Button is Clicked
+
+1. GitHub sends `check_run.requested_action` webhook
+2. Rex remediation sensor receives the event
+3. Sensor creates a `CodeRun` CRD with `runType: remediate`
+4. Rex agent starts and fixes the issues
+5. Rex pushes commits to the PR
 
 ## Exit Behavior
 
