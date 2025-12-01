@@ -1,5 +1,5 @@
 ---
-name: Continuous Integration
+name: Controller CI
 
 on:
   push:
@@ -573,10 +573,14 @@ jobs:
           SCCACHE_IDLE_TIMEOUT: "0"
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-          CARGO_TARGET_DIR: "$HOME/cache/target"
         run: |
           echo "🏗️ Building controller binary..."
-          mkdir -p $HOME/cache/target
+          
+          # Set CARGO_TARGET_DIR in shell where $HOME expands properly
+          export CARGO_TARGET_DIR="$HOME/cache/target"
+          mkdir -p "$CARGO_TARGET_DIR"
+          
+          echo "📁 Target directory: $CARGO_TARGET_DIR"
           
           cargo build --release --bin agent-controller
           
@@ -585,7 +589,8 @@ jobs:
           sccache --show-stats
           
           # Copy binary for Docker build
-          cp $HOME/cache/target/release/agent-controller agent-controller
+          echo "📦 Copying binary from $CARGO_TARGET_DIR/release/"
+          cp "$CARGO_TARGET_DIR/release/agent-controller" agent-controller
           ls -lh agent-controller
 
       - name: Set up Docker Buildx
