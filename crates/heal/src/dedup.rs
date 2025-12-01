@@ -22,10 +22,7 @@ pub fn check_existing_remediation(
     namespace: &str,
 ) -> Result<Option<String>> {
     // Query for CodeRuns with matching labels that are still active
-    let label_selector = format!(
-        "alert-type={},target-pod={},remediation=true",
-        alert_type, pod_name
-    );
+    let label_selector = format!("alert-type={alert_type},target-pod={pod_name},remediation=true");
 
     let output = Command::new("kubectl")
         .args([
@@ -110,7 +107,7 @@ pub fn check_existing_github_issue(
             "--state",
             "open",
             "--label",
-            &format!("heal,{}", alert_type),
+            &format!("heal,{alert_type}"),
             "--search",
             &search_query,
             "--json",
