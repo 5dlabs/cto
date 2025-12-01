@@ -66,6 +66,10 @@ spec:
                     - name: repo-url
                     - name: head-sha
                     - name: repo-slug
+                    - name: base-branch
+                    - name: head-branch
+                    - name: pr-title
+                    - name: pr-author
                     - name: trigger
                       value: pull_request
                 ttlStrategy:
@@ -79,8 +83,12 @@ spec:
                       items:
                         - key: review_factory_agents.md.hbs
                           path: agents.md
-                        - key: review_factory_container.sh.hbs
-                          path: container.sh
+                  - name: github-app-key
+                    secret:
+                      secretName: github-app-5dlabs-stitch
+                      items:
+                        - key: private-key
+                          path: private-key.pem
                 templates:
                   - name: review
                     container:
@@ -89,14 +97,38 @@ spec:
                       args:
                         - "-c"
                         - |
-                          echo "🔍 Stitch PR Review"
-                          echo "PR: #{{workflow.parameters.pr-number}}"
-                          echo "Repo: {{workflow.parameters.repo-slug}}"
-                          echo "SHA: {{workflow.parameters.head-sha}}"
-                          echo "Trigger: {{workflow.parameters.trigger}}"
+                          set -e
+                          echo '════════════════════════════════════════════════════════════════'
+                          echo '║           STITCH PR REVIEW (FACTORY) STARTING                ║'
+                          echo '════════════════════════════════════════════════════════════════'
+                          echo "🎯 Agent: 5DLabs-Stitch"
+                          echo "🔢 PR Number: $PR_NUMBER"
+                          echo "📂 Repository: $REPO_SLUG"
+                          echo "🔍 Review Mode: review"
+                          echo "⚡ Trigger: $TRIGGER"
+                          echo "📝 Head SHA: $HEAD_SHA"
+                          echo "📌 Title: $PR_TITLE"
+                          echo "👤 Author: $PR_AUTHOR"
                           echo ""
-                          echo "📋 This is a test run - full review logic coming soon"
-                          # TODO: Execute actual review via droid exec
+                          
+                          # Load agent prompt
+                          AGENT_PROMPT="/task-files/agents.md"
+                          if [ ! -f "${AGENT_PROMPT}" ]; then
+                              echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+                              exit 1
+                          fi
+                          
+                          echo "📋 Agent prompt loaded from ${AGENT_PROMPT}"
+                          echo ""
+                          echo "🚀 Starting Factory CLI (droid exec)..."
+                          echo ""
+                          
+                          # Run Factory with the review agent prompt
+                          exec droid exec \
+                              --auto high \
+                              --model "${MODEL}" \
+                              --output-format stream-json \
+                              "$(cat ${AGENT_PROMPT})"
                       env:
                         - name: PR_NUMBER
                           value: "{{workflow.parameters.pr-number}}"
@@ -106,18 +138,37 @@ spec:
                           value: "{{workflow.parameters.repo-slug}}"
                         - name: HEAD_SHA
                           value: "{{workflow.parameters.head-sha}}"
+                        - name: BASE_BRANCH
+                          value: "{{workflow.parameters.base-branch}}"
+                        - name: HEAD_BRANCH
+                          value: "{{workflow.parameters.head-branch}}"
+                        - name: PR_TITLE
+                          value: "{{workflow.parameters.pr-title}}"
+                        - name: PR_AUTHOR
+                          value: "{{workflow.parameters.pr-author}}"
                         - name: TRIGGER
                           value: "{{workflow.parameters.trigger}}"
+                        - name: REVIEW_MODE
+                          value: "review"
+                        - name: MODEL
+                          value: "claude-opus-4-5-20251101"
+                        - name: GITHUB_APP_ID
+                          value: "1379126"
+                        - name: GITHUB_APP_PRIVATE_KEY_PATH
+                          value: "/secrets/github-app/private-key.pem"
                       resources:
                         limits:
-                          cpu: 2000m
-                          memory: 4Gi
+                          cpu: 4000m
+                          memory: 8Gi
                         requests:
-                          cpu: 500m
-                          memory: 1Gi
+                          cpu: 1000m
+                          memory: 2Gi
                       volumeMounts:
                         - name: agent-templates
                           mountPath: /task-files
+                          readOnly: true
+                        - name: github-app-key
+                          mountPath: /secrets/github-app
                           readOnly: true
           parameters:
             - src:
@@ -136,3 +187,19 @@ spec:
                 dependencyName: pr-event
                 dataKey: body.repository.full_name
               dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.base.ref
+              dest: spec.arguments.parameters.4.value
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.head.ref
+              dest: spec.arguments.parameters.5.value
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.title
+              dest: spec.arguments.parameters.6.value
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.user.login
+              dest: spec.arguments.parameters.7.value
