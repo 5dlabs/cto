@@ -49,3 +49,14 @@ pub const CODE_GEMINI_CONTAINER_BASE_TEMPLATE: &str = "code/gemini/container-bas
 pub const CODE_GEMINI_CONTAINER_TEMPLATE: &str = "code/gemini/container.sh.hbs";
 pub const CODE_GEMINI_MEMORY_TEMPLATE: &str = "code/gemini/memory.md.hbs";
 pub const CODE_GEMINI_CONFIG_TEMPLATE: &str = "code/gemini/config.json.hbs";
+
+// Review templates (Stitch PR Review)
+pub const REVIEW_FACTORY_CONTAINER_TEMPLATE: &str = "review/factory/container.sh.hbs";
+pub const REVIEW_FACTORY_AGENTS_TEMPLATE: &str = "review/factory/agents.md.hbs";
+pub const REVIEW_FACTORY_POST_REVIEW_TEMPLATE: &str = "review/factory/post_review.py";
+
+// Remediate templates (Rex PR Remediation)
+pub const REMEDIATE_FACTORY_CONTAINER_TEMPLATE: &str = "remediate/factory/container.sh.hbs";
+pub const REMEDIATE_FACTORY_AGENTS_TEMPLATE: &str = "remediate/factory/agents.md.hbs";
+pub const REMEDIATE_CLAUDE_CONTAINER_TEMPLATE: &str = "remediate/claude/container.sh.hbs";
+pub const REMEDIATE_CLAUDE_AGENTS_TEMPLATE: &str = "remediate/claude/agents.md.hbs";

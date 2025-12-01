@@ -54,6 +54,14 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
+        // Check run_type first for review/remediate tasks
+        match code_run.spec.run_type.as_str() {
+            "review" => return Self::generate_review_templates(code_run, config),
+            "remediate" => return Self::generate_remediate_templates(code_run, config),
+            _ => {}
+        }
+
+        // Fall through to CLI-based dispatch for other run types
         match Self::determine_cli_type(code_run) {
             CLIType::Codex => Self::generate_codex_templates(code_run, config),
             CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
@@ -1655,6 +1663,234 @@ impl CodeTemplateGenerator {
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    /// Generate templates for review tasks (Stitch PR Review)
+    fn generate_review_templates(
+        code_run: &CodeRun,
+        _config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        use crate::tasks::template_paths::{
+            REVIEW_FACTORY_AGENTS_TEMPLATE, REVIEW_FACTORY_CONTAINER_TEMPLATE,
+            REVIEW_FACTORY_POST_REVIEW_TEMPLATE,
+        };
+
+        let mut templates = BTreeMap::new();
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        // Extract PR number from labels or env
+        let pr_number = code_run
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get("pr-number"))
+            .cloned()
+            .or_else(|| code_run.spec.env.get("PR_NUMBER").cloned())
+            .unwrap_or_default();
+
+        // Extract head SHA from env
+        let head_sha = code_run
+            .spec
+            .env
+            .get("HEAD_SHA")
+            .cloned()
+            .unwrap_or_default();
+
+        // Extract review mode from env or default
+        let review_mode = code_run
+            .spec
+            .env
+            .get("REVIEW_MODE")
+            .cloned()
+            .unwrap_or_else(|| "review".to_string());
+
+        // Extract trigger from env
+        let trigger = code_run
+            .spec
+            .env
+            .get("TRIGGER")
+            .cloned()
+            .unwrap_or_else(|| "pull_request".to_string());
+
+        // Extract repo slug from repository URL
+        let repo_slug = code_run
+            .spec
+            .repository_url
+            .strip_prefix("https://github.com/")
+            .and_then(|s| s.strip_suffix(".git"))
+            .or_else(|| code_run.spec.repository_url.strip_prefix("https://github.com/"))
+            .unwrap_or(&code_run.spec.repository_url)
+            .to_string();
+
+        let context = json!({
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Stitch"),
+            "pr_number": pr_number,
+            "repository_url": code_run.spec.repository_url,
+            "repo_slug": repo_slug,
+            "head_sha": head_sha,
+            "review_mode": review_mode,
+            "trigger": trigger,
+            "model": code_run.spec.model,
+        });
+
+        // Load and render container script
+        let container_template = Self::load_template(REVIEW_FACTORY_CONTAINER_TEMPLATE)?;
+        handlebars
+            .register_template_string("review_container", container_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register review container template: {e}"
+                ))
+            })?;
+
+        templates.insert(
+            "container.sh".to_string(),
+            handlebars.render("review_container", &context).map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render review container template: {e}"
+                ))
+            })?,
+        );
+
+        // Load and render agents.md
+        let agents_template = Self::load_template(REVIEW_FACTORY_AGENTS_TEMPLATE)?;
+        handlebars
+            .register_template_string("review_agents", agents_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register review agents template: {e}"
+                ))
+            })?;
+
+        templates.insert(
+            "agents.md".to_string(),
+            handlebars.render("review_agents", &context).map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render review agents template: {e}"
+                ))
+            })?,
+        );
+
+        // Load post_review.py helper script
+        let post_review_script = Self::load_template(REVIEW_FACTORY_POST_REVIEW_TEMPLATE)?;
+        templates.insert("post_review.py".to_string(), post_review_script);
+
+        Ok(templates)
+    }
+
+    /// Generate templates for remediate tasks (Rex PR Remediation)
+    fn generate_remediate_templates(
+        code_run: &CodeRun,
+        _config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        use crate::tasks::template_paths::{
+            REMEDIATE_FACTORY_AGENTS_TEMPLATE, REMEDIATE_FACTORY_CONTAINER_TEMPLATE,
+        };
+
+        let mut templates = BTreeMap::new();
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        // Extract PR number from labels or env
+        let pr_number = code_run
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get("pr-number"))
+            .cloned()
+            .or_else(|| code_run.spec.env.get("PR_NUMBER").cloned())
+            .unwrap_or_default();
+
+        // Extract head SHA from env
+        let head_sha = code_run
+            .spec
+            .env
+            .get("HEAD_SHA")
+            .cloned()
+            .unwrap_or_default();
+
+        // Extract repo slug from repository URL
+        let repo_slug = code_run
+            .spec
+            .repository_url
+            .strip_prefix("https://github.com/")
+            .and_then(|s| s.strip_suffix(".git"))
+            .or_else(|| code_run.spec.repository_url.strip_prefix("https://github.com/"))
+            .unwrap_or(&code_run.spec.repository_url)
+            .to_string();
+
+        // Extract review comment ID if triggered by review comment
+        let review_comment_id = code_run
+            .spec
+            .env
+            .get("REVIEW_COMMENT_ID")
+            .cloned()
+            .unwrap_or_default();
+
+        // Extract findings JSON path if available
+        let findings_path = code_run
+            .spec
+            .env
+            .get("FINDINGS_PATH")
+            .cloned()
+            .unwrap_or_default();
+
+        let context = json!({
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Rex"),
+            "pr_number": pr_number,
+            "repository_url": code_run.spec.repository_url,
+            "repo_slug": repo_slug,
+            "head_sha": head_sha,
+            "model": code_run.spec.model,
+            "review_comment_id": review_comment_id,
+            "findings_path": findings_path,
+            "task_id": code_run.spec.task_id.unwrap_or(0),
+        });
+
+        // Load and render container script
+        let container_template = Self::load_template(REMEDIATE_FACTORY_CONTAINER_TEMPLATE)?;
+        handlebars
+            .register_template_string("remediate_container", container_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register remediate container template: {e}"
+                ))
+            })?;
+
+        templates.insert(
+            "container.sh".to_string(),
+            handlebars
+                .render("remediate_container", &context)
+                .map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to render remediate container template: {e}"
+                    ))
+                })?,
+        );
+
+        // Load and render agents.md
+        let agents_template = Self::load_template(REMEDIATE_FACTORY_AGENTS_TEMPLATE)?;
+        handlebars
+            .register_template_string("remediate_agents", agents_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register remediate agents template: {e}"
+                ))
+            })?;
+
+        templates.insert(
+            "agents.md".to_string(),
+            handlebars
+                .render("remediate_agents", &context)
+                .map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to render remediate agents template: {e}"
+                    ))
+                })?,
         );
 
         Ok(templates)
