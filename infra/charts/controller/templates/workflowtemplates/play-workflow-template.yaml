@@ -334,9 +334,11 @@ spec:
                   value: "waiting-atlas-integration"
 
           # Update stage after Atlas completes integration checks
+          # Only run if not resuming from waiting-merge (already at that stage)
           - name: update-to-waiting-merge
             depends: "wait-for-atlas-integration.Succeeded || wait-for-atlas-integration.Skipped"
             template: update-workflow-stage
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -346,7 +348,7 @@ spec:
 
           # Wait for PR merged to main
           - name: wait-merge-to-main
-            depends: "update-to-waiting-merge.Succeeded"
+            depends: "update-to-waiting-merge.Succeeded || update-to-waiting-merge.Skipped"
             template: suspend-for-event
             arguments:
               parameters:
