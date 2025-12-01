@@ -93,8 +93,8 @@ impl HealNaming {
         if parts.len() >= 3 && parts[0] == "heal" && parts[1] == "remediation" {
             // task part is "task42" - extract the number
             let task_part = parts[2];
-            if task_part.starts_with("task") {
-                return Some(task_part[4..].to_string());
+            if let Some(task_id) = task_part.strip_prefix("task") {
+                return Some(task_id.to_string());
             }
         }
         None
@@ -122,7 +122,7 @@ impl HealNaming {
 
             // Calculate how much space we have for task part
             // Format: {prefix}-task{truncated_task}-{alert_type}-{alert_id}
-            let suffix = format!("-{}-{}", alert_type, alert_id);
+            let suffix = format!("-{alert_type}-{alert_id}");
             let task_prefix = "task";
             let available_for_task = MAX_K8S_NAME_LENGTH
                 .saturating_sub(prefix.len())
@@ -236,15 +236,13 @@ mod tests {
         // Should preserve the alert_id suffix
         assert!(
             name.ends_with("-a7-abcd1234"),
-            "Name should preserve alert_type and alert_id: {}",
-            name
+            "Name should preserve alert_type and alert_id: {name}"
         );
 
         // Should preserve the prefix
         assert!(
             name.starts_with("heal-remediation-task"),
-            "Name should preserve prefix: {}",
-            name
+            "Name should preserve prefix: {name}"
         );
     }
 
