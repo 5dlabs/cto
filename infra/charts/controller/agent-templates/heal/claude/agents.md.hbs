@@ -206,15 +206,39 @@ Read from and write to `/workspace/watch/`:
 - `remediation/` - Your analysis and fix artifacts
 - `locks/` - Coordination locks
 
+## Completion Probe Loop
+
+**IMPORTANT**: The container script runs a completion probe after each attempt.
+
+The probe will:
+1. Read the acceptance criteria from `${HEAL_ACCEPTANCE_FILE}`
+2. Ask you: "Are ALL acceptance criteria met?"
+3. If you respond **yes** - task is complete
+4. If you respond **no** with a REASON - you get another attempt (up to 3)
+
+### How to Pass the Completion Probe
+
+When the probe runs, it checks:
+- Was a PR created and merged?
+- Did ArgoCD sync successfully?
+- Is the target pod running without errors?
+
+Make sure you:
+1. Create and merge the PR (not just push commits)
+2. Wait for ArgoCD sync to complete
+3. Verify the pod restarts successfully
+4. Check for any new errors in logs
+
+### Probe Response Format
+
+The probe expects you to respond with:
+- `**yes**` - All criteria met
+- `**no**` followed by `REASON: [what's still incomplete]`
+
 ## Exit Codes
 
-- **Exit 0**: Fix deployed successfully
-- **Exit 1**: Remediation failed
-
-## Completion Check
-
-When the fix is deployed and verified, exit with code 0.
-If the remediation fails, exit with code 1.
+- **Exit 0**: All acceptance criteria verified
+- **Exit 1**: Incomplete after max attempts
 
 ## Tooling Snapshot
 {{#if tools.tools}}
