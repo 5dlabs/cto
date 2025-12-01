@@ -100,6 +100,42 @@ if [ ! -f "${AGENT_PROMPT}" ]; then
     echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
     exit 1
 fi
+echo "✅ Agent prompt file exists: ${AGENT_PROMPT}"
+
+# ============================================================================
+# MCP TOOLS VALIDATION
+# ============================================================================
+echo ""
+echo "═══ MCP TOOLS VALIDATION ═══"
+echo "🔍 Checking MCP tools..."
+
+if command -v droid >/dev/null 2>&1; then
+    TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+    
+    if [ "$TOOL_LIST" != "FAILED" ] && echo "$TOOL_LIST" | grep -q "mcp_tools\|github\|kubernetes"; then
+        TOOL_COUNT=$(echo "$TOOL_LIST" | wc -l)
+        echo "✅ MCP tools available: ~${TOOL_COUNT} tools"
+        echo ""
+        echo "📋 Sample tools:"
+        echo "$TOOL_LIST" | grep -E "github|kubernetes|argocd|cto" | head -10 || echo "   (showing first 10 matching tools)"
+    else
+        echo "⚠️  No MCP tools found (proceeding anyway)"
+        echo "   Output: $(echo "$TOOL_LIST" | head -5)"
+    fi
+else
+    echo "⚠️  Droid CLI not found - MCP validation skipped"
+fi
+
+# List configured remote tools from heal config
+echo ""
+echo "📋 Configured remote tools (from heal-config):"
+echo "   - mcp_tools_github_*"
+echo "   - mcp_tools_kubernetes_*"
+echo "   - mcp_tools_argocd_*"
+echo "   - mcp_tools_cto_*"
+echo "   - mcp_tools_context7_*"
+echo "   - mcp_tools_firecrawl_*"
+echo "   - mcp_tools_grafana_*"
 
 # ============================================================================
 # COMPLETION PROBE LOOP

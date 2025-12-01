@@ -107,6 +107,38 @@ fi
 echo "✅ Agent prompt file exists: ${AGENT_PROMPT}"
 
 # ============================================================================
+# MCP TOOLS VALIDATION
+# ============================================================================
+echo ""
+echo "═══ MCP TOOLS VALIDATION ═══"
+echo "🔍 Checking MCP servers..."
+
+if command -v claude >/dev/null 2>&1; then
+    MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+    
+    if echo "$MCP_LIST" | grep -q "Connected\|tools"; then
+        echo "✅ MCP servers available:"
+        echo "$MCP_LIST" | head -20
+    else
+        echo "⚠️  No MCP servers connected (proceeding anyway)"
+        echo "   Output: $MCP_LIST"
+    fi
+else
+    echo "⚠️  Claude CLI not found - MCP validation skipped"
+fi
+
+# List configured remote tools from heal config
+echo ""
+echo "📋 Configured remote tools (from heal-config):"
+echo "   - mcp_tools_github_*"
+echo "   - mcp_tools_kubernetes_*"
+echo "   - mcp_tools_argocd_*"
+echo "   - mcp_tools_cto_*"
+echo "   - mcp_tools_context7_*"
+echo "   - mcp_tools_firecrawl_*"
+echo "   - mcp_tools_grafana_*"
+
+# ============================================================================
 # COMPLETION PROBE LOOP
 # ============================================================================
 ATTEMPT=1
