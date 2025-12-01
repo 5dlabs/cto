@@ -1,29 +1,12 @@
-# Build stage for heal (cross-compile for amd64)
-FROM --platform=linux/amd64 rust:1.83-bookworm AS builder
-
-WORKDIR /app
-
-# Copy workspace Cargo files
-COPY Cargo.toml Cargo.lock ./
-COPY heal/Cargo.toml ./heal/
-COPY cli/Cargo.toml ./cli/
-COPY controller/Cargo.toml ./controller/
-COPY tools/Cargo.toml ./tools/
-COPY mcp/Cargo.toml ./mcp/
-COPY tasks/Cargo.toml ./tasks/
-
-# Create lib.rs stubs for workspace members we don't need
-RUN mkdir -p cli/src controller/src tools/src mcp/src tasks/src && \
-    touch cli/src/lib.rs controller/src/lib.rs tools/src/lib.rs mcp/src/lib.rs tasks/src/lib.rs
-
-# Copy the actual heal source
-COPY heal/src ./heal/src
-
-# Build the heal binary
-RUN cargo build --release --package heal
-
-# Copy prompts
-COPY heal/prompts ./heal/prompts
+# Heal Monitor Dockerfile
+#
+# Expects a pre-built binary at infra/images/heal/heal-linux
+# The CI workflow builds the binary with sccache caching before Docker build.
+#
+# To build locally:
+#   cargo build --release --package heal
+#   cp target/release/heal infra/images/heal/heal-linux
+#   docker build -f infra/images/heal/Dockerfile -t heal .
 
 # Runtime stage - use factory image as base (includes droid CLI)
 FROM --platform=linux/amd64 ghcr.io/5dlabs/factory:latest
@@ -47,9 +30,12 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy heal binary and prompts
-COPY --from=builder /app/target/release/heal /usr/local/bin/
-COPY --from=builder /app/heal/prompts /app/prompts
+# Copy pre-built heal binary (must exist in build context)
+COPY infra/images/heal/heal-linux /usr/local/bin/heal
+RUN chmod +x /usr/local/bin/heal
+
+# Copy prompts from source
+COPY heal/prompts /app/prompts
 
 WORKDIR /app
 

@@ -1,0 +1,160 @@
+---
+name: Heal CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'heal/**'
+      - 'infra/images/heal/**'
+      - '.github/workflows/heal-ci.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'heal/**'
+      - 'infra/images/heal/**'
+      - '.github/workflows/heal-ci.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      heal: ${{ steps.filter.outputs.heal }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            heal:
+              - 'heal/**'
+              - '!heal/**/*.md'
+            docker:
+              - 'infra/images/heal/**'
+
+  # Rust linting (format + clippy pedantic)
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    outputs:
+      format-needed: ${{ steps.format-check.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-heal-ci"
+
+      - name: Check formatting
+        id: format-check
+        run: |
+          echo "🔧 Checking cargo fmt..."
+          if ! cargo fmt -p heal -- --check; then
+            echo "📝 Formatting issues detected"
+            echo "format-needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "format-needed=false" >> $GITHUB_OUTPUT
+            echo "✅ Code formatting is correct"
+          fi
+
+      - name: Run Clippy (pedantic)
+        run: |
+          echo "🔍 Running clippy with pedantic warnings..."
+          cargo clippy -p heal --all-targets -- -D warnings -W clippy::pedantic
+
+  # Run tests
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-heal-ci"
+
+      - name: Run unit tests
+        run: |
+          echo "🧪 Running heal unit tests..."
+          cargo test -p heal --lib
+
+      - name: Run all tests
+        run: |
+          echo "🧪 Running all heal tests..."
+          cargo test -p heal --all-targets
+
+  # Build check (ensure it compiles for release)
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-heal-ci"
+
+      - name: Build release binary
+        run: |
+          echo "🔨 Building heal binary..."
+          cargo build -p heal --release --bin heal
+          echo "✅ Release build successful"
+
+  # Security audit (non-blocking)
+  security-audit:
+    needs: changes
+    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        id: cargo-audit-cache
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-${{ runner.os }}-0.21.2
+
+      - name: Install cargo-audit
+        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --version 0.21.2
+
+      - name: Run security audit
+        run: |
+          echo "🔒 Running cargo audit..."
+          cargo audit || true
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/images/heal/Dockerfile
+          failure-threshold: warning

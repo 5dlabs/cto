@@ -79,6 +79,10 @@ agent_*.md
 # cargo-dist research
 .repos/
 
+# Pre-built binaries for Docker builds (CI artifacts)
+infra/images/heal/heal-linux
+infra/images/tools/tools-server-linux
+
 .claude/*
 
 *.private-key.pem
