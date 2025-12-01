@@ -4433,6 +4433,23 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
             _ => continue, // Skip other events
         };
 
+        // Debug: Log any terminated containers in Running pods (potential A2 alerts)
+        if pod.phase == "Running" {
+            for cs in &pod.container_statuses {
+                if let k8s::ContainerState::Terminated { exit_code, .. } = &cs.state {
+                    if *exit_code != 0 {
+                        println!(
+                            "{}",
+                            format!(
+                                "👀 DEBUG: Pod {} has terminated container '{}' (exit={}) while still Running",
+                                pod.name, cs.name, exit_code
+                            ).yellow()
+                        );
+                    }
+                }
+            }
+        }
+
         // Build alert context from pod labels
         let task_id = pod.labels.get("task-id").cloned().unwrap_or_default();
         let alert_ctx = alerts::AlertContext {
