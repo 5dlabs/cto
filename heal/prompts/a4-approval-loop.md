@@ -1,4 +1,4 @@
-# Alert A4: Repeated Approval Loop
+# Alert A4: Approval Comment Loop
 
 ## Detected Condition
 
@@ -8,8 +8,8 @@ An agent has posted multiple approval comments without the workflow advancing.
 - **Namespace**: {{namespace}}
 - **Agent**: {{agent}}
 - **Task ID**: {{task_id}}
-- **PR Number**: {{pr_number}}
 - **Approval Count**: {{approval_count}}
+- **PR Number**: {{pr_number}}
 
 ## Container Logs
 
@@ -40,7 +40,8 @@ mkdir -p "${ISSUE_DIR}"
 
 ### Step 3: Write prompt.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 # Approval Loop: {{pod_name}}
 
 ## Summary
@@ -58,11 +59,13 @@ mkdir -p "${ISSUE_DIR}"
 1. [Check PR state and labels]
 2. [Verify workflow trigger conditions]
 3. [Kill pod, fix workflow trigger, or manual advancement]
+PROMPT
 ```
 
 ### Step 4: Write acceptance-criteria.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -72,6 +75,7 @@ mkdir -p "${ISSUE_DIR}"
 - [ ] PR {{pr_number}} progresses to next phase
 - [ ] No repeated approval comments
 - [ ] No new A4 alerts for this PR
+CRITERIA
 ```
 
 ### Step 5: Update GitHub Issue

@@ -40,7 +40,8 @@ mkdir -p "${ISSUE_DIR}"
 
 ### Step 3: Write prompt.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 # Step Timeout: {{pod_name}}
 
 ## Summary
@@ -60,11 +61,13 @@ mkdir -p "${ISSUE_DIR}"
 1. [Analyze recent logs for patterns]
 2. [Determine if agent is making progress]
 3. [Kill and retry, let continue, or fix underlying issue]
+PROMPT
 ```
 
 ### Step 4: Write acceptance-criteria.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -75,6 +78,7 @@ mkdir -p "${ISSUE_DIR}"
 - [ ] Timeout threshold adjusted if legitimate
 - [ ] Task {{task_id}} progresses to completion
 - [ ] No new A8 alerts for similar timeouts
+CRITERIA
 ```
 
 ### Step 5: Update GitHub Issue

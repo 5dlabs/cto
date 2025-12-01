@@ -42,7 +42,8 @@ mkdir -p "${ISSUE_DIR}"
 
 ### Step 3: Write prompt.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 # Post-Tess Failure: {{pod_name}}
 
 ## Summary
@@ -69,11 +70,13 @@ mkdir -p "${ISSUE_DIR}"
 1. [Fix failing tests if CI failure]
 2. [Resolve merge conflicts if conflict]
 3. [Re-run Tess validation if needed]
+PROMPT
 ```
 
 ### Step 4: Write acceptance-criteria.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -84,6 +87,7 @@ mkdir -p "${ISSUE_DIR}"
 - [ ] PR {{pr_number}} is mergeable
 - [ ] All CI checks pass
 - [ ] No new A5 alerts for this PR
+CRITERIA
 ```
 
 ### Step 5: Update GitHub Issue

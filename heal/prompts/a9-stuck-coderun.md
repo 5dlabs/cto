@@ -55,7 +55,8 @@ kubectl logs -n {{namespace}} -l coderun={{pod_name}} --tail=500
 
 ### Step 4: Write prompt.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 # Stuck CodeRun: {{pod_name}}
 
 ## Summary
@@ -73,11 +74,13 @@ kubectl logs -n {{namespace}} -l coderun={{pod_name}} --tail=500
 1. [Delete CodeRun to retry, OR]
 2. [Fix underlying bug, OR]
 3. [Restart controller if status update issue]
+PROMPT
 ```
 
 ### Step 5: Write acceptance-criteria.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -88,6 +91,7 @@ kubectl logs -n {{namespace}} -l coderun={{pod_name}} --tail=500
 - [ ] If infra issue: controller/cluster state verified
 - [ ] Task {{task_id}} progresses to completion
 - [ ] No new A9 alerts for this CodeRun
+CRITERIA
 ```
 
 ### Step 6: Update GitHub Issue

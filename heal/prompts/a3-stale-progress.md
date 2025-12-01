@@ -1,8 +1,8 @@
-# Alert A3: Stale Progress - No Commits
+# Alert A3: Stale Agent Progress
 
 ## Detected Condition
 
-An agent pod has been running but no new commits have been pushed to the feature branch.
+An agent pod has been running but no new commits have been pushed to the feature branch for an extended period.
 
 - **Pod Name**: {{pod_name}}
 - **Namespace**: {{namespace}}
@@ -41,11 +41,12 @@ mkdir -p "${ISSUE_DIR}"
 
 ### Step 3: Write prompt.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 # Stale Progress: {{pod_name}}
 
 ## Summary
-[Is agent stuck, looping, or legitimately working?]
+[Pod running but no commits in {{stale_duration}}]
 
 ## Last Productive Action
 [What was the agent last doing before going stale?]
@@ -61,11 +62,13 @@ mkdir -p "${ISSUE_DIR}"
 1. [Check agent logs for errors or loops]
 2. [Determine if intervention needed]
 3. [Kill pod, fix config, or let continue]
+PROMPT
 ```
 
 ### Step 4: Write acceptance-criteria.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -76,6 +79,7 @@ mkdir -p "${ISSUE_DIR}"
 - [ ] Underlying issue (auth, API limits) resolved
 - [ ] Branch {{branch}} has new commits
 - [ ] No new A3 alerts for this agent
+CRITERIA
 ```
 
 ### Step 5: Update GitHub Issue

@@ -44,7 +44,8 @@ mkdir -p "${ISSUE_DIR}"
 
 ### Step 3: Write prompt.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 # Comment Order Mismatch: {{pod_name}}
 
 ## Summary
@@ -60,11 +61,13 @@ Rex/Blaze → Cleo → Tess → Cipher → Atlas
 1. [Check if the missing agent's pod exists]
 2. [Verify the agent completed its task]
 3. [Trigger missing comment or rerun agent]
+PROMPT
 ```
 
 ### Step 4: Write acceptance-criteria.md
 
-```markdown
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -74,6 +77,7 @@ Rex/Blaze → Cleo → Tess → Cipher → Atlas
 - [ ] Fixed underlying issue preventing comment
 - [ ] PR {{pr_number}} has all expected comments in order
 - [ ] No A1 alerts for this PR
+CRITERIA
 ```
 
 ### Step 5: Update GitHub Issue
