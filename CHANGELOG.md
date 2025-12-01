@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.12](https://github.com/5dlabs/cto/compare/v0.11.11...v0.11.12) (2025-12-01)
+
+
+### ✨ Features
+
+* **stitch:** add inline PR review comments like Cursor Bot ([#1936](https://github.com/5dlabs/cto/issues/1936)) ([aabbbdf](https://github.com/5dlabs/cto/commit/aabbbdf5ff825e7def6d4a01aa40c92d06999509))
+
 ## [0.11.11](https://github.com/5dlabs/cto/compare/v0.11.10...v0.11.11) (2025-12-01)
 
 
