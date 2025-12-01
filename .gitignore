@@ -13,8 +13,8 @@ node_modules/
 .env
 *.env
 
-# Agent secrets (SSH keys and tokens)
-agents/
+# Agent secrets (SSH keys and tokens) - at root level only
+/agents/
 **/id_ed25519
 **/id_ed25519.pub
 **/.env

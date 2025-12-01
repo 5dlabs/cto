@@ -31,18 +31,18 @@ logs: e2e-logs ## Follow agent workflow logs
 .PHONY: build
 build: ## Build all project binaries
 	@echo "Building controller..."
-	@cd controller && cargo build --release --bin agent-controller
+	@cargo build --release --bin agent-controller
 	@echo "Building MCP server..."
-	@cd mcp && cargo build --release
-	@cp mcp/target/release/cto-mcp dist/
+	@cargo build --release -p cto-mcp
+	@cp target/release/cto-mcp dist/
 	@echo "Build complete!"
 
 .PHONY: test
 test: ## Run all tests
 	@echo "Running controller tests..."
-	@cd controller && cargo test
+	@cargo test -p controller
 	@echo "Running MCP tests..."
-	@cd mcp && cargo test
+	@cargo test -p cto-mcp
 	@echo "All tests passed!"
 
 .PHONY: lint

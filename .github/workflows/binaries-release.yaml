@@ -95,22 +95,31 @@ jobs:
         package:
           - name: cto-mcp
             binary: cto-mcp
-            dir: mcp
+            dir: crates/mcp
           - name: tools
             binary: tools-server
-            dir: tools
+            dir: crates/tools
           - name: tools
             binary: tools-client
-            dir: tools
+            dir: crates/tools
           - name: heal
             binary: heal
-            dir: heal
+            dir: crates/heal
           - name: controller
             binary: agent-controller
-            dir: controller
+            dir: crates/controller
           - name: utils
             binary: utils
-            dir: utils
+            dir: crates/utils
+          - name: cto-cli
+            binary: cto
+            dir: crates/installer
+          - name: tasks
+            binary: tasks
+            dir: crates/tasks
+          - name: tasks
+            binary: tasks-mcp
+            dir: crates/tasks
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -130,7 +139,7 @@ jobs:
             suffix: windows-x86_64
             ext: .exe
         exclude:
-          # heal, controller, and utils don't need Windows builds
+          # heal, controller, utils, cto-cli, and tasks don't need Windows builds
           - package:
               name: heal
             target:
@@ -141,6 +150,14 @@ jobs:
               os: windows-latest
           - package:
               name: utils
+            target:
+              os: windows-latest
+          - package:
+              name: cto-cli
+            target:
+              os: windows-latest
+          - package:
+              name: tasks
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}

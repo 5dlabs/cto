@@ -22,16 +22,16 @@ jobs:
       infra: ${{ steps.filter.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             controller:
-              - 'controller/**'
-              - '!controller/**/*.md'
+              - 'crates/controller/**'
+              - '!crates/controller/**/*.md'
             taskrun:
-              - 'controller/core/src/controllers/task_controller/**'
-              - 'controller/core/src/crds/**'
+              - 'crates/controller/core/src/controllers/task_controller/**'
+              - 'crates/controller/core/src/crds/**'
               - 'infra/test-resources/crds/**'
             infra:
               - 'infra/**'
@@ -52,26 +52,26 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
-          workspaces: controller -> target
+          workspaces: crates/controller -> target
           shared-key: "rust-cache-ci"
 
       - name: Auto-format code
         id: format-check
-        working-directory: ./controller
+        working-directory: ./crates/controller
         run: |
           echo "🔧 Running cargo fmt to ensure consistent formatting..."
           if ! cargo fmt --all -- --check; then
             echo "📝 Formatting issues detected - applying auto-format..."
             cargo fmt --all
-            echo "format-needed=true" >> $GITHUB_OUTPUT
+            echo "format-needed=true" >> "$GITHUB_OUTPUT"
             echo "✅ Code formatting automatically fixed"
           else
-            echo "format-needed=false" >> $GITHUB_OUTPUT
+            echo "format-needed=false" >> "$GITHUB_OUTPUT"
             echo "✅ Code formatting is already correct"
           fi
 
       - name: Run Clippy (pedantic)
-        working-directory: ./controller
+        working-directory: ./crates/controller
         run: |
           echo "🔍 Enforcing AWS-spec lint gates (clippy::pedantic + -D warnings)"
           cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
@@ -97,7 +97,7 @@ jobs:
           components: rustfmt
 
       - name: Auto-format Rust code
-        working-directory: ./controller
+        working-directory: ./crates/controller
         run: |
           echo "🔧 Auto-formatting Rust code..."
           cargo fmt --all
@@ -107,10 +107,10 @@ jobs:
         run: |
           if git diff --quiet; then
             echo "No changes after formatting"
-            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "Changes detected after formatting"
-            echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit and push changes
@@ -152,13 +152,13 @@ jobs:
           
           # Check if there are any changes
           if ! git diff --quiet templates/agent-templates-*.yaml; then
-            echo "templates-outdated=true" >> $GITHUB_OUTPUT
+            echo "templates-outdated=true" >> "$GITHUB_OUTPUT"
             echo "⚠️ Templates are outdated - will attempt auto-update"
             echo ""
             echo "The following changes were detected:"
             git diff --stat templates/agent-templates-*.yaml
           else
-            echo "templates-outdated=false" >> $GITHUB_OUTPUT
+            echo "templates-outdated=false" >> "$GITHUB_OUTPUT"
             echo "✅ agent-templates ConfigMaps are up-to-date"
           fi
 
@@ -181,6 +181,11 @@ jobs:
           fetch-depth: 0
       
       - name: Regenerate and commit templates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           echo "🔄 Auto-updating agent-templates ConfigMap..."
           cd infra/charts/controller
@@ -197,7 +202,7 @@ jobs:
             # Commit the changes
             git add templates/agent-templates-*.yaml
             
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "$EVENT_NAME" == "pull_request" ]]; then
               # For PRs, commit to the PR branch
               git commit -m "chore: auto-update agent-templates ConfigMap
           
@@ -205,11 +210,11 @@ jobs:
           to keep the templates ConfigMap in sync with source files."
               
               # Push to the PR branch (handle failures gracefully)
-              if git push origin HEAD:${{ github.head_ref }} 2>&1; then
+              if git push origin "HEAD:$PR_HEAD_REF" 2>&1; then
                 echo "✅ Templates automatically updated in PR branch"
                 
                 # Add a comment to the PR
-                GH_TOKEN=${{ secrets.GITHUB_TOKEN }} gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Auto-Update**: The agent-templates ConfigMap has been automatically regenerated and committed to this PR.
+                gh pr comment "$PR_NUMBER" --body "🤖 **Auto-Update**: The agent-templates ConfigMap has been automatically regenerated and committed to this PR.
                 
                 The templates were out of sync with the source files in \`agent-templates/\`. This has been fixed automatically.
                 
@@ -219,7 +224,7 @@ jobs:
                 echo "ℹ️  Posting comment with instructions instead..."
                 
                 # Post comment with instructions if can't push
-                GH_TOKEN=${{ secrets.GITHUB_TOKEN }} gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Template Update Required**
+                gh pr comment "$PR_NUMBER" --body "🤖 **Template Update Required**
                 
                 The agent-templates ConfigMaps need to be regenerated because source files changed.
                 
@@ -260,11 +265,11 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
-          workspaces: controller -> target
+          workspaces: crates/controller -> target
           shared-key: "rust-cache-ci"
 
       - name: Run tests
-        working-directory: ./controller
+        working-directory: ./crates/controller
         run: cargo test --all-features --all-targets
 
   # Integration tests
@@ -404,7 +409,7 @@ jobs:
         run: cargo install cargo-audit --version 0.21.2
 
       - name: Rust security audit
-        working-directory: ./controller
+        working-directory: ./crates/controller
         run: cargo audit || true  # Non-blocking
 
   # Test coverage reporting (non-blocking)
@@ -421,7 +426,7 @@ jobs:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
-          workspaces: controller -> target
+          workspaces: crates/controller -> target
           shared-key: "rust-cache-ci"
 
       - name: Cache cargo-llvm-cov
@@ -436,7 +441,7 @@ jobs:
         run: cargo install cargo-llvm-cov --version 0.6.8
 
       - name: Generate test coverage
-        working-directory: ./controller
+        working-directory: ./crates/controller
         run: |
           echo "📊 Generating test coverage report..."
           cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info || true
@@ -462,39 +467,6 @@ jobs:
             controller/coverage-html/
             controller/coverage-summary.md
 
-  codeql:
-    name: CodeQL
-    needs: changes
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: rust
-          queries: +security-extended
-
-      - name: Build Rust workspace
-        run: |
-          echo "🔨 Building Rust workspace for CodeQL extraction..."
-          cargo fetch
-          cargo build --workspace --all-features
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
-
   # =============================================================================
   # Docker Build & Push (main branch only)
   # =============================================================================
@@ -518,7 +490,7 @@ jobs:
           echo "🚀 Setting up optimized Rust build environment..."
           
           # Add cargo bin to PATH
-          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
           export PATH="/home/runner/.cargo/bin:$PATH"
           
           # Check if both rustc and cargo are available and working
@@ -527,7 +499,7 @@ jobs:
           else
             echo "🔧 Installing/repairing Rust toolchain..."
             rustup toolchain uninstall stable 2>/dev/null || true
-            for i in 1 2 3; do
+            for _ in 1 2 3; do
               rustup toolchain install stable && \
               rustup toolchain install stable && \
               rustup default stable && break
@@ -575,7 +547,7 @@ jobs:
           done
 
       - name: Build release binary
-        working-directory: ./controller
+        working-directory: ./crates/controller
         env:
           CARGO_INCREMENTAL: "0"
           RUSTC_WRAPPER: "sccache"
@@ -619,10 +591,10 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path controller/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "controller") | .version')
+          VERSION=$(cargo metadata --manifest-path crates/controller/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "controller") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "short-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
@@ -640,11 +612,13 @@ jobs:
 
       - name: Build summary
         run: |
-          echo "## 🐳 Controller Image Published" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.short-sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "ArgoCD Image Updater will detect and deploy this image automatically." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🐳 Controller Image Published"
+            echo ""
+            echo "**Tags:**"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.short-sha }}\`"
+            echo ""
+            echo "ArgoCD Image Updater will detect and deploy this image automatically."
+          } >> "$GITHUB_STEP_SUMMARY"

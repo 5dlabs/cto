@@ -39,7 +39,7 @@ COPY infra/images/heal/heal-linux /usr/local/bin/heal
 RUN chmod +x /usr/local/bin/heal
 
 # Copy prompts from source
-COPY heal/prompts /app/prompts
+COPY crates/heal/prompts /app/prompts
 
 WORKDIR /app
 
