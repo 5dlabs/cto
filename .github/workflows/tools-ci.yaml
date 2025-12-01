@@ -94,11 +94,6 @@ jobs:
           workspaces: ". -> target"
           shared-key: "rust-cache-tools-ci"
 
-      - name: Run unit tests
-        run: |
-          echo "🧪 Running tools unit tests..."
-          cargo test -p tools --lib
-
       - name: Run all tests
         run: |
           echo "🧪 Running all tools tests..."
