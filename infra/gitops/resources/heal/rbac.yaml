@@ -33,7 +33,7 @@ rules:
     verbs: ["get"]
 
   # Create and manage CodeRun CRDs for spawning remediation agents
-  - apiGroups: ["cto.5dlabs.io"]
+  - apiGroups: ["agents.platform"]
     resources: ["coderuns"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
 
