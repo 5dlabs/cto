@@ -25,9 +25,7 @@ impl HealNaming {
     /// A K8s-compliant name, truncated if necessary.
     #[must_use]
     pub fn remediation_job_name(task_id: &str, alert_type: &str, alert_id: &str) -> String {
-        let base_name = format!(
-            "{HEAL_REMEDIATION_PREFIX}task{task_id}-{alert_type}-{alert_id}"
-        );
+        let base_name = format!("{HEAL_REMEDIATION_PREFIX}task{task_id}-{alert_type}-{alert_id}");
         Self::ensure_k8s_name_length(&base_name)
     }
 
@@ -71,7 +69,7 @@ impl HealNaming {
         // Format: heal-remediation-task{id}-{alert_type}-{alert_id}
         // Parts: ["heal", "remediation", "task42", "a7", "0dc49936"] or with hyphenated alert_id
         let parts: Vec<&str> = job_name.split('-').collect();
-        
+
         if parts.len() >= 4 && parts[0] == "heal" && parts[1] == "remediation" {
             // The task part is at index 2 (e.g., "task42")
             // The alert_type is at index 3 and always starts with 'a' followed by digits
@@ -116,12 +114,12 @@ impl HealNaming {
         // Format: heal-remediation-task{task_id}-{alert_type}-{alert_id}
         // We want to preserve: prefix, alert_type, and alert_id
         let parts: Vec<&str> = name.split('-').collect();
-        
+
         if parts.len() >= 5 {
             let prefix = format!("{}-{}", parts[0], parts[1]); // "heal-remediation"
             let alert_type = parts[parts.len() - 2]; // e.g., "a7"
             let alert_id = parts[parts.len() - 1]; // e.g., "0dc49936"
-            
+
             // Calculate how much space we have for task part
             // Format: {prefix}-task{truncated_task}-{alert_type}-{alert_id}
             let suffix = format!("-{}-{}", alert_type, alert_id);
@@ -131,15 +129,15 @@ impl HealNaming {
                 .saturating_sub(1) // hyphen before task
                 .saturating_sub(task_prefix.len())
                 .saturating_sub(suffix.len());
-            
+
             // Extract task_id from the task part (parts[2] is "task{id}")
             let task_part = parts[2];
             let task_id = task_part.strip_prefix("task").unwrap_or(task_part);
-            
+
             let truncated_task: String = task_id.chars().take(available_for_task).collect();
-            
+
             let result = format!("{prefix}-{task_prefix}{truncated_task}{suffix}");
-            
+
             // Final safety check
             if result.len() <= MAX_K8S_NAME_LENGTH {
                 return result;
@@ -176,13 +174,19 @@ mod tests {
     #[test]
     fn test_worktree_path() {
         let path = HealNaming::worktree_path("heal-remediation-task42-a7-0dc49936");
-        assert_eq!(path, "/workspace/worktrees/heal-remediation-task42-a7-0dc49936");
+        assert_eq!(
+            path,
+            "/workspace/worktrees/heal-remediation-task42-a7-0dc49936"
+        );
     }
 
     #[test]
     fn test_log_file_path() {
         let path = HealNaming::log_file_path("a7", "my-pod-abc123", "20251201-134523");
-        assert_eq!(path, "/workspace/watch/logs/A7-my-pod-abc123-20251201-134523.log");
+        assert_eq!(
+            path,
+            "/workspace/watch/logs/A7-my-pod-abc123-20251201-134523.log"
+        );
     }
 
     #[test]
@@ -201,10 +205,7 @@ mod tests {
             HealNaming::extract_alert_type("heal-remediation-task100-a2-abcd1234"),
             Some("a2".to_string())
         );
-        assert_eq!(
-            HealNaming::extract_alert_type("some-other-job"),
-            None
-        );
+        assert_eq!(HealNaming::extract_alert_type("some-other-job"), None);
     }
 
     #[test]
@@ -217,10 +218,7 @@ mod tests {
             HealNaming::extract_task_id("heal-remediation-task4010126410-a7-0dc49936"),
             Some("4010126410".to_string())
         );
-        assert_eq!(
-            HealNaming::extract_task_id("some-other-job"),
-            None
-        );
+        assert_eq!(HealNaming::extract_task_id("some-other-job"), None);
     }
 
     #[test]
@@ -231,15 +229,23 @@ mod tests {
             "a7",
             "abcd1234",
         );
-        
+
         // Should be within limits
         assert!(name.len() <= MAX_K8S_NAME_LENGTH);
-        
+
         // Should preserve the alert_id suffix
-        assert!(name.ends_with("-a7-abcd1234"), "Name should preserve alert_type and alert_id: {}", name);
-        
+        assert!(
+            name.ends_with("-a7-abcd1234"),
+            "Name should preserve alert_type and alert_id: {}",
+            name
+        );
+
         // Should preserve the prefix
-        assert!(name.starts_with("heal-remediation-task"), "Name should preserve prefix: {}", name);
+        assert!(
+            name.starts_with("heal-remediation-task"),
+            "Name should preserve prefix: {}",
+            name
+        );
     }
 
     #[test]
@@ -253,13 +259,13 @@ mod tests {
             HealNaming::extract_alert_type("heal-remediation-task42-a12-0dc49936"),
             Some("a12".to_string())
         );
-        
+
         // Invalid - doesn't start with 'a'
         assert_eq!(
             HealNaming::extract_alert_type("heal-remediation-task42-xyz-0dc49936"),
             None
         );
-        
+
         // Invalid - 'a' not followed by digits
         assert_eq!(
             HealNaming::extract_alert_type("heal-remediation-task42-abc-0dc49936"),
