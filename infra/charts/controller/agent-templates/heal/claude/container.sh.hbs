@@ -39,7 +39,7 @@ else
     echo "   ⚠️  Prompt file not found at ${PROMPT_FILE}"
     echo "   Checking /workspace/watch/alerts/..."
     ls -la /workspace/watch/alerts/ 2>/dev/null || echo "   No alerts directory"
-fi
+LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1 || true)
 
 # Find latest matching log file
 LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1)
