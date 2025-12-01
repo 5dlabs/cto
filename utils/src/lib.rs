@@ -88,7 +88,6 @@
 //! - [`resolve`] - Resolve PR review thread conversations
 //! - [`reviews`] - Fetch PR review comments from Bugbot and Stitch
 
-
 pub mod alerts;
 pub mod clippy;
 pub mod comment;

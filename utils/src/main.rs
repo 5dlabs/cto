@@ -481,7 +481,11 @@ async fn run_resolve(
                 println!("{}", serde_json::to_string_pretty(&threads)?);
             }
             OutputFormat::Text => {
-                println!("📝 {} unresolved conversations for PR #{}:\n", threads.len(), pr);
+                println!(
+                    "📝 {} unresolved conversations for PR #{}:\n",
+                    threads.len(),
+                    pr
+                );
                 for (i, thread) in threads.iter().enumerate() {
                     let location = thread
                         .path

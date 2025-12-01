@@ -169,11 +169,12 @@ mod tests {
     fn test_sanitize_label_value() {
         assert_eq!(sanitize_label_value("simple-pod"), "simple-pod");
         assert_eq!(
-            sanitize_label_value("pod-with-very-long-name-that-exceeds-kubernetes-label-limits-definitely"),
+            sanitize_label_value(
+                "pod-with-very-long-name-that-exceeds-kubernetes-label-limits-definitely"
+            ),
             "pod-with-very-long-name-that-exceeds-kubernetes-label-limits-de"
         );
         assert_eq!(sanitize_label_value("pod-name---"), "pod-name");
         assert_eq!(sanitize_label_value("pod@with#special"), "podwithspecial");
     }
 }
-

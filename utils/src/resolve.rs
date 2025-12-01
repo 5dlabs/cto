@@ -330,11 +330,11 @@ mod tests {
     #[test]
     fn test_truncate_body() {
         assert_eq!(truncate_body("short", 10), "short");
-        assert_eq!(truncate_body("this is a very long string", 10), "this is...");
         assert_eq!(
-            truncate_body("line 1\nline 2\nline 3", 100),
-            "line 1"
+            truncate_body("this is a very long string", 10),
+            "this is..."
         );
+        assert_eq!(truncate_body("line 1\nline 2\nline 3", 100), "line 1");
     }
 
     #[test]
