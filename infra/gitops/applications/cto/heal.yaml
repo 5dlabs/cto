@@ -98,10 +98,16 @@ spec:
           - name: heal-workspace
             persistentVolumeClaim:
               claimName: heal-workspace
+          - name: heal-config
+            configMap:
+              name: heal-config
 
         volumeMounts:
           - name: heal-workspace
             mountPath: /workspace/watch
+          - name: heal-config
+            mountPath: /app/heal-config.json
+            subPath: heal-config.json
 
         nodeSelector: {}
         tolerations: []
