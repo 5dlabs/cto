@@ -113,6 +113,51 @@ spec:
                           echo "👤 Author: $PR_AUTHOR"
                           echo ""
 
+                          # Generate GitHub App installation token
+                          echo "🔐 Generating GitHub App installation token..."
+                          APP_ID="${GITHUB_APP_ID}"
+                          PRIVATE_KEY_PATH="${GITHUB_APP_PRIVATE_KEY_PATH}"
+
+                          # Generate JWT
+                          NOW=$(date +%s)
+                          IAT=$((NOW - 60))
+                          EXP=$((NOW + 600))
+
+                          HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+                          PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+                          UNSIGNED="${HEADER}.${PAYLOAD}"
+                          SIGNATURE=$(echo -n "${UNSIGNED}" | openssl dgst -sha256 -sign "${PRIVATE_KEY_PATH}" | \
+                            base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+                          JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+                          # Get installation ID for the org
+                          INSTALL_ID=$(curl -s -H "Authorization: Bearer ${JWT}" \
+                            -H "Accept: application/vnd.github+json" \
+                            "https://api.github.com/app/installations" | \
+                            grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+
+                          if [ -z "$INSTALL_ID" ]; then
+                            echo "❌ Failed to get installation ID"
+                            exit 1
+                          fi
+                          echo "📍 Installation ID: $INSTALL_ID"
+
+                          # Generate installation access token
+                          TOKEN_RESPONSE=$(curl -s -X POST \
+                            -H "Authorization: Bearer ${JWT}" \
+                            -H "Accept: application/vnd.github+json" \
+                            "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens")
+
+                          export GH_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+                          if [ -z "$GH_TOKEN" ]; then
+                            echo "❌ Failed to generate installation token"
+                            echo "Response: $TOKEN_RESPONSE"
+                            exit 1
+                          fi
+                          echo "✅ GitHub App token generated successfully"
+                          echo ""
+
                           # Load agent prompt
                           AGENT_PROMPT="/task-files/agents.md"
                           if [ ! -f "${AGENT_PROMPT}" ]; then
@@ -155,14 +200,9 @@ spec:
                         - name: MODEL
                           value: "claude-opus-4-5-20251101"
                         - name: GITHUB_APP_ID
-                          value: "1379126"
+                          value: "1794583"
                         - name: GITHUB_APP_PRIVATE_KEY_PATH
                           value: "/secrets/github-app/private-key.pem"
-                        - name: GH_TOKEN
-                          valueFrom:
-                            secretKeyRef:
-                              name: tools-github-secrets
-                              key: GITHUB_PERSONAL_ACCESS_TOKEN
                         - name: FACTORY_API_KEY
                           valueFrom:
                             secretKeyRef:
