@@ -107,18 +107,80 @@ For each changed file:
 3. Identify issues by severity
 4. Formulate actionable suggestions
 
-### Step 5: Post Review Comment
-```bash
-# Create a review comment
-gh pr comment $PR_NUMBER --repo "$REPO_SLUG" --body "$(cat /tmp/review.md)"
+### Step 5: Output Structured Review
 
-# Or create a formal review
-gh pr review $PR_NUMBER --repo "$REPO_SLUG" --comment --body "$(cat /tmp/review.md)"
+**CRITICAL**: You MUST output your review as a JSON object to `/tmp/review.json`. This enables inline PR comments with suggestion blocks.
+
+```bash
+# Write the review JSON to file
+cat > /tmp/review.json << 'REVIEW_EOF'
+{
+  "summary": "Brief 1-2 sentence summary of findings",
+  "verdict": "COMMENT",
+  "findings": [
+    {
+      "severity": "critical",
+      "file": "path/to/file.rs",
+      "start_line": 42,
+      "end_line": 45,
+      "title": "Brief issue title",
+      "description": "Detailed explanation of the issue",
+      "suggestion": "let fixed_code = better_approach();",
+      "suggestion_start_line": 43,
+      "suggestion_end_line": 44
+    }
+  ],
+  "positive": ["What the PR does well"],
+  "ci_analysis": "Analysis of CI failures if applicable"
+}
+REVIEW_EOF
+
+echo "Review written to /tmp/review.json"
 ```
 
-## Review Comment Format
+## Review JSON Schema
 
-Use this structure:
+```json
+{
+  "summary": "string - 1-2 sentence summary",
+  "verdict": "APPROVE | REQUEST_CHANGES | COMMENT",
+  "findings": [
+    {
+      "severity": "critical | important | suggestion | info",
+      "file": "string - file path relative to repo root",
+      "start_line": "number - first line of the issue",
+      "end_line": "number - last line of the issue",
+      "title": "string - brief issue title (max 100 chars)",
+      "description": "string - detailed explanation",
+      "suggestion": "string - replacement code (optional)",
+      "suggestion_start_line": "number - first line to replace (optional)",
+      "suggestion_end_line": "number - last line to replace (optional)"
+    }
+  ],
+  "positive": ["array of strings - what the PR does well"],
+  "ci_analysis": "string - CI failure analysis (optional)"
+}
+```
+
+### Verdict Guidelines
+- **APPROVE**: No critical/important issues, code looks good
+- **REQUEST_CHANGES**: Critical issues that must be fixed before merge
+- **COMMENT**: Important issues or suggestions, but not blocking
+
+### Suggestion Blocks
+When providing a `suggestion`, it will be rendered as a GitHub suggestion block that can be applied with one click:
+
+````markdown
+```suggestion
+let fixed_code = better_approach();
+```
+````
+
+**Important**: The suggestion replaces lines from `suggestion_start_line` to `suggestion_end_line`. Make sure the replacement is complete and syntactically correct.
+
+## Review Output Format (Legacy Fallback)
+
+If you cannot produce JSON, fall back to markdown at `/tmp/review.md`:
 
 ```markdown
 ## 🔍 Stitch Review
@@ -137,27 +199,11 @@ Use this structure:
 #### 🟡 Suggestions
 [Nice-to-have improvements]
 
+### ✅ What's Good
+[Positive aspects of the PR]
+
 ### CI Failure Analysis
 [If triggered by CI failure, detailed analysis here]
-
-<details>
-<summary>📝 Detailed Findings</summary>
-
-**Issue: [Brief description]**
-
-Problem:
-```[language]
-// Current code
-```
-
-Suggestion:
-```[language]
-// Fixed code
-```
-
-Why: [Explanation]
-
-</details>
 
 ---
 *Reviewed by Stitch 🧵 | [Docs](https://github.com/5dlabs/cto)*
