@@ -1669,6 +1669,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Generate templates for review tasks (Stitch PR Review)
+    #[allow(clippy::too_many_lines)]
     fn generate_review_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -1815,6 +1816,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Generate templates for remediate tasks (Rex PR Remediation)
+    #[allow(clippy::too_many_lines)]
     fn generate_remediate_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
