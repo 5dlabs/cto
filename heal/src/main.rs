@@ -5295,18 +5295,24 @@ fn spawn_remediation_agent(
     }
     println!("{}", "   ✓ Issue file exists".green());
 
-    // Generate unique CodeRun name and apply
+    // Generate unique CodeRun name with new naming pattern:
+    // heal-remediation-task{task_id}-{alert_type}-{alert_id}
     let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
-    let coderun_name = format!("remediation-{alert}-{uid}");
+    let coderun_name = format!("heal-remediation-task{task_id}-{alert}-{uid}");
 
     println!("{}", format!("🏷️  CodeRun name: {coderun_name}").dimmed());
     println!("{}", format!("⏰ Timestamp: {timestamp}").dimmed());
+
+    // Derive log file path from alert pattern (matches spawn_factory_with_prompt output)
+    let log_dir = "/workspace/watch/logs";
+    let log_file = format!("{log_dir}/{}-*.log", alert.to_uppercase());
 
     let coderun_yaml = build_coderun_yaml(
         alert,
         task_id,
         issue_file,
+        &log_file,
         &coderun_name,
         &timestamp,
         &config,
@@ -5339,6 +5345,7 @@ fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
     issue_file: &str,
+    log_file: &str,
     coderun_name: &str,
     timestamp: &impl std::fmt::Display,
     config: &HealConfig,
@@ -5394,7 +5401,9 @@ spec:
   env:
     ALERT_TYPE: "{alert}"
     TASK_ID: "{task_id}"
-    ISSUE_FILE: "{issue_file}"
+    HEAL_PROMPT_FILE: "{issue_file}"
+    HEAL_LOG_FILE: "{log_file}"
+    CODERUN_NAME: "{coderun_name}"
     REMEDIATION_MODE: "true"
 "#,
         namespace = c.namespace,
@@ -5413,6 +5422,8 @@ spec:
         cli_type = c.cli_config.cli_type,
         cli_model = c.cli_config.model,
         template = c.cli_config.settings.template,
+        log_file = log_file,
+        coderun_name = coderun_name,
     )
 }
 

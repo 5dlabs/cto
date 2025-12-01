@@ -2,6 +2,9 @@
 # Claude Heal Remediation - Rex
 # Executes remediation tasks identified by the heal monitoring system
 # Spawned via CodeRun CRD when heal detects issues requiring intervention
+#
+# IMPORTANT: This template does NOT use the docs workflow.
+# Issue context comes from heal-generated files on the shared PVC.
 
 set -e
 
@@ -10,20 +13,50 @@ echo '║             REX HEAL REMEDIATION (CLAUDE) STARTING           ║'
 echo '════════════════════════════════════════════════════════════════'
 echo "🎯 Agent: {{github_app}}"
 echo "📋 Task ID: {{task_id}}"
-echo "🔧 Issue ID: ${ISSUE_ID:-unknown}"
+echo "🔧 Alert Type: ${ALERT_TYPE:-unknown}"
 echo "📂 Repository: {{repository_url}}"
+echo "🌳 CodeRun: ${CODERUN_NAME:-unknown}"
+
+# Export worktree path for agent instructions
+export WORKTREE_PATH="/workspace/worktrees/${CODERUN_NAME}"
+echo "📁 Worktree: ${WORKTREE_PATH}"
+
+# Create worktrees directory if needed
+mkdir -p /workspace/worktrees
+
+# Verify heal-generated files exist
+PROMPT_FILE="${HEAL_PROMPT_FILE:-/workspace/watch/alerts/${ALERT_TYPE:-unknown}.md}"
+LOG_FILE="${HEAL_LOG_FILE:-/workspace/watch/logs/${ALERT_TYPE:-A7}-*.log}"
+
+echo ""
+echo "═══ HEAL CONTEXT FILES ═══"
+echo "📄 Prompt file: ${PROMPT_FILE}"
+echo "📋 Log pattern: ${LOG_FILE}"
+
+if [ -f "${PROMPT_FILE}" ]; then
+    echo "   ✓ Prompt file exists"
+else
+    echo "   ⚠️  Prompt file not found at ${PROMPT_FILE}"
+    echo "   Checking /workspace/watch/alerts/..."
+    ls -la /workspace/watch/alerts/ 2>/dev/null || echo "   No alerts directory"
+LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1 || true)
+
+# Find latest matching log file (|| true prevents glob expansion errors)
+LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1 || true)
+if [ -n "${LATEST_LOG}" ]; then
+    echo "   ✓ Log file: ${LATEST_LOG}"
+    export HEAL_LOG_FILE="${LATEST_LOG}"
+else
+    echo "   ⚠️  No log files matching ${LOG_FILE}"
+fi
 
 # Source common utilities if available
 if [ -f /workspace/scripts/lib/common.sh ]; then
     . /workspace/scripts/lib/common.sh
 fi
 
-# Verify issue context exists
-if [ ! -f "/workspace/watch/alerts/${ISSUE_ID}.md" ] && [ ! -f "/workspace/watch/current-issue.md" ]; then
-    echo "⚠️  No issue context found at /workspace/watch/alerts/ or /workspace/watch/current-issue.md"
-    echo "    Checking for any pending issues..."
-    ls -la /workspace/watch/alerts/ 2>/dev/null || echo "    No alerts directory found"
-fi
+echo ""
+echo "═══ STARTING CLAUDE ═══"
 
 # Run Claude with the heal remediation agent prompt
 exec claude \
@@ -31,4 +64,3 @@ exec claude \
     --model "{{model}}" \
     --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit" \
     -p "$(cat /task-files/agents.md)"
-
