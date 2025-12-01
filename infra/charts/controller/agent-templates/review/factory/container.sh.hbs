@@ -20,15 +20,15 @@ if [ -f /workspace/scripts/lib/common.sh ]; then
     . /workspace/scripts/lib/common.sh
 fi
 
-# Set up environment
-export REPO_URL="{{repository_url}}"
+# Set up environment (names match agents.md documentation)
+export REPOSITORY_URL="{{repository_url}}"
 export PR_NUMBER="{{pr_number}}"
 export HEAD_SHA="{{head_sha}}"
 export REVIEW_MODE="{{review_mode}}"
 export TRIGGER="{{trigger}}"
 
 # Extract owner/repo from URL
-REPO_SLUG=$(echo "$REPO_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+REPO_SLUG=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
 export REPO_SLUG
 
 echo "📦 Repository: $REPO_SLUG"
@@ -45,7 +45,7 @@ echo "   Conclusion: {{check_run_context.conclusion}}"
 echo ""
 echo "📊 Fetching CI failure annotations..."
 if command -v utils >/dev/null 2>&1; then
-    utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-failures.json 2>/dev/null || true
+    utils --format json alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" > /tmp/ci-failures.json 2>/dev/null || true
     if [ -s /tmp/ci-failures.json ]; then
         echo "✅ CI failure context loaded"
         export CI_FAILURES_FILE="/tmp/ci-failures.json"
