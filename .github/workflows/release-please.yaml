@@ -28,6 +28,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
@@ -102,3 +103,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **binaries-release**: Triggered by tag \`${{ needs.release-please.outputs.tag_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **agents-build**: Triggered to rebuild with latest runtime" >> $GITHUB_STEP_SUMMARY
+
