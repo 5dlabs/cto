@@ -88,7 +88,7 @@ enum Commands {
         #[arg(short, long)]
         author: Option<String>,
 
-        /// Only show inline comments (with file:line)
+        /// Only show inline comments (with `file:line`)
         #[arg(short, long)]
         inline: bool,
     },
@@ -265,7 +265,7 @@ async fn run_reviews(
     let client = PrReviews::new(owner, repo_name);
 
     let comments = match author.as_deref() {
-        Some("bugbot") | Some("bug-bot") | Some("cursor") => client.fetch_bugbot(pr).await?,
+        Some("bugbot" | "bug-bot" | "cursor") => client.fetch_bugbot(pr).await?,
         Some("stitch") => client.fetch_stitch(pr).await?,
         Some(author_name) => client.fetch_by_author(pr, author_name).await?,
         None => client.fetch(pr).await?, // Default: Bugbot + Stitch
