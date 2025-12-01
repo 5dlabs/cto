@@ -250,7 +250,7 @@ if [ $SUCCESS -eq 1 ]; then
     echo "════════════════════════════════════════════════════════════════"
     echo "Completed in ${ATTEMPT} attempt(s)"
 
-    # Update GitHub issue if we have an issue number
+    # Update and close GitHub issue if we have an issue number
     if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
         echo "📝 Adding completion comment to issue #${HEAL_ISSUE_NUMBER}..."
         gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "✅ **Remediation Complete**
@@ -262,6 +262,24 @@ All acceptance criteria have been verified:
 
 Completed by: ${CODERUN_NAME}
 Attempts: ${ATTEMPT}" 2>/dev/null || echo "   (could not comment on issue)"
+
+        echo "🔒 Closing issue #${HEAL_ISSUE_NUMBER}..."
+        gh issue close "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --reason completed 2>/dev/null || echo "   (could not close issue)"
+    fi
+
+    # Clean up issue folder on PVC
+    if [ -n "${HEAL_ISSUE_DIR}" ] && [ -d "${HEAL_ISSUE_DIR}" ]; then
+        echo "🧹 Archiving issue folder: ${HEAL_ISSUE_DIR}"
+        ARCHIVE_DIR="/workspace/watch/archived/${HEAL_ISSUE_NUMBER:-unknown}"
+        mkdir -p "$(dirname ${ARCHIVE_DIR})"
+        mv "${HEAL_ISSUE_DIR}" "${ARCHIVE_DIR}" 2>/dev/null || echo "   (folder already moved or missing)"
+    fi
+
+    # Clean up worktree if it exists
+    if [ -n "${WORKTREE_PATH}" ] && [ -d "${WORKTREE_PATH}" ]; then
+        echo "🧹 Removing worktree: ${WORKTREE_PATH}"
+        cd "${REPO_PATH:-/workspace/5dlabs-cto}" 2>/dev/null || true
+        git worktree remove "${WORKTREE_PATH}" --force 2>/dev/null || rm -rf "${WORKTREE_PATH}" 2>/dev/null || true
     fi
 
     exit 0

@@ -176,14 +176,33 @@ gh pr merge $PR_NUMBER --squash --auto
 ```
 
 ### Phase 7: Verify Deployment
+
+Use MCP tools to verify the deployment is healthy:
+
 ```bash
-# Wait for ArgoCD sync
+# Option 1: kubectl (always available)
 echo "⏳ Waiting for ArgoCD sync..."
 sleep 60
 
-# Check deployment status
 kubectl rollout status deployment/cto-controller -n cto --timeout=300s
+kubectl get pods -n cto -l app=cto-controller
+kubectl logs -n cto -l app=cto-controller --tail=50
 ```
+
+**MCP Tool Validation (if available):**
+
+1. **ArgoCD Status**: Check if the application is synced and healthy
+   - Use `argocd_get_application` to verify sync status
+   - Look for `status.sync.status = Synced` and `status.health.status = Healthy`
+
+2. **Kubernetes Validation**: Check pod status directly
+   - Use `kubernetes_pods_list` to get pods in namespace
+   - Use `kubernetes_pods_log` to check for errors
+   - Verify restart count is 0 or stable
+
+3. **Event Check**: Look for recent errors
+   - Use `kubernetes_events_list` to see recent cluster events
+   - Filter for Warning events related to your pod
 
 ### Phase 8: Cleanup
 ```bash
