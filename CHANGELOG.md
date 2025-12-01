@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3](https://github.com/5dlabs/cto/compare/v0.11.2...v0.11.3) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** use full github_app name 5DLabs-Rex ([#1909](https://github.com/5dlabs/cto/issues/1909)) ([99822ee](https://github.com/5dlabs/cto/commit/99822ee6bcfcd4742a64b3c3d8609274a3c6fca7))
+
 ## [0.11.2](https://github.com/5dlabs/cto/compare/v0.11.1...v0.11.2) (2025-12-01)
 
 
