@@ -1,0 +1,18 @@
+---
+# Heal Remediation Agent Templates ConfigMap
+# Contains templates for self-healing remediation agents
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controller.fullname" . }}-agent-templates-heal
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent-templates
+    agent-templates/type: heal
+data:
+{{- $files := .Files }}
+{{- range $path, $_ := .Files.Glob "agent-templates/heal/**.hbs" }}
+  {{ $path | replace "/" "_" | replace "agent-templates_" "" }}: |
+{{ $files.Get $path | indent 4 }}
+{{- end }}
