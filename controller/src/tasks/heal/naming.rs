@@ -63,14 +63,25 @@ impl HealNaming {
     /// Extract alert type from a heal remediation job name.
     ///
     /// Example: `heal-remediation-task42-a7-0dc49936` -> `Some("a7")`
+    ///
+    /// Note: This handles the case where alert_id may contain hyphens (e.g., UUIDs).
+    /// The alert_type is always immediately after the task part and starts with 'a'.
     #[must_use]
     pub fn extract_alert_type(job_name: &str) -> Option<String> {
         // Format: heal-remediation-task{id}-{alert_type}-{alert_id}
+        // Parts: ["heal", "remediation", "task42", "a7", "0dc49936"] or with hyphenated alert_id
         let parts: Vec<&str> = job_name.split('-').collect();
-        // Parts: ["heal", "remediation", "task42", "a7", "0dc49936"]
+        
         if parts.len() >= 4 && parts[0] == "heal" && parts[1] == "remediation" {
-            // alert_type is the 4th part (index 3)
-            return Some(parts[3].to_string());
+            // The task part is at index 2 (e.g., "task42")
+            // The alert_type is at index 3 and always starts with 'a' followed by digits
+            let candidate = parts[3];
+            if candidate.starts_with('a') && candidate.len() > 1 {
+                let rest = &candidate[1..];
+                if rest.chars().all(|c| c.is_ascii_digit()) {
+                    return Some(candidate.to_string());
+                }
+            }
         }
         None
     }
@@ -92,17 +103,55 @@ impl HealNaming {
     }
 
     /// Ensure name is within K8s limits (63 chars).
+    ///
+    /// Uses smart truncation to preserve important identifiers:
+    /// - Always preserves the prefix "heal-remediation-"
+    /// - Always preserves the alert_id suffix (last 8 chars after final hyphen)
+    /// - Truncates the task_id in the middle if needed
     fn ensure_k8s_name_length(name: &str) -> String {
         if name.len() <= MAX_K8S_NAME_LENGTH {
-            name.to_string()
-        } else {
-            // Truncate but ensure it doesn't end with a hyphen
-            let mut truncated: String = name.chars().take(MAX_K8S_NAME_LENGTH).collect();
-            while truncated.ends_with('-') {
-                truncated.pop();
-            }
-            truncated
+            return name.to_string();
         }
+
+        // Format: heal-remediation-task{task_id}-{alert_type}-{alert_id}
+        // We want to preserve: prefix, alert_type, and alert_id
+        let parts: Vec<&str> = name.split('-').collect();
+        
+        if parts.len() >= 5 {
+            let prefix = format!("{}-{}", parts[0], parts[1]); // "heal-remediation"
+            let alert_type = parts[parts.len() - 2]; // e.g., "a7"
+            let alert_id = parts[parts.len() - 1]; // e.g., "0dc49936"
+            
+            // Calculate how much space we have for task part
+            // Format: {prefix}-task{truncated_task}-{alert_type}-{alert_id}
+            let suffix = format!("-{}-{}", alert_type, alert_id);
+            let task_prefix = "task";
+            let available_for_task = MAX_K8S_NAME_LENGTH
+                .saturating_sub(prefix.len())
+                .saturating_sub(1) // hyphen before task
+                .saturating_sub(task_prefix.len())
+                .saturating_sub(suffix.len());
+            
+            // Extract task_id from the task part (parts[2] is "task{id}")
+            let task_part = parts[2];
+            let task_id = task_part.strip_prefix("task").unwrap_or(task_part);
+            
+            let truncated_task: String = task_id.chars().take(available_for_task).collect();
+            
+            let result = format!("{prefix}-{task_prefix}{truncated_task}{suffix}");
+            
+            // Final safety check
+            if result.len() <= MAX_K8S_NAME_LENGTH {
+                return result;
+            }
+        }
+
+        // Fallback: simple truncation ensuring no trailing hyphen
+        let mut truncated: String = name.chars().take(MAX_K8S_NAME_LENGTH).collect();
+        while truncated.ends_with('-') {
+            truncated.pop();
+        }
+        truncated
     }
 }
 
@@ -170,6 +219,50 @@ mod tests {
         );
         assert_eq!(
             HealNaming::extract_task_id("some-other-job"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_smart_truncation_preserves_alert_id() {
+        // Very long task ID that would exceed 63 chars
+        let name = HealNaming::remediation_job_name(
+            "99999999999999999999999999999999", // 32 digit task_id
+            "a7",
+            "abcd1234",
+        );
+        
+        // Should be within limits
+        assert!(name.len() <= MAX_K8S_NAME_LENGTH);
+        
+        // Should preserve the alert_id suffix
+        assert!(name.ends_with("-a7-abcd1234"), "Name should preserve alert_type and alert_id: {}", name);
+        
+        // Should preserve the prefix
+        assert!(name.starts_with("heal-remediation-task"), "Name should preserve prefix: {}", name);
+    }
+
+    #[test]
+    fn test_extract_alert_type_validates_format() {
+        // Valid alert types
+        assert_eq!(
+            HealNaming::extract_alert_type("heal-remediation-task42-a7-0dc49936"),
+            Some("a7".to_string())
+        );
+        assert_eq!(
+            HealNaming::extract_alert_type("heal-remediation-task42-a12-0dc49936"),
+            Some("a12".to_string())
+        );
+        
+        // Invalid - doesn't start with 'a'
+        assert_eq!(
+            HealNaming::extract_alert_type("heal-remediation-task42-xyz-0dc49936"),
+            None
+        );
+        
+        // Invalid - 'a' not followed by digits
+        assert_eq!(
+            HealNaming::extract_alert_type("heal-remediation-task42-abc-0dc49936"),
             None
         );
     }

@@ -41,8 +41,8 @@ else
     ls -la /workspace/watch/alerts/ 2>/dev/null || echo "   No alerts directory"
 LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1 || true)
 
-# Find latest matching log file
-LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1)
+# Find latest matching log file (|| true prevents glob expansion errors)
+LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1 || true)
 if [ -n "${LATEST_LOG}" ]; then
     echo "   ✓ Log file: ${LATEST_LOG}"
     export HEAL_LOG_FILE="${LATEST_LOG}"
