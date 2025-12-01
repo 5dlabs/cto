@@ -85,15 +85,19 @@
 //! - [`alerts`] - Fetch PR check run annotations (alerts) from GitHub
 //! - [`clippy`] - Fetch and parse Clippy errors from CI for automated remediation
 //! - [`comment`] - Post comments to GitHub PRs
+//! - [`resolve`] - Resolve PR review thread conversations
 //! - [`reviews`] - Fetch PR review comments from Bugbot and Stitch
+
 
 pub mod alerts;
 pub mod clippy;
 pub mod comment;
+pub mod resolve;
 pub mod reviews;
 
 // Re-export key types for convenience
 pub use alerts::{Annotation, AnnotationLevel, CheckRun, PrAlerts};
 pub use clippy::{ClippyError, ClippyErrors};
 pub use comment::{format_alerts_comment, format_alerts_comment_with_context, PrComment};
+pub use resolve::{PrConversations, ReviewThread};
 pub use reviews::{PrReviews, ReviewComment, BUGBOT_AUTHORS, STITCH_AUTHORS};

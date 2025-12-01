@@ -5,6 +5,7 @@
 //! Emits unified JSON events for Cursor agent E2E feedback loop automation.
 
 mod alerts;
+mod dedup;
 mod github;
 mod k8s;
 
@@ -325,6 +326,9 @@ enum Commands {
         /// Task ID for the remediation
         #[arg(long)]
         task_id: String,
+        /// Target pod name (for deduplication and labeling)
+        #[arg(long)]
+        target_pod: Option<String>,
         /// GitHub issue number (preferred - derives paths from /workspace/watch/issues/{number}/)
         #[arg(long)]
         issue_number: Option<u64>,
@@ -1792,6 +1796,7 @@ async fn main() -> Result<()> {
         Commands::SpawnRemediation {
             alert,
             task_id,
+            target_pod,
             issue_number,
             issue_file,
             config,
@@ -1799,6 +1804,7 @@ async fn main() -> Result<()> {
             spawn_remediation_agent(
                 &alert,
                 &task_id,
+                target_pod.as_deref(),
                 issue_number,
                 issue_file.as_deref(),
                 &config,
@@ -4602,6 +4608,12 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                 let pod = parse_pod_from_json(&event_json["object"], namespace);
                 let event_type = event_json["type"].as_str().unwrap_or("");
 
+                // Check for exclusion label - skip monitoring this pod if excluded
+                if dedup::should_exclude_pod(&pod.labels) {
+                    debug!(pod = %pod.name, "Skipping excluded pod (heal.platform/exclude=true)");
+                    continue;
+                }
+
                 // Determine the K8sEvent type based on phase and event type
                 let k8s_event = match (pod.phase.as_str(), event_type) {
                     ("Failed" | "Error", _) => k8s::K8sEvent::PodFailed(pod.clone()),
@@ -5305,9 +5317,11 @@ async fn test_alert_flow(
 }
 
 /// Spawn a remediation agent for a detected issue by creating a `CodeRun` CRD.
+#[allow(clippy::too_many_lines)] // Dedup check + file validation + YAML generation in one flow
 fn spawn_remediation_agent(
     alert: &str,
     task_id: &str,
+    target_pod: Option<&str>,
     issue_number: Option<u64>,
     issue_file: Option<&str>,
     config_path: &str,
@@ -5323,6 +5337,32 @@ fn spawn_remediation_agent(
 
     // Load heal config (fall back to defaults if not found)
     let config = load_heal_config(config_path);
+
+    // Check for existing remediation (deduplication)
+    if let Some(pod_name) = target_pod {
+        println!(
+            "{}",
+            format!("🔍 Checking for existing remediation: alert={alert} pod={pod_name}").dimmed()
+        );
+        match dedup::check_existing_remediation(alert, pod_name, &config.coderun.namespace) {
+            Ok(Some(existing)) => {
+                println!(
+                    "{}",
+                    format!("⏭️  Skipping - active remediation exists: {existing}").yellow()
+                );
+                return Ok(());
+            }
+            Ok(None) => {
+                println!("{}", "✅ No existing remediation found".dimmed());
+            }
+            Err(e) => {
+                println!(
+                    "{}",
+                    format!("⚠️  Dedup check failed, proceeding anyway: {e}").yellow()
+                );
+            }
+        }
+    }
     println!(
         "{}",
         format!(
@@ -5412,6 +5452,7 @@ fn spawn_remediation_agent(
     let coderun_yaml = build_coderun_yaml(
         alert,
         task_id,
+        target_pod,
         &prompt_file,
         &log_file,
         &coderun_name,
@@ -5449,6 +5490,7 @@ fn load_heal_config(config_path: &str) -> HealConfig {
 fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
+    target_pod: Option<&str>,
     prompt_file: &str,
     log_file: &str,
     coderun_name: &str,
@@ -5464,6 +5506,16 @@ fn build_coderun_yaml(
     });
 
     let c = &config.coderun;
+
+    // Build target-pod label (sanitized for K8s label requirements)
+    let target_pod_label = target_pod
+        .map(|p| format!("    target-pod: \"{}\"\n", dedup::sanitize_label_value(p)))
+        .unwrap_or_default();
+
+    // Build issue-number label
+    let issue_number_label = issue_number
+        .map(|n| format!("    issue-number: \"{n}\"\n"))
+        .unwrap_or_default();
 
     // Build optional fields only if non-empty
     let remote_tools_line = if c.remote_tools.is_empty() {
@@ -5500,7 +5552,7 @@ metadata:
     remediation: "true"
     created-at: "{timestamp}"
     agents.platform/type: heal-remediation
-spec:
+{target_pod_label}{issue_number_label}spec:
   taskId: {task_id_numeric}
   runType: "{run_type}"
   githubApp: "{github_app}"
@@ -5544,6 +5596,8 @@ spec:
         template = c.cli_config.settings.template,
         log_file = log_file,
         coderun_name = coderun_name,
+        target_pod_label = target_pod_label,
+        issue_number_label = issue_number_label,
         issue_number = issue_number_line,
         issue_dir = issue_dir_line,
         acceptance = acceptance_line,

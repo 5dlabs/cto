@@ -18,7 +18,7 @@ agents/
 **/id_ed25519
 **/id_ed25519.pub
 **/.env
-
+.transcripts/
 # Editor directories and files
 .idea
 .vscode

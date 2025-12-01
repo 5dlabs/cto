@@ -8,7 +8,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use utils::{AnnotationLevel, ClippyErrors, PrAlerts, PrComment, PrReviews};
+use utils::{AnnotationLevel, ClippyErrors, PrAlerts, PrComment, PrConversations, PrReviews};
 
 #[derive(Parser)]
 #[command(name = "utils")]
@@ -111,6 +111,33 @@ enum Commands {
         #[arg(long)]
         check_run_id: Option<u64>,
     },
+
+    /// Resolve PR review thread conversations
+    Resolve {
+        /// Repository in owner/repo format
+        #[arg(short, long)]
+        repo: String,
+
+        /// Pull request number
+        #[arg(short, long)]
+        pr: u32,
+
+        /// Resolve all unresolved conversations
+        #[arg(long)]
+        all: bool,
+
+        /// Only resolve conversations by this author
+        #[arg(short, long)]
+        author: Option<String>,
+
+        /// Specific thread ID to resolve
+        #[arg(long)]
+        thread_id: Option<String>,
+
+        /// List unresolved conversations without resolving
+        #[arg(long)]
+        list: bool,
+    },
 }
 
 #[tokio::main]
@@ -161,6 +188,16 @@ async fn main() -> Result<()> {
             check_run_id,
         } => {
             run_clippy(&repo, pr, prompt, check_run_id, cli.format).await?;
+        }
+        Commands::Resolve {
+            repo,
+            pr,
+            all,
+            author,
+            thread_id,
+            list,
+        } => {
+            run_resolve(&repo, pr, all, author, thread_id, list, cli.format).await?;
         }
     }
 
@@ -413,6 +450,96 @@ async fn run_clippy(
             }
         }
     }
+
+    Ok(())
+}
+
+/// Run the resolve command to manage PR conversations
+async fn run_resolve(
+    repo: &str,
+    pr: u32,
+    all: bool,
+    author: Option<String>,
+    thread_id: Option<String>,
+    list: bool,
+    format: OutputFormat,
+) -> Result<()> {
+    let (owner, repo_name) = utils::alerts::parse_repo(repo)?;
+    let client = PrConversations::new(owner, repo_name);
+
+    // List mode - show unresolved conversations
+    if list {
+        let threads = client.list_unresolved(pr).await?;
+
+        if threads.is_empty() {
+            println!("✅ No unresolved conversations for PR #{pr}");
+            return Ok(());
+        }
+
+        match format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&threads)?);
+            }
+            OutputFormat::Text => {
+                println!("📝 {} unresolved conversations for PR #{}:\n", threads.len(), pr);
+                for (i, thread) in threads.iter().enumerate() {
+                    let location = thread
+                        .path
+                        .as_ref()
+                        .map(|p| {
+                            thread
+                                .line
+                                .map(|l| format!("{p}:{l}"))
+                                .unwrap_or_else(|| p.clone())
+                        })
+                        .unwrap_or_else(|| "general".to_string());
+
+                    println!(
+                        "{}. [{}] @{} at {}",
+                        i + 1,
+                        &thread.id[..12.min(thread.id.len())],
+                        thread.author,
+                        location
+                    );
+                    println!("   {}", thread.body_preview);
+                    println!();
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    // Resolve specific thread by ID
+    if let Some(id) = thread_id {
+        match client.resolve(&id).await {
+            Ok(true) => println!("✅ Resolved thread {id}"),
+            Ok(false) => println!("⚠️ Thread {id} is not a conversation (skipped)"),
+            Err(e) => println!("❌ Failed to resolve thread {id}: {e}"),
+        }
+        return Ok(());
+    }
+
+    // Resolve by author
+    if let Some(author) = author {
+        let resolved = client.resolve_by_author(pr, &author).await?;
+        println!("✅ Resolved {resolved} conversations by @{author} on PR #{pr}");
+        return Ok(());
+    }
+
+    // Resolve all
+    if all {
+        let resolved = client.resolve_all(pr).await?;
+        println!("✅ Resolved {resolved} conversations on PR #{pr}");
+        return Ok(());
+    }
+
+    // Default: list unresolved
+    let threads = client.list_unresolved(pr).await?;
+    println!(
+        "📝 {} unresolved conversations on PR #{}. Use --list, --all, --author, or --thread-id",
+        threads.len(),
+        pr
+    );
 
     Ok(())
 }

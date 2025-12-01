@@ -249,9 +249,10 @@ impl ClippyErrors {
         // "https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#too_many_lines"
         if let Some(start) = message.find('#') {
             let rest = &message[start + 1..];
-            if let Some(end) = rest.find(|c: char| c.is_whitespace() || c == '\n') {
-                return format!("clippy::{}", &rest[..end]);
-            }
+            let end = rest
+                .find(|c: char| c.is_whitespace() || c == '\n')
+                .unwrap_or(rest.len());
+            return format!("clippy::{}", &rest[..end]);
         }
 
         "unknown".to_string()
