@@ -101,7 +101,7 @@ Write acceptance criteria to `${ISSUE_DIR}/acceptance-criteria.md`:
 Update the GitHub issue with the full analysis:
 
 ```bash
-gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat <<'EOF'
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat << EOF
 # Pod Failure Analysis: {{pod_name}}
 
 ## Alert Details

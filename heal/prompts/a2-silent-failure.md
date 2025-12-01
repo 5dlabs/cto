@@ -68,7 +68,7 @@ Analyze the logs and write your analysis to `${ISSUE_DIR}/prompt.md`:
 ### Step 4: Write acceptance-criteria.md
 
 ```bash
-cat > "${ISSUE_DIR}/acceptance-criteria.md" << 'CRITERIA'
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 # Acceptance Criteria - Issue #${ISSUE_NUMBER}
 
 ## Definition of Done
@@ -77,9 +77,9 @@ cat > "${ISSUE_DIR}/acceptance-criteria.md" << 'CRITERIA'
 - [ ] Root cause of silent failure identified
 - [ ] Fix implemented to prevent crash/unhandled error
 - [ ] Error handling improved if applicable
-- [ ] Code passes `cargo fmt --all --check`
-- [ ] Code passes `cargo clippy --all-targets -- -D warnings`
-- [ ] All tests pass: `cargo test --workspace`
+- [ ] Code passes \`cargo fmt --all --check\`
+- [ ] Code passes \`cargo clippy --all-targets -- -D warnings\`
+- [ ] All tests pass: \`cargo test --workspace\`
 
 ### Deployment
 - [ ] PR created and linked to issue #${ISSUE_NUMBER}
@@ -97,7 +97,7 @@ CRITERIA
 ### Step 5: Update GitHub Issue
 
 ```bash
-gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat <<'EOF'
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat << EOF
 # Silent Failure Analysis: {{pod_name}}
 
 ## Alert Details
