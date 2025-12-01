@@ -742,6 +742,15 @@ agents:
       - Document the root cause in your commit message
 
       Your goal: Turn red → green with minimal disruption.
+    tools:
+      remote:
+        - github_get_pull_request
+        - github_get_pull_request_files
+        - github_get_pull_request_comments
+        - github_create_pull_request_review
+        - github_get_file_contents
+        - context7_resolve_library_id
+        - context7_get_library_docs
 
   atlas:
     name: "Atlas"

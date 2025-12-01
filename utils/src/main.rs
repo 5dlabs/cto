@@ -8,7 +8,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use utils::{AnnotationLevel, PrAlerts, PrComment};
+use utils::{AnnotationLevel, ClippyErrors, PrAlerts, PrComment, PrReviews};
 
 #[derive(Parser)]
 #[command(name = "utils")]
@@ -73,6 +73,44 @@ enum Commands {
         #[arg(short, long)]
         dry_run: bool,
     },
+
+    /// Fetch PR review comments from Bugbot and Stitch
+    Reviews {
+        /// Repository in owner/repo format
+        #[arg(short, long)]
+        repo: String,
+
+        /// Pull request number
+        #[arg(short, long)]
+        pr: u32,
+
+        /// Filter by author: bugbot, stitch, or username
+        #[arg(short, long)]
+        author: Option<String>,
+
+        /// Only show inline comments (with `file:line`)
+        #[arg(short, long)]
+        inline: bool,
+    },
+
+    /// Fetch Clippy errors from failed lint-rust CI check
+    Clippy {
+        /// Repository in owner/repo format
+        #[arg(short, long)]
+        repo: String,
+
+        /// Pull request number
+        #[arg(short, long)]
+        pr: u32,
+
+        /// Output as fix prompt for AI remediation
+        #[arg(long)]
+        prompt: bool,
+
+        /// Specific check run ID (optional, defaults to finding lint-rust)
+        #[arg(long)]
+        check_run_id: Option<u64>,
+    },
 }
 
 #[tokio::main]
@@ -107,6 +145,22 @@ async fn main() -> Result<()> {
             dry_run,
         } => {
             run_post_alerts(&repo, pr, warnings, dry_run).await?;
+        }
+        Commands::Reviews {
+            repo,
+            pr,
+            author,
+            inline,
+        } => {
+            run_reviews(&repo, pr, author, inline, cli.format).await?;
+        }
+        Commands::Clippy {
+            repo,
+            pr,
+            prompt,
+            check_run_id,
+        } => {
+            run_clippy(&repo, pr, prompt, check_run_id, cli.format).await?;
         }
     }
 
@@ -217,6 +271,142 @@ async fn run_alerts(
                     println!("  {}", ann.message);
                     if !ann.title.is_empty() {
                         println!("  Title: {}", ann.title);
+                    }
+                    println!();
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_reviews(
+    repo: &str,
+    pr: u32,
+    author: Option<String>,
+    inline_only: bool,
+    format: OutputFormat,
+) -> Result<()> {
+    let (owner, repo_name) = utils::alerts::parse_repo(repo)?;
+    let client = PrReviews::new(owner, repo_name);
+
+    let comments = match author.as_deref() {
+        Some("bugbot" | "bug-bot" | "cursor") => client.fetch_bugbot(pr).await?,
+        Some("stitch") => client.fetch_stitch(pr).await?,
+        Some(author_name) => client.fetch_by_author(pr, author_name).await?,
+        None => client.fetch(pr).await?, // Default: Bugbot + Stitch
+    };
+
+    // Filter to inline only if requested
+    let comments: Vec<_> = if inline_only {
+        comments
+            .into_iter()
+            .filter(|c| c.line.is_some() && !c.path.is_empty())
+            .collect()
+    } else {
+        comments
+    };
+
+    match format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&comments)?);
+        }
+        OutputFormat::Text => {
+            if comments.is_empty() {
+                println!("No review comments found for PR #{pr}");
+            } else {
+                println!(
+                    "Review comments for PR #{pr} ({} total):\n",
+                    comments.len()
+                );
+                for comment in comments {
+                    // Header with author and location
+                    let location = if !comment.path.is_empty() && comment.line.is_some() {
+                        format!("{}:{}", comment.path, comment.line.unwrap())
+                    } else if !comment.path.is_empty() {
+                        comment.path.clone()
+                    } else {
+                        "general comment".to_string()
+                    };
+
+                    let source = if comment.is_bugbot {
+                        "🤖 Bugbot"
+                    } else if comment.is_stitch {
+                        "🧵 Stitch"
+                    } else {
+                        "👤"
+                    };
+
+                    println!("[{source}] @{} at {location}", comment.author);
+
+                    // Truncate body for display
+                    let body_preview: String = comment
+                        .body
+                        .lines()
+                        .take(3)
+                        .collect::<Vec<_>>()
+                        .join("\n  ");
+                    println!("  {body_preview}");
+
+                    // Show suggestion if present
+                    if let Some(suggestion) = &comment.suggestion {
+                        println!("  💡 Suggestion: {}", suggestion.lines().next().unwrap_or(""));
+                    }
+
+                    println!();
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Run the clippy command to fetch and display Clippy errors
+async fn run_clippy(
+    repo: &str,
+    pr: u32,
+    as_prompt: bool,
+    check_run_id: Option<u64>,
+    format: OutputFormat,
+) -> Result<()> {
+    let (owner, repo_name) = utils::alerts::parse_repo(repo)?;
+    let client = ClippyErrors::new(owner, repo_name);
+
+    let errors = if let Some(id) = check_run_id {
+        client.fetch_by_check_run(id).await?
+    } else {
+        client.fetch(pr).await?
+    };
+
+    if errors.is_empty() {
+        println!("✅ No Clippy errors found for PR #{pr}");
+        return Ok(());
+    }
+
+    if as_prompt {
+        // Output as a fix prompt for AI remediation
+        println!("{}", client.generate_fix_prompt(&errors));
+    } else {
+        match format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(&errors)?);
+            }
+            OutputFormat::Text => {
+                println!("🔴 Found {} Clippy errors for PR #{}:\n", errors.len(), pr);
+                for (i, err) in errors.iter().enumerate() {
+                    println!(
+                        "{}. [{}] {} at {}:{}",
+                        i + 1,
+                        err.level,
+                        err.code,
+                        err.file,
+                        err.line
+                    );
+                    println!("   Message: {}", err.message);
+                    if let Some(suggestion) = &err.suggestion {
+                        println!("   💡 {suggestion}");
                     }
                     println!();
                 }

@@ -1,49 +1,49 @@
 #!/bin/sh
-# Factory PR Review - Stitch
-# Executes PR review tasks triggered by GitHub events
-# Spawned via CodeRun CRD (runType: review) when PRs are opened, CI fails, or review commands are issued
+# Claude PR Remediation - Rex
+# Executes PR remediation tasks triggered by review findings
+# Spawned via CodeRun CRD when users click "remediate" or when Rex is triggered to fix issues
 
 set -e
 
 echo '════════════════════════════════════════════════════════════════'
-echo '║           STITCH PR REVIEW (FACTORY) STARTING                ║'
+echo '║           REX PR REMEDIATION (CLAUDE) STARTING               ║'
 echo '════════════════════════════════════════════════════════════════'
 echo "🎯 Agent: {{github_app}}"
 echo "🔢 PR Number: {{pr_number}}"
 echo "📂 Repository: {{repository_url}}"
-echo "🔍 Review Mode: {{review_mode}}"
-echo "⚡ Trigger: {{trigger}}"
 echo "📝 Head SHA: {{head_sha}}"
+{{#if task_id}}
+echo "📋 Task ID: {{task_id}}"
+{{/if}}
 
 # Source common utilities if available
 if [ -f /workspace/scripts/lib/common.sh ]; then
     . /workspace/scripts/lib/common.sh
 fi
 
-# Set up environment (names match agents.md documentation)
+# Set up environment
 export REPOSITORY_URL="{{repository_url}}"
 export PR_NUMBER="{{pr_number}}"
 export HEAD_SHA="{{head_sha}}"
-export REVIEW_MODE="{{review_mode}}"
-export TRIGGER="{{trigger}}"
+export REPO_SLUG="{{repo_slug}}"
 
 # MCP Tools configuration
 export TOOLS_URL="{{tools_url}}"
 
-# Extract owner/repo from URL
-REPO_SLUG=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
-export REPO_SLUG
-
 echo "📦 Repository: $REPO_SLUG"
 echo "🔧 Tools URL: $TOOLS_URL"
 
-# Always fetch CI alerts for proactive analysis (not just when triggered by check_run)
+# Pre-flight: Check for required tools
+if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ Warning: jq not found - CI alert parsing will be limited"
+fi
+
+# Always fetch CI alerts for remediation context
 echo ""
-echo "📊 Pre-flight: Checking CI status..."
+echo "📊 Fetching CI alerts for remediation context..."
 if command -v utils >/dev/null 2>&1; then
     utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-alerts.json 2>/dev/null || echo "[]" > /tmp/ci-alerts.json
     
-    # Count alerts by severity
     if command -v jq >/dev/null 2>&1 && [ -s /tmp/ci-alerts.json ]; then
         FAILURE_COUNT=$(jq '[.[] | select(.annotation_level == "failure")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
         WARNING_COUNT=$(jq '[.[] | select(.annotation_level == "warning")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
@@ -53,51 +53,34 @@ if command -v utils >/dev/null 2>&1; then
         
         if [ "$FAILURE_COUNT" -gt 0 ]; then
             echo "🔴 Found $FAILURE_COUNT CI error(s), $WARNING_COUNT warning(s)"
-            echo "   → CI failures will be analyzed and posted as inline comments"
+            echo "   → These will be included in remediation targets"
         elif [ "$WARNING_COUNT" -gt 0 ]; then
             echo "🟡 Found $WARNING_COUNT CI warning(s)"
         else
             echo "✅ No CI failures detected"
         fi
-    else
-        echo "⚠️  Could not parse CI alerts (jq not available)"
     fi
 else
-    echo "⚠️  utils binary not available, skipping CI analysis"
+    echo "⚠️ utils binary not available, skipping CI alert fetch"
 fi
 
-# Additional context if triggered by check_run
-{{#if check_run_context}}
+# Check for review findings to remediate
+{{#if findings_path}}
 echo ""
-echo "🔴 CI Failure Analysis Mode (triggered by check_run)"
-echo "   Check Run: {{check_run_context.name}}"
-echo "   Check Run ID: {{check_run_context.check_run_id}}"
-echo "   Conclusion: {{check_run_context.conclusion}}"
-export CHECK_RUN_ID="{{check_run_context.check_run_id}}"
-export CHECK_RUN_NAME="{{check_run_context.name}}"
+echo "📋 Remediating findings from: {{findings_path}}"
+if [ -f "{{findings_path}}" ]; then
+    export FINDINGS_FILE="{{findings_path}}"
+    echo "✅ Findings file found"
+else
+    echo "⚠️ Findings file not found at {{findings_path}}"
+fi
 {{/if}}
 
-# Fetch comment context if triggered by comment
-{{#if comment_context}}
+# Check for review comment context
+{{#if review_comment_id}}
 echo ""
-echo "💬 Comment-Triggered Review"
-echo "   Author: {{comment_context.author}}"
-echo "   Command: {{comment_context.body}}"
-{{#if comment_context.file_path}}
-echo "   File: {{comment_context.file_path}}:{{comment_context.line_number}}"
-{{/if}}
-{{/if}}
-
-# Fetch code scan context if triggered by security alert
-{{#if code_scan_context}}
-echo ""
-echo "🔒 Security Alert Analysis Mode"
-echo "   Alert: #{{code_scan_context.alert_number}}"
-echo "   Rule: {{code_scan_context.rule_id}}"
-echo "   Severity: {{code_scan_context.severity}}"
-{{#if code_scan_context.file_path}}
-echo "   File: {{code_scan_context.file_path}}"
-{{/if}}
+echo "💬 Triggered by review comment: {{review_comment_id}}"
+export REVIEW_COMMENT_ID="{{review_comment_id}}"
 {{/if}}
 
 # Load agent prompt
@@ -126,43 +109,30 @@ echo "  • {{this}}"
 echo "  (none configured)"
 {{/if}}
 
-# Verify Factory MCP tools are available using droid --list-tools
+# Verify Claude MCP tools are available
 echo ""
-echo "🔍 Verifying Factory MCP tools..."
-if command -v droid >/dev/null 2>&1; then
-    TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
-    
-    if [ "$TOOL_LIST" != "FAILED" ]; then
-        # Show tool count
-        TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
-        echo "  📊 Total tools available: $TOOL_COUNT"
-        
-        # List available tools for verification
-        echo ""
-        echo "📋 Available Tools:"
-        echo "$TOOL_LIST" | grep "status:" | sed 's/^/  /' | head -20
-        
-        if [ "$TOOL_COUNT" -gt 20 ]; then
-            echo "  ... and $((TOOL_COUNT - 20)) more"
-        fi
+echo "🔍 Verifying Claude MCP servers..."
+if command -v claude >/dev/null 2>&1; then
+    MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+    if [ "$MCP_LIST" != "FAILED" ]; then
+        echo "$MCP_LIST" | sed 's/^/  /'
     else
-        echo "  ⚠️ Could not list Factory tools (droid exec --list-tools failed)"
+        echo "  ⚠️ Could not list MCP servers"
     fi
 else
-    echo "  ⚠️ droid CLI not available for tool verification"
+    echo "  ⚠️ claude CLI not available for MCP verification"
 fi
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
 echo ""
-echo "🚀 Starting Factory CLI (droid exec)..."
+echo "🚀 Starting Claude CLI..."
 echo ""
 
-# Run Factory with the review agent prompt
-exec droid exec \
-    --auto high \
+# Run Claude with the remediation agent prompt
+exec claude \
+    --dangerously-skip-permissions \
     --model "{{model}}" \
-    --output-format stream-json \
-    "$(cat ${AGENT_PROMPT})"
-
+    --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(jq:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit" \
+    -p "$(cat ${AGENT_PROMPT})"

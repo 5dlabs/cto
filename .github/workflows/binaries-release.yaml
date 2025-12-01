@@ -6,6 +6,7 @@
 # - tools-server/tools-client: Dynamic MCP tool management
 # - heal: Self-healing platform monitor
 # - controller: Agent platform controller
+# - utils: Micro-utilities for GitHub operations (CI alerts, PR comments)
 #
 # Cross-platform builds via cargo-dist (macOS, Linux, Windows)
 # Docker images for tools-server (Kubernetes deployment)
@@ -107,6 +108,9 @@ jobs:
           - name: controller
             binary: agent-controller
             dir: controller
+          - name: utils
+            binary: utils
+            dir: utils
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -126,13 +130,17 @@ jobs:
             suffix: windows-x86_64
             ext: .exe
         exclude:
-          # heal and controller don't need Windows builds
+          # heal, controller, and utils don't need Windows builds
           - package:
               name: heal
             target:
               os: windows-latest
           - package:
               name: controller
+            target:
+              os: windows-latest
+          - package:
+              name: utils
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}
@@ -389,6 +397,9 @@ jobs:
           ### 🎮 controller
           Agent platform controller - manages Claude Code agents via TaskRun CRDs.
 
+          ### 🔨 utils
+          Micro-utilities for GitHub operations - CI alerts, PR comments, and more.
+
           ---
 
           ### Installation
@@ -403,6 +414,9 @@ jobs:
 
           # Install heal
           curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/heal-installer.sh | sh
+
+          # Install utils
+          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/utils-installer.sh | sh
           ```
 
           **Docker (tools-server only):**
@@ -413,13 +427,13 @@ jobs:
           **Manual download:**
           Download the appropriate binary for your platform from the assets below.
 
-          | Platform | cto-mcp | tools-server | tools-client | heal | controller |
-          |----------|---------|--------------|--------------|------|------------|
-          | Linux x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ |
-          | Linux ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ |
-          | macOS x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ |
-          | macOS ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ |
-          | Windows x86_64 | ✅ | ✅ | ✅ | ❌ | ❌ |
+          | Platform | cto-mcp | tools-server | tools-client | heal | controller | utils |
+          |----------|---------|--------------|--------------|------|------------|-------|
+          | Linux x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | Linux ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | macOS x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | macOS ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | Windows x86_64 | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
           EOF
 
       - name: Create or update release

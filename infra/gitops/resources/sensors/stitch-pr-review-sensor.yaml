@@ -1,7 +1,8 @@
 ---
 # Stitch PR Review Sensor
 # Triggers Stitch to review PRs on pull_request events
-# Phase 1: PR opened/synchronized/reopened only
+# Creates a CodeRun CRD with runType: "review" which the controller processes
+# Pod naming: review-pr{pr}-stitch-{model}-{uid}-v{version}
 
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -30,6 +31,8 @@ spec:
       eventSourceName: github
       eventName: org
       filters:
+        # Logical operator for combining filters (default is AND)
+        exprLogicalOperator: "and"
         data:
           - path: body.X-GitHub-Event
             type: string
@@ -41,310 +44,135 @@ spec:
               - opened
               - synchronize
               - reopened
+        # Expression filters to exclude automated PRs
+        exprs:
+          # Exclude bot users (github-actions, dependabot, renovate, etc.)
+          - expr: >-
+              !(
+                body.pull_request.user.login contains "[bot]" ||
+                body.pull_request.user.login == "github-actions" ||
+                body.pull_request.user.login == "dependabot" ||
+                body.pull_request.user.login == "renovate"
+              )
+            fields:
+              - name: body.pull_request.user.login
+                path: body.pull_request.user.login
+          # Exclude release-please branches
+          - expr: >-
+              !(body.pull_request.head.ref contains "release-please")
+            fields:
+              - name: body.pull_request.head.ref
+                path: body.pull_request.head.ref
+          # Exclude auto-release/dependency PR titles
+          - expr: >-
+              !(
+                body.pull_request.title startsWith "chore: release" ||
+                body.pull_request.title startsWith "chore(deps)" ||
+                body.pull_request.title startsWith "chore(release)" ||
+                body.pull_request.title contains "[skip review]" ||
+                body.pull_request.title contains "[no review]"
+              )
+            fields:
+              - name: body.pull_request.title
+                path: body.pull_request.title
   triggers:
     - template:
-        name: stitch-review-pr
+        name: stitch-review-coderun
         conditions: pr-event
-        argoWorkflow:
-          operation: submit
+        k8s:
+          operation: create
           source:
             resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
+              apiVersion: agents.platform/v1
+              kind: CodeRun
               metadata:
                 generateName: stitch-review-
                 namespace: cto
                 labels:
                   agent: stitch
-                  workflow-type: pr-review
+                  run-type: review
+                  pr-number: ""  # Will be filled by parameter
               spec:
-                serviceAccountName: cto
-                entrypoint: review
-                arguments:
-                  parameters:
-                    - name: pr-number
-                    - name: repo-url
-                    - name: head-sha
-                    - name: repo-slug
-                    - name: base-branch
-                    - name: head-branch
-                    - name: pr-title
-                    - name: pr-author
-                    - name: trigger
-                      value: pull_request
-                ttlStrategy:
-                  secondsAfterCompletion: 300
-                  secondsAfterFailure: 3600
-                  secondsAfterSuccess: 300
-                volumes:
-                  - name: agent-templates
-                    configMap:
-                      name: cto-controller-agent-templates-factory
-                      items:
-                        - key: review_factory_agents.md.hbs
-                          path: agents.md
-                        - key: review_factory_post_review.py
-                          path: post_review.py
-                          mode: 0755
-                  - name: github-app-key
-                    secret:
-                      secretName: github-app-5dlabs-stitch
-                      items:
-                        - key: private-key
-                          path: private-key.pem
-                  - name: factory-home
-                    emptyDir: {}
-                templates:
-                  - name: review
-                    container:
-                      image: ghcr.io/5dlabs/factory:latest
-                      command: ["/bin/sh"]
-                      args:
-                        - "-c"
-                        - |
-                          set -e
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo '║           STITCH PR REVIEW (FACTORY) STARTING                ║'
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo "🎯 Agent: 5DLabs-Stitch"
-                          echo "🔢 PR Number: $PR_NUMBER"
-                          echo "📂 Repository: $REPO_SLUG"
-                          echo "🔍 Review Mode: review"
-                          echo "⚡ Trigger: $TRIGGER"
-                          echo "📝 Head SHA: $HEAD_SHA"
-                          echo "📌 Title: $PR_TITLE"
-                          echo "👤 Author: $PR_AUTHOR"
-                          echo ""
-
-                          # Generate GitHub App installation token
-                          echo "🔐 Generating GitHub App installation token..."
-                          APP_ID="${GITHUB_APP_ID}"
-                          PRIVATE_KEY_PATH="${GITHUB_APP_PRIVATE_KEY_PATH}"
-
-                          # Generate JWT
-                          NOW=$(date +%s)
-                          IAT=$((NOW - 60))
-                          EXP=$((NOW + 600))
-
-                          HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-                          PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-                          UNSIGNED="${HEADER}.${PAYLOAD}"
-                          SIGNATURE=$(echo -n "${UNSIGNED}" | openssl dgst -sha256 -sign "${PRIVATE_KEY_PATH}" | \
-                            base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-                          JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
-
-                          # Get installation ID for this repo (jq is available in Factory image)
-                          INSTALL_RESP=$(curl -s -H "Authorization: Bearer ${JWT}" \
-                            -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/repos/${REPO_SLUG}/installation")
-                          INSTALL_ID=$(echo "$INSTALL_RESP" | jq -r '.id')
-
-                          if [ -z "$INSTALL_ID" ] || [ "$INSTALL_ID" = "null" ]; then
-                            echo "❌ Failed to get installation ID"
-                            echo "Response: $INSTALL_RESP"
-                            exit 1
-                          fi
-                          echo "📍 Installation ID: $INSTALL_ID"
-
-                          # Generate installation access token
-                          TOKEN_RESPONSE=$(curl -s -X POST \
-                            -H "Authorization: Bearer ${JWT}" \
-                            -H "Accept: application/vnd.github+json" \
-                            "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens")
-
-                          export GH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-
-                          if [ -z "$GH_TOKEN" ]; then
-                            echo "❌ Failed to generate installation token"
-                            echo "Response: $TOKEN_RESPONSE"
-                            exit 1
-                          fi
-                          echo "✅ GitHub App token generated successfully"
-                          echo ""
-
-                          # Create check run (in_progress)
-                          echo "📊 Creating check run..."
-                          OWNER=$(echo "$REPO_SLUG" | cut -d'/' -f1)
-                          REPO=$(echo "$REPO_SLUG" | cut -d'/' -f2)
-                          START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-                          CHECK_RUN_RESPONSE=$(curl -s -X POST \
-                            -H "Authorization: Bearer ${GH_TOKEN}" \
-                            -H "Accept: application/vnd.github+json" \
-                            -H "X-GitHub-Api-Version: 2022-11-28" \
-                            "https://api.github.com/repos/${REPO_SLUG}/check-runs" \
-                            -d "{
-                              \"name\": \"Stitch PR Review\",
-                              \"head_sha\": \"${HEAD_SHA}\",
-                              \"status\": \"in_progress\",
-                              \"started_at\": \"${START_TIME}\",
-                              \"output\": {
-                                \"title\": \"Stitch is reviewing your PR\",
-                                \"summary\": \"AI-powered code review in progress...\"
-                              }
-                            }")
-
-                          CHECK_RUN_ID=$(echo "$CHECK_RUN_RESPONSE" | jq -r '.id')
-                          if [ -z "$CHECK_RUN_ID" ] || [ "$CHECK_RUN_ID" = "null" ]; then
-                            echo "⚠️ Failed to create check run (continuing anyway)"
-                            echo "Response: $CHECK_RUN_RESPONSE"
-                          else
-                            echo "✅ Check run created: $CHECK_RUN_ID"
-                          fi
-                          echo ""
-
-                          # Load agent prompt
-                          AGENT_PROMPT="/task-files/agents.md"
-                          if [ ! -f "${AGENT_PROMPT}" ]; then
-                              echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
-                              # Update check run to failure if it exists
-                              if [ -n "$CHECK_RUN_ID" ]; then
-                                curl -s -X PATCH \
-                                  -H "Authorization: Bearer ${GH_TOKEN}" \
-                                  -H "Accept: application/vnd.github+json" \
-                                  "https://api.github.com/repos/${REPO_SLUG}/check-runs/${CHECK_RUN_ID}" \
-                                  -d '{"status":"completed","conclusion":"failure"}'
-                              fi
-                              exit 1
-                          fi
-
-                          echo "📋 Agent prompt loaded from ${AGENT_PROMPT}"
-                          echo ""
-                          echo "🚀 Starting Factory CLI (droid exec)..."
-                          echo ""
-
-                          # Run Factory with the review agent prompt
-                          # Capture exit code to update check run
-                          set +e
-                          droid exec \
-                              --auto high \
-                              --model "${MODEL}" \
-                              --output-format stream-json \
-                              "$(cat ${AGENT_PROMPT})"
-                          DROID_EXIT=$?
-                          set -e
-
-                          # Post inline review comments
-                          if [ $DROID_EXIT -eq 0 ]; then
-                            echo ""
-                            echo "📝 Posting review..."
-                            python3 /task-files/post_review.py || true
-                          fi
-
-                          # Update check run with result
-                          END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-                          if [ -n "$CHECK_RUN_ID" ]; then
-                            if [ $DROID_EXIT -eq 0 ]; then
-                              CONCLUSION="success"
-                              TITLE="Stitch review complete"
-                              SUMMARY="PR review completed successfully."
-                            else
-                              CONCLUSION="failure"
-                              TITLE="Stitch review failed"
-                              SUMMARY="PR review encountered an error."
-                            fi
-
-                            curl -s -X PATCH \
-                              -H "Authorization: Bearer ${GH_TOKEN}" \
-                              -H "Accept: application/vnd.github+json" \
-                              -H "X-GitHub-Api-Version: 2022-11-28" \
-                              "https://api.github.com/repos/${REPO_SLUG}/check-runs/${CHECK_RUN_ID}" \
-                              -d "{
-                                \"status\": \"completed\",
-                                \"conclusion\": \"${CONCLUSION}\",
-                                \"completed_at\": \"${END_TIME}\",
-                                \"output\": {
-                                  \"title\": \"${TITLE}\",
-                                  \"summary\": \"${SUMMARY}\"
-                                }
-                              }"
-                            echo "✅ Check run updated: ${CONCLUSION}"
-                          fi
-
-                          exit $DROID_EXIT
-                      env:
-                        - name: PR_NUMBER
-                          value: "{{workflow.parameters.pr-number}}"
-                        - name: REPOSITORY_URL
-                          value: "{{workflow.parameters.repo-url}}"
-                        - name: REPO_SLUG
-                          value: "{{workflow.parameters.repo-slug}}"
-                        - name: HEAD_SHA
-                          value: "{{workflow.parameters.head-sha}}"
-                        - name: BASE_BRANCH
-                          value: "{{workflow.parameters.base-branch}}"
-                        - name: HEAD_BRANCH
-                          value: "{{workflow.parameters.head-branch}}"
-                        - name: PR_TITLE
-                          value: "{{workflow.parameters.pr-title}}"
-                        - name: PR_AUTHOR
-                          value: "{{workflow.parameters.pr-author}}"
-                        - name: TRIGGER
-                          value: "{{workflow.parameters.trigger}}"
-                        - name: REVIEW_MODE
-                          value: "review"
-                        - name: MODEL
-                          value: "claude-opus-4-5-20251101"
-                        - name: GITHUB_APP_ID
-                          value: "1794583"
-                        - name: GITHUB_APP_PRIVATE_KEY_PATH
-                          value: "/secrets/github-app/private-key.pem"
-                        - name: FACTORY_API_KEY
-                          valueFrom:
-                            secretKeyRef:
-                              name: cto-secrets
-                              key: FACTORY_API_KEY
-                        - name: ANTHROPIC_API_KEY
-                          valueFrom:
-                            secretKeyRef:
-                              name: cto-secrets
-                              key: ANTHROPIC_API_KEY
-                      resources:
-                        limits:
-                          cpu: 4000m
-                          memory: 8Gi
-                        requests:
-                          cpu: 1000m
-                          memory: 2Gi
-                      volumeMounts:
-                        - name: agent-templates
-                          mountPath: /task-files
-                          readOnly: true
-                        - name: github-app-key
-                          mountPath: /secrets/github-app
-                          readOnly: true
-                        - name: factory-home
-                          mountPath: /home/node/.factory
+                runType: review
+                service: stitch-review
+                repositoryUrl: ""  # Will be filled by parameter
+                docsRepositoryUrl: ""  # Will be filled by parameter (same as repo)
+                docsBranch: main
+                model: claude-opus-4-5-20251101
+                githubApp: 5DLabs-Stitch
+                contextVersion: 1
+                continueSession: false
+                overwriteMemory: false
+                enableDocker: false
+                env:
+                  PR_NUMBER: ""
+                  HEAD_SHA: ""
+                  BASE_BRANCH: ""
+                  HEAD_BRANCH: ""
+                  PR_TITLE: ""
+                  PR_AUTHOR: ""
+                  TRIGGER: pull_request
+                  REVIEW_MODE: review
+                  REPO_SLUG: ""
+                envFromSecrets:
+                  - name: FACTORY_API_KEY
+                    secretName: cto-secrets
+                    secretKey: FACTORY_API_KEY
+                  - name: ANTHROPIC_API_KEY
+                    secretName: cto-secrets
+                    secretKey: ANTHROPIC_API_KEY
+                cliConfig:
+                  cliType: factory
+                  model: claude-opus-4-5-20251101
+                  settings:
+                    template: review/factory
+                    autoLevel: high
           parameters:
+            # PR number - used in labels and env
             - src:
                 dependencyName: pr-event
                 dataKey: body.pull_request.number
-              dest: spec.arguments.parameters.0.value
+              dest: metadata.labels.pr-number
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.number
+              dest: spec.env.PR_NUMBER
+            # Repository URL
             - src:
                 dependencyName: pr-event
                 dataKey: body.repository.html_url
-              dest: spec.arguments.parameters.1.value
+              dest: spec.repositoryUrl
+            - src:
+                dependencyName: pr-event
+                dataKey: body.repository.html_url
+              dest: spec.docsRepositoryUrl
+            # Head SHA
             - src:
                 dependencyName: pr-event
                 dataKey: body.pull_request.head.sha
-              dest: spec.arguments.parameters.2.value
+              dest: spec.env.HEAD_SHA
+            # Repo slug (owner/repo)
             - src:
                 dependencyName: pr-event
                 dataKey: body.repository.full_name
-              dest: spec.arguments.parameters.3.value
+              dest: spec.env.REPO_SLUG
+            # Base branch
             - src:
                 dependencyName: pr-event
                 dataKey: body.pull_request.base.ref
-              dest: spec.arguments.parameters.4.value
+              dest: spec.env.BASE_BRANCH
+            # Head branch
             - src:
                 dependencyName: pr-event
                 dataKey: body.pull_request.head.ref
-              dest: spec.arguments.parameters.5.value
+              dest: spec.env.HEAD_BRANCH
+            # PR title
             - src:
                 dependencyName: pr-event
                 dataKey: body.pull_request.title
-              dest: spec.arguments.parameters.6.value
+              dest: spec.env.PR_TITLE
+            # PR author
             - src:
                 dependencyName: pr-event
                 dataKey: body.pull_request.user.login
-              dest: spec.arguments.parameters.7.value
+              dest: spec.env.PR_AUTHOR
