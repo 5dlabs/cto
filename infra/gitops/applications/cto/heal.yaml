@@ -2,6 +2,11 @@
 # ArgoCD Application for Heal (Self-Healing Platform Monitor)
 # Deployed as a continuous Kubernetes deployment in the CTO namespace
 # Watches for pod failures and spawns Rex remediation agents via CodeRun CRDs
+#
+# Image updates are managed by ArgoCD Image Updater:
+# - Watches ghcr.io/5dlabs/heal for new semver tags
+# - Automatically updates image.tag parameter
+# - ArgoCD syncs and rolls out new version
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,6 +16,16 @@ metadata:
     app.kubernetes.io/name: heal
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/managed-by: cto-app-of-apps
+  annotations:
+    # ═══════════════════════════════════════════════════════════════════
+    # ArgoCD Image Updater Configuration
+    # Enables automatic image updates on new releases
+    # ═══════════════════════════════════════════════════════════════════
+    argocd-image-updater.argoproj.io/image-list: heal=ghcr.io/5dlabs/heal
+    argocd-image-updater.argoproj.io/heal.update-strategy: semver
+    argocd-image-updater.argoproj.io/heal.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    argocd-image-updater.argoproj.io/heal.helm.image-tag: image.tag
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

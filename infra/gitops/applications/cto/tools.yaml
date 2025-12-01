@@ -3,6 +3,11 @@
 # Manages the Tools MCP server via GitOps
 # Server configurations are defined in infra/charts/tools/values.yaml (single source of truth)
 # Part of the CTO App of Apps (parent: cto.yaml)
+#
+# Image updates are managed by ArgoCD Image Updater:
+# - Watches ghcr.io/5dlabs/tools for new semver tags
+# - Automatically updates image.tag parameter
+# - ArgoCD syncs and rolls out new version
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -13,6 +18,16 @@ metadata:
     app.kubernetes.io/name: tools
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/managed-by: cto-app-of-apps
+  annotations:
+    # ═══════════════════════════════════════════════════════════════════
+    # ArgoCD Image Updater Configuration
+    # Enables automatic image updates on new releases
+    # ═══════════════════════════════════════════════════════════════════
+    argocd-image-updater.argoproj.io/image-list: tools=ghcr.io/5dlabs/tools
+    argocd-image-updater.argoproj.io/tools.update-strategy: semver
+    argocd-image-updater.argoproj.io/tools.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    argocd-image-updater.argoproj.io/tools.helm.image-tag: image.tag
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

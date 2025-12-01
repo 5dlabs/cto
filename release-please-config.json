@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "packages": {
     ".": {
-      "release-type": "rust",
+      "release-type": "simple",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
       "include-component-in-tag": false,
@@ -12,8 +12,18 @@
       "pull-request-header": "🚀 Release ${version}",
       "extra-files": [
         {
+          "type": "toml",
+          "path": "Cargo.toml",
+          "jsonpath": "$.workspace.package.version"
+        },
+        {
           "type": "yaml",
           "path": "infra/charts/controller/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "infra/charts/tools/Chart.yaml",
           "jsonpath": "$.appVersion"
         }
       ]
