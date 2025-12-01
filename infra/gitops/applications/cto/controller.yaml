@@ -2,6 +2,11 @@
 # Argo CD Application for Platform Controller
 # This enables GitOps deployment of the controller service
 # Part of the CTO App of Apps (parent: cto.yaml)
+#
+# Image updates are managed by ArgoCD Image Updater:
+# - Watches ghcr.io/5dlabs/controller for new semver tags
+# - Automatically updates image.tag parameter
+# - ArgoCD syncs and rolls out new version
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -15,6 +20,20 @@ metadata:
   annotations:
     # Exclude CRDs from GitOps management (managed by existing Helm release)
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # ═══════════════════════════════════════════════════════════════════
+    # ArgoCD Image Updater Configuration
+    # Enables automatic image updates on new releases
+    # ═══════════════════════════════════════════════════════════════════
+    # Image to watch (alias=registry/image)
+    argocd-image-updater.argoproj.io/image-list: controller=ghcr.io/5dlabs/controller
+    # Update strategy: semver picks latest semantic version tag
+    argocd-image-updater.argoproj.io/controller.update-strategy: semver
+    # Only allow tags matching v*.*.* pattern (ignore latest, SHA tags)
+    argocd-image-updater.argoproj.io/controller.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    # Where to write the update (argocd = parameter override, no git commit)
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    # Which Helm parameter to update
+    argocd-image-updater.argoproj.io/controller.helm.image-tag: image.tag
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -36,10 +55,13 @@ spec:
       parameters:
         - name: image.repository
           value: ghcr.io/5dlabs/controller
+        # Initial version - ArgoCD Image Updater will override this
+        # with the latest semver tag (e.g., v0.2.1)
         - name: image.tag
-          value: latest
+          value: v0.2.0
+        # IfNotPresent is safe now since we use immutable semver tags
         - name: image.pullPolicy
-          value: Always
+          value: IfNotPresent
 
         # Skip CRDs - managed by existing Helm release
 
@@ -116,4 +138,3 @@ spec:
 
   # Revision history
   revisionHistoryLimit: 10
-
