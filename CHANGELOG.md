@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.11](https://github.com/5dlabs/cto/compare/v0.11.10...v0.11.11) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use GitHub App token instead of PAT for reviews ([#1934](https://github.com/5dlabs/cto/issues/1934)) ([c1cf7e2](https://github.com/5dlabs/cto/commit/c1cf7e28d6cea32a7a8ec48e41f32a5135d0c5e3))
+
 ## [0.11.10](https://github.com/5dlabs/cto/compare/v0.11.9...v0.11.10) (2025-12-01)
 
 
