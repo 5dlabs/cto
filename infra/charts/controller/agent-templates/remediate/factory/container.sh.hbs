@@ -29,7 +29,41 @@ export REPO_SLUG="{{repo_slug}}"
 
 echo "📦 Repository: $REPO_SLUG"
 
-# Check for review findings to remediate
+# Always fetch CI alerts for remediation context
+echo ""
+echo "📊 Fetching CI alerts for remediation context..."
+if command -v utils >/dev/null 2>&1; then
+    utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-alerts.json 2>/dev/null || echo "[]" > /tmp/ci-alerts.json
+    
+    # Count and analyze alerts
+    if command -v jq >/dev/null 2>&1 && [ -s /tmp/ci-alerts.json ]; then
+        FAILURE_COUNT=$(jq '[.[] | select(.annotation_level == "failure")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        WARNING_COUNT=$(jq '[.[] | select(.annotation_level == "warning")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        export CI_ALERTS_FILE="/tmp/ci-alerts.json"
+        export CI_FAILURE_COUNT="$FAILURE_COUNT"
+        export CI_WARNING_COUNT="$WARNING_COUNT"
+        
+        if [ "$FAILURE_COUNT" -gt 0 ]; then
+            echo "🔴 Found $FAILURE_COUNT CI error(s), $WARNING_COUNT warning(s)"
+            echo "   → These will be included in remediation targets"
+            
+            # Show a preview of what needs to be fixed
+            echo ""
+            echo "📍 Files requiring fixes:"
+            jq -r '.[] | select(.annotation_level == "failure") | "   - \(.path):\(.start_line) - \(.message | split("\n")[0])"' /tmp/ci-alerts.json 2>/dev/null | head -10
+        elif [ "$WARNING_COUNT" -gt 0 ]; then
+            echo "🟡 Found $WARNING_COUNT CI warning(s)"
+        else
+            echo "✅ No CI failures detected"
+        fi
+    else
+        echo "⚠️ Could not parse CI alerts (jq not available)"
+    fi
+else
+    echo "⚠️ utils binary not available, skipping CI alert fetch"
+fi
+
+# Check for review findings to remediate (from Stitch)
 {{#if findings_path}}
 echo ""
 echo "📋 Remediating findings from: {{findings_path}}"
@@ -40,6 +74,23 @@ else
     echo "⚠️ Findings file not found at {{findings_path}}"
 fi
 {{/if}}
+
+# If no findings file but we have CI alerts, use those as findings
+if [ -z "$FINDINGS_FILE" ] && [ -f "$CI_ALERTS_FILE" ] && [ "$CI_FAILURE_COUNT" -gt 0 ]; then
+    # Convert CI alerts to findings format for Rex
+    echo ""
+    echo "🔄 Converting CI alerts to findings format..."
+    jq '[.[] | select(.annotation_level == "failure" or .annotation_level == "warning") | {
+        severity: (if .annotation_level == "failure" then "critical" else "suggestion" end),
+        file: .path,
+        start_line: .start_line,
+        end_line: .end_line,
+        title: ("CI: " + (.message | split("\n")[0] | .[0:80])),
+        description: .message
+    }]' /tmp/ci-alerts.json > /tmp/findings.json 2>/dev/null || echo "[]" > /tmp/findings.json
+    export FINDINGS_FILE="/tmp/findings.json"
+    echo "✅ Created findings file with $CI_FAILURE_COUNT CI failures"
+fi
 
 # Check for review comment context
 {{#if review_comment_id}}
