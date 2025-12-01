@@ -158,6 +158,16 @@ spec:
                           value: "1379126"
                         - name: GITHUB_APP_PRIVATE_KEY_PATH
                           value: "/secrets/github-app/private-key.pem"
+                        - name: FACTORY_API_KEY
+                          valueFrom:
+                            secretKeyRef:
+                              name: cto-secrets
+                              key: FACTORY_API_KEY
+                        - name: ANTHROPIC_API_KEY
+                          valueFrom:
+                            secretKeyRef:
+                              name: cto-secrets
+                              key: ANTHROPIC_API_KEY
                       resources:
                         limits:
                           cpu: 4000m
