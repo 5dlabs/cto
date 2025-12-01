@@ -16,7 +16,6 @@ on:
     paths:
       - 'infra/images/**'
       - '.github/workflows/agents-build.yaml'
-      - '.github/workflows/agents-build.yaml'
 
   workflow_dispatch:
     inputs:
