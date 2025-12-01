@@ -423,18 +423,18 @@ llmsTxt:
   sveltekit:
     url: "https://svelte.dev/docs/kit/llms.txt"
     description: "SvelteKit routing, server routes, load functions"
-  
+
   # Backend / API
   elysia:
     url: "https://elysiajs.com/llms.txt"
     fullUrl: "https://elysiajs.com/llms-full.txt"
     description: "Elysia.js type-safe API framework for Bun"
-  
+
   # Authentication
   betterAuth:
     url: "https://better-auth.com/llms.txt"
     description: "Better Auth - universal authentication framework"
-  
+
   # Database
   prisma:
     url: "https://www.prisma.io/llms.txt"
@@ -442,12 +442,12 @@ llmsTxt:
   drizzle:
     url: "https://orm.drizzle.team/llms.txt"
     description: "Drizzle ORM - headless TypeScript ORM"
-  
+
   # UI Components
   shadcn:
     url: "https://ui.shadcn.com/llms.txt"
     description: "shadcn/ui component library"
-  
+
   # Validation
   zod:
     url: "https://zod.dev/llms.txt"
@@ -603,6 +603,38 @@ ctoConfig:
       model: "glm-4-plus"
       template: "watch/factory"
       maxIterations: 3
+    # Stitch PR Review configuration
+    review:
+      agent: "5DLabs-Stitch"
+      cli: "factory"
+      model: "claude-opus-4-5-20251101"
+      template: "review/factory"
+      # Review modes with specialized prompts
+      modes:
+        hunt: "Quick bug detection - critical issues only"
+        analyze: "Deep technical analysis - architecture, patterns, design"
+        security: "Security-focused review - auth, input validation, secrets"
+        performance: "Performance optimization - bottlenecks, memory, scalability"
+        review: "Comprehensive review (default) - all categories, balanced"
+      # Events to trigger on
+      events:
+        pullRequest:
+          - opened
+          - synchronize
+          - reopened
+        checkRun:
+          - completed  # Only when conclusion is failure
+        issueComment:
+          - created    # For @stitch commands
+      # CI failure analysis integration
+      ciAnalysis:
+        enabled: true
+        # Use utils alerts tool for detailed error context
+        utilsAlerts: true
+        # Include code snippets in review comments
+        includeCodeSnippets: true
+        # Include lint documentation links
+        includeLintDocs: true
   agents:
     morgan:
       githubApp: "5DLabs-Morgan"
@@ -748,4 +780,37 @@ ctoConfig:
           - "github_get_secret_scanning_alert"
           - "github_get_pull_request"
           - "github_create_pull_request_review"
+        localServers: {}
+    # Stitch - PR Review Bot
+    stitch:
+      githubApp: "5DLabs-Stitch"
+      cli: "factory"
+      model: "claude-opus-4-5-20251101"
+      role: "PR Review & Bug Detection"
+      expertise: "Code review, bug detection, security analysis, CI failure diagnosis"
+      tools:
+        remote:
+          # Documentation and research
+          - "context7_resolve_library_id"
+          - "context7_get_library_docs"
+          - "firecrawl_scrape"
+          - "firecrawl_search"
+          # Memory for learning patterns
+          - "openmemory_openmemory_query"
+          - "openmemory_openmemory_store"
+          - "openmemory_openmemory_list"
+          - "openmemory_openmemory_get"
+          - "openmemory_openmemory_reinforce"
+          # GitHub PR operations
+          - "github_get_pull_request"
+          - "github_get_pull_request_files"
+          - "github_get_pull_request_comments"
+          - "github_add_pull_request_review_comment"
+          - "github_create_pull_request_review"
+          - "github_get_file_contents"
+          # Security scanning (shared with Cipher)
+          - "github_list_code_scanning_alerts"
+          - "github_get_code_scanning_alert"
+          - "github_list_secret_scanning_alerts"
+          - "github_get_secret_scanning_alert"
         localServers: {}

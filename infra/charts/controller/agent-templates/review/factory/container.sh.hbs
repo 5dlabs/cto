@@ -1,0 +1,100 @@
+#!/bin/sh
+# Factory PR Review - Stitch
+# Executes PR review tasks triggered by GitHub events
+# Spawned via ReviewRun CRD when PRs are opened, CI fails, or review commands are issued
+
+set -e
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║           STITCH PR REVIEW (FACTORY) STARTING                ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "🔢 PR Number: {{pr_number}}"
+echo "📂 Repository: {{repository_url}}"
+echo "🔍 Review Mode: {{review_mode}}"
+echo "⚡ Trigger: {{trigger}}"
+echo "📝 Head SHA: {{head_sha}}"
+
+# Source common utilities if available
+if [ -f /workspace/scripts/lib/common.sh ]; then
+    . /workspace/scripts/lib/common.sh
+fi
+
+# Set up environment
+export REPO_URL="{{repository_url}}"
+export PR_NUMBER="{{pr_number}}"
+export HEAD_SHA="{{head_sha}}"
+export REVIEW_MODE="{{review_mode}}"
+export TRIGGER="{{trigger}}"
+
+# Extract owner/repo from URL
+REPO_SLUG=$(echo "$REPO_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+export REPO_SLUG
+
+echo "📦 Repository: $REPO_SLUG"
+
+# Fetch CI failure context if triggered by check_run
+{{#if check_run_context}}
+echo ""
+echo "🔴 CI Failure Analysis Mode"
+echo "   Check Run: {{check_run_context.name}}"
+echo "   Check Run ID: {{check_run_context.check_run_id}}"
+echo "   Conclusion: {{check_run_context.conclusion}}"
+
+# Use utils alerts tool to get detailed CI failure context
+echo ""
+echo "📊 Fetching CI failure annotations..."
+if command -v utils >/dev/null 2>&1; then
+    utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-failures.json 2>/dev/null || true
+    if [ -s /tmp/ci-failures.json ]; then
+        echo "✅ CI failure context loaded"
+        export CI_FAILURES_FILE="/tmp/ci-failures.json"
+    else
+        echo "⚠️  No CI annotations found"
+    fi
+else
+    echo "⚠️  utils binary not available, skipping detailed CI analysis"
+fi
+{{/if}}
+
+# Fetch comment context if triggered by comment
+{{#if comment_context}}
+echo ""
+echo "💬 Comment-Triggered Review"
+echo "   Author: {{comment_context.author}}"
+echo "   Command: {{comment_context.body}}"
+{{#if comment_context.file_path}}
+echo "   File: {{comment_context.file_path}}:{{comment_context.line_number}}"
+{{/if}}
+{{/if}}
+
+# Fetch code scan context if triggered by security alert
+{{#if code_scan_context}}
+echo ""
+echo "🔒 Security Alert Analysis Mode"
+echo "   Alert: #{{code_scan_context.alert_number}}"
+echo "   Rule: {{code_scan_context.rule_id}}"
+echo "   Severity: {{code_scan_context.severity}}"
+{{#if code_scan_context.file_path}}
+echo "   File: {{code_scan_context.file_path}}"
+{{/if}}
+{{/if}}
+
+# Load agent prompt
+AGENT_PROMPT="/task-files/agents.md"
+if [ ! -f "${AGENT_PROMPT}" ]; then
+    echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+    exit 1
+fi
+
+echo ""
+echo "🚀 Starting Factory CLI (droid exec)..."
+echo ""
+
+# Run Factory with the review agent prompt
+exec droid exec \
+    --auto high \
+    --model "{{model}}" \
+    --output-format stream-json \
+    "$(cat ${AGENT_PROMPT})"
+
