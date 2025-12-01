@@ -494,3 +494,131 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
+
+  # =============================================================================
+  # Docker Build & Push (main branch only)
+  # =============================================================================
+  # Builds controller image and pushes to GHCR with 'latest' tag.
+  # ArgoCD Image Updater will detect the new image and trigger deployment.
+  # =============================================================================
+  build-and-push:
+    needs: [changes, lint-rust, test-rust]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.changes.outputs.controller == 'true' || needs.changes.outputs.infra == 'true')
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust environment with sccache
+        run: |
+          echo "🚀 Setting up optimized Rust build environment..."
+          
+          # Add cargo bin to PATH
+          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          
+          # Setup Rust toolchain
+          rustup default stable
+          rustup update stable
+          
+          # Verify tools
+          echo "🔍 Verifying build tools..."
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found, builds may be slower"
+          mold --version || echo "⚠️ mold not found, using default linker"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          
+          # Configure sccache
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          
+          # Start sccache server
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
+          
+          echo "📊 Initial sccache stats:"
+          sccache --show-stats
+
+      - name: Validate Helm templates
+        run: |
+          echo "🔄 Validating Helm templates..."
+          cd infra/charts/controller
+          ./scripts/generate-agent-templates-configmaps-split.sh
+          
+          # Verify templates are valid YAML
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
+            if head -n 5 "$file" | grep -qE "^(#|---|apiVersion:|kind:)"; then
+              echo "✅ $(basename $file): Valid"
+            else
+              echo "❌ $(basename $file): Invalid YAML!"
+              exit 1
+            fi
+          done
+
+      - name: Build release binary
+        working-directory: ./controller
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
+          SCCACHE_IDLE_TIMEOUT: "0"
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+          CARGO_TARGET_DIR: "$HOME/cache/target"
+        run: |
+          echo "🏗️ Building controller binary..."
+          mkdir -p $HOME/cache/target
+          
+          cargo build --release --bin agent-controller
+          
+          # Show sccache stats
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
+          
+          # Copy binary for Docker build
+          cp $HOME/cache/target/release/agent-controller agent-controller
+          ls -lh agent-controller
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        with:
+          driver: docker
+          install: true
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ github.sha }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Build summary
+        run: |
+          echo "## 🐳 Controller Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ArgoCD Image Updater will detect and deploy this image automatically." >> $GITHUB_STEP_SUMMARY
