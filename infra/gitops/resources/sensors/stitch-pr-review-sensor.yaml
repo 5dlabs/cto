@@ -1,9 +1,7 @@
 ---
 # Stitch PR Review Sensor
-# Triggers Stitch to review PRs on various GitHub events:
-# - PR opened/synchronized/reopened
-# - Check run failures
-# - Issue comments with @stitch or stitch commands
+# Triggers Stitch to review PRs on pull_request events
+# Phase 1: PR opened/synchronized/reopened only
 
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -28,514 +26,113 @@ spec:
           cpu: 200m
           memory: 256Mi
   dependencies:
-    # Trigger 1: PR opened, synchronized, or reopened
-    - name: pull-request-event
+    - name: pr-event
       eventSourceName: github
       eventName: org
       filters:
         data:
-          - path: headers.X-Github-Event
+          - path: body.X-GitHub-Event
             type: string
             value:
-              - "pull_request"
+              - pull_request
           - path: body.action
             type: string
             value:
-              - "opened"
-              - "synchronize"
-              - "reopened"
-
-    # Trigger 2: Check run completed with failure
-    - name: check-run-failure
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          - path: headers.X-Github-Event
-            type: string
-            value:
-              - "check_run"
-          - path: body.action
-            type: string
-            value:
-              - "completed"
-          - path: body.check_run.conclusion
-            type: string
-            value:
-              - "failure"
-
-    # Trigger 3: Issue comment with stitch command
-    - name: stitch-comment-command
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          - path: headers.X-Github-Event
-            type: string
-            value:
-              - "issue_comment"
-          - path: body.action
-            type: string
-            value:
-              - "created"
-          # Human users only (prevent bot loops)
-          - path: body.comment.user.type
-            type: string
-            value:
-              - "User"
-        # Filter for stitch commands in comment body
-        script: |
-          local body = event.body.comment.body
-          if body == nil then
-            return false
-          end
-          -- Check if this is a PR (has pull_request field)
-          if event.body.issue.pull_request == nil then
-            return false
-          end
-          body = string.lower(body)
-          -- Match @stitch or stitch commands
-          if string.match(body, "@stitch") or
-             string.match(body, "^stitch review") or
-             string.match(body, "^stitch hunt") or
-             string.match(body, "^stitch security") or
-             string.match(body, "^stitch analyze") or
-             string.match(body, "^stitch performance") then
-            return true
-          end
-          return false
-
+              - opened
+              - synchronize
+              - reopened
   triggers:
-    # =========================================================================
-    # Trigger: PR Review on PR Events
-    # =========================================================================
     - template:
-        name: review-pr-on-open
-        conditions: "pull-request-event"
-        k8s:
-          operation: create
+        name: stitch-review-pr
+        conditions: pr-event
+        argoWorkflow:
+          operation: submit
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: "stitch-review-"
+                generateName: stitch-review-
                 namespace: cto
                 labels:
                   agent: stitch
-                  trigger: pull-request
+                  workflow-type: pr-review
               spec:
-                serviceAccountName: argo-workflow
-                entrypoint: review-pr
-                ttlStrategy:
-                  secondsAfterCompletion: 300
-                  secondsAfterSuccess: 300
-                  secondsAfterFailure: 3600
-                podGC:
-                  strategy: OnPodCompletion
+                serviceAccountName: cto-controller
+                entrypoint: review
                 arguments:
                   parameters:
                     - name: pr-number
-                      value: ""
-                    - name: repository-url
-                      value: ""
+                    - name: repo-url
                     - name: head-sha
-                      value: ""
-                    - name: base-branch
-                      value: ""
-                    - name: head-branch
-                      value: ""
-                    - name: pr-author
-                      value: ""
-                    - name: pr-title
-                      value: ""
-                    - name: review-mode
-                      value: "review"
+                    - name: repo-slug
                     - name: trigger
-                      value: "pull_request"
+                      value: pull_request
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                  secondsAfterFailure: 3600
+                  secondsAfterSuccess: 300
+                volumes:
+                  - name: agent-templates
+                    configMap:
+                      name: cto-controller-agent-templates-factory
+                      items:
+                        - key: review_factory_agents.md.hbs
+                          path: agents.md
+                        - key: review_factory_container.sh.hbs
+                          path: container.sh
                 templates:
-                  - name: review-pr
+                  - name: review
                     container:
                       image: ghcr.io/5dlabs/factory:latest
-                      command: ["/bin/sh", "-c"]
+                      command: ["/bin/sh"]
                       args:
+                        - "-c"
                         - |
-                          set -e
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo '║           STITCH PR REVIEW STARTING                          ║'
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo "🔢 PR: #{{workflow.parameters.pr-number}}"
-                          echo "📂 Repo: {{workflow.parameters.repository-url}}"
-                          echo "🔍 Mode: {{workflow.parameters.review-mode}}"
-                          echo "⚡ Trigger: {{workflow.parameters.trigger}}"
-
-                          # Extract owner/repo from URL
-                          REPO_SLUG=$(echo "{{workflow.parameters.repository-url}}" | sed 's|https://github.com/||' | sed 's|\.git$||')
-
-                          # Authenticate with GitHub App
-                          echo "🔐 Authenticating with GitHub App..."
-
-                          # Get PR diff
-                          echo "📄 Fetching PR diff..."
-                          gh pr diff {{workflow.parameters.pr-number}} --repo "$REPO_SLUG" > /tmp/pr-diff.txt || true
-
-                          # Get PR details
-                          gh pr view {{workflow.parameters.pr-number}} --repo "$REPO_SLUG" --json title,body,files,additions,deletions > /tmp/pr-details.json || true
-
-                          # Run Factory with review prompt
-                          echo "🚀 Starting review with Factory CLI..."
-                          droid exec \
-                            --auto high \
-                            --model "claude-opus-4-5-20251101" \
-                            --output-format stream-json \
-                            "$(cat /task-files/agents.md)"
+                          echo "🔍 Stitch PR Review"
+                          echo "PR: #{{workflow.parameters.pr-number}}"
+                          echo "Repo: {{workflow.parameters.repo-slug}}"
+                          echo "SHA: {{workflow.parameters.head-sha}}"
+                          echo "Trigger: {{workflow.parameters.trigger}}"
+                          echo ""
+                          echo "📋 This is a test run - full review logic coming soon"
+                          # TODO: Execute actual review via droid exec
                       env:
-                        - name: GITHUB_APP_ID
-                          valueFrom:
-                            secretKeyRef:
-                              name: github-app-5dlabs-stitch
-                              key: app-id
-                        - name: GITHUB_APP_PRIVATE_KEY
-                          valueFrom:
-                            secretKeyRef:
-                              name: github-app-5dlabs-stitch
-                              key: private-key
                         - name: PR_NUMBER
                           value: "{{workflow.parameters.pr-number}}"
                         - name: REPOSITORY_URL
-                          value: "{{workflow.parameters.repository-url}}"
+                          value: "{{workflow.parameters.repo-url}}"
+                        - name: REPO_SLUG
+                          value: "{{workflow.parameters.repo-slug}}"
                         - name: HEAD_SHA
                           value: "{{workflow.parameters.head-sha}}"
-                        - name: REVIEW_MODE
-                          value: "{{workflow.parameters.review-mode}}"
                         - name: TRIGGER
                           value: "{{workflow.parameters.trigger}}"
+                      resources:
+                        limits:
+                          cpu: 2000m
+                          memory: 4Gi
+                        requests:
+                          cpu: 500m
+                          memory: 1Gi
                       volumeMounts:
                         - name: agent-templates
                           mountPath: /task-files
                           readOnly: true
-                      resources:
-                        requests:
-                          cpu: 500m
-                          memory: 1Gi
-                        limits:
-                          cpu: 2000m
-                          memory: 4Gi
-                volumes:
-                  - name: agent-templates
-                    configMap:
-                      name: controller-agent-templates-factory
-                      items:
-                        - key: review_factory_agents.md.hbs
-                          path: agents.md
           parameters:
             - src:
-                dependencyName: pull-request-event
-                dataKey: body.number
+                dependencyName: pr-event
+                dataKey: body.pull_request.number
               dest: spec.arguments.parameters.0.value
             - src:
-                dependencyName: pull-request-event
-                dataKey: body.repository.clone_url
+                dependencyName: pr-event
+                dataKey: body.repository.html_url
               dest: spec.arguments.parameters.1.value
             - src:
-                dependencyName: pull-request-event
+                dependencyName: pr-event
                 dataKey: body.pull_request.head.sha
               dest: spec.arguments.parameters.2.value
             - src:
-                dependencyName: pull-request-event
-                dataKey: body.pull_request.base.ref
-              dest: spec.arguments.parameters.3.value
-            - src:
-                dependencyName: pull-request-event
-                dataKey: body.pull_request.head.ref
-              dest: spec.arguments.parameters.4.value
-            - src:
-                dependencyName: pull-request-event
-                dataKey: body.pull_request.user.login
-              dest: spec.arguments.parameters.5.value
-            - src:
-                dependencyName: pull-request-event
-                dataKey: body.pull_request.title
-              dest: spec.arguments.parameters.6.value
-
-    # =========================================================================
-    # Trigger: CI Failure Analysis
-    # =========================================================================
-    - template:
-        name: review-ci-failure
-        conditions: "check-run-failure"
-        k8s:
-          operation: create
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                generateName: "stitch-ci-"
-                namespace: cto
-                labels:
-                  agent: stitch
-                  trigger: check-run
-              spec:
-                serviceAccountName: argo-workflow
-                entrypoint: analyze-ci-failure
-                ttlStrategy:
-                  secondsAfterCompletion: 300
-                  secondsAfterSuccess: 300
-                  secondsAfterFailure: 3600
-                podGC:
-                  strategy: OnPodCompletion
-                arguments:
-                  parameters:
-                    - name: pr-number
-                      value: ""
-                    - name: repository-url
-                      value: ""
-                    - name: head-sha
-                      value: ""
-                    - name: check-run-id
-                      value: ""
-                    - name: check-run-name
-                      value: ""
-                    - name: review-mode
-                      value: "hunt"
-                    - name: trigger
-                      value: "check_run"
-                templates:
-                  - name: analyze-ci-failure
-                    container:
-                      image: ghcr.io/5dlabs/factory:latest
-                      command: ["/bin/sh", "-c"]
-                      args:
-                        - |
-                          set -e
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo '║           STITCH CI FAILURE ANALYSIS                         ║'
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo "🔢 PR: #{{workflow.parameters.pr-number}}"
-                          echo "🔴 Check Run: {{workflow.parameters.check-run-name}}"
-                          echo "📂 Repo: {{workflow.parameters.repository-url}}"
-
-                          # Extract owner/repo from URL
-                          REPO_SLUG=$(echo "{{workflow.parameters.repository-url}}" | sed 's|https://github.com/||' | sed 's|\.git$||')
-
-                          # Use utils alerts tool to get detailed CI failure context
-                          echo "📊 Fetching CI failure annotations..."
-                          if command -v utils >/dev/null 2>&1; then
-                            utils alerts --repo "$REPO_SLUG" --pr "{{workflow.parameters.pr-number}}" --format json > /tmp/ci-failures.json 2>/dev/null || true
-                            if [ -s /tmp/ci-failures.json ]; then
-                              echo "✅ CI failure context loaded"
-                              cat /tmp/ci-failures.json
-                            fi
-                          fi
-
-                          # Run Factory with CI analysis prompt
-                          echo "🚀 Starting CI failure analysis..."
-                          droid exec \
-                            --auto high \
-                            --model "claude-opus-4-5-20251101" \
-                            --output-format stream-json \
-                            "$(cat /task-files/agents.md)"
-                      env:
-                        - name: GITHUB_APP_ID
-                          valueFrom:
-                            secretKeyRef:
-                              name: github-app-5dlabs-stitch
-                              key: app-id
-                        - name: GITHUB_APP_PRIVATE_KEY
-                          valueFrom:
-                            secretKeyRef:
-                              name: github-app-5dlabs-stitch
-                              key: private-key
-                        - name: PR_NUMBER
-                          value: "{{workflow.parameters.pr-number}}"
-                        - name: REPOSITORY_URL
-                          value: "{{workflow.parameters.repository-url}}"
-                        - name: HEAD_SHA
-                          value: "{{workflow.parameters.head-sha}}"
-                        - name: CHECK_RUN_ID
-                          value: "{{workflow.parameters.check-run-id}}"
-                        - name: CHECK_RUN_NAME
-                          value: "{{workflow.parameters.check-run-name}}"
-                        - name: REVIEW_MODE
-                          value: "{{workflow.parameters.review-mode}}"
-                        - name: TRIGGER
-                          value: "{{workflow.parameters.trigger}}"
-                      volumeMounts:
-                        - name: agent-templates
-                          mountPath: /task-files
-                          readOnly: true
-                      resources:
-                        requests:
-                          cpu: 500m
-                          memory: 1Gi
-                        limits:
-                          cpu: 2000m
-                          memory: 4Gi
-                volumes:
-                  - name: agent-templates
-                    configMap:
-                      name: controller-agent-templates-factory
-                      items:
-                        - key: review_factory_agents.md.hbs
-                          path: agents.md
-          parameters:
-            - src:
-                dependencyName: check-run-failure
-                dataKey: body.check_run.pull_requests[0].number
-              dest: spec.arguments.parameters.0.value
-            - src:
-                dependencyName: check-run-failure
-                dataKey: body.repository.clone_url
-              dest: spec.arguments.parameters.1.value
-            - src:
-                dependencyName: check-run-failure
-                dataKey: body.check_run.head_sha
-              dest: spec.arguments.parameters.2.value
-            - src:
-                dependencyName: check-run-failure
-                dataKey: body.check_run.id
-              dest: spec.arguments.parameters.3.value
-            - src:
-                dependencyName: check-run-failure
-                dataKey: body.check_run.name
-              dest: spec.arguments.parameters.4.value
-
-    # =========================================================================
-    # Trigger: Comment Command
-    # =========================================================================
-    - template:
-        name: review-on-command
-        conditions: "stitch-comment-command"
-        k8s:
-          operation: create
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                generateName: "stitch-cmd-"
-                namespace: cto
-                labels:
-                  agent: stitch
-                  trigger: comment
-              spec:
-                serviceAccountName: argo-workflow
-                entrypoint: review-on-command
-                ttlStrategy:
-                  secondsAfterCompletion: 300
-                  secondsAfterSuccess: 300
-                  secondsAfterFailure: 3600
-                podGC:
-                  strategy: OnPodCompletion
-                arguments:
-                  parameters:
-                    - name: pr-number
-                      value: ""
-                    - name: repository-url
-                      value: ""
-                    - name: comment-author
-                      value: ""
-                    - name: comment-body
-                      value: ""
-                    - name: review-mode
-                      value: "review"
-                    - name: trigger
-                      value: "comment"
-                templates:
-                  - name: review-on-command
-                    container:
-                      image: ghcr.io/5dlabs/factory:latest
-                      command: ["/bin/sh", "-c"]
-                      args:
-                        - |
-                          set -e
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo '║           STITCH REVIEW (COMMAND TRIGGERED)                  ║'
-                          echo '════════════════════════════════════════════════════════════════'
-                          echo "🔢 PR: #{{workflow.parameters.pr-number}}"
-                          echo "👤 Requested by: {{workflow.parameters.comment-author}}"
-                          echo "💬 Command: {{workflow.parameters.comment-body}}"
-                          echo "🔍 Mode: {{workflow.parameters.review-mode}}"
-
-                          # Extract owner/repo from URL
-                          REPO_SLUG=$(echo "{{workflow.parameters.repository-url}}" | sed 's|https://github.com/||' | sed 's|\.git$||')
-
-                          # Parse review mode from comment
-                          COMMENT_LOWER=$(echo "{{workflow.parameters.comment-body}}" | tr '[:upper:]' '[:lower:]')
-                          if echo "$COMMENT_LOWER" | grep -q "hunt"; then
-                            export REVIEW_MODE="hunt"
-                          elif echo "$COMMENT_LOWER" | grep -q "security"; then
-                            export REVIEW_MODE="security"
-                          elif echo "$COMMENT_LOWER" | grep -q "analyze"; then
-                            export REVIEW_MODE="analyze"
-                          elif echo "$COMMENT_LOWER" | grep -q "performance"; then
-                            export REVIEW_MODE="performance"
-                          else
-                            export REVIEW_MODE="review"
-                          fi
-                          echo "📋 Detected mode: $REVIEW_MODE"
-
-                          # Run Factory with review prompt
-                          echo "🚀 Starting review..."
-                          droid exec \
-                            --auto high \
-                            --model "claude-opus-4-5-20251101" \
-                            --output-format stream-json \
-                            "$(cat /task-files/agents.md)"
-                      env:
-                        - name: GITHUB_APP_ID
-                          valueFrom:
-                            secretKeyRef:
-                              name: github-app-5dlabs-stitch
-                              key: app-id
-                        - name: GITHUB_APP_PRIVATE_KEY
-                          valueFrom:
-                            secretKeyRef:
-                              name: github-app-5dlabs-stitch
-                              key: private-key
-                        - name: PR_NUMBER
-                          value: "{{workflow.parameters.pr-number}}"
-                        - name: REPOSITORY_URL
-                          value: "{{workflow.parameters.repository-url}}"
-                        - name: COMMENT_AUTHOR
-                          value: "{{workflow.parameters.comment-author}}"
-                        - name: COMMENT_BODY
-                          value: "{{workflow.parameters.comment-body}}"
-                        - name: TRIGGER
-                          value: "{{workflow.parameters.trigger}}"
-                      volumeMounts:
-                        - name: agent-templates
-                          mountPath: /task-files
-                          readOnly: true
-                      resources:
-                        requests:
-                          cpu: 500m
-                          memory: 1Gi
-                        limits:
-                          cpu: 2000m
-                          memory: 4Gi
-                volumes:
-                  - name: agent-templates
-                    configMap:
-                      name: controller-agent-templates-factory
-                      items:
-                        - key: review_factory_agents.md.hbs
-                          path: agents.md
-          parameters:
-            - src:
-                dependencyName: stitch-comment-command
-                dataKey: body.issue.number
-              dest: spec.arguments.parameters.0.value
-            - src:
-                dependencyName: stitch-comment-command
-                dataKey: body.repository.clone_url
-              dest: spec.arguments.parameters.1.value
-            - src:
-                dependencyName: stitch-comment-command
-                dataKey: body.comment.user.login
-              dest: spec.arguments.parameters.2.value
-            - src:
-                dependencyName: stitch-comment-command
-                dataKey: body.comment.body
+                dependencyName: pr-event
+                dataKey: body.repository.full_name
               dest: spec.arguments.parameters.3.value
