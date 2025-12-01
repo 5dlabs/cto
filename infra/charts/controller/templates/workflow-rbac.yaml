@@ -74,4 +74,25 @@ roleRef:
   name: workflow-permissions
   apiGroup: rbac.authorization.k8s.io
 
+---
+# RoleBinding for cto service account (used by Stitch and other sensor-triggered workflows)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cto-workflow-permissions
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: cto-workflow-permissions
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ include "controller.chart" . }}
+subjects:
+  - kind: ServiceAccount
+    name: cto
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: workflow-permissions
+  apiGroup: rbac.authorization.k8s.io
+
 {{- end }}
