@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.9](https://github.com/5dlabs/cto/compare/v0.11.8...v0.11.9) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add initContainer to fix PVC permissions on startup ([#1931](https://github.com/5dlabs/cto/issues/1931)) ([8e53a4b](https://github.com/5dlabs/cto/commit/8e53a4b7a9fad425c69fbcaed247717625c195dd))
+
+
+### ♻️ Refactoring
+
+* **ci:** consolidate controller workflows into single CI pipeline ([#1929](https://github.com/5dlabs/cto/issues/1929)) ([8c47fde](https://github.com/5dlabs/cto/commit/8c47fde8ed6ec13b20d0d7eff565c9626b326848))
+
 ## [0.11.8](https://github.com/5dlabs/cto/compare/v0.11.7...v0.11.8) (2025-12-01)
 
 
