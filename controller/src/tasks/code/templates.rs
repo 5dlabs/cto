@@ -950,13 +950,14 @@ impl CodeTemplateGenerator {
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
 
-        let template = Self::load_template(CODE_CLAUDE_MEMORY_TEMPLATE)?;
+        let template_path = Self::get_claude_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
 
         handlebars
             .register_template_string("claude_memory", template)
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register CLAUDE.md template: {e}"
+                    "Failed to register CLAUDE.md template {template_path}: {e}"
                 ))
             })?;
 
@@ -2908,6 +2909,43 @@ impl CodeTemplateGenerator {
         // Currently using single shared memory template for all Gemini agents
         // Can be extended in the future for agent-specific templates similar to other CLIs
         CODE_GEMINI_MEMORY_TEMPLATE.to_string()
+    }
+
+    fn get_claude_memory_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let service = &code_run.spec.service;
+
+        // Check if this is a Heal workflow:
+        // 1. Service name contains "heal", OR
+        // 2. cli_config.settings.template starts with "heal/"
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_heal =
+            service.to_lowercase().contains("heal") || template_setting.starts_with("heal/");
+
+        // Heal-specific templates for remediation agents
+        if is_heal {
+            return "heal/claude/agents.md.hbs".to_string();
+        }
+
+        // Agent-specific templates
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Morgan" => "code/claude/agents-rex.md.hbs",
+            "5DLabs-Blaze" => "code/claude/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/claude/agents-cipher.md.hbs",
+            "5DLabs-Cleo" => "code/claude/agents-cleo.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
+            _ => CODE_CLAUDE_MEMORY_TEMPLATE,
+        };
+
+        template_name.to_string()
     }
 
     fn get_factory_container_template(code_run: &CodeRun) -> String {

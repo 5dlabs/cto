@@ -328,8 +328,8 @@ enum Commands {
         /// Path to issue file written by Factory
         #[arg(long)]
         issue_file: String,
-        /// Path to cto-config.json
-        #[arg(long, default_value = "cto-config.json")]
+        /// Path to heal-config.json
+        #[arg(long, default_value = "/app/heal-config.json")]
         config: String,
     },
     /// [ALERTS] Fetch all logs for a pod (current, previous, events, describe)
@@ -618,7 +618,7 @@ fn default_sync_timeout() -> u64 {
 }
 
 /// Heal configuration for spawning remediation `CodeRuns`.
-/// Loaded from `heal-config.json` - maps directly to CodeRun CRD fields.
+/// Loaded from `heal-config.json` - maps directly to `CodeRun` CRD fields.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HealConfig {
