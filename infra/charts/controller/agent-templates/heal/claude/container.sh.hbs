@@ -39,13 +39,32 @@ mkdir -p /workspace/worktrees
 # ============================================================================
 PROMPT_FILE="${HEAL_PROMPT_FILE:-/workspace/watch/alerts/${ALERT_TYPE:-unknown}.md}"
 LOG_FILE="${HEAL_LOG_FILE:-/workspace/watch/logs/${ALERT_TYPE:-A7}-*.log}"
-ACCEPTANCE_FILE="${HEAL_ACCEPTANCE_FILE:-${HEAL_ISSUE_DIR:-/workspace/watch/issues/unknown}/acceptance-criteria.md}"
+
+# Determine acceptance file path - handle legacy mode gracefully
+if [ -n "${HEAL_ACCEPTANCE_FILE}" ]; then
+    ACCEPTANCE_FILE="${HEAL_ACCEPTANCE_FILE}"
+    LEGACY_MODE="false"
+elif [ -n "${HEAL_ISSUE_DIR}" ]; then
+    ACCEPTANCE_FILE="${HEAL_ISSUE_DIR}/acceptance-criteria.md"
+    LEGACY_MODE="false"
+elif [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+    ACCEPTANCE_FILE="/workspace/watch/issues/${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
+    LEGACY_MODE="false"
+else
+    # Legacy mode - no issue number, acceptance criteria may not exist
+    ACCEPTANCE_FILE=""
+    LEGACY_MODE="true"
+fi
 
 echo ""
 echo "═══ HEAL CONTEXT FILES ═══"
 echo "📄 Prompt file: ${PROMPT_FILE}"
 echo "📋 Log pattern: ${LOG_FILE}"
-echo "✅ Acceptance: ${ACCEPTANCE_FILE}"
+if [ "${LEGACY_MODE}" = "true" ]; then
+    echo "⚠️  Legacy mode: No acceptance criteria (--issue-file used instead of --issue-number)"
+else
+    echo "✅ Acceptance: ${ACCEPTANCE_FILE}"
+fi
 
 if [ -f "${PROMPT_FILE}" ]; then
     echo "   ✓ Prompt file exists"
@@ -133,13 +152,24 @@ Focus on addressing the above items before re-checking acceptance criteria."
     echo "════════════════════════════════════════════════════════════════"
 
     # Build completion probe prompt
-    if [ -f "${ACCEPTANCE_FILE}" ]; then
+    if [ -n "${ACCEPTANCE_FILE}" ] && [ -f "${ACCEPTANCE_FILE}" ]; then
         ACCEPTANCE_CONTENT=$(cat "${ACCEPTANCE_FILE}")
+    elif [ "${LEGACY_MODE}" = "true" ]; then
+        ACCEPTANCE_CONTENT="**Legacy Mode** - No formal acceptance criteria available.
+
+Use basic health checks:
+- [ ] Fix has been deployed (PR merged)
+- [ ] ArgoCD sync successful
+- [ ] Target pod running without errors
+- [ ] No new alerts for this issue type"
     else
-        ACCEPTANCE_CONTENT="No acceptance criteria file found. Check if:
-- Fix has been deployed
-- Pod is running without errors
-- No new alerts for this issue"
+        ACCEPTANCE_CONTENT="No acceptance criteria file found at: ${ACCEPTANCE_FILE}
+
+Use basic health checks:
+- [ ] Fix has been deployed (PR merged)
+- [ ] ArgoCD sync successful
+- [ ] Target pod running without errors
+- [ ] No new alerts for this issue"
     fi
 
     COMPLETION_PROMPT="You are a completion probe for a heal remediation task.
