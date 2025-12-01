@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.6](https://github.com/5dlabs/cto/compare/v0.11.5...v0.11.6) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use correct service account 'cto' instead of 'cto-controller' ([#1917](https://github.com/5dlabs/cto/issues/1917)) ([b9d3867](https://github.com/5dlabs/cto/commit/b9d3867ec56b45f2a75d6c29d4fc616b0db523e9))
+
 ## [0.11.5](https://github.com/5dlabs/cto/compare/v0.11.4...v0.11.5) (2025-12-01)
 
 
