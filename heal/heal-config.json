@@ -1,0 +1,24 @@
+{
+  "coderun": {
+    "namespace": "cto",
+    "githubApp": "rex",
+    "model": "claude-opus-4-5-20251101",
+    "repositoryUrl": "https://github.com/5dlabs/cto",
+    "docsRepositoryUrl": "https://github.com/5dlabs/cto",
+    "docsProjectDirectory": "docs",
+    "docsBranch": "main",
+    "workingDirectory": ".",
+    "service": "heal",
+    "runType": "implementation",
+    "enableDocker": false,
+    "remoteTools": "mcp_tools_github_*,mcp_tools_kubernetes_*",
+    "localTools": "",
+    "cliConfig": {
+      "cliType": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "settings": {
+        "template": "heal/claude"
+      }
+    }
+  }
+}
