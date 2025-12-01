@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.14](https://github.com/5dlabs/cto/compare/v0.11.13...v0.11.14) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **play:** add guard to prevent update-to-waiting-merge when resuming ([#1941](https://github.com/5dlabs/cto/issues/1941)) ([e92b6c5](https://github.com/5dlabs/cto/commit/e92b6c583b22c6ef3152fe28de7af9fe1f67793d))
+
 ## [0.11.13](https://github.com/5dlabs/cto/compare/v0.11.12...v0.11.13) (2025-12-01)
 
 
