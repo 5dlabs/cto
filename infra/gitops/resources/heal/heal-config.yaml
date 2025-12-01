@@ -14,7 +14,7 @@ data:
     {
       "coderun": {
         "namespace": "cto",
-        "githubApp": "rex",
+        "githubApp": "5DLabs-Rex",
         "model": "claude-opus-4-5-20251101",
         "repositoryUrl": "https://github.com/5dlabs/cto",
         "docsRepositoryUrl": "https://github.com/5dlabs/cto",
