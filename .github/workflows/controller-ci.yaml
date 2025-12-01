@@ -526,19 +526,33 @@ jobs:
             echo "✅ Rust toolchain ready: $(rustc --version)"
           else
             echo "🔧 Installing/repairing Rust toolchain..."
+            # Force remove the entire toolchain directory to handle conflict errors
+            # like 'detected conflict: bin/rust-gdb' that leave partial installations
+            rm -rf /cache/rustup/toolchains/stable-x86_64-unknown-linux-gnu 2>/dev/null || true
+            rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
             rustup toolchain uninstall stable 2>/dev/null || true
+            
             for i in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup toolchain install stable && \
-              rustup default stable && break
+              echo "🔄 Attempt $i/3: Installing Rust toolchain..."
+              if rustup toolchain install stable && rustup default stable; then
+                # Verify cargo actually works after installation
+                if cargo --version 2>/dev/null; then
+                  echo "✅ Toolchain installed successfully"
+                  break
+                else
+                  echo "⚠️ Cargo not working after install, cleaning up..."
+                  rm -rf /cache/rustup/toolchains/stable-x86_64-unknown-linux-gnu 2>/dev/null || true
+                fi
+              fi
               rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+              sleep 2
             done
           fi
           
-          # Verify tools
+          # Verify tools - fail if cargo doesn't work
           echo "🔍 Verifying build tools..."
           rustc --version
-          cargo --version
+          cargo --version || { echo "❌ cargo not available after setup!"; exit 1; }
           sccache --version || echo "⚠️ sccache not found, builds may be slower"
           mold --version || echo "⚠️ mold not found, using default linker"
 
