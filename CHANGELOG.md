@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.7](https://github.com/5dlabs/cto/compare/v0.11.6...v0.11.7) (2025-12-01)
+
+
+### ✨ Features
+
+* **stitch:** Enable full PR review with Factory CLI ([#1922](https://github.com/5dlabs/cto/issues/1922)) ([77dad90](https://github.com/5dlabs/cto/commit/77dad904411863104d3f6ef4c05357cd431c6730))
+
+
+### 🐛 Bug Fixes
+
+* **controller:** mount heal templates ConfigMap in controller deployment ([#1920](https://github.com/5dlabs/cto/issues/1920)) ([e8a5027](https://github.com/5dlabs/cto/commit/e8a5027ecff6382a5b93d4c3b1d3821a7c20472e))
+* **stitch:** Add Factory and Anthropic API keys ([#1925](https://github.com/5dlabs/cto/issues/1925)) ([5a0920b](https://github.com/5dlabs/cto/commit/5a0920b14b75a36bf3dd4a7458990266640a5ed2))
+* **stitch:** Add writable home directory for Factory CLI ([#1924](https://github.com/5dlabs/cto/issues/1924)) ([ab0a44c](https://github.com/5dlabs/cto/commit/ab0a44c0630c5f0d09a9d655e815592b8059aa21))
+
 ## [0.11.6](https://github.com/5dlabs/cto/compare/v0.11.5...v0.11.6) (2025-12-01)
 
 
