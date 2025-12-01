@@ -5,6 +5,7 @@
 #
 # IMPORTANT: This template does NOT use the docs workflow.
 # Issue context comes from heal-generated files on the shared PVC.
+# Completion is verified against acceptance criteria with retry loop.
 
 set -e
 
@@ -16,6 +17,15 @@ echo "📋 Task ID: {{task_id}}"
 echo "🔧 Alert Type: ${ALERT_TYPE:-unknown}"
 echo "📂 Repository: {{repository_url}}"
 echo "🌳 CodeRun: ${CODERUN_NAME:-unknown}"
+if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+    echo "🔗 GitHub Issue: #${HEAL_ISSUE_NUMBER}"
+fi
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+MAX_RETRIES=${HEAL_MAX_RETRIES:-3}
+COMPLETION_TIMEOUT=${HEAL_COMPLETION_TIMEOUT:-60}
 
 # Export worktree path for agent instructions
 export WORKTREE_PATH="/workspace/worktrees/${CODERUN_NAME}"
@@ -24,14 +34,37 @@ echo "📁 Worktree: ${WORKTREE_PATH}"
 # Create worktrees directory if needed
 mkdir -p /workspace/worktrees
 
-# Verify heal-generated files exist
+# ============================================================================
+# VERIFY HEAL CONTEXT FILES
+# ============================================================================
 PROMPT_FILE="${HEAL_PROMPT_FILE:-/workspace/watch/alerts/${ALERT_TYPE:-unknown}.md}"
 LOG_FILE="${HEAL_LOG_FILE:-/workspace/watch/logs/${ALERT_TYPE:-A7}-*.log}"
+
+# Determine acceptance file path - handle legacy mode gracefully
+if [ -n "${HEAL_ACCEPTANCE_FILE}" ]; then
+    ACCEPTANCE_FILE="${HEAL_ACCEPTANCE_FILE}"
+    LEGACY_MODE="false"
+elif [ -n "${HEAL_ISSUE_DIR}" ]; then
+    ACCEPTANCE_FILE="${HEAL_ISSUE_DIR}/acceptance-criteria.md"
+    LEGACY_MODE="false"
+elif [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+    ACCEPTANCE_FILE="/workspace/watch/issues/${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
+    LEGACY_MODE="false"
+else
+    # Legacy mode - no issue number, acceptance criteria may not exist
+    ACCEPTANCE_FILE=""
+    LEGACY_MODE="true"
+fi
 
 echo ""
 echo "═══ HEAL CONTEXT FILES ═══"
 echo "📄 Prompt file: ${PROMPT_FILE}"
 echo "📋 Log pattern: ${LOG_FILE}"
+if [ "${LEGACY_MODE}" = "true" ]; then
+    echo "⚠️  Legacy mode: No acceptance criteria (--issue-file used instead of --issue-number)"
+else
+    echo "✅ Acceptance: ${ACCEPTANCE_FILE}"
+fi
 
 if [ -f "${PROMPT_FILE}" ]; then
     echo "   ✓ Prompt file exists"
@@ -50,6 +83,12 @@ else
     echo "   ⚠️  No log files matching ${LOG_FILE}"
 fi
 
+if [ -f "${ACCEPTANCE_FILE}" ]; then
+    echo "   ✓ Acceptance criteria exists"
+else
+    echo "   ⚠️  No acceptance criteria at ${ACCEPTANCE_FILE}"
+fi
+
 # Source common utilities if available
 if [ -f /workspace/scripts/lib/common.sh ]; then
     . /workspace/scripts/lib/common.sh
@@ -61,13 +100,245 @@ if [ ! -f "${AGENT_PROMPT}" ]; then
     echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
     exit 1
 fi
+echo "✅ Agent prompt file exists: ${AGENT_PROMPT}"
+
+# ============================================================================
+# MCP TOOLS VALIDATION
+# ============================================================================
+echo ""
+echo "═══ MCP TOOLS VALIDATION ═══"
+echo "🔍 Checking MCP tools..."
+
+if command -v droid >/dev/null 2>&1; then
+    TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+    
+    if [ "$TOOL_LIST" != "FAILED" ] && echo "$TOOL_LIST" | grep -q "mcp_tools\|github\|kubernetes"; then
+        TOOL_COUNT=$(echo "$TOOL_LIST" | wc -l)
+        echo "✅ MCP tools available: ~${TOOL_COUNT} tools"
+        echo ""
+        echo "📋 Sample tools:"
+        echo "$TOOL_LIST" | grep -E "github|kubernetes|argocd|cto" | head -10 || echo "   (showing first 10 matching tools)"
+    else
+        echo "⚠️  No MCP tools found (proceeding anyway)"
+        echo "   Output: $(echo "$TOOL_LIST" | head -5)"
+    fi
+else
+    echo "⚠️  Droid CLI not found - MCP validation skipped"
+fi
+
+# List configured remote tools from heal config
+echo ""
+echo "📋 Configured remote tools (from heal-config):"
+echo "   - mcp_tools_github_*"
+echo "   - mcp_tools_kubernetes_*"
+echo "   - mcp_tools_argocd_*"
+echo "   - mcp_tools_cto_*"
+echo "   - mcp_tools_context7_*"
+echo "   - mcp_tools_firecrawl_*"
+echo "   - mcp_tools_grafana_*"
+
+# ============================================================================
+# COMPLETION PROBE LOOP
+# ============================================================================
+ATTEMPT=1
+SUCCESS=0
+COMPLETION_LAST_MESSAGE="/tmp/heal-completion-last.txt"
+COMPLETION_LOG="/tmp/heal-completion.log"
 
 echo ""
-echo "═══ STARTING FACTORY (droid exec) ═══"
+echo "═══ STARTING REMEDIATION (max ${MAX_RETRIES} attempts) ═══"
 
-# Run Factory with the heal remediation agent prompt
-exec droid exec \
-    --auto high \
-    --model "{{model}}" \
-    --output-format stream-json \
-    "$(cat ${AGENT_PROMPT})"
+while [ $ATTEMPT -le $MAX_RETRIES ] && [ $SUCCESS -eq 0 ]; do
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ ATTEMPT ${ATTEMPT} of ${MAX_RETRIES}                                         ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    # Build the prompt content for this iteration
+    PROMPT_CONTENT=$(cat "${AGENT_PROMPT}")
+
+    # Add iteration context if not first attempt
+    if [ $ATTEMPT -gt 1 ] && [ -f "${COMPLETION_LAST_MESSAGE}" ]; then
+        LAST_REASON=$(cat "${COMPLETION_LAST_MESSAGE}" 2>/dev/null || echo "")
+        if [ -n "${LAST_REASON}" ]; then
+            PROMPT_CONTENT="${PROMPT_CONTENT}
+
+🔁 **ITERATION ${ATTEMPT} - Previous attempt incomplete**
+
+The previous completion probe indicated these items remain:
+${LAST_REASON}
+
+Focus on addressing the above items before re-checking acceptance criteria."
+        fi
+    fi
+
+    # Run Factory with the remediation prompt
+    echo "🚀 Running Factory remediation agent..."
+    set +e
+    droid exec \
+        --auto high \
+        --model "{{model}}" \
+        --output-format stream-json \
+        "${PROMPT_CONTENT}"
+    AGENT_EXIT=$?
+    set -e
+
+    echo ""
+    echo "🧭 Agent exited with code: ${AGENT_EXIT}"
+
+    # ========================================================================
+    # COMPLETION PROBE - Check acceptance criteria
+    # ========================================================================
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ COMPLETION PROBE - Checking Acceptance Criteria              ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    # Build completion probe prompt
+    if [ -n "${ACCEPTANCE_FILE}" ] && [ -f "${ACCEPTANCE_FILE}" ]; then
+        ACCEPTANCE_CONTENT=$(cat "${ACCEPTANCE_FILE}")
+    elif [ "${LEGACY_MODE}" = "true" ]; then
+        ACCEPTANCE_CONTENT="**Legacy Mode** - No formal acceptance criteria available.
+
+Use basic health checks:
+- [ ] Fix has been deployed (PR merged)
+- [ ] ArgoCD sync successful
+- [ ] Target pod running without errors
+- [ ] No new alerts for this issue type"
+    else
+        ACCEPTANCE_CONTENT="No acceptance criteria file found at: ${ACCEPTANCE_FILE}
+
+Use basic health checks:
+- [ ] Fix has been deployed (PR merged)
+- [ ] ArgoCD sync successful
+- [ ] Target pod running without errors
+- [ ] No new alerts for this issue"
+    fi
+
+    COMPLETION_PROMPT="You are a completion probe for a heal remediation task.
+
+## Acceptance Criteria
+${ACCEPTANCE_CONTENT}
+
+## Instructions
+Review the current state and determine if ALL acceptance criteria are met.
+
+Check:
+1. Was a PR created and merged? (use: gh pr list --state merged --search 'fix heal')
+2. Did ArgoCD sync successfully? (use: kubectl get application -n argocd)
+3. Is the target pod running without errors? (use: kubectl get pods -n cto)
+4. Are there any new errors in the logs?
+
+Respond with ONLY:
+- **yes** - if ALL criteria are satisfied
+- **no** - if ANY criteria are NOT satisfied
+
+If no, add:
+REASON: [list the specific criteria that are not met]
+
+Your response:"
+
+    echo "📋 Running completion probe..."
+    set +e
+    COMPLETION_OUTPUT=$(droid exec --auto high --model "{{model}}" --output-format text "${COMPLETION_PROMPT}" 2>&1 | tee "${COMPLETION_LOG}")
+    COMPLETION_EXIT=$?
+    set -e
+
+    echo "🧭 Completion probe response:"
+    printf '%s\n' "${COMPLETION_OUTPUT}"
+
+    # Extract yes/no from response (flexible pattern handles leading text, whitespace, or markdown)
+    COMPLETION_RESPONSE=$(printf '%s\n' "${COMPLETION_OUTPUT}" | tr -d '\r' | grep -Eio '\*\*(yes|no)\*\*|(^|[[:space:]])(yes|no)([[:space:]]|$)' | sed 's/\*//g; s/^[[:space:]]*//; s/[[:space:]]*$//' | head -n1 | tr '[:upper:]' '[:lower:]')
+
+    if [ "${COMPLETION_RESPONSE}" = "yes" ]; then
+        echo ""
+        echo "✅ Completion probe confirmed: ALL acceptance criteria met!"
+        SUCCESS=1
+        break
+    elif [ "${COMPLETION_RESPONSE}" = "no" ]; then
+        # Extract reason for next iteration
+        CURRENT_REASON=$(printf '%s\n' "${COMPLETION_OUTPUT}" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+        if [ -n "${CURRENT_REASON}" ]; then
+            echo ""
+            echo "⚠️ Completion probe found incomplete criteria:"
+            echo "${CURRENT_REASON}"
+            printf '%s\n' "${CURRENT_REASON}" > "${COMPLETION_LAST_MESSAGE}"
+        else
+            echo "⚠️ Completion probe reported 'no' without specific reason"
+            echo "Task incomplete - review acceptance criteria" > "${COMPLETION_LAST_MESSAGE}"
+        fi
+    else
+        echo "⚠️ Could not parse completion probe response: ${COMPLETION_RESPONSE:-<empty>}"
+        echo "Treating as incomplete..."
+        echo "Unable to verify completion" > "${COMPLETION_LAST_MESSAGE}"
+    fi
+
+    ATTEMPT=$((ATTEMPT + 1))
+done
+
+# ============================================================================
+# FINAL STATUS
+# ============================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+    echo "║ ✅ REMEDIATION COMPLETE                                       ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo "Completed in ${ATTEMPT} attempt(s)"
+
+    # Update and close GitHub issue if we have an issue number
+    if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+        echo "📝 Adding completion comment to issue #${HEAL_ISSUE_NUMBER}..."
+        gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "✅ **Remediation Complete**
+
+All acceptance criteria have been verified:
+- PR merged to main
+- ArgoCD sync successful
+- Target system healthy
+
+Completed by: ${CODERUN_NAME}
+Attempts: ${ATTEMPT}" 2>/dev/null || echo "   (could not comment on issue)"
+
+        echo "🔒 Closing issue #${HEAL_ISSUE_NUMBER}..."
+        gh issue close "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --reason completed 2>/dev/null || echo "   (could not close issue)"
+    fi
+
+    # Clean up issue folder on PVC
+    if [ -n "${HEAL_ISSUE_DIR}" ] && [ -d "${HEAL_ISSUE_DIR}" ]; then
+        echo "🧹 Archiving issue folder: ${HEAL_ISSUE_DIR}"
+        ARCHIVE_DIR="/workspace/watch/archived/${HEAL_ISSUE_NUMBER:-unknown}"
+        mkdir -p "$(dirname ${ARCHIVE_DIR})"
+        mv "${HEAL_ISSUE_DIR}" "${ARCHIVE_DIR}" 2>/dev/null || echo "   (folder already moved or missing)"
+    fi
+
+    # Clean up worktree if it exists
+    if [ -n "${WORKTREE_PATH}" ] && [ -d "${WORKTREE_PATH}" ]; then
+        echo "🧹 Removing worktree: ${WORKTREE_PATH}"
+        cd "${REPO_PATH:-/workspace/5dlabs-cto}" 2>/dev/null || true
+        git worktree remove "${WORKTREE_PATH}" --force 2>/dev/null || rm -rf "${WORKTREE_PATH}" 2>/dev/null || true
+    fi
+
+    exit 0
+else
+    echo "║ ❌ REMEDIATION INCOMPLETE                                      ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo "Failed after ${MAX_RETRIES} attempts"
+
+    # Update GitHub issue if we have an issue number
+    if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+        echo "📝 Adding failure comment to issue #${HEAL_ISSUE_NUMBER}..."
+        LAST_REASON=$(cat "${COMPLETION_LAST_MESSAGE}" 2>/dev/null || echo "Unknown")
+        gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "⚠️ **Remediation Incomplete**
+
+Unable to satisfy all acceptance criteria after ${MAX_RETRIES} attempts.
+
+**Remaining issues:**
+${LAST_REASON}
+
+**Next steps:** Manual intervention may be required.
+
+Agent: ${CODERUN_NAME}" 2>/dev/null || echo "   (could not comment on issue)"
+    fi
+
+    exit 1
+fi

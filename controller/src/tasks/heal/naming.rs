@@ -93,8 +93,8 @@ impl HealNaming {
         if parts.len() >= 3 && parts[0] == "heal" && parts[1] == "remediation" {
             // task part is "task42" - extract the number
             let task_part = parts[2];
-            if let Some(id) = task_part.strip_prefix("task") {
-                return Some(id.to_string());
+            if let Some(task_id) = task_part.strip_prefix("task") {
+                return Some(task_id.to_string());
             }
         }
         None

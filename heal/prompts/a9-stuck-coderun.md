@@ -21,7 +21,34 @@ This alert fires when a CodeRun CRD has been stuck in Running/Pending state for 
 
 ## Your Task
 
-1. **Investigate** the CodeRun and its associated pod:
+### Step 1: Create GitHub Issue
+
+```bash
+ISSUE_URL=$(gh issue create \
+  --repo 5dlabs/cto \
+  --title "[HEAL-A9] Stuck CodeRun: {{pod_name}} in {{phase}}" \
+  --label "heal,remediation,a9" \
+  --body "🔍 Analyzing stuck CodeRun... Full analysis to follow.")
+if [ -z "$ISSUE_URL" ]; then
+  echo "❌ Failed to create GitHub issue"
+  exit 1
+fi
+ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+if [ -z "$ISSUE_NUMBER" ]; then
+  echo "❌ Failed to extract issue number from: $ISSUE_URL"
+  exit 1
+fi
+echo "✅ Created issue #${ISSUE_NUMBER}"
+```
+
+### Step 2: Create Issue Folder
+
+```bash
+ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
+mkdir -p "${ISSUE_DIR}"
+```
+
+### Step 3: Investigate
 
 ```bash
 # Get CodeRun status
@@ -34,39 +61,64 @@ kubectl get pods -n {{namespace}} -l coderun={{pod_name}}
 kubectl logs -n {{namespace}} -l coderun={{pod_name}} --tail=500
 ```
 
-2. **Analyze** - What caused the CodeRun to get stuck?
+### Step 4: Write prompt.md
 
-3. **Write analysis** to `/workspace/watch/alerts/A9-{{pod_name}}.md`
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
+# Stuck CodeRun: {{pod_name}}
 
-4. **Spawn remediation**:
+## Summary
+[One sentence: CodeRun stuck in phase {{phase}}, suspected cause]
+
+## Investigation Results
+- **CodeRun Status**: [phase, conditions from kubectl output]
+- **Associated Pod**: [exists/missing, phase, status]
+- **Pod Logs**: [last activity, any errors]
+
+## Root Cause
+[Agent hang, silent crash, controller issue, infrastructure?]
+
+## Remediation Steps
+1. [Delete CodeRun to retry, OR]
+2. [Fix underlying bug, OR]
+3. [Restart controller if status update issue]
+PROMPT
+```
+
+### Step 5: Write acceptance-criteria.md
+
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+- [ ] Root cause of stuck CodeRun identified
+- [ ] CodeRun either completes or is cleaned up
+- [ ] If code bug: fix deployed
+- [ ] If infra issue: controller/cluster state verified
+- [ ] Task {{task_id}} progresses to completion
+- [ ] No new A9 alerts for this CodeRun
+CRITERIA
+```
+
+### Step 6: Update GitHub Issue
+
+```bash
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
+
+---
+
+$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
+```
+
+### Step 7: Spawn Remediation Agent
 
 ```bash
 heal spawn-remediation \
   --alert a9 \
   --task-id {{task_id}} \
-  --issue-file /workspace/watch/alerts/A9-{{pod_name}}.md
-```
-
-## Analysis Template
-
-Write this to `/workspace/watch/alerts/A9-{{pod_name}}.md`:
-
-```markdown
-# Stuck CodeRun: {{pod_name}}
-
-## Summary
-[One sentence: CodeRun stuck in phase X for Y minutes, suspected cause]
-
-## Investigation Results
-- CodeRun Status: [phase, conditions]
-- Associated Pod: [exists/missing, phase, status]
-- Pod Logs: [last activity, any errors]
-
-## Root Cause
-[Agent hang, silent crash, controller issue, infrastructure?]
-
-## Remediation Required
-[Delete CodeRun to retry, fix underlying bug, restart controller?]
+  --issue-number ${ISSUE_NUMBER}
 ```
 
 ## Common Causes
