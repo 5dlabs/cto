@@ -5298,6 +5298,16 @@ fn spawn_remediation_agent(
     // Determine issue directory and files based on issue_number or issue_file
     let (issue_dir, prompt_file, acceptance_file) = if let Some(num) = issue_number {
         let dir = format!("/workspace/watch/issues/{num}");
+        // Validate directory exists before deriving file paths
+        if !std::path::Path::new(&dir).exists() {
+            println!(
+                "{}",
+                format!("❌ Issue directory not found: {dir} (issue #{num})").red()
+            );
+            return Err(anyhow::anyhow!(
+                "Issue directory not found: {dir} (issue #{num})"
+            ));
+        }
         let prompt = format!("{dir}/prompt.md");
         let acceptance = format!("{dir}/acceptance-criteria.md");
         println!(
@@ -5309,9 +5319,7 @@ fn spawn_remediation_agent(
         println!("{}", format!("📄 Using legacy issue file: {file}").yellow());
         (None, file.to_string(), None)
     } else {
-        return Err(anyhow::anyhow!(
-            "Either --issue-number or --issue-file must be provided"
-        ));
+        anyhow::bail!("Either --issue-number or --issue-file must be provided");
     };
 
     // Verify the prompt file exists

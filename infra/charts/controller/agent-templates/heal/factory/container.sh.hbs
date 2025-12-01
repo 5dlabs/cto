@@ -181,8 +181,8 @@ Your response:"
     echo "🧭 Completion probe response:"
     printf '%s\n' "${COMPLETION_OUTPUT}"
 
-    # Extract yes/no from response
-    COMPLETION_RESPONSE=$(printf '%s\n' "${COMPLETION_OUTPUT}" | tr -d '\r' | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
+    # Extract yes/no from response (flexible pattern handles leading text, whitespace, or markdown)
+    COMPLETION_RESPONSE=$(printf '%s\n' "${COMPLETION_OUTPUT}" | tr -d '\r' | grep -Eio '\*\*(yes|no)\*\*|(^|[[:space:]])(yes|no)([[:space:]]|$)' | sed 's/\*//g; s/^[[:space:]]*//; s/[[:space:]]*$//' | head -n1 | tr '[:upper:]' '[:lower:]')
 
     if [ "${COMPLETION_RESPONSE}" = "yes" ]; then
         echo ""
