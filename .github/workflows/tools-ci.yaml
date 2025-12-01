@@ -68,7 +68,7 @@ jobs:
             echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
               # Force reinstall to fix broken toolchains
-              rustup toolchain install stable --force-non-host && \
+              rustup toolchain install stable && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
@@ -137,7 +137,7 @@ jobs:
           else
             echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
-              rustup toolchain install stable --force-non-host && \
+              rustup toolchain install stable && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
@@ -188,7 +188,7 @@ jobs:
           else
             echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
-              rustup toolchain install stable --force-non-host && \
+              rustup toolchain install stable && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
@@ -314,7 +314,7 @@ jobs:
           else
             echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
-              rustup toolchain install stable --force-non-host && \
+              rustup toolchain install stable && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
