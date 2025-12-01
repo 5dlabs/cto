@@ -130,6 +130,12 @@ extraContainers: []
 #   image: busybox:latest
 #   command: ["tail", "-f", "/var/log/app.log"]
 
+# Extra init containers (run before main containers)
+extraInitContainers: []
+# - name: init-setup
+#   image: busybox:latest
+#   command: ["sh", "-c", "echo 'init complete'"]
+
 nodeSelector: {}
 
 tolerations: []
