@@ -89,6 +89,8 @@ spec:
                       items:
                         - key: private-key
                           path: private-key.pem
+                  - name: factory-home
+                    emptyDir: {}
                 templates:
                   - name: review
                     container:
@@ -170,6 +172,8 @@ spec:
                         - name: github-app-key
                           mountPath: /secrets/github-app
                           readOnly: true
+                        - name: factory-home
+                          mountPath: /home/node/.factory
           parameters:
             - src:
                 dependencyName: pr-event
