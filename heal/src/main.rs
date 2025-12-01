@@ -4808,6 +4808,7 @@ async fn handle_coderun_alert(
         &coderun.phase,
         prompts_dir,
         dry_run,
+        Some(&alert.context), // Pass full alert context for template rendering
     )
     .await
 }
@@ -4891,6 +4892,7 @@ async fn handle_detected_alert(
         &pod.phase,
         prompts_dir,
         dry_run,
+        Some(&alert.context), // Pass full alert context for template rendering
     )
     .await
 }
@@ -4914,11 +4916,13 @@ async fn handle_completion_check(
         &pod.phase,
         prompts_dir,
         dry_run,
+        None, // No additional context for completion checks
     )
     .await
 }
 
 /// Handle a detected alert by loading prompt and spawning Factory
+#[allow(clippy::too_many_arguments)]
 async fn handle_alert(
     alert_id: &str,
     pod_name: &str,
@@ -4928,6 +4932,7 @@ async fn handle_alert(
     phase: &str,
     prompts_dir: &str,
     dry_run: bool,
+    alert_context: Option<&std::collections::HashMap<String, String>>,
 ) -> Result<()> {
     // Map alert IDs to prompt filenames
     let prompt_file = match alert_id {
@@ -4938,6 +4943,7 @@ async fn handle_alert(
         "a5" => format!("{prompts_dir}/a5-post-tess-ci.md"),
         "a7" => format!("{prompts_dir}/a7-pod-failure.md"),
         "a8" => format!("{prompts_dir}/a8-step-timeout.md"),
+        "a9" => format!("{prompts_dir}/a9-stuck-coderun.md"),
         "completion" => format!("{prompts_dir}/success-completion.md"),
         _ => {
             println!("{}", format!("Unknown alert ID: {alert_id}").red());
@@ -4969,8 +4975,8 @@ async fn handle_alert(
         String::new()
     };
 
-    // Render the prompt
-    let rendered = prompt_template
+    // Render the prompt - start with base variables
+    let mut rendered = prompt_template
         .replace("{{pod_name}}", pod_name)
         .replace("{{namespace}}", namespace)
         .replace("{{phase}}", phase)
@@ -4979,6 +4985,35 @@ async fn handle_alert(
         .replace("{{logs}}", &logs)
         .replace("{{expected_behaviors}}", &expected_behaviors)
         .replace("{{duration}}", "N/A"); // TODO: Calculate actual duration
+
+    // Replace all additional context variables from the alert
+    // This handles alert-specific variables like {{missing_agent}}, {{pr_number}},
+    // {{approval_count}}, {{stale_duration}}, etc.
+    if let Some(ctx) = alert_context {
+        for (key, value) in ctx {
+            let pattern = format!("{{{{{key}}}}}");
+            rendered = rendered.replace(&pattern, value);
+        }
+    }
+
+    // Warn about any unreplaced template variables (helps catch missing context)
+    let unreplaced: Vec<&str> = rendered
+        .match_indices("{{")
+        .filter_map(|(start, _)| {
+            let end = rendered[start..].find("}}")?;
+            Some(&rendered[start..start + end + 2])
+        })
+        .collect();
+    if !unreplaced.is_empty() && !dry_run {
+        println!(
+            "{}",
+            format!(
+                "⚠️  Template has unreplaced variables: {}",
+                unreplaced.join(", ")
+            )
+            .yellow()
+        );
+    }
 
     if dry_run {
         println!("{}", "=".repeat(80).dimmed());
@@ -4989,6 +5024,12 @@ async fn handle_alert(
         println!("{}", "=".repeat(80).dimmed());
         println!("{rendered}");
         println!("{}", "=".repeat(80).dimmed());
+        if !unreplaced.is_empty() {
+            println!(
+                "{}",
+                format!("⚠️  Unreplaced variables: {}", unreplaced.join(", ")).yellow()
+            );
+        }
         return Ok(());
     }
 
@@ -5256,6 +5297,7 @@ async fn test_alert_flow(
         "Failed", // Simulated phase
         prompts_dir,
         dry_run,
+        None, // No context for test alerts
     )
     .await?;
 
