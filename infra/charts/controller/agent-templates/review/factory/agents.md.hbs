@@ -54,15 +54,146 @@ fi
 
 Do NOT post duplicate reviews. This is critical for a good user experience.
 
+## 🔄 Re-Review: Check and Resolve Fixed Issues
+
+**When re-reviewing a PR (e.g., after Rex pushes fixes), check if previous issues are resolved.**
+
+This closes the feedback loop: Stitch finds issues → Rex fixes them → Stitch confirms they're fixed.
+
+### Step 0.5: Check Previous Review Threads (On Re-Review)
+
+```bash
+# Get owner and repo from REPO_SLUG
+OWNER=$(echo "$REPO_SLUG" | cut -d'/' -f1)
+REPO=$(echo "$REPO_SLUG" | cut -d'/' -f2)
+
+echo "🔍 Checking for previous unresolved Stitch review threads..."
+
+# Query unresolved review threads from Stitch
+THREADS_JSON=$(gh api graphql -f query='
+query($owner: String!, $repo: String!, $prNumber: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $prNumber) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          path
+          line
+          comments(first: 1) {
+            nodes {
+              author { login }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}' -f owner="$OWNER" -f repo="$REPO" -F prNumber="$PR_NUMBER" 2>/dev/null) || THREADS_JSON=""
+
+if [ -n "$THREADS_JSON" ]; then
+    # Filter to unresolved Stitch threads
+    UNRESOLVED_THREADS=$(echo "$THREADS_JSON" | jq -r '
+      .data.repository.pullRequest.reviewThreads.nodes[]
+      | select(.isResolved == false)
+      | select(.comments.nodes[0].author.login | test("stitch"; "i"))
+      | {id: .id, path: .path, line: .line, body: .comments.nodes[0].body}
+    ' 2>/dev/null)
+    
+    THREAD_COUNT=$(echo "$UNRESOLVED_THREADS" | jq -s 'length' 2>/dev/null || echo "0")
+    
+    if [ "$THREAD_COUNT" -gt 0 ]; then
+        echo "📋 Found $THREAD_COUNT unresolved Stitch review thread(s)"
+        echo "   Will check if issues are fixed in current code..."
+        
+        # Save for later analysis
+        echo "$UNRESOLVED_THREADS" | jq -s '.' > /tmp/previous-threads.json
+    else
+        echo "✅ No unresolved Stitch threads to check"
+    fi
+fi
+```
+
+### Resolving Fixed Issues
+
+After your review, for each previous thread in `/tmp/previous-threads.json`:
+
+1. **Read the current code** at that file:line
+2. **Compare** against the issue description in the thread
+3. **If the issue is fixed**, resolve the thread:
+
+```bash
+# For each resolved issue, mark the thread as resolved
+resolve_thread() {
+    THREAD_ID="$1"
+    echo "  ✅ Resolving thread $THREAD_ID..."
+    
+    gh api graphql -f query='
+    mutation($threadId: ID!) {
+      resolveReviewThread(input: {threadId: $threadId}) {
+        thread {
+          isResolved
+        }
+      }
+    }' -f threadId="$THREAD_ID" >/dev/null 2>&1
+}
+
+# Example: After checking the code at path:line
+if [ -f /tmp/previous-threads.json ]; then
+    echo ""
+    echo "🔄 Checking if previous issues are fixed..."
+    
+    # For each thread, check if issue persists
+    jq -c '.[]' /tmp/previous-threads.json | while read thread; do
+        THREAD_ID=$(echo "$thread" | jq -r '.id')
+        FILE_PATH=$(echo "$thread" | jq -r '.path')
+        LINE_NUM=$(echo "$thread" | jq -r '.line')
+        ISSUE_BODY=$(echo "$thread" | jq -r '.body')
+        
+        echo "  Checking: $FILE_PATH:$LINE_NUM"
+        
+        # Read current code at that location
+        # (Agent should analyze if the issue described in ISSUE_BODY still exists)
+        # If fixed, call: resolve_thread "$THREAD_ID"
+    done
+fi
+```
+
+### When to Resolve vs. Keep Open
+
+| Scenario | Action |
+|----------|--------|
+| Code at file:line was changed and issue is fixed | **Resolve** the thread |
+| Code was changed but issue still exists | **Keep open** + add new comment |
+| Code was not changed | **Keep open** (issue still applies) |
+| File was deleted | **Resolve** (no longer applicable) |
+| Issue was a false positive | **Resolve** + add clarifying comment |
+
+### Adding a Resolution Comment
+
+When resolving a thread, optionally add a comment explaining:
+
+```bash
+# Add a comment before resolving
+gh api "repos/$REPO_SLUG/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies" \
+    --method POST \
+    -f body="✅ **Fixed!** This issue has been addressed in the latest commit."
+
+# Then resolve
+resolve_thread "$THREAD_ID"
+```
+
 ## Mission-Critical Execution Rules
 
 1. **Check for existing reviews first.** Never post duplicate reviews for the same commit.
-2. **Be helpful, not pedantic.** Focus on issues that matter. Don't nitpick style when there are real bugs.
-3. **Provide actionable feedback.** Every issue you raise should include a concrete suggestion for how to fix it.
-4. **Use code snippets.** Show the problematic code AND the suggested fix.
-5. **Prioritize by severity.** Critical bugs > Security issues > Performance > Code quality > Style.
-6. **Be concise but complete.** Developers are busy. Get to the point.
-7. **Always create the check run.** After posting your review, create a GitHub check run (see Step 6). This enables the "Remediate with Rex" button.
+2. **Check for previous unresolved threads.** On re-review, resolve threads where issues are fixed (see Step 0.5).
+3. **Be helpful, not pedantic.** Focus on issues that matter. Don't nitpick style when there are real bugs.
+4. **Provide actionable feedback.** Every issue you raise should include a concrete suggestion for how to fix it.
+5. **Use code snippets.** Show the problematic code AND the suggested fix.
+6. **Prioritize by severity.** Critical bugs > Security issues > Performance > Code quality > Style.
+7. **Be concise but complete.** Developers are busy. Get to the point.
+8. **Always create the check run.** After posting your review, create a GitHub check run (see Step 6). This enables the "Remediate with Rex" button.
 
 ## Review Modes
 
