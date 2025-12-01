@@ -4,7 +4,8 @@
 # Builds and releases all CTO platform CLI tools:
 # - cto-mcp: MCP server for Argo Workflows integration
 # - tools-server/tools-client: Dynamic MCP tool management
-# - play-monitor: E2E workflow monitoring
+# - heal: Self-healing platform monitor
+# - controller: Agent platform controller
 #
 # Cross-platform builds via cargo-dist (macOS, Linux, Windows)
 # Docker images for tools-server (Kubernetes deployment)
@@ -100,9 +101,12 @@ jobs:
           - name: tools
             binary: tools-client
             dir: tools
-          - name: play-monitor
-            binary: play-monitor
-            dir: monitor
+          - name: heal
+            binary: heal
+            dir: heal
+          - name: controller
+            binary: agent-controller
+            dir: controller
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -122,9 +126,13 @@ jobs:
             suffix: windows-x86_64
             ext: .exe
         exclude:
-          # play-monitor doesn't need Windows builds
+          # heal and controller don't need Windows builds
           - package:
-              name: play-monitor
+              name: heal
+            target:
+              os: windows-latest
+          - package:
+              name: controller
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}
@@ -225,7 +233,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ needs.plan.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -234,11 +242,109 @@ jobs:
         run: |
           echo "## 🐳 Tools Docker Image" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Build controller Docker image
+  build-docker-controller:
+    needs: [plan, build-binaries]
+    if: needs.plan.outputs.publishing == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux x86_64 controller binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-agent-controller-linux-x86_64
+          path: artifacts/
+
+      - name: Prepare binary for Docker
+        run: |
+          cp artifacts/agent-controller-linux-x86_64 infra/images/controller/agent-controller
+          chmod +x infra/images/controller/agent-controller
+          ls -lh infra/images/controller/agent-controller
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./infra/images/controller
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker summary
+        run: |
+          echo "## 🐳 Controller Docker Image" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Build heal Docker image
+  build-docker-heal:
+    needs: [plan, build-binaries]
+    if: needs.plan.outputs.publishing == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux x86_64 heal binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-heal-linux-x86_64
+          path: artifacts/
+
+      - name: Prepare binary for Docker
+        run: |
+          cp artifacts/heal-linux-x86_64 infra/images/heal/heal
+          chmod +x infra/images/heal/heal
+          ls -lh infra/images/heal/heal
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./infra/images/heal
+          file: ./infra/images/heal/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:v${{ needs.plan.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker summary
+        run: |
+          echo "## 🐳 Heal Docker Image" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
 
   # Create GitHub Release with all artifacts
   release:
-    needs: [plan, build-binaries, build-docker]
+    needs: [plan, build-binaries, build-docker, build-docker-controller, build-docker-heal]
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' }}
     runs-on: ubuntu-22.04
     env:
@@ -277,8 +383,11 @@ jobs:
           ### 🔧 tools-server / tools-client
           Dynamic MCP (Model Context Protocol) tool management and proxy server.
 
-          ### 📊 play-monitor
-          E2E workflow monitoring CLI for the play feedback loop.
+          ### 🩺 heal
+          Self-healing platform monitor - detects issues and spawns remediation agents.
+
+          ### 🎮 controller
+          Agent platform controller - manages Claude Code agents via TaskRun CRDs.
 
           ---
 
@@ -292,8 +401,8 @@ jobs:
           # Install tools
           curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/tools-installer.sh | sh
 
-          # Install play-monitor
-          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/play-monitor-installer.sh | sh
+          # Install heal
+          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/heal-installer.sh | sh
           ```
 
           **Docker (tools-server only):**
@@ -304,13 +413,13 @@ jobs:
           **Manual download:**
           Download the appropriate binary for your platform from the assets below.
 
-          | Platform | cto-mcp | tools-server | tools-client | play-monitor |
-          |----------|---------|--------------|--------------|--------------|
-          | Linux x86_64 | ✅ | ✅ | ✅ | ✅ |
-          | Linux ARM64 | ✅ | ✅ | ✅ | ✅ |
-          | macOS x86_64 | ✅ | ✅ | ✅ | ✅ |
-          | macOS ARM64 | ✅ | ✅ | ✅ | ✅ |
-          | Windows x86_64 | ✅ | ✅ | ✅ | ❌ |
+          | Platform | cto-mcp | tools-server | tools-client | heal | controller |
+          |----------|---------|--------------|--------------|------|------------|
+          | Linux x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | Linux ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | macOS x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | macOS ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | Windows x86_64 | ✅ | ✅ | ✅ | ❌ | ❌ |
           EOF
 
       - name: Create or update release
