@@ -112,6 +112,51 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 ${{ matrix.name }} version: $VERSION"
 
+      # ========================================
+      # Heal-specific: Pre-build Rust binary with caching
+      # Same pattern as controller build for faster builds
+      # ========================================
+      - name: Setup Rust environment (Heal only)
+        if: steps.should-build.outputs.build == 'true' && matrix.id == 'heal'
+        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+
+      - name: Setup Rust cache (Heal only)
+        if: steps.should-build.outputs.build == 'true' && matrix.id == 'heal'
+        uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-heal-build"
+
+      - name: Install sccache (Heal only)
+        if: steps.should-build.outputs.build == 'true' && matrix.id == 'heal'
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Build Heal binary with caching (Heal only)
+        if: steps.should-build.outputs.build == 'true' && matrix.id == 'heal'
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_GHA_ENABLED: "true"
+        run: |
+          echo "🏗️ Building heal binary with sccache..."
+          echo "📊 Initial sccache stats:"
+          sccache --show-stats
+
+          cargo build --release --package heal --bin heal
+
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
+
+          # Copy binary to Docker context
+          cp target/release/heal infra/images/heal/heal-linux
+          chmod +x infra/images/heal/heal-linux
+
+          echo "📦 Built binary info:"
+          ls -lh infra/images/heal/heal-linux
+          file infra/images/heal/heal-linux
+
       - name: Set up Docker Buildx
         if: steps.should-build.outputs.build == 'true'
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
@@ -133,6 +178,11 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Cleanup pre-built binary (Heal only)
+        if: always() && matrix.id == 'heal'
+        run: |
+          rm -f infra/images/heal/heal-linux || true
 
       - name: Show GHCR tags for ${{ matrix.name }}
         if: steps.should-build.outputs.build == 'true'
