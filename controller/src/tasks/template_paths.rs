@@ -54,6 +54,8 @@ pub const CODE_GEMINI_CONFIG_TEMPLATE: &str = "code/gemini/config.json.hbs";
 pub const REVIEW_FACTORY_CONTAINER_TEMPLATE: &str = "review/factory/container.sh.hbs";
 pub const REVIEW_FACTORY_AGENTS_TEMPLATE: &str = "review/factory/agents.md.hbs";
 pub const REVIEW_FACTORY_POST_REVIEW_TEMPLATE: &str = "review/factory/post_review.py";
+pub const REVIEW_CLAUDE_CONTAINER_TEMPLATE: &str = "review/claude/container.sh.hbs";
+pub const REVIEW_CLAUDE_AGENTS_TEMPLATE: &str = "review/claude/agents.md.hbs";
 
 // Remediate templates (Rex PR Remediation)
 pub const REMEDIATE_FACTORY_CONTAINER_TEMPLATE: &str = "remediate/factory/container.sh.hbs";

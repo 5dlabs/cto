@@ -1,0 +1,138 @@
+#!/bin/sh
+# Claude PR Remediation - Rex
+# Executes PR remediation tasks triggered by review findings
+# Spawned via CodeRun CRD when users click "remediate" or when Rex is triggered to fix issues
+
+set -e
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║           REX PR REMEDIATION (CLAUDE) STARTING               ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "🔢 PR Number: {{pr_number}}"
+echo "📂 Repository: {{repository_url}}"
+echo "📝 Head SHA: {{head_sha}}"
+{{#if task_id}}
+echo "📋 Task ID: {{task_id}}"
+{{/if}}
+
+# Source common utilities if available
+if [ -f /workspace/scripts/lib/common.sh ]; then
+    . /workspace/scripts/lib/common.sh
+fi
+
+# Set up environment
+export REPOSITORY_URL="{{repository_url}}"
+export PR_NUMBER="{{pr_number}}"
+export HEAD_SHA="{{head_sha}}"
+export REPO_SLUG="{{repo_slug}}"
+
+# MCP Tools configuration
+export TOOLS_URL="{{tools_url}}"
+
+echo "📦 Repository: $REPO_SLUG"
+echo "🔧 Tools URL: $TOOLS_URL"
+
+# Pre-flight: Check for required tools
+if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ Warning: jq not found - CI alert parsing will be limited"
+fi
+
+# Always fetch CI alerts for remediation context
+echo ""
+echo "📊 Fetching CI alerts for remediation context..."
+if command -v utils >/dev/null 2>&1; then
+    utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-alerts.json 2>/dev/null || echo "[]" > /tmp/ci-alerts.json
+    
+    if command -v jq >/dev/null 2>&1 && [ -s /tmp/ci-alerts.json ]; then
+        FAILURE_COUNT=$(jq '[.[] | select(.annotation_level == "failure")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        WARNING_COUNT=$(jq '[.[] | select(.annotation_level == "warning")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        export CI_ALERTS_FILE="/tmp/ci-alerts.json"
+        export CI_FAILURE_COUNT="$FAILURE_COUNT"
+        export CI_WARNING_COUNT="$WARNING_COUNT"
+        
+        if [ "$FAILURE_COUNT" -gt 0 ]; then
+            echo "🔴 Found $FAILURE_COUNT CI error(s), $WARNING_COUNT warning(s)"
+            echo "   → These will be included in remediation targets"
+        elif [ "$WARNING_COUNT" -gt 0 ]; then
+            echo "🟡 Found $WARNING_COUNT CI warning(s)"
+        else
+            echo "✅ No CI failures detected"
+        fi
+    fi
+else
+    echo "⚠️ utils binary not available, skipping CI alert fetch"
+fi
+
+# Check for review findings to remediate
+{{#if findings_path}}
+echo ""
+echo "📋 Remediating findings from: {{findings_path}}"
+if [ -f "{{findings_path}}" ]; then
+    export FINDINGS_FILE="{{findings_path}}"
+    echo "✅ Findings file found"
+else
+    echo "⚠️ Findings file not found at {{findings_path}}"
+fi
+{{/if}}
+
+# Check for review comment context
+{{#if review_comment_id}}
+echo ""
+echo "💬 Triggered by review comment: {{review_comment_id}}"
+export REVIEW_COMMENT_ID="{{review_comment_id}}"
+{{/if}}
+
+# Load agent prompt
+AGENT_PROMPT="/task-files/agents.md"
+if [ ! -f "${AGENT_PROMPT}" ]; then
+    echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+    exit 1
+fi
+
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Display configured remote tools
+echo ""
+echo "📋 Configured Remote Tools:"
+{{#if remote_tools}}
+{{#each remote_tools}}
+echo "  • {{this}}"
+{{/each}}
+{{else}}
+echo "  (none configured)"
+{{/if}}
+
+# Verify Claude MCP tools are available
+echo ""
+echo "🔍 Verifying Claude MCP servers..."
+if command -v claude >/dev/null 2>&1; then
+    MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+    if [ "$MCP_LIST" != "FAILED" ]; then
+        echo "$MCP_LIST" | sed 's/^/  /'
+    else
+        echo "  ⚠️ Could not list MCP servers"
+    fi
+else
+    echo "  ⚠️ claude CLI not available for MCP verification"
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+
+echo ""
+echo "🚀 Starting Claude CLI..."
+echo ""
+
+# Run Claude with the remediation agent prompt
+exec claude \
+    --dangerously-skip-permissions \
+    --model "{{model}}" \
+    --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(jq:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit" \
+    -p "$(cat ${AGENT_PROMPT})"

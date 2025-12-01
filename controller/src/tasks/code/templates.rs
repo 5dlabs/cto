@@ -1673,7 +1673,9 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
+        use crate::cli::types::CLIType;
         use crate::tasks::template_paths::{
+            REVIEW_CLAUDE_AGENTS_TEMPLATE, REVIEW_CLAUDE_CONTAINER_TEMPLATE,
             REVIEW_FACTORY_AGENTS_TEMPLATE, REVIEW_FACTORY_CONTAINER_TEMPLATE,
             REVIEW_FACTORY_POST_REVIEW_TEMPLATE,
         };
@@ -1681,6 +1683,10 @@ impl CodeTemplateGenerator {
         let mut templates = BTreeMap::new();
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Determine CLI type (default to Factory for review tasks)
+        let cli_type = Self::determine_cli_type(code_run);
+        let use_claude = matches!(cli_type, CLIType::Claude);
 
         // Extract PR number from labels or env
         let pr_number = code_run
@@ -1750,8 +1756,15 @@ impl CodeTemplateGenerator {
         // Generate client-config.json for MCP tools
         templates.insert("client-config.json".to_string(), client_config);
 
+        // Select template paths based on CLI type
+        let (container_path, agents_path) = if use_claude {
+            (REVIEW_CLAUDE_CONTAINER_TEMPLATE, REVIEW_CLAUDE_AGENTS_TEMPLATE)
+        } else {
+            (REVIEW_FACTORY_CONTAINER_TEMPLATE, REVIEW_FACTORY_AGENTS_TEMPLATE)
+        };
+
         // Load and render container script
-        let container_template = Self::load_template(REVIEW_FACTORY_CONTAINER_TEMPLATE)?;
+        let container_template = Self::load_template(container_path)?;
         handlebars
             .register_template_string("review_container", container_template)
             .map_err(|e| {
@@ -1770,7 +1783,7 @@ impl CodeTemplateGenerator {
         );
 
         // Load and render agents.md
-        let agents_template = Self::load_template(REVIEW_FACTORY_AGENTS_TEMPLATE)?;
+        let agents_template = Self::load_template(agents_path)?;
         handlebars
             .register_template_string("review_agents", agents_template)
             .map_err(|e| {
@@ -1788,11 +1801,11 @@ impl CodeTemplateGenerator {
             })?,
         );
 
-        // Load post_review.py helper script
+        // Load post_review.py helper script (Factory only, but include for both)
         let post_review_script = Self::load_template(REVIEW_FACTORY_POST_REVIEW_TEMPLATE)?;
         templates.insert("post_review.py".to_string(), post_review_script);
 
-        // Generate MCP config for Factory
+        // Generate MCP config
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
@@ -1806,13 +1819,19 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
+        use crate::cli::types::CLIType;
         use crate::tasks::template_paths::{
+            REMEDIATE_CLAUDE_AGENTS_TEMPLATE, REMEDIATE_CLAUDE_CONTAINER_TEMPLATE,
             REMEDIATE_FACTORY_AGENTS_TEMPLATE, REMEDIATE_FACTORY_CONTAINER_TEMPLATE,
         };
 
         let mut templates = BTreeMap::new();
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Determine CLI type (default to Factory for remediate tasks)
+        let cli_type = Self::determine_cli_type(code_run);
+        let use_claude = matches!(cli_type, CLIType::Claude);
 
         // Extract PR number from labels or env
         let pr_number = code_run
@@ -1883,8 +1902,15 @@ impl CodeTemplateGenerator {
         // Generate client-config.json for MCP tools
         templates.insert("client-config.json".to_string(), client_config);
 
+        // Select template paths based on CLI type
+        let (container_path, agents_path) = if use_claude {
+            (REMEDIATE_CLAUDE_CONTAINER_TEMPLATE, REMEDIATE_CLAUDE_AGENTS_TEMPLATE)
+        } else {
+            (REMEDIATE_FACTORY_CONTAINER_TEMPLATE, REMEDIATE_FACTORY_AGENTS_TEMPLATE)
+        };
+
         // Load and render container script
-        let container_template = Self::load_template(REMEDIATE_FACTORY_CONTAINER_TEMPLATE)?;
+        let container_template = Self::load_template(container_path)?;
         handlebars
             .register_template_string("remediate_container", container_template)
             .map_err(|e| {
@@ -1905,7 +1931,7 @@ impl CodeTemplateGenerator {
         );
 
         // Load and render agents.md
-        let agents_template = Self::load_template(REMEDIATE_FACTORY_AGENTS_TEMPLATE)?;
+        let agents_template = Self::load_template(agents_path)?;
         handlebars
             .register_template_string("remediate_agents", agents_template)
             .map_err(|e| {
@@ -1925,7 +1951,7 @@ impl CodeTemplateGenerator {
                 })?,
         );
 
-        // Generate MCP config for Factory
+        // Generate MCP config
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
