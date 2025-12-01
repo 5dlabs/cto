@@ -157,6 +157,27 @@ spec:
           - /app/prompts
 
         extraContainers:
+          - name: filebrowser
+            image: filebrowser/filebrowser:latest
+            args:
+              - --noauth
+              - --root=/srv
+              - --address=0.0.0.0
+              - --port=8081
+            ports:
+              - containerPort: 8081
+                name: filebrowser
+                protocol: TCP
+            resources:
+              limits:
+                cpu: 100m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            volumeMounts:
+              - name: heal-workspace
+                mountPath: /srv
           - name: log-tailer
             image: busybox:latest
             command:
