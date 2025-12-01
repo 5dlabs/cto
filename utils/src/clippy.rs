@@ -259,12 +259,7 @@ impl ClippyErrors {
 
     /// Extract the main error message (first line)
     fn extract_main_message(&self, message: &str) -> String {
-        message
-            .lines()
-            .next()
-            .unwrap_or(message)
-            .trim()
-            .to_string()
+        message.lines().next().unwrap_or(message).trim().to_string()
     }
 
     /// Extract suggestion from "help: try:" or similar patterns
@@ -318,7 +313,8 @@ impl ClippyErrors {
 
         prompt.push_str("## Instructions\n\n");
         prompt.push_str("1. Fix each error following Clippy's suggestion if provided\n");
-        prompt.push_str("2. Run `cargo clippy --workspace --all-targets -- -D warnings` to verify\n");
+        prompt
+            .push_str("2. Run `cargo clippy --workspace --all-targets -- -D warnings` to verify\n");
         prompt.push_str("3. Only fix Clippy errors, don't refactor unrelated code\n");
 
         prompt
@@ -368,10 +364,7 @@ mod tests {
 
         // From message
         let msg = "for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#too_many_lines";
-        assert_eq!(
-            client.extract_lint_code(msg, ""),
-            "clippy::too_many_lines"
-        );
+        assert_eq!(client.extract_lint_code(msg, ""), "clippy::too_many_lines");
     }
 
     #[test]

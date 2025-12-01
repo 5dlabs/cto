@@ -316,10 +316,7 @@ async fn run_reviews(
             if comments.is_empty() {
                 println!("No review comments found for PR #{pr}");
             } else {
-                println!(
-                    "Review comments for PR #{pr} ({} total):\n",
-                    comments.len()
-                );
+                println!("Review comments for PR #{pr} ({} total):\n", comments.len());
                 for comment in comments {
                     // Header with author and location
                     let location = if !comment.path.is_empty() && comment.line.is_some() {
@@ -351,7 +348,10 @@ async fn run_reviews(
 
                     // Show suggestion if present
                     if let Some(suggestion) = &comment.suggestion {
-                        println!("  💡 Suggestion: {}", suggestion.lines().next().unwrap_or(""));
+                        println!(
+                            "  💡 Suggestion: {}",
+                            suggestion.lines().next().unwrap_or("")
+                        );
                     }
 
                     println!();

@@ -772,10 +772,7 @@ mod tests {
     fn shorten_model_name_handles_other_models() {
         assert_eq!(ResourceNaming::shorten_model_name("haiku"), "haiku");
         assert_eq!(ResourceNaming::shorten_model_name("gpt-4"), "gpt4");
-        assert_eq!(
-            ResourceNaming::shorten_model_name("gemini-pro"),
-            "gempro"
-        );
+        assert_eq!(ResourceNaming::shorten_model_name("gemini-pro"), "gempro");
         assert_eq!(
             ResourceNaming::shorten_model_name("some-custom-model"),
             "somecust"

@@ -1759,9 +1759,15 @@ impl CodeTemplateGenerator {
 
         // Select template paths based on CLI type
         let (container_path, agents_path) = if use_claude {
-            (REVIEW_CLAUDE_CONTAINER_TEMPLATE, REVIEW_CLAUDE_AGENTS_TEMPLATE)
+            (
+                REVIEW_CLAUDE_CONTAINER_TEMPLATE,
+                REVIEW_CLAUDE_AGENTS_TEMPLATE,
+            )
         } else {
-            (REVIEW_FACTORY_CONTAINER_TEMPLATE, REVIEW_FACTORY_AGENTS_TEMPLATE)
+            (
+                REVIEW_FACTORY_CONTAINER_TEMPLATE,
+                REVIEW_FACTORY_AGENTS_TEMPLATE,
+            )
         };
 
         // Load and render container script
@@ -1776,11 +1782,13 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            handlebars.render("review_container", &context).map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render review container template: {e}"
-                ))
-            })?,
+            handlebars
+                .render("review_container", &context)
+                .map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to render review container template: {e}"
+                    ))
+                })?,
         );
 
         // Load and render agents.md
@@ -1906,9 +1914,15 @@ impl CodeTemplateGenerator {
 
         // Select template paths based on CLI type
         let (container_path, agents_path) = if use_claude {
-            (REMEDIATE_CLAUDE_CONTAINER_TEMPLATE, REMEDIATE_CLAUDE_AGENTS_TEMPLATE)
+            (
+                REMEDIATE_CLAUDE_CONTAINER_TEMPLATE,
+                REMEDIATE_CLAUDE_AGENTS_TEMPLATE,
+            )
         } else {
-            (REMEDIATE_FACTORY_CONTAINER_TEMPLATE, REMEDIATE_FACTORY_AGENTS_TEMPLATE)
+            (
+                REMEDIATE_FACTORY_CONTAINER_TEMPLATE,
+                REMEDIATE_FACTORY_AGENTS_TEMPLATE,
+            )
         };
 
         // Load and render container script
