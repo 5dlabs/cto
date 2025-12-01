@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.5](https://github.com/5dlabs/cto/compare/v0.11.4...v0.11.5) (2025-12-01)
+
+
+### ✨ Features
+
+* **controller:** add heal templates ConfigMap for remediation agents ([#1914](https://github.com/5dlabs/cto/issues/1914)) ([0bb6d78](https://github.com/5dlabs/cto/commit/0bb6d7859805a15937bdd5823a15b85b6b1727a9))
+
 ## [0.11.4](https://github.com/5dlabs/cto/compare/v0.11.3...v0.11.4) (2025-12-01)
 
 
