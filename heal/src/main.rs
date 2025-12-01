@@ -4458,10 +4458,19 @@ fn create_next_monitor_iteration(config_path: &str, iteration: u32, namespace: &
 // Alert System Functions
 // =============================================================================
 
-/// Watch for alerts and spawn Factory when detected
+/// Message types for the alert watch event loop
+#[derive(Debug)]
+enum AlertWatchEvent {
+    PodEvent(serde_json::Value),
+    CodeRunEvent(serde_json::Value),
+}
+
+/// Watch for alerts and spawn Factory when detected.
+#[allow(clippy::too_many_lines)]
 async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> Result<()> {
     use tokio::io::{AsyncBufReadExt, BufReader};
     use tokio::process::Command as AsyncCommand;
+    use tokio::sync::mpsc;
 
     println!(
         "{}",
@@ -4479,110 +4488,320 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
     let registry = alerts::AlertRegistry::new();
     let github_state = github::GitHubState::default();
 
+    // Track CodeRun timestamps for A9 alerts
+    let mut coderun_tracker = alerts::CodeRunTracker::new();
+    // Track which CodeRuns we've already alerted on (to avoid spam)
+    let mut alerted_coderuns: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Create a channel for events from both watches
+    let (tx, mut rx) = mpsc::channel::<AlertWatchEvent>(100);
+
     // Start kubectl watch for pods
-    let mut child = AsyncCommand::new("kubectl")
-        .args([
-            "get",
-            "pods",
-            "-n",
-            namespace,
-            "-w",
-            "-o",
-            "json",
-            "--output-watch-events",
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .context("Failed to start kubectl watch")?;
-
-    let stdout = child.stdout.take().context("Failed to get stdout")?;
-    let reader = BufReader::new(stdout);
-    let mut lines = reader.lines();
-
-    println!("{}", "Watching for pod events...".green());
-
-    while let Some(line) = lines.next_line().await? {
-        // Parse the watch event JSON
-        let event_json: serde_json::Value = match serde_json::from_str(&line) {
-            Ok(v) => v,
-            Err(_) => continue,
+    let tx_pods = tx.clone();
+    let namespace_pods = namespace.to_string();
+    let pod_watch_handle = tokio::spawn(async move {
+        let mut child = match AsyncCommand::new("kubectl")
+            .args([
+                "get",
+                "pods",
+                "-n",
+                &namespace_pods,
+                "-w",
+                "-o",
+                "json",
+                "--output-watch-events",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to start pod watch: {e}");
+                return;
+            }
         };
 
-        // Convert JSON to our Pod type
-        let pod = parse_pod_from_json(&event_json["object"], namespace);
-        let event_type = event_json["type"].as_str().unwrap_or("");
+        let Some(stdout) = child.stdout.take() else {
+            return;
+        };
+        let reader = BufReader::new(stdout);
+        let mut lines = reader.lines();
 
-        // Determine the K8sEvent type based on phase and event type
-        let k8s_event = match (pod.phase.as_str(), event_type) {
-            ("Failed" | "Error", _) => k8s::K8sEvent::PodFailed(pod.clone()),
-            ("Succeeded", _) => k8s::K8sEvent::PodSucceeded(pod.clone()),
-            ("Running", "ADDED") => k8s::K8sEvent::PodRunning(pod.clone()),
-            ("Running" | _, "MODIFIED") => k8s::K8sEvent::PodModified(pod.clone()),
-            _ => continue, // Skip other events
+        while let Ok(Some(line)) = lines.next_line().await {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                if tx_pods.send(AlertWatchEvent::PodEvent(json)).await.is_err() {
+                    break;
+                }
+            }
+        }
+    });
+
+    // Start kubectl watch for CodeRuns
+    let tx_coderuns = tx;
+    let namespace_coderuns = namespace.to_string();
+    let coderun_watch_handle = tokio::spawn(async move {
+        let mut child = match AsyncCommand::new("kubectl")
+            .args([
+                "get",
+                "coderuns.agents.platform",
+                "-n",
+                &namespace_coderuns,
+                "-w",
+                "-o",
+                "json",
+                "--output-watch-events",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to start coderun watch: {e}");
+                return;
+            }
         };
 
-        // Debug: Log any terminated containers in Running pods (potential A2 alerts)
-        if pod.phase == "Running" {
-            for cs in &pod.container_statuses {
-                if let k8s::ContainerState::Terminated { exit_code, .. } = &cs.state {
-                    if *exit_code != 0 {
-                        println!(
-                            "{}",
-                            format!(
-                                "👀 DEBUG: Pod {} has terminated container '{}' (exit={}) while still Running",
-                                pod.name, cs.name, exit_code
-                            ).yellow()
-                        );
+        let Some(stdout) = child.stdout.take() else {
+            return;
+        };
+        let reader = BufReader::new(stdout);
+        let mut lines = reader.lines();
+
+        while let Ok(Some(line)) = lines.next_line().await {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                if tx_coderuns
+                    .send(AlertWatchEvent::CodeRunEvent(json))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        }
+    });
+
+    println!(
+        "{}",
+        "Watching for pod and CodeRun events...".green()
+    );
+
+    // Process events from both watches
+    while let Some(event) = rx.recv().await {
+        match event {
+            AlertWatchEvent::PodEvent(event_json) => {
+                // Convert JSON to our Pod type
+                let pod = parse_pod_from_json(&event_json["object"], namespace);
+                let event_type = event_json["type"].as_str().unwrap_or("");
+
+                // Determine the K8sEvent type based on phase and event type
+                let k8s_event = match (pod.phase.as_str(), event_type) {
+                    ("Failed" | "Error", _) => k8s::K8sEvent::PodFailed(pod.clone()),
+                    ("Succeeded", _) => k8s::K8sEvent::PodSucceeded(pod.clone()),
+                    ("Running", "ADDED") => k8s::K8sEvent::PodRunning(pod.clone()),
+                    ("Running" | _, "MODIFIED") => k8s::K8sEvent::PodModified(pod.clone()),
+                    _ => continue, // Skip other events
+                };
+
+                // Debug: Log any terminated containers in Running pods (potential A2 alerts)
+                if pod.phase == "Running" {
+                    for cs in &pod.container_statuses {
+                        if let k8s::ContainerState::Terminated { exit_code, .. } = &cs.state {
+                            if *exit_code != 0 {
+                                println!(
+                                    "{}",
+                                    format!(
+                                        "👀 DEBUG: Pod {} has terminated container '{}' (exit={}) while still Running",
+                                        pod.name, cs.name, exit_code
+                                    ).yellow()
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Build alert context from pod labels
+                let task_id = pod.labels.get("task-id").cloned().unwrap_or_default();
+                let alert_ctx = alerts::AlertContext {
+                    task_id: task_id.clone(),
+                    repository: String::new(),
+                    namespace: namespace.to_string(),
+                    pr_number: None,
+                    workflow_name: None,
+                    config: alerts::types::AlertConfig::default(),
+                };
+
+                // Evaluate all alert handlers
+                let detected_alerts = registry.evaluate(&k8s_event, &github_state, &alert_ctx);
+
+                // Process each detected alert
+                for alert in detected_alerts {
+                    println!(
+                        "{}",
+                        format!(
+                            "🚨 ALERT {}: {} [severity: {:?}]",
+                            alert.id.as_str(),
+                            alert.message,
+                            alert.severity
+                        )
+                        .red()
+                    );
+
+                    // Handle the alert (load prompt, fetch logs, spawn Factory)
+                    handle_detected_alert(&alert, &pod, namespace, prompts_dir, dry_run).await?;
+                }
+
+                // Also check for completion (pod succeeded) - this is a proactive check, not an alert
+                // Skip infrastructure pods (cronjobs, platform services)
+                if matches!(k8s_event, k8s::K8sEvent::PodSucceeded(_))
+                    && !k8s::is_excluded_pod(&pod.name)
+                {
+                    println!(
+                        "{}",
+                        format!("✅ Pod {} succeeded - running completion check", pod.name).green()
+                    );
+
+                    handle_completion_check(&pod, namespace, prompts_dir, dry_run).await?;
+                }
+            }
+            AlertWatchEvent::CodeRunEvent(event_json) => {
+                // Parse CodeRun from JSON
+                let coderun = parse_coderun_from_json(&event_json["object"], namespace);
+                let event_type = event_json["type"].as_str().unwrap_or("");
+
+                // Log CodeRun events for visibility
+                println!(
+                    "{}",
+                    format!(
+                        "📦 CodeRun {}: phase={} (event={})",
+                        coderun.name, coderun.phase, event_type
+                    )
+                    .dimmed()
+                );
+
+                // Track CodeRun for A9 stuck detection
+                let phase = coderun.phase.as_str();
+                if phase == "Succeeded" || phase == "Failed" || event_type == "DELETED" {
+                    // Terminal state or deleted - remove from tracking
+                    coderun_tracker.remove(&coderun.name);
+                    alerted_coderuns.remove(&coderun.name);
+                } else {
+                    // Non-terminal state - track first seen time
+                    coderun_tracker.record_first_seen(&coderun.name);
+
+                    // Check if we should alert (exceeded threshold and not yet alerted)
+                    let config = alerts::types::AlertConfig::default();
+                    if coderun_tracker
+                        .exceeds_threshold(&coderun.name, config.stuck_coderun_threshold_mins)
+                        && !alerted_coderuns.contains(&coderun.name)
+                    {
+                        // Create K8sEvent and evaluate
+                        let k8s_event = k8s::K8sEvent::CodeRunChanged(coderun.clone());
+
+                        let task_id = coderun.task_id.clone();
+                        let alert_ctx = alerts::AlertContext {
+                            task_id,
+                            repository: String::new(),
+                            namespace: namespace.to_string(),
+                            pr_number: None,
+                            workflow_name: None,
+                            config,
+                        };
+
+                        let detected_alerts =
+                            registry.evaluate(&k8s_event, &github_state, &alert_ctx);
+
+                        for alert in detected_alerts {
+                            println!(
+                                "{}",
+                                format!(
+                                    "🚨 ALERT {}: {} [severity: {:?}]",
+                                    alert.id.as_str(),
+                                    alert.message,
+                                    alert.severity
+                                )
+                                .red()
+                            );
+
+                            // Mark as alerted to avoid spam
+                            alerted_coderuns.insert(coderun.name.clone());
+
+                            // Handle the alert for CodeRun
+                            handle_coderun_alert(&alert, &coderun, namespace, prompts_dir, dry_run)
+                                .await?;
+                        }
                     }
                 }
             }
         }
+    }
 
-        // Build alert context from pod labels
-        let task_id = pod.labels.get("task-id").cloned().unwrap_or_default();
-        let alert_ctx = alerts::AlertContext {
-            task_id: task_id.clone(),
-            repository: String::new(),
-            namespace: namespace.to_string(),
-            pr_number: None,
-            workflow_name: None,
-            config: alerts::types::AlertConfig::default(),
-        };
+    // Wait for watch tasks (they'll run until the channel closes)
+    let _ = pod_watch_handle.await;
+    let _ = coderun_watch_handle.await;
 
-        // Evaluate all alert handlers
-        let detected_alerts = registry.evaluate(&k8s_event, &github_state, &alert_ctx);
+    Ok(())
+}
 
-        // Process each detected alert
-        for alert in detected_alerts {
-            println!(
-                "{}",
-                format!(
-                    "🚨 ALERT {}: {} [severity: {:?}]",
-                    alert.id.as_str(),
-                    alert.message,
-                    alert.severity
-                )
-                .red()
-            );
-
-            // Handle the alert (load prompt, fetch logs, spawn Factory)
-            handle_detected_alert(&alert, &pod, namespace, prompts_dir, dry_run).await?;
-        }
-
-        // Also check for completion (pod succeeded) - this is a proactive check, not an alert
-        // Skip infrastructure pods (cronjobs, platform services)
-        if matches!(k8s_event, k8s::K8sEvent::PodSucceeded(_)) && !k8s::is_excluded_pod(&pod.name) {
-            println!(
-                "{}",
-                format!("✅ Pod {} succeeded - running completion check", pod.name).green()
-            );
-
-            handle_completion_check(&pod, namespace, prompts_dir, dry_run).await?;
+/// Parse kubectl JSON output into our `CodeRun` type.
+fn parse_coderun_from_json(json: &serde_json::Value, namespace: &str) -> k8s::CodeRun {
+    let mut labels = std::collections::HashMap::new();
+    if let Some(obj) = json["metadata"]["labels"].as_object() {
+        for (k, v) in obj {
+            if let Some(s) = v.as_str() {
+                labels.insert(k.clone(), s.to_string());
+            }
         }
     }
 
-    Ok(())
+    k8s::CodeRun {
+        name: json["metadata"]["name"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string(),
+        namespace: namespace.to_string(),
+        phase: json["status"]["phase"]
+            .as_str()
+            .unwrap_or("Unknown")
+            .to_string(),
+        agent: json["spec"]["githubApp"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        task_id: json["spec"]["taskId"]
+            .as_str()
+            .map(String::from)
+            .or_else(|| json["spec"]["taskId"].as_i64().map(|n| n.to_string()))
+            .unwrap_or_default(),
+        labels,
+    }
+}
+
+/// Handle a detected alert for a `CodeRun`.
+async fn handle_coderun_alert(
+    alert: &alerts::Alert,
+    coderun: &k8s::CodeRun,
+    namespace: &str,
+    prompts_dir: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let alert_id = alert.id.as_str().to_lowercase();
+    let task_id = &coderun.task_id;
+    let agent = &coderun.agent;
+
+    // For CodeRun alerts, we use the coderun name as the "pod" name for consistency
+    handle_alert(
+        &alert_id,
+        &coderun.name,
+        if task_id.is_empty() { "unknown" } else { task_id },
+        if agent.is_empty() { "unknown" } else { agent },
+        namespace,
+        &coderun.phase,
+        prompts_dir,
+        dry_run,
+    )
+    .await
 }
 
 /// Parse kubectl JSON output into our Pod type
