@@ -282,7 +282,7 @@ jobs:
           sccache --stop-server 2>/dev/null || true
           sccache --start-server
 
-      - name: Build release binary
+      - name: Build release binaries
         env:
           CARGO_INCREMENTAL: "0"
           RUSTC_WRAPPER: "sccache"
@@ -293,10 +293,17 @@ jobs:
           echo "🔨 Building tools-server for linux/amd64..."
           cargo build -p tools --release --bin tools-server
 
-          # Copy binary to Docker context (matches release workflow pattern)
+          echo "🔨 Building cto-mcp for linux/amd64..."
+          cargo build -p cto-mcp --release --bin cto-mcp
+
+          # Copy binaries to Docker context (matches release workflow pattern)
           cp target/release/tools-server infra/images/tools/tools-server-linux
           chmod +x infra/images/tools/tools-server-linux
-          echo "✅ Binary copied to Docker context"
+
+          cp target/release/cto-mcp infra/images/tools/cto-mcp-linux
+          chmod +x infra/images/tools/cto-mcp-linux
+
+          echo "✅ Binaries copied to Docker context"
           echo "📊 Final sccache stats:"
           sccache --show-stats
 
