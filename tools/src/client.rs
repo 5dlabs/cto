@@ -93,6 +93,7 @@ impl McpClient {
     /// For remote tools:
     /// - If `remoteTools` is empty or missing → include ALL remote tools (no filtering)
     /// - If `remoteTools` has items → only include those specific tools (whitelist mode)
+    /// - Supports wildcard patterns with `*` (e.g., `mcp_tools_cto_*`)
     ///
     /// For local tools:
     /// - Always check against explicit tool lists from local server configs
@@ -100,23 +101,43 @@ impl McpClient {
         if let Some(ref config) = self.client_config {
             if is_local {
                 // Check if any local server exposes this tool
-                config
-                    .local_servers
-                    .values()
-                    .any(|server| server.tools.contains(&tool_name.to_string()))
+                config.local_servers.values().any(|server| {
+                    server
+                        .tools
+                        .iter()
+                        .any(|pattern| Self::matches_pattern(pattern, tool_name))
+                })
             } else {
                 // For remote tools: empty list means "include all" (no filtering)
                 // This allows dynamic discovery without explicit whitelisting
                 if config.remote_tools.is_empty() {
                     true
                 } else {
-                    // Explicit whitelist mode: only include tools in the list
-                    config.remote_tools.contains(&tool_name.to_string())
+                    // Explicit whitelist mode: only include tools matching patterns
+                    config
+                        .remote_tools
+                        .iter()
+                        .any(|pattern| Self::matches_pattern(pattern, tool_name))
                 }
             }
         } else {
             // Legacy mode: include all tools
             true
+        }
+    }
+
+    /// Check if a tool name matches a pattern (supports `*` wildcard at end)
+    ///
+    /// Examples:
+    /// - `mcp_tools_cto_*` matches `mcp_tools_cto_play`, `mcp_tools_cto_jobs`
+    /// - `mcp_tools_github_create_issue` matches exactly `mcp_tools_github_create_issue`
+    fn matches_pattern(pattern: &str, tool_name: &str) -> bool {
+        if let Some(prefix) = pattern.strip_suffix('*') {
+            // Wildcard pattern: match prefix
+            tool_name.starts_with(prefix)
+        } else {
+            // Exact match
+            pattern == tool_name
         }
     }
 
