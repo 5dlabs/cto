@@ -48,21 +48,21 @@ HEADER_EOF
   if [ "$filter" = "shared" ]; then
     # Shared: collect files matching shared patterns
     for pattern in "${SHARED_PATTERNS[@]}"; do
-      files_list+=$(find "agent-templates" -type f -path "*/${pattern}*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null || true)$'\n'
+      files_list+=$(find "agent-templates" -type f -path "*/${pattern}*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null || true)$'\n'
     done
   else
     # CLI-specific: collect files under that CLI directory PLUS shared agent partials
     # Handle split claude ConfigMaps (claude-code and claude-docs)
     if [ "$filter" = "claude-code" ]; then
-      files_list=$(find "agent-templates/code/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+      files_list=$(find "agent-templates/code/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     elif [ "$filter" = "claude-docs" ]; then
-      files_list=$(find "agent-templates/docs/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+      files_list=$(find "agent-templates/docs/claude" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     elif [ "$filter" = "watch" ]; then
       # Watch templates: include all watch/ subdirectories (factory, claude) and shared acceptance criteria
-      files_list=$(find "agent-templates/watch" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+      files_list=$(find "agent-templates/watch" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     else
       # CLI-specific: collect files under code/, docs/, heal/, review/ directories for this CLI
-      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/heal/${filter}" "agent-templates/review/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/heal/${filter}" "agent-templates/review/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     fi
     
     # Also include shared agent partials so templates can resolve {{> agents/...}} references
@@ -73,7 +73,7 @@ HEADER_EOF
     fi
 
     # Include shared code templates (e.g., hooks prefixed with code_shared_)
-    code_shared=$(find "agent-templates" -maxdepth 1 -type f -name "code_shared_*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    code_shared=$(find "agent-templates" -maxdepth 1 -type f -name "code_shared_*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     if [ -n "$code_shared" ]; then
       files_list+=$'\n'
       files_list+="$code_shared"

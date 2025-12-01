@@ -83,6 +83,9 @@ spec:
                       items:
                         - key: review_factory_agents.md.hbs
                           path: agents.md
+                        - key: review_factory_post_review.py
+                          path: post_review.py
+                          mode: 0755
                   - name: github-app-key
                     secret:
                       secretName: github-app-5dlabs-stitch
@@ -219,6 +222,13 @@ spec:
                               "$(cat ${AGENT_PROMPT})"
                           DROID_EXIT=$?
                           set -e
+
+                          # Post inline review comments
+                          if [ $DROID_EXIT -eq 0 ]; then
+                            echo ""
+                            echo "📝 Posting review..."
+                            python3 /task-files/post_review.py || true
+                          fi
 
                           # Update check run with result
                           END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
