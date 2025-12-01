@@ -23,31 +23,74 @@ An agent is running but a preceding agent in the workflow hasn't posted their ex
 
 ## Your Task
 
-1. **Analyze** - Why is `{{missing_agent}}`'s comment missing?
-2. **Write analysis** to `/workspace/watch/alerts/A1-{{pod_name}}.md`
-3. **Spawn remediation** using the CLI:
+### Step 1: Create GitHub Issue
 
 ```bash
-heal spawn-remediation \
-  --alert a1 \
-  --task-id {{task_id}} \
-  --issue-file /workspace/watch/alerts/A1-{{pod_name}}.md
+ISSUE_URL=$(gh issue create \
+  --repo 5dlabs/cto \
+  --title "[HEAL-A1] Comment Order Mismatch: {{missing_agent}} missing" \
+  --label "heal,remediation,a1" \
+  --body "🔍 Analyzing comment order mismatch... Full analysis to follow.")
+ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+echo "✅ Created issue #${ISSUE_NUMBER}"
 ```
 
-## Analysis Template
+### Step 2: Create Issue Folder
 
-Write this to `/workspace/watch/alerts/A1-{{pod_name}}.md`:
+```bash
+ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
+mkdir -p "${ISSUE_DIR}"
+```
+
+### Step 3: Write prompt.md
 
 ```markdown
 # Comment Order Mismatch: {{pod_name}}
 
 ## Summary
-[Which agent is missing and why]
+[Which agent ({{missing_agent}}) is missing and why]
+
+## Expected Order
+Rex/Blaze → Cleo → Tess → Cipher → Atlas
 
 ## Root Cause
 [Why the comment is missing - did the agent fail, skip, or not run?]
 
-## Remediation Required
-[What the remediation agent should do to fix this]
+## Remediation Steps
+1. [Check if the missing agent's pod exists]
+2. [Verify the agent completed its task]
+3. [Trigger missing comment or rerun agent]
 ```
 
+### Step 4: Write acceptance-criteria.md
+
+```markdown
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+- [ ] Identified why {{missing_agent}}'s comment is missing
+- [ ] Either: Agent rerun and comment posted, OR
+- [ ] Fixed underlying issue preventing comment
+- [ ] PR {{pr_number}} has all expected comments in order
+- [ ] No A1 alerts for this PR
+```
+
+### Step 5: Update GitHub Issue
+
+```bash
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
+
+---
+
+$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
+```
+
+### Step 6: Spawn Remediation Agent
+
+```bash
+heal spawn-remediation \
+  --alert a1 \
+  --task-id {{task_id}} \
+  --issue-number ${ISSUE_NUMBER}
+```

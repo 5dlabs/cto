@@ -19,20 +19,26 @@ An agent has posted multiple approval comments without the workflow advancing.
 
 ## Your Task
 
-1. **Analyze** - Why is the agent looping on approval?
-2. **Write analysis** to `/workspace/watch/alerts/A4-{{pod_name}}.md`
-3. **Spawn remediation**:
+### Step 1: Create GitHub Issue
 
 ```bash
-heal spawn-remediation \
-  --alert a4 \
-  --task-id {{task_id}} \
-  --issue-file /workspace/watch/alerts/A4-{{pod_name}}.md
+ISSUE_URL=$(gh issue create \
+  --repo 5dlabs/cto \
+  --title "[HEAL-A4] Approval Loop: {{agent}} posted {{approval_count}} approvals" \
+  --label "heal,remediation,a4" \
+  --body "🔍 Analyzing approval loop... Full analysis to follow.")
+ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+echo "✅ Created issue #${ISSUE_NUMBER}"
 ```
 
-## Analysis Template
+### Step 2: Create Issue Folder
 
-Write this to `/workspace/watch/alerts/A4-{{pod_name}}.md`:
+```bash
+ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
+mkdir -p "${ISSUE_DIR}"
+```
+
+### Step 3: Write prompt.md
 
 ```markdown
 # Approval Loop: {{pod_name}}
@@ -41,12 +47,48 @@ Write this to `/workspace/watch/alerts/A4-{{pod_name}}.md`:
 [Agent is saying "approved" but workflow isn't advancing]
 
 ## Loop Pattern
-[Are the approvals identical? Time between them?]
+- **Approval Count**: {{approval_count}}
+- **Time Between Approvals**: [analyze]
+- **Are approvals identical?**: [yes/no]
 
 ## Root Cause
-[Why isn't the next workflow step triggering?]
+[Why isn't the next workflow step triggering? Controller issue? PR state?]
 
-## Remediation Required
-[Kill pod, fix workflow trigger, manual advancement?]
+## Remediation Steps
+1. [Check PR state and labels]
+2. [Verify workflow trigger conditions]
+3. [Kill pod, fix workflow trigger, or manual advancement]
 ```
 
+### Step 4: Write acceptance-criteria.md
+
+```markdown
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+- [ ] Root cause of approval loop identified
+- [ ] Workflow advances past stuck step
+- [ ] PR {{pr_number}} progresses to next phase
+- [ ] No repeated approval comments
+- [ ] No new A4 alerts for this PR
+```
+
+### Step 5: Update GitHub Issue
+
+```bash
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
+
+---
+
+$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
+```
+
+### Step 6: Spawn Remediation Agent
+
+```bash
+heal spawn-remediation \
+  --alert a4 \
+  --task-id {{task_id}} \
+  --issue-number ${ISSUE_NUMBER}
+```

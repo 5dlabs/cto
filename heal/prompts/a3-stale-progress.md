@@ -20,20 +20,26 @@ An agent pod has been running but no new commits have been pushed to the feature
 
 ## Your Task
 
-1. **Analyze** - Is the agent stuck, looping, or blocked?
-2. **Write analysis** to `/workspace/watch/alerts/A3-{{pod_name}}.md`
-3. **Spawn remediation**:
+### Step 1: Create GitHub Issue
 
 ```bash
-heal spawn-remediation \
-  --alert a3 \
-  --task-id {{task_id}} \
-  --issue-file /workspace/watch/alerts/A3-{{pod_name}}.md
+ISSUE_URL=$(gh issue create \
+  --repo 5dlabs/cto \
+  --title "[HEAL-A3] Stale Progress: {{agent}} no commits for {{stale_duration}}" \
+  --label "heal,remediation,a3" \
+  --body "🔍 Analyzing stale agent progress... Full analysis to follow.")
+ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+echo "✅ Created issue #${ISSUE_NUMBER}"
 ```
 
-## Analysis Template
+### Step 2: Create Issue Folder
 
-Write this to `/workspace/watch/alerts/A3-{{pod_name}}.md`:
+```bash
+ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
+mkdir -p "${ISSUE_DIR}"
+```
+
+### Step 3: Write prompt.md
 
 ```markdown
 # Stale Progress: {{pod_name}}
@@ -44,10 +50,49 @@ Write this to `/workspace/watch/alerts/A3-{{pod_name}}.md`:
 ## Last Productive Action
 [What was the agent last doing before going stale?]
 
-## Root Cause
-[Why no commits - API limits, auth failure, infinite loop?]
+## Timing
+- **Last Commit**: {{last_commit_time}}
+- **Stale Duration**: {{stale_duration}}
 
-## Remediation Required
-[Kill pod, fix config, manual intervention?]
+## Root Cause
+[Why no commits - API limits, auth failure, infinite loop, legitimately complex task?]
+
+## Remediation Steps
+1. [Check agent logs for errors or loops]
+2. [Determine if intervention needed]
+3. [Kill pod, fix config, or let continue]
 ```
 
+### Step 4: Write acceptance-criteria.md
+
+```markdown
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+- [ ] Root cause of stale progress identified
+- [ ] Either: Agent makes progress (new commits), OR
+- [ ] Agent terminated and restarted with fix, OR
+- [ ] Underlying issue (auth, API limits) resolved
+- [ ] Branch {{branch}} has new commits
+- [ ] No new A3 alerts for this agent
+```
+
+### Step 5: Update GitHub Issue
+
+```bash
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
+
+---
+
+$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
+```
+
+### Step 6: Spawn Remediation Agent
+
+```bash
+heal spawn-remediation \
+  --alert a3 \
+  --task-id {{task_id}} \
+  --issue-number ${ISSUE_NUMBER}
+```

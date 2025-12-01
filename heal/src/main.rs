@@ -325,9 +325,12 @@ enum Commands {
         /// Task ID for the remediation
         #[arg(long)]
         task_id: String,
-        /// Path to issue file written by Factory
+        /// GitHub issue number (preferred - derives paths from /workspace/watch/issues/{number}/)
         #[arg(long)]
-        issue_file: String,
+        issue_number: Option<u64>,
+        /// Path to issue file (legacy - use --issue-number instead)
+        #[arg(long)]
+        issue_file: Option<String>,
         /// Path to heal-config.json
         #[arg(long, default_value = "/app/heal-config.json")]
         config: String,
@@ -1789,10 +1792,17 @@ async fn main() -> Result<()> {
         Commands::SpawnRemediation {
             alert,
             task_id,
+            issue_number,
             issue_file,
             config,
         } => {
-            spawn_remediation_agent(&alert, &task_id, &issue_file, &config)?;
+            spawn_remediation_agent(
+                &alert,
+                &task_id,
+                issue_number,
+                issue_file.as_deref(),
+                &config,
+            )?;
         }
         Commands::FetchLogs {
             pod_name,
@@ -5256,7 +5266,8 @@ async fn test_alert_flow(
 fn spawn_remediation_agent(
     alert: &str,
     task_id: &str,
-    issue_file: &str,
+    issue_number: Option<u64>,
+    issue_file: Option<&str>,
     config_path: &str,
 ) -> Result<()> {
     println!("{}", "═".repeat(60).cyan());
@@ -5284,16 +5295,50 @@ fn spawn_remediation_agent(
         .dimmed()
     );
 
-    // Verify the issue file exists
+    // Determine issue directory and files based on issue_number or issue_file
+    let (issue_dir, prompt_file, acceptance_file) = if let Some(num) = issue_number {
+        let dir = format!("/workspace/watch/issues/{num}");
+        let prompt = format!("{dir}/prompt.md");
+        let acceptance = format!("{dir}/acceptance-criteria.md");
+        println!(
+            "{}",
+            format!("📁 Issue directory: {dir} (from issue #{num})").dimmed()
+        );
+        (Some(dir), prompt, Some(acceptance))
+    } else if let Some(file) = issue_file {
+        println!("{}", format!("📄 Using legacy issue file: {file}").yellow());
+        (None, file.to_string(), None)
+    } else {
+        return Err(anyhow::anyhow!(
+            "Either --issue-number or --issue-file must be provided"
+        ));
+    };
+
+    // Verify the prompt file exists
     println!(
         "{}",
-        format!("📄 Checking issue file: {issue_file}").dimmed()
+        format!("📄 Checking prompt file: {prompt_file}").dimmed()
     );
-    if !std::path::Path::new(issue_file).exists() {
-        println!("{}", format!("❌ Issue file not found: {issue_file}").red());
-        return Err(anyhow::anyhow!("Issue file not found: {issue_file}"));
+    if !std::path::Path::new(&prompt_file).exists() {
+        println!(
+            "{}",
+            format!("❌ Prompt file not found: {prompt_file}").red()
+        );
+        return Err(anyhow::anyhow!("Prompt file not found: {prompt_file}"));
     }
-    println!("{}", "   ✓ Issue file exists".green());
+    println!("{}", "   ✓ Prompt file exists".green());
+
+    // Check acceptance criteria if using issue_number
+    if let Some(ref acc_file) = acceptance_file {
+        if std::path::Path::new(acc_file).exists() {
+            println!("{}", "   ✓ Acceptance criteria exists".green());
+        } else {
+            println!(
+                "{}",
+                format!("   ⚠️  Acceptance criteria not found: {acc_file}").yellow()
+            );
+        }
+    }
 
     // Generate unique CodeRun name with new naming pattern:
     // heal-remediation-task{task_id}-{alert_type}-{alert_id}
@@ -5303,6 +5348,12 @@ fn spawn_remediation_agent(
 
     println!("{}", format!("🏷️  CodeRun name: {coderun_name}").dimmed());
     println!("{}", format!("⏰ Timestamp: {timestamp}").dimmed());
+    if let Some(num) = issue_number {
+        println!(
+            "{}",
+            format!("🔗 GitHub Issue: #{num} (PR will link with 'Fixes #{num}')").green()
+        );
+    }
 
     // Derive log file path from alert pattern (matches spawn_factory_with_prompt output)
     let log_dir = "/workspace/watch/logs";
@@ -5311,10 +5362,13 @@ fn spawn_remediation_agent(
     let coderun_yaml = build_coderun_yaml(
         alert,
         task_id,
-        issue_file,
+        &prompt_file,
         &log_file,
         &coderun_name,
         &timestamp,
+        issue_number,
+        issue_dir.as_deref(),
+        acceptance_file.as_deref(),
         &config,
     );
     apply_coderun(&coderun_yaml, &coderun_name)
@@ -5341,13 +5395,17 @@ fn load_heal_config(config_path: &str) -> HealConfig {
 }
 
 /// Build the `CodeRun` YAML manifest using values from config.
+#[allow(clippy::too_many_arguments)]
 fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
-    issue_file: &str,
+    prompt_file: &str,
     log_file: &str,
     coderun_name: &str,
     timestamp: &impl std::fmt::Display,
+    issue_number: Option<u64>,
+    issue_dir: Option<&str>,
+    acceptance_file: Option<&str>,
     config: &HealConfig,
 ) -> String {
     // Hash task_id to numeric (CodeRun requires integer taskId)
@@ -5368,6 +5426,17 @@ fn build_coderun_yaml(
     } else {
         format!("  localTools: \"{}\"\n", c.local_tools)
     };
+
+    // Build issue-related env vars
+    let issue_number_line = issue_number
+        .map(|n| format!("    HEAL_ISSUE_NUMBER: \"{n}\"\n"))
+        .unwrap_or_default();
+    let issue_dir_line = issue_dir
+        .map(|d| format!("    HEAL_ISSUE_DIR: \"{d}\"\n"))
+        .unwrap_or_default();
+    let acceptance_line = acceptance_file
+        .map(|f| format!("    HEAL_ACCEPTANCE_FILE: \"{f}\"\n"))
+        .unwrap_or_default();
 
     format!(
         r#"apiVersion: agents.platform/v1
@@ -5401,10 +5470,11 @@ spec:
   env:
     ALERT_TYPE: "{alert}"
     TASK_ID: "{task_id}"
-    HEAL_PROMPT_FILE: "{issue_file}"
+    HEAL_PROMPT_FILE: "{prompt_file}"
     HEAL_LOG_FILE: "{log_file}"
     CODERUN_NAME: "{coderun_name}"
     REMEDIATION_MODE: "true"
+{issue_number}{issue_dir}{acceptance}
 "#,
         namespace = c.namespace,
         run_type = c.run_type,
@@ -5424,6 +5494,9 @@ spec:
         template = c.cli_config.settings.template,
         log_file = log_file,
         coderun_name = coderun_name,
+        issue_number = issue_number_line,
+        issue_dir = issue_dir_line,
+        acceptance = acceptance_line,
     )
 }
 
