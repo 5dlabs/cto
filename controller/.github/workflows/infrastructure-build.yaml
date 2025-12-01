@@ -1,0 +1,183 @@
+---
+name: Infrastructure Images
+
+# Build infrastructure images like databases, caching systems, etc.
+# Separate from agent images to maintain logical separation
+
+on:
+  schedule:
+    # Daily at 7 AM UTC (after agents build)
+    - cron: '0 7 * * *'
+
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'infra/images/postgresql/**'
+      - 'infra/images/redis/**'
+      - 'infra/images/builder/**'
+      - 'infra/images/openmemory/**'
+      - 'infra/images/heal/**'
+      - 'heal/**'
+      - '.github/workflows/infrastructure-build.yaml'
+
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild all infrastructure images'
+        required: false
+        default: false
+        type: boolean
+      image:
+        description: 'Specific image to build (postgresql, rust-builder, openmemory, heal, or leave blank for all)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Build infrastructure images
+  build-infrastructure:
+    runs-on: [k8s-runner]
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - id: postgresql
+            name: PostgreSQL+pgvector
+            image: postgresql
+            context: ./infra/images/postgresql
+            file: ./infra/images/postgresql/Dockerfile
+            version: "16.3.0-pgvector"
+            description: "PostgreSQL 16 with pgvector extension for high-dimensional vectors"
+          - id: rust-builder
+            name: Rust Builder
+            image: rust-builder
+            context: ./infra/images/builder
+            file: ./infra/images/builder/Dockerfile
+            version: "latest"
+            description: "Rust development environment with pre-warmed dependencies for CI/CD"
+          - id: openmemory
+            name: OpenMemory
+            image: openmemory
+            context: ./infra/images/openmemory
+            file: ./infra/images/openmemory/Dockerfile
+            version: "1.0.0"
+            description: "OpenMemory long-term memory system for AI agents"
+          - id: heal
+            name: Heal Monitor
+            image: heal
+            context: .
+            file: ./infra/images/heal/Dockerfile
+            version: "latest"
+            description: "Self-healing platform monitor - detects issues and spawns remediation agents"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if should build this image
+        id: should-build
+        run: |
+          if [ "${{ github.event.inputs.image }}" = "" ] || [ "${{ github.event.inputs.image }}" = "${{ matrix.id }}" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+            echo "✅ Building ${{ matrix.name }} image"
+          else
+            echo "build=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Skipping ${{ matrix.name }} (building ${{ github.event.inputs.image }} only)"
+          fi
+
+      - name: Log in to Container Registry
+        if: steps.should-build.outputs.build == 'true'
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate version tag
+        if: steps.should-build.outputs.build == 'true'
+        id: version
+        run: |
+          # Use directory hash for versioning to ensure rebuilds when content changes
+          # For heal, check both source and Dockerfile directories
+          if [ "${{ matrix.id }}" = "heal" ]; then
+            VERSION=$(git log -1 --format="%h" -- heal/ infra/images/heal/)
+          else
+            VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 ${{ matrix.name }} version: $VERSION"
+
+      - name: Set up Docker Buildx
+        if: steps.should-build.outputs.build == 'true'
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Build and push ${{ matrix.name }} image
+        if: steps.should-build.outputs.build == 'true'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          pull: true
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:${{ matrix.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:v${{ steps.version.outputs.version }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Show GHCR tags for ${{ matrix.name }}
+        if: steps.should-build.outputs.build == 'true'
+        run: |
+          echo "🔎 Latest GHCR tags for ${{ matrix.image }}:"
+          gh api -H "Accept: application/vnd.github+json" \
+            "/orgs/${{ env.IMAGE_BASE }}/packages/container/${{ matrix.image }}/versions?per_page=3" \
+            | jq -r '.[].metadata.container.tags' || echo "Package not found or no access"
+
+      - name: Image build summary
+        if: steps.should-build.outputs.build == 'true'
+        run: |
+          echo "## ✅ ${{ matrix.name }} Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tags**: \`latest\`, \`${{ matrix.version }}\`, \`v${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Description**: ${{ matrix.description }}" >> $GITHUB_STEP_SUMMARY
+
+  # Cycle Arc runners when rust-builder image is updated (only on main branch)
+  cycle-runners:
+    needs: build-infrastructure
+    runs-on: [k8s-runner]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Check if rust-builder was built
+        id: check-rust-builder
+        run: |
+          # Check if rust-builder context changed in this push
+          if git diff --name-only HEAD~1 HEAD | grep -q "infra/images/builder/"; then
+            echo "rust_builder_changed=true" >> $GITHUB_OUTPUT
+            echo "🔄 rust-builder image was updated, will cycle runners"
+          else
+            echo "rust_builder_changed=false" >> $GITHUB_OUTPUT
+            echo "⏭️  rust-builder unchanged, skipping runner cycling"
+          fi
+
+      - name: Cycle rust-builder runners
+        if: steps.check-rust-builder.outputs.rust_builder_changed == 'true'
+        run: |
+          echo "🔄 Cycling Arc runners to use new rust-builder image..."
+
+          # Delete Arc runner pods to force them to pull new image
+          kubectl delete pods -n arc-runners \
+            -l runner-deployment-name=k8s-runner \
+            --grace-period=30 || true
+
+          echo "✅ Runner pods deleted - new pods will use updated rust-builder image"
+          echo "⏱️  Wait ~2-3 minutes for new runners to become available"

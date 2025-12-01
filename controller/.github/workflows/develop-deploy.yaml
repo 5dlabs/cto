@@ -1,0 +1,481 @@
+---
+name: Deploy Agent Controller
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g., v0.1.4)'
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+      - feature/*
+      - feat/*
+      - fix/*
+      - hotfix/*
+    paths:
+      - 'controller/**'
+      - 'infra/images/controller/**'
+      - 'infra/charts/controller/**'
+      - '.github/workflows/develop-deploy.yaml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+  
+  # ========================================
+  # TEMPORARY DOCKER HUB OUTAGE WORKAROUND
+  # ========================================
+  # Docker Hub authentication is down (Sept 24, 2025)
+  # Status: https://status.docker.com/
+  # 
+  # WHEN DOCKER HUB IS FIXED:
+  # 1. Change DOCKER_HUB_WORKING to 'true'
+  # 2. This will restore:
+  #    - Docker Hub login for buildx builder images
+  #    - docker-container driver (supports GitHub Actions cache)
+  #    - Multi-platform builds (linux/amd64,linux/arm64)
+  #
+  # CURRENT WORKAROUND (DOCKER_HUB_WORKING=false):
+  # - Uses docker driver (no Docker Hub auth needed)
+  # - Single platform builds only (linux/amd64)  
+  # - No GitHub Actions build cache support
+  # ========================================
+  DOCKER_HUB_WORKING: false
+
+jobs:
+  # Version determination
+  version:
+    runs-on: [k8s-runner]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short-sha: ${{ steps.version.outputs.short-sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - name: Set version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.tag }}"
+          else
+            # For push events, use latest
+            VERSION="latest"
+          fi
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short-sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "📦 Deploy version: ${VERSION}"
+
+
+  # Build only controller (skip Claude Code for now)
+  build-controller:
+    needs: [version]
+    runs-on: [k8s-runner]
+    # No container needed - the Arc runners now have the rust-builder image!
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - name: Setup optimized Rust environment
+        run: |
+          echo "🚀 Setting up ULTRA-OPTIMIZED Rust build environment..."
+
+          # Add cargo bin to PATH for this step and all subsequent steps
+          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          # Set up Rust toolchain (required for rust-builder image)
+          echo "🦀 Setting up Rust toolchain..."
+          rustup default stable
+          rustup update stable
+
+          # Custom image already has most tools pre-installed, just verify
+          echo "🔍 Verifying pre-installed tools..."
+          rustc --version || echo "⚠️ Rust not found"
+          cargo --version || echo "⚠️ Cargo not found"
+          sccache --version || echo "⚠️ sccache not found"
+          mold --version || echo "⚠️ mold not found"
+          clang --version || echo "⚠️ clang not found"
+          pkg-config --version || echo "⚠️ pkg-config not found"
+          openssl version || echo "⚠️ openssl not found"
+
+          # Show available resources
+          echo "💾 Available resources:"
+          echo "CPU cores: $(nproc)"
+          echo "Memory: $(free -h | grep '^Mem:' | awk '{print $2}')"
+          echo "Disk space: $(df -h . | tail -1 | awk '{print $4}')"
+
+          # Show cache locations
+          echo "📁 Cache locations:"
+          echo "CARGO_HOME: ${CARGO_HOME:-$HOME/.cargo}"
+          echo "SCCACHE_DIR: ${SCCACHE_DIR:-$HOME/.cache/sccache}"
+          echo "RUSTUP_HOME: ${RUSTUP_HOME:-$HOME/.rustup}"
+
+      - name: Setup sccache
+        run: |
+          echo "🗄️ Setting up sccache for ULTRA-FAST builds..."
+
+          # Ensure cargo bin is in PATH
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          # Configure sccache
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+
+          # Ensure sccache is running
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
+
+          echo "📊 Initial sccache stats:"
+          sccache --show-stats
+
+          # Verify mold is available
+          echo "🔗 Verifying mold linker:"
+          mold --version
+
+      - name: Verify pre-warmed dependencies
+        run: |
+          echo "🗂️ Checking pre-warmed dependency cache..."
+
+          # Check if dependencies are pre-warmed in the image
+          if [ -d "$CARGO_HOME/registry" ] && [ "$(ls -A $CARGO_HOME/registry 2>/dev/null)" ]; then
+            echo "✅ Pre-warmed dependencies found in image"
+            echo "Registry cache size: $(du -sh $CARGO_HOME/registry 2>/dev/null || echo '0B')"
+            echo "Git cache size: $(du -sh $CARGO_HOME/git 2>/dev/null || echo '0B')"
+            echo "📦 Sample pre-warmed packages:"
+            find $CARGO_HOME/registry -name "*.crate" 2>/dev/null | head -5 | xargs -I {} basename {} .crate || echo "Unable to list packages"
+          else
+            echo "⚠️ No pre-warmed dependencies found - will download at build time"
+            echo "CARGO_HOME contents:"
+            ls -la $CARGO_HOME/ 2>/dev/null || echo "CARGO_HOME not found"
+          fi
+
+      - name: Validate and regenerate Helm templates
+        run: |
+          echo "🔄 Validating and regenerating Helm templates before deployment..."
+          cd infra/charts/controller
+          
+          # Store originals for comparison
+          for file in templates/agent-templates-*.yaml; do
+            [ -f "$file" ] && cp "$file" "$file.orig"
+          done
+          
+          # Regenerate the templates
+          ./scripts/generate-agent-templates-configmaps-split.sh
+          
+          # Check if templates were updated
+          TEMPLATES_CHANGED=false
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
+            ORIG="$file.orig"
+            if [ -f "$ORIG" ]; then
+              if ! diff -q "$ORIG" "$file" >/dev/null 2>&1; then
+                TEMPLATES_CHANGED=true
+                echo "⚠️ WARNING: $(basename $file) was out of sync and has been regenerated!"
+              fi
+              rm -f "$ORIG"
+            fi
+          done
+          
+          if [ "$TEMPLATES_CHANGED" = "true" ]; then
+            echo "🔧 Using regenerated templates for this deployment"
+            echo "📋 ACTION REQUIRED: Commit the template updates to avoid this in future deployments:"
+            echo "   cd infra/charts/controller"
+            echo "   ./scripts/generate-agent-templates-configmaps-split.sh"
+            echo "   git add templates/agent-templates-*.yaml"
+            echo "   git commit -m 'chore: update agent templates ConfigMaps'"
+            echo ""
+            
+            # For workflow_dispatch (manual deploys), this is critical
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "⚠️ MANUAL DEPLOYMENT: Proceeding with regenerated templates"
+            fi
+          else
+            echo "✅ Templates are up to date"
+          fi
+          
+          # Verify the generated ConfigMaps are valid YAML
+          echo "🔍 Validating generated ConfigMap YAML..."
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
+            
+            if command -v yamllint >/dev/null 2>&1; then
+              yamllint -d relaxed "$file" || {
+                echo "❌ ERROR: $(basename $file) is not valid YAML!"
+                exit 1
+              }
+            else
+              # Basic validation without yamllint - check for valid YAML structure
+              if [ ! -f "$file" ]; then
+                echo "❌ ERROR: ConfigMap file $(basename $file) does not exist!"
+                exit 1
+              fi
+              
+              # Check file is not empty and has reasonable size
+              if [ ! -s "$file" ]; then
+                echo "❌ ERROR: ConfigMap $(basename $file) is empty!"
+                exit 1
+              fi
+              
+              # Check for valid YAML start patterns (comment, document separator, or apiVersion)
+              if head -n 5 "$file" | grep -qE "^(#|---|apiVersion:|kind:)"; then
+                echo "✅ $(basename $file): Basic YAML structure validation passed"
+              else
+                echo "❌ ERROR: $(basename $file) doesn't appear to be valid YAML!"
+                echo "First 5 lines:"
+                head -n 5 "$file"
+                exit 1
+              fi
+            fi
+          done
+          
+          echo "✅ All template ConfigMaps are valid and ready for deployment"
+
+      - name: Build release binary (ultra-fast)
+        working-directory: ./controller
+        env:
+          CARGO_INCREMENTAL: "0"  # Disable for better sccache hits
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
+          SCCACHE_IDLE_TIMEOUT: "0"
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+          CARGO_TARGET_DIR: "$HOME/cache/target"  # Build to cache directory for persistence
+        run: |
+          echo "🏗️ Building controller binary with pre-warmed dependencies..."
+
+          # Create cache directory
+          mkdir -p $HOME/cache/target
+
+          # Show build environment
+          echo "Build environment:"
+          echo "Available cores: $(nproc)"
+          echo "RUSTFLAGS: $RUSTFLAGS"
+          echo "RUSTC_WRAPPER: $RUSTC_WRAPPER"
+          echo "CARGO_HOME: ${CARGO_HOME:-$HOME/.cargo}"
+          echo "SCCACHE_DIR: ${SCCACHE_DIR:-$HOME/.cache/sccache}"
+
+          # Pre-warm sccache
+          sccache --start-server || true
+          echo "📊 Initial sccache stats:"
+          sccache --show-stats
+
+          # Set CARGO_TARGET_DIR to use cache directory
+          export CARGO_TARGET_DIR=$HOME/cache/target
+
+          # Build with detailed output
+          echo "⏱️ Starting build..."
+          cargo build --release --bin agent-controller
+
+          # Show final sccache stats
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
+
+          # Debug: Show what's in the target directory
+          echo "🔍 Checking target directory contents:"
+          echo "CARGO_TARGET_DIR is: ${CARGO_TARGET_DIR:-not set}"
+          ls -la target/release/ || echo "target/release/ not found"
+          ls -la $HOME/cache/target/release/ || echo "$HOME/cache/target/release/ not found"
+          find target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in target/"
+          find $HOME/cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in target/"
+          find $HOME/cache/target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in $HOME/cache/target/"
+          find $HOME/cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in $HOME/cache/target/"
+
+          # Copy binary from cache target dir (where CARGO_TARGET_DIR points)
+          cp $HOME/cache/target/release/agent-controller agent-controller
+
+          # Show binary info
+          echo "📦 Built binary info:"
+          ls -lh agent-controller
+          file agent-controller
+
+          # Verify binary is present for Docker build context (controller/agent-controller)
+          echo "📋 Verifying agent-controller binary for Docker build context"
+          test -f agent-controller && echo "agent-controller present in ./controller" || (echo "agent-controller missing" && exit 1)
+          ls -la agent-controller
+
+      - name: Log in to Docker Hub (for builder images only)
+        if: env.DOCKER_HUB_WORKING == 'true'
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Set up Docker Buildx (full functionality)
+        if: env.DOCKER_HUB_WORKING == 'true'
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        with:
+          driver: docker-container
+          install: true
+
+      - name: Set up Docker Buildx (outage workaround - limited functionality)
+        if: env.DOCKER_HUB_WORKING == 'false'
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        with:
+          driver: docker
+          install: true
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Controller image (full functionality)
+        if: env.DOCKER_HUB_WORKING == 'true'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.short-sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Controller image (outage workaround)
+        if: env.DOCKER_HUB_WORKING == 'false'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.short-sha }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Show GHCR controller tags
+        run: |
+          echo "🔎 Latest GHCR tags for controller:"
+          gh api -H "Accept: application/vnd.github+json" \
+            "/orgs/5dlabs/packages/container/cto%2Fcontroller/versions?per_page=1" \
+            | jq -r '.[0].metadata.container.tags'
+
+  # Deploy immediately
+  deploy:
+    needs: [version, build-controller]
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - name: Setup tools
+        run: |
+          mkdir -p $HOME/bin
+          if [ -f /shared/kubectl ]; then
+            cp /shared/kubectl $HOME/bin/
+            chmod +x $HOME/bin/kubectl
+          fi
+          if [ -f /shared/helm ]; then
+            cp /shared/helm $HOME/bin/
+            chmod +x $HOME/bin/helm
+          fi
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Prepare template updates for ArgoCD
+        id: template-check
+        run: |
+          echo "📦 Preparing template updates for ArgoCD deployment..."
+          
+          # Check if templates were regenerated in the build job
+          cd infra/charts/controller
+          
+          # Regenerate templates again to ensure consistency
+          ./scripts/generate-agent-templates-configmaps-split.sh
+          
+          # Create a patch file if templates differ from Git
+          TEMPLATES_CHANGED=false
+          for file in templates/agent-templates-*.yaml; do
+            if ! git diff --quiet "$file"; then
+              TEMPLATES_CHANGED=true
+              break
+            fi
+          done
+          
+          if [ "$TEMPLATES_CHANGED" = "true" ]; then
+            echo "templates-changed=true" >> $GITHUB_OUTPUT
+            echo "📝 Creating template update patch..."
+            git diff templates/agent-templates-*.yaml > /tmp/templates-update.patch
+            
+            # Also save the full updated files
+            mkdir -p /tmp/templates-backup
+            cp templates/agent-templates-*.yaml /tmp/templates-backup/
+            
+            echo "⚠️ IMPORTANT: Templates have been updated!"
+            echo "The regenerated templates will be used by ArgoCD for this deployment."
+            echo ""
+            echo "To make these changes permanent, apply this patch to your main branch:"
+            echo "   git apply /tmp/templates-update.patch"
+            echo "   git add infra/charts/controller/templates/agent-templates-*.yaml"
+            echo "   git commit -m 'chore: update agent templates ConfigMaps'"
+            echo "   git push"
+          else
+            echo "templates-changed=false" >> $GITHUB_OUTPUT
+            echo "✅ Templates are in sync with Git repository"
+          fi
+      
+      - name: Upload template updates
+        if: steps.template-check.outputs.templates-changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: template-updates-${{ github.run_id }}
+          path: |
+            /tmp/templates-update.patch
+            /tmp/templates-backup/
+          retention-days: 7
+
+      - name: GitOps Update (Skipped)
+        run: |
+          echo "📝 GitOps configuration uses 'latest' tag - no update needed"
+          echo "New image: ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest"
+
+      - name: Force ArgoCD Sync
+        run: |
+          echo "🔄 Forcing ArgoCD to sync the updated configuration"
+
+          # Wait a moment for Git changes to propagate
+          sleep 5
+
+          # Force ArgoCD application refresh and sync
+          kubectl patch application cto-controller -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+          # Give ArgoCD time to process the sync (can't wait due to permissions)
+          echo "⏳ ArgoCD sync triggered, waiting 30s for processing..."
+          sleep 30
+
+          echo "✅ ArgoCD sync triggered successfully"
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Deployment verification..."
+          kubectl get pods -n cto -o wide
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=controller -n cto --timeout=120s || true
+
+          echo ""
+          echo "✅ Deployment complete!"
+          echo "📦 Deployed: ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest"
+          echo "🏷️ Version: ${{ needs.version.outputs.version }}"
+
+      - name: Show recent TaskRuns
+        run: |
+          echo "📋 Recent TaskRuns:"
+          kubectl get taskruns -A --sort-by=.metadata.creationTimestamp | tail -10 || echo "No TaskRuns found"

@@ -26,7 +26,7 @@ pub enum K8sEvent {
 }
 
 /// Pod name prefixes to exclude from alerts and completion checks.
-/// These are infrastructure pods that restart during deployments or CronJobs.
+/// These are infrastructure pods that restart during deployments or `CronJobs`.
 const EXCLUDED_POD_PREFIXES: &[&str] = &[
     "heal",
     "cto-tools",
@@ -38,7 +38,7 @@ const EXCLUDED_POD_PREFIXES: &[&str] = &[
 ];
 
 /// Check if a pod name should be excluded from alerts/completion checks.
-/// Returns true for infrastructure pods that restart during deployments or CronJobs.
+/// Returns true for infrastructure pods that restart during deployments or `CronJobs`.
 pub fn is_excluded_pod(pod_name: &str) -> bool {
     EXCLUDED_POD_PREFIXES
         .iter()
