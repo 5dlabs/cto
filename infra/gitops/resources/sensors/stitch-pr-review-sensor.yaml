@@ -9,13 +9,24 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: stitch-pr-review
-  namespace: cto
+  namespace: automation
   labels:
     app.kubernetes.io/name: stitch-pr-review-sensor
     app.kubernetes.io/part-of: argo-events
     agent: stitch
     event-type: github-pr-review
 spec:
+  replicas: 1
+  template:
+    serviceAccountName: argo-events-sa
+    container:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
   dependencies:
     # Trigger 1: PR opened, synchronized, or reopened
     - name: pull-request-event
