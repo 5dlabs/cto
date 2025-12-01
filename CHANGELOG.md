@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.1](https://github.com/5dlabs/cto/compare/v0.11.0...v0.11.1) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* simplify Stitch sensor to single dependency ([#1903](https://github.com/5dlabs/cto/issues/1903)) ([115ef44](https://github.com/5dlabs/cto/commit/115ef4477d76ae593dff65ff89fa5c940b8aea87))
+
+
+### 🔧 Maintenance
+
+* release 0.11.0 ([#1902](https://github.com/5dlabs/cto/issues/1902)) ([e52c7ff](https://github.com/5dlabs/cto/commit/e52c7ff7928e1693653394be184cdaea589281b0))
+
 ## [0.11.0](https://github.com/5dlabs/cto/compare/v0.10.0...v0.11.0) (2025-12-01)
 
 
