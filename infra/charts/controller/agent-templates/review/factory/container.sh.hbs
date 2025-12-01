@@ -27,11 +27,15 @@ export HEAD_SHA="{{head_sha}}"
 export REVIEW_MODE="{{review_mode}}"
 export TRIGGER="{{trigger}}"
 
+# MCP Tools configuration
+export TOOLS_URL="{{tools_url}}"
+
 # Extract owner/repo from URL
 REPO_SLUG=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
 export REPO_SLUG
 
 echo "📦 Repository: $REPO_SLUG"
+echo "🔧 Tools URL: $TOOLS_URL"
 
 # Always fetch CI alerts for proactive analysis (not just when triggered by check_run)
 echo ""
@@ -102,6 +106,54 @@ if [ ! -f "${AGENT_PROMPT}" ]; then
     echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
     exit 1
 fi
+
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Display configured remote tools
+echo ""
+echo "📋 Configured Remote Tools:"
+{{#if remote_tools}}
+{{#each remote_tools}}
+echo "  • {{this}}"
+{{/each}}
+{{else}}
+echo "  (none configured)"
+{{/if}}
+
+# Verify Factory MCP tools are available using droid --list-tools
+echo ""
+echo "🔍 Verifying Factory MCP tools..."
+if command -v droid >/dev/null 2>&1; then
+    TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+    
+    if [ "$TOOL_LIST" != "FAILED" ]; then
+        # Show tool count
+        TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
+        echo "  📊 Total tools available: $TOOL_COUNT"
+        
+        # List available tools for verification
+        echo ""
+        echo "📋 Available Tools:"
+        echo "$TOOL_LIST" | grep "status:" | sed 's/^/  /' | head -20
+        
+        if [ "$TOOL_COUNT" -gt 20 ]; then
+            echo "  ... and $((TOOL_COUNT - 20)) more"
+        fi
+    else
+        echo "  ⚠️ Could not list Factory tools (droid exec --list-tools failed)"
+    fi
+else
+    echo "  ⚠️ droid CLI not available for tool verification"
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
 
 echo ""
 echo "🚀 Starting Factory CLI (droid exec)..."

@@ -27,7 +27,11 @@ export PR_NUMBER="{{pr_number}}"
 export HEAD_SHA="{{head_sha}}"
 export REPO_SLUG="{{repo_slug}}"
 
+# MCP Tools configuration
+export TOOLS_URL="{{tools_url}}"
+
 echo "📦 Repository: $REPO_SLUG"
+echo "🔧 Tools URL: $TOOLS_URL"
 
 # Pre-flight: Check for required tools
 # jq is critical for parsing CI alerts and review findings
@@ -118,6 +122,54 @@ if [ ! -f "${AGENT_PROMPT}" ]; then
     echo "  3. The volume mount is configured correctly in the CodeRun spec"
     exit 1
 fi
+
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Display configured remote tools
+echo ""
+echo "📋 Configured Remote Tools:"
+{{#if remote_tools}}
+{{#each remote_tools}}
+echo "  • {{this}}"
+{{/each}}
+{{else}}
+echo "  (none configured)"
+{{/if}}
+
+# Verify Factory MCP tools are available using droid --list-tools
+echo ""
+echo "🔍 Verifying Factory MCP tools..."
+if command -v droid >/dev/null 2>&1; then
+    TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+    
+    if [ "$TOOL_LIST" != "FAILED" ]; then
+        # Show tool count
+        TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
+        echo "  📊 Total tools available: $TOOL_COUNT"
+        
+        # List available tools for verification
+        echo ""
+        echo "📋 Available Tools:"
+        echo "$TOOL_LIST" | grep "status:" | sed 's/^/  /' | head -20
+        
+        if [ "$TOOL_COUNT" -gt 20 ]; then
+            echo "  ... and $((TOOL_COUNT - 20)) more"
+        fi
+    else
+        echo "  ⚠️ Could not list Factory tools (droid exec --list-tools failed)"
+    fi
+else
+    echo "  ⚠️ droid CLI not available for tool verification"
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
 
 echo ""
 echo "🚀 Starting Factory CLI (droid exec)..."

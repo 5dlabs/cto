@@ -1671,7 +1671,7 @@ impl CodeTemplateGenerator {
     /// Generate templates for review tasks (Stitch PR Review)
     fn generate_review_templates(
         code_run: &CodeRun,
-        _config: &ControllerConfig,
+        config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
         use crate::tasks::template_paths::{
             REVIEW_FACTORY_AGENTS_TEMPLATE, REVIEW_FACTORY_CONTAINER_TEMPLATE,
@@ -1719,6 +1719,21 @@ impl CodeTemplateGenerator {
         // Extract repo slug from repository URL (shared helper)
         let repo_slug = Self::extract_repo_slug(&code_run.spec.repository_url);
 
+        // Generate MCP client config and extract remote tools
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        // Get tools URL from cli_config settings (using shared helper)
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Stitch"),
             "pr_number": pr_number,
@@ -1728,7 +1743,12 @@ impl CodeTemplateGenerator {
             "review_mode": review_mode,
             "trigger": trigger,
             "model": code_run.spec.model,
+            "tools_url": render_settings.tools_url,
+            "remote_tools": remote_tools,
         });
+
+        // Generate client-config.json for MCP tools
+        templates.insert("client-config.json".to_string(), client_config);
 
         // Load and render container script
         let container_template = Self::load_template(REVIEW_FACTORY_CONTAINER_TEMPLATE)?;
@@ -1772,13 +1792,19 @@ impl CodeTemplateGenerator {
         let post_review_script = Self::load_template(REVIEW_FACTORY_POST_REVIEW_TEMPLATE)?;
         templates.insert("post_review.py".to_string(), post_review_script);
 
+        // Generate MCP config for Factory
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
         Ok(templates)
     }
 
     /// Generate templates for remediate tasks (Rex PR Remediation)
     fn generate_remediate_templates(
         code_run: &CodeRun,
-        _config: &ControllerConfig,
+        config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
         use crate::tasks::template_paths::{
             REMEDIATE_FACTORY_AGENTS_TEMPLATE, REMEDIATE_FACTORY_CONTAINER_TEMPLATE,
@@ -1825,6 +1851,21 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_default();
 
+        // Generate MCP client config and extract remote tools
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        // Get tools URL from cli_config settings (using shared helper)
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Rex"),
             "pr_number": pr_number,
@@ -1835,7 +1876,12 @@ impl CodeTemplateGenerator {
             "review_comment_id": review_comment_id,
             "findings_path": findings_path,
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "tools_url": render_settings.tools_url,
+            "remote_tools": remote_tools,
         });
+
+        // Generate client-config.json for MCP tools
+        templates.insert("client-config.json".to_string(), client_config);
 
         // Load and render container script
         let container_template = Self::load_template(REMEDIATE_FACTORY_CONTAINER_TEMPLATE)?;
@@ -1877,6 +1923,12 @@ impl CodeTemplateGenerator {
                         "Failed to render remediate agents template: {e}"
                     ))
                 })?,
+        );
+
+        // Generate MCP config for Factory
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
         );
 
         Ok(templates)
