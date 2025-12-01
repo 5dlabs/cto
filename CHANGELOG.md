@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.10](https://github.com/5dlabs/cto/compare/v0.11.9...v0.11.10) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** fix controller build target directory and rename workflow ([#1932](https://github.com/5dlabs/cto/issues/1932)) ([490522b](https://github.com/5dlabs/cto/commit/490522b5de1c4c41ed466e6a49a3aff0bb226686))
+
 ## [0.11.9](https://github.com/5dlabs/cto/compare/v0.11.8...v0.11.9) (2025-12-01)
 
 
