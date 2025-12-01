@@ -60,11 +60,15 @@ jobs:
           echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
           export PATH="/home/runner/.cargo/bin:$PATH"
 
-          # Use existing toolchain if available, retry on failure (handles concurrent cache issues)
-          if rustc --version 2>/dev/null; then
-            echo "✅ Rust already installed: $(rustc --version)"
+          # Check if both rustc and cargo are available and working
+          # If either is missing/broken, reinstall the toolchain
+          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+            echo "✅ Rust toolchain ready: $(rustc --version)"
           else
+            echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
+              # Force reinstall to fix broken toolchains
+              rustup toolchain install stable --force-non-host && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
@@ -127,11 +131,13 @@ jobs:
           echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
           export PATH="/home/runner/.cargo/bin:$PATH"
 
-          # Use existing toolchain if available, retry on failure (handles concurrent cache issues)
-          if rustc --version 2>/dev/null; then
-            echo "✅ Rust already installed: $(rustc --version)"
+          # Check if both rustc and cargo are available and working
+          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+            echo "✅ Rust toolchain ready: $(rustc --version)"
           else
+            echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
+              rustup toolchain install stable --force-non-host && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
@@ -176,11 +182,13 @@ jobs:
           echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
           export PATH="/home/runner/.cargo/bin:$PATH"
 
-          # Use existing toolchain if available, retry on failure (handles concurrent cache issues)
-          if rustc --version 2>/dev/null; then
-            echo "✅ Rust already installed: $(rustc --version)"
+          # Check if both rustc and cargo are available and working
+          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+            echo "✅ Rust toolchain ready: $(rustc --version)"
           else
+            echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
+              rustup toolchain install stable --force-non-host && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
@@ -300,11 +308,13 @@ jobs:
           echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
           export PATH="/home/runner/.cargo/bin:$PATH"
 
-          # Use existing toolchain if available, retry on failure (handles concurrent cache issues)
-          if rustc --version 2>/dev/null; then
-            echo "✅ Rust already installed: $(rustc --version)"
+          # Check if both rustc and cargo are available and working
+          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+            echo "✅ Rust toolchain ready: $(rustc --version)"
           else
+            echo "🔧 Installing/repairing Rust toolchain..."
             for i in 1 2 3; do
+              rustup toolchain install stable --force-non-host && \
               rustup default stable && break
               echo "⚠️ Rustup failed, retrying ($i/3)..."
               sleep 5
