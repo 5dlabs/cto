@@ -4944,7 +4944,7 @@ fn spawn_remediation_agent(
     apply_coderun(&coderun_yaml, &coderun_name)
 }
 
-/// Build the CodeRun YAML manifest.
+/// Build the `CodeRun` YAML manifest.
 fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
@@ -4992,7 +4992,7 @@ spec:
     )
 }
 
-/// Apply the CodeRun YAML via kubectl.
+/// Apply the `CodeRun` YAML via kubectl.
 fn apply_coderun(coderun_yaml: &str, coderun_name: &str) -> Result<()> {
     use std::io::Write as _;
 
