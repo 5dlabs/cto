@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.16](https://github.com/5dlabs/cto/compare/v0.11.15...v0.11.16) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add DAC_OVERRIDE capability to fix PVC permission denied errors ([#1953](https://github.com/5dlabs/cto/issues/1953)) ([6c6a7f8](https://github.com/5dlabs/cto/commit/6c6a7f886b16f996ba4c5eb677115c28c9afa82c))
+
 ## [0.11.15](https://github.com/5dlabs/cto/compare/v0.11.14...v0.11.15) (2025-12-01)
 
 
