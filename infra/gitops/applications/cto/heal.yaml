@@ -71,6 +71,8 @@ spec:
           capabilities:
             drop:
               - ALL
+            add:
+              - DAC_OVERRIDE
           readOnlyRootFilesystem: false
           runAsNonRoot: false
           runAsUser: 0
