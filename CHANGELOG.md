@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.8](https://github.com/5dlabs/cto/compare/v0.11.7...v0.11.8) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** replace play-monitor with heal/controller in binaries-release ([#1927](https://github.com/5dlabs/cto/issues/1927)) ([759b765](https://github.com/5dlabs/cto/commit/759b76530045379ab1004f9dafc88c1e0b0161df))
+* **stitch:** Add GH_TOKEN from tools-github-secrets PAT ([#1926](https://github.com/5dlabs/cto/issues/1926)) ([91209bb](https://github.com/5dlabs/cto/commit/91209bbc4611ff3a3c16d72be996838852af1aee))
+
 ## [0.11.7](https://github.com/5dlabs/cto/compare/v0.11.6...v0.11.7) (2025-12-01)
 
 
