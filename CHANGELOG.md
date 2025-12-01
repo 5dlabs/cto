@@ -1,5 +1,85 @@
 # Changelog
 
+## [0.2.2](https://github.com/5dlabs/cto/compare/v0.2.1...v0.2.2) (2025-12-01)
+
+
+### ✨ Features
+
+* add command, args, and extraContainers support to universal-app ([#1869](https://github.com/5dlabs/cto/issues/1869)) ([5b3ee7f](https://github.com/5dlabs/cto/commit/5b3ee7ff05f9e707180529b6d07931e0621f8b9f))
+* add dedicated RBAC for heal and move config to gitops ([d0e9c8c](https://github.com/5dlabs/cto/commit/d0e9c8c2d01227f1cd23825fa5a9b94cf1d123d0))
+* add Stitch PR Review Bot ([#1893](https://github.com/5dlabs/cto/issues/1893)) ([21806f7](https://github.com/5dlabs/cto/commit/21806f78ac8b0782ef61dcfd4d0ceb29c0032f23))
+* **blaze:** add Effect.ts integration with effect-solutions CLI ([#1855](https://github.com/5dlabs/cto/issues/1855)) ([afaadcb](https://github.com/5dlabs/cto/commit/afaadcb6fcb73da2017e1f5d34d9c4b08d973e54))
+* **blaze:** add Playwright visual verification workflow ([#1859](https://github.com/5dlabs/cto/issues/1859)) ([15d5c42](https://github.com/5dlabs/cto/commit/15d5c42781856f5689de14f55885e03b643c6595))
+* **blaze:** add Prisma ORM as standard database ORM ([#1856](https://github.com/5dlabs/cto/issues/1856)) ([aaae3bb](https://github.com/5dlabs/cto/commit/aaae3bb59099474753d6f1323a34fdc299ce242f))
+* **blaze:** add XState (Stately) state management guidance ([#1857](https://github.com/5dlabs/cto/issues/1857)) ([7de381a](https://github.com/5dlabs/cto/commit/7de381a69a8553b8f8cbe90476a854c22168ddaf))
+* **cd:** add ArgoCD Image Updater and Release Please for automated deployments ([#1892](https://github.com/5dlabs/cto/issues/1892)) ([f44083b](https://github.com/5dlabs/cto/commit/f44083b2d236a0c17c057d4679fd6359251bda0c))
+* deploy Stitch PR review sensor ([#1897](https://github.com/5dlabs/cto/issues/1897)) ([5c5126b](https://github.com/5dlabs/cto/commit/5c5126beaaaf44b101b9d255ed3150b0c349d323))
+* **heal:** add ConfigMap mount and agent coordination ([#1889](https://github.com/5dlabs/cto/issues/1889)) ([abf0d2e](https://github.com/5dlabs/cto/commit/abf0d2e2291d77f8fbc3c6673efc41338089eb98))
+* **heal:** add debug logging for A2 silent failure detection ([#1882](https://github.com/5dlabs/cto/issues/1882)) ([049818e](https://github.com/5dlabs/cto/commit/049818eb7399bb86589306434fca6fbe6757a2a1))
+* **heal:** add exclusion list for infrastructure pods ([#1875](https://github.com/5dlabs/cto/issues/1875)) ([8c92a1b](https://github.com/5dlabs/cto/commit/8c92a1be86e783896d494d8d367d68286ecf043f))
+* **heal:** add FACTORY_API_KEY environment variable ([#1873](https://github.com/5dlabs/cto/issues/1873)) ([d0458df](https://github.com/5dlabs/cto/commit/d0458dfb3ac5f3188027afeb995321f6fa39b9ef))
+* **heal:** add filebrowser service for direct cluster access ([#1883](https://github.com/5dlabs/cto/issues/1883)) ([e1416f4](https://github.com/5dlabs/cto/commit/e1416f49c9d12cc5c0ba59850833464aee77298f))
+* **heal:** add filebrowser sidecar for PVC inspection ([#1881](https://github.com/5dlabs/cto/issues/1881)) ([fcf4f1d](https://github.com/5dlabs/cto/commit/fcf4f1df2a63a79cd98f19e1a4009a867628ed2f))
+* **heal:** add Rust caching for faster builds ([#1879](https://github.com/5dlabs/cto/issues/1879)) ([b080d11](https://github.com/5dlabs/cto/commit/b080d110502e666c863d46f7b9e74c6a28598890))
+* **heal:** echo Factory analysis to logs and add heal-config.json ([#1886](https://github.com/5dlabs/cto/issues/1886)) ([cc1a20f](https://github.com/5dlabs/cto/commit/cc1a20fc3d22acafc29961a498fc158fef6b0aa2))
+* **heal:** implement fetch-logs and spawn-remediation commands ([#1878](https://github.com/5dlabs/cto/issues/1878)) ([2b86efb](https://github.com/5dlabs/cto/commit/2b86efb3c4943a5c096f86de0bb737dd90b11b55))
+* **heal:** rename watch to heal and use static PVC ([55b5e92](https://github.com/5dlabs/cto/commit/55b5e92d6123ff3dcaa309d62decccd7cc2dd7c9))
+* **intake:** unified intake with multi-CLI support and DocsRun deprecation ([#1831](https://github.com/5dlabs/cto/issues/1831)) ([6ce00d4](https://github.com/5dlabs/cto/commit/6ce00d41a696c0f0c1df4bcca9213185099fc2fa))
+* **tools:** add all available MCP tools to filter ([#1861](https://github.com/5dlabs/cto/issues/1861)) ([62f8bed](https://github.com/5dlabs/cto/commit/62f8bed8788a4f017b840c8220d62aed154cf882))
+* **tools:** add OpenMemory MCP integration ([#1860](https://github.com/5dlabs/cto/issues/1860)) ([6f69c42](https://github.com/5dlabs/cto/commit/6f69c42f32c49dca158099020ee42a681c0b4da9))
+* **watch:** add dedicated PVC for Monitor and Remediation agents ([#1842](https://github.com/5dlabs/cto/issues/1842)) ([8c71426](https://github.com/5dlabs/cto/commit/8c714264ea13aadfd1b6d7e53e0fb659fa6cbe6b))
+
+
+### 🐛 Bug Fixes
+
+* add case normalization for heal CodeRun detection in build_job_spec ([4a7b682](https://github.com/5dlabs/cto/commit/4a7b6829fb077c08342d9fd318747763b23665b8))
+* add missing default values to universal-app chart ([#1874](https://github.com/5dlabs/cto/issues/1874)) ([c70ba4a](https://github.com/5dlabs/cto/commit/c70ba4a3a2d0c8821db215505b0c48a499464339))
+* add tools parameters to monitor workflow submission ([#1854](https://github.com/5dlabs/cto/issues/1854)) ([1a286ae](https://github.com/5dlabs/cto/commit/1a286aefc177d06e18a283e145de120389f27c57))
+* **cd:** use simple release type and add Image Updater to tools/heal ([#1895](https://github.com/5dlabs/cto/issues/1895)) ([7bf1f3e](https://github.com/5dlabs/cto/commit/7bf1f3e1ecf4ef32bf5e4fe29a4be467dfa796df))
+* change heal PVC access mode from RWX to RWO ([#1866](https://github.com/5dlabs/cto/issues/1866)) ([4984af4](https://github.com/5dlabs/cto/commit/4984af4a3f864bb528573d04529798903498ea58))
+* **ci:** add ServerSideApply to workflow sync operations ([#1839](https://github.com/5dlabs/cto/issues/1839)) ([fa5182e](https://github.com/5dlabs/cto/commit/fa5182eb0cfbfef649e272c0c08bcfaf453d5e89))
+* **ci:** extract release tag from correct column in gh release list ([#1836](https://github.com/5dlabs/cto/issues/1836)) ([9b80d27](https://github.com/5dlabs/cto/commit/9b80d275127b4856bbfae08aceb3e8c0a63c454c))
+* clippy lint and add trailing newlines ([5a4cbea](https://github.com/5dlabs/cto/commit/5a4cbea8bcd44d10f8976e79966dea129acfcd1b))
+* **controller:** properly detect watch CodeRuns for template and naming ([#1840](https://github.com/5dlabs/cto/issues/1840)) ([c48ecac](https://github.com/5dlabs/cto/commit/c48ecac1e8c9ce2e393427bce71520ee5442979a))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1844](https://github.com/5dlabs/cto/issues/1844)) ([f42988d](https://github.com/5dlabs/cto/commit/f42988dfedce7b327982eb8646b6d05466f8bf14))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1845](https://github.com/5dlabs/cto/issues/1845)) ([04f2eb4](https://github.com/5dlabs/cto/commit/04f2eb47d767ed66883a32ac49bc8ec5ddae84f5))
+* **factory:** prevent script exit on Tools MCP server DNS failure ([#1837](https://github.com/5dlabs/cto/issues/1837)) ([8467866](https://github.com/5dlabs/cto/commit/8467866e9e1b5170863c3d6fbd503b3abcde8d9f))
+* **factory:** set default WORKFLOW_STAGE for standalone runs ([#1838](https://github.com/5dlabs/cto/issues/1838)) ([13e58f2](https://github.com/5dlabs/cto/commit/13e58f2db76ce0c38f538e21c4e2bfeab47ff529))
+* **heal:** add filebrowser-service to kustomization ([#1884](https://github.com/5dlabs/cto/issues/1884)) ([2e1bdcb](https://github.com/5dlabs/cto/commit/2e1bdcbbbda0375ab19284d375450b922d9acc5e))
+* **heal:** fix CI test command and Dockerfile lint warnings ([#1894](https://github.com/5dlabs/cto/issues/1894)) ([13430fd](https://github.com/5dlabs/cto/commit/13430fd8111c6fd0c45372a0c2f22cc9a98197d0))
+* **heal:** resolve clippy pedantic warnings ([1efd652](https://github.com/5dlabs/cto/commit/1efd652eaeee07e7afbaf725197ed1750735b8bf))
+* **heal:** use heal-config.json path and custom Claude template ([#1890](https://github.com/5dlabs/cto/issues/1890)) ([c598ad8](https://github.com/5dlabs/cto/commit/c598ad896fffde3013ddf49accbe910a1750c01c))
+* **heal:** wrap CodeRun in backticks for clippy doc_markdown ([#1880](https://github.com/5dlabs/cto/issues/1880)) ([d9d7d58](https://github.com/5dlabs/cto/commit/d9d7d580a4cb2b67fb55f1257285cd0c7deb56b8))
+* make probes optional in universal-app chart ([#1872](https://github.com/5dlabs/cto/issues/1872)) ([311b763](https://github.com/5dlabs/cto/commit/311b7630d2f3c748ef0ae9eeadb8fd2fe012c266))
+* **monitor:** extract org/repo from URL before passing to workflow ([#1851](https://github.com/5dlabs/cto/issues/1851)) ([70ac563](https://github.com/5dlabs/cto/commit/70ac5637d4e9fc92f82f3cd62388bfd9b8913753))
+* **monitor:** pass docs-repository and docs-project-directory to workflow ([#1852](https://github.com/5dlabs/cto/issues/1852)) ([47070bb](https://github.com/5dlabs/cto/commit/47070bbe0b4f0c213d634b75cdd037f46ba235f7))
+* **monitor:** pass play config as CLI args instead of config file ([#1847](https://github.com/5dlabs/cto/issues/1847)) ([a8bc8ca](https://github.com/5dlabs/cto/commit/a8bc8ca25765ab3188f887c70fc6f28528c0cac5))
+* **monitor:** use env vars for GitHub auth like factory base ([#1850](https://github.com/5dlabs/cto/issues/1850)) ([8f7b41c](https://github.com/5dlabs/cto/commit/8f7b41ccde1976fe13c4a717cdc4ab68c74c5f7a))
+* **monitor:** use monitor/cto-config.json as default config path ([#1849](https://github.com/5dlabs/cto/issues/1849)) ([dee3320](https://github.com/5dlabs/cto/commit/dee332051520efda018e979a99f316e5ddd2d8b1))
+* nullify httpGet in heal probes to prevent merge conflict ([#1871](https://github.com/5dlabs/cto/issues/1871)) ([ed9e601](https://github.com/5dlabs/cto/commit/ed9e601790fb12fbc834ba66012a728ff62d0aad))
+* remediation CodeRun schema to match CRD ([#1853](https://github.com/5dlabs/cto/issues/1853)) ([dae81ff](https://github.com/5dlabs/cto/commit/dae81ff327dca649ef6cf2983b6fc448c491ae9b))
+* restore .github/workflows/ directory ([#1891](https://github.com/5dlabs/cto/issues/1891)) ([260c687](https://github.com/5dlabs/cto/commit/260c6874448bb6094fd8fc5102f1feb2b729d9b0))
+* use exec probes for heal instead of HTTP ([#1870](https://github.com/5dlabs/cto/issues/1870)) ([391934c](https://github.com/5dlabs/cto/commit/391934cc937558194ef5282a00a297b99be09378))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1867](https://github.com/5dlabs/cto/issues/1867)) ([3dae21f](https://github.com/5dlabs/cto/commit/3dae21f19bbe47f6a36ab84958ef4c33020efa87))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1868](https://github.com/5dlabs/cto/issues/1868)) ([c715c3a](https://github.com/5dlabs/cto/commit/c715c3aff0deff830bf005bcdd0feccd041a0ed7))
+* use unified release URLs for tools and play-monitor ([#1858](https://github.com/5dlabs/cto/issues/1858)) ([be9eb9a](https://github.com/5dlabs/cto/commit/be9eb9acd28b5d6866dcbd0bfeaf3fab4405eda4))
+* **watch:** create dedicated monitor container script ([#1841](https://github.com/5dlabs/cto/issues/1841)) ([b933170](https://github.com/5dlabs/cto/commit/b9331708b4dd44f741808694303e854e2472f0f8))
+
+
+### ♻️ Refactoring
+
+* consolidate heal build into infrastructure-build workflow ([839723d](https://github.com/5dlabs/cto/commit/839723d6d55edb890481de00d1df6aef32297a36))
+* move heal image to infra/images and remove obsolete watch files ([8abacf7](https://github.com/5dlabs/cto/commit/8abacf707b1b4234b1705bcd89ae0ff0712401ab))
+* remove cto-config and talos-kubeconfig mounts from heal CodeRuns ([969a79c](https://github.com/5dlabs/cto/commit/969a79c66d6e0646e3f2b4343325c088fd2c0778))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([d4fffea](https://github.com/5dlabs/cto/commit/d4fffea7f7d72a374ab3026a3179432687a0b404))
+* **chart:** regenerate agent templates ConfigMaps ([e0cb7ad](https://github.com/5dlabs/cto/commit/e0cb7ad586f3635ec4c7666db2feecc428283dd2))
+* **chart:** regenerate agent templates ConfigMaps ([#1848](https://github.com/5dlabs/cto/issues/1848)) ([98be1ca](https://github.com/5dlabs/cto/commit/98be1ca67830aee560cf387b60d378f2cc0383cc))
+* release 0.2.1 ([#1896](https://github.com/5dlabs/cto/issues/1896)) ([3a32715](https://github.com/5dlabs/cto/commit/3a327150ec007daec5d855d4c871734ea26ed21c))
+
 ## [0.2.1](https://github.com/5dlabs/cto/compare/v0.2.0...v0.2.1) (2025-12-01)
 
 
