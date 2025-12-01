@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.15](https://github.com/5dlabs/cto/compare/v0.11.14...v0.11.15) (2025-12-01)
+
+
+### ✨ Features
+
+* **heal:** add A9 alert for stuck CodeRuns ([#1944](https://github.com/5dlabs/cto/issues/1944)) ([06efeba](https://github.com/5dlabs/cto/commit/06efeba3445f87376a219d119f9c4e15d7f1ba0b))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** consolidate Docker builds and standardize tagging ([#1946](https://github.com/5dlabs/cto/issues/1946)) ([4e8dd31](https://github.com/5dlabs/cto/commit/4e8dd3156db106fa9fe520db12c98db9bea82453))
+
 ## [0.11.14](https://github.com/5dlabs/cto/compare/v0.11.13...v0.11.14) (2025-12-01)
 
 
