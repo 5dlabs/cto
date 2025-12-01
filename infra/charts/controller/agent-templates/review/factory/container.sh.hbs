@@ -33,28 +33,44 @@ export REPO_SLUG
 
 echo "📦 Repository: $REPO_SLUG"
 
-# Fetch CI failure context if triggered by check_run
+# Always fetch CI alerts for proactive analysis (not just when triggered by check_run)
+echo ""
+echo "📊 Pre-flight: Checking CI status..."
+if command -v utils >/dev/null 2>&1; then
+    utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-alerts.json 2>/dev/null || echo "[]" > /tmp/ci-alerts.json
+    
+    # Count alerts by severity
+    if command -v jq >/dev/null 2>&1 && [ -s /tmp/ci-alerts.json ]; then
+        FAILURE_COUNT=$(jq '[.[] | select(.annotation_level == "failure")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        WARNING_COUNT=$(jq '[.[] | select(.annotation_level == "warning")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        export CI_ALERTS_FILE="/tmp/ci-alerts.json"
+        export CI_FAILURE_COUNT="$FAILURE_COUNT"
+        export CI_WARNING_COUNT="$WARNING_COUNT"
+        
+        if [ "$FAILURE_COUNT" -gt 0 ]; then
+            echo "🔴 Found $FAILURE_COUNT CI error(s), $WARNING_COUNT warning(s)"
+            echo "   → CI failures will be analyzed and posted as inline comments"
+        elif [ "$WARNING_COUNT" -gt 0 ]; then
+            echo "🟡 Found $WARNING_COUNT CI warning(s)"
+        else
+            echo "✅ No CI failures detected"
+        fi
+    else
+        echo "⚠️  Could not parse CI alerts (jq not available)"
+    fi
+else
+    echo "⚠️  utils binary not available, skipping CI analysis"
+fi
+
+# Additional context if triggered by check_run
 {{#if check_run_context}}
 echo ""
-echo "🔴 CI Failure Analysis Mode"
+echo "🔴 CI Failure Analysis Mode (triggered by check_run)"
 echo "   Check Run: {{check_run_context.name}}"
 echo "   Check Run ID: {{check_run_context.check_run_id}}"
 echo "   Conclusion: {{check_run_context.conclusion}}"
-
-# Use utils alerts tool to get detailed CI failure context
-echo ""
-echo "📊 Fetching CI failure annotations..."
-if command -v utils >/dev/null 2>&1; then
-    utils --format json alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" > /tmp/ci-failures.json 2>/dev/null || true
-    if [ -s /tmp/ci-failures.json ]; then
-        echo "✅ CI failure context loaded"
-        export CI_FAILURES_FILE="/tmp/ci-failures.json"
-    else
-        echo "⚠️  No CI annotations found"
-    fi
-else
-    echo "⚠️  utils binary not available, skipping detailed CI analysis"
-fi
+export CHECK_RUN_ID="{{check_run_context.check_run_id}}"
+export CHECK_RUN_NAME="{{check_run_context.name}}"
 {{/if}}
 
 # Fetch comment context if triggered by comment
