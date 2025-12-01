@@ -16,6 +16,7 @@ pub enum AlertId {
     A5,         // Post-Tess CI/merge failure
     A7,         // Pod failure
     A8,         // Step timeout
+    A9,         // Stuck CodeRun (no phase transition)
     Completion, // Success completion check
 }
 
@@ -29,6 +30,7 @@ impl AlertId {
             Self::A5 => "A5",
             Self::A7 => "A7",
             Self::A8 => "A8",
+            Self::A9 => "A9",
             Self::Completion => "completion",
         }
     }
@@ -42,6 +44,7 @@ impl AlertId {
             Self::A5 => "Post-Tess CI/Merge Failure",
             Self::A7 => "Pod Failure",
             Self::A8 => "Workflow Step Timeout",
+            Self::A9 => "Stuck CodeRun",
             Self::Completion => "Success Completion Check",
         }
     }
@@ -106,6 +109,8 @@ pub struct AlertConfig {
     pub approval_loop_threshold: u32,
     /// Step timeout thresholds by agent type (A8)
     pub step_timeouts: StepTimeouts,
+    /// Minutes before stuck `CodeRun` alert (A9)
+    pub stuck_coderun_threshold_mins: u64,
 }
 
 impl Default for AlertConfig {
@@ -114,6 +119,7 @@ impl Default for AlertConfig {
             stale_progress_threshold_mins: 15,
             approval_loop_threshold: 2,
             step_timeouts: StepTimeouts::default(),
+            stuck_coderun_threshold_mins: 10, // 10 minutes for stuck CodeRun
         }
     }
 }

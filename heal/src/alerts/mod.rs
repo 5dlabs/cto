@@ -11,6 +11,7 @@
 //! - A5: Post-Tess CI/Merge failure (CI failing or merge conflict after Tess approval)
 //! - A7: Pod failure (any CTO pod in Failed/Error state)
 //! - A8: Workflow step timeout (step running longer than threshold)
+//! - A9: Stuck `CodeRun` (`CodeRun` in non-terminal state beyond threshold)
 
 pub mod a1_comment_order;
 pub mod a2_silent_failure;
@@ -19,9 +20,12 @@ pub mod a4_approval_loop;
 pub mod a5_post_tess_ci;
 pub mod a7_pod_failure;
 pub mod a8_step_timeout;
+pub mod a9_stuck_coderun;
 pub mod types;
 
-#[allow(unused_imports)] // Public API re-exports
+// Public API re-exports
+pub use a9_stuck_coderun::CodeRunTracker;
+#[allow(unused_imports)] // Re-exported for external use
 pub use types::{Alert, AlertConfig, AlertContext, AlertHandler, AlertId};
 
 use crate::github::GitHubState;
@@ -44,6 +48,7 @@ impl AlertRegistry {
                 Box::new(a5_post_tess_ci::Handler::new()),
                 Box::new(a7_pod_failure::Handler::new()),
                 Box::new(a8_step_timeout::Handler::new()),
+                Box::new(a9_stuck_coderun::Handler::new()),
             ],
         }
     }
