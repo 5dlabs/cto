@@ -6,4 +6,5 @@ resources:
   - rbac.yaml
   - pvc.yaml
   - filebrowser-service.yaml
+  - heal-config.yaml
 
