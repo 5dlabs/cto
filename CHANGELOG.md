@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.17](https://github.com/5dlabs/cto/compare/v0.11.16...v0.11.17) (2025-12-01)
+
+
+### ✨ Features
+
+* **heal:** add worktree isolation and task module for remediation agents ([#1955](https://github.com/5dlabs/cto/issues/1955)) ([44b0e39](https://github.com/5dlabs/cto/commit/44b0e396cee6f736eef36ee47538ea593378a828))
+
 ## [0.11.16](https://github.com/5dlabs/cto/compare/v0.11.15...v0.11.16) (2025-12-01)
 
 
