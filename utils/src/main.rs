@@ -151,7 +151,10 @@ async fn run_post_alerts(repo: &str, pr: u32, include_warnings: bool, dry_run: b
     if annotations.is_empty() {
         println!("   (No failures found - posted success message)");
     } else {
-        println!("   ({} alert(s) included with code snippets)", annotations.len());
+        println!(
+            "   ({} alert(s) included with code snippets)",
+            annotations.len()
+        );
     }
 
     Ok(())

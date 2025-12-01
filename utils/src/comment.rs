@@ -346,10 +346,7 @@ fn format_annotation_with_context(
     }
 
     // Link to file on GitHub
-    let _ = writeln!(
-        s,
-        "\n[View in repository]({line_info})\n",
-    );
+    let _ = writeln!(s, "\n[View in repository]({line_info})\n",);
 
     let _ = writeln!(s, "</details>\n");
 
@@ -388,8 +385,7 @@ fn extract_lint_info(message: &str) -> (Option<String>, Option<String>) {
 
     for (pattern, lint) in known_lints {
         if message.to_lowercase().contains(&pattern.to_lowercase()) {
-            let link =
-                format!("https://rust-lang.github.io/rust-clippy/master/index.html#{lint}");
+            let link = format!("https://rust-lang.github.io/rust-clippy/master/index.html#{lint}");
             return (Some(format!("clippy::{lint}")), Some(link));
         }
     }

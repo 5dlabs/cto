@@ -385,4 +385,3 @@ mod tests {
         assert!(json.contains("\"trigger\":\"check_run\""));
     }
 }
-
