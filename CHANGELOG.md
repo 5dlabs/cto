@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/5dlabs/cto/compare/v0.11.1...v0.11.2) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** correct CodeRun RBAC apiGroup to agents.platform ([#1906](https://github.com/5dlabs/cto/issues/1906)) ([638bb11](https://github.com/5dlabs/cto/commit/638bb11bd9d11225d06b2f66da3b3f5b37b8c940))
+
 ## [0.11.1](https://github.com/5dlabs/cto/compare/v0.11.0...v0.11.1) (2025-12-01)
 
 
