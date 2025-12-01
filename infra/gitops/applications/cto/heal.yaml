@@ -177,6 +177,27 @@ spec:
           - --prompts-dir
           - /app/prompts
 
+        # Skip default claude-config init (not needed for heal)
+        skipDefaultInitContainers: true
+
+        # Fix PVC permissions on startup
+        # The heal-workspace PVC may be created/owned by different users (filebrowser runs as 'user')
+        # but heal container runs as root. This ensures all containers can write to the shared PVC.
+        extraInitContainers:
+          - name: fix-pvc-permissions
+            image: busybox:latest
+            command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Fixing PVC permissions for shared workspace..."
+                mkdir -p /workspace/watch/logs /workspace/watch/alerts /workspace/watch/completion /workspace/watch/locks
+                chmod -R 777 /workspace/watch
+                echo "Permissions fixed."
+            volumeMounts:
+              - name: heal-workspace
+                mountPath: /workspace/watch
+
         extraContainers:
           - name: filebrowser
             image: filebrowser/filebrowser:latest
