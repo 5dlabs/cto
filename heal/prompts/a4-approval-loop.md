@@ -27,7 +27,15 @@ ISSUE_URL=$(gh issue create \
   --title "[HEAL-A4] Approval Loop: {{agent}} posted {{approval_count}} approvals" \
   --label "heal,remediation,a4" \
   --body "🔍 Analyzing approval loop... Full analysis to follow.")
+if [ -z "$ISSUE_URL" ]; then
+  echo "❌ Failed to create GitHub issue"
+  exit 1
+fi
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+if [ -z "$ISSUE_NUMBER" ]; then
+  echo "❌ Failed to extract issue number from: $ISSUE_URL"
+  exit 1
+fi
 echo "✅ Created issue #${ISSUE_NUMBER}"
 ```
 

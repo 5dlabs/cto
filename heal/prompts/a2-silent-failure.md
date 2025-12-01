@@ -26,7 +26,15 @@ ISSUE_URL=$(gh issue create \
   --title "[HEAL-A2] Silent Failure: {{pod_name}}" \
   --label "heal,remediation,a2" \
   --body "🔍 Analyzing silent agent failure for {{pod_name}}... Full analysis to follow.")
+if [ -z "$ISSUE_URL" ]; then
+  echo "❌ Failed to create GitHub issue"
+  exit 1
+fi
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+if [ -z "$ISSUE_NUMBER" ]; then
+  echo "❌ Failed to extract issue number from: $ISSUE_URL"
+  exit 1
+fi
 echo "✅ Created issue #${ISSUE_NUMBER}"
 ```
 
