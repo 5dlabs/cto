@@ -16,6 +16,7 @@ pub mod code;
 pub mod config;
 pub mod docs;
 pub mod github;
+pub mod heal;
 pub mod label;
 pub mod play;
 pub mod template_paths;
