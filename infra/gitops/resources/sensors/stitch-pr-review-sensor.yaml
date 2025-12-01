@@ -158,6 +158,11 @@ spec:
                           value: "1379126"
                         - name: GITHUB_APP_PRIVATE_KEY_PATH
                           value: "/secrets/github-app/private-key.pem"
+                        - name: GH_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: tools-github-secrets
+                              key: GITHUB_PERSONAL_ACCESS_TOKEN
                         - name: FACTORY_API_KEY
                           valueFrom:
                             secretKeyRef:
