@@ -58,7 +58,7 @@ spec:
                   agent: stitch
                   workflow-type: pr-review
               spec:
-                serviceAccountName: cto-controller
+                serviceAccountName: cto
                 entrypoint: review
                 arguments:
                   parameters:
