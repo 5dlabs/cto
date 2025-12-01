@@ -8,7 +8,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use utils::{format_alerts_comment, AnnotationLevel, PrAlerts, PrComment};
+use utils::{AnnotationLevel, PrAlerts, PrComment};
 
 #[derive(Parser)]
 #[command(name = "utils")]
@@ -132,16 +132,12 @@ async fn run_post_alerts(repo: &str, pr: u32, include_warnings: bool, dry_run: b
     let comment_client = PrComment::new(owner, repo_name);
 
     if dry_run {
-        // For dry run, still fetch file context to show full preview
+        // For dry run, format with context but don't post
         println!("=== Dry run: would post this comment to PR #{pr} ===\n");
-        println!("Fetching file contents for code snippets...");
-        comment_client
-            .post_alerts_with_context(pr, &head_sha, &annotations)
-            .await
-            .ok(); // Ignore errors in dry-run preview generation
-
-        // Fall back to simple format for dry-run display
-        let comment_body = format_alerts_comment(&annotations);
+        println!("Fetching file contents for code snippets...\n");
+        let comment_body = comment_client
+            .format_alerts_with_context(&head_sha, &annotations)
+            .await;
         println!("{comment_body}");
         return Ok(());
     }

@@ -347,6 +347,8 @@ mod tests {
         assert_eq!(ReviewTrigger::Comment.to_string(), "comment");
         assert_eq!(ReviewTrigger::CheckRun.to_string(), "check_run");
         assert_eq!(ReviewTrigger::CodeScan.to_string(), "code_scan");
+        assert_eq!(ReviewTrigger::SecretScan.to_string(), "secret_scan");
+        assert_eq!(ReviewTrigger::Manual.to_string(), "manual");
     }
 
     #[test]

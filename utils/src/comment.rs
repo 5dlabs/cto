@@ -79,10 +79,22 @@ impl PrComment {
         sha: &str,
         annotations: &[Annotation],
     ) -> Result<()> {
+        let body = self.format_alerts_with_context(sha, annotations).await;
+        self.post(pr_number, &body).await
+    }
+
+    /// Format alerts with code snippets (without posting)
+    ///
+    /// Use this for dry-run/preview mode where you want to see the formatted
+    /// comment without actually posting it to GitHub.
+    pub async fn format_alerts_with_context(
+        &self,
+        sha: &str,
+        annotations: &[Annotation],
+    ) -> String {
         // Fetch file contents for annotations
         let file_cache = self.fetch_files_for_annotations(sha, annotations).await;
-        let body = format_alerts_comment_with_context(annotations, &file_cache);
-        self.post(pr_number, &body).await
+        format_alerts_comment_with_context(annotations, &file_cache)
     }
 
     /// Fetch file contents for all annotations

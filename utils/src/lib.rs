@@ -88,10 +88,6 @@
 pub mod alerts;
 pub mod comment;
 
-// Test module with intentional lint failures - DELETE AFTER TESTING
-// Temporarily commented out for local testing
-// mod test_lint_failures;
-
 // Re-export key types for convenience
 pub use alerts::{Annotation, AnnotationLevel, CheckRun, PrAlerts};
 pub use comment::{format_alerts_comment, format_alerts_comment_with_context, PrComment};
