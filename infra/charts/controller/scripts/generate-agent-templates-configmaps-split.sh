@@ -61,7 +61,8 @@ HEADER_EOF
       # Watch templates: include all watch/ subdirectories (factory, claude) and shared acceptance criteria
       files_list=$(find "agent-templates/watch" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     else
-      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+      # CLI-specific: collect files under code/, docs/, heal/, review/ directories for this CLI
+      files_list=$(find "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/heal/${filter}" "agent-templates/review/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
     fi
     
     # Also include shared agent partials so templates can resolve {{> agents/...}} references

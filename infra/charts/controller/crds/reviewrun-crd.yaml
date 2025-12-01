@@ -1,0 +1,265 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: reviewruns.agents.platform
+spec:
+  group: agents.platform
+  scope: Namespaced
+  names:
+    plural: reviewruns
+    singular: reviewrun
+    kind: ReviewRun
+    shortNames:
+    - rr
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: PR
+      type: integer
+      jsonPath: .spec.prNumber
+    - name: Mode
+      type: string
+      jsonPath: .spec.reviewMode
+    - name: Trigger
+      type: string
+      jsonPath: .spec.trigger
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["prNumber", "repositoryUrl", "headSha", "model"]
+            properties:
+              prNumber:
+                type: integer
+                description: "Pull request number"
+              repositoryUrl:
+                type: string
+                description: "Repository URL (e.g., https://github.com/5dlabs/cto)"
+              headSha:
+                type: string
+                description: "Head SHA of the PR (commit to review)"
+              baseBranch:
+                type: string
+                description: "Base branch (e.g., main)"
+              headBranch:
+                type: string
+                description: "Head branch (e.g., feature/my-feature)"
+              reviewMode:
+                type: string
+                default: "review"
+                description: "Review mode: hunt, analyze, security, performance, review"
+                enum:
+                - hunt
+                - analyze
+                - security
+                - performance
+                - review
+              trigger:
+                type: string
+                default: "pull_request"
+                description: "What triggered this review"
+                enum:
+                - pull_request
+                - comment
+                - check_run
+                - code_scan
+                - secret_scan
+                - manual
+              githubApp:
+                type: string
+                default: "5DLabs-Stitch"
+                description: "GitHub App name for authentication"
+              model:
+                type: string
+                description: "Model identifier to use (e.g., claude-opus-4-5-20251101)"
+              checkRunContext:
+                type: object
+                description: "Check run context when triggered by CI failure"
+                required: ["checkRunId", "name"]
+                properties:
+                  checkRunId:
+                    type: integer
+                    format: int64
+                    description: "Check run ID from GitHub"
+                  name:
+                    type: string
+                    description: "Check run name (e.g., Lint, Test, Build)"
+                  checkSuiteId:
+                    type: integer
+                    format: int64
+                    description: "Check suite ID"
+                  conclusion:
+                    type: string
+                    description: "Conclusion (failure, success, etc.)"
+              codeScanContext:
+                type: object
+                description: "Code scanning alert context"
+                required: ["alertNumber"]
+                properties:
+                  alertNumber:
+                    type: integer
+                    format: int64
+                    description: "Alert number"
+                  ruleId:
+                    type: string
+                    description: "Alert rule ID"
+                  severity:
+                    type: string
+                    description: "Severity (critical, high, medium, low)"
+                  filePath:
+                    type: string
+                    description: "File path where alert was found"
+              commentContext:
+                type: object
+                description: "Comment context when triggered by user command"
+                required: ["commentId", "author", "body"]
+                properties:
+                  commentId:
+                    type: integer
+                    format: int64
+                    description: "Comment ID from GitHub"
+                  author:
+                    type: string
+                    description: "Comment author"
+                  body:
+                    type: string
+                    description: "Comment body (the command)"
+                  isReviewComment:
+                    type: boolean
+                    default: false
+                    description: "Whether this is a review comment (inline) vs issue comment"
+                  filePath:
+                    type: string
+                    description: "File path if inline review comment"
+                  lineNumber:
+                    type: integer
+                    description: "Line number if inline review comment"
+              prAuthor:
+                type: string
+                description: "PR author username"
+              prTitle:
+                type: string
+                description: "PR title"
+              env:
+                type: object
+                additionalProperties:
+                  type: string
+                description: "Environment variables to set in the container"
+              envFromSecrets:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: "Name of the environment variable"
+                    secretName:
+                      type: string
+                      description: "Name of the secret"
+                    secretKey:
+                      type: string
+                      description: "Key within the secret"
+                  required:
+                  - name
+                  - secretName
+                  - secretKey
+                description: "Environment variables from secrets"
+              serviceAccountName:
+                type: string
+                description: "Optional Kubernetes ServiceAccount for Job pods"
+              cliConfig:
+                type: object
+                description: "CLI-specific configuration"
+                required: ["cliType", "model"]
+                properties:
+                  cliType:
+                    type: string
+                    description: "CLI type to use (claude, codex, factory, etc.)"
+                  model:
+                    type: string
+                    description: "Model identifier for the selected CLI"
+                  settings:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    description: "Arbitrary CLI-specific settings"
+                  maxTokens:
+                    type: integer
+                    format: int32
+                    description: "Maximum output tokens"
+                  temperature:
+                    type: number
+                    format: float
+                    description: "Sampling temperature"
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current phase of the review"
+              message:
+                type: string
+                description: "Human-readable message about the current state"
+              lastUpdate:
+                type: string
+                description: "Timestamp when this phase was reached"
+              jobName:
+                type: string
+                description: "Associated Kubernetes Job name"
+              reviewCommentUrl:
+                type: string
+                description: "Review comment URL if posted"
+              issuesFound:
+                type: integer
+                description: "Number of issues found"
+              suggestionsCount:
+                type: integer
+                description: "Number of suggestions made"
+              ciAlertsAnalyzed:
+                type: integer
+                description: "CI alerts analyzed (from utils alerts tool)"
+              conditions:
+                type: array
+                description: "Conditions for the ReviewRun"
+                items:
+                  type: object
+                  required: ["type", "status"]
+                  properties:
+                    type:
+                      type: string
+                      description: "Type of condition"
+                    status:
+                      type: string
+                      description: "Status of the condition (True, False, or Unknown)"
+                    lastTransitionTime:
+                      type: string
+                      description: "Last time the condition transitioned (RFC3339 format)"
+                    reason:
+                      type: string
+                      description: "Reason for the condition's last transition"
+                    message:
+                      type: string
+                      description: "Human-readable message about the condition"
+              configmapName:
+                type: string
+                description: "Name of the ConfigMap containing the prompt and context"
+              finishedAt:
+                type: string
+                description: "Timestamp when the run finished"
+              expireAt:
+                type: string
+                description: "Timestamp when controller should clean up run resources"
+
