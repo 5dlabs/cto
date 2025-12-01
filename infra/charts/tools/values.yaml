@@ -8,8 +8,9 @@ replicaCount: 1
 image:
   repository: ghcr.io/5dlabs/tools
   pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  # Use 'latest' until semver tagging is implemented in tools-ci
+  # ArgoCD Image Updater will override with semver tags when available
+  tag: "latest"
 
 imagePullSecrets:
   - name: ghcr-secret
