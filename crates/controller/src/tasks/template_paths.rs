@@ -11,6 +11,9 @@ pub const SHARED_BOOTSTRAP_RUST_ENV: &str = "shared/bootstrap/rust-env.sh.hbs";
 pub const SHARED_FUNCTIONS_GITHUB_AUTH: &str = "shared/functions/github-auth.sh.hbs";
 pub const SHARED_FUNCTIONS_DOCKER_SIDECAR: &str = "shared/functions/docker-sidecar.sh.hbs";
 pub const SHARED_FUNCTIONS_COMPLETION_MARKER: &str = "shared/functions/completion-marker.sh.hbs";
+pub const SHARED_FUNCTIONS_GIT_OPERATIONS: &str = "shared/functions/git-operations.sh.hbs";
+pub const SHARED_FUNCTIONS_GH_CLI: &str = "shared/functions/gh-cli.sh.hbs";
+pub const SHARED_FUNCTIONS_QUALITY_GATES: &str = "shared/functions/quality-gates.sh.hbs";
 
 // Prompt partials
 pub const SHARED_PROMPTS_CONTEXT7: &str = "shared/context7-instructions.md.hbs";
