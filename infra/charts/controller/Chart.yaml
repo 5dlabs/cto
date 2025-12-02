@@ -5,7 +5,7 @@ description: >-
   via TaskRun CRDs
 type: application
 version: 0.1.1
-appVersion: 0.12.2
+appVersion: 0.12.3
 keywords:
   - controller
   - cto
