@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0](https://github.com/5dlabs/cto/compare/v0.11.17...v0.12.0) (2025-12-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* Template paths have changed. Users must update any references to infra/charts/controller/agent-templates/ to templates/
+
+### ✨ Features
+
+* **heal:** add deduplication and exclusion for remediation CodeRuns ([#2072](https://github.com/5dlabs/cto/issues/2072)) ([8c476d6](https://github.com/5dlabs/cto/commit/8c476d631b60b2b77fe6cdaf7a67d4f59da194c6))
+
+
+### ♻️ Refactoring
+
+* reorganize crates and templates ([#2085](https://github.com/5dlabs/cto/issues/2085)) ([cb0f24c](https://github.com/5dlabs/cto/commit/cb0f24cdd5e71ad570e3ee6f507b7ab65ddfc4d9))
+
 ## [0.11.17](https://github.com/5dlabs/cto/compare/v0.11.16...v0.11.17) (2025-12-01)
 
 
