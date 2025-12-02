@@ -8,6 +8,12 @@ SHELL ["/bin/bash", "-lc"]
 ARG TZ
 ENV TZ="$TZ"
 
+# =============================================================================
+# Frequently-updated tool versions (defined early, used late for better caching)
+# Changing these ARGs only invalidates layers AFTER they are used
+# =============================================================================
+ARG TASKMASTER_VERSION=0.36.0
+
 # Core tools and CLIs (cache apt metadata)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -364,8 +370,9 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
 
-# Install TaskMaster globally (stable release)
-RUN npm install -g task-master-ai@0.36.0
+# Install TaskMaster globally (version controlled via ARG for easy updates)
+# This layer is intentionally placed late so version bumps don't invalidate earlier layers
+RUN npm install -g task-master-ai@${TASKMASTER_VERSION}
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
