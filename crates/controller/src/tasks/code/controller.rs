@@ -902,7 +902,7 @@ fn emit_agent_notification(
             let duration_secs = match (created_at, finished_at) {
                 (Some(start), Some(end)) => {
                     let duration = end.signed_duration_since(start);
-                    duration.num_seconds().max(0) as u64
+                    u64::try_from(duration.num_seconds()).unwrap_or(0)
                 }
                 _ => 0,
             };
