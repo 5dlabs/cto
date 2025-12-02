@@ -19,6 +19,11 @@ dialoguer = { workspace = true }
 indicatif = { workspace = true }
 colored = { workspace = true }
 
+# TUI framework
+ratatui = "0.29"
+crossterm = "0.28"
+tui-big-text = "0.7"
+
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }

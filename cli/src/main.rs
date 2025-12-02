@@ -2,9 +2,11 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
+mod agent_defs;
 mod commands;
 mod config;
 mod installer;
+mod tui;
 mod ui;
 mod validator;
 
@@ -23,12 +25,20 @@ use commands::install::InstallCommand;
 #[command(propagate_version = true)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
+
+    /// Run in demo mode (no actual installation)
+    #[arg(long, global = true)]
+    demo: bool,
+
+    /// Use legacy CLI instead of TUI
+    #[arg(long, global = true)]
+    no_tui: bool,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Install the CTO platform
+    /// Install the CTO platform (launches TUI by default)
     Install(InstallCommand),
 
     /// Show platform status
@@ -42,34 +52,70 @@ enum Commands {
 
     /// Validate installation
     Validate,
+
+    /// Check system requirements
+    Doctor,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Print banner
-    print_banner();
-
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Install(cmd) => cmd.run().await,
+    // If no command specified, launch TUI installer
+    if cli.command.is_none() {
+        return tui::run(cli.demo).await;
+    }
+
+    match cli.command.unwrap() {
+        Commands::Install(cmd) => {
+            if cli.no_tui {
+                // Legacy CLI mode
+                print_banner();
+                cmd.run().await
+            } else {
+                // TUI mode
+                tui::run(cli.demo).await
+            }
+        }
         Commands::Status => {
+            print_banner();
             println!("{}", "Status command not yet implemented".yellow());
             Ok(())
         }
         Commands::Upgrade => {
+            print_banner();
             println!("{}", "Upgrade command not yet implemented".yellow());
             Ok(())
         }
         Commands::Uninstall => {
+            print_banner();
             println!("{}", "Uninstall command not yet implemented".yellow());
             Ok(())
         }
         Commands::Validate => {
+            print_banner();
             println!("{}", "Validate command not yet implemented".yellow());
             Ok(())
         }
+        Commands::Doctor => {
+            print_banner();
+            run_doctor().await
+        }
     }
+}
+
+/// Run the doctor command to check system requirements
+async fn run_doctor() -> Result<()> {
+    use crate::validator::PrerequisitesValidator;
+
+    println!();
+    println!("{}", "Checking system requirements...".cyan().bold());
+    println!();
+
+    let validator = PrerequisitesValidator::new();
+    validator.validate()?;
+
+    Ok(())
 }
 
 fn print_banner() {
