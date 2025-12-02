@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.14](https://github.com/5dlabs/cto/compare/v0.12.13...v0.12.14) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** explicitly trigger binaries-release workflow from release-please ([#2462](https://github.com/5dlabs/cto/issues/2462)) ([4f9f9fa](https://github.com/5dlabs/cto/commit/4f9f9fa703a2fa187480577f0429ca6d95ed825c))
+
 ## [0.12.13](https://github.com/5dlabs/cto/compare/v0.12.12...v0.12.13) (2025-12-02)
 
 
