@@ -1,5 +1,28 @@
 //! Shared Handlebars template path constants used across the controller.
 
+// ============================================================================
+// Shared partials (CLI-agnostic building blocks)
+// ============================================================================
+
+// Bootstrap partials
+pub const SHARED_BOOTSTRAP_RUST_ENV: &str = "shared/bootstrap/rust-env.sh.hbs";
+
+// Function partials
+pub const SHARED_FUNCTIONS_GITHUB_AUTH: &str = "shared/functions/github-auth.sh.hbs";
+pub const SHARED_FUNCTIONS_DOCKER_SIDECAR: &str = "shared/functions/docker-sidecar.sh.hbs";
+pub const SHARED_FUNCTIONS_COMPLETION_MARKER: &str = "shared/functions/completion-marker.sh.hbs";
+
+// Prompt partials
+pub const SHARED_PROMPTS_CONTEXT7: &str = "shared/context7-instructions.md.hbs";
+pub const SHARED_PROMPTS_DESIGN_SYSTEM: &str = "shared/design-system.md";
+
+// Container core (universal CLI-agnostic container base)
+pub const SHARED_CONTAINER_CORE: &str = "shared/container-core.sh.hbs";
+
+// ============================================================================
+// CLI-specific templates
+// ============================================================================
+
 // Claude code templates
 pub const CODE_CLAUDE_CONTAINER_TEMPLATE: &str = "code/claude/container.sh.hbs";
 pub const CODE_CLAUDE_MEMORY_TEMPLATE: &str = "code/claude/memory.md.hbs";

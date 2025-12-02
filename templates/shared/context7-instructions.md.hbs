@@ -1,8 +1,8 @@
-# Context7 Documentation Tools
+## 📚 Context7 Documentation Tools
 
 You have access to **Context7** for real-time, up-to-date library documentation.
 
-## Two-Step Workflow
+### Two-Step Workflow
 
 **Step 1: Resolve the library**
 ```
@@ -21,10 +21,11 @@ get_library_docs({
 })
 ```
 
-## Pre-Resolved Rust Library IDs
+### Pre-Resolved Library IDs
 
 Use these directly without resolving:
 
+**Rust Libraries:**
 | Library | Context7 ID | Score | Use Case |
 |---------|-------------|-------|----------|
 | **Tokio** | `/websites/rs_tokio_tokio` | 93.8 | Async runtime, I/O, networking |
@@ -34,15 +35,14 @@ Use these directly without resolving:
 | **Clippy** | `/rust-lang/rust-clippy` | - | Linting, pedantic best practices |
 | **Tracing** | `/tokio-rs/tracing` | 69.6 | Structured logging |
 
-## Pre-Resolved Frontend Library IDs
-
+**Frontend Libraries:**
 | Library | Context7 ID | Use Case |
 |---------|-------------|----------|
 | **React** | `/facebook/react` | UI components |
 | **Next.js** | `/vercel/next.js` | Full-stack framework |
 | **shadcn/ui** | Use `shadcn_*` MCP tools | Component library |
 
-## When to Query Context7
+### When to Query Context7
 
 **Always use Context7 before:**
 - Implementing async code with Tokio
@@ -52,7 +52,7 @@ Use these directly without resolving:
 - Writing HTTP handlers (Axum) or database queries (SQLx)
 - Implementing React hooks or Next.js features
 
-## Example Queries
+### Example Queries
 
 **Error handling patterns:**
 ```
@@ -86,7 +86,7 @@ get_library_docs({
 })
 ```
 
-## Best Practices
+### Best Practices
 
 ✅ **DO:**
 - Use pre-resolved IDs from the table above for common libraries
@@ -99,3 +99,4 @@ get_library_docs({
 - Use vague topics like "how to use" or "documentation"
 - Query for basic programming concepts (use your knowledge)
 - Combine multiple unrelated questions in one topic
+

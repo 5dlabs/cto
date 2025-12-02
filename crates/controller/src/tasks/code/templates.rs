@@ -342,6 +342,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared partials for CLI-agnostic building blocks
+        Self::register_shared_partials(&mut handlebars)?;
+
         let base_template = Self::load_template(CODE_CURSOR_CONTAINER_BASE_TEMPLATE)?;
         handlebars
             .register_partial("cursor_container_base", base_template)
@@ -653,6 +656,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared partials for CLI-agnostic building blocks
+        Self::register_shared_partials(&mut handlebars)?;
+
         let base_template = Self::load_template(CODE_FACTORY_CONTAINER_BASE_TEMPLATE)?;
         handlebars
             .register_partial("factory_container_base", base_template)
@@ -888,6 +894,9 @@ impl CodeTemplateGenerator {
     fn generate_container_script(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared partials for CLI-agnostic building blocks
+        Self::register_shared_partials(&mut handlebars)?;
 
         // Select agent-specific template based on github_app field
         let template_path = Self::get_agent_container_template(code_run);
@@ -1160,6 +1169,9 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared partials for CLI-agnostic building blocks
+        Self::register_shared_partials(&mut handlebars)?;
 
         let base_template = Self::load_template(CODE_CODEX_CONTAINER_BASE_TEMPLATE)?;
         handlebars
@@ -2350,6 +2362,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared partials for CLI-agnostic building blocks
+        Self::register_shared_partials(&mut handlebars)?;
+
         let base_template = Self::load_template(CODE_OPENCODE_CONTAINER_BASE_TEMPLATE)?;
         handlebars
             .register_partial("opencode_container_base", base_template)
@@ -2593,6 +2608,9 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared partials for CLI-agnostic building blocks
+        Self::register_shared_partials(&mut handlebars)?;
 
         let base_template = Self::load_template(CODE_GEMINI_CONTAINER_BASE_TEMPLATE)?;
         handlebars
@@ -3466,6 +3484,70 @@ impl CodeTemplateGenerator {
             .or_else(|| repository_url.strip_prefix("https://github.com/"))
             .unwrap_or(repository_url)
             .to_string()
+    }
+
+    /// Register shared function and bootstrap partials
+    /// These partials provide CLI-agnostic building blocks for container scripts
+    fn register_shared_partials(handlebars: &mut Handlebars) -> Result<()> {
+        use crate::tasks::template_paths::{
+            SHARED_BOOTSTRAP_RUST_ENV, SHARED_CONTAINER_CORE, SHARED_FUNCTIONS_COMPLETION_MARKER,
+            SHARED_FUNCTIONS_DOCKER_SIDECAR, SHARED_FUNCTIONS_GITHUB_AUTH, SHARED_PROMPTS_CONTEXT7,
+            SHARED_PROMPTS_DESIGN_SYSTEM,
+        };
+
+        // Map partial name (used in templates) -> template path
+        let shared_partials = vec![
+            ("shared/bootstrap/rust-env", SHARED_BOOTSTRAP_RUST_ENV),
+            ("shared/functions/github-auth", SHARED_FUNCTIONS_GITHUB_AUTH),
+            (
+                "shared/functions/docker-sidecar",
+                SHARED_FUNCTIONS_DOCKER_SIDECAR,
+            ),
+            (
+                "shared/functions/completion-marker",
+                SHARED_FUNCTIONS_COMPLETION_MARKER,
+            ),
+            ("shared/context7-instructions", SHARED_PROMPTS_CONTEXT7),
+            ("shared/design-system", SHARED_PROMPTS_DESIGN_SYSTEM),
+            ("shared/container-core", SHARED_CONTAINER_CORE),
+        ];
+
+        let mut failed_partials = Vec::new();
+
+        for (partial_name, template_path) in shared_partials {
+            match Self::load_template(template_path) {
+                Ok(content) => {
+                    handlebars
+                        .register_partial(partial_name, content)
+                        .map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to register shared partial {partial_name}: {e}"
+                            ))
+                        })?;
+                    debug!("Successfully registered shared partial: {}", partial_name);
+                }
+                Err(e) => {
+                    // Warn but don't fail - the partial may not be needed for all templates
+                    warn!(
+                        "Failed to load shared partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Templates referencing this partial will fail to render."
+                    );
+                    failed_partials.push(partial_name);
+                }
+            }
+        }
+
+        if !failed_partials.is_empty() {
+            warn!(
+                "Shared partial registration incomplete. {} partials failed to load: {:?}. \
+                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                failed_partials.len(),
+                failed_partials,
+                AGENT_TEMPLATES_PATH
+            );
+        }
+
+        Ok(())
     }
 
     /// Register shared agent system prompt partials

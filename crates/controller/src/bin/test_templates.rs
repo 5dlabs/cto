@@ -13,7 +13,9 @@ use controller::tasks::template_paths::{
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
     CODE_FACTORY_AGENTS_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
     CODE_FACTORY_CONTAINER_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
-    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE,
+    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, SHARED_BOOTSTRAP_RUST_ENV, SHARED_CONTAINER_CORE,
+    SHARED_FUNCTIONS_COMPLETION_MARKER, SHARED_FUNCTIONS_DOCKER_SIDECAR,
+    SHARED_FUNCTIONS_GITHUB_AUTH, SHARED_PROMPTS_CONTEXT7, SHARED_PROMPTS_DESIGN_SYSTEM,
 };
 use handlebars::Handlebars;
 use serde_json::json;
@@ -30,10 +32,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let template_dir =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../infra/charts/controller/agent-templates");
 
+    // Register shared partials first (these are used by CLI-specific templates)
+    register_shared_partials(&mut handlebars, &template_dir)?;
+
     // Test code templates
     test_code_templates(&mut handlebars, &template_dir)?;
 
     println!("✅ All templates rendered successfully!");
+    Ok(())
+}
+
+/// Register shared partials that are used across all CLI templates
+fn register_shared_partials(
+    handlebars: &mut Handlebars,
+    template_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("📦 Registering shared partials:");
+
+    // Map partial name (used in templates) -> template path
+    let shared_partials = vec![
+        ("shared/bootstrap/rust-env", SHARED_BOOTSTRAP_RUST_ENV),
+        ("shared/functions/github-auth", SHARED_FUNCTIONS_GITHUB_AUTH),
+        (
+            "shared/functions/docker-sidecar",
+            SHARED_FUNCTIONS_DOCKER_SIDECAR,
+        ),
+        (
+            "shared/functions/completion-marker",
+            SHARED_FUNCTIONS_COMPLETION_MARKER,
+        ),
+        ("shared/context7-instructions", SHARED_PROMPTS_CONTEXT7),
+        ("shared/design-system", SHARED_PROMPTS_DESIGN_SYSTEM),
+        ("shared/container-core", SHARED_CONTAINER_CORE),
+    ];
+
+    for (partial_name, template_path) in shared_partials {
+        let full_path = template_dir.join(template_path);
+        if full_path.exists() {
+            let content = std::fs::read_to_string(&full_path)?;
+            handlebars.register_partial(partial_name, content)?;
+            println!("  ✅ {partial_name}");
+        } else {
+            println!("  ⚠️  Partial not found: {template_path}");
+        }
+    }
+    println!();
+
     Ok(())
 }
 
