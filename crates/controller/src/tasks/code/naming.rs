@@ -7,6 +7,7 @@ const MAX_DNS_LABEL_LENGTH: usize = 63;
 const CODERUN_JOB_PREFIX: &str = "play-coderun-";
 const MONITOR_JOB_PREFIX: &str = "monitor-";
 const REMEDIATION_JOB_PREFIX: &str = "remediation-";
+const HEAL_REMEDIATION_JOB_PREFIX: &str = "heal-remediation-";
 const REVIEW_JOB_PREFIX: &str = "review-";
 const REMEDIATE_JOB_PREFIX: &str = "remediate-";
 
@@ -17,6 +18,7 @@ impl ResourceNaming {
     ///
     /// Format varies by type:
     /// - Play: `play-coderun-pr{pr}-t{task_id}-{agent}-{cli}-{uid}-v{version}`
+    /// - Heal Remediation: `heal-remediation-t{task_id}-{agent}-{uid}-v{version}`
     /// - Monitor: `monitor-t{task_id}-{agent}-{uid}-v{version}`
     /// - Remediation: `remediation-t{task_id}-{agent}-{uid}-v{version}`
     /// - Review: `review-pr{pr}-{agent}-{model}-{uid}-v{version}`
@@ -24,6 +26,7 @@ impl ResourceNaming {
     ///
     /// This is the single source of truth for job names.
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn job_name(code_run: &CodeRun) -> String {
         let uid_suffix = code_run
             .metadata
@@ -90,7 +93,14 @@ impl ResourceNaming {
             );
         }
 
-        // Check if this is a watch CodeRun (monitor or remediation from heal)
+        // Check if this is a heal remediation CodeRun
+        // Detected via: label, template prefix, or service name
+        let heal_remediation_label = code_run
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get("agents.platform/type"))
+            .is_some_and(|v| v == "heal-remediation");
         let template_setting = code_run
             .spec
             .cli_config
@@ -98,6 +108,19 @@ impl ResourceNaming {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
+        let is_heal = heal_remediation_label
+            || template_setting.starts_with("heal/")
+            || code_run.spec.service == "heal";
+
+        // For heal remediation CodeRuns, use heal-remediation- prefix
+        if is_heal {
+            let base_name = format!("t{task_id}-{agent}-{uid_suffix}-v{context_version}");
+            let available = MAX_K8S_NAME_LENGTH.saturating_sub(HEAL_REMEDIATION_JOB_PREFIX.len());
+            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
+            return format!("{HEAL_REMEDIATION_JOB_PREFIX}{trimmed}");
+        }
+
+        // Check if this is a watch CodeRun (monitor or remediation from watch service)
         let watch_role = code_run
             .spec
             .cli_config
@@ -776,6 +799,124 @@ mod tests {
         assert_eq!(
             ResourceNaming::shorten_model_name("some-custom-model"),
             "somecust"
+        );
+    }
+
+    fn build_heal_remediation_code_run() -> CodeRun {
+        use crate::cli::types::CLIType;
+        use crate::crds::coderun::CLIConfig;
+        use serde_json::json;
+
+        let mut labels = BTreeMap::new();
+        labels.insert(
+            "agents.platform/type".to_string(),
+            "heal-remediation".to_string(),
+        );
+
+        let mut settings = HashMap::new();
+        settings.insert("template".to_string(), json!("heal/claude"));
+
+        CodeRun {
+            metadata: ObjectMeta {
+                name: Some("heal-remediation-task123-a2-abc12345".to_string()),
+                namespace: Some("cto".to_string()),
+                uid: Some("abc12345def67890".to_string()),
+                labels: Some(labels),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
+                cli_config: Some(CLIConfig {
+                    cli_type: CLIType::Claude,
+                    model: "claude-opus-4-5-20251101".to_string(),
+                    settings,
+                    max_tokens: None,
+                    temperature: None,
+                    model_rotation: None,
+                }),
+                task_id: Some(123),
+                service: "heal".to_string(),
+                repository_url: "https://github.com/5dlabs/cto.git".to_string(),
+                docs_repository_url: "https://github.com/5dlabs/cto.git".to_string(),
+                docs_project_directory: None,
+                working_directory: None,
+                model: "claude-opus-4-5-20251101".to_string(),
+                github_user: None,
+                github_app: Some("5DLabs-Rex".to_string()),
+                context_version: 1,
+                docs_branch: "main".to_string(),
+                continue_session: false,
+                overwrite_memory: false,
+                env: HashMap::new(),
+                env_from_secrets: vec![],
+                enable_docker: false,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        }
+    }
+
+    #[test]
+    fn heal_remediation_job_name_has_correct_prefix() {
+        let code_run = build_heal_remediation_code_run();
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(
+            job_name.starts_with(HEAL_REMEDIATION_JOB_PREFIX),
+            "Heal remediation job should start with 'heal-remediation-': {job_name}"
+        );
+        assert!(
+            job_name.contains("t123"),
+            "Heal remediation job should contain task ID: {job_name}"
+        );
+        assert!(
+            job_name.contains("rex"),
+            "Heal remediation job should contain agent name: {job_name}"
+        );
+        assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn heal_service_triggers_heal_remediation_prefix() {
+        // Test that service="heal" alone triggers heal-remediation- prefix
+        let code_run = CodeRun {
+            metadata: ObjectMeta {
+                name: Some("test-heal".to_string()),
+                namespace: Some("cto".to_string()),
+                uid: Some("1234567890abcdef".to_string()),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
+                cli_config: None,
+                task_id: Some(456),
+                service: "heal".to_string(),
+                repository_url: "https://github.com/example/repo.git".to_string(),
+                docs_repository_url: "https://github.com/example/docs.git".to_string(),
+                docs_project_directory: None,
+                working_directory: None,
+                model: "sonnet".to_string(),
+                github_user: None,
+                github_app: Some("5DLabs-Rex".to_string()),
+                context_version: 1,
+                docs_branch: "main".to_string(),
+                continue_session: false,
+                overwrite_memory: false,
+                env: HashMap::new(),
+                env_from_secrets: vec![],
+                enable_docker: false,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        };
+
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(
+            job_name.starts_with(HEAL_REMEDIATION_JOB_PREFIX),
+            "Service 'heal' should trigger heal-remediation- prefix: {job_name}"
         );
     }
 }
