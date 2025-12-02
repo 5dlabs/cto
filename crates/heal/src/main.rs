@@ -5678,14 +5678,18 @@ fn build_coderun_yaml(
     };
 
     // Build issue-related env vars
+    // Transform paths from heal server view (/workspace/watch/...) to remediation pod view (/workspace/...)
+    // The heal server mounts PVC at /workspace/watch, but remediation pods mount at /workspace
+    let transform_path = |p: &str| p.replace("/workspace/watch/", "/workspace/");
+
     let issue_number_line = issue_number
         .map(|n| format!("    HEAL_ISSUE_NUMBER: \"{n}\"\n"))
         .unwrap_or_default();
     let issue_dir_line = issue_dir
-        .map(|d| format!("    HEAL_ISSUE_DIR: \"{d}\"\n"))
+        .map(|d| format!("    HEAL_ISSUE_DIR: \"{}\"\n", transform_path(d)))
         .unwrap_or_default();
     let acceptance_line = acceptance_file
-        .map(|f| format!("    HEAL_ACCEPTANCE_FILE: \"{f}\"\n"))
+        .map(|f| format!("    HEAL_ACCEPTANCE_FILE: \"{}\"\n", transform_path(f)))
         .unwrap_or_default();
 
     format!(
@@ -5720,8 +5724,8 @@ metadata:
   env:
     ALERT_TYPE: "{alert}"
     TASK_ID: "{task_id}"
-    HEAL_PROMPT_FILE: "{prompt_file}"
-    HEAL_LOG_FILE: "{log_file}"
+    HEAL_PROMPT_FILE: "{prompt_file_transformed}"
+    HEAL_LOG_FILE: "{log_file_transformed}"
     CODERUN_NAME: "{coderun_name}"
     REMEDIATION_MODE: "true"
 {issue_number}{issue_dir}{acceptance}
@@ -5742,7 +5746,8 @@ metadata:
         cli_type = c.cli_config.cli_type,
         cli_model = c.cli_config.model,
         template = c.cli_config.settings.template,
-        log_file = log_file,
+        prompt_file_transformed = transform_path(prompt_file),
+        log_file_transformed = transform_path(log_file),
         coderun_name = coderun_name,
         target_pod_label = target_pod_label,
         issue_number_label = issue_number_label,
