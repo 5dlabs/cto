@@ -34,12 +34,12 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     apt-get install -y --no-install-recommends gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy pre-built heal binary (must exist in build context)
-COPY infra/images/heal/heal-linux /usr/local/bin/heal
+# Copy pre-built heal binary (placed by CI workflow into build context)
+COPY heal /usr/local/bin/heal
 RUN chmod +x /usr/local/bin/heal
 
-# Copy prompts from source
-COPY crates/heal/prompts /app/prompts
+# Copy prompts (placed by CI workflow into build context)
+COPY prompts /app/prompts
 
 WORKDIR /app
 

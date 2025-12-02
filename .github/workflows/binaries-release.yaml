@@ -332,11 +332,14 @@ jobs:
           name: binary-heal-linux-x86_64
           path: artifacts/
 
-      - name: Prepare binary for Docker
+      - name: Prepare binary and prompts for Docker
         run: |
           cp artifacts/heal-linux-x86_64 infra/images/heal/heal
           chmod +x infra/images/heal/heal
           ls -lh infra/images/heal/heal
+          # Copy prompts to build context
+          cp -r crates/heal/prompts infra/images/heal/prompts
+          ls -lh infra/images/heal/prompts/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3

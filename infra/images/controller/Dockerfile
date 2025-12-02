@@ -17,8 +17,8 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 # Set working directory
 WORKDIR /app
 
-# Copy pre-built binary (must exist in build context)
-COPY crates/controller/agent-controller /app/agent-controller
+# Copy pre-built binary (placed by CI workflow into build context)
+COPY agent-controller /app/agent-controller
 
 # Make binary executable and change ownership to app user  
 RUN chmod +x /app/agent-controller && \
