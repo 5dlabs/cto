@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.10](https://github.com/5dlabs/cto/compare/v0.12.9...v0.12.10) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **tweakcn:** fix deployment by using npm install and correct image pull secret ([#2410](https://github.com/5dlabs/cto/issues/2410)) ([88a9948](https://github.com/5dlabs/cto/commit/88a9948e3365a6588173dc4ff24643977165f753))
+
 ## [0.12.9](https://github.com/5dlabs/cto/compare/v0.12.8...v0.12.9) (2025-12-02)
 
 
