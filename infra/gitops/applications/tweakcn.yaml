@@ -25,6 +25,9 @@ spec:
           tag: "latest"
           pullPolicy: Always
 
+        imagePullSecrets:
+          - name: ghcr-secret
+
         service:
           type: ClusterIP
           port: 3000

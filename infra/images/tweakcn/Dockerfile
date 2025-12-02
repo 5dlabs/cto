@@ -11,8 +11,8 @@ WORKDIR /app
 # Clone tweakcn repository
 RUN git clone --depth 1 https://github.com/jnsahaj/tweakcn.git .
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (using npm install since upstream lockfile may be out of sync)
+RUN npm install --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder
