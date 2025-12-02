@@ -132,7 +132,7 @@ spec:
 
       # Model configuration
       - name: model
-        value: "claude-3-5-sonnet-20241022"
+        value: "claude-sonnet-4-5-20250929"
 
   # Shared volume for Morgan PM state
   volumeClaimTemplates:

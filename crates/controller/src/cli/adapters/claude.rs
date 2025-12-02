@@ -452,8 +452,10 @@ impl ClaudeModelValidator {
             Regex::new(r"^opus$").unwrap(),
             Regex::new(r"^sonnet$").unwrap(),
             Regex::new(r"^haiku$").unwrap(),
-            // Future-proofing for Claude 4
+            // Claude 4.x models
             Regex::new(r"^claude-4.*").unwrap(),
+            Regex::new(r"^claude-sonnet-4.*").unwrap(),
+            Regex::new(r"^claude-opus-4.*").unwrap(),
         ];
 
         Self { valid_patterns }
@@ -477,7 +479,8 @@ impl ClaudeModelValidator {
     #[must_use]
     pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
         vec![
-            "claude-3-5-sonnet-20241022".to_string(),
+            "claude-sonnet-4-5-20250929".to_string(),
+            "claude-opus-4-5-20250929".to_string(),
             "claude-3-opus-20240229".to_string(),
             "claude-3-sonnet-20240229".to_string(),
             "claude-3-haiku-20240307".to_string(),
@@ -697,7 +700,7 @@ Done!
         let suggestions = validator.get_model_suggestions("invalid-model");
 
         assert!(!suggestions.is_empty());
-        assert!(suggestions.contains(&"claude-3-5-sonnet-20241022".to_string()));
+        assert!(suggestions.contains(&"claude-sonnet-4-5-20250929".to_string()));
         assert!(suggestions.contains(&"opus".to_string()));
     }
 }

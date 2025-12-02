@@ -39,7 +39,7 @@ spec:
         description: "CLI type to use (claude, codex, opencode, etc.)"
         default: ""
       - name: cli-model
-        description: "CLI model to use (e.g., claude-3-5-sonnet-20241022, gpt-4)"
+        description: "CLI model to use (e.g., claude-sonnet-4-5-20250929, gpt-4)"
         default: ""
       - name: cli-max-tokens
         description: "Maximum tokens for CLI execution"
