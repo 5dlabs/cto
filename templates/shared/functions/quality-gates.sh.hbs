@@ -1,0 +1,154 @@
+# =========================================================================
+# Quality Gates - Shared Functions
+# 
+# Common quality gate checks used across all CLI containers.
+# Provides Rust-specific checks (fmt, clippy, test) and generic helpers.
+# =========================================================================
+
+# Run Rust quality gates (fmt, clippy, test)
+# Returns 0 if all pass, 1 otherwise
+run_rust_quality_gates() {
+  local verbose="${1:-false}"
+  local all_passed=1
+  
+  echo "🔍 Running Rust quality gates..."
+  
+  # Check if this is a Rust project
+  if [ ! -f "Cargo.toml" ]; then
+    echo "⚠️ No Cargo.toml found, skipping Rust quality gates"
+    return 0
+  fi
+  
+  # Format check
+  echo "  ➤ Checking code formatting (cargo fmt)..."
+  if ! cargo fmt --all -- --check >/tmp/fmt-check.log 2>&1; then
+    echo "  ❌ Format check failed"
+    if [ "$verbose" = "true" ]; then
+      cat /tmp/fmt-check.log
+    fi
+    all_passed=0
+  else
+    echo "  ✅ Format check passed"
+  fi
+  
+  # Clippy (linting)
+  echo "  ➤ Checking lints (cargo clippy)..."
+  if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic >/tmp/clippy-check.log 2>&1; then
+    echo "  ❌ Clippy check failed"
+    if [ "$verbose" = "true" ]; then
+      cat /tmp/clippy-check.log
+    fi
+    all_passed=0
+  else
+    echo "  ✅ Clippy check passed"
+  fi
+  
+  # Tests
+  echo "  ➤ Running tests (cargo test)..."
+  if ! cargo test --workspace --all-features >/tmp/test-check.log 2>&1; then
+    echo "  ❌ Tests failed"
+    if [ "$verbose" = "true" ]; then
+      cat /tmp/test-check.log
+    fi
+    all_passed=0
+  else
+    echo "  ✅ Tests passed"
+  fi
+  
+  # Cleanup temp files
+  rm -f /tmp/fmt-check.log /tmp/clippy-check.log /tmp/test-check.log
+  
+  if [ $all_passed -eq 1 ]; then
+    echo "✅ All Rust quality gates passed"
+    return 0
+  else
+    echo "❌ Some quality gates failed"
+    return 1
+  fi
+}
+
+# Run frontend quality gates (lint, typecheck, test)
+run_frontend_quality_gates() {
+  local verbose="${1:-false}"
+  local all_passed=1
+  
+  echo "🔍 Running frontend quality gates..."
+  
+  # Detect package manager
+  local pkg_mgr=""
+  if [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+    pkg_mgr="bun"
+  elif [ -f "pnpm-lock.yaml" ]; then
+    pkg_mgr="pnpm"
+  elif [ -f "yarn.lock" ]; then
+    pkg_mgr="yarn"
+  elif [ -f "package-lock.json" ] || [ -f "package.json" ]; then
+    pkg_mgr="npm"
+  else
+    echo "⚠️ No package.json found, skipping frontend quality gates"
+    return 0
+  fi
+  
+  echo "  📦 Using package manager: $pkg_mgr"
+  
+  # Lint check
+  echo "  ➤ Running lint..."
+  if $pkg_mgr run lint >/tmp/lint-check.log 2>&1; then
+    echo "  ✅ Lint passed"
+  else
+    echo "  ⚠️ Lint check failed or not configured"
+    if [ "$verbose" = "true" ]; then
+      cat /tmp/lint-check.log
+    fi
+  fi
+  
+  # Type check (if TypeScript)
+  if [ -f "tsconfig.json" ]; then
+    echo "  ➤ Running type check..."
+    if $pkg_mgr run typecheck >/tmp/typecheck.log 2>&1 || $pkg_mgr run type-check >/tmp/typecheck.log 2>&1; then
+      echo "  ✅ Type check passed"
+    else
+      echo "  ⚠️ Type check failed or not configured"
+      if [ "$verbose" = "true" ]; then
+        cat /tmp/typecheck.log
+      fi
+    fi
+  fi
+  
+  # Tests
+  echo "  ➤ Running tests..."
+  if $pkg_mgr run test >/tmp/test-check.log 2>&1 || $pkg_mgr test >/tmp/test-check.log 2>&1; then
+    echo "  ✅ Tests passed"
+  else
+    echo "  ⚠️ Tests failed or not configured"
+    if [ "$verbose" = "true" ]; then
+      cat /tmp/test-check.log
+    fi
+  fi
+  
+  # Cleanup
+  rm -f /tmp/lint-check.log /tmp/typecheck.log /tmp/test-check.log
+  
+  echo "✅ Frontend quality gates complete"
+  return 0
+}
+
+# Auto-detect project type and run appropriate quality gates
+run_quality_gates() {
+  local verbose="${1:-false}"
+  local exit_code=0
+  
+  # Check for Rust project
+  if [ -f "Cargo.toml" ]; then
+    run_rust_quality_gates "$verbose" || exit_code=1
+  fi
+  
+  # Check for frontend project
+  if [ -f "package.json" ]; then
+    run_frontend_quality_gates "$verbose" || exit_code=1
+  fi
+  
+  return $exit_code
+}
+
+

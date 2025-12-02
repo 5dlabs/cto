@@ -3491,8 +3491,9 @@ impl CodeTemplateGenerator {
     fn register_shared_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
             SHARED_BOOTSTRAP_RUST_ENV, SHARED_CONTAINER_CORE, SHARED_FUNCTIONS_COMPLETION_MARKER,
-            SHARED_FUNCTIONS_DOCKER_SIDECAR, SHARED_FUNCTIONS_GITHUB_AUTH, SHARED_PROMPTS_CONTEXT7,
-            SHARED_PROMPTS_DESIGN_SYSTEM,
+            SHARED_FUNCTIONS_DOCKER_SIDECAR, SHARED_FUNCTIONS_GH_CLI, SHARED_FUNCTIONS_GITHUB_AUTH,
+            SHARED_FUNCTIONS_GIT_OPERATIONS, SHARED_FUNCTIONS_QUALITY_GATES,
+            SHARED_PROMPTS_CONTEXT7, SHARED_PROMPTS_DESIGN_SYSTEM,
         };
 
         // Map partial name (used in templates) -> template path
@@ -3506,6 +3507,15 @@ impl CodeTemplateGenerator {
             (
                 "shared/functions/completion-marker",
                 SHARED_FUNCTIONS_COMPLETION_MARKER,
+            ),
+            (
+                "shared/functions/git-operations",
+                SHARED_FUNCTIONS_GIT_OPERATIONS,
+            ),
+            ("shared/functions/gh-cli", SHARED_FUNCTIONS_GH_CLI),
+            (
+                "shared/functions/quality-gates",
+                SHARED_FUNCTIONS_QUALITY_GATES,
             ),
             ("shared/context7-instructions", SHARED_PROMPTS_CONTEXT7),
             ("shared/design-system", SHARED_PROMPTS_DESIGN_SYSTEM),
