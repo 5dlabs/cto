@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.3](https://github.com/5dlabs/cto/compare/v0.12.2...v0.12.3) (2025-12-02)
+
+
+### ✨ Features
+
+* **templates:** Phase 2 - Context7 on all agents + extended shared partials ([#2154](https://github.com/5dlabs/cto/issues/2154)) ([b217211](https://github.com/5dlabs/cto/commit/b2172114a61443b0f2e039d821e3d8e70a4d882a))
+
 ## [0.12.2](https://github.com/5dlabs/cto/compare/v0.12.1...v0.12.2) (2025-12-02)
 
 
