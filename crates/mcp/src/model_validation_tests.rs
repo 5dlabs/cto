@@ -1,7 +1,9 @@
 //! Test module for Task 2: Flexible CLI Model Configuration
 //!
-//! Tests the new permissive `validate_model_name` function
+//! Tests the new permissive `validate_model_name` function and
+//! the `autocorrect_anthropic_model` function for deprecated model handling.
 
+use crate::autocorrect_anthropic_model;
 use crate::validate_model_name;
 
 #[cfg(test)]
@@ -110,5 +112,51 @@ mod tests {
             "Validation took {:?} ms for 40k validations",
             duration.as_millis()
         );
+    }
+
+    /// Test autocorrection of deprecated Anthropic model IDs
+    #[test]
+    fn test_autocorrect_deprecated_models() {
+        // Deprecated claude-3-5-sonnet-20241022 should be corrected
+        let (corrected, was_corrected) =
+            autocorrect_anthropic_model("claude-3-5-sonnet-20241022", "anthropic");
+        assert!(was_corrected);
+        assert_eq!(corrected, "claude-sonnet-4-5-20250929");
+
+        // claude-3-5-sonnet (short form) should also be corrected
+        let (corrected, was_corrected) =
+            autocorrect_anthropic_model("claude-3-5-sonnet", "anthropic");
+        assert!(was_corrected);
+        assert_eq!(corrected, "claude-sonnet-4-5-20250929");
+    }
+
+    /// Test that autocorrection does not modify valid models
+    #[test]
+    fn test_autocorrect_preserves_valid_models() {
+        // Valid models should pass through unchanged
+        let (model, was_corrected) =
+            autocorrect_anthropic_model("claude-sonnet-4-5-20250929", "anthropic");
+        assert!(!was_corrected);
+        assert_eq!(model, "claude-sonnet-4-5-20250929");
+
+        let (model, was_corrected) =
+            autocorrect_anthropic_model("claude-opus-4-5-20251101", "anthropic");
+        assert!(!was_corrected);
+        assert_eq!(model, "claude-opus-4-5-20251101");
+    }
+
+    /// Test that autocorrection only applies to anthropic provider
+    #[test]
+    fn test_autocorrect_skips_non_anthropic() {
+        // Same deprecated model name but different provider should not be corrected
+        let (model, was_corrected) =
+            autocorrect_anthropic_model("claude-3-5-sonnet-20241022", "openai");
+        assert!(!was_corrected);
+        assert_eq!(model, "claude-3-5-sonnet-20241022");
+
+        let (model, was_corrected) =
+            autocorrect_anthropic_model("claude-3-5-sonnet-20241022", "claude-code");
+        assert!(!was_corrected);
+        assert_eq!(model, "claude-3-5-sonnet-20241022");
     }
 }

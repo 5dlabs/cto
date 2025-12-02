@@ -420,6 +420,37 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
     })
 }
 
+/// Auto-correct deprecated Anthropic model IDs to valid alternatives
+/// This prevents silent failures when clients pass outdated model names
+#[allow(clippy::disallowed_macros)]
+fn autocorrect_anthropic_model(model: &str, provider: &str) -> (String, bool) {
+    // Only apply autocorrection for anthropic provider
+    if provider != "anthropic" {
+        return (model.to_string(), false);
+    }
+
+    // Map of deprecated model IDs to their replacements
+    // claude-3-5-sonnet-20241022 was removed from Anthropic API in late 2025
+    let deprecated_models: &[(&str, &str)] = &[
+        ("claude-3-5-sonnet-20241022", "claude-sonnet-4-5-20250929"),
+        ("claude-3-5-sonnet", "claude-sonnet-4-5-20250929"),
+        // Add other deprecated models as they're retired
+    ];
+
+    for &(deprecated, replacement) in deprecated_models {
+        if model == deprecated {
+            eprintln!(
+                "⚠️  DEPRECATED MODEL: '{deprecated}' is no longer available in Anthropic API"
+            );
+            eprintln!("   ↳ Auto-correcting to: '{replacement}'");
+            eprintln!("   💡 Update your client configuration to use '{replacement}' directly");
+            return ((*replacement).to_string(), true);
+        }
+    }
+
+    (model.to_string(), false)
+}
+
 fn resolve_workspace_dir() -> Option<std::path::PathBuf> {
     // 1. Try current directory first - this is most likely the intended workspace
     if let Ok(cwd) = std::env::current_dir() {
@@ -2702,15 +2733,15 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or(&config.defaults.intake.github_app);
 
     // Extract model configuration (client can specify granular control)
-    let primary_model = arguments
+    let primary_model_raw = arguments
         .get("primary_model")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.intake.primary.model);
-    let research_model = arguments
+    let research_model_raw = arguments
         .get("research_model")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.intake.research.model);
-    let fallback_model = arguments
+    let fallback_model_raw = arguments
         .get("fallback_model")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.intake.fallback.model);
@@ -2728,6 +2759,21 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .get("fallback_provider")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.intake.fallback.provider);
+
+    // Auto-correct deprecated Anthropic model IDs to prevent silent failures
+    let (primary_model, primary_corrected) =
+        autocorrect_anthropic_model(primary_model_raw, primary_provider);
+    let (research_model, research_corrected) =
+        autocorrect_anthropic_model(research_model_raw, research_provider);
+    let (fallback_model, fallback_corrected) =
+        autocorrect_anthropic_model(fallback_model_raw, fallback_provider);
+
+    // Log summary of corrections if any were made
+    if primary_corrected || research_corrected || fallback_corrected {
+        eprintln!("📢 Model configuration was auto-corrected due to deprecated model IDs");
+        eprintln!("   Please update your MCP client configuration to avoid this warning");
+    }
+
     let num_tasks = 50; // Standard task count
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
