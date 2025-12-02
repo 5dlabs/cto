@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.7](https://github.com/5dlabs/cto/compare/v0.12.6...v0.12.7) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add diagnostic logging for A2 alert debugging ([#2328](https://github.com/5dlabs/cto/issues/2328)) ([a5b0ddc](https://github.com/5dlabs/cto/commit/a5b0ddcdccb353739e76c65d9d3627548128572a))
+
+
+### ♻️ Refactoring
+
+* **mcp:** remove docs_ingest tool in favor of Context7 ([#2326](https://github.com/5dlabs/cto/issues/2326)) ([9ef63a6](https://github.com/5dlabs/cto/commit/9ef63a6c2e0fc2dfe2d567d24e2add391684e5af))
+
 ## [0.12.6](https://github.com/5dlabs/cto/compare/v0.12.5...v0.12.6) (2025-12-02)
 
 
