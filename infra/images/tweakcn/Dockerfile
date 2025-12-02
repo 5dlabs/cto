@@ -1,5 +1,6 @@
 # Tweakcn - Visual Theme Editor for shadcn/ui
 # Built from upstream: https://github.com/jnsahaj/tweakcn
+# Build trigger: 2025-12-02-fix-init-container
 
 FROM node:20-alpine AS base
 

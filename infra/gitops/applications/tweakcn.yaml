@@ -28,6 +28,9 @@ spec:
         imagePullSecrets:
           - name: ghcr-secret
 
+        # Skip the init-claude-config container (not needed for tweakcn)
+        skipDefaultInitContainers: true
+
         service:
           type: ClusterIP
           port: 3000
