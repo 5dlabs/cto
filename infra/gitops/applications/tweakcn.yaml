@@ -1,0 +1,100 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tweakcn
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: tweakcn
+    app.kubernetes.io/part-of: cto-platform
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/charts/universal-app
+    helm:
+      releaseName: tweakcn
+      values: |
+        fullnameOverride: "tweakcn"
+
+        image:
+          repository: ghcr.io/5dlabs/tweakcn
+          tag: "latest"
+          pullPolicy: Always
+
+        service:
+          type: ClusterIP
+          port: 3000
+
+        # No ingress - internal access via Kilo/WireGuard
+        ingress:
+          enabled: false
+
+        env:
+          - name: NODE_ENV
+            value: "production"
+          - name: PORT
+            value: "3000"
+          - name: DATABASE_URL
+            value: "file:/data/tweakcn.db"
+
+        # Persistence for SQLite database
+        persistence:
+          enabled: true
+          storageClass: "local-path"
+          accessMode: ReadWriteOnce
+          size: 5Gi
+          mountPath: /data
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
