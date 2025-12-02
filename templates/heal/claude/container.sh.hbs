@@ -78,8 +78,10 @@ echo "✓ Repository ready at ${REPO_PATH}"
 # ============================================================================
 # VERIFY HEAL CONTEXT FILES
 # ============================================================================
-PROMPT_FILE="${HEAL_PROMPT_FILE:-/workspace/watch/alerts/${ALERT_TYPE:-unknown}.md}"
-LOG_FILE="${HEAL_LOG_FILE:-/workspace/watch/logs/${ALERT_TYPE:-A7}-*.log}"
+# Note: Heal server mounts PVC at /workspace/watch, but remediation pods mount at /workspace
+# So files that heal creates at /workspace/watch/issues/... appear at /workspace/issues/... here
+PROMPT_FILE="${HEAL_PROMPT_FILE:-/workspace/issues/issue-${HEAL_ISSUE_NUMBER:-unknown}/prompt.md}"
+LOG_FILE="${HEAL_LOG_FILE:-/workspace/logs/${ALERT_TYPE:-A7}-*.log}"
 
 # Determine acceptance file path - handle legacy mode gracefully
 if [ -n "${HEAL_ACCEPTANCE_FILE}" ]; then
@@ -89,7 +91,7 @@ elif [ -n "${HEAL_ISSUE_DIR}" ]; then
     ACCEPTANCE_FILE="${HEAL_ISSUE_DIR}/acceptance-criteria.md"
     LEGACY_MODE="false"
 elif [ -n "${HEAL_ISSUE_NUMBER}" ]; then
-    ACCEPTANCE_FILE="/workspace/watch/issues/issue-${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
+    ACCEPTANCE_FILE="/workspace/issues/issue-${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
     LEGACY_MODE="false"
 else
     # Legacy mode - no issue number, acceptance criteria may not exist
@@ -111,8 +113,10 @@ if [ -f "${PROMPT_FILE}" ]; then
     echo "   ✓ Prompt file exists"
 else
     echo "   ⚠️  Prompt file not found at ${PROMPT_FILE}"
-    echo "   Checking /workspace/watch/alerts/..."
-    ls -la /workspace/watch/alerts/ 2>/dev/null || echo "   No alerts directory"
+    echo "   Checking /workspace/issues/..."
+    ls -la /workspace/issues/ 2>/dev/null || echo "   No issues directory"
+    echo "   Checking /workspace/alerts/..."
+    ls -la /workspace/alerts/ 2>/dev/null || echo "   No alerts directory"
 fi
 
 # Find latest matching log file (|| true prevents glob expansion errors)
@@ -148,6 +152,40 @@ fi
 echo "✅ Agent prompt file exists: ${AGENT_PROMPT}"
 
 # ============================================================================
+# MCP CONFIGURATION SETUP
+# ============================================================================
+echo ""
+echo "═══ MCP CONFIGURATION SETUP ═══"
+
+# Define Claude working directory
+CLAUDE_WORK_DIR="${REPO_PATH}"
+
+# Copy MCP configuration from ConfigMap to project root (project scope)
+if [ -f "/task-files/mcp.json" ]; then
+    cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+    echo "✓ Copied mcp.json to ${CLAUDE_WORK_DIR}/.mcp.json (project scope)"
+else
+    echo "⚠️  mcp.json template not found in /task-files"
+    echo "   Checking for fallback at /task-files/heal_mcp.json.hbs..."
+    if [ -f "/task-files/heal_mcp.json" ]; then
+        cp /task-files/heal_mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+        echo "✓ Copied heal_mcp.json to ${CLAUDE_WORK_DIR}/.mcp.json"
+    fi
+fi
+
+# Also copy to workspace root for some CLIs that look there
+if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ] && [ "$CLAUDE_WORK_DIR" != "/workspace" ]; then
+    cp "$CLAUDE_WORK_DIR/.mcp.json" /workspace/.mcp.json 2>/dev/null || true
+    echo "✓ Also copied to /workspace/.mcp.json"
+fi
+
+# Debug: show MCP config
+if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
+    echo "📋 MCP configuration:"
+    cat "$CLAUDE_WORK_DIR/.mcp.json" | head -30
+fi
+
+# ============================================================================
 # MCP TOOLS VALIDATION
 # ============================================================================
 echo ""
@@ -155,6 +193,10 @@ echo "═══ MCP TOOLS VALIDATION ═══"
 echo "🔍 Checking MCP servers..."
 
 if command -v claude >/dev/null 2>&1; then
+    # Test MCP connection with the config
+    if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
+        cd "$CLAUDE_WORK_DIR"
+    fi
     MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
     
     if echo "$MCP_LIST" | grep -q "Connected\|tools"; then
@@ -170,7 +212,7 @@ fi
 
 # List configured remote tools from heal config
 echo ""
-echo "📋 Configured remote tools (from heal-config):"
+echo "📋 Configured remote tools (via toolman):"
 echo "   - mcp_tools_github_*"
 echo "   - mcp_tools_kubernetes_*"
 echo "   - mcp_tools_argocd_*"
@@ -216,12 +258,26 @@ Focus on addressing the above items before re-checking acceptance criteria."
 
     # Run Claude with the remediation prompt
     echo "🚀 Running Claude remediation agent..."
+    
+    # Build Claude command with MCP config if available
+    CLAUDE_CMD="claude --dangerously-skip-permissions --model {{model}}"
+    CLAUDE_CMD="$CLAUDE_CMD --allowedTools Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit,mcp__*"
+    
+    # Add MCP configuration if available
+    if [ -f "${CLAUDE_WORK_DIR}/.mcp.json" ]; then
+        echo "✓ Adding MCP configuration from ${CLAUDE_WORK_DIR}/.mcp.json"
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config ${CLAUDE_WORK_DIR}/.mcp.json"
+    elif [ -f "/workspace/.mcp.json" ]; then
+        echo "✓ Adding MCP configuration from /workspace/.mcp.json"
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/.mcp.json"
+    else
+        echo "⚠️ No MCP configuration file found - MCP tools will not be available"
+    fi
+    
+    echo "📋 Running: $CLAUDE_CMD -p [prompt]"
+    
     set +e
-    claude \
-        --dangerously-skip-permissions \
-        --model "{{model}}" \
-        --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit" \
-        -p "${PROMPT_CONTENT}"
+    $CLAUDE_CMD -p "${PROMPT_CONTENT}"
     AGENT_EXIT=$?
     set -e
 
@@ -348,7 +404,7 @@ Attempts: ${ATTEMPT}" 2>/dev/null || echo "   (could not comment on issue)"
     # Clean up issue folder on PVC
     if [ -n "${HEAL_ISSUE_DIR}" ] && [ -d "${HEAL_ISSUE_DIR}" ]; then
         echo "🧹 Archiving issue folder: ${HEAL_ISSUE_DIR}"
-        ARCHIVE_DIR="/workspace/watch/archived/${HEAL_ISSUE_NUMBER:-unknown}"
+        ARCHIVE_DIR="/workspace/archived/${HEAL_ISSUE_NUMBER:-unknown}"
         mkdir -p "$(dirname ${ARCHIVE_DIR})"
         mv "${HEAL_ISSUE_DIR}" "${ARCHIVE_DIR}" 2>/dev/null || echo "   (folder already moved or missing)"
     fi
