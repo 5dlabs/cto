@@ -6,15 +6,16 @@
 //! - Supporting both `.hbs` and legacy `.md` templates
 
 use anyhow::{Context, Result};
-use handlebars::{
-    Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext,
-};
+use handlebars::{Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Helper function to concatenate strings in templates.
 /// Usage: `{{concat "prefix" variable "suffix"}}`
+///
+/// Null/undefined values are skipped silently to avoid producing "null" strings
+/// in output when context variables are missing.
 fn concat_helper(
     h: &Helper,
     _: &Handlebars,
@@ -24,14 +25,36 @@ fn concat_helper(
 ) -> HelperResult {
     let mut result = String::new();
     for param in h.params() {
-        if let Some(s) = param.value().as_str() {
+        let value = param.value();
+        // Skip null/undefined values to avoid "null" in output
+        if value.is_null() {
+            continue;
+        }
+        if let Some(s) = value.as_str() {
             result.push_str(s);
         } else {
-            // Handle non-string values by converting to string
-            result.push_str(param.value().to_string().trim_matches('"'));
+            // Handle non-string values (numbers, bools) by converting to string
+            result.push_str(value.to_string().trim_matches('"'));
         }
     }
     out.write(&result)?;
+    Ok(())
+}
+
+/// Helper function to convert strings to lowercase.
+/// Usage: `{{lowercase alert_id}}` -> "a7" (from "A7")
+fn lowercase_helper(
+    h: &Helper,
+    _: &Handlebars,
+    _: &HbsContext,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    if let Some(param) = h.param(0) {
+        if let Some(s) = param.value().as_str() {
+            out.write(&s.to_lowercase())?;
+        }
+    }
     Ok(())
 }
 
@@ -68,6 +91,7 @@ impl TemplateEngine<'_> {
 
         // Register custom helpers
         handlebars.register_helper("concat", Box::new(concat_helper));
+        handlebars.register_helper("lowercase", Box::new(lowercase_helper));
 
         // Load partials from the partials directory
         let partials_dir = Path::new(prompts_dir).join("partials");
@@ -229,5 +253,58 @@ mod tests {
         let result = handlebars.render_template(template, &context).unwrap();
         assert_eq!(result, "[Rex] my-pod");
     }
-}
 
+    #[test]
+    fn test_concat_with_missing_variable() {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+        handlebars.register_helper("concat", Box::new(concat_helper));
+
+        let context = AlertContext {
+            alert_id: "a1".to_string(),
+            pod_name: "my-pod".to_string(),
+            namespace: "cto".to_string(),
+            phase: "Running".to_string(),
+            task_id: "task-123".to_string(),
+            agent: "Rex".to_string(),
+            logs: String::new(),
+            expected_behaviors: String::new(),
+            duration: "5m".to_string(),
+            extra: HashMap::new(), // missing_agent is NOT in extra
+        };
+
+        // Test with missing variable - should NOT produce "null"
+        let template = "{{concat \"Comment Order Mismatch: \" missing_agent \" missing\"}}";
+        let result = handlebars.render_template(template, &context).unwrap();
+        // Should skip the null value, NOT produce "Comment Order Mismatch: null missing"
+        assert!(
+            !result.contains("null"),
+            "Missing variable should not render as 'null', got: {result}"
+        );
+        assert_eq!(result, "Comment Order Mismatch:  missing");
+    }
+
+    #[test]
+    fn test_lowercase_helper() {
+        let mut handlebars = Handlebars::new();
+        handlebars.register_helper("lowercase", Box::new(lowercase_helper));
+
+        let context = AlertContext {
+            alert_id: "A7".to_string(),
+            pod_name: "my-pod".to_string(),
+            namespace: "cto".to_string(),
+            phase: "Running".to_string(),
+            task_id: "task-123".to_string(),
+            agent: "Rex".to_string(),
+            logs: String::new(),
+            expected_behaviors: String::new(),
+            duration: "5m".to_string(),
+            extra: HashMap::new(),
+        };
+
+        // Test lowercase conversion
+        let template = "heal,remediation,{{lowercase alert_id}}";
+        let result = handlebars.render_template(template, &context).unwrap();
+        assert_eq!(result, "heal,remediation,a7");
+    }
+}

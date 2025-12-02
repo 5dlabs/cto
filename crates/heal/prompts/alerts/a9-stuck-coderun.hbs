@@ -27,7 +27,9 @@ This alert fires when a CodeRun CRD has been stuck in Running/Pending state for 
 
 {{> _issue-folder}}
 
-### Step 3: Investigate
+### Step 3: Investigate and Write prompt.md
+
+First, investigate the stuck CodeRun:
 
 ```bash
 # Get CodeRun status
@@ -40,7 +42,7 @@ kubectl get pods -n {{namespace}} -l coderun={{pod_name}}
 kubectl logs -n {{namespace}} -l coderun={{pod_name}} --tail=500
 ```
 
-### Step 4: Write prompt.md
+Then write your analysis to `${ISSUE_DIR}/prompt.md`:
 
 ```bash
 cat > "${ISSUE_DIR}/prompt.md" << PROMPT
@@ -64,7 +66,7 @@ cat > "${ISSUE_DIR}/prompt.md" << PROMPT
 PROMPT
 ```
 
-### Step 5: Write acceptance-criteria.md
+### Step 4: Write acceptance-criteria.md
 
 ```bash
 cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA

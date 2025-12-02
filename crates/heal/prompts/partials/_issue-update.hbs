@@ -6,9 +6,11 @@ gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat << EOF
 
 ## Alert Details
 - **Alert Type**: {{alert_id}} ({{alert_title}})
-{{#each alert_details}}
-- **{{@key}}**: {{this}}
-{{/each}}
+- **Pod**: {{pod_name}}
+- **Namespace**: {{namespace}}
+- **Phase**: {{phase}}
+- **Agent**: {{agent}}
+- **Task ID**: {{task_id}}
 
 ---
 

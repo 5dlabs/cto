@@ -4,7 +4,7 @@
 ISSUE_URL=$(gh issue create \
   --repo 5dlabs/cto \
   --title "[HEAL-{{alert_id}}] {{issue_title}}" \
-  --label "heal,remediation,{{alert_id}}" \
+  --label "heal,remediation,{{lowercase alert_id}}" \
   --body "🔍 {{issue_placeholder}}... Full analysis to follow.")
 if [ -z "$ISSUE_URL" ]; then
   echo "❌ Failed to create GitHub issue"

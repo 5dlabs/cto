@@ -1,3 +1,13 @@
+{{!--
+  UNUSED TEMPLATE: This is a generic base template for future alert creation.
+  Currently, all alerts use their own specific templates (a1-a9).
+
+  Required context fields (not yet in AlertContext):
+  - alert_description: String describing the condition
+  - alert_details: HashMap<String, String> for key-value pairs
+  - prompt_instructions: String with alert-specific instructions
+  - acceptance_criteria: Vec<{section, items}> for criteria
+--}}
 # Alert {{alert_id}}: {{alert_title}}
 
 ## Detected Condition
