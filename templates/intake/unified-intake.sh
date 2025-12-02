@@ -15,6 +15,10 @@
 
 set -e
 
+# Disable TaskMaster auto-update to prevent infinite loops in containerized environments
+export TASKMASTER_SKIP_AUTO_UPDATE=1
+export CI=1
+
 # Force output to be unbuffered
 exec 2>&1
 
