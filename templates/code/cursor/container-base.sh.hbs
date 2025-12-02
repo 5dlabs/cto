@@ -1,0 +1,2598 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# Cursor Container Base
+# 
+# This container uses shared partials for common functionality.
+# See templates/shared/ for the reusable building blocks.
+# =========================================================================
+
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else}}
+echo "🔧 Initialising Cursor environment"
+{{/if}}
+
+# Bootstrap Rust environment (shared partial)
+{{> shared/bootstrap/rust-env}}
+
+# Ensure Node.js is available at the path expected by cursor-agent
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ Node.js binary not found; cursor-agent cannot run"
+  exit 1
+fi
+
+CURSOR_RUNTIME_BIN="/tmp/cursor-agent-bin"
+CURSOR_AGENT_ROOT="/usr/local/lib/cursor-agent"
+CURSOR_AGENT_ENTRY="$CURSOR_AGENT_ROOT/index.js"
+
+mkdir -p "$CURSOR_RUNTIME_BIN"
+cat >"$CURSOR_RUNTIME_BIN/cursor-agent" <<'WRAPPER'
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ Node.js binary not found in PATH"
+  exit 1
+fi
+
+NODE_BIN="$(command -v node)"
+CURSOR_AGENT_ROOT="/usr/local/lib/cursor-agent"
+CURSOR_AGENT_ENTRY="$CURSOR_AGENT_ROOT/index.js"
+
+if [ ! -f "$CURSOR_AGENT_ENTRY" ]; then
+  echo "❌ Cursor agent entrypoint not found at $CURSOR_AGENT_ENTRY"
+  exit 1
+fi
+
+exec "$NODE_BIN" "$CURSOR_AGENT_ENTRY" "$@"
+WRAPPER
+chmod +x "$CURSOR_RUNTIME_BIN/cursor-agent"
+export PATH="$CURSOR_RUNTIME_BIN:$PATH"
+
+if [ ! -x "/usr/local/bin/node" ]; then
+  echo "ℹ️ Falling back to cursor-agent wrapper; /usr/local/bin/node missing"
+fi
+
+echo "PATH: $PATH"
+
+# Docker sidecar management (shared partial)
+{{> shared/functions/docker-sidecar}}
+
+# Set up EXIT trap to ensure Docker sidecar cleanup
+trap 'stop_docker_sidecar || true' EXIT
+
+# =========================================================================
+# RETRY CONFIGURATION
+# =========================================================================
+MAX_RETRIES_CONFIG=${CURSOR_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🤖 CLI: {{cli_type}}"
+echo "🎯 Model: {{model}}"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${CURSOR_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: CURSOR_MAX_RETRIES environment variable"
+elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# GitHub App authentication (shared partial)
+{{> shared/functions/github-auth}}
+
+export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+export GH_HOST="github.com"
+
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
+mkdir -p "$GH_CONFIG_DIR"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
+# Clean up any leftover completion marker from previous runs
+# This prevents issues with sequential task executions on the same PVC
+if [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
+export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
+CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
+
+git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
+echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+
+gh_hosts_file() {
+  if [ -n "${GH_CONFIG_DIR:-}" ] && [ -f "${GH_CONFIG_DIR}/hosts.yml" ]; then
+    printf '%s\n' "${GH_CONFIG_DIR}/hosts.yml"
+    return
+  fi
+  if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+    printf '%s\n' "$HOME/.config/gh/hosts.yml"
+    return
+  fi
+  printf ''
+}
+
+sync_gh_hosts_to_path() {
+  local target="$1"
+  if [ -z "$target" ]; then
+    return
+  fi
+  local source
+  source=$(gh_hosts_file)
+  if [ -z "$source" ] || [ ! -f "$source" ]; then
+    return
+  fi
+  local dest_dir="$target/.config/gh"
+  mkdir -p "$dest_dir"
+  if cp "$source" "$dest_dir/hosts.yml" >/dev/null 2>&1; then
+    chmod 600 "$dest_dir/hosts.yml" 2>/dev/null || true
+  fi
+}
+
+TOKEN_GENERATED_AT=$(date +%s)
+
+refresh_github_token() {
+  echo "🔄 Refreshing GitHub App token..."
+
+  TEMP_KEY_FILE="/tmp/github-app-key-$$"
+  printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+  chmod 600 "$TEMP_KEY_FILE"
+
+  JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  NOW=$(date +%s)
+  EXP=$((NOW + 600))
+  JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+  rm -f "$TEMP_KEY_FILE"
+
+  NEW_INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+  if [ "$NEW_INSTALLATION_ID" = "null" ] || [ -z "$NEW_INSTALLATION_ID" ]; then
+    NEW_INSTALLATION_ID=$(curl -s -L \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+  fi
+
+  TOKEN_RESPONSE=$(curl -s -X POST \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/app/installations/$NEW_INSTALLATION_ID/access_tokens")
+
+  NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+  if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+    export GITHUB_TOKEN="$NEW_TOKEN"
+    export GH_TOKEN="$NEW_TOKEN"
+    TOKEN_GENERATED_AT=$(date +%s)
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+    echo "✅ Token refreshed"
+    return 0
+  fi
+
+  echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+  return 1
+}
+
+refresh_token_if_needed() {
+  if [ -z "$TOKEN_GENERATED_AT" ]; then
+    refresh_github_token
+    return
+  fi
+
+  NOW=$(date +%s)
+  TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+  if [ $TOKEN_AGE -gt 3000 ]; then
+    echo "🔄 Token age: $((TOKEN_AGE / 60)) minutes — refreshing"
+    refresh_github_token
+  fi
+}
+
+ensure_gh_authenticated() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
+    return 0
+  fi
+
+  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    refresh_token_if_needed || true
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  gh auth setup-git >/dev/null 2>&1 || true
+
+  if gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "✅ GitHub CLI authenticated for $GH_HOST"
+  else
+    echo "⚠️ Unable to confirm GitHub CLI auth; GH_TOKEN will still be used for git operations"
+  fi
+}
+
+ensure_gh_authenticated
+sync_gh_hosts_to_path "$TASK_WORKSPACE"
+
+sanitize_status_message() {
+  printf '%s' "$1" | tr '\n' ' ' | tr '\r' ' '
+}
+
+resolve_pr_url() {
+  if [ -n "${PR_URL:-}" ]; then
+    printf '%s' "$PR_URL"
+    return
+  fi
+
+  if [ -n "${PR_NUMBER:-}" ] && [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ]; then
+    printf 'https://github.com/%s/%s/pull/%s' "$REPO_OWNER" "$REPO_NAME" "$PR_NUMBER"
+    return
+  fi
+
+  if command -v gh >/dev/null 2>&1; then
+    local current_branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
+    if [ -n "$current_branch" ]; then
+      local pr_url
+      pr_url=$(gh pr list --state all --head "$current_branch" --json url --jq '.[0].url' 2>/dev/null || printf '')
+      if [ -n "$pr_url" ]; then
+        printf '%s' "$pr_url"
+        return
+      fi
+    fi
+  fi
+
+  printf ''
+}
+
+patch_coderun_status() {
+  local phase="$1"
+  local message="$2"
+  local remediation_status="${3:-}"
+  local qa_status="${4:-}"
+  local pr_url="${5:-}"
+  local work_completed_flag="${6:-false}"
+
+  if [ -z "${CODERUN_NAME:-}" ] || [ -z "${NAMESPACE:-}" ]; then
+    return
+  fi
+
+  local token_path="/var/run/secrets/kubernetes.io/serviceaccount/token"
+  local ca_path="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+  if [ ! -f "$token_path" ] || [ ! -f "$ca_path" ]; then
+    echo "ℹ️ Service account credentials unavailable; skipping CodeRun status update"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "ℹ️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local work_completed="false"
+  if [ "$work_completed_flag" = "true" ]; then
+    work_completed="true"
+  fi
+
+  local payload
+  payload=$(jq -n \
+    --arg phase "$phase" \
+    --arg message "$(sanitize_status_message "$message")" \
+    --arg remediation "$remediation_status" \
+    --arg qa "$qa_status" \
+    --arg pr "$pr_url" \
+    --arg workCompleted "$work_completed" \
+    '{
+      status: (
+        {
+          phase: $phase,
+          message: $message,
+          workCompleted: ($workCompleted == "true")
+        }
+        + (if $remediation != "" then {remediationStatus: $remediation} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end)
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+      )
+    }'
+  ) || return
+
+  local api_host="${KUBERNETES_SERVICE_HOST:-}"
+  local api_port="${KUBERNETES_SERVICE_PORT_HTTPS:-${KUBERNETES_SERVICE_PORT:-443}}"
+
+  if [ -z "$api_host" ]; then
+    echo "ℹ️ Kubernetes API host unavailable; skipping CodeRun status update"
+    return
+  fi
+
+  local token
+  token=$(cat "$token_path")
+
+  curl -sS -X PATCH \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/merge-patch+json" \
+    --cacert "$ca_path" \
+    --data "$payload" \
+    "https://${api_host}:${api_port}/apis/agents.platform/v1/namespaces/${NAMESPACE}/coderuns/${CODERUN_NAME}/status" >/dev/null 2>&1 || \
+    echo "⚠️ Failed to patch CodeRun status"
+}
+
+ensure_pr_created() {
+  if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
+    echo "⏭️  Auto PR creation disabled via SKIP_AUTO_PR=1"
+    return
+  fi
+
+  # CRITICAL GUARD #1: Check if orchestrator already provided PR_NUMBER
+  # This must be checked BEFORE any other logic to prevent duplicate PRs
+  if [ -n "${PR_NUMBER:-}" ]; then
+    echo "ℹ️ PR_NUMBER=${PR_NUMBER} provided by orchestrator; skipping fallback PR creation"
+    return
+  fi
+
+  # CRITICAL GUARD #2: Only auto-create PRs during implementation stage
+  # Quality/security/testing agents should NEVER create PRs
+  if [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
+    echo "ℹ️ Not in implementation stage (${WORKFLOW_STAGE:-unknown}); skipping fallback PR creation"
+    return
+  fi
+
+  if [ ! -d .git ]; then
+    echo "⚠️ Repository not initialised; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI not available; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping auto PR creation"
+    return
+  fi
+
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "⚠️ GITHUB_TOKEN not set; skipping auto PR creation"
+    return
+  fi
+
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
+  if [ -z "$CURRENT_BRANCH" ]; then
+    echo "⚠️ Unable to determine current branch; skipping auto PR creation"
+    return
+  fi
+
+  # Ensure we have repo context for PR checks
+  REPO_SLUG="${REPO_OWNER:-}/${REPO_NAME:-}"
+  if [ "$REPO_SLUG" = "/" ] || [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
+    echo "⚠️ REPO_OWNER/REPO_NAME not set; checking for PRs without explicit repo context"
+    REPO_SLUG=""
+  fi
+
+  # Check if PR already exists for this branch (with explicit repo context)
+  refresh_token_if_needed || true
+  if [ -n "$REPO_SLUG" ]; then
+    PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  else
+  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  fi
+  PR_EXIT_CODE=$?
+
+  if [ $PR_EXIT_CODE -ne 0 ] && printf '%s' "$PR_OUTPUT" | grep -qi "HTTP 401"; then
+    echo "⚠️ gh pr list returned HTTP 401; refreshing GitHub credentials"
+    refresh_github_token || true
+    if [ -n "$REPO_SLUG" ]; then
+      PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    else
+    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    fi
+    PR_EXIT_CODE=$?
+  fi
+
+  if [ $PR_EXIT_CODE -ne 0 ]; then
+    printf '%s\n' "$PR_OUTPUT" >&2
+    PR_DATA="[]"
+  else
+    PR_DATA="$PR_OUTPUT"
+  fi
+
+  if [ -z "$PR_DATA" ]; then
+    PR_DATA="[]"
+  fi
+
+  if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
+    echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
+    return
+  fi
+
+  BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+  REMOTE_BASE="origin/$BASE_BRANCH"
+  if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+      BASE_BRANCH="master"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+      if [ -n "$DEFAULT_REMOTE" ]; then
+        BASE_BRANCH="$DEFAULT_REMOTE"
+        REMOTE_BASE="origin/$BASE_BRANCH"
+      else
+        REMOTE_BASE=""
+      fi
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  if [ -n "$BASE_BRANCH" ]; then
+    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  fi
+
+  if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
+    AUTO_BRANCH="task-{{task_id}}-{{service}}-$(date +%Y%m%d-%H%M%S)"
+    echo "⚠️ Branch $CURRENT_BRANCH unsuitable for PR; creating $AUTO_BRANCH"
+    if ! git checkout -B "$AUTO_BRANCH" >/dev/null 2>&1; then
+      echo "❌ Failed to create fallback branch $AUTO_BRANCH"
+      return
+    fi
+    CURRENT_BRANCH="$AUTO_BRANCH"
+  fi
+
+  git add .
+  if git diff --cached --quiet --exit-code; then
+    echo "ℹ️ No staged changes detected after auto-staging"
+  else
+    COMMIT_MSG="chore({{service}}): auto-commit for task {{task_id}}"
+    if ! git commit -m "$COMMIT_MSG" >/dev/null 2>&1; then
+      echo "⚠️ Failed to commit staged changes automatically"
+    else
+      echo "✅ Auto-committed staged changes"
+    fi
+  fi
+
+  if git rev-parse --verify --quiet "$CURRENT_BRANCH" >/dev/null 2>&1; then
+    refresh_token_if_needed || true
+    if ! git push -u origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
+      echo "⚠️ Failed to push branch $CURRENT_BRANCH; skipping auto PR creation"
+      return
+    fi
+  else
+    echo "⚠️ Unable to verify branch $CURRENT_BRANCH; skipping auto PR creation"
+    return
+  fi
+
+  git fetch origin "$CURRENT_BRANCH" >/dev/null 2>&1 || true
+  if [ -n "$REMOTE_BASE" ]; then
+    AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+  else
+    AHEAD_COUNT=1
+  fi
+  if [ "${AHEAD_COUNT:-0}" -eq 0 ]; then
+    echo "⚠️ Branch $CURRENT_BRANCH has no commits ahead of $BASE_BRANCH; skipping PR creation"
+    return
+  fi
+
+  # Use environment variable WORKFLOW_NAME if available, otherwise fall back to template
+  RUN_LABEL="run-${WORKFLOW_NAME:-{{workflow_name}}}"
+  if [ "${RUN_LABEL#run-}" = "" ] || [ "$RUN_LABEL" = "run-" ]; then
+    RUN_LABEL="run-unknown"
+  fi
+
+  TASK_LABEL="task-{{task_id}}"
+  SERVICE_LABEL="service-{{service}}"
+  REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+
+  echo "🔍 Ensuring PR correlation labels exist"
+  for label in "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"; do
+    if [ -z "$label" ]; then
+      continue
+    fi
+
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      echo "   ✓ Label '$label' already exists"
+      continue
+    fi
+
+    case "$label" in
+      task-*) COLOR="28a745"; DESC="Task correlation" ;;
+      service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+      run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
+      *) COLOR="ededed"; DESC="Automation label" ;;
+    esac
+
+    if gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
+      echo "   ✅ Created label '$label'"
+    else
+      echo "   ❌ Failed to create label '$label'"
+      cat /tmp/gh-label-create.log >&2 || true
+    fi
+    rm -f /tmp/gh-label-create.log
+  done
+
+  # VALIDATION: Check for problematic commits before creating PR
+  echo "🔍 Validating changes before PR creation..."
+  
+  # Check total diff size
+  TOTAL_ADDITIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$1} END {print sum+0}')
+  TOTAL_DELETIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$2} END {print sum+0}')
+  TOTAL_CHANGES=$((TOTAL_ADDITIONS + TOTAL_DELETIONS))
+  
+  echo "   📊 Total changes: +$TOTAL_ADDITIONS -$TOTAL_DELETIONS (total: $TOTAL_CHANGES lines)"
+  
+  # Warn if commit is suspiciously large
+  if [[ $TOTAL_CHANGES -gt 100000 ]]; then
+    echo "   ⚠️  WARNING: Very large commit detected ($TOTAL_CHANGES lines)!"
+    echo "   This may include unwanted files like node_modules or build artifacts"
+  fi
+  
+  # Check for commonly ignored files that shouldn't be committed
+  PROBLEMATIC_FILES=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | grep -E "(node_modules/|\.next/|dist/|build/|target/debug/|\.pyc$|__pycache__/)" || echo "")
+
+  if [[ -n "$PROBLEMATIC_FILES" ]]; then
+    echo "   ❌ ERROR: Detected files that should be gitignored!"
+    echo "$PROBLEMATIC_FILES" | head -10 | sed 's/^/      /'
+    if [[ $(echo "$PROBLEMATIC_FILES" | wc -l) -gt 10 ]]; then
+      echo "      ... and $(($(echo "$PROBLEMATIC_FILES" | wc -l) - 10)) more"
+    fi
+    echo ""
+    echo "   🛑 BLOCKING PR CREATION"
+    echo "   Please add a .gitignore file and remove these files from git"
+    echo "   Suggested .gitignore entries:"
+    echo "      node_modules/"
+    echo "      dist/"
+    echo "      build/"
+    echo "      target/debug/"
+    echo "      __pycache__/"
+    return 1
+  fi
+
+  # Check file count
+  FILE_COUNT=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | wc -l)
+  echo "   📁 Files changed: $FILE_COUNT"
+
+  if [[ $FILE_COUNT -gt 100 ]]; then
+    echo "   ⚠️  WARNING: Large number of files changed ($FILE_COUNT)"
+    echo "   Verify this is intentional and not due to dependency/build commits"
+  fi
+
+  echo "   ✅ Validation passed"
+
+  PR_TITLE="feat({{service}}): complete task {{task_id}}"
+  read -r -d '' PR_BODY <<'EOF' || true
+## Summary
+- Auto-generated fallback PR because the Cursor agent finished without opening one
+- Task {{task_id}} for service {{service}} is ready for review
+
+## Metadata
+- Agent: {{github_app}}
+- Workflow: {{workflow_name}}
+- Branch: \\`$CURRENT_BRANCH\\` → \\`$BASE_BRANCH\\`
+
+_This PR was created automatically by the Cursor container._
+EOF
+
+  LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
+
+  maybe_add_label() {
+    local label="$1"
+    if [ -z "$label" ]; then
+      return
+    fi
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      LABEL_ARGS+=("--label" "$label")
+    else
+      echo "⚠️ Label '$label' not found; skipping"
+    fi
+  }
+
+  maybe_add_label "$TASK_LABEL"
+  maybe_add_label "$SERVICE_LABEL"
+  maybe_add_label "$RUN_LABEL"
+
+  # Note: Critical guards (PR_NUMBER and WORKFLOW_STAGE checks) are now at the top of this function
+  # to prevent duplicate PRs before any PR creation setup occurs
+
+  if gh pr create "${LABEL_ARGS[@]}"; then
+    echo "✅ Auto-created pull request for $CURRENT_BRANCH"
+
+    # Add PR to GitHub Project (works for all CLIs: Claude, Codex, Cursor, Factory, OpenCode, Blaze, Rex)
+    echo "=== Linking PR to GitHub Project ==="
+
+    # Get PR number for this branch
+    PR_NUMBER=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+    if [ -n "$PR_NUMBER" ]; then
+      # Use organization project number 1 (Task Master / CTO Project)
+      # This works across all repos and agents
+      PROJECT_NUMBER="1"
+
+      echo "🔗 Adding PR #$PR_NUMBER to Project #$PROJECT_NUMBER..."
+
+      # Use gh project item-add command (simpler than GraphQL)
+      if gh project item-add "$PROJECT_NUMBER" --owner 5dlabs --url "https://github.com/$REPO_SLUG/pull/$PR_NUMBER" 2>&1 | grep -q "Added\|already"; then
+        echo "✅ PR linked to GitHub Project #$PROJECT_NUMBER"
+      else
+        echo "⚠️ Could not link PR to project (may already be linked or permissions issue)"
+      fi
+    else
+      echo "⚠️ Could not get PR number for project linking"
+    fi
+  else
+    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+  fi
+}
+
+git config --global --add safe.directory "$TASK_WORKSPACE"
+
+derive_bot_identity() {
+  local app_name="$1"
+
+  if [ -z "$app_name" ] || [ "$app_name" = "null" ]; then
+    GIT_AUTHOR_NAME="automation[bot]"
+    GIT_AUTHOR_EMAIL="automation[bot]@users.noreply.github.com"
+    return
+  fi
+
+  local slug
+  slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+  if [ -z "$slug" ]; then
+    slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]')
+  fi
+
+  local bot_login="${slug}[bot]"
+  local bot_email="${bot_login}@users.noreply.github.com"
+
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    local encoded_login
+    encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/%5B/g; s/\]/%5D/g')
+    local bot_response
+    bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
+    local bot_id
+    bot_id=$(printf '%s' "$bot_response" | jq -r '.id // empty' 2>/dev/null || echo '')
+    if [ -n "$bot_id" ]; then
+      bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
+    fi
+  fi
+
+  GIT_AUTHOR_NAME="$bot_login"
+  GIT_AUTHOR_EMAIL="$bot_email"
+}
+
+GITHUB_APP="{{github_app}}"
+derive_bot_identity "$GITHUB_APP"
+
+# Extract agent name for display (e.g., "5DLabs-Rex" → "Rex", "5DLabs-Cipher" → "Cipher")
+AGENT_NAME=$(echo "$GITHUB_APP" | sed -E 's/.*-([^-]+)$/\1/')
+
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_NAME
+export GIT_AUTHOR_EMAIL
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# =========================================================================
+# Repository checkout
+# =========================================================================
+
+WORK_DIR="{{working_directory}}"
+cd "$TASK_WORKSPACE"
+
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
+git config --global --add safe.directory "$REPO_ROOT"
+
+if [ -d "$REPO_NAME/.git" ]; then
+  echo "🔁 Repository already cloned, fetching latest"
+  cd "$REPO_NAME"
+  refresh_token_if_needed
+  git fetch --all --prune
+else
+  echo "⬇️  Cloning repository"
+  refresh_token_if_needed
+  git clone "$REPO_HTTP_URL"
+  cd "$REPO_NAME"
+fi
+
+cd "$REPO_ROOT"
+sync_gh_hosts_to_path "$REPO_ROOT"
+
+echo "=== BRANCH SETUP ==="
+# Remove stale automation-managed files that block branch checkout when rerunning
+MANAGED_PATHS=(
+  ".mcp.json"
+  "AGENTS.md"
+  "tools-config.json"
+  "coding-guidelines.md"
+  "github-guidelines.md"
+  "task"
+)
+
+for managed_path in "${MANAGED_PATHS[@]}"; do
+  if git ls-files --error-unmatch -- "$managed_path" >/dev/null 2>&1; then
+    status_output=$(git status --short -- "$managed_path" 2>/dev/null || true)
+    untracked=false
+    while IFS= read -r line; do
+      case "$line" in
+        "?? "*)
+          untracked=true
+          break
+          ;;
+      esac
+    done <<EOF
+$status_output
+EOF
+
+    if [ "$untracked" = true ]; then
+      echo "🧹 Removing stale untracked files to allow checkout: $managed_path"
+      git clean -fd -- "$managed_path" >/dev/null 2>&1 || rm -rf "$managed_path"
+    fi
+    continue
+  fi
+
+  if [ -e "$managed_path" ]; then
+    echo "🧹 Removing stale file to allow checkout: $managed_path"
+    rm -rf "$managed_path"
+  fi
+done
+
+BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+REMOTE_BASE="origin/$BASE_BRANCH"
+
+if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+  # Fall back to origin/master or the remote HEAD if main is absent
+  if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+    BASE_BRANCH="master"
+    REMOTE_BASE="origin/$BASE_BRANCH"
+  else
+    DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if [ -n "$DEFAULT_REMOTE" ]; then
+      BASE_BRANCH="$DEFAULT_REMOTE"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      REMOTE_BASE=""
+    fi
+  fi
+fi
+
+if [ -n "$BASE_BRANCH" ]; then
+  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+fi
+
+# === BRANCH DERIVATION FROM PR_NUMBER ===
+# If PR_NUMBER is provided, derive the branch from the PR to ensure consistency
+FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+DERIVED_FROM_PR=false
+if [ -n "${PR_NUMBER:-}" ] && command -v gh >/dev/null 2>&1; then
+  echo "🔍 Deriving branch from PR #${PR_NUMBER}..."
+  DERIVED_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+  if [ -n "$DERIVED_BRANCH" ]; then
+    FEATURE_BRANCH="$DERIVED_BRANCH"
+    DERIVED_FROM_PR=true
+    echo "✅ Using PR branch: $FEATURE_BRANCH (from PR #${PR_NUMBER})"
+    # Fetch the branch from remote to ensure it exists locally
+    echo "📥 Fetching branch $FEATURE_BRANCH from remote..."
+    git fetch origin "$FEATURE_BRANCH:$FEATURE_BRANCH" 2>/dev/null || git fetch origin "$FEATURE_BRANCH" 2>/dev/null || true
+  else
+    echo "⚠️ Could not derive branch from PR #${PR_NUMBER}; using default"
+  fi
+fi
+if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
+  echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  # Stash any local changes from previous runs to avoid checkout conflicts
+  # Exclude task/ directory to preserve task files that were just copied
+  if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo "🔄 Stashing local changes and untracked files (excluding task/) before checkout"
+    git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
+  fi
+  git checkout "$FEATURE_BRANCH"
+
+  # Check if upstream branch is gone (deleted after previous PR was closed)
+  UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+  if [ -n "$UPSTREAM_BRANCH" ]; then
+    if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
+      echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
+      echo "🔍 Checking for closed PRs from previous runs..."
+
+      # Check if there's a CLOSED PR for this branch
+      refresh_token_if_needed || true
+      CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+
+      if [ -n "$CLOSED_PR" ]; then
+        echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
+        echo "🔄 Deleting stale branch and recreating fresh from $REMOTE_BASE"
+
+        # Switch off the branch before deleting it
+        git checkout "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-cleanup-branch "$REMOTE_BASE"
+        git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+
+        # Recreate fresh branch
+        git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+        echo "✅ Created fresh branch $FEATURE_BRANCH from $REMOTE_BASE"
+        echo "ℹ️ Previous PR was closed - starting with clean slate"
+      else
+        echo "ℹ️ No closed PRs found - will unset upstream and continue"
+        git branch --unset-upstream 2>/dev/null || true
+      fi
+    fi
+  fi
+
+  if [ -n "$REMOTE_BASE" ]; then
+    echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
+    if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
+      # Skip timestamped fallback if PR_NUMBER is provided - stay on the PR branch
+      if [ -n "${PR_NUMBER:-}" ]; then
+        echo "⚠️ Unable to fast-forward $FEATURE_BRANCH but PR_NUMBER is set; staying on PR branch"
+        echo "ℹ️ Manual conflict resolution may be needed"
+      else
+        # Check if PR exists for this branch before creating timestamped fallback
+        echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; checking for existing PR"
+        refresh_token_if_needed || true
+        EXISTING_PR=$(gh pr list --state open --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+
+        if [ -n "$EXISTING_PR" ]; then
+          echo "✅ Found existing PR #$EXISTING_PR for branch $FEATURE_BRANCH"
+          echo "ℹ️ Continuing with this branch despite merge conflict (will be resolved in PR)"
+          # Stay on the current branch and let the PR handle conflicts
+        else
+          echo "ℹ️ No existing PR found; recreating branch from $REMOTE_BASE"
+          # Delete local branch and recreate fresh from base
+          # Force discard all local changes since we're recreating from scratch
+          git reset --hard HEAD 2>/dev/null || true
+          git clean -fd 2>/dev/null || true
+          git checkout -f "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-branch "$REMOTE_BASE"
+          git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+          git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+          echo "✅ Recreated $FEATURE_BRANCH from $REMOTE_BASE"
+        fi
+      fi
+    fi
+  fi
+else
+  echo "Creating new feature branch '$FEATURE_BRANCH'"
+
+  # Check for and abort any in-progress merge conflicts before checkout
+  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^DD\|^AU\|^UA\|^DU\|^UD"; then
+    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
+    git merge --abort 2>/dev/null || true
+    echo "✓ Merge conflicts aborted"
+  fi
+
+  # Check for and reset any incomplete merge (rebase, cherry-pick, etc.)
+  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
+    echo "⚠️ Detecting incomplete git operation, resetting..."
+    git rebase --abort 2>/dev/null || true
+    git cherry-pick --abort 2>/dev/null || true
+    git merge --abort 2>/dev/null || true
+    if ! git diff-index --quiet HEAD; then
+      git reset --hard HEAD 2>/dev/null || true
+    fi
+    echo "✓ Git operations reset"
+  fi
+
+  # Stash any local changes from previous runs to avoid checkout conflicts
+  # Exclude task/ directory to preserve task files that were just copied
+  if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo "🔄 Stashing local changes and untracked files (excluding task/) before creating new branch"
+    git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
+  fi
+
+  if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+  else
+    git checkout -b "$FEATURE_BRANCH"
+  fi
+fi
+
+git config --local user.name "$GIT_AUTHOR_NAME"
+git config --local user.email "$GIT_AUTHOR_EMAIL"
+git config --local push.autoSetupRemote true
+export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
+echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
+
+# Set working directory: use repo root if working_directory is "." or empty
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  CURSOR_WORK_DIR="$REPO_ROOT"
+else
+  CURSOR_WORK_DIR="$REPO_ROOT/$WORK_DIR"
+  mkdir -p "$CURSOR_WORK_DIR"
+fi
+
+cd "$CURSOR_WORK_DIR"
+sync_gh_hosts_to_path "$CURSOR_WORK_DIR"
+echo "✓ Working directory: $CURSOR_WORK_DIR"
+
+echo "📦 git status"
+refresh_token_if_needed
+git status --short || true
+
+# Load resilient task setup functions (mounted from shared ConfigMap)
+source /agent-templates/shared_task-setup-functions.sh || {
+    echo "⚠️ Warning: Resilient task functions not available, using basic operations"
+    # Define minimal fallback functions
+    safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
+    safe_copy_directory() { cp -r "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
+    safe_ensure_directory() { mkdir -p "$1"; }
+    verify_task_files() {
+        if [ -f "$1/prompt.md" ]; then
+            echo "✅ Task files verified"
+            return 0
+        else
+            echo "❌ Task files missing"
+            return 1
+        fi
+    }
+    create_error_report() { echo "❌ ERROR: $3"; }
+    attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
+}
+
+# Optional helper for billing/quota failure detection
+if [ -f /agent-templates/helpers_detect-billing-failure.sh ]; then
+  # shellcheck disable=SC1091
+  source /agent-templates/helpers_detect-billing-failure.sh
+else
+  echo "⚠️ Billing failure helper not found; skipping quota detection"
+fi
+
+# =========================================================================
+# Materialise task context (RESILIENT MODE)
+# =========================================================================
+
+echo "🧱 Syncing task assets (RESILIENT MODE)"
+# Use safe directory creation to avoid overwriting files
+if ! safe_ensure_directory "$CURSOR_WORK_DIR/task" "Cursor task directory"; then
+    echo "❌ CRITICAL: Cannot create Cursor task directory"
+    exit 1
+fi
+if ! safe_ensure_directory "$CURSOR_WORK_DIR/.cursor" "Cursor config directory"; then
+    echo "❌ CRITICAL: Cannot create Cursor config directory"
+    exit 1
+fi
+safe_ensure_directory "$HOME/.cursor" "Home Cursor config directory"
+# Safely copy task files from ConfigMap
+if [ -d "/task-files/task" ]; then
+    echo "📂 Copying task files from ConfigMap..."
+    if ! safe_copy_directory "/task-files/task" "$CURSOR_WORK_DIR/task" "ConfigMap task files"; then
+        echo "⚠️ Warning: Could not copy all task files from ConfigMap"
+    fi
+else
+    echo "ℹ️ No task files in ConfigMap - will rely on docs repository"
+fi
+
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{docs_branch}}"
+DOCS_PROJECT_DIRECTORY="{{docs_project_directory}}"
+
+if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
+  refresh_token_if_needed
+  if [ -z "$DOCS_BRANCH" ] || [ "$DOCS_BRANCH" = "null" ]; then
+    DOCS_BRANCH="main"
+  fi
+
+  echo "📚 Syncing docs repository: $DOCS_REPO_URL (branch: $DOCS_BRANCH)"
+  DOCS_CLONE_DIR="/tmp/docs-repo"
+  rm -rf "$DOCS_CLONE_DIR"
+
+  read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
+  DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
+
+  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
+    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    fi
+
+    echo "🔍 Docs base path: $DOCS_BASE_PATH"
+
+    # Resilient task directory discovery - check regular, tasks/, and .completed locations
+    # Check both regular location and .completed location (tasks moved after completion)
+    TASK_DIR=""
+    if [ -d "$DOCS_BASE_PATH/docs/task-{{task_id}}" ]; then
+      TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+      echo "✓ Found task files in docs/ directory"
+    elif [ -d "$DOCS_BASE_PATH/docs/.completed/task-{{task_id}}" ]; then
+      TASK_DIR="$DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
+      echo "✓ Found task files in docs/.completed/ directory"
+      echo "ℹ️ Task appears to be completed - using files from .completed folder"
+    elif [ -d "$DOCS_BASE_PATH/tasks/task-{{task_id}}" ]; then
+      TASK_DIR="$DOCS_BASE_PATH/tasks/task-{{task_id}}"
+      echo "✓ Found task files in tasks/ directory"
+    fi
+
+    if [ -n "$TASK_DIR" ] && [ -d "$TASK_DIR" ]; then
+      echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
+      refresh_token_if_needed
+      if safe_copy_directory "$TASK_DIR" "$CURSOR_WORK_DIR/task" "docs task files"; then
+          echo "✅ Task files copied successfully from docs repository"
+      else
+          echo "❌ CRITICAL: Failed to copy task files from docs repository"
+          create_error_report "$CURSOR_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
+      fi
+    else
+      echo "❌ CRITICAL: Task directory not found. Checked:"
+      echo "   - $DOCS_BASE_PATH/docs/task-{{task_id}}"
+      echo "   - $DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
+      echo "   - $DOCS_BASE_PATH/tasks/task-{{task_id}}"
+      create_error_report "$CURSOR_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
+    fi
+
+    if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
+      refresh_token_if_needed
+      safe_copy_file "$DOCS_BASE_PATH/tasks.json" "$CURSOR_WORK_DIR/task/tasks.json" "tasks.json"
+    fi
+  fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
+fi
+
+if [ -f /task-files/AGENTS.md ]; then
+  cp -f /task-files/AGENTS.md "$CURSOR_WORK_DIR/AGENTS.md"
+fi
+
+if [ -f /task-files/coding-guidelines.md ]; then
+  cp -f /task-files/coding-guidelines.md "$CURSOR_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/github-guidelines.md ]; then
+  cp -f /task-files/github-guidelines.md "$CURSOR_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$CURSOR_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$CURSOR_WORK_DIR/tools-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate tools-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
+if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
+  echo "📋 tools-config.json not generated, using ConfigMap fallback..."
+  if [ -f /task-files/tools-config.json ]; then
+    cp -f /task-files/tools-config.json "$CURSOR_WORK_DIR/"
+    echo "✓ Copied tools-config.json to working directory"
+  fi
+else
+  echo "✓ Using dynamically generated tools-config.json from cto-config.json"
+fi
+
+if [ -f /task-files/mcp.json ]; then
+  cp -f /task-files/mcp.json "$CURSOR_WORK_DIR/.mcp.json"
+fi
+
+if [ -f /task-files/cursor-cli.json ]; then
+  mkdir -p "$CURSOR_WORK_DIR/.cursor"
+  cp -f /task-files/cursor-cli.json "$CURSOR_WORK_DIR/.cursor/cli.json"
+  echo "✓ Installed project-level cursor CLI permissions"
+else
+  echo "⚠️ cursor-cli.json not provided; using default project permissions"
+fi
+
+if [ -f /task-files/cursor-cli-config.json ]; then
+  mkdir -p "$HOME/.cursor"
+  cp -f /task-files/cursor-cli-config.json "$HOME/.cursor/cli-config.json"
+  echo "✓ Installed global cursor CLI config"
+else
+  echo "⚠️ cursor-cli-config.json not provided; using existing global Cursor config"
+fi
+
+if [ -f /task-files/cursor-mcp.json ]; then
+  mkdir -p "$HOME/.cursor"
+  mkdir -p "$CURSOR_WORK_DIR/.cursor"
+  cp -f /task-files/cursor-mcp.json "$HOME/.cursor/mcp.json"
+  cp -f /task-files/cursor-mcp.json "$CURSOR_WORK_DIR/.cursor/mcp.json"
+  echo "✓ Installed Cursor MCP configuration"
+else
+  echo "⚠️ cursor-mcp.json not provided; MCP servers may not be available"
+fi
+
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+  ensure_default_client_config "$CURSOR_WORK_DIR/tools-config.json" "$REPO_ROOT/tools-config.json" "/workspace/$REPO_NAME/tools-config.json"
+fi
+
+# Check if tools-config.json exists in working directory
+if [ ! -f "$CURSOR_WORK_DIR/tools-config.json" ]; then
+  echo "❌ tools-config.json missing from workspace; required for MCP/tools"
+  exit 1
+fi
+
+echo "=== MCP PRECHECKS ==="
+if ! command -v tools >/dev/null 2>&1; then
+  echo "❌ 'tools' CLI not found in PATH; required for MCP"
+  exit 1
+fi
+
+WORKSPACE_CFG="$MCP_TOOLS_CONFIG"
+SOURCE_CFG="/task-files/tools-config.json"
+TARGET_CFG="${MCP_TOOLS_CONFIG:-$TASK_WORKSPACE/tools-config.json}"
+
+is_valid_cfg() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e 'type=="object" and length>=0' "$path" >/dev/null 2>&1
+  else
+    [ -s "$path" ]
+  fi
+}
+
+if is_valid_cfg "$WORKSPACE_CFG"; then
+  # Only copy if source and destination are different files
+  if [ "$WORKSPACE_CFG" != "$TARGET_CFG" ]; then
+    cp -f "$WORKSPACE_CFG" "$TARGET_CFG"
+  fi
+  echo "✓ Using MCP client config from workspace: $TARGET_CFG"
+elif is_valid_cfg "$SOURCE_CFG"; then
+  # Only copy if source and destination are different files
+  if [ "$SOURCE_CFG" != "$WORKSPACE_CFG" ]; then
+    cp -f "$SOURCE_CFG" "$WORKSPACE_CFG"
+  fi
+  if [ "$SOURCE_CFG" != "$TARGET_CFG" ]; then
+    cp -f "$SOURCE_CFG" "$TARGET_CFG"
+  fi
+  echo "✓ Restored MCP client config from source: $TARGET_CFG"
+else
+  echo "❌ No valid tools-config.json available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace contents preview:"; head -c 200 "$WORKSPACE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source contents preview:"; head -c 200 "$SOURCE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  exit 1
+fi
+
+MCP_TOOLS_CONFIG="$TARGET_CFG"
+export MCP_TOOLS_CONFIG
+
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
+echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+TOOLS_RETRIES=3
+TOOLS_WAIT=2
+TOOLS_SUCCESS=false
+for i in $(seq 1 $TOOLS_RETRIES); do
+  if curl -sSf --connect-timeout 5 --max-time 10 \
+    -X POST "$TOOLS_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+    TOOLS_SUCCESS=true
+    rm -f /tmp/tools-ping.log
+    break
+  fi
+  if [ $i -lt $TOOLS_RETRIES ]; then
+    echo "⚠️ Tools connectivity check failed (attempt $i/$TOOLS_RETRIES), retrying in ${TOOLS_WAIT}s..."
+    cat /tmp/tools-ping.log >&2 || true
+    rm -f /tmp/tools-ping.log
+    sleep $TOOLS_WAIT
+    TOOLS_WAIT=$((TOOLS_WAIT * 2))  # Exponential backoff
+  fi
+done
+
+if [ "$TOOLS_SUCCESS" != "true" ]; then
+  echo "❌ Unable to reach Tools server at $TOOLS_URL after $TOOLS_RETRIES attempts"
+  cat /tmp/tools-ping.log >&2 || true
+  rm -f /tmp/tools-ping.log
+  echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
+  echo "⚠️ If Cursor execution fails, check Tools service health and DNS resolution."
+  # Don't exit - allow Cursor to proceed in case Tools comes back online
+  # The MCP client will handle connection failures gracefully
+fi
+echo "✓ Tools endpoint check completed"
+
+if command -v jq >/dev/null 2>&1; then
+  echo "[client-config] summary:"
+  if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$MCP_TOOLS_CONFIG" 2>/dev/null; then
+    echo "  (not valid JSON)"
+  fi
+else
+  echo "⚠️ jq not available; skipping client-config summary"
+fi
+
+guard_rm() {
+  if [ "$#" -ge 2 ]; then
+    local flags=()
+    local targets=()
+    for arg in "$@"; do
+      case "$arg" in
+        -*) flags+=("$arg") ;;
+        *) targets+=("$arg") ;;
+      esac
+    done
+
+    if printf '%s\n' "${flags[@]}" | grep -Eq -- '--|^-r.*-f|-f.*-r'; then
+      local has_recursive=0
+      local has_force=0
+      for flag in "${flags[@]}"; do
+        case "$flag" in
+          -*)
+            [[ "$flag" == *r* || "$flag" == *R* ]] && has_recursive=1
+            [[ "$flag" == *f* || "$flag" == *F* ]] && has_force=1
+            ;;
+        esac
+      done
+
+      if ((has_recursive && has_force)); then
+        for target in "${targets[@]}"; do
+          [ -z "$target" ] && continue
+          local expanded="$target"
+          case "$target" in
+            ~*) expanded="${target/#\~/$HOME}" ;;
+          esac
+          local resolved
+          resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
+          if [ "$resolved" = "$CURSOR_WORK_DIR" ] || [ "$resolved" = "$TASK_WORKSPACE" ] ||            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
+            echo "❌ Guard: destructive rm blocked (target=$target)" >&2
+            return 1
+          fi
+        done
+      fi
+    fi
+  fi
+
+  return 0
+}
+
+rm() {
+  if guard_rm "$@"; then
+    command rm "$@"
+  else
+    return 1
+  fi
+}
+
+export -f guard_rm rm
+
+if [ -z "${CURSOR_API_KEY:-}" ]; then
+  echo "❌ CURSOR_API_KEY is not set; Cursor cannot authenticate"
+  exit 1
+fi
+
+echo "🔑 Using provided CURSOR_API_KEY for authentication"
+
+if [ ! -f "$CURSOR_WORK_DIR/AGENTS.md" ]; then
+  echo "⚠️ AGENTS.md missing; creating placeholder"
+  cat <<'PLACEHOLDER' > "$CURSOR_WORK_DIR/AGENTS.md"
+# Project Guidance
+
+This Cursor run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give Cursor richer instructions.
+PLACEHOLDER
+fi
+
+# =========================================================================
+# Prompt assembly and Cursor execution
+# =========================================================================
+
+PROMPT_PREFIX=""
+if declare -F ensure_default_tools_guide >/dev/null 2>&1; then
+  ensure_default_tools_guide "$CURSOR_WORK_DIR/task" "{{task_id}}" "{{service}}"
+fi
+
+if [ -f "$CURSOR_WORK_DIR/task/tools-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CURSOR_WORK_DIR/task/tools-guide.md")\n\n---\n\n"
+fi
+
+PR_STAGE="${WORKFLOW_STAGE:-implementation}"
+if [ "$PR_STAGE" = "implementation" ]; then
+  PR_DIRECTIVE="- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}."
+else
+  PR_DIRECTIVE="- **Documentation & PR**: update project docs and push commits to the existing PR branch. Implementation agents already created the PR, so never run \`gh pr create\`; focus on reviews and fixes."
+fi
+
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates** (ALL must pass before declaring success):\n  1. Format check: \`qlty fmt --verify\` OR \`cargo fmt --all -- --check\`\n  2. Linting: \`qlty check --all\` AND \`cargo clippy --workspace --all-targets --all-features -- -D warnings\`\n  3. Security scanning: \`gitleaks detect --no-git\`, \`trivy fs . --severity HIGH,CRITICAL\`, \`cargo deny check\`\n  4. Dockerfile linting (if applicable): \`hadolint Dockerfile\`\n  5. Testing: \`cargo nextest run --workspace --all-features\` OR \`cargo test --workspace --all-features\`\n- **Auto-fix before commit**: run \`qlty fmt\` and \`qlty check --fix\` to automatically resolve formatting and linting issues.\n- **Security first**: NEVER commit code with secrets or HIGH/CRITICAL vulnerabilities.\n${PR_DIRECTIVE}\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
+
+if [ -f "$CURSOR_WORK_DIR/github-guidelines.md" ] || [ -f "$CURSOR_WORK_DIR/coding-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
+  if [ -f "$CURSOR_WORK_DIR/github-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md\n"
+  fi
+  if [ -f "$CURSOR_WORK_DIR/coding-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md\n"
+  fi
+  PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
+fi
+
+if [ -f "$CURSOR_WORK_DIR/AGENTS.md" ]; then
+  if AGENT_GUIDANCE=$(jq -Rs @json "$CURSOR_WORK_DIR/AGENTS.md" 2>/dev/null); then
+    if [ "${#AGENT_GUIDANCE}" -gt 2 ]; then
+      AGENT_GUIDANCE=${AGENT_GUIDANCE:1:-1}
+      PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${AGENT_GUIDANCE}\n\n---\n\n"
+    fi
+  fi
+fi
+
+# Resilient verification of task files
+echo "🔍 RESILIENT VERIFICATION: Checking task files at: $CURSOR_WORK_DIR/task/"
+if verify_task_files "$CURSOR_WORK_DIR/task" "{{task_id}}"; then
+    echo "✅ Task files verification: PASSED"
+else
+    echo "❌ CRITICAL: Task files verification: FAILED"
+    create_error_report "$CURSOR_WORK_DIR/task" "{{task_id}}" "Task files missing before agent execution"
+
+    # Attempt recovery
+    if attempt_task_recovery "/tmp/docs-repo" "$CURSOR_WORK_DIR/task" "{{task_id}}"; then
+        echo "✅ Recovery successful - continuing with execution"
+    else
+        echo "❌ Recovery failed - cannot proceed without prompt.md"
+        exit 1
+    fi
+fi
+
+PROMPT_FILE="$CURSOR_WORK_DIR/task/prompt.md"
+echo "📄 Using prompt file: $PROMPT_FILE"
+
+echo "startingTask:{{task_id}}"
+echo ""
+
+PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+
+echo "🧾 Resolved prompt content (truncated to 2000 chars for log safety):"
+PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
+printf '%s\n' "$PROMPT_PREVIEW"
+PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
+echo "📏 Prompt size: $PROMPT_BYTES bytes"
+
+MAX_RETRIES=${CURSOR_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
+ATTEMPT=1
+SUCCESS=0
+CURSOR_EXIT=1
+COMMITS_MADE=0
+LAST_MESSAGE_FILE=""
+RUN_LOG=""
+LAST_COMPLETION_REASON=""
+
+# Track provider billing failures
+BILLING_FAILURE_DETECTED=0
+BILLING_FAILURE_REASON=""
+
+# Circuit breaker: track repeated command failures
+declare -A FAILED_COMMANDS
+MAX_SAME_COMMAND_FAILURES=3
+
+FORCE_WRITES="{{#if force_writes}}true{{else}}false{{/if}}"
+OUTPUT_FORMAT="{{#if output_format}}{{output_format}}{{else}}stream-json{{/if}}"
+
+FORCE_FLAG=""
+if [ "${FORCE_WRITES,,}" = "true" ]; then
+  FORCE_FLAG="--force"
+fi
+
+print_attempt_banner() {
+  local attempt="$1"
+  local max="$2"
+  local unlimited="$3"
+  local border="════════════════════════════════════════════════════════════════"
+  local label
+
+  if [ "$unlimited" = "1" ]; then
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt} (UNLIMITED MODE)"
+  elif [ -n "$max" ] && [ "$max" -gt 0 ]; then
+    label="║ 🚀 EXECUTION ATTEMPT ${attempt} / ${max}"
+  else
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
+  fi
+
+  local base_padding=$(( ${#border} - ${#label} - 1 ))
+  local extra_width=0
+
+  if [[ "$label" == *"🚀"* ]]; then
+    extra_width=$((extra_width + 1))
+  fi
+
+  local padding=$((base_padding - extra_width))
+  if [ $padding -lt 0 ]; then
+    padding=0
+  fi
+
+  echo ""
+  echo "$border"
+  printf '%s%*s║\n' "$label" "$padding" ""
+  echo "$border"
+  echo ""
+}
+
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
+# =========================================================================
+# QA Mode Safeguard: Prevent PR creation when in testing mode
+# =========================================================================
+if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
+  echo "🛡️  Installing PR creation safeguard for ${WORKFLOW_STAGE:-unknown} stage"
+
+  block_pr_create_stage="${WORKFLOW_STAGE:-unknown}"
+  case "$block_pr_create_stage" in
+    "quality"|"quality-in-progress")
+      block_reason="Cleo reviews existing PRs. You're working on PR #${PR_NUMBER:-unknown}, so never create a new one."
+      ;;
+    "security"|"security-in-progress")
+      block_reason="Cipher performs security scans on the implementation PR. Creating a new PR would bypass Rex/Blaze ownership."
+      ;;
+    "testing"|"testing-in-progress")
+      block_reason="Tess is in QA review mode and must validate PR #${PR_NUMBER:-unknown}; PR creation is forbidden."
+      ;;
+    *)
+      block_reason="Non-implementation stages must only review the branch created by Rex/Blaze. Do not open new PRs."
+      ;;
+  esac
+
+  gh() {
+    if [[ "$1" == "pr" && "$2" == "create" ]]; then
+      echo "❌ ERROR: 'gh pr create' is blocked for ${block_pr_create_stage:-non-implementation} stage."
+      echo "❌ ${block_reason}"
+      echo "❌ Use review commands such as 'gh pr checkout ${PR_NUMBER:-...}' or 'gh pr review ${PR_NUMBER:-...}' instead."
+      return 1
+    fi
+    command gh "$@"
+  }
+  export -f gh
+
+  echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
+fi
+
+# Clean up any leftover completion markers from previous runs (agent-specific)
+# This prevents issues with sequential task executions on the same PVC
+if [[ "{{github_app}}" =~ [Rr]ex ]] && [ -f /workspace/.rex-complete ]; then
+    echo "🧹 Rex cleaning up completion marker from previous run"
+    rm -f /workspace/.rex-complete
+elif [[ "{{github_app}}" =~ [Cc]leo ]] && [ -f /workspace/.cleo-complete ]; then
+    echo "🧹 Cleo cleaning up completion marker from previous run"
+    rm -f /workspace/.cleo-complete
+elif [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cipher cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+elif [[ "{{github_app}}" =~ [Tt]ess ]] && [ -f /workspace/.tess-complete ]; then
+    echo "🧹 Tess cleaning up completion marker from previous run"
+    rm -f /workspace/.tess-complete
+fi
+
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "🔍 Verifying Cursor MCP tools..."
+
+TOOL_VERIFICATION_FAILED=false
+
+if command -v cursor-agent >/dev/null 2>&1; then
+  # Check MCP servers first
+  echo "📋 Checking MCP servers..."
+  MCP_LIST=$(cursor-agent mcp list 2>&1 || echo "FAILED")
+  
+  # Count how many servers are configured (even if not approved)
+  SERVER_COUNT=$(echo "$MCP_LIST" | grep -c "MCP server" || echo "0")
+  
+  if [ "$SERVER_COUNT" -gt 0 ]; then
+    echo "  ✓ Found $SERVER_COUNT MCP server(s) configured"
+  else
+    echo "  ⚠️ No MCP servers configured"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Check for tools server (required for remote tools)
+  echo ""
+  echo "🔍 Verifying Tools MCP server..."
+  if echo "$MCP_LIST" | grep -qi "tools"; then
+    echo "  ✓ tools server configured"
+  else
+    echo "  ❌ tools server NOT configured"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # List available tools through Cursor CLI
+  echo ""
+  echo "📦 Listing tools available through Cursor CLI..."
+  
+  # Try different methods to list tools
+  # Method 1: cursor-agent tool list
+  CURSOR_TOOLS=$(cursor-agent tool list 2>&1 || echo "")
+  
+  if [ -z "$CURSOR_TOOLS" ] || echo "$CURSOR_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 2: cursor-agent mcp list-tools
+    CURSOR_TOOLS=$(cursor-agent mcp list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -z "$CURSOR_TOOLS" ] || echo "$CURSOR_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    # Method 3: cursor-agent --list-tools
+    CURSOR_TOOLS=$(cursor-agent --list-tools 2>&1 || echo "")
+  fi
+  
+  if [ -n "$CURSOR_TOOLS" ] && ! echo "$CURSOR_TOOLS" | grep -q "Error\|Unknown\|Invalid"; then
+    echo "  ✓ Retrieved tool list from Cursor CLI:"
+    TOOL_COUNT=$(echo "$CURSOR_TOOLS" | grep -v "^$" | wc -l | tr -d ' ')
+    echo "  📊 Total: $TOOL_COUNT tools available"
+    echo "$CURSOR_TOOLS" | sed 's/^/    - /'
+  else
+    echo "  ℹ️ Cursor CLI may not support direct tool listing"
+    echo "  ℹ️ Tools will be discovered at runtime"
+  fi
+  
+  echo ""
+else
+  echo "  ⚠️ cursor-agent CLI not available for tool verification"
+  TOOL_VERIFICATION_FAILED=true
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "Critical MCP servers are not available. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - Tools server not reachable"
+  echo "  - MCP servers not initialized properly"
+  echo "  - .cursor/mcp.json misconfigured"
+  echo ""
+  echo "Full MCP server list:"
+  cursor-agent mcp list 2>&1 || echo "Failed to list MCP servers"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical MCP tools verified successfully"
+echo ""
+# =========================================================================
+
+COMPLETED_ATTEMPTS=0
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
+  
+  # Reset completion status for each iteration
+  COMPLETION_RESPONSE=""
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+  fi
+
+  # Special handling for different workflow stages - check for completion marker files
+  if [ "$WORKFLOW_STAGE" = "implementation" ] || [ "$WORKFLOW_STAGE" = "implementation-in-progress" ]; then
+    if [ -f "/workspace/.rex-complete" ]; then
+      echo "✅ Implementation completion marker found - Rex has declared work complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$ATTEMPT
+      break
+    fi
+  elif [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
+    if [ -f "/workspace/.cleo-complete" ]; then
+      echo "✅ Quality completion marker found - Cleo has declared review complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$ATTEMPT
+      break
+    fi
+  elif [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+    if [ -f "/workspace/.cipher-complete" ]; then
+      echo "✅ Security completion marker found - Cipher has declared work complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$ATTEMPT
+      break
+    fi
+  elif [ "$WORKFLOW_STAGE" = "testing" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+    if [ -f "/workspace/.tess-complete" ]; then
+      echo "✅ Testing completion marker found - Tess has declared QA complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$ATTEMPT
+      break
+    fi
+  fi
+  
+  # Refresh GitHub token at the start of each iteration to keep gh interactions authenticated
+  refresh_github_token || true
+
+  CURRENT_ATTEMPT=$ATTEMPT
+  LAST_MESSAGE_FILE="/tmp/cursor-last-message-${ATTEMPT}.txt"
+  RUN_LOG="/tmp/cursor-run-${ATTEMPT}.jsonl"
+
+  # =========================================================================
+  # INCREMENTAL CONTEXT: Load previous iteration findings
+  # =========================================================================
+  AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
+  mkdir -p "$AGENT_STATE_DIR"
+
+  PREVIOUS_CONTEXT=""
+  if [ $ATTEMPT -gt 1 ]; then
+    PREV_ATTEMPT=$((ATTEMPT - 1))
+    PREV_STATE_FILE="$AGENT_STATE_DIR/${WORKFLOW_STAGE:-agent}-iteration-${PREV_ATTEMPT}.json"
+
+    if [ -f "$PREV_STATE_FILE" ]; then
+      echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
+
+      # Extract key findings from previous run
+      if command -v jq >/dev/null 2>&1; then
+        PREV_FINDINGS=$(jq -r '.findings // "No findings recorded"' "$PREV_STATE_FILE" 2>/dev/null || echo "")
+        PREV_STATUS=$(jq -r '.status // "unknown"' "$PREV_STATE_FILE" 2>/dev/null || echo "unknown")
+        PREV_ISSUES=$(jq -r '.issues // []' "$PREV_STATE_FILE" 2>/dev/null || echo "[]")
+
+        if [ -n "$PREV_FINDINGS" ] && [ "$PREV_FINDINGS" != "No findings recorded" ]; then
+          PREVIOUS_CONTEXT="
+
+## 🔄 Context from Previous Iteration (#$PREV_ATTEMPT)
+
+**Status**: $PREV_STATUS
+
+**Previous Findings**:
+$PREV_FINDINGS
+
+**Focus for This Iteration**:
+- Address the issues identified above
+- Don't repeat the same analysis
+- Build on previous progress incrementally
+
+"
+          echo "✅ Loaded context: $PREV_STATUS with findings"
+        fi
+      fi
+    else
+      echo "ℹ️ No previous iteration state found (first attempt or state cleared)"
+    fi
+  fi
+
+  # Append previous context to prompt if available
+  if [ -n "$PREVIOUS_CONTEXT" ]; then
+    PROMPT_CONTENT="${PROMPT_CONTENT}${PREVIOUS_CONTEXT}"
+    echo "📝 Enhanced prompt with previous iteration context"
+  fi
+
+  CURSOR_CMD=("cursor-agent" "--print" "--output-format" "$OUTPUT_FORMAT")
+  if [ -n "$CURRENT_MODEL" ]; then
+    CURSOR_CMD+=("--model" "$CURRENT_MODEL")
+  fi
+  if [ -n "$FORCE_FLAG" ]; then
+    CURSOR_CMD+=("$FORCE_FLAG")
+  fi
+  CURSOR_CMD+=("$PROMPT_CONTENT")
+
+  echo "🔧 cursor-agent invocation arguments (${#CURSOR_CMD[@]} entries):"
+  for idx in "${!CURSOR_CMD[@]}"; do
+    printf '    [%d] %s\n' "$idx" "${CURSOR_CMD[$idx]}"
+  done
+
+  set +e
+  set -o pipefail
+  "${CURSOR_CMD[@]}" | tee "$RUN_LOG"
+  CURSOR_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  echo "[cursor-debug] Attempt $ATTEMPT finished with exit code $CURSOR_EXIT"
+
+  if [ $CURSOR_EXIT -ne 0 ]; then
+    echo "⚠️ Cursor exited with status $CURSOR_EXIT on attempt $ATTEMPT"
+    
+    if command -v detect_billing_failure >/dev/null 2>&1; then
+      CLI_OUTPUT_SNIPPET=""
+      if [ -f "$RUN_LOG" ]; then
+        CLI_OUTPUT_SNIPPET=$(tail -n 400 "$RUN_LOG" 2>/dev/null || cat "$RUN_LOG" 2>/dev/null || true)
+      fi
+
+      if [ -n "$CLI_OUTPUT_SNIPPET" ]; then
+        if ! detect_billing_failure "$CLI_OUTPUT_SNIPPET" "$CURSOR_EXIT" "${PR_NUMBER:-}" "${REPOSITORY:-}" "$AGENT_NAME" "{{task_id}}" "${WORKFLOW_STAGE:-}" "{{workflow_name}}"; then
+          BILLING_DETECT_EXIT=$?
+          if [ "$BILLING_DETECT_EXIT" -eq 1 ]; then
+            echo "🚫 Billing/quota failure detected - aborting additional Cursor retries"
+            BILLING_FAILURE_DETECTED=1
+            BILLING_FAILURE_REASON="Billing or quota error detected for $AGENT_NAME. Restore provider credits/quota, then rerun task {{task_id}}."
+            LAST_COMPLETION_REASON="$BILLING_FAILURE_REASON"
+            break
+          elif [ "$BILLING_DETECT_EXIT" -ne 0 ]; then
+            echo "⚠️ Billing failure detector exited with status $BILLING_DETECT_EXIT"
+          fi
+        fi
+      fi
+    fi
+  fi
+
+  # Circuit breaker: detect repeated failing bash commands
+  if [ -f "$RUN_LOG" ] && command -v jq >/dev/null 2>&1; then
+    # Try to extract failed bash/shell commands from JSON log
+    # Cursor format: look for shell tool failures
+    FAILED_CMD=$(jq -r 'select(.type=="tool_call" and .subtype=="completed" and (.tool_call.shellToolCall.result.exitCode // 0) != 0) | .tool_call.shellToolCall.args.command' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100)
+    
+    if [ -n "$FAILED_CMD" ]; then
+      # Track how many times this command has failed
+      FAILED_COMMANDS["$FAILED_CMD"]=$((${FAILED_COMMANDS["$FAILED_CMD"]:-0} + 1))
+      FAIL_COUNT=${FAILED_COMMANDS["$FAILED_CMD"]}
+
+      if [ $FAIL_COUNT -ge $MAX_SAME_COMMAND_FAILURES ]; then
+        echo "🔴 CIRCUIT BREAKER TRIGGERED: Command has failed $FAIL_COUNT times in a row:"
+        echo "   Command: $FAILED_CMD"
+        echo "   This indicates the agent is stuck in a loop."
+
+        # Inject intervention prompt for next attempt
+        PROMPT_CONTENT="${PROMPT_CONTENT}
+
+⚠️ **LOOP DETECTED**: You tried this command $FAIL_COUNT times:
+\`\`\`bash
+$FAILED_CMD
+\`\`\`
+
+It keeps failing. **STOP REPEATING THIS COMMAND.**
+
+Try instead:
+1. Check working directory: \`pwd\`
+2. List files: \`ls -la\`
+3. Use a completely different approach
+4. Create files/directories step-by-step"
+
+        # Reset counter
+        FAILED_COMMANDS["$FAILED_CMD"]=0
+      fi
+    fi
+  fi
+
+  # Extract token usage for cost tracking
+  if [ -f "$RUN_LOG" ] && command -v jq >/dev/null 2>&1; then
+    TOKENS_IN=$(jq -r 'select(.metadata.usage.inputTokens != null) | .metadata.usage.inputTokens' "$RUN_LOG" 2>/dev/null | tail -n1)
+    TOKENS_OUT=$(jq -r 'select(.metadata.usage.outputTokens != null) | .metadata.usage.outputTokens' "$RUN_LOG" 2>/dev/null | tail -n1)
+
+    if [[ "$TOKENS_IN" =~ ^[0-9]+$ ]] && [[ "$TOKENS_OUT" =~ ^[0-9]+$ ]]; then
+      TOKENS_TOTAL=$((TOKENS_IN + TOKENS_OUT))
+      echo "📊 Cursor tokens this attempt: input=$TOKENS_IN, output=$TOKENS_OUT, total=$TOKENS_TOTAL"
+
+      # Store for metrics (future: send to backend)
+      echo "{\"attempt\":$ATTEMPT,\"task_id\":\"{{task_id}}\",\"service\":\"{{service}}\",\"cli\":\"cursor\",\"tokens_in\":$TOKENS_IN,\"tokens_out\":$TOKENS_OUT,\"tokens_total\":$TOKENS_TOTAL}" >> /tmp/cursor-metrics.jsonl
+    fi
+  fi
+
+  if [ -s "$RUN_LOG" ]; then
+    RESULT_TEXT=$(jq -r 'select(.type == "result") | .result // empty' "$RUN_LOG" 2>/dev/null | tail -n1)
+    printf '%s\n' "$RESULT_TEXT" > "$LAST_MESSAGE_FILE"
+  else
+    : > "$LAST_MESSAGE_FILE"
+  fi
+
+  COMPLETION_PROMPT="Task {{task_id}} completion verification.
+
+**FIRST**: Review the acceptance criteria in task/acceptance-criteria.md
+
+**Then answer 'yes' ONLY if ALL of these are true:**
+
+1. **EVERY acceptance criterion is fully implemented** (not just started, but DONE)
+2. All code changes are committed to git
+3. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
+4. Quality gates passed (cargo fmt, cargo clippy with no warnings, tests pass)
+
+**To verify:**
+- Review: cat task/acceptance-criteria.md
+- Git status: git status
+- Commits pushed: git log origin/main..HEAD
+- PR exists: gh pr view
+- Tests pass: Check your test results
+
+If incomplete, respond with:
+no
+REASON: <specific reason why not complete>
+
+For 'no' responses, REASON must specify:
+- Which acceptance criteria are incomplete (list them by number/name)
+- What specific work remains (be concrete)
+- Any blockers or issues encountered
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
+
+Your response:"
+  COMPLETION_LAST_MESSAGE="/tmp/cursor-completion-${ATTEMPT}.txt"
+  COMPLETION_LOG="/tmp/cursor-completion-${ATTEMPT}.log"
+
+  COMPLETION_CMD=("cursor-agent" "--print" "--output-format" "text")
+  {{#if model}}
+  COMPLETION_CMD+=("--model" "{{model}}")
+  {{/if}}
+  COMPLETION_CMD+=("$COMPLETION_PROMPT")
+
+  set +e
+  set -o pipefail
+  COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  printf '%s\n' "$COMPLETION_OUTPUT" > "$COMPLETION_LAST_MESSAGE"
+  echo "🧭 Completion probe response:"
+  printf '%s\n' "$COMPLETION_OUTPUT"
+
+  if [ $COMPLETION_EXIT -ne 0 ]; then
+    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+  fi
+
+  # Extract yes/no from response - handles multiple formats:
+  # - **yes** or **no** (markdown bold)
+  # - ## **YES** (markdown heading with bold)
+  # - Standalone yes/no
+  # Avoids false matches from "no warnings", "no errors"
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^[#* ]*\*?\*?(yes|no)\*?\*?[* ]*$|^(yes|no)$' | sed 's/[#*]//g' | sed 's/^ *//;s/ *$//' | head -n1 | tr '[:upper:]' '[:lower:]')
+  CURRENT_REASON=""
+  if [ "$COMPLETION_RESPONSE" = "no" ]; then
+    CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+    if [ -n "$CURRENT_REASON" ]; then
+      echo "📋 Incompletion details:"
+      echo "$CURRENT_REASON"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║ 🔁 NEXT ITERATION FOCUS (FROM COMPLETION PROBE)              ║"
+      echo "════════════════════════════════════════════════════════════════"
+      printf '%s\n' "$CURRENT_REASON"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      PROMPT_CONTENT="${PROMPT_CONTENT}
+
+🔁 **NEXT ITERATION FOCUS (from completion probe attempt $ATTEMPT)**
+
+${CURRENT_REASON}
+
+Address the items above before rerunning checks."
+      LAST_COMPLETION_REASON="$CURRENT_REASON"
+    else
+      echo "⚠️ Completion probe reported 'no' without a reason"
+    fi
+  fi
+
+  # =========================================================================
+  # SAVE ITERATION STATE: Persist findings for next iteration
+  # =========================================================================
+  STATE_FILE="$AGENT_STATE_DIR/${WORKFLOW_STAGE:-agent}-iteration-${ATTEMPT}.json"
+
+  if [ "$COMPLETION_RESPONSE" = "yes" ]; then
+    # Save successful completion state
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "completed",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": "Task completed successfully on iteration $ATTEMPT",
+  "completion_response": "yes",
+  "issues": []
+}
+EOF
+    echo "💾 Saved successful completion state to $STATE_FILE"
+
+    SUCCESS=1
+    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+    break
+  else
+    # Save incomplete state with findings for next iteration
+    ISSUES_JSON="[]"
+    if [ -n "$CURRENT_REASON" ]; then
+      # Escape quotes and newlines for JSON
+      ESCAPED_REASON=$(printf '%s' "$CURRENT_REASON" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+      ISSUES_JSON="[\"$ESCAPED_REASON\"]"
+    fi
+
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "incomplete",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": $([ -n "$CURRENT_REASON" ] && echo "\"$ESCAPED_REASON\"" || echo "\"No specific issues identified\""),
+  "completion_response": "no",
+  "issues": $ISSUES_JSON
+}
+EOF
+    echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
+  fi
+
+  if [ -n "$CURRENT_REASON" ]; then
+    echo "⚠️ Cursor reported task incomplete; retrying with new guidance..."
+  else
+    echo "⚠️ Cursor reported task incomplete; retrying..."
+  fi
+  COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+  ATTEMPT=$((ATTEMPT + 1))
+done
+
+if [ "${BILLING_FAILURE_DETECTED:-0}" -eq 1 ]; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo "║      TASK COMPLETION STATUS: BLOCKED - BILLING/QUOTA ISSUE    ║"
+  echo "════════════════════════════════════════════════════════════════"
+  echo ""
+  echo "❌ ${AGENT_NAME} cannot continue until provider billing/quota issues are resolved."
+  echo "   A remediation comment has been posted to the PR with details."
+  if [ -n "$BILLING_FAILURE_REASON" ]; then
+    echo ""
+    echo "📋 Reason:"
+    echo "$BILLING_FAILURE_REASON"
+  fi
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  EXIT_CODE=1
+  SUCCESS=0
+  exit $EXIT_CODE
+fi
+
+FINAL_ATTEMPTS=$COMPLETED_ATTEMPTS
+if [ "${FINAL_ATTEMPTS:-0}" -le 0 ]; then
+  FINAL_ATTEMPTS=$((ATTEMPT - 1))
+fi
+if [ $FINAL_ATTEMPTS -gt $MAX_RETRIES ]; then
+  FINAL_ATTEMPTS=$MAX_RETRIES
+fi
+
+if [ $SUCCESS -ne 1 ]; then
+  echo "⚠️ Cursor did not confirm task completion after $MAX_RETRIES attempts"
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    echo ""
+    echo "💡 Last reported reason for incompletion:"
+    echo "$LAST_COMPLETION_REASON"
+  fi
+
+  # Document remaining work for downstream agents (stage-aware)
+  echo ""
+
+  # Determine handoff target and agent name based on workflow stage
+  HANDOFF_TARGET="Cleo"
+  HANDOFF_AGENT="Rex"
+  HANDOFF_FILE="$CURSOR_WORK_DIR/task/rex-handoff.md"
+
+  case "${WORKFLOW_STAGE:-implementation}" in
+    "implementation")
+      HANDOFF_TARGET="Cleo"
+      HANDOFF_AGENT="Rex"
+      HANDOFF_FILE="$CURSOR_WORK_DIR/task/rex-handoff.md"
+      ;;
+    "quality"|"quality-in-progress")
+      HANDOFF_TARGET="Tess"
+      HANDOFF_AGENT="Cleo"
+      HANDOFF_FILE="$CURSOR_WORK_DIR/task/cleo-handoff.md"
+      ;;
+    "security"|"security-in-progress")
+      HANDOFF_TARGET="Tess"
+      HANDOFF_AGENT="Cipher"
+      HANDOFF_FILE="$CURSOR_WORK_DIR/task/cipher-handoff.md"
+      ;;
+    "testing"|"testing-in-progress")
+      HANDOFF_TARGET="Human Reviewer"
+      HANDOFF_AGENT="Tess"
+      HANDOFF_FILE="$CURSOR_WORK_DIR/task/tess-handoff.md"
+      ;;
+    *)
+      HANDOFF_TARGET="Next Agent"
+      HANDOFF_AGENT="${AGENT_NAME:-Agent}"
+      HANDOFF_FILE="$CURSOR_WORK_DIR/task/agent-handoff.md"
+      ;;
+  esac
+
+  echo "📝 Creating handoff document for $HANDOFF_TARGET..."
+  mkdir -p "$CURSOR_WORK_DIR/task"
+
+  # Prepare handoff content with proper variable expansion
+  HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    REMAINING_WORK_SECTION="$LAST_COMPLETION_REASON"
+  else
+    REMAINING_WORK_SECTION=$'Review the completion probe responses in the logs above for details on what remains to be done.
+Compare current implementation against acceptance criteria in task/acceptance-criteria.md.'
+  fi
+
+  cat > "$HANDOFF_FILE" << EOF
+# $HANDOFF_AGENT Handoff to $HANDOFF_TARGET
+
+**Status**: Incomplete after $FINAL_ATTEMPTS iterations (max: $MAX_RETRIES)
+**Date**: $HANDOFF_DATE
+**Task**: {{task_id}}
+**Stage**: ${WORKFLOW_STAGE:-implementation}
+
+## What Was Accomplished
+
+$HANDOFF_AGENT made $FINAL_ATTEMPTS attempts to complete this task. Review the PR and commit history for details on what was done.
+
+## Remaining Work
+
+$REMAINING_WORK_SECTION
+
+## Next Steps for $HANDOFF_TARGET
+
+1. Review the PR and commits made by $HANDOFF_AGENT
+2. Identify gaps between current state and acceptance criteria
+3. Complete any remaining work
+4. Ensure all checks pass before proceeding
+
+## Acceptance Criteria Reference
+
+See \`task/acceptance-criteria.md\` for complete requirements.
+
+---
+*Generated by $HANDOFF_AGENT (Cursor) after $FINAL_ATTEMPTS attempts*
+EOF
+
+  echo "✅ Handoff document created at $(basename "$HANDOFF_FILE")"
+
+  # Commit and push the handoff document
+  cd "$CURSOR_WORK_DIR"
+  git add "task/$(basename "$HANDOFF_FILE")" 2>/dev/null || true
+  git commit -m "docs(task-{{task_id}}): add $HANDOFF_AGENT handoff document
+
+$HANDOFF_AGENT completed $FINAL_ATTEMPTS iterations with incomplete status (max: $MAX_RETRIES).
+Handoff document created for $HANDOFF_TARGET to continue work." 2>/dev/null || echo "⚠️ Could not commit handoff document"
+
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+    git push origin HEAD 2>/dev/null || echo "⚠️ Could not push handoff document"
+  fi
+
+  # Check if agent made any commits before deciding to handoff vs fail
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  REMOTE_BASE="origin/${BASE_BRANCH:-main}"
+
+  if [ -n "$CURRENT_BRANCH" ]; then
+    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+    if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
+      COMMITS_MADE=1
+      echo "✅ $AGENT_NAME made $AHEAD_COUNT commit(s) - will handoff to next stage"
+    else
+      echo "⚠️ $AGENT_NAME made NO commits - cannot handoff without progress"
+    fi
+  fi
+
+  if [ "$COMMITS_MADE" -eq 1 ]; then
+    # Agent made progress - BUT check if this is Cipher with security issues
+    # Cipher must NOT hand off to Tess if security issues found (even if commits were made)
+    if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║      CIPHER SECURITY GATE: ISSUES FOUND - BLOCKING TESS      ║"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      echo "🛑 Security issues detected - Tess handoff BLOCKED"
+      echo "   - Cipher found security vulnerabilities or policy violations"
+      echo "   - Rex remediation will be triggered to fix issues"
+      echo "   - Cipher will re-scan after Rex pushes fixes"
+      echo "   - Tess will only start after Cipher approves"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      
+      EXIT_CODE=1  # Exit with failure to block workflow progression
+    else
+      # Non-security stages can handoff with partial completion
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      echo "🔄 NEXT STEPS:"
+      echo "   - Handoff document created at task/rex-handoff.md"
+      echo "   - Workflow will continue to next stage for completion"
+      echo "   - Next agent will review PR and finish remaining work"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      
+      EXIT_CODE=0  # Exit successfully to allow next stage to continue
+    fi
+  else
+    # Agent made NO progress - this is a failure, should retry
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║          TASK COMPLETION STATUS: FAILED - NO PROGRESS         ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "❌ Rex failed to make any commits after $MAX_RETRIES attempts"
+    echo ""
+    if [ -n "$LAST_COMPLETION_REASON" ]; then
+      echo "📋 LAST COMPLETION REASON:"
+      echo "$LAST_COMPLETION_REASON"
+    else
+      echo "⚠️ Cursor did not provide a reason for incompletion"
+      echo "   This may indicate an error occurred before Cursor could respond"
+    fi
+    echo ""
+    echo "🔄 NEXT STEPS:"
+    echo "   - Check Cursor logs above for errors"
+    echo "   - CodeRun will retry this task"
+    echo "   - If retries exhausted, workflow will fail"
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    EXIT_CODE=1  # Exit with failure to trigger retry
+  fi
+else
+  echo "✅ Cursor confirmed task completion"
+  if [ ${CURSOR_EXIT:-0} -ne 0 ]; then
+    echo "⚠️ Cursor returned non-zero exit code ${CURSOR_EXIT}, but completion probe passed"
+  fi
+  EXIT_CODE=0
+fi
+
+if [ $SUCCESS -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+  echo "🔍 Verifying pull request status"
+  ensure_pr_created
+elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+  echo "🔍 Implementation agent ($AGENT_NAME) made commits - ensuring PR exists"
+  ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
+else
+  echo "⚠️ Skipping auto PR enforcement (no commits or non-implementation stage)"
+fi
+
+RESOLVED_PR_URL="$(resolve_pr_url)"
+
+if [ $SUCCESS -eq 1 ]; then
+  # Create completion marker for the appropriate agent based on workflow stage
+  if [[ "{{github_app}}" =~ [Rr]ex ]] && ([ "$WORKFLOW_STAGE" = "implementation" ] || [ "$WORKFLOW_STAGE" = "implementation-in-progress" ]); then
+    echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
+    echo "✅ Rex created implementation completion marker at /workspace/.rex-complete"
+  elif [[ "{{github_app}}" =~ [Cc]leo ]] && ([ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "quality-in-progress" ]); then
+    echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
+    echo "✅ Cleo created quality completion marker at /workspace/.cleo-complete"
+  elif [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]); then
+    echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+    echo "✅ Cipher created security completion marker at /workspace/.cipher-complete"
+  elif [[ "{{github_app}}" =~ [Tt]ess ]] && ([ "$WORKFLOW_STAGE" = "testing" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]); then
+    echo "tess-testing-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
+    echo "✅ Tess created testing completion marker at /workspace/.tess-complete"
+  fi
+  
+  patch_coderun_status \
+    "Running" \
+    "Implementation completed - ready for security review" \
+    "ready-for-security" \
+    "" \
+    "$RESOLVED_PR_URL" \
+    "false"
+else
+  STATUS_NOTE="Cursor reported task incomplete"
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    STATUS_NOTE="$LAST_COMPLETION_REASON"
+  fi
+  patch_coderun_status \
+    "Running" \
+    "$STATUS_NOTE" \
+    "needs-fixes" \
+    "" \
+    "$RESOLVED_PR_URL" \
+    "false"
+fi
+
+# Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
+# Map CodeRun stage values to workflow stage labels expected by container logic
+case "${WORKFLOW_STAGE:-}" in
+  "quality")
+    WORKFLOW_STAGE="quality-in-progress"
+    ;;
+  "testing")
+    WORKFLOW_STAGE="testing-in-progress"
+    ;;
+  *)
+    # Use existing value for other stages (implementation, etc.)
+    ;;
+esac
+
+if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
+  PR_NUM="${PR_NUMBER:-}"
+  if [ -z "$PR_NUM" ]; then
+    # Try to get PR number from current branch
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -n "$CURRENT_BRANCH" ]; then
+      PR_NUM=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+  fi
+
+  if [ -n "$PR_NUM" ]; then
+    if [ $SUCCESS -eq 1 ]; then
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      CHECKS_PASSED=$'- Code formatting verified
+- Linting passed
+- Unit tests successful
+- Quality standards met'
+      NEXT_STAGE="security review by Cipher"
+
+      if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+        # Cipher security review - ONLY hand off to Tess if security actually passed
+        # This block only runs when SUCCESS=1, meaning Cursor confirmed completion
+        STAGE_NAME="Security"
+        STAGE_EMOJI="🔒"
+        CHECKS_PASSED=$'- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified'
+        NEXT_STAGE="QA testing by Tess"
+
+        echo "✅ $STAGE_NAME checks passed - posting status comment (no approval)"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED (Status Only)
+All security checks have passed:
+$CHECKS_PASSED
+
+**Status:** Ready for $NEXT_STAGE
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher — final approval belongs to Tess*
+EOF
+        refresh_token_if_needed || true
+        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        rm -f "$REVIEW_BODY_FILE"
+
+        # Add security-approved label (create if missing)
+        LABEL_NAME="security-approved"
+        LABEL_API_PATH=$(printf '%s' "$LABEL_NAME" | sed 's/ /%20/g')
+        echo "🏷️  Ensuring '$LABEL_NAME' label exists"
+        if ! gh api -H "Accept: application/vnd.github+json" "repos/$REPO_OWNER/$REPO_NAME/labels/$LABEL_API_PATH" >/dev/null 2>&1; then
+          gh api -X POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REPO_OWNER/$REPO_NAME/labels" \
+            -f name="$LABEL_NAME" \
+            -f color="0E8A16" \
+            -f description="Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
+        fi
+        echo "🏷️  Adding '$LABEL_NAME' label"
+        if ! gh api -X POST \
+          -H "Accept: application/vnd.github+json" \
+          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
+          -F labels[]="$LABEL_NAME" >/dev/null 2>&1; then
+          echo "⚠️ Failed to add $LABEL_NAME label"
+        fi
+
+        # Add ready-for-qa label to trigger Tess (DO NOT refresh - causes duplicate runs)
+        LABEL_READY_FOR_QA="ready-for-qa"
+        echo "🏷️  Adding '$LABEL_READY_FOR_QA' label to signal Tess (if not already present)"
+        # Only add if not present - don't remove/re-add to avoid triggering sensor multiple times
+        if ! gh api "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" --jq '.[].name' 2>/dev/null | grep -q "^${LABEL_READY_FOR_QA}$"; then
+          if gh api -X POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
+            -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
+            echo "✅ Added '$LABEL_READY_FOR_QA' label to trigger Tess"
+          else
+            echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
+          fi
+        else
+          echo "ℹ️  Label '$LABEL_READY_FOR_QA' already present - no action needed"
+        fi
+      elif [ "$WORKFLOW_STAGE" = "testing" ]; then
+        # Tess has final approval authority - but ONLY if CI passes
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        CHECKS_PASSED=$'- End-to-end tests passed
+- Integration tests successful
+- Acceptance criteria validated
+- Production readiness confirmed'
+        NEXT_STAGE="human review and merge"
+
+        # CRITICAL: Check GitHub CI status before approving
+        if [ $SUCCESS -eq 1 ]; then
+          echo "🔍 Verifying GitHub CI status before Tess approval..."
+          CI_CHECK_FAILED=0
+          
+          # Wait for CI to complete (max 5 minutes)
+          CI_TIMEOUT=300
+          CI_WAIT=0
+          CI_ALL_COMPLETE=false
+          
+          while [ $CI_WAIT -lt $CI_TIMEOUT ]; do
+            # Check if any checks are still pending/queued
+            PENDING_COUNT=$(gh pr checks "$PR_NUM" --json state --jq '[.[] | select(.state != "COMPLETED")] | length' 2>/dev/null || echo "99")
+            
+            if [ "${PENDING_COUNT:-99}" -eq 0 ]; then
+              CI_ALL_COMPLETE=true
+              echo "✅ All CI checks completed"
+              break
+            fi
+            
+            echo "⏳ Waiting for CI to complete... ${PENDING_COUNT} checks pending (${CI_WAIT}s / ${CI_TIMEOUT}s)"
+            sleep 15
+            CI_WAIT=$((CI_WAIT + 15))
+          done
+          
+          if [ "$CI_ALL_COMPLETE" = "false" ]; then
+            echo "⚠️ CI checks still running after ${CI_TIMEOUT}s - NOT approving"
+            CI_CHECK_FAILED=1
+          else
+            # All checks completed - verify they passed
+            FAILED_COUNT=$(gh pr checks "$PR_NUM" --json conclusion --jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED")] | length' 2>/dev/null || echo "0")
+            
+            if [ "${FAILED_COUNT:-0}" -gt 0 ]; then
+              echo "❌ ${FAILED_COUNT} CI check(s) FAILED - NOT approving"
+              FAILED_CHECKS=$(gh pr checks "$PR_NUM" --json name,conclusion --jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED")] | .[].name' 2>/dev/null | head -5)
+              echo "   Failed checks: $FAILED_CHECKS"
+              CI_CHECK_FAILED=1
+            else
+              echo "✅ All CI checks PASSED - safe to approve"
+            fi
+          fi
+          
+          # Override SUCCESS if CI failed
+          if [ $CI_CHECK_FAILED -eq 1 ]; then
+            echo "🛑 Blocking approval due to CI failures"
+            SUCCESS=0
+            CHECKS_PASSED="CI checks must pass before Tess approval"
+          fi
+        fi
+
+        # Check if this is the final task requiring deployment verification
+        DEPLOYMENT_STATUS=""
+        if [ "${FINAL_TASK:-false}" = "true" ] && [ $SUCCESS -eq 1 ]; then
+          echo "🎯 Final task detected - verifying Kubernetes deployment"
+
+          # Extract service name from repository or use default
+          SERVICE_NAME="${SERVICE_NAME:-$(basename "$REPOSITORY" .git)}"
+          NAMESPACE="${NAMESPACE:-cto}"
+
+          # Check for deployment
+          if kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" &>/dev/null; then
+            READY_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            DESIRED_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+
+            if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "0" ]; then
+              echo "✅ Deployment verified: $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
+
+              # Get ingress URLs
+              INGRESS_URLS=$(kubectl get ingress -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.rules[*].host}{"\n"}{end}' 2>/dev/null | grep -v "^$" || echo "")
+
+              if [ -n "$INGRESS_URLS" ]; then
+                DEPLOYMENT_STATUS="
+
+## 🚀 Deployment Verified
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Live URLs**:
+$(echo "$INGRESS_URLS" | sed 's/^/  - https:\/\//')"
+              else
+                DEPLOYMENT_STATUS="
+
+## 🚀 Deployment Verified
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Access**: Service deployed (no ingress configured)"
+              fi
+            else
+              echo "⚠️ Deployment not ready: $READY_REPLICAS/$DESIRED_REPLICAS replicas"
+              DEPLOYMENT_STATUS="
+
+## ⚠️ Deployment Not Ready
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ⏳ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Action Required**: Waiting for deployment to stabilize"
+            fi
+          else
+            echo "⚠️ Deployment not found: $SERVICE_NAME in namespace $NAMESPACE"
+            DEPLOYMENT_STATUS="
+
+## ⚠️ Deployment Not Found
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ❌ Deployment not detected
+- **Action Required**: Ensure deployment manifests are applied"
+          fi
+        fi
+
+        echo "✅ $STAGE_NAME complete - posting APPROVE review (Tess final approval)"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+All checks have passed:
+$CHECKS_PASSED
+Ready for $NEXT_STAGE.$DEPLOYMENT_STATUS
+
+**Final Approval:** Tess has verified all acceptance criteria are met.
+EOF
+        refresh_token_if_needed || true
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
+        rm -f "$REVIEW_BODY_FILE"
+
+        # Auto-merge if enabled (Tess only)
+        if [ "${AUTO_MERGE:-false}" = "true" ]; then
+          echo "🔀 AUTO_MERGE enabled - merging PR automatically"
+          if timeout 30 gh pr merge "$PR_NUM" --auto --squash --delete-branch; then
+            echo "✅ PR scheduled for auto-merge"
+          else
+            echo "⚠️ Auto-merge failed - PR may need manual intervention"
+          fi
+        fi
+      else
+        # Cleo posts APPROVE review to show up in Reviews tab
+        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+All quality checks have passed:
+$CHECKS_PASSED
+
+**Status:** Ready for $NEXT_STAGE
+**Next Step:** Cipher will now perform comprehensive security validation
+
+---
+*Quality review by Cleo*
+EOF
+        refresh_token_if_needed || true
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
+        rm -f "$REVIEW_BODY_FILE"
+
+        # Add ready-for-security label to trigger Cipher
+        echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "ready-for-security" 2>&1 || echo "⚠️ Failed to add ready-for-security label"
+      fi
+    else
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      ISSUES_DESC=$'- Review code formatting
+- Fix linting errors
+- Ensure unit tests pass
+- Meet quality standards'
+      if [ "$WORKFLOW_STAGE" = "security" ]; then
+        STAGE_NAME="Security"
+        STAGE_EMOJI="🔒"
+        ISSUES_DESC=$'- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations'
+      elif [ "$WORKFLOW_STAGE" = "testing" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        ISSUES_DESC=$'- Fix failing end-to-end tests
+- Address integration test failures
+- Validate acceptance criteria
+- Ensure production readiness'
+      fi
+
+      echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
+      REVIEW_BODY_FILE=$(mktemp)
+      cat <<EOF > "$REVIEW_BODY_FILE"
+### 🔴 Required Changes
+$STAGE_NAME issues detected. Please address the following:
+$ISSUES_DESC
+EOF
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
+      rm -f "$REVIEW_BODY_FILE"
+    fi
+  else
+    echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
+  fi
+fi
+
+touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
+
+# Explicitly stop Docker sidecar before exiting
+echo "🛑 Explicitly stopping Docker sidecar..."
+stop_docker_sidecar || true
+
+# Kill any remaining background processes to ensure clean exit
+echo "🧹 Cleaning up background processes..."
+pkill -P $$ 2>/dev/null || true
+
+if [ $SUCCESS -ne 1 ]; then
+  {{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+  {{else}}
+echo "⚠️ Cursor execution incomplete"
+  {{/if}}
+  # Force exit to ensure container stops
+  exit $EXIT_CODE
+fi
+
+{{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+{{else}}
+echo "✅ Cursor execution complete"
+{{/if}}
+
+# Ensure container exits by terminating the shell process
+echo "🏁 Terminating container..."
+  exit $EXIT_CODE

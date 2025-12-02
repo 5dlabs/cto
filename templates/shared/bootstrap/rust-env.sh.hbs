@@ -1,0 +1,41 @@
+{{!--
+  Rust Environment Bootstrap
+  
+  Sets up the Rust toolchain environment including:
+  - Sourcing cargo environment
+  - Setting default toolchain
+  - Cleaning up stale downloads
+  
+  No required context variables.
+  
+  Safe to include in any container that may use Rust tooling.
+--}}
+
+# =========================================================================
+# Rust Environment Bootstrap
+# =========================================================================
+
+# Source cargo environment from common locations
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+# Ensure stable toolchain is default
+if command -v rustup >/dev/null 2>&1; then
+  rustup default stable 2>/dev/null || true
+fi
+
+# Preemptively prune stale Rustup downloads to avoid bulk cleanup commands later
+if [ -d "$HOME/.rustup/downloads" ]; then
+  find "$HOME/.rustup/downloads" -mindepth 1 -delete 2>/dev/null || true
+fi
+
+# Verify Rust is available (informational only, don't fail)
+if command -v cargo >/dev/null 2>&1; then
+  echo "✓ Rust available: $(rustc --version 2>/dev/null || echo 'unknown')"
+fi
+

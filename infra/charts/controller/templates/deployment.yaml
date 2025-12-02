@@ -67,6 +67,19 @@ spec:
                 configMapKeyRef:
                   name: {{ include "controller.fullname" . }}-config
                   key: RUST_LOG
+            {{- if and .Values.notifications.enabled .Values.notifications.discord.enabled }}
+            # Notification configuration
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notifications.discord.secretName }}
+                  key: {{ .Values.notifications.discord.secretKey }}
+                  optional: true
+            {{- end }}
+            {{- if not .Values.notifications.enabled }}
+            - name: NOTIFY_DISABLED
+              value: "true"
+            {{- end }}
 
           volumeMounts:
             # Mount agent templates ConfigMap

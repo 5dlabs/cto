@@ -7,7 +7,7 @@
 #
 # Scope verification:
 # - Runners are deployed in arc-runners namespace
-# - Runners manage CodeRun/DocsRun resources in cto namespace
+# - Runners manage CodeRun resources in cto namespace
 # - ConfigMaps, Deployments, Pods accessed are all in cto namespace
 # - No documented use case requires cross-namespace access
 #

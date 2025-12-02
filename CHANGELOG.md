@@ -1,5 +1,85 @@
 # Changelog
 
+## [0.12.8](https://github.com/5dlabs/cto/compare/v0.12.7...v0.12.8) (2025-12-02)
+
+
+### ✨ Features
+
+* **infra:** add self-hosted tweakcn theme editor ([#2329](https://github.com/5dlabs/cto/issues/2329)) ([71d011e](https://github.com/5dlabs/cto/commit/71d011e5083de9d1ab4e833653cc3582c7847688))
+* **infra:** add self-hosted tweakcn theme editor ([#2330](https://github.com/5dlabs/cto/issues/2330)) ([d234689](https://github.com/5dlabs/cto/commit/d2346891d16d62d8415ddad9550554c7b734b7dd))
+
+## [0.12.7](https://github.com/5dlabs/cto/compare/v0.12.6...v0.12.7) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add diagnostic logging for A2 alert debugging ([#2328](https://github.com/5dlabs/cto/issues/2328)) ([a5b0ddc](https://github.com/5dlabs/cto/commit/a5b0ddcdccb353739e76c65d9d3627548128572a))
+
+
+### ♻️ Refactoring
+
+* **mcp:** remove docs_ingest tool in favor of Context7 ([#2326](https://github.com/5dlabs/cto/issues/2326)) ([9ef63a6](https://github.com/5dlabs/cto/commit/9ef63a6c2e0fc2dfe2d567d24e2add391684e5af))
+
+## [0.12.6](https://github.com/5dlabs/cto/compare/v0.12.5...v0.12.6) (2025-12-02)
+
+
+### ✨ Features
+
+* **heal:** add Handlebars templating for DRY alert prompts ([#2308](https://github.com/5dlabs/cto/issues/2308)) ([64139fa](https://github.com/5dlabs/cto/commit/64139fa1e36523baf0b630df31130e4cdb659c0c))
+
+## [0.12.5](https://github.com/5dlabs/cto/compare/v0.12.4...v0.12.5) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add --target-pod to spawn-remediation for deduplication ([#2198](https://github.com/5dlabs/cto/issues/2198)) ([f9a11ac](https://github.com/5dlabs/cto/commit/f9a11ace8626b1f19d84bd827f44c786fd9cde80))
+* **heal:** use heal-remediation prefix and service for PVC sharing ([#2215](https://github.com/5dlabs/cto/issues/2215)) ([cbf8903](https://github.com/5dlabs/cto/commit/cbf8903b0902af684385b6e708da0132a6bd0367))
+
+## [0.12.4](https://github.com/5dlabs/cto/compare/v0.12.3...v0.12.4) (2025-12-02)
+
+
+### ✨ Features
+
+* **notify:** add Discord notification system for platform events ([#2156](https://github.com/5dlabs/cto/issues/2156)) ([c86be8e](https://github.com/5dlabs/cto/commit/c86be8ead18819583ad8b23d568a2ea7cc2625e1))
+
+## [0.12.3](https://github.com/5dlabs/cto/compare/v0.12.2...v0.12.3) (2025-12-02)
+
+
+### ✨ Features
+
+* **templates:** Phase 2 - Context7 on all agents + extended shared partials ([#2154](https://github.com/5dlabs/cto/issues/2154)) ([b217211](https://github.com/5dlabs/cto/commit/b2172114a61443b0f2e039d821e3d8e70a4d882a))
+
+## [0.12.2](https://github.com/5dlabs/cto/compare/v0.12.1...v0.12.2) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* add -L flag to follow symlinks in template generation ([#2149](https://github.com/5dlabs/cto/issues/2149)) ([db82b78](https://github.com/5dlabs/cto/commit/db82b7823b10e5941e693335acd68e7f3b7b3c83))
+* **heal:** add in-memory deduplication for pod alerts ([#2152](https://github.com/5dlabs/cto/issues/2152)) ([08880f7](https://github.com/5dlabs/cto/commit/08880f76532f5c30e172f01034a9c016eea859a7))
+
+## [0.12.1](https://github.com/5dlabs/cto/compare/v0.12.0...v0.12.1) (2025-12-02)
+
+
+### ♻️ Refactoring
+
+* **templates:** implement shared partial system for DRY templates ([#2109](https://github.com/5dlabs/cto/issues/2109)) ([948d1fc](https://github.com/5dlabs/cto/commit/948d1fc664ff8b9e6fa8f1cdecefe910a67ea4d7))
+
+## [0.12.0](https://github.com/5dlabs/cto/compare/v0.11.17...v0.12.0) (2025-12-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* Template paths have changed. Users must update any references to infra/charts/controller/agent-templates/ to templates/
+
+### ✨ Features
+
+* **heal:** add deduplication and exclusion for remediation CodeRuns ([#2072](https://github.com/5dlabs/cto/issues/2072)) ([8c476d6](https://github.com/5dlabs/cto/commit/8c476d631b60b2b77fe6cdaf7a67d4f59da194c6))
+
+
+### ♻️ Refactoring
+
+* reorganize crates and templates ([#2085](https://github.com/5dlabs/cto/issues/2085)) ([cb0f24c](https://github.com/5dlabs/cto/commit/cb0f24cdd5e71ad570e3ee6f507b7ab65ddfc4d9))
+
 ## [0.11.17](https://github.com/5dlabs/cto/compare/v0.11.16...v0.11.17) (2025-12-01)
 
 

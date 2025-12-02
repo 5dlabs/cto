@@ -9,7 +9,7 @@ metadata:
 data:
   config.yaml: |
     # Task Controller Configuration
-    # Simplified configuration for CodeRun and DocsRun controllers
+    # Configuration for the CodeRun controller
 
     # Job configuration
     job:

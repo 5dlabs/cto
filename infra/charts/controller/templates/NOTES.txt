@@ -35,22 +35,23 @@
 {{- end }}
 
 5. Agent Management:
-   • Agents are deployed via CodeRun and DocsRun custom resources
+   • Agents are deployed via CodeRun custom resources (supports implementation, documentation, and review run types)
    • Workspaces are automatically created as PVCs named "workspace-{service}"
    • Setup agent secrets: ./infra/scripts/setup-agent-secrets.sh --help
 
 6. Create your first task:
    kubectl apply -f - <<EOF
-   apiVersion: controller.platform/v1
-   kind: DocsRun
+   apiVersion: agents.platform/v1
+   kind: CodeRun
    metadata:
      name: example-docs
    spec:
+     runType: "documentation"
      repositoryUrl: "https://github.com/your-org/your-repo"
-     githubUser: "your-github-username"
+     githubApp: "your-github-app"
    EOF
 
 For more information about configuring the controller, see:
 • Documentation: https://github.com/5dlabs/cto
 • Agent setup: ./infra/scripts/setup-agent-secrets.sh --help
-• CRD reference: kubectl explain coderuns.controller.platform
+• CRD reference: kubectl explain coderuns.agents.platform

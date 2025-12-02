@@ -130,7 +130,7 @@ simulate_ci_failure() {
     git checkout -b $TEST_BRANCH
     
     # Introduce a Clippy error in a Rust file
-    local test_file="controller/src/lib.rs"
+    local test_file="crates/controller/src/lib.rs"
     print_status "info" "Introducing Clippy error in $test_file"
     
     # Backup original file

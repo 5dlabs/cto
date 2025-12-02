@@ -1,0 +1,73 @@
+{{> _preamble}}
+
+# Alert A1: Agent Comment Order Mismatch
+
+## Detected Condition
+
+An agent is running but a preceding agent in the workflow hasn't posted their expected GitHub comment yet.
+
+- **Pod Name**: {{pod_name}}
+- **Namespace**: {{namespace}}
+- **Current Agent**: {{agent}}
+- **Task ID**: {{task_id}}
+- **Missing Comment From**: {{missing_agent}}
+- **PR Number**: {{pr_number}}
+
+## Expected Agent Order
+
+1. **Rex/Blaze** → 2. **Cleo** → 3. **Tess** → 4. **Cipher** → 5. **Atlas**
+
+## Container Logs
+
+```
+{{logs}}
+```
+
+## Your Task
+
+{{> _issue-create alert_id="A1" issue_title=(concat "Comment Order Mismatch: " missing_agent " missing") issue_placeholder="Analyzing comment order mismatch"}}
+
+{{> _issue-folder}}
+
+### Step 3: Write prompt.md
+
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
+# Comment Order Mismatch: {{pod_name}}
+
+## Summary
+[Which agent ({{missing_agent}}) is missing and why]
+
+## Expected Order
+Rex/Blaze → Cleo → Tess → Cipher → Atlas
+
+## Root Cause
+[Why the comment is missing - did the agent fail, skip, or not run?]
+
+## Remediation Steps
+1. [Check if the missing agent's pod exists]
+2. [Verify the agent completed its task]
+3. [Trigger missing comment or rerun agent]
+PROMPT
+```
+
+### Step 4: Write acceptance-criteria.md
+
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+- [ ] Identified why {{missing_agent}}'s comment is missing
+- [ ] Either: Agent rerun and comment posted, OR
+- [ ] Fixed underlying issue preventing comment
+- [ ] PR {{pr_number}} has all expected comments in order
+- [ ] No A1 alerts for this PR
+CRITERIA
+```
+
+{{> _issue-update alert_id="A1" alert_title="Agent Comment Order Mismatch" issue_body_title=(concat "Comment Order Analysis: " pod_name)}}
+
+{{> _spawn-remediation alert_id="a1"}}
+

@@ -4,7 +4,7 @@ on:
   push:
     branches: ['**']  # Run on all branches for faster testing iteration
     paths:
-      - 'infra/charts/controller/agent-templates/**'
+      - 'templates/**'
       - 'infra/charts/controller/templates/agent-templates-*.yaml'
       - 'scripts/generate-templates-configmap.sh'
       - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'

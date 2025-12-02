@@ -1,17 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "cli",
-    "controller",
-    "heal",
-    "mcp",
-    "tasks",
-    "tools",
-    "utils",
+    "crates/installer",
+    "crates/controller",
+    "crates/heal",
+    "crates/mcp",
+    "crates/notify",
+    "crates/tasks",
+    "crates/tools",
+    "crates/utils",
 ]
 
 [workspace.package]
-version = "0.11.17"
+version = "0.12.8"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"

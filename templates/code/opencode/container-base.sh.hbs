@@ -1,0 +1,1021 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# OpenCode Container Bootstrap
+# 
+# This container uses shared partials for common functionality.
+# See templates/shared/ for the reusable building blocks.
+# =========================================================================
+
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else}}
+echo "🔧 Initialising OpenCode environment"
+{{/if}}
+
+# Bootstrap Rust environment (shared partial)
+{{> shared/bootstrap/rust-env}}
+
+echo "PATH: $PATH"
+
+# GitHub App authentication (shared partial)
+{{> shared/functions/github-auth}}
+
+# Docker sidecar management (shared partial)
+{{> shared/functions/docker-sidecar}}
+
+trap 'stop_docker_sidecar || true' EXIT
+
+ensure_gh_authenticated() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
+    return 0
+  fi
+
+  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  gh auth setup-git >/dev/null 2>&1 || true
+
+  if gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "✅ GitHub CLI authenticated for $GH_HOST"
+  else
+    echo "⚠️ Unable to confirm GitHub CLI auth; GH_TOKEN will still be used for git operations"
+  fi
+}
+
+ensure_gh_authenticated
+
+ensure_pr_created() {
+  if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
+    echo "⏭️  Auto PR creation disabled via SKIP_AUTO_PR=1"
+    return
+  fi
+
+  if [ ! -d .git ]; then
+    echo "⚠️ Repository not initialised; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI not available; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping auto PR creation"
+    return
+  fi
+
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "⚠️ GITHUB_TOKEN not set; skipping auto PR creation"
+    return
+  fi
+
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
+  if [ -z "$CURRENT_BRANCH" ]; then
+    echo "⚠️ Unable to determine current branch; skipping auto PR creation"
+    return
+  fi
+
+  PR_DATA=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>/dev/null || echo "[]")
+  if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
+    echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
+    return
+  fi
+
+  BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+  REMOTE_BASE="origin/$BASE_BRANCH"
+  if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+      BASE_BRANCH="master"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+      if [ -n "$DEFAULT_REMOTE" ]; then
+        BASE_BRANCH="$DEFAULT_REMOTE"
+        REMOTE_BASE="origin/$BASE_BRANCH"
+      else
+        REMOTE_BASE=""
+      fi
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  if [ -n "$BASE_BRANCH" ]; then
+    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  fi
+
+  if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
+    AUTO_BRANCH="task-{{task_id}}-{{service}}-$(date +%Y%m%d-%H%M%S)"
+    echo "⚠️ Branch $CURRENT_BRANCH unsuitable for PR; creating $AUTO_BRANCH"
+    if ! git checkout -B "$AUTO_BRANCH" >/dev/null 2>&1; then
+      echo "❌ Failed to create fallback branch $AUTO_BRANCH"
+      return
+    fi
+    CURRENT_BRANCH="$AUTO_BRANCH"
+  fi
+
+  git add .
+  if git diff --cached --quiet --exit-code; then
+    echo "ℹ️ No staged changes detected after auto-staging"
+  else
+    COMMIT_MSG="chore({{service}}): auto-commit for task {{task_id}}"
+    if ! git commit -m "$COMMIT_MSG" >/dev/null 2>&1; then
+      echo "⚠️ Failed to commit staged changes automatically"
+    else
+      echo "✅ Auto-committed staged changes"
+    fi
+  fi
+
+  if git rev-parse --verify --quiet "$CURRENT_BRANCH" >/dev/null 2>&1; then
+    refresh_token_if_needed || true
+    if ! git push -u origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
+      echo "⚠️ Failed to push branch $CURRENT_BRANCH; skipping auto PR creation"
+      return
+    fi
+  else
+    echo "⚠️ Unable to verify branch $CURRENT_BRANCH; skipping auto PR creation"
+    return
+  fi
+
+  git fetch origin "$CURRENT_BRANCH" >/dev/null 2>&1 || true
+  if [ -n "$REMOTE_BASE" ]; then
+    AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+  else
+    AHEAD_COUNT=1
+  fi
+  if [ "${AHEAD_COUNT:-0}" -eq 0 ]; then
+    echo "⚠️ Branch $CURRENT_BRANCH has no commits ahead of $BASE_BRANCH; skipping PR creation"
+    return
+  fi
+
+  RUN_LABEL="run-{{workflow_name}}"
+  if [ "${RUN_LABEL#run-}" = "" ]; then
+    RUN_LABEL="run-unknown"
+  fi
+
+  TASK_LABEL="task-{{task_id}}"
+  SERVICE_LABEL="service-{{service}}"
+  REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+
+  echo "🔍 Ensuring PR correlation labels exist"
+  for label in "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"; do
+    if [ -z "$label" ]; then
+      continue
+    fi
+
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      echo "   ✓ Label '$label' already exists"
+      continue
+    fi
+
+    case "$label" in
+      task-*) COLOR="f29513"; DESC="Task correlation" ;;
+      service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+      run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
+      *) COLOR="ededed"; DESC="Automation label" ;;
+    esac
+
+    if gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
+      echo "   ✅ Created label '$label'"
+    else
+      echo "   ❌ Failed to create label '$label'"
+      cat /tmp/gh-label-create.log >&2 || true
+    fi
+    rm -f /tmp/gh-label-create.log
+  done
+
+  PR_TITLE="feat({{service}}): complete task {{task_id}}"
+  read -r -d '' PR_BODY <<'EOF' || true
+## Summary
+- Auto-generated fallback PR because the OpenCode agent finished without opening one
+- Task {{task_id}} for service {{service}} is ready for review
+
+## Metadata
+- Agent: {{github_app}}
+- Workflow: {{workflow_name}}
+- Branch: \`$CURRENT_BRANCH\` → \`$BASE_BRANCH\`
+
+_This PR was created automatically by the OpenCode container._
+EOF
+
+  LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
+
+  maybe_add_label() {
+    local label="$1"
+    if [ -z "$label" ]; then
+      return
+    fi
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      LABEL_ARGS+=("--label" "$label")
+    else
+      echo "⚠️ Label '$label' not found; skipping"
+    fi
+  }
+
+  maybe_add_label "$TASK_LABEL"
+  maybe_add_label "$SERVICE_LABEL"
+  maybe_add_label "$RUN_LABEL"
+
+  if gh pr create "${LABEL_ARGS[@]}"; then
+    echo "✅ Auto-created pull request for $CURRENT_BRANCH"
+  else
+    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+  fi
+}
+
+git config --global --add safe.directory /workspace
+GITHUB_APP="{{github_app}}"
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (OpenCode CLI)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_NAME
+export GIT_AUTHOR_EMAIL
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# =========================================================================
+# Repository checkout
+# =========================================================================
+
+WORK_DIR="{{working_directory}}"
+if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  WORK_DIR="{{service}}"
+fi
+
+TARGET_DIR="/workspace/$WORK_DIR"
+mkdir -p "$TARGET_DIR"
+cd /workspace
+
+REPO_ROOT="/workspace/$REPO_NAME"
+git config --global --add safe.directory "$REPO_ROOT"
+
+if [ -d "$REPO_NAME/.git" ]; then
+  echo "🔁 Repository already cloned, fetching latest"
+  cd "$REPO_NAME"
+  refresh_token_if_needed
+  git fetch --all --prune
+else
+  echo "⬇️  Cloning repository"
+  refresh_token_if_needed
+  git clone "$REPO_HTTP_URL"
+  cd "$REPO_NAME"
+fi
+
+git config --global --add safe.directory "$REPO_ROOT"
+cd "$REPO_ROOT"
+
+# Remove stale automation-managed files that block branch checkout when rerunning
+MANAGED_PATHS=(
+  ".mcp.json"
+  "AGENTS.md"
+  "tools-config.json"
+  "coding-guidelines.md"
+  "github-guidelines.md"
+  "task"
+)
+
+for managed_path in "${MANAGED_PATHS[@]}"; do
+  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
+    continue
+  fi
+  if [ -e "$managed_path" ]; then
+    echo "🧹 Removing stale file to allow checkout: $managed_path"
+    rm -rf "$managed_path"
+  fi
+done
+
+BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+REMOTE_BASE="origin/$BASE_BRANCH"
+
+if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+  if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+    BASE_BRANCH="master"
+    REMOTE_BASE="origin/$BASE_BRANCH"
+  else
+    DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if [ -n "$DEFAULT_REMOTE" ]; then
+      BASE_BRANCH="$DEFAULT_REMOTE"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      REMOTE_BASE=""
+    fi
+  fi
+fi
+
+if [ -n "$BASE_BRANCH" ]; then
+  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+fi
+
+FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
+  echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  git checkout "$FEATURE_BRANCH"
+  if [ -n "$REMOTE_BASE" ]; then
+    echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
+    if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
+      echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; creating fresh branch from $REMOTE_BASE"
+      NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+      git checkout -B "$NEW_BRANCH" "$REMOTE_BASE"
+      FEATURE_BRANCH="$NEW_BRANCH"
+    fi
+  fi
+else
+  echo "Creating new feature branch '$FEATURE_BRANCH'"
+  if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+  else
+    git checkout -b "$FEATURE_BRANCH"
+  fi
+fi
+
+git config --local user.name "$GIT_AUTHOR_NAME"
+git config --local user.email "$GIT_AUTHOR_EMAIL"
+git config --local push.autoSetupRemote true
+export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
+echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
+
+OPENCODE_WORK_DIR="$REPO_ROOT"
+if [ "$WORK_DIR" != "$REPO_NAME" ]; then
+  OPENCODE_WORK_DIR="$OPENCODE_WORK_DIR/$WORK_DIR"
+  mkdir -p "$OPENCODE_WORK_DIR"
+fi
+
+cd "$OPENCODE_WORK_DIR"
+echo "✓ Working directory: $OPENCODE_WORK_DIR"
+
+echo "📦 git status"
+refresh_token_if_needed
+git status --short || true
+
+# =========================================================================
+# Materialise task context
+# =========================================================================
+
+echo "🧱 Syncing task assets"
+mkdir -p "$OPENCODE_WORK_DIR/task"
+cp -R /task-files/task/* "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
+
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{docs_branch}}"
+DOCS_PROJECT_DIRECTORY="{{docs_project_directory}}"
+
+if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
+  refresh_token_if_needed
+  if [ -z "$DOCS_BRANCH" ] || [ "$DOCS_BRANCH" = "null" ]; then
+    DOCS_BRANCH="main"
+  fi
+
+  echo "📚 Syncing docs repository: $DOCS_REPO_URL (branch: $DOCS_BRANCH)"
+  DOCS_CLONE_DIR="/tmp/docs-repo"
+  rm -rf "$DOCS_CLONE_DIR"
+
+  read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
+  DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
+
+  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
+    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    fi
+
+    echo "🔍 Docs base path: $DOCS_BASE_PATH"
+    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+
+  if [ -d "$TASK_DIR" ]; then
+    echo "✓ Copying task definition from $TASK_DIR"
+    refresh_token_if_needed
+    cp -R "$TASK_DIR"/. "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
+    else
+      echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
+    fi
+
+    if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
+      refresh_token_if_needed
+      cp "$DOCS_BASE_PATH/tasks.json" "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
+    fi
+  fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
+fi
+
+if [ -f /task-files/AGENTS.md ]; then
+  cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
+fi
+
+if [ -f /task-files/coding-guidelines.md ]; then
+  cp /task-files/coding-guidelines.md "$OPENCODE_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/github-guidelines.md ]; then
+  cp /task-files/github-guidelines.md "$OPENCODE_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$OPENCODE_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$OPENCODE_WORK_DIR/tools-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | awk -F'- ' '{print $2}' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate tools-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$OPENCODE_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$OPENCODE_WORK_DIR/tools-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate tools-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files if generation failed or cto-config.json not found
+if [ -f /task-files/tools-config.json ]; then
+  cp /task-files/tools-config.json "$OPENCODE_WORK_DIR/"
+  echo "✓ Copied tools-config.json to working directory"
+fi
+
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+  ensure_default_client_config "$OPENCODE_WORK_DIR/tools-config.json" "$REPO_ROOT/tools-config.json" "$TASK_WORKSPACE/tools-config.json"
+fi
+
+if [ -f /task-files/mcp.json ]; then
+  cp /task-files/mcp.json "$OPENCODE_WORK_DIR/.mcp.json"
+fi
+
+# Guard against destructive workspace cleanup
+guard_rm() {
+  if [ "$#" -ge 2 ]; then
+    local flags=()
+    local targets=()
+    for arg in "$@"; do
+      case "$arg" in
+        -*) flags+=("$arg") ;;
+        *) targets+=("$arg") ;;
+      esac
+    done
+
+    local has_recursive=0
+    local has_force=0
+    for flag in "${flags[@]}"; do
+      case "$flag" in
+        -*)
+          [[ "$flag" == *r* || "$flag" == *R* ]] && has_recursive=1
+          [[ "$flag" == *f* || "$flag" == *F* ]] && has_force=1
+          ;;
+      esac
+    done
+
+    if ((has_recursive && has_force)); then
+      for target in "${targets[@]}"; do
+        [ -z "$target" ] && continue
+        local expanded="$target"
+        case "$target" in
+          ~*) expanded="${target/#\~/$HOME}" ;;
+        esac
+        local resolved
+        resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
+        if [ "$resolved" = "$OPENCODE_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||
+           [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
+          echo "❌ Guard: destructive rm blocked (target=$target)" >&2
+          return 1
+        fi
+      done
+    fi
+  fi
+
+  return 0
+}
+
+rm() {
+  if guard_rm "$@"; then
+    command rm "$@"
+  else
+    return 1
+  fi
+}
+
+export -f guard_rm rm
+
+if [ ! -f "$OPENCODE_WORK_DIR/tools-config.json" ]; then
+  echo "❌ tools-config.json missing from workspace; required for MCP/tools"
+  exit 1
+fi
+
+echo "=== MCP CLIENT CONFIG ==="
+WORKSPACE_CFG="$OPENCODE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
+TARGET_CFG="${MCP_TOOLS_CONFIG:-/workspace/tools-config.json}"
+
+is_valid_cfg() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e 'type=="object" and length>=0' "$path" >/dev/null 2>&1
+  else
+    [ -s "$path" ]
+  fi
+}
+
+if is_valid_cfg "$WORKSPACE_CFG"; then
+  cp "$WORKSPACE_CFG" "$TARGET_CFG"
+  echo "✓ Using MCP client config from workspace: $TARGET_CFG"
+elif is_valid_cfg "$SOURCE_CFG"; then
+  cp "$SOURCE_CFG" "$WORKSPACE_CFG"
+  cp "$SOURCE_CFG" "$TARGET_CFG"
+  echo "✓ Restored MCP client config from source: $TARGET_CFG"
+else
+  echo "❌ No valid MCP client config available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace contents preview:"; head -c 200 "$WORKSPACE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source contents preview:"; head -c 200 "$SOURCE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  exit 1
+fi
+
+MCP_TOOLS_CONFIG="$TARGET_CFG"
+export MCP_TOOLS_CONFIG
+
+if [ -f "$MCP_TOOLS_CONFIG" ]; then
+  if command -v jq >/dev/null 2>&1; then
+    echo "[client-config] summary:"
+    if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$MCP_TOOLS_CONFIG" 2>/dev/null; then
+      echo "  (not valid JSON)"
+    fi
+  fi
+fi
+
+echo "=== tools-config.json ==="
+if command -v jq >/dev/null 2>&1; then
+  jq '.' "$MCP_TOOLS_CONFIG" 2>/dev/null || cat "$MCP_TOOLS_CONFIG"
+else
+  cat "$MCP_TOOLS_CONFIG"
+fi
+echo "=========================="
+
+# Configure OpenCode config directory
+mkdir -p "$HOME/.opencode"
+if [ -f /task-files/opencode-config.json ]; then
+  cp /task-files/opencode-config.json "$HOME/.opencode/config.json"
+  echo "✓ Installed opencode-config.json"
+else
+  echo "⚠️ opencode-config.json not provided; falling back to defaults"
+fi
+
+echo "=== MCP PRECHECKS ==="
+if ! command -v tools >/dev/null 2>&1; then
+  echo "❌ 'tools' CLI not found in PATH; required for MCP"
+  exit 1
+fi
+
+TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
+TOOLS_URL="${TOOLS_URL%/}"
+echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+if ! curl -sSf --connect-timeout 2 --max-time 6 \
+  -X POST "$TOOLS_URL" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+  echo "❌ Unable to reach Tools server at $TOOLS_URL"
+  cat /tmp/tools-ping.log >&2 || true
+  rm -f /tmp/tools-ping.log
+  exit 1
+fi
+rm -f /tmp/tools-ping.log
+echo "✓ Tools endpoint reachable"
+
+# Verify OpenCode provider API key is set based on config
+OPENCODE_CONFIG_PATH="$HOME/.opencode/config.json"
+if [ -f "$OPENCODE_CONFIG_PATH" ]; then
+  PROVIDER_ENV_KEY=$(jq -r '.provider.envKey // "OPENAI_API_KEY"' "$OPENCODE_CONFIG_PATH")
+else
+  PROVIDER_ENV_KEY="OPENAI_API_KEY"
+fi
+
+if [ -z "${!PROVIDER_ENV_KEY:-}" ]; then
+  echo "❌ $PROVIDER_ENV_KEY is not set; OpenCode cannot authenticate with its provider"
+  exit 1
+fi
+
+echo "🔑 Configuring OpenCode authentication (provider key: $PROVIDER_ENV_KEY)"
+
+if [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
+  echo "⚠️ AGENTS.md missing; creating placeholder"
+  cat <<'PLACEHOLDER' > "$OPENCODE_WORK_DIR/AGENTS.md"
+# Project Guidance
+
+This OpenCode run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give OpenCode richer instructions.
+PLACEHOLDER
+fi
+
+# =========================================================================
+# Prompt assembly and OpenCode execution
+# =========================================================================
+
+PROMPT_PREFIX=""
+if [ -f "$OPENCODE_WORK_DIR/task/tools-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$OPENCODE_WORK_DIR/task/tools-guide.md")\n\n---\n\n"
+fi
+
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **GitHub auth ready**: the GitHub App token (\`GH_TOKEN\`) is already configured; skip manual \`gh auth login\` flows and avoid hitting user-only endpoints like \`/user\`.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
+
+if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ] || [ -f "$OPENCODE_WORK_DIR/coding-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
+  if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md\n"
+  fi
+  if [ -f "$OPENCODE_WORK_DIR/coding-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md\n"
+  fi
+  PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
+fi
+
+if [ -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
+  if AGENT_GUIDANCE=$(jq -Rs @json "$OPENCODE_WORK_DIR/AGENTS.md" 2>/dev/null); then
+    if [ "${#AGENT_GUIDANCE}" -gt 2 ]; then
+      AGENT_GUIDANCE=${AGENT_GUIDANCE:1:-1}
+      PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${AGENT_GUIDANCE}\n\n---\n\n"
+    fi
+  fi
+fi
+
+echo "🔍 DEBUG: About to check for prompt.md at: $OPENCODE_WORK_DIR/task/prompt.md"
+echo "🔍 DEBUG: Contents of task directory:"
+ls -la "$OPENCODE_WORK_DIR/task/" || echo "Task directory not found or empty"
+echo "🔍 DEBUG: Current working directory contents:"
+ls -la "$OPENCODE_WORK_DIR/" || echo "Working directory not accessible"
+
+PROMPT_FILE="$OPENCODE_WORK_DIR/task/prompt.md"
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "❌ prompt.md not found at $PROMPT_FILE"
+  exit 1
+fi
+
+echo "startingTask:{{task_id}}"
+echo ""
+
+PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+
+ORIGINAL_PROMPT="$PROMPT_CONTENT"
+PREVIOUS_MESSAGE_FILE=""
+TOKEN_LIMIT=${OPENCODE_TOKEN_LIMIT:-240000}
+OPENCODE_TIMEOUT=${OPENCODE_EXEC_TIMEOUT:-1800}
+RESET_SESSION_ON_RETRY=${OPENCODE_RESET_SESSION_ON_RETRY:-1}
+CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
+
+MAX_RETRIES=${OPENCODE_MAX_RETRIES:-5}
+ATTEMPT=1
+SUCCESS=0
+OPENCODE_EXIT=1
+LAST_MESSAGE_FILE=""
+RUN_LOG=""
+
+SESSION_DIR="$HOME/.opencode/sessions"
+RESUME_ARGS=()
+SESSION_FILE="$OPENCODE_WORK_DIR/.opencode-session"
+CURRENT_SESSION_ID=""
+
+if [ -f "$SESSION_FILE" ]; then
+  CURRENT_SESSION_ID=$(tr -d '\r\n ' < "$SESSION_FILE" 2>/dev/null || true)
+fi
+
+extract_session_id() {
+  local log_file="$1"
+  [ -f "$log_file" ] || return 1
+  awk '
+    {
+      gsub(/\033\[[0-9;]*[mK]/, "");
+      if ($0 ~ /opencode session[[:space:]]+[0-9a-fA-F-]{4,}/) {
+        match($0, /opencode session[[:space:]]+([0-9a-fA-F-]+)/, a);
+        if (a[1] != "") last=a[1];
+      }
+    }
+    END {
+      if (last != "") print last;
+    }
+  ' "$log_file" 2>/dev/null
+}
+
+persist_session_id() {
+  local session_id="$1"
+  if [ -n "$session_id" ]; then
+    printf '%s\n' "$session_id" > "$SESSION_FILE"
+  fi
+}
+
+if [ "$CONTINUE_SESSION" = "1" ]; then
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    echo "ℹ️  Resuming OpenCode session from breadcrumb: $CURRENT_SESSION_ID"
+    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+  elif [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
+    echo "ℹ️  Existing OpenCode sessions found; will resume most recent"
+    RESUME_ARGS=("resume" "--last")
+  fi
+else
+  if [ -d "$SESSION_DIR" ]; then
+    find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+  fi
+  rm -f "$SESSION_FILE"
+fi
+
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "🚀 OpenCode execution attempt $ATTEMPT/$MAX_RETRIES"
+  LAST_MESSAGE_FILE="/tmp/opencode-last-message-${ATTEMPT}.txt"
+  RUN_LOG="/tmp/opencode-run-${ATTEMPT}.jsonl"
+
+  SESSION_FLAGS=()
+  if [ $ATTEMPT -eq 1 ] && [ ${#RESUME_ARGS[@]} -gt 0 ]; then
+    SESSION_FLAGS=("${RESUME_ARGS[@]}")
+  else
+    SESSION_FLAGS=()
+    if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
+      find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+      rm -f "$SESSION_FILE"
+      CURRENT_SESSION_ID=""
+    fi
+  fi
+
+  if [ $ATTEMPT -eq 1 ]; then
+    PROMPT_PAYLOAD="$ORIGINAL_PROMPT"
+  else
+    if [ -n "$PREVIOUS_MESSAGE_FILE" ] && [ -s "$PREVIOUS_MESSAGE_FILE" ]; then
+      PREVIOUS_SNIPPET=$(tail -n 40 "$PREVIOUS_MESSAGE_FILE" 2>/dev/null | sed 's/^/    /')
+    else
+      PREVIOUS_SNIPPET="    <no previous OpenCode summary available>"
+    fi
+    PROMPT_PAYLOAD="Continuing Task {{task_id}} for service {{service}} (attempt $ATTEMPT).
+
+Previous OpenCode summary:
+$PREVIOUS_SNIPPET
+
+Focus on unresolved work, avoid repeating completed steps, and progress toward completion."
+  fi
+
+  set +e
+  set -o pipefail
+  OPENCODE_CMD=(
+    "opencode"
+    "exec"
+    "--no-approval"
+    "--output-last-message" "$LAST_MESSAGE_FILE"
+    "--cwd" "$OPENCODE_WORK_DIR"
+  )
+  if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
+    OPENCODE_CMD+=("${SESSION_FLAGS[@]}")
+  fi
+  OPENCODE_CMD+=("$PROMPT_PAYLOAD")
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+  else
+    "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+  fi
+  OPENCODE_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  if [ $OPENCODE_EXIT -eq 124 ]; then
+    echo "⏱️ OpenCode command exceeded ${OPENCODE_TIMEOUT}s timeout; terminating session"
+    pkill -f "opencode" 2>/dev/null || true
+    PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
+    ATTEMPT=$((ATTEMPT + 1))
+    continue
+  fi
+
+  echo "[opencode-debug] Attempt $ATTEMPT finished with exit code $OPENCODE_EXIT"
+
+  if [ $OPENCODE_EXIT -ne 0 ]; then
+    echo "⚠️ OpenCode exited with status $OPENCODE_EXIT on attempt $ATTEMPT"
+  fi
+
+  NEW_SESSION_ID=""
+  if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+    NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
+  fi
+  if [ -n "$NEW_SESSION_ID" ]; then
+    if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
+      echo "ℹ️  Captured OpenCode session ID: $NEW_SESSION_ID"
+      CURRENT_SESSION_ID="$NEW_SESSION_ID"
+      persist_session_id "$CURRENT_SESSION_ID"
+    fi
+  fi
+
+  if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then
+    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+  else
+    RESUME_ARGS=()
+  fi
+
+  PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
+
+  if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ -f "$RUN_LOG" ]; then
+    LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" 2>/dev/null | tail -n1 | awk '{print $3}' | tr -d ',' | tr -d '\n' || true)
+    if [[ "$LAST_TOKENS" =~ ^[0-9]+$ ]]; then
+      echo "📊 OpenCode tokens used this attempt: $LAST_TOKENS"
+      if [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ]; then
+        echo "⚠️ Token usage $LAST_TOKENS exceeds limit $TOKEN_LIMIT; forcing clean session before retry"
+        if [ -d "$SESSION_DIR" ]; then
+          find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+        fi
+        PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
+        ATTEMPT=$((ATTEMPT + 1))
+        continue
+      fi
+    fi
+  fi
+
+  COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
+  COMPLETION_LAST_MESSAGE="/tmp/opencode-completion-${ATTEMPT}.txt"
+  COMPLETION_LOG="/tmp/opencode-completion-${ATTEMPT}.jsonl"
+
+  set +e
+  set -o pipefail
+  COMPLETION_CMD=(
+    "opencode"
+    "exec"
+    "--no-approval"
+    "--output-last-message" "$COMPLETION_LAST_MESSAGE"
+    "--cwd" "$OPENCODE_WORK_DIR"
+    "resume"
+  )
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    COMPLETION_CMD+=("$CURRENT_SESSION_ID")
+  else
+    COMPLETION_CMD+=("--last")
+  fi
+  COMPLETION_CMD+=("$COMPLETION_PROMPT")
+  "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  if [ $COMPLETION_EXIT -ne 0 ]; then
+    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+  fi
+
+  echo "[opencode-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+
+  if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
+    COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
+  else
+    COMPLETION_RESPONSE=""
+  fi
+  if echo "$COMPLETION_RESPONSE" | grep -Eq '^yes'; then
+    SUCCESS=1
+    break
+  fi
+
+  echo "[opencode-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
+
+  echo "⚠️ OpenCode reported task incomplete; retrying..."
+  ATTEMPT=$((ATTEMPT + 1))
+done
+
+if [ $SUCCESS -ne 1 ]; then
+  echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
+  EXIT_CODE=0
+else
+  if [ ${OPENCODE_EXIT:-0} -ne 0 ]; then
+    echo "⚠️ OpenCode returned exit code ${OPENCODE_EXIT}; treating as success"
+  fi
+  EXIT_CODE=0
+fi
+
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔍 Verifying pull request status"
+  ensure_pr_created
+else
+  echo "⚠️ Skipping auto PR enforcement due to OpenCode completion status"
+fi
+
+touch /workspace/.agent_done 2>/dev/null || true
+
+if [ $SUCCESS -ne 1 ]; then
+  {{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+  {{else}}
+echo "⚠️ OpenCode execution incomplete"
+  {{/if}}
+  exit $EXIT_CODE
+fi
+
+{{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+{{else}}
+echo "✅ OpenCode execution complete"
+{{/if}}
+exit $EXIT_CODE
