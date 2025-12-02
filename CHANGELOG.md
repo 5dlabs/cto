@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.6](https://github.com/5dlabs/cto/compare/v0.12.5...v0.12.6) (2025-12-02)
+
+
+### ✨ Features
+
+* **heal:** add Handlebars templating for DRY alert prompts ([#2308](https://github.com/5dlabs/cto/issues/2308)) ([64139fa](https://github.com/5dlabs/cto/commit/64139fa1e36523baf0b630df31130e4cdb659c0c))
+
 ## [0.12.5](https://github.com/5dlabs/cto/compare/v0.12.4...v0.12.5) (2025-12-02)
 
 
