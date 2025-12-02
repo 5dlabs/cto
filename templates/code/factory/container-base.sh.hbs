@@ -2,7 +2,10 @@
 set -euo pipefail
 
 # =========================================================================
-# Environment bootstrapping
+# Factory Container Base
+# 
+# This container uses shared partials for common functionality.
+# See templates/shared/ for the reusable building blocks.
 # =========================================================================
 
 {{#if agent_banner}}
@@ -11,17 +14,8 @@ echo "{{agent_banner}}"
 echo "🔧 Initialising Factory environment"
 {{/if}}
 
-if [ -f "$HOME/.cargo/env" ]; then
-  . "$HOME/.cargo/env"
-fi
-
-if [ -f "/root/.cargo/env" ]; then
-  . "/root/.cargo/env"
-fi
-
-if command -v rustup >/dev/null 2>&1; then
-  rustup default stable 2>/dev/null || true
-fi
+# Bootstrap Rust environment (shared partial)
+{{> shared/bootstrap/rust-env}}
 
 echo "PATH: $PATH"
 
@@ -63,74 +57,8 @@ fi
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-# =========================================================================
-# GitHub App authentication
-# =========================================================================
-
-REPO_URL="{{repository_url}}"
-
-if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
-  echo "❌ Missing GitHub App credentials"
-  exit 1
-fi
-
-echo "🔐 Authenticating with GitHub App"
-TEMP_KEY_FILE="/tmp/github-app-key.pem"
-printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
-chmod 600 "$TEMP_KEY_FILE"
-
-JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-NOW=$(date +%s)
-EXP=$((NOW + 600))
-JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-rm -f "$TEMP_KEY_FILE"
-
-parse_repo() {
-  local input="$1"
-  if echo "$input" | grep -qE '^https://github.com/'; then
-    echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
-  elif echo "$input" | grep -qE '^git@github.com:'; then
-    echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
-  else
-    echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
-  fi
-}
-
-read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
-REPO_HTTP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
-
-INSTALLATION_ID=$(curl -s -L \
-  -H "Authorization: Bearer $JWT_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
-
-if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-  INSTALLATION_ID=$(curl -s -L \
-    -H "Authorization: Bearer $JWT_TOKEN" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
-fi
-
-if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-  echo "❌ Unable to resolve installation ID for $REPO_OWNER/$REPO_NAME"
-  exit 1
-fi
-
-GITHUB_TOKEN=$(curl -s -X POST \
-  -H "Authorization: Bearer $JWT_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
-
-if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
-  echo "❌ Unable to obtain installation token"
-  exit 1
-fi
-
-export GITHUB_TOKEN
-export GH_TOKEN="$GITHUB_TOKEN"
-export GH_HOST="github.com"
+# GitHub App authentication (shared partial)
+{{> shared/functions/github-auth}}
 
 # Task-specific workspace for parallel execution isolation
 TASK_WORKSPACE="/workspace/task-{{task_id}}"

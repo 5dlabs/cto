@@ -21,10 +21,10 @@ Use documentation tools to understand WHAT to test:
   - Find documented limitations and constraints
 
 - **Testing Framework Documentation**:
-  - **Rust Testing**: Query `rustdocs_query_rust_docs` for:
-    - Test framework capabilities
-    - Assertion macros and patterns
-    - Async testing patterns
+  - **Rust Testing**: Use Context7 for testing documentation:
+    - Test framework capabilities (`get_library_docs` with topic: "testing assertions")
+    - Assertion macros and patterns (topic: "assert macros")
+    - Async testing patterns (Tokio: topic: "async testing")
     - Property-based testing
   - Query framework-specific testing guides
   - Understand mocking and stubbing patterns
@@ -82,7 +82,7 @@ Use tools to create and execute comprehensive tests:
 
 **Unit Testing:**
 ```
-1. Query: rustdocs_query_rust_docs("testing module")
+1. Query: get_library_docs({ context7CompatibleLibraryID: "/websites/rs_tokio_tokio", topic: "testing async code" })
 2. Read: filesystem_read_file("src/lib.rs") // Understand what to test
 3. Search: filesystem_search_files("#[test]") // Find test patterns
 4. Implement: Tests based on documentation

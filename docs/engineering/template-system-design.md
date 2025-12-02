@@ -1,9 +1,10 @@
 # CTO Platform Template System Design
 
-> **Version**: 1.0.0-draft  
-> **Status**: RFC (Request for Comments)  
+> **Version**: 1.0.0  
+> **Status**: Phase 1-2 Implemented  
 > **Authors**: Claude Opus 4.5, Engineering Team  
-> **Date**: December 2, 2025
+> **Date**: December 2, 2025  
+> **Last Updated**: December 2, 2025
 
 ---
 
@@ -1216,3 +1217,104 @@ The proposed 4-week migration plan is realistic given the scope. I recommend sta
 ---
 
 Feedback compiled from comprehensive template review on December 2, 2025
+
+---
+
+## Appendix C: Implementation Summary (December 2, 2025)
+
+### Completed Work
+
+#### Phase 1: Extract Shared Functions ✅
+
+Created the foundational shared partial library:
+
+```
+templates/shared/
+├── bootstrap/
+│   └── rust-env.sh.hbs           # Rust toolchain initialization
+├── functions/
+│   ├── github-auth.sh.hbs        # GitHub App JWT authentication
+│   ├── docker-sidecar.sh.hbs     # Docker sidecar management
+│   └── completion-marker.sh.hbs  # Task completion signaling
+├── container-core.sh.hbs         # Core container orchestration
+├── context7-instructions.md.hbs  # Context7 documentation tool usage
+└── design-system.md              # Frontend design principles
+```
+
+#### Phase 2: Convert CLI Containers ✅
+
+Updated all CLI container-base files to use shared partials:
+- `code/opencode/container-base.sh.hbs`
+- `code/codex/container-base.sh.hbs`
+- `code/cursor/container-base.sh.hbs`
+- `code/factory/container-base.sh.hbs`
+- `code/claude/container.sh.hbs`
+
+#### Phase 3: Agent Prompts Cleanup ✅
+
+- Removed all `rustdocs_query_rust_docs` references (deprecated)
+- Updated Rex, Cleo, and Tess system prompts to use Context7
+- Standardized documentation tool usage across all agents
+
+#### Phase 4: Cleanup ✅
+
+Deleted orphaned files:
+- `templates/context7-instructions-snippet.md`
+- `templates/design-system.md` (duplicate of `shared/design-system.md`)
+- `templates/effect-solutions-instructions.md`
+- `templates/shadcn-instructions-snippet.md`
+
+### Controller Updates
+
+Registered all shared partials in `crates/controller/src/tasks/code/templates.rs`:
+- `shared/bootstrap/rust-env`
+- `shared/functions/github-auth`
+- `shared/functions/docker-sidecar`
+- `shared/functions/completion-marker`
+- `shared/context7-instructions`
+- `shared/design-system`
+- `shared/container-core`
+
+Updated test binary (`src/bin/test_templates.rs`) to register shared partials.
+
+### Validation
+
+All templates render successfully:
+- ✅ `cargo run -p controller --bin test-templates` passes
+- ✅ `cargo clippy --all-targets -- -D warnings` passes
+- ✅ `cargo test -p controller` passes (142 tests)
+- ✅ `cargo fmt --all --check` passes
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `templates/shared/bootstrap/rust-env.sh.hbs` | Created |
+| `templates/shared/functions/github-auth.sh.hbs` | Created |
+| `templates/shared/functions/docker-sidecar.sh.hbs` | Created |
+| `templates/shared/functions/completion-marker.sh.hbs` | Created |
+| `templates/shared/container-core.sh.hbs` | Created |
+| `templates/shared/context7-instructions.md.hbs` | Created |
+| `templates/code/claude/container.sh.hbs` | Uses shared partials |
+| `templates/code/codex/container-base.sh.hbs` | Uses shared partials |
+| `templates/code/cursor/container-base.sh.hbs` | Uses shared partials |
+| `templates/code/factory/container-base.sh.hbs` | Uses shared partials |
+| `templates/code/opencode/container-base.sh.hbs` | Uses shared partials |
+| `templates/agents/rex-system-prompt.md.hbs` | Context7 migration |
+| `templates/agents/cleo-system-prompt.md.hbs` | Context7 migration |
+| `templates/agents/tess-system-prompt.md.hbs` | Context7 migration |
+| `crates/controller/src/tasks/template_paths.rs` | Added SHARED_* constants |
+| `crates/controller/src/tasks/code/templates.rs` | Partial registration |
+| `crates/controller/src/bin/test_templates.rs` | Shared partial test support |
+
+### Next Steps
+
+1. **Further Deduplication**: The container scripts still have significant duplication in the agent-specific sections. Phase 3 of the original plan (Agent Behavior Partials) could further reduce duplication.
+
+2. **Snapshot Testing**: Add golden file testing to validate rendered template output against known-good baselines.
+
+3. **Documentation**: Update contributor guidelines to reference this design document.
+
+---
+
+Implementation completed December 2, 2025

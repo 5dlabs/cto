@@ -15,10 +15,10 @@ Before starting ANY code review work, you MUST:
 Your reviews MUST be based on authoritative documentation:
 
 - **Language-Specific Documentation**:
-  - **Rust**: Query `rustdocs_query_rust_docs` for:
-    - Correct API usage
-    - Idiomatic patterns
-    - Safety requirements
+  - **Rust**: Use Context7 for up-to-date documentation:
+    - Correct API usage (`get_library_docs` with relevant topic)
+    - Idiomatic patterns (e.g., topic: "error handling best practices")
+    - Safety requirements (e.g., topic: "unsafe code guidelines")
     - Performance best practices
   - Verify implementations match documented behavior
   - Check for deprecated patterns or APIs
@@ -95,8 +95,8 @@ Use tools to perform systematic analysis:
 
 **For Rust Code Reviews:**
 ```
-1. Query: rustdocs_query_rust_docs("unsafe code guidelines")
-2. Query: rustdocs_query_rust_docs("error handling best practices")
+1. Query: get_library_docs({ context7CompatibleLibraryID: "/rust-lang/rust-clippy", topic: "unsafe code guidelines" })
+2. Query: get_library_docs({ context7CompatibleLibraryID: "/dtolnay/anyhow", topic: "error handling best practices" })
 3. Search: filesystem_search_files("unsafe|unwrap|panic")
 4. Analyze: Check lifetime annotations against documentation
 5. Verify: Trait implementations match documented contracts

@@ -28,10 +28,10 @@ Before writing any code, ALWAYS check for relevant documentation:
     - **Tracing**: `/tokio-rs/tracing` (logging)
 
 - **Rust Development**:
-  - If implementing Rust code, ALWAYS query Context7 or `rustdocs_query_rust_docs` first
+  - If implementing Rust code, ALWAYS query Context7 first
   - Search for relevant crates, traits, structs, and functions
   - Understand the API before attempting implementation
-  - Example: Before using `tokio`, query its documentation for async patterns
+  - Example: Before using `tokio`, query Context7 for async patterns
 
 - **Kubernetes Resources**:
   - If working with K8s resources, query the Kubernetes documentation tool
@@ -107,8 +107,8 @@ Only after gathering documentation and context:
 
 **For Rust Projects:**
 ```
-1. Query: rustdocs_query_rust_docs("tokio runtime")
-2. Query: rustdocs_query_rust_docs("serde serialization")
+1. Query: get_library_docs({ context7CompatibleLibraryID: "/websites/rs_tokio_tokio", topic: "runtime setup" })
+2. Query: get_library_docs({ context7CompatibleLibraryID: "/websites/serde_rs", topic: "serialization derive" })
 3. Read: filesystem_read_file("Cargo.toml")
 4. Search: filesystem_search_files("impl.*Service")
 5. Write: filesystem_write_file("src/service.rs", code)

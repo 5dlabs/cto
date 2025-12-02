@@ -1,14 +1,8 @@
-{{!--
-  Docker Sidecar Management
-  
-  Provides functions to manage Docker sidecar containers:
-  - stop_docker_sidecar(): Gracefully stop dockerd process
-  
-  No required context variables.
---}}
-
 # =========================================================================
 # Docker Sidecar Management
+# 
+# Shared function to stop Docker sidecar containers gracefully.
+# This is used by CLIs that need Docker support (e.g., Cursor).
 # =========================================================================
 
 stop_docker_sidecar() {
@@ -40,6 +34,15 @@ stop_docker_sidecar() {
     fi
   fi
 
-  echo "✅ Docker sidecar stopped"
-}
+  for _ in 1 2 3 4 5; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped"
+      return
+    fi
+    sleep 1
+  done
 
+  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
+  echo "⚠️ Docker sidecar still running (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+}
