@@ -26,20 +26,16 @@ COPY --from=deps /app ./
 # Patch next.config.ts to add standalone output for Docker deployment
 RUN sed -i 's/const nextConfig: NextConfig = {/const nextConfig: NextConfig = {\n  output: "standalone",/' next.config.ts
 
-# Build arguments for environment
-ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
-ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Provide dummy env vars for build (the app works without DB for basic editing)
-ENV DATABASE_URL=""
-ENV BETTER_AUTH_SECRET="not-needed-for-basic-usage"
-ENV BASE_URL="http://localhost:3000"
+# Provide properly formatted dummy DATABASE_URL for build
+# The Neon driver validates the URL format but doesn't connect during build
+# At runtime, this gets replaced by the actual env var
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?sslmode=disable"
 
-# Build the application
-RUN pnpm run build
+# Skip prebuild and run next build directly
+RUN pnpm exec next build
 
 # Production image
 FROM base AS runner
