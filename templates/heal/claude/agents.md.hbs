@@ -155,11 +155,20 @@ cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic
 cargo test --workspace --all-features
 ```
 
-### Phase 4: Create PR and Deploy
+### Phase 4: Sync with Main & Create PR
 ```bash
+# CRITICAL: Always rebase on latest main before pushing to avoid conflicts
+git fetch origin main
+git rebase origin/main
+
+# If rebase has conflicts, resolve them:
+# 1. Fix the conflicting files
+# 2. git add <resolved-files>
+# 3. git rebase --continue
+
 git add -A
 git commit -m "fix: [description of the issue fixed]"
-git push origin HEAD
+git push origin HEAD --force-with-lease
 
 # Create PR linking to GitHub issue (if HEAL_ISSUE_NUMBER is set)
 if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
@@ -180,11 +189,71 @@ else
     gh pr create --title "fix: [description]" --body "Fixes issue detected by Heal monitoring system" --label "remediation"
 fi
 
-# Wait for CI then merge
+# Enable auto-merge
 gh pr merge --squash --auto
 ```
 
-### Phase 5: Verify Deployment
+### Phase 5: Handle Merge Conflicts & CI Failures (ITERATION LOOP)
+
+**CRITICAL**: You must iterate until the PR is merged. Do not exit on failures.
+
+```bash
+PR_NUMBER=$(gh pr view --json number -q '.number')
+
+while true; do
+    # Check for merge conflicts
+    MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable')
+    if [ "$MERGEABLE" = "CONFLICTING" ]; then
+        echo "⚠️ Merge conflict detected - rebasing on main..."
+        git fetch origin main
+        git rebase origin/main
+        # Resolve conflicts if any, then:
+        git push origin HEAD --force-with-lease
+        echo "✅ Rebased and pushed - waiting for CI..."
+        sleep 30
+        continue
+    fi
+
+    # Check CI status
+    STATUS=$(gh pr checks $PR_NUMBER --json state,name -q '.[].state' 2>/dev/null | sort -u)
+    
+    if echo "$STATUS" | grep -q "FAILURE"; then
+        echo "❌ CI failed - analyzing failures..."
+        gh pr checks $PR_NUMBER
+        
+        # Get failed check details and fix
+        FAILED_CHECKS=$(gh pr checks $PR_NUMBER --json name,state -q '.[] | select(.state=="FAILURE") | .name')
+        echo "Failed checks: $FAILED_CHECKS"
+        
+        # Make fixes based on CI failures, then:
+        git add -A
+        git commit -m "fix: address CI failures"
+        git push origin HEAD
+        echo "🔄 Pushed fixes - waiting for CI..."
+        sleep 60
+        continue
+    fi
+    
+    if echo "$STATUS" | grep -q "PENDING"; then
+        echo "⏳ CI still running..."
+        sleep 30
+        continue
+    fi
+    
+    # All checks passed
+    echo "✅ All CI checks passed!"
+    break
+done
+
+# Verify merge completed
+MERGED=$(gh pr view $PR_NUMBER --json merged -q '.merged')
+if [ "$MERGED" != "true" ]; then
+    echo "⏳ Waiting for auto-merge..."
+    sleep 30
+fi
+```
+
+### Phase 6: Verify Deployment
 
 Use MCP tools to verify the deployment is healthy:
 
@@ -235,7 +304,7 @@ kubectl logs -n cto -l app=cto-controller --tail=50
    - `firecrawl_search` - Search the web for solutions
    - `firecrawl_scrape` - Read documentation pages
 
-### Phase 6: Cleanup
+### Phase 7: Cleanup
 ```bash
 # Remove worktree after successful deployment
 cd "${REPO_PATH}"
