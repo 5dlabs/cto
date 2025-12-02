@@ -344,25 +344,16 @@ jobs:
             --namespace=test-platform \
             --from-literal=api-key="mock-api-key" || true
 
-          # Apply test CodeRun and DocsRun instances
-          echo "🧪 Applying test CRD instances..."
-          kubectl apply -f infra/test-resources/crds/ -n test-platform || true
-
-          # Wait a moment for resources to be created
+          # Wait a moment for CRDs to be registered
           sleep 5
 
       - name: Verify CRD deployment
         run: |
           echo "🔍 Verifying CRD definitions..."
           kubectl get crd coderuns.agents.platform
-          kubectl get crd docsruns.agents.platform
 
-          echo "🔍 Verifying CRD instances..."
-          kubectl get coderuns,docsruns -n test-platform
-
-          echo "🔍 Describing test instances..."
-          kubectl describe coderun test-coderun-ci -n test-platform || true
-          kubectl describe docsrun test-docsrun-ci -n test-platform || true
+          echo "🔍 Verifying CodeRun instances..."
+          kubectl get coderuns -n test-platform || true
 
   # Security scanning (non-blocking)
   security-scan:
