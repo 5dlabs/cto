@@ -1,3 +1,5 @@
+{{> _preamble}}
+
 # Alert A3: Stale Agent Progress
 
 ## Detected Condition
@@ -20,32 +22,9 @@ An agent pod has been running but no new commits have been pushed to the feature
 
 ## Your Task
 
-### Step 1: Create GitHub Issue
+{{> _issue-create alert_id="A3" issue_title=(concat "Stale Progress: " agent " no commits for " stale_duration) issue_placeholder="Analyzing stale agent progress"}}
 
-```bash
-ISSUE_URL=$(gh issue create \
-  --repo 5dlabs/cto \
-  --title "[HEAL-A3] Stale Progress: {{agent}} no commits for {{stale_duration}}" \
-  --label "heal,remediation,a3" \
-  --body "🔍 Analyzing stale agent progress... Full analysis to follow.")
-if [ -z "$ISSUE_URL" ]; then
-  echo "❌ Failed to create GitHub issue"
-  exit 1
-fi
-ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
-if [ -z "$ISSUE_NUMBER" ]; then
-  echo "❌ Failed to extract issue number from: $ISSUE_URL"
-  exit 1
-fi
-echo "✅ Created issue #${ISSUE_NUMBER}"
-```
-
-### Step 2: Create Issue Folder
-
-```bash
-ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
-mkdir -p "${ISSUE_DIR}"
-```
+{{> _issue-folder}}
 
 ### Step 3: Write prompt.md
 
@@ -90,22 +69,7 @@ cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 CRITERIA
 ```
 
-### Step 5: Update GitHub Issue
+{{> _issue-update alert_id="A3" alert_title="Stale Agent Progress" issue_body_title=(concat "Stale Progress Analysis: " pod_name)}}
 
-```bash
-gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
+{{> _spawn-remediation alert_id="a3"}}
 
----
-
-$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
-```
-
-### Step 6: Spawn Remediation Agent
-
-```bash
-heal spawn-remediation \
-  --alert a3 \
-  --task-id {{task_id}} \
-  --target-pod "{{pod_name}}" \
-  --issue-number ${ISSUE_NUMBER}
-```
