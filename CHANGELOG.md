@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.12.13](https://github.com/5dlabs/cto/compare/v0.12.12...v0.12.13) (2025-12-02)
+
+
+### ✨ Features
+
+* **intake:** add verbose logging and progress indicator for TaskMaster ([#2461](https://github.com/5dlabs/cto/issues/2461)) ([a4e77c6](https://github.com/5dlabs/cto/commit/a4e77c6659102c94fae18af8d8db6aa921e98483))
+
+
+### 🐛 Bug Fixes
+
+* **intake:** remove erroneous .hbs extension from script path ([#2459](https://github.com/5dlabs/cto/issues/2459)) ([0518fb1](https://github.com/5dlabs/cto/commit/0518fb1287ec8696ae7c144e48d89e73329ae4bf))
+* **intake:** revert workflow to use .sh instead of .sh.hbs ([#2457](https://github.com/5dlabs/cto/issues/2457)) ([bbb07bc](https://github.com/5dlabs/cto/commit/bbb07bc77a9e042a672b6543dc7d2a51fd7411ea))
+
+
+### 🔧 Maintenance
+
+* bump TaskMaster to 0.36.0 ([#2460](https://github.com/5dlabs/cto/issues/2460)) ([7a00c09](https://github.com/5dlabs/cto/commit/7a00c09b2ac409aa751ecb9573d2026d05a510e7))
+
 ## [0.12.12](https://github.com/5dlabs/cto/compare/v0.12.11...v0.12.12) (2025-12-02)
 
 
