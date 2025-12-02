@@ -30,10 +30,12 @@ RUN sed -i 's/const nextConfig: NextConfig = {/const nextConfig: NextConfig = {\
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Provide properly formatted dummy DATABASE_URL for build
-# The Neon driver validates the URL format but doesn't connect during build
-# At runtime, this gets replaced by the actual env var
+# Provide dummy environment variables for build
+# These are required by the app during Next.js page collection but don't need real values
+# At runtime, they get replaced by actual env vars
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?sslmode=disable"
+ENV BETTER_AUTH_SECRET="build-time-dummy-secret-not-used-at-runtime"
+ENV POLAR_WEBHOOK_SECRET="build-time-dummy-secret-not-used-at-runtime"
 
 # Skip prebuild and run next build directly
 RUN pnpm exec next build
