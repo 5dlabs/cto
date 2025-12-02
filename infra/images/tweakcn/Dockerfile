@@ -29,8 +29,12 @@ RUN sed -i 's/const nextConfig: NextConfig = {/const nextConfig: NextConfig = {\
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Skip prebuild (generate-theme-registry requires database connection)
-# Run next build directly instead of pnpm run build
+# Provide properly formatted dummy DATABASE_URL for build
+# The Neon driver validates the URL format but doesn't connect during build
+# At runtime, this gets replaced by the actual env var
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?sslmode=disable"
+
+# Skip prebuild and run next build directly
 RUN pnpm exec next build
 
 # Production image
