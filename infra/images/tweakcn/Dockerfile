@@ -1,6 +1,6 @@
 # Tweakcn - Visual Theme Editor for shadcn/ui
 # Built from upstream: https://github.com/jnsahaj/tweakcn
-# Build trigger: Initial GHCR image push
+# Build trigger: HEAL-2485 - Initial GHCR image push for deployment
 
 FROM node:20-alpine AS base
 
