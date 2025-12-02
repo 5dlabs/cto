@@ -20,14 +20,14 @@ const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 /// Supported Anthropic models
 const SUPPORTED_MODELS: &[&str] = &[
     // Claude 4.5 models (latest)
-    "claude-opus-4-5-20250929",
+    "claude-opus-4-5-20251101",
     "claude-sonnet-4-5-20250929",
     // Claude 4.1 models
     "claude-opus-4-1-20250805",
     // Claude 4 models
     "claude-sonnet-4-20250514",
-    // Claude 3.5 models
-    "claude-3-5-sonnet-20241022",
+    // Claude 3.5 models (deprecated, but kept for backwards compatibility tests)
+    // Note: claude-3-5-sonnet-20241022 was removed from Anthropic API
     "claude-3-5-haiku-20241022",
     // Claude 3 models
     "claude-3-opus-20240229",

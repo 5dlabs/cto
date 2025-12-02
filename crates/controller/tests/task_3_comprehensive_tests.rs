@@ -563,10 +563,10 @@ async fn test_fr5_claude_adapter_reference_implementation() {
     );
     assert!(
         adapter
-            .validate_model("claude-3-5-sonnet-20241022")
+            .validate_model("claude-sonnet-4-5-20250929")
             .await
             .expect("Model validation must work"),
-        "ClaudeAdapter must accept Claude 3.5 models"
+        "ClaudeAdapter must accept Claude 4.5 models"
     );
     assert!(
         adapter

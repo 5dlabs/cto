@@ -58,7 +58,7 @@ spec:
       - name: testing-agent
         value: "5DLabs-Tess"
       - name: model
-        value: "claude-3-5-sonnet-20241022"
+        value: "claude-sonnet-4-5-20250929"
 EOF
 
 # Submit workflow
