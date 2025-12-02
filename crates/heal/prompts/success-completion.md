@@ -29,6 +29,7 @@
 heal spawn-remediation \
   --alert completion \
   --task-id {{task_id}} \
+  --target-pod "{{pod_name}}" \
   --issue-file /workspace/watch/completion/{{agent}}-{{pod_name}}.md
 ```
 

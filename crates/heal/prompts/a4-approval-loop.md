@@ -102,5 +102,6 @@ $(cat ${ISSUE_DIR}/acceptance-criteria.md)"
 heal spawn-remediation \
   --alert a4 \
   --task-id {{task_id}} \
+  --target-pod "{{pod_name}}" \
   --issue-number ${ISSUE_NUMBER}
 ```
