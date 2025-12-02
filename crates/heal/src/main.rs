@@ -4497,6 +4497,8 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
     let mut coderun_tracker = alerts::CodeRunTracker::new();
     // Track which CodeRuns we've already alerted on (to avoid spam)
     let mut alerted_coderuns: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Track which pods we've already alerted on (key: "alert_id:pod_name")
+    let mut alerted_pods: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // Create a channel for events from both watches
     let (tx, mut rx) = mpsc::channel::<AlertWatchEvent>(100);
@@ -4597,6 +4599,15 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                 let pod = parse_pod_from_json(&event_json["object"], namespace);
                 let event_type = event_json["type"].as_str().unwrap_or("");
 
+                // Clean up alerted_pods when pod is deleted (truly gone)
+                // Must run BEFORE exclusion check to prevent unbounded memory growth
+                // for pods that were alerted on before getting the exclusion label
+                if event_type == "DELETED" {
+                    let suffix = format!(":{}", pod.name);
+                    alerted_pods.retain(|key| !key.ends_with(&suffix));
+                    continue; // Nothing more to do for deleted pods
+                }
+
                 // Check for exclusion label - skip monitoring this pod if excluded
                 if dedup::should_exclude_pod(&pod.labels) {
                     debug!(pod = %pod.name, "Skipping excluded pod (heal.platform/exclude=true)");
@@ -4643,8 +4654,25 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                 // Evaluate all alert handlers
                 let detected_alerts = registry.evaluate(&k8s_event, &github_state, &alert_ctx);
 
-                // Process each detected alert
+                // Process each detected alert (with deduplication)
                 for alert in detected_alerts {
+                    // Build dedup key: "alert_id:pod_name"
+                    let dedup_key = format!("{}:{}", alert.id.as_str(), pod.name);
+
+                    // Skip if we've already alerted on this combination
+                    if alerted_pods.contains(&dedup_key) {
+                        println!(
+                            "{}",
+                            format!(
+                                "⏭️  Skipping duplicate alert {}: {} (already alerted)",
+                                alert.id.as_str(),
+                                pod.name
+                            )
+                            .dimmed()
+                        );
+                        continue;
+                    }
+
                     println!(
                         "{}",
                         format!(
@@ -4655,6 +4683,9 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                         )
                         .red()
                     );
+
+                    // Mark as alerted BEFORE handling to prevent races
+                    alerted_pods.insert(dedup_key);
 
                     // Handle the alert (load prompt, fetch logs, spawn Factory)
                     handle_detected_alert(&alert, &pod, namespace, prompts_dir, dry_run).await?;
