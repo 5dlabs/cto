@@ -277,8 +277,10 @@ Focus on addressing the above items before re-checking acceptance criteria."
     echo "📋 Running: $CLAUDE_CMD -p [prompt]"
     
     set +e
+    set -f  # Disable glob expansion to prevent mcp__* from being expanded
     $CLAUDE_CMD -p "${PROMPT_CONTENT}"
     AGENT_EXIT=$?
+    set +f  # Re-enable glob expansion
     set -e
 
     echo ""
