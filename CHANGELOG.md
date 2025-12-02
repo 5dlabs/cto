@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.15](https://github.com/5dlabs/cto/compare/v0.12.14...v0.12.15) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** fix Docker build paths for controller and heal images ([795adbf](https://github.com/5dlabs/cto/commit/795adbfe0b83f257dea8bbad4e25d29c76870f0f))
+* **intake:** use anthropic provider instead of claude-code ([#2468](https://github.com/5dlabs/cto/issues/2468)) ([149e931](https://github.com/5dlabs/cto/commit/149e931e8ee52d57b4a3b4996a9d826684dec062))
+
+
+### ⚡ Performance
+
+* **ci:** optimize runtime image build with registry cache ([#2464](https://github.com/5dlabs/cto/issues/2464)) ([c189e9e](https://github.com/5dlabs/cto/commit/c189e9ee8d40e7e1d9305b0ad1fa5c71ac4f4b14))
+
 ## [0.12.14](https://github.com/5dlabs/cto/compare/v0.12.13...v0.12.14) (2025-12-02)
 
 
