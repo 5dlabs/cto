@@ -1,0 +1,95 @@
+================================================================================
+  CTO Platform - Unified Deployment
+================================================================================
+
+Thank you for installing {{ .Chart.Name }} version {{ .Chart.Version }}!
+
+COMPONENTS DEPLOYED:
+{{- if .Values.controller.enabled }}
+  ✓ Controller     - Agent Platform Controller (manages CodeRun CRDs)
+{{- end }}
+{{- if .Values.tools.enabled }}
+  ✓ Tools          - MCP Tool Management Server
+{{- end }}
+{{- if .Values.openmemory.enabled }}
+  ✓ OpenMemory     - AI Agent Memory System
+{{- end }}
+{{- if .Values.heal.enabled }}
+  ✓ Heal           - Self-Healing Platform Monitor
+{{- end }}
+{{- if .Values.workflows.enabled }}
+  ✓ Workflows      - Argo WorkflowTemplates
+{{- end }}
+{{- if .Values.sensors.enabled }}
+  ✓ Sensors        - Argo Event Sensors
+{{- end }}
+{{- if .Values.webhooks.enabled }}
+  ✓ Webhooks       - GitHub EventSource & EventBus
+{{- end }}
+
+NAMESPACES:
+  • CTO Components:  {{ include "cto.namespace" . }}
+  • Automation:      {{ include "cto.automationNamespace" . }}
+
+ACCESSING SERVICES:
+
+{{- if .Values.controller.enabled }}
+Controller API:
+  kubectl port-forward -n {{ include "cto.namespace" . }} svc/cto-controller 8080:80
+  curl http://localhost:8080/health
+{{- end }}
+
+{{- if .Values.tools.enabled }}
+Tools MCP Server:
+  kubectl port-forward -n {{ include "cto.namespace" . }} svc/tools 3000:3000
+  # Configure your MCP client to connect to http://localhost:3000
+{{- end }}
+
+{{- if .Values.openmemory.enabled }}
+OpenMemory API:
+  kubectl port-forward -n {{ include "cto.namespace" . }} svc/openmemory 8080:8080
+  curl http://localhost:8080/health
+{{- end }}
+
+{{- if .Values.heal.enabled }}
+Heal File Browser:
+  kubectl port-forward -n {{ include "cto.namespace" . }} svc/heal-filebrowser 8081:8081
+  open http://localhost:8081
+{{- end }}
+
+PERSISTENT VOLUMES:
+  The following PVCs have retention policies to prevent data loss:
+{{- if .Values.tools.enabled }}
+  • tools-data ({{ .Values.tools.persistence.size | default "10Gi" }})
+{{- end }}
+{{- if .Values.openmemory.enabled }}
+  • openmemory-data ({{ .Values.openmemory.database.storage.size | default "20Gi" }})
+{{- end }}
+{{- if .Values.healResources.enabled }}
+  • heal-workspace ({{ .Values.healResources.pvc.size | default "10Gi" }})
+{{- end }}
+
+WEBHOOK ENDPOINT:
+{{- if .Values.webhooks.enabled }}
+  GitHub webhooks: https://{{ .Values.webhooks.networking.hostname }}/github/webhook
+  Ensure your GitHub organization webhook is configured to send events here.
+{{- end }}
+
+NEXT STEPS:
+
+1. Verify all pods are running:
+   kubectl get pods -n {{ include "cto.namespace" . }}
+   kubectl get pods -n {{ include "cto.automationNamespace" . }}
+
+2. Check ArgoCD sync status (if using GitOps):
+   argocd app get cto
+
+3. View controller logs:
+   kubectl logs -n {{ include "cto.namespace" . }} -l app.kubernetes.io/name=controller -f
+
+4. Test the MCP tools:
+   kubectl exec -n {{ include "cto.namespace" . }} -it deploy/tools -- curl localhost:3000/health
+
+For more information, visit: {{ .Chart.Home }}
+================================================================================
+

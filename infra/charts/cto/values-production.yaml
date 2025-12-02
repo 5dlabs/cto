@@ -1,0 +1,192 @@
+---
+# =============================================================================
+# CTO Platform Production Values
+# =============================================================================
+# Production-specific overrides for the unified CTO chart.
+# These values are applied on top of values.yaml when deploying to production.
+
+# =============================================================================
+# Global Production Settings
+# =============================================================================
+global:
+  namespace: cto
+  automationNamespace: automation
+  imageRegistry: ghcr.io/5dlabs
+  storageClass: local-path
+
+# =============================================================================
+# Controller - Production Configuration
+# =============================================================================
+controller:
+  enabled: true
+
+  image:
+    repository: ghcr.io/5dlabs/controller
+    tag: latest
+    pullPolicy: Always
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+# =============================================================================
+# Tools - Production Configuration
+# =============================================================================
+tools:
+  enabled: true
+
+  image:
+    repository: ghcr.io/5dlabs/tools
+    tag: latest
+    pullPolicy: Always
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 10Gi
+
+# =============================================================================
+# OpenMemory - Production Configuration
+# =============================================================================
+openmemory:
+  enabled: true
+
+  image:
+    repository: ghcr.io/5dlabs/openmemory
+    tag: latest
+    pullPolicy: Always
+
+  database:
+    storage:
+      size: 20Gi
+      storageClassName: local-path
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  monitoring:
+    enabled: true
+    metrics:
+      enabled: true
+
+  api:
+    rateLimit:
+      enabled: true
+      maxRequests: 2000
+
+# =============================================================================
+# Heal - Production Configuration
+# =============================================================================
+heal:
+  enabled: true
+
+  image:
+    repository: ghcr.io/5dlabs/heal
+    tag: latest
+    pullPolicy: Always
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# =============================================================================
+# Heal Resources - Production Configuration
+# =============================================================================
+healResources:
+  enabled: true
+
+  pvc:
+    name: heal-workspace
+    storageClass: local-path
+    size: 10Gi
+
+# =============================================================================
+# Workflow Templates - Production Configuration
+# =============================================================================
+workflows:
+  enabled: true
+  crdNamespace: cto
+
+# =============================================================================
+# Sensors - Production Configuration
+# =============================================================================
+sensors:
+  enabled: true
+
+  bolt:
+    enabled: true
+    production:
+      enabled: true
+    preview:
+      enabled: true
+    monitor:
+      enabled: true
+
+  stitch:
+    enabled: true
+
+  ciRemediation:
+    enabled: true
+
+  rexRemediation:
+    enabled: true
+
+# =============================================================================
+# Webhooks - Production Configuration
+# =============================================================================
+webhooks:
+  enabled: true
+
+  eventBus:
+    name: default
+    nats:
+      replicas: 1
+
+  eventSource:
+    name: github
+    organizations:
+      - "5dlabs"
+    webhookEndpoint: /github/webhook
+    webhookPort: "12000"
+    secretName: github-webhook-secret
+    secretKey: secret
+
+  networking:
+    enabled: true
+    hostname: github.public.5dlabs.ai
+    gateway:
+      name: public-gateway
+      namespace: automation
+    service:
+      name: github-eventsource-svc
+      port: 12000
+
+  rbac:
+    enabled: true
+

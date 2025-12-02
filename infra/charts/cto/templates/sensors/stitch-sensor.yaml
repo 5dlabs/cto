@@ -1,0 +1,170 @@
+{{- if and .Values.sensors.enabled .Values.sensors.stitch.enabled }}
+{{- $automationNs := include "cto.automationNamespace" . }}
+{{- $ctoNs := include "cto.namespace" . }}
+---
+# Stitch PR Review Sensor
+# Triggers Stitch to review PRs on pull_request events
+# Creates a CodeRun CRD with runType: "review" which the controller processes
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: stitch-pr-review
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.sensor.labels" . | nindent 4 }}
+    agent: stitch
+    event-type: github-pr-review
+spec:
+  replicas: 1
+  template:
+    serviceAccountName: argo-events-sa
+    container:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+  dependencies:
+    - name: pr-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        exprLogicalOperator: "and"
+        data:
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - synchronize
+              - reopened
+        exprs:
+          # Exclude bot users
+          - expr: >-
+              !(
+                body.pull_request.user.login contains "[bot]" ||
+                body.pull_request.user.login == "github-actions" ||
+                body.pull_request.user.login == "dependabot" ||
+                body.pull_request.user.login == "renovate"
+              )
+            fields:
+              - name: body.pull_request.user.login
+                path: body.pull_request.user.login
+          # Exclude release-please branches
+          - expr: >-
+              !(body.pull_request.head.ref contains "release-please")
+            fields:
+              - name: body.pull_request.head.ref
+                path: body.pull_request.head.ref
+          # Exclude auto-release/dependency PR titles
+          - expr: >-
+              !(
+                body.pull_request.title startsWith "chore: release" ||
+                body.pull_request.title startsWith "chore(deps)" ||
+                body.pull_request.title startsWith "chore(release)" ||
+                body.pull_request.title contains "[skip review]" ||
+                body.pull_request.title contains "[no review]"
+              )
+            fields:
+              - name: body.pull_request.title
+                path: body.pull_request.title
+  triggers:
+    - template:
+        name: stitch-review-coderun
+        conditions: pr-event
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform/v1
+              kind: CodeRun
+              metadata:
+                generateName: stitch-review-
+                namespace: {{ $ctoNs }}
+                labels:
+                  agent: stitch
+                  run-type: review
+                  pr-number: ""
+              spec:
+                runType: review
+                service: stitch-review
+                repositoryUrl: ""
+                docsRepositoryUrl: ""
+                docsBranch: main
+                model: claude-opus-4-5-20251101
+                githubApp: 5DLabs-Stitch
+                contextVersion: 1
+                continueSession: false
+                overwriteMemory: false
+                enableDocker: false
+                env:
+                  PR_NUMBER: ""
+                  HEAD_SHA: ""
+                  BASE_BRANCH: ""
+                  HEAD_BRANCH: ""
+                  PR_TITLE: ""
+                  PR_AUTHOR: ""
+                  TRIGGER: pull_request
+                  REVIEW_MODE: review
+                  REPO_SLUG: ""
+                envFromSecrets:
+                  - name: FACTORY_API_KEY
+                    secretName: cto-secrets
+                    secretKey: FACTORY_API_KEY
+                  - name: ANTHROPIC_API_KEY
+                    secretName: cto-secrets
+                    secretKey: ANTHROPIC_API_KEY
+                cliConfig:
+                  cliType: factory
+                  model: claude-opus-4-5-20251101
+                  settings:
+                    template: review/factory
+                    autoLevel: high
+          parameters:
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.number
+              dest: metadata.labels.pr-number
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.number
+              dest: spec.env.PR_NUMBER
+            - src:
+                dependencyName: pr-event
+                dataKey: body.repository.html_url
+              dest: spec.repositoryUrl
+            - src:
+                dependencyName: pr-event
+                dataKey: body.repository.html_url
+              dest: spec.docsRepositoryUrl
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.head.sha
+              dest: spec.env.HEAD_SHA
+            - src:
+                dependencyName: pr-event
+                dataKey: body.repository.full_name
+              dest: spec.env.REPO_SLUG
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.base.ref
+              dest: spec.env.BASE_BRANCH
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.head.ref
+              dest: spec.env.HEAD_BRANCH
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.title
+              dest: spec.env.PR_TITLE
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.user.login
+              dest: spec.env.PR_AUTHOR
+{{- end }}
+

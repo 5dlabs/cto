@@ -1,0 +1,19 @@
+{{- if .Values.healResources.enabled }}
+---
+# ConfigMap containing heal configuration for remediation CodeRuns
+# Maps directly to CodeRun CRD fields
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: heal-config
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.heal.labels" . | nindent 4 }}
+    app.kubernetes.io/name: heal-config
+data:
+  heal-config.json: |
+    {
+      "coderun": {{ .Values.healResources.config.coderun | toJson }}
+    }
+{{- end }}
+

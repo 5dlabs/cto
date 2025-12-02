@@ -1,0 +1,18 @@
+{{- if .Values.webhooks.enabled }}
+{{- $automationNs := include "cto.automationNamespace" . }}
+---
+# EventBus for Argo Events
+# Required for sensors to receive events
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: {{ .Values.webhooks.eventBus.name | default "default" }}
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+spec:
+  nats:
+    native:
+      replicas: {{ .Values.webhooks.eventBus.nats.replicas | default 1 }}
+{{- end }}
+

@@ -135,7 +135,7 @@ impl Widget for InstallProgress<'_> {
             let suffix_x = area.x + 5 + item.name.len() as u16 + 2;
             if let Some(elapsed) = item.elapsed_secs {
                 let time_str = format_duration(elapsed);
-                buf.set_string(suffix_x, y, &format!("[{time_str}]"), Theme::text_dim());
+                buf.set_string(suffix_x, y, format!("[{time_str}]"), Theme::text_dim());
             } else if matches!(item.status, ComponentStatus::Installing) {
                 buf.set_string(suffix_x, y, "installing...", Theme::text_muted());
             }

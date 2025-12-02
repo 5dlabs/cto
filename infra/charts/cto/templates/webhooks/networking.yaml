@@ -1,0 +1,58 @@
+{{- if and .Values.webhooks.enabled .Values.webhooks.networking.enabled }}
+{{- $automationNs := include "cto.automationNamespace" . }}
+---
+# Service for GitHub EventSource
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.webhooks.networking.service.name | default "github-eventsource-svc" }}
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+    app.kubernetes.io/name: github-eventsource
+spec:
+  type: ClusterIP
+  selector:
+    eventsource-name: {{ .Values.webhooks.eventSource.name | default "github" }}
+  ports:
+    - name: webhook
+      port: {{ .Values.webhooks.networking.service.port | default 12000 }}
+      protocol: TCP
+      targetPort: {{ .Values.webhooks.networking.service.port | default 12000 }}
+
+---
+# HTTPRoute for GitHub webhooks
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: github-webhooks
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/ignore-differences: |
+      jsonPointers:
+      - /status
+      - /metadata/annotations
+      - /metadata/managedFields
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.webhooks.networking.gateway.name | default "public-gateway" }}
+      namespace: {{ .Values.webhooks.networking.gateway.namespace | default $automationNs }}
+  hostnames:
+    - {{ .Values.webhooks.networking.hostname | default "github.public.5dlabs.ai" | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.webhooks.eventSource.webhookEndpoint | default "/github/webhook" }}
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ .Values.webhooks.networking.service.name | default "github-eventsource-svc" }}
+          port: {{ .Values.webhooks.networking.service.port | default 12000 }}
+          weight: 1
+{{- end }}
+

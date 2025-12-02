@@ -1,0 +1,27 @@
+{{- if .Values.healResources.enabled }}
+---
+# PersistentVolumeClaim for heal workspace
+# Used by heal monitor (local-path only supports ReadWriteOnce)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.healResources.pvc.name | default "heal-workspace" }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.heal.labels" . | nindent 4 }}
+    app.kubernetes.io/name: heal-workspace
+  annotations:
+    # CRITICAL: Prevent PVC deletion during helm uninstall/upgrade
+    {{- include "cto.pvcRetentionAnnotation" . | nindent 4 }}
+    {{- with .Values.healResources.pvc.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.healResources.pvc.storageClass | default (include "cto.storageClass" .) }}
+  resources:
+    requests:
+      storage: {{ .Values.healResources.pvc.size | default "10Gi" }}
+{{- end }}
+

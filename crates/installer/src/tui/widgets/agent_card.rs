@@ -44,25 +44,22 @@ impl Widget for AgentCard<'_> {
         let agent_style = Theme::agent(self.agent.name);
 
         // Build the card content
-        let mut lines = Vec::new();
-
-        // Agent name and role header
-        lines.push(Line::from(vec![
-            Span::styled(self.agent.name, agent_style.add_modifier(Modifier::BOLD)),
-            Span::styled(" - ", Theme::text_dim()),
-            Span::styled(self.agent.role, Theme::text_muted()),
-        ]));
-
-        lines.push(Line::from(""));
-
-        // Speech bubble with message
-        lines.push(Line::from(vec![
-            Span::styled("\"", Theme::text_dim()),
-            Span::styled(self.message, Theme::text()),
-            Span::styled("\"", Theme::text_dim()),
-        ]));
-
-        lines.push(Line::from(""));
+        let mut lines = vec![
+            // Agent name and role header
+            Line::from(vec![
+                Span::styled(self.agent.name, agent_style.add_modifier(Modifier::BOLD)),
+                Span::styled(" - ", Theme::text_dim()),
+                Span::styled(self.agent.role, Theme::text_muted()),
+            ]),
+            Line::from(""),
+            // Speech bubble with message
+            Line::from(vec![
+                Span::styled("\"", Theme::text_dim()),
+                Span::styled(self.message, Theme::text()),
+                Span::styled("\"", Theme::text_dim()),
+            ]),
+            Line::from(""),
+        ];
 
         // ASCII art
         for line in self.agent.ascii_art.lines() {

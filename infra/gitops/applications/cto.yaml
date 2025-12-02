@@ -1,0 +1,172 @@
+---
+# Unified CTO Platform ArgoCD Application
+# This single application manages all CTO platform components:
+# - Controller (agent platform controller)
+# - Tools (MCP tool management server)
+# - OpenMemory (AI agent memory system)
+# - Heal (self-healing platform monitor)
+# - Workflow Templates (Argo WorkflowTemplates)
+# - Sensors (Argo Event sensors for Bolt, Stitch, CI remediation, Rex)
+# - Webhooks (GitHub EventSource, EventBus, networking)
+#
+# This replaces 13+ individual ArgoCD applications with a single umbrella chart.
+#
+# Image updates are managed by ArgoCD Image Updater:
+# - Watches ghcr.io/5dlabs/* for new semver tags
+# - Automatically updates image.tag parameters
+# - ArgoCD syncs and rolls out new versions
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    # ═══════════════════════════════════════════════════════════════════
+    # ArgoCD Image Updater Configuration
+    # Enables automatic image updates for all CTO components
+    # ═══════════════════════════════════════════════════════════════════
+    argocd-image-updater.argoproj.io/image-list: |
+      controller=ghcr.io/5dlabs/controller,
+      tools=ghcr.io/5dlabs/tools,
+      heal=ghcr.io/5dlabs/heal,
+      openmemory=ghcr.io/5dlabs/openmemory
+    # Update strategies
+    argocd-image-updater.argoproj.io/controller.update-strategy: semver
+    argocd-image-updater.argoproj.io/controller.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/tools.update-strategy: semver
+    argocd-image-updater.argoproj.io/tools.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/heal.update-strategy: semver
+    argocd-image-updater.argoproj.io/heal.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/openmemory.update-strategy: semver
+    argocd-image-updater.argoproj.io/openmemory.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    # Write back method (argocd = parameter override, no git commit)
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+    # Helm parameter mappings
+    argocd-image-updater.argoproj.io/controller.helm.image-tag: controller.image.tag
+    argocd-image-updater.argoproj.io/tools.helm.image-tag: tools.image.tag
+    argocd-image-updater.argoproj.io/heal.helm.image-tag: heal.image.tag
+    argocd-image-updater.argoproj.io/openmemory.helm.image-tag: openmemory.image.tag
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  # Source configuration - unified CTO chart
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/charts/cto
+
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-production.yaml
+
+      # Override values for production deployment
+      parameters:
+        # Controller image (use latest until semver tagging)
+        - name: controller.image.tag
+          value: latest
+        - name: controller.image.pullPolicy
+          value: Always
+
+        # Tools image
+        - name: tools.image.tag
+          value: latest
+        - name: tools.image.pullPolicy
+          value: Always
+
+        # Heal image
+        - name: heal.image.tag
+          value: latest
+        - name: heal.image.pullPolicy
+          value: Always
+
+        # OpenMemory image
+        - name: openmemory.image.tag
+          value: latest
+        - name: openmemory.image.pullPolicy
+          value: Always
+
+  # Destination configuration
+  # Note: Resources deploy to multiple namespaces (cto, automation)
+  # The chart templates specify namespace explicitly
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences for better GitOps experience
+  ignoreDifferences:
+    # Completely ignore CRDs to prevent duplication warnings
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /
+    # Ignore deployment replicas (managed by HPA/manual scaling)
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    # Ignore secret data changes (managed externally by Vault)
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    # Ignore last-applied-configuration annotation on large ConfigMaps
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+    # Ignore HTTPRoute status (managed by gateway controller)
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jsonPointers:
+        - /status
+        - /metadata/annotations
+        - /metadata/managedFields
+    # Ignore EventSource status
+    - group: argoproj.io
+      kind: EventSource
+      jsonPointers:
+        - /status
+    # Ignore Sensor status
+    - group: argoproj.io
+      kind: Sensor
+      jsonPointers:
+        - /status
+    # Ignore EventBus status
+    - group: argoproj.io
+      kind: EventBus
+      jsonPointers:
+        - /status
+
+  # Revision history
+  revisionHistoryLimit: 10
+

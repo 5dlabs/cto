@@ -1,0 +1,70 @@
+{{- if .Values.healResources.enabled }}
+---
+# Heal ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: heal
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.heal.labels" . | nindent 4 }}
+
+---
+# Heal Role - permissions within cto namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: heal
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.heal.labels" . | nindent 4 }}
+rules:
+  # Watch and get pods for alert detection
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Get pod logs for completion analysis
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+
+  # Create and manage CodeRun CRDs for spawning remediation agents
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Read ConfigMaps (for prompts, config)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Read secrets (for API keys)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+
+  # Watch workflows for status
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Heal RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: heal
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.heal.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: heal
+    namespace: {{ include "cto.namespace" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: heal
+{{- end }}
+

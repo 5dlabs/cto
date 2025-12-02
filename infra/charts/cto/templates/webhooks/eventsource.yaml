@@ -1,0 +1,39 @@
+{{- if .Values.webhooks.enabled }}
+{{- $automationNs := include "cto.automationNamespace" . }}
+---
+# GitHub EventSource
+# Receives webhooks from GitHub and publishes to EventBus
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: {{ .Values.webhooks.eventSource.name | default "github" }}
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhooks
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: webhooks
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: github-webhooks
+  github:
+    org:
+      events:
+        - "*"
+      organizations:
+        {{- range .Values.webhooks.eventSource.organizations }}
+        - {{ . | quote }}
+        {{- end }}
+      webhook:
+        endpoint: {{ .Values.webhooks.eventSource.webhookEndpoint | default "/github/webhook" }}
+        port: {{ .Values.webhooks.eventSource.webhookPort | default "12000" | quote }}
+      secret:
+        name: {{ .Values.webhooks.eventSource.secretName | default "github-webhook-secret" }}
+        key: {{ .Values.webhooks.eventSource.secretKey | default "secret" }}
+{{- end }}
+

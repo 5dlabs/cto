@@ -1,0 +1,488 @@
+---
+# =============================================================================
+# CTO Platform Unified Values
+# =============================================================================
+# This file configures all CTO platform components as a single deployable unit.
+# Each section corresponds to a subchart or template directory.
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+global:
+  # Primary namespace for CTO components
+  namespace: cto
+  # Namespace for Argo Events sensors and webhooks
+  automationNamespace: automation
+
+  # Image registry for all CTO images
+  imageRegistry: ghcr.io/5dlabs
+
+  # Image pull secrets (shared across all components)
+  imagePullSecrets:
+    - name: ghcr-secret
+
+  # Storage class for PVCs
+  storageClass: local-path
+
+  # Common labels applied to all resources
+  labels:
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/managed-by: helm
+
+# =============================================================================
+# Controller - Agent Platform Controller
+# =============================================================================
+# Manages Claude Code agents via TaskRun CRDs
+controller:
+  enabled: true
+
+  # Image configuration
+  image:
+    repository: ghcr.io/5dlabs/controller
+    tag: latest
+    pullPolicy: Always
+
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  # Metrics configuration
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  # All other controller values are inherited from charts/controller/values.yaml
+
+# =============================================================================
+# Tools - MCP Tool Management Server
+# =============================================================================
+# Dynamic MCP tool management and proxy server
+tools:
+  enabled: true
+
+  # Image configuration
+  image:
+    repository: ghcr.io/5dlabs/tools
+    tag: latest
+    pullPolicy: Always
+
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+  # Persistence for temporary files and caches
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 10Gi
+    annotations:
+      helm.sh/resource-policy: keep
+
+  # All other tools values are inherited from charts/tools/values.yaml
+
+# =============================================================================
+# OpenMemory - AI Agent Memory System
+# =============================================================================
+# Long-term memory system for AI agents
+openmemory:
+  enabled: true
+
+  # Image configuration
+  image:
+    repository: ghcr.io/5dlabs/openmemory
+    tag: latest
+    pullPolicy: Always
+
+  # Database storage
+  database:
+    storage:
+      size: 20Gi
+      storageClassName: local-path
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  # Persistence with retention policy
+  persistence:
+    enabled: true
+    annotations:
+      helm.sh/resource-policy: keep
+
+  # Monitoring
+  monitoring:
+    enabled: true
+    metrics:
+      enabled: true
+
+  # API rate limiting
+  api:
+    rateLimit:
+      enabled: true
+      maxRequests: 2000
+
+# =============================================================================
+# Heal - Self-Healing Platform Monitor
+# =============================================================================
+# Uses universal-app chart with custom configuration
+heal:
+  enabled: true
+
+  # Heal-specific values (passed to universal-app subchart)
+  replicaCount: 1
+  revisionHistoryLimit: 5
+
+  image:
+    repository: ghcr.io/5dlabs/heal
+    pullPolicy: Always
+    tag: latest
+
+  imagePullSecrets:
+    - name: ghcr-secret
+
+  fullnameOverride: heal
+
+  serviceAccount:
+    create: false
+    automount: true
+    name: heal
+
+  podAnnotations:
+    logs.platform.5dlabs.io/collect: "true"
+    logs.platform.5dlabs.io/service: heal
+
+  podLabels:
+    app.kubernetes.io/component: monitor
+    platform.5dlabs.io/log-collection: enabled
+
+  podSecurityContext:
+    fsGroup: 65532
+
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - DAC_OVERRIDE
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    runAsUser: 0
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: false
+
+  terminationGracePeriodSeconds: 30
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  livenessProbe:
+    exec:
+      command: ["pgrep", "-f", "heal"]
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    failureThreshold: 3
+
+  readinessProbe:
+    exec:
+      command: ["pgrep", "-f", "heal"]
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+  autoscaling:
+    enabled: false
+
+  volumes:
+    - name: heal-workspace
+      persistentVolumeClaim:
+        claimName: heal-workspace
+    - name: heal-config
+      configMap:
+        name: heal-config
+
+  volumeMounts:
+    - name: heal-workspace
+      mountPath: /workspace/watch
+    - name: heal-config
+      mountPath: /app/heal-config.json
+      subPath: heal-config.json
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  configureDefaultAffinity: false
+
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  env:
+    - name: LOG_LEVEL
+      value: info
+    - name: RUST_LOG
+      value: heal=debug,info
+    - name: ANTHROPIC_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: cto-secrets
+          key: ANTHROPIC_API_KEY
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: tools-github-secrets
+          key: GITHUB_PERSONAL_ACCESS_TOKEN
+    - name: FACTORY_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: cto-secrets
+          key: FACTORY_API_KEY
+
+  envFrom: []
+
+  configMap:
+    enabled: false
+
+  persistence:
+    enabled: false
+
+  networkPolicy:
+    enabled: false
+
+  command:
+    - /usr/local/bin/heal
+
+  args:
+    - alert-watch
+    - --namespace
+    - cto
+    - --prompts-dir
+    - /app/prompts
+
+  skipDefaultInitContainers: true
+
+  extraInitContainers:
+    - name: fix-pvc-permissions
+      image: busybox:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Fixing PVC permissions for shared workspace..."
+          mkdir -p /workspace/watch/logs /workspace/watch/alerts /workspace/watch/completion /workspace/watch/locks
+          chmod -R 777 /workspace/watch
+          echo "Permissions fixed."
+      volumeMounts:
+        - name: heal-workspace
+          mountPath: /workspace/watch
+
+  extraContainers:
+    - name: filebrowser
+      image: filebrowser/filebrowser:latest
+      args:
+        - --noauth
+        - --root=/srv
+        - --address=0.0.0.0
+        - --port=8081
+      ports:
+        - containerPort: 8081
+          name: filebrowser
+          protocol: TCP
+      resources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+      volumeMounts:
+        - name: heal-workspace
+          mountPath: /srv
+    - name: log-tailer
+      image: busybox:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for log directory..."
+          mkdir -p /workspace/watch/logs
+          while true; do
+            if ls /workspace/watch/logs/*.log 1>/dev/null 2>&1; then
+              tail -F /workspace/watch/logs/*.log 2>/dev/null || sleep 5
+            else
+              echo "No logs yet, waiting..."
+              sleep 10
+            fi
+          done
+      volumeMounts:
+        - name: heal-workspace
+          mountPath: /workspace/watch
+
+# =============================================================================
+# Workflow Templates - Argo WorkflowTemplates
+# =============================================================================
+# Deploys to automation namespace
+workflows:
+  enabled: true
+
+  # Namespace configuration
+  crdNamespace: cto
+
+  # Argo settings
+  argo:
+    enabled: true
+
+  # Storage configuration
+  storage:
+    storageClassName: local-path
+
+  # Agent CLI images
+  agent:
+    cliImages:
+      codex:
+        repository: ghcr.io/5dlabs/codex
+        tag: latest
+      opencode:
+        repository: ghcr.io/5dlabs/opencode
+        tag: latest
+      claude:
+        repository: ghcr.io/5dlabs/claude
+        tag: latest
+      cursor:
+        repository: ghcr.io/5dlabs/cursor
+        tag: latest
+      factory:
+        repository: ghcr.io/5dlabs/factory
+        tag: latest
+
+# =============================================================================
+# Heal Resources - RBAC, PVC, ConfigMap
+# =============================================================================
+# These are deployed directly by the umbrella chart (not a subchart)
+healResources:
+  enabled: true
+
+  # PVC configuration
+  pvc:
+    name: heal-workspace
+    storageClass: local-path
+    size: 10Gi
+    annotations:
+      helm.sh/resource-policy: keep
+
+  # ConfigMap for heal configuration
+  config:
+    coderun:
+      namespace: cto
+      githubApp: "5DLabs-Rex"
+      model: "claude-opus-4-5-20251101"
+      repositoryUrl: "https://github.com/5dlabs/cto"
+      docsRepositoryUrl: "https://github.com/5dlabs/cto"
+      docsProjectDirectory: "docs"
+      docsBranch: "main"
+      workingDirectory: "."
+      service: "heal"
+      runType: "implementation"
+      enableDocker: false
+      remoteTools: "mcp_tools_github_*,mcp_tools_kubernetes_*,mcp_tools_argocd_*,mcp_tools_cto_*,mcp_tools_context7_*,mcp_tools_firecrawl_*,mcp_tools_grafana_*"
+      localTools: ""
+      cliConfig:
+        cliType: "claude"
+        model: "claude-opus-4-5-20251101"
+        settings:
+          template: "heal/claude"
+
+# =============================================================================
+# Sensors - Argo Event Sensors
+# =============================================================================
+# All sensors deploy to automation namespace
+sensors:
+  enabled: true
+
+  # Bolt sensors
+  bolt:
+    enabled: true
+    production:
+      enabled: true
+    preview:
+      enabled: true
+    monitor:
+      enabled: true
+
+  # Stitch PR review sensor
+  stitch:
+    enabled: true
+
+  # CI remediation sensor
+  ciRemediation:
+    enabled: true
+
+  # Rex remediation sensor
+  rexRemediation:
+    enabled: true
+
+# =============================================================================
+# Webhooks - GitHub EventSource and EventBus
+# =============================================================================
+# Deploys to automation namespace
+webhooks:
+  enabled: true
+
+  # EventBus configuration
+  eventBus:
+    name: default
+    nats:
+      replicas: 1
+
+  # GitHub EventSource
+  eventSource:
+    name: github
+    organizations:
+      - "5dlabs"
+    webhookEndpoint: /github/webhook
+    webhookPort: "12000"
+    secretName: github-webhook-secret
+    secretKey: secret
+
+  # Networking (HTTPRoute and Service)
+  networking:
+    enabled: true
+    hostname: github.public.5dlabs.ai
+    gateway:
+      name: public-gateway
+      namespace: automation
+    service:
+      name: github-eventsource-svc
+      port: 12000
+
+  # RBAC for sensors
+  rbac:
+    enabled: true
+

@@ -1,0 +1,87 @@
+{{- if and .Values.webhooks.enabled .Values.webhooks.rbac.enabled }}
+{{- $automationNs := include "cto.automationNamespace" . }}
+{{- $ctoNs := include "cto.namespace" . }}
+---
+# ServiceAccount for Argo Events sensors
+# This SA is used by all sensors to execute triggers (workflows, k8s resources, etc.)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-events-sa
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+    app.kubernetes.io/name: argo-events-sa
+
+---
+# Role for sensor execution in automation namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-executor
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-events-executor-binding
+  namespace: {{ $automationNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-events-executor
+subjects:
+  - kind: ServiceAccount
+    name: argo-events-sa
+    namespace: {{ $automationNs }}
+
+---
+# Role for creating CodeRuns and Workflows in CTO namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-workflows-cto
+  namespace: {{ $ctoNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns/status"]
+    verbs: ["get", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-events-workflows-binding
+  namespace: {{ $ctoNs }}
+  labels:
+    {{- include "cto.webhook.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-events-workflows-cto
+subjects:
+  - kind: ServiceAccount
+    name: argo-events-sa
+    namespace: {{ $automationNs }}
+{{- end }}
+
