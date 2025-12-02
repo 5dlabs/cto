@@ -5,16 +5,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'tools/**'
-      - 'mcp/**'
+      - 'crates/tools/**'
+      - 'crates/mcp/**'
       - 'infra/images/tools/**'
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
   pull_request:
     branches: [main]
     paths:
-      - 'tools/**'
-      - 'mcp/**'
+      - 'crates/tools/**'
+      - 'crates/mcp/**'
       - 'infra/images/tools/**'
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
@@ -40,11 +40,11 @@ jobs:
         with:
           filters: |
             tools:
-              - 'tools/**'
-              - '!tools/**/*.md'
+              - 'crates/tools/**'
+              - '!crates/tools/**/*.md'
             mcp:
-              - 'mcp/**'
-              - '!mcp/**/*.md'
+              - 'crates/mcp/**'
+              - '!crates/mcp/**/*.md'
             helm:
               - 'infra/charts/tools/**'
             docker:
@@ -386,7 +386,7 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path tools/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "tools") | .version')
+          VERSION=$(cargo metadata --manifest-path crates/tools/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "tools") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"

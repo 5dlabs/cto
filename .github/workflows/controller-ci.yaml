@@ -454,9 +454,9 @@ jobs:
         with:
           name: coverage-reports
           path: |
-            controller/lcov.info
-            controller/coverage-html/
-            controller/coverage-summary.md
+            crates/controller/lcov.info
+            crates/controller/coverage-html/
+            crates/controller/coverage-summary.md
 
   # =============================================================================
   # Docker Build & Push (main branch only)
