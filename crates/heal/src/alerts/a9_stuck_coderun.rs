@@ -40,6 +40,17 @@ impl AlertHandler for Handler {
             return None;
         };
 
+        // Skip Heal's own remediation CodeRuns to prevent self-monitoring loops
+        // These have label `remediation: "true"` or name prefix `heal-remediation-`
+        if coderun
+            .labels
+            .get("remediation")
+            .is_some_and(|v| v == "true")
+            || coderun.name.starts_with("heal-remediation-")
+        {
+            return None;
+        }
+
         // Only alert on non-terminal phases
         let phase = coderun.phase.as_str();
         if phase == "Succeeded" || phase == "Failed" {
