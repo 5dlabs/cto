@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.17](https://github.com/5dlabs/cto/compare/v0.12.16...v0.12.17) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **intake:** add error logging to prevent silent failures ([#2476](https://github.com/5dlabs/cto/issues/2476)) ([1eda3e5](https://github.com/5dlabs/cto/commit/1eda3e5f4cf7d25099651cfe7c9f9f1e6c5c323e))
+* **intake:** disable TaskMaster auto-update in containers ([#2477](https://github.com/5dlabs/cto/issues/2477)) ([ab685d2](https://github.com/5dlabs/cto/commit/ab685d2dbc28f59d7aa086ce5d388612c06fb3f2))
+* trigger initial tweakcn image build for GHCR ([#2480](https://github.com/5dlabs/cto/issues/2480)) ([f8fbebc](https://github.com/5dlabs/cto/commit/f8fbebc8936e3db10625d1950822b3bbcdb88101)), closes [#2475](https://github.com/5dlabs/cto/issues/2475)
+
 ## [0.12.16](https://github.com/5dlabs/cto/compare/v0.12.15...v0.12.16) (2025-12-02)
 
 
