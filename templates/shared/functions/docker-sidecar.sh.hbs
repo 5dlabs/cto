@@ -1,0 +1,45 @@
+{{!--
+  Docker Sidecar Management
+  
+  Provides functions to manage Docker sidecar containers:
+  - stop_docker_sidecar(): Gracefully stop dockerd process
+  
+  No required context variables.
+--}}
+
+# =========================================================================
+# Docker Sidecar Management
+# =========================================================================
+
+stop_docker_sidecar() {
+  if [ ! -S /var/run/docker.sock ]; then
+    return
+  fi
+
+  echo "🛑 Stopping Docker sidecar"
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill dockerd >/dev/null 2>&1 || true
+    sleep 1
+    if pidof dockerd >/dev/null 2>&1; then
+      pkill -9 dockerd >/dev/null 2>&1 || true
+    fi
+    if pidof docker-init >/dev/null 2>&1; then
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+  else
+    PID=$(pidof dockerd 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+      kill "$PID" >/dev/null 2>&1 || true
+    fi
+    PID_INIT=$(pidof docker-init 2>/dev/null || true)
+    if [ -n "$PID_INIT" ]; then
+      kill "$PID_INIT" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  echo "✅ Docker sidecar stopped"
+}
+
