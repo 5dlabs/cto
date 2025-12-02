@@ -2994,12 +2994,6 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("docs_ingest") => Some(handle_docs_ingest_tool(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
                 Ok("add_mcp_server") => Some(handle_add_mcp_server(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
@@ -3349,30 +3343,6 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
             "HTTP request failed with status {status}: {error_text}"
         ))
     }
-}
-
-fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
-    let url = arguments
-        .get("url")
-        .and_then(|v| v.as_str())
-        .ok_or(anyhow!("url is required"))?;
-
-    let doc_type_str = arguments
-        .get("type")
-        .and_then(|v| v.as_str())
-        .ok_or(anyhow!("type is required (repo or scrape)"))?;
-
-    let doc_type = doc_proxy::DocType::from_str(doc_type_str)?;
-
-    let query = arguments.get("query").and_then(|v| v.as_str());
-
-    let limit = arguments
-        .get("limit")
-        .and_then(Value::as_u64)
-        .and_then(|v| u32::try_from(v).ok())
-        .unwrap_or(50);
-
-    doc_proxy::handle_add_docs(url, doc_type, query, limit)
 }
 
 /// Create a `CodeRun` for MCP server management tasks

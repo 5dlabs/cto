@@ -11,7 +11,6 @@ pub fn get_tool_schemas() -> Value {
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_docs_ingest_schema(),
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema()
@@ -29,7 +28,6 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_docs_ingest_schema(),
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema()
@@ -236,37 +234,6 @@ fn get_input_schema() -> Value {
                 "user": {"type": "string", "description": "Optional user label (agents.platform/user) to route to active job"}
             },
             "required": ["text"]
-        }
-    })
-}
-
-fn get_docs_ingest_schema() -> Value {
-    json!({
-        "name": "docs_ingest",
-        "description": "Ingest documentation from a URL using Firecrawl. Supports GitHub repositories (type: repo) and websites (type: scrape). Returns crawled/scraped content in markdown format.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The documentation source URL. For repos: GitHub URL (e.g., https://github.com/org/repo). For scrape: any website URL (e.g., https://docs.example.com)."
-                },
-                "type": {
-                    "type": "string",
-                    "enum": ["repo", "scrape"],
-                    "description": "Type of ingestion: 'repo' for GitHub repositories, 'scrape' for websites."
-                },
-                "query": {
-                    "type": "string",
-                    "description": "Optional search query/topic to focus the crawl on specific content."
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum number of pages to crawl (default: 50).",
-                    "default": 50
-                }
-            },
-            "required": ["url", "type"]
         }
     })
 }
