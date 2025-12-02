@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.12.10](https://github.com/5dlabs/cto/compare/v0.12.9...v0.12.10) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **controller/heal:** use heal templates, issue- prefix, and repo pre-staging ([94fca4f](https://github.com/5dlabs/cto/commit/94fca4f672dcc0a6575e7aeb004fe2d2321d1b0e))
+* **controller/heal:** use heal templates, issue- prefix, and repo pre-staging ([#2408](https://github.com/5dlabs/cto/issues/2408)) ([7aba875](https://github.com/5dlabs/cto/commit/7aba8757ef08a4c281b846444027ba8ad14008fc))
+* **heal:** conditionally append .git to repository URL ([#2420](https://github.com/5dlabs/cto/issues/2420)) ([474b0bc](https://github.com/5dlabs/cto/commit/474b0bcce41fff9ce4055673dbd41fba5866f89c))
+* **tweakcn:** fix deployment by using npm install and correct image pull secret ([#2410](https://github.com/5dlabs/cto/issues/2410)) ([88a9948](https://github.com/5dlabs/cto/commit/88a9948e3365a6588173dc4ff24643977165f753))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([2dc74e9](https://github.com/5dlabs/cto/commit/2dc74e9871e175e8389c34d81fef70ef3058cb86))
+* auto-update agent-templates ConfigMap ([322d682](https://github.com/5dlabs/cto/commit/322d682aa7962b24a43a7f82a410384733654f0c))
+* **chart:** regenerate agent templates ConfigMaps ([#2419](https://github.com/5dlabs/cto/issues/2419)) ([5af9d3c](https://github.com/5dlabs/cto/commit/5af9d3cb9dd2a7ffad61f7a3efe554e7f97f7e1d))
+* **chart:** regenerate agent templates ConfigMaps ([#2421](https://github.com/5dlabs/cto/issues/2421)) ([8f859b5](https://github.com/5dlabs/cto/commit/8f859b5602fd5bfd21e139f4e3903199e61b6a64))
+
 ## [0.12.9](https://github.com/5dlabs/cto/compare/v0.12.8...v0.12.9) (2025-12-02)
 
 
