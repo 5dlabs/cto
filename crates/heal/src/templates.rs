@@ -6,10 +6,34 @@
 //! - Supporting both `.hbs` and legacy `.md` templates
 
 use anyhow::{Context, Result};
-use handlebars::Handlebars;
+use handlebars::{
+    Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
+
+/// Helper function to concatenate strings in templates.
+/// Usage: `{{concat "prefix" variable "suffix"}}`
+fn concat_helper(
+    h: &Helper,
+    _: &Handlebars,
+    _: &HbsContext,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let mut result = String::new();
+    for param in h.params() {
+        if let Some(s) = param.value().as_str() {
+            result.push_str(s);
+        } else {
+            // Handle non-string values by converting to string
+            result.push_str(param.value().to_string().trim_matches('"'));
+        }
+    }
+    out.write(&result)?;
+    Ok(())
+}
 
 /// Template engine for heal prompts
 pub struct TemplateEngine<'a> {
@@ -41,6 +65,9 @@ impl TemplateEngine<'_> {
 
         // Configure handlebars
         handlebars.set_strict_mode(false); // Allow missing variables
+
+        // Register custom helpers
+        handlebars.register_helper("concat", Box::new(concat_helper));
 
         // Load partials from the partials directory
         let partials_dir = Path::new(prompts_dir).join("partials");
@@ -172,6 +199,35 @@ mod tests {
         let rendered = TemplateEngine::render_legacy(template, &context);
 
         assert_eq!(rendered, "Pod test-pod in cto is Running");
+    }
+
+    #[test]
+    fn test_concat_helper() {
+        let mut handlebars = Handlebars::new();
+        handlebars.register_helper("concat", Box::new(concat_helper));
+
+        let context = AlertContext {
+            alert_id: "a2".to_string(),
+            pod_name: "my-pod".to_string(),
+            namespace: "cto".to_string(),
+            phase: "Running".to_string(),
+            task_id: "task-123".to_string(),
+            agent: "Rex".to_string(),
+            logs: String::new(),
+            expected_behaviors: String::new(),
+            duration: "5m".to_string(),
+            extra: HashMap::new(),
+        };
+
+        // Test basic concat
+        let template = "{{concat \"Pod Failure: \" pod_name}}";
+        let result = handlebars.render_template(template, &context).unwrap();
+        assert_eq!(result, "Pod Failure: my-pod");
+
+        // Test multiple args
+        let template = "{{concat \"[\" agent \"] \" pod_name}}";
+        let result = handlebars.render_template(template, &context).unwrap();
+        assert_eq!(result, "[Rex] my-pod");
     }
 }
 
