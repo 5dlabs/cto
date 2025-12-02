@@ -6,11 +6,77 @@
 # It runs after TaskMaster has parsed the PRD and generated tasks.
 # =============================================================================
 
+# =============================================================================
+# Error Handling - Prevent Silent Failures
+# =============================================================================
+# Write errors to shared PVC before exit to prevent silent failures (A2 alerts)
+INTAKE_ERROR_DIR="${WORKSPACE_PVC:-/workspace}/intake-errors"
+INTAKE_POD_NAME="${POD_NAME:-$(hostname)}"
+INTAKE_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Function to log errors to shared storage (POSIX sh compatible)
+log_error_to_pvc() {
+    error_exit_code="$1"
+    error_line_no="$2"
+    error_command="$3"
+    error_timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    # Create error directory if it exists (shared PVC)
+    mkdir -p "$INTAKE_ERROR_DIR" 2>/dev/null || true
+
+    # Write error report
+    error_file="$INTAKE_ERROR_DIR/error-${INTAKE_POD_NAME}-$(date +%s).log"
+    {
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "INTAKE ERROR REPORT (Cursor Template)"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "Pod Name: $INTAKE_POD_NAME"
+        echo "Start Time: $INTAKE_START_TIME"
+        echo "Error Time: $error_timestamp"
+        echo "Exit Code: $error_exit_code"
+        echo "Failed at Line: $error_line_no"
+        echo "Failed Command: $error_command"
+        echo ""
+        echo "Configuration:"
+        echo "  Repository: ${REPO_URL:-unknown}"
+        echo "  GitHub App: {{github_app}}"
+        echo ""
+        echo "Environment:"
+        echo "  PWD: $(pwd)"
+        echo "  USER: $(whoami)"
+        echo ""
+        echo "Last 50 lines of output available in container logs"
+        echo "═══════════════════════════════════════════════════════════════"
+    } > "$error_file" 2>/dev/null || true
+
+    echo "📝 Error logged to: $error_file" >&2
+}
+
+# Set up error handling (sh compatible)
+set -e
+
+# Track success for exit trap
+INTAKE_SUCCESS=0
+
+# Exit trap that only logs on failure
+exit_handler() {
+    exit_code=$?
+    if [ "$exit_code" -ne 0 ] && [ "$INTAKE_SUCCESS" -eq 0 ]; then
+        log_error_to_pvc "$exit_code" "unknown" "unknown"
+        echo "❌ INTAKE FAILURE (exit code: $exit_code)" >&2
+        sync 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+trap 'exit_handler' EXIT
+
 echo '════════════════════════════════════════════════════════════════'
 echo '║        INTAKE DOCUMENTATION GENERATION - CURSOR CLI          ║'
 echo '════════════════════════════════════════════════════════════════'
-echo "📍 Template version: intake-cursor v1.0.0"
-echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "📍 Template version: intake-cursor v1.1.0"
+echo "📅 Timestamp: $INTAKE_START_TIME"
+echo "📦 Pod: $INTAKE_POD_NAME"
 echo "🎯 Agent: {{github_app}}"
 echo "📋 Run Type: documentation"
 
@@ -227,6 +293,9 @@ if [ "$STAGED_FILES" -gt 0 ]; then
 else
     echo "⚠️ No documentation changes to commit"
 fi
+
+# Mark as successful to prevent exit trap from logging error
+INTAKE_SUCCESS=1
 
 echo ""
 echo "✅ Intake documentation generation complete!"

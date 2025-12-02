@@ -18,13 +18,87 @@ set -e
 # Force output to be unbuffered
 exec 2>&1
 
-# Error trap for debugging
-trap 'echo "❌ Error at line $LINENO (exit code: $?). Command: $BASH_COMMAND"; exit 1' ERR
+# =============================================================================
+# Error Handling - Prevent Silent Failures
+# =============================================================================
+# Write errors to shared PVC before exit to prevent silent failures (A2 alerts)
+INTAKE_ERROR_DIR="${WORKSPACE_PVC:-/workspace}/intake-errors"
+INTAKE_POD_NAME="${POD_NAME:-$(hostname)}"
+INTAKE_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Function to log errors to shared storage
+log_error_to_pvc() {
+    local exit_code="$1"
+    local line_no="$2"
+    local command="$3"
+    local timestamp
+    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    # Create error directory if it exists (shared PVC)
+    mkdir -p "$INTAKE_ERROR_DIR" 2>/dev/null || true
+
+    # Write error report
+    local error_file="$INTAKE_ERROR_DIR/error-${INTAKE_POD_NAME}-$(date +%s).log"
+    {
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "INTAKE ERROR REPORT"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "Pod Name: $INTAKE_POD_NAME"
+        echo "Start Time: $INTAKE_START_TIME"
+        echo "Error Time: $timestamp"
+        echo "Exit Code: $exit_code"
+        echo "Failed at Line: $line_no"
+        echo "Failed Command: $command"
+        echo ""
+        echo "Configuration:"
+        echo "  Project: ${PROJECT_NAME:-unknown}"
+        echo "  Repository: ${REPOSITORY_URL:-unknown}"
+        echo "  Config File: ${CONFIG_FILE:-unknown}"
+        echo ""
+        echo "Environment:"
+        echo "  PWD: $(pwd)"
+        echo "  USER: $(whoami)"
+        echo ""
+        echo "Last 50 lines of output available in container logs"
+        echo "═══════════════════════════════════════════════════════════════"
+    } > "$error_file" 2>/dev/null || true
+
+    echo "📝 Error logged to: $error_file" >&2
+}
+
+# Enhanced error trap that logs to PVC before exit
+trap_handler() {
+    local exit_code=$?
+    local line_no=$1
+    local command="$BASH_COMMAND"
+
+    echo "" >&2
+    echo "❌ ═══════════════════════════════════════════════════════════════" >&2
+    echo "❌ INTAKE FAILURE DETECTED" >&2
+    echo "❌ ═══════════════════════════════════════════════════════════════" >&2
+    echo "❌ Exit code: $exit_code" >&2
+    echo "❌ Line: $line_no" >&2
+    echo "❌ Command: $command" >&2
+    echo "❌ Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >&2
+    echo "❌ ═══════════════════════════════════════════════════════════════" >&2
+
+    # Log to PVC for persistence
+    log_error_to_pvc "$exit_code" "$line_no" "$command"
+
+    # Ensure output is flushed before exit
+    sync 2>/dev/null || true
+    sleep 1
+
+    exit "$exit_code"
+}
+
+trap 'trap_handler $LINENO' ERR
 
 echo "🚀 Starting Unified Intake Process"
 echo "================================="
-echo "📍 Script version: unified-intake v1.0.0"
-echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "📍 Script version: unified-intake v1.1.0"
+echo "📅 Timestamp: $INTAKE_START_TIME"
+echo "📦 Pod: $INTAKE_POD_NAME"
 
 # =============================================================================
 # Phase 1: Configuration and Environment Setup
