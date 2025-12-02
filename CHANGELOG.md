@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.12](https://github.com/5dlabs/cto/compare/v0.12.11...v0.12.12) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **intake:** correct script path in unified intake workflow template ([#2453](https://github.com/5dlabs/cto/issues/2453)) ([f0f455c](https://github.com/5dlabs/cto/commit/f0f455c6a3259d2c2332656e6b41d8acb73468fa)), closes [#2448](https://github.com/5dlabs/cto/issues/2448)
+* **intake:** rename unified-intake.sh.hbs to unified-intake.sh ([#2455](https://github.com/5dlabs/cto/issues/2455)) ([6fa8674](https://github.com/5dlabs/cto/commit/6fa8674ac12feb0f35b446624d4dc03bd7c33bb0))
+
 ## [0.12.11](https://github.com/5dlabs/cto/compare/v0.12.10...v0.12.11) (2025-12-02)
 
 
