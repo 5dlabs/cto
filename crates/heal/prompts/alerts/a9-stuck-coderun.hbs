@@ -1,3 +1,5 @@
+{{> _preamble}}
+
 # Alert A9: Stuck CodeRun
 
 ## Detected Condition
@@ -21,32 +23,9 @@ This alert fires when a CodeRun CRD has been stuck in Running/Pending state for 
 
 ## Your Task
 
-### Step 1: Create GitHub Issue
+{{> _issue-create alert_id="A9" issue_title=(concat "Stuck CodeRun: " pod_name " in " phase) issue_placeholder="Analyzing stuck CodeRun"}}
 
-```bash
-ISSUE_URL=$(gh issue create \
-  --repo 5dlabs/cto \
-  --title "[HEAL-A9] Stuck CodeRun: {{pod_name}} in {{phase}}" \
-  --label "heal,remediation,a9" \
-  --body "🔍 Analyzing stuck CodeRun... Full analysis to follow.")
-if [ -z "$ISSUE_URL" ]; then
-  echo "❌ Failed to create GitHub issue"
-  exit 1
-fi
-ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
-if [ -z "$ISSUE_NUMBER" ]; then
-  echo "❌ Failed to extract issue number from: $ISSUE_URL"
-  exit 1
-fi
-echo "✅ Created issue #${ISSUE_NUMBER}"
-```
-
-### Step 2: Create Issue Folder
-
-```bash
-ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
-mkdir -p "${ISSUE_DIR}"
-```
+{{> _issue-folder}}
 
 ### Step 3: Investigate
 
@@ -102,25 +81,9 @@ cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 CRITERIA
 ```
 
-### Step 6: Update GitHub Issue
+{{> _issue-update alert_id="A9" alert_title="Stuck CodeRun" issue_body_title=(concat "Stuck CodeRun Analysis: " pod_name)}}
 
-```bash
-gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
-
----
-
-$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
-```
-
-### Step 7: Spawn Remediation Agent
-
-```bash
-heal spawn-remediation \
-  --alert a9 \
-  --task-id {{task_id}} \
-  --target-pod "{{pod_name}}" \
-  --issue-number ${ISSUE_NUMBER}
-```
+{{> _spawn-remediation alert_id="a9"}}
 
 ## Common Causes
 
@@ -138,3 +101,4 @@ heal spawn-remediation \
 
 4. **Network Issues**: Agent cannot communicate with APIs
    - Check for DNS or connectivity errors in logs
+

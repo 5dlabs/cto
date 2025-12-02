@@ -8,6 +8,7 @@ mod alerts;
 mod dedup;
 mod github;
 mod k8s;
+mod templates;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -5022,35 +5023,6 @@ async fn handle_alert(
     dry_run: bool,
     alert_context: Option<&std::collections::HashMap<String, String>>,
 ) -> Result<()> {
-    // Map alert IDs to prompt filenames
-    let prompt_file = match alert_id {
-        "a1" => format!("{prompts_dir}/a1-comment-order.md"),
-        "a2" => format!("{prompts_dir}/a2-silent-failure.md"),
-        "a3" => format!("{prompts_dir}/a3-stale-progress.md"),
-        "a4" => format!("{prompts_dir}/a4-approval-loop.md"),
-        "a5" => format!("{prompts_dir}/a5-post-tess-ci.md"),
-        "a7" => format!("{prompts_dir}/a7-pod-failure.md"),
-        "a8" => format!("{prompts_dir}/a8-step-timeout.md"),
-        "a9" => format!("{prompts_dir}/a9-stuck-coderun.md"),
-        "completion" => format!("{prompts_dir}/success-completion.md"),
-        _ => {
-            println!("{}", format!("Unknown alert ID: {alert_id}").red());
-            return Ok(());
-        }
-    };
-
-    // Load prompt template
-    let prompt_template = match std::fs::read_to_string(&prompt_file) {
-        Ok(content) => content,
-        Err(e) => {
-            println!(
-                "{}",
-                format!("Failed to load prompt {prompt_file}: {e}").red()
-            );
-            return Ok(());
-        }
-    };
-
     // Fetch pod logs
     let logs = get_pod_logs_for_alert(pod_name, namespace, 500);
 
@@ -5063,26 +5035,41 @@ async fn handle_alert(
         String::new()
     };
 
-    // Render the prompt - start with base variables
-    let mut rendered = prompt_template
-        .replace("{{pod_name}}", pod_name)
-        .replace("{{namespace}}", namespace)
-        .replace("{{phase}}", phase)
-        .replace("{{task_id}}", task_id)
-        .replace("{{agent}}", agent)
-        .replace("{{logs}}", &logs)
-        .replace("{{expected_behaviors}}", &expected_behaviors)
-        .replace("{{duration}}", "N/A"); // TODO: Calculate actual duration
+    // Build template context
+    let template_filename = templates::TemplateEngine::alert_to_filename(alert_id);
+    let context = templates::AlertContext {
+        alert_id: alert_id.to_string(),
+        pod_name: pod_name.to_string(),
+        namespace: namespace.to_string(),
+        phase: phase.to_string(),
+        task_id: task_id.to_string(),
+        agent: agent.to_string(),
+        logs,
+        expected_behaviors,
+        duration: "N/A".to_string(),
+        extra: alert_context.cloned().unwrap_or_default(),
+    };
 
-    // Replace all additional context variables from the alert
-    // This handles alert-specific variables like {{missing_agent}}, {{pr_number}},
-    // {{approval_count}}, {{stale_duration}}, etc.
-    if let Some(ctx) = alert_context {
-        for (key, value) in ctx {
-            let pattern = format!("{{{{{key}}}}}");
-            rendered = rendered.replace(&pattern, value);
+    // Try Handlebars rendering first, fall back to legacy
+    let rendered = match templates::TemplateEngine::new(prompts_dir) {
+        Ok(engine) => match engine.render_alert(&template_filename, &context) {
+            Ok(r) => r,
+            Err(e) => {
+                println!(
+                    "{}",
+                    format!("Template rendering failed, using legacy: {e}").yellow()
+                );
+                render_legacy_template(prompts_dir, alert_id, &context)?
+            }
+        },
+        Err(e) => {
+            println!(
+                "{}",
+                format!("Template engine init failed, using legacy: {e}").yellow()
+            );
+            render_legacy_template(prompts_dir, alert_id, &context)?
         }
-    }
+    };
 
     // Warn about any unreplaced template variables (helps catch missing context)
     let unreplaced: Vec<&str> = rendered
@@ -5128,6 +5115,46 @@ async fn handle_alert(
     spawn_factory_with_prompt(&prompt_path, pod_name, alert_id).await?;
 
     Ok(())
+}
+
+/// Legacy template rendering for backward compatibility with .md files
+fn render_legacy_template(
+    prompts_dir: &str,
+    alert_id: &str,
+    context: &templates::AlertContext,
+) -> Result<String> {
+    let prompt_file = match alert_id {
+        "a1" => format!("{prompts_dir}/a1-comment-order.md"),
+        "a2" => format!("{prompts_dir}/a2-silent-failure.md"),
+        "a3" => format!("{prompts_dir}/a3-stale-progress.md"),
+        "a4" => format!("{prompts_dir}/a4-approval-loop.md"),
+        "a5" => format!("{prompts_dir}/a5-post-tess-ci.md"),
+        "a7" => format!("{prompts_dir}/a7-pod-failure.md"),
+        "a8" => format!("{prompts_dir}/a8-step-timeout.md"),
+        "a9" => format!("{prompts_dir}/a9-stuck-coderun.md"),
+        "completion" => format!("{prompts_dir}/success-completion.md"),
+        _ => anyhow::bail!("Unknown alert ID: {alert_id}"),
+    };
+
+    let template = std::fs::read_to_string(&prompt_file)
+        .with_context(|| format!("Failed to load prompt {prompt_file}"))?;
+
+    let mut rendered = template
+        .replace("{{pod_name}}", &context.pod_name)
+        .replace("{{namespace}}", &context.namespace)
+        .replace("{{phase}}", &context.phase)
+        .replace("{{task_id}}", &context.task_id)
+        .replace("{{agent}}", &context.agent)
+        .replace("{{logs}}", &context.logs)
+        .replace("{{expected_behaviors}}", &context.expected_behaviors)
+        .replace("{{duration}}", &context.duration);
+
+    for (key, value) in &context.extra {
+        let pattern = format!("{{{{{key}}}}}");
+        rendered = rendered.replace(&pattern, value);
+    }
+
+    Ok(rendered)
 }
 
 /// Fetch recent logs for a pod

@@ -1,3 +1,5 @@
+{{> _preamble}}
+
 # Alert A8: Workflow Step Timeout
 
 ## Detected Condition
@@ -19,32 +21,9 @@ A workflow step has exceeded its expected runtime.
 
 ## Your Task
 
-### Step 1: Create GitHub Issue
+{{> _issue-create alert_id="A8" issue_title=(concat "Step Timeout: " agent " running " duration) issue_placeholder="Analyzing workflow step timeout"}}
 
-```bash
-ISSUE_URL=$(gh issue create \
-  --repo 5dlabs/cto \
-  --title "[HEAL-A8] Step Timeout: {{agent}} running {{duration}}" \
-  --label "heal,remediation,a8" \
-  --body "🔍 Analyzing workflow step timeout... Full analysis to follow.")
-if [ -z "$ISSUE_URL" ]; then
-  echo "❌ Failed to create GitHub issue"
-  exit 1
-fi
-ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
-if [ -z "$ISSUE_NUMBER" ]; then
-  echo "❌ Failed to extract issue number from: $ISSUE_URL"
-  exit 1
-fi
-echo "✅ Created issue #${ISSUE_NUMBER}"
-```
-
-### Step 2: Create Issue Folder
-
-```bash
-ISSUE_DIR="/workspace/watch/issues/${ISSUE_NUMBER}"
-mkdir -p "${ISSUE_DIR}"
-```
+{{> _issue-folder}}
 
 ### Step 3: Write prompt.md
 
@@ -89,22 +68,7 @@ cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
 CRITERIA
 ```
 
-### Step 5: Update GitHub Issue
+{{> _issue-update alert_id="A8" alert_title="Workflow Step Timeout" issue_body_title=(concat "Step Timeout Analysis: " pod_name)}}
 
-```bash
-gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat ${ISSUE_DIR}/prompt.md)
+{{> _spawn-remediation alert_id="a8"}}
 
----
-
-$(cat ${ISSUE_DIR}/acceptance-criteria.md)"
-```
-
-### Step 6: Spawn Remediation Agent
-
-```bash
-heal spawn-remediation \
-  --alert a8 \
-  --task-id {{task_id}} \
-  --target-pod "{{pod_name}}" \
-  --issue-number ${ISSUE_NUMBER}
-```

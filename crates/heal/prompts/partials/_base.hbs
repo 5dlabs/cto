@@ -1,0 +1,34 @@
+# Alert {{alert_id}}: {{alert_title}}
+
+## Detected Condition
+
+{{alert_description}}
+
+{{#each alert_details}}
+- **{{@key}}**: {{this}}
+{{/each}}
+
+## Container Logs
+
+```
+{{logs}}
+```
+
+## Your Task
+
+{{> _issue-create}}
+
+{{> _issue-folder}}
+
+### Step 3: Write prompt.md
+
+{{prompt_instructions}}
+
+### Step 4: Write acceptance-criteria.md
+
+{{> _acceptance-criteria}}
+
+{{> _issue-update}}
+
+{{> _spawn-remediation}}
+

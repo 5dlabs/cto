@@ -1,0 +1,16 @@
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+{{#each acceptance_criteria}}
+### {{section}}
+{{#each items}}
+- [ ] {{this}}
+{{/each}}
+
+{{/each}}
+CRITERIA
+```
+

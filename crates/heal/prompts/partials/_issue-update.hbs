@@ -1,0 +1,24 @@
+### Step 5: Update GitHub Issue
+
+```bash
+gh issue edit ${ISSUE_NUMBER} --repo 5dlabs/cto --body "$(cat << EOF
+# {{issue_body_title}}
+
+## Alert Details
+- **Alert Type**: {{alert_id}} ({{alert_title}})
+{{#each alert_details}}
+- **{{@key}}**: {{this}}
+{{/each}}
+
+---
+
+$(cat ${ISSUE_DIR}/prompt.md)
+
+---
+
+$(cat ${ISSUE_DIR}/acceptance-criteria.md)
+EOF
+)"
+echo "📝 Updated issue #${ISSUE_NUMBER} with analysis"
+```
+
