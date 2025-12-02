@@ -231,9 +231,9 @@ mod tests {
 
     #[test]
     fn test_severity_colors() {
-        assert_eq!(Severity::Info.color(), 0x3498_db);
-        assert_eq!(Severity::Warning.color(), 0xf39c_12);
-        assert_eq!(Severity::Critical.color(), 0xe74c_3c);
+        assert_eq!(Severity::Info.color(), 0x0034_98db);
+        assert_eq!(Severity::Warning.color(), 0x00f3_9c12);
+        assert_eq!(Severity::Critical.color(), 0x00e7_4c3c);
     }
 
     #[test]
