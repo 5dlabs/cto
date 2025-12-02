@@ -26,20 +26,12 @@ COPY --from=deps /app ./
 # Patch next.config.ts to add standalone output for Docker deployment
 RUN sed -i 's/const nextConfig: NextConfig = {/const nextConfig: NextConfig = {\n  output: "standalone",/' next.config.ts
 
-# Build arguments for environment
-ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
-ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Provide dummy env vars for build (the app works without DB for basic editing)
-ENV DATABASE_URL=""
-ENV BETTER_AUTH_SECRET="not-needed-for-basic-usage"
-ENV BASE_URL="http://localhost:3000"
-
-# Build the application
-RUN pnpm run build
+# Skip prebuild (generate-theme-registry requires database connection)
+# Run next build directly instead of pnpm run build
+RUN pnpm exec next build
 
 # Production image
 FROM base AS runner
