@@ -27,12 +27,48 @@ fi
 MAX_RETRIES=${HEAL_MAX_RETRIES:-3}
 COMPLETION_TIMEOUT=${HEAL_COMPLETION_TIMEOUT:-60}
 
+# Derive repo name and path from repository URL
+REPO_NAME=$(basename "{{repository_url}}" .git | tr '/' '-')
+REPO_PATH="/workspace/${REPO_NAME}"
+export REPO_PATH
+
 # Export worktree path for agent instructions
 export WORKTREE_PATH="/workspace/worktrees/${CODERUN_NAME}"
 echo "📁 Worktree: ${WORKTREE_PATH}"
 
 # Create worktrees directory if needed
 mkdir -p /workspace/worktrees
+
+# ============================================================================
+# REPOSITORY PRE-STAGING (Optimization: reset instead of clone)
+# ============================================================================
+echo ""
+echo "═══ REPOSITORY PRE-STAGING ═══"
+echo "📦 Repository: {{repository_url}}"
+echo "📂 Local path: ${REPO_PATH}"
+
+if [ -d "${REPO_PATH}/.git" ]; then
+    echo "✓ Repository exists, syncing with origin/main..."
+    cd "${REPO_PATH}"
+    
+    # Fetch latest (shallow to save bandwidth)
+    git fetch --depth 1 origin main 2>/dev/null || git fetch origin main
+    
+    # Clean any uncommitted changes and reset to origin/main
+    git reset --hard origin/main
+    git clean -fd
+    
+    echo "✓ Repository synced to $(git rev-parse --short HEAD)"
+else
+    echo "📥 Repository not found, cloning (shallow)..."
+    git clone --depth 1 "{{repository_url}}.git" "${REPO_PATH}"
+    cd "${REPO_PATH}"
+    echo "✓ Repository cloned to $(git rev-parse --short HEAD)"
+fi
+
+# Ensure worktrees can be created from this repo
+git config core.bare false 2>/dev/null || true
+echo "✓ Repository ready at ${REPO_PATH}"
 
 # ============================================================================
 # VERIFY HEAL CONTEXT FILES
@@ -48,7 +84,7 @@ elif [ -n "${HEAL_ISSUE_DIR}" ]; then
     ACCEPTANCE_FILE="${HEAL_ISSUE_DIR}/acceptance-criteria.md"
     LEGACY_MODE="false"
 elif [ -n "${HEAL_ISSUE_NUMBER}" ]; then
-    ACCEPTANCE_FILE="/workspace/watch/issues/${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
+    ACCEPTANCE_FILE="/workspace/watch/issues/issue-${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
     LEGACY_MODE="false"
 else
     # Legacy mode - no issue number, acceptance criteria may not exist
