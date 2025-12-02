@@ -4567,9 +4567,18 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         let mut lines = reader.lines();
 
         while let Ok(Some(line)) = lines.next_line().await {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                if tx_pods.send(AlertWatchEvent::PodEvent(json)).await.is_err() {
-                    break;
+            match serde_json::from_str::<serde_json::Value>(&line) {
+                Ok(json) => {
+                    if tx_pods.send(AlertWatchEvent::PodEvent(json)).await.is_err() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  Failed to parse pod watch JSON (len={}): {}",
+                        line.len(),
+                        e
+                    );
                 }
             }
         }
@@ -4608,13 +4617,22 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         let mut lines = reader.lines();
 
         while let Ok(Some(line)) = lines.next_line().await {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                if tx_coderuns
-                    .send(AlertWatchEvent::CodeRunEvent(json))
-                    .await
-                    .is_err()
-                {
-                    break;
+            match serde_json::from_str::<serde_json::Value>(&line) {
+                Ok(json) => {
+                    if tx_coderuns
+                        .send(AlertWatchEvent::CodeRunEvent(json))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  Failed to parse coderun watch JSON (len={}): {}",
+                        line.len(),
+                        e
+                    );
                 }
             }
         }
@@ -4629,6 +4647,33 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                 // Convert JSON to our Pod type
                 let pod = parse_pod_from_json(&event_json["object"], namespace);
                 let event_type = event_json["type"].as_str().unwrap_or("");
+
+                // Debug: Log all pod events with container status info
+                let terminated_containers: Vec<_> = pod
+                    .container_statuses
+                    .iter()
+                    .filter_map(|cs| {
+                        if let k8s::ContainerState::Terminated { exit_code, .. } = &cs.state {
+                            Some(format!("{}(exit={})", cs.name, exit_code))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if !terminated_containers.is_empty() || pod.phase == "Running" {
+                    println!(
+                        "{}",
+                        format!(
+                            "🔍 Pod event: {} type={} phase={} containers={} terminated=[{}]",
+                            pod.name,
+                            event_type,
+                            pod.phase,
+                            pod.container_statuses.len(),
+                            terminated_containers.join(", ")
+                        )
+                        .dimmed()
+                    );
+                }
 
                 // Clean up alerted_pods when pod is deleted (truly gone)
                 // Must run BEFORE exclusion check to prevent unbounded memory growth
