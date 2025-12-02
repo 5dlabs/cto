@@ -24,7 +24,7 @@ fi
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-MAX_RETRIES=${HEAL_MAX_RETRIES:-3}
+# No max iterations - iterate until acceptance criteria met
 COMPLETION_TIMEOUT=${HEAL_COMPLETION_TIMEOUT:-60}
 
 # Derive repo name and path from repository URL
@@ -230,12 +230,12 @@ COMPLETION_LAST_MESSAGE="/tmp/heal-completion-last.txt"
 COMPLETION_LOG="/tmp/heal-completion.log"
 
 echo ""
-echo "═══ STARTING REMEDIATION (max ${MAX_RETRIES} attempts) ═══"
+echo "═══ STARTING REMEDIATION (iterating until acceptance criteria met) ═══"
 
-while [ $ATTEMPT -le $MAX_RETRIES ] && [ $SUCCESS -eq 0 ]; do
+while [ $SUCCESS -eq 0 ]; do
     echo ""
     echo "════════════════════════════════════════════════════════════════"
-    echo "║ ATTEMPT ${ATTEMPT} of ${MAX_RETRIES}                                         ║"
+    echo "║ ITERATION ${ATTEMPT}                                                ║"
     echo "════════════════════════════════════════════════════════════════"
 
     # Build the prompt content for this iteration
@@ -285,6 +285,67 @@ Focus on addressing the above items before re-checking acceptance criteria."
 
     echo ""
     echo "🧭 Agent exited with code: ${AGENT_EXIT}"
+
+    # ========================================================================
+    # MERGE CONFLICT & CI CHECK - Handle PR issues before completion probe
+    # ========================================================================
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ CHECKING PR STATUS & MERGE CONFLICTS                         ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    # Check if we have an open PR
+    cd "${WORKTREE_PATH}" 2>/dev/null || cd "${REPO_PATH}" || true
+    PR_NUMBER=$(gh pr view --json number -q '.number' 2>/dev/null || echo "")
+    
+    if [ -n "${PR_NUMBER}" ]; then
+        echo "📋 Found PR #${PR_NUMBER}"
+        
+        # Check for merge conflicts
+        MERGEABLE=$(gh pr view ${PR_NUMBER} --json mergeable -q '.mergeable' 2>/dev/null || echo "")
+        if [ "${MERGEABLE}" = "CONFLICTING" ]; then
+            echo "⚠️ Merge conflict detected - rebasing on main..."
+            git fetch origin main
+            if git rebase origin/main; then
+                git push origin HEAD --force-with-lease
+                echo "✅ Rebased and pushed successfully"
+            else
+                echo "❌ Rebase failed - conflicts need manual resolution"
+                git rebase --abort 2>/dev/null || true
+                # Store reason for next iteration
+                echo "Merge conflict with main branch - need to resolve conflicts" > "${COMPLETION_LAST_MESSAGE}"
+            fi
+            sleep 10  # Give GitHub time to process
+        fi
+        
+        # Check CI status and wait if pending
+        echo "🔍 Checking CI status..."
+        CI_ATTEMPTS=0
+        MAX_CI_WAIT=20  # Max 20 iterations of 30s = 10 minutes wait
+        while [ $CI_ATTEMPTS -lt $MAX_CI_WAIT ]; do
+            CI_STATUS=$(gh pr checks ${PR_NUMBER} --json state -q '.[].state' 2>/dev/null | sort -u || echo "")
+            
+            if echo "${CI_STATUS}" | grep -q "FAILURE"; then
+                echo "❌ CI failed - agent should fix in next iteration"
+                break
+            elif echo "${CI_STATUS}" | grep -q "PENDING"; then
+                echo "⏳ CI still running... (${CI_ATTEMPTS}/${MAX_CI_WAIT})"
+                sleep 30
+                CI_ATTEMPTS=$((CI_ATTEMPTS + 1))
+            else
+                echo "✅ CI checks passed or no checks running"
+                break
+            fi
+        done
+        
+        # Check if already merged
+        MERGED=$(gh pr view ${PR_NUMBER} --json merged -q '.merged' 2>/dev/null || echo "false")
+        if [ "${MERGED}" = "true" ]; then
+            echo "✅ PR already merged!"
+        fi
+    else
+        echo "📝 No PR found yet - agent may create one in next iteration"
+    fi
 
     # ========================================================================
     # COMPLETION PROBE - Check acceptance criteria
@@ -420,22 +481,23 @@ Attempts: ${ATTEMPT}" 2>/dev/null || echo "   (could not comment on issue)"
 
     exit 0
 else
-    echo "║ ❌ REMEDIATION INCOMPLETE                                      ║"
+    # This branch should not be reached since we iterate until success
+    echo "║ ⚠️ REMEDIATION LOOP EXITED UNEXPECTEDLY                        ║"
     echo "════════════════════════════════════════════════════════════════"
-    echo "Failed after ${MAX_RETRIES} attempts"
+    echo "Loop exited after ${ATTEMPT} iterations without success flag"
 
     # Update GitHub issue if we have an issue number
     if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
-        echo "📝 Adding failure comment to issue #${HEAL_ISSUE_NUMBER}..."
+        echo "📝 Adding status comment to issue #${HEAL_ISSUE_NUMBER}..."
         LAST_REASON=$(cat "${COMPLETION_LAST_MESSAGE}" 2>/dev/null || echo "Unknown")
-        gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "⚠️ **Remediation Incomplete**
+        gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "⚠️ **Remediation Loop Exited**
 
-Unable to satisfy all acceptance criteria after ${MAX_RETRIES} attempts.
+Loop exited unexpectedly after ${ATTEMPT} iterations.
 
-**Remaining issues:**
+**Last known status:**
 ${LAST_REASON}
 
-**Next steps:** Manual intervention may be required.
+**Next steps:** Check agent logs for errors.
 
 Agent: ${CODERUN_NAME}" 2>/dev/null || echo "   (could not comment on issue)"
     fi
