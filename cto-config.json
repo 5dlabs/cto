@@ -22,15 +22,15 @@
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "primary": {
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-5-20250929",
         "provider": "anthropic"
       },
       "research": {
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-5-20250929",
         "provider": "anthropic"
       },
       "fallback": {
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-5-20250929",
         "provider": "anthropic"
       }
     },
