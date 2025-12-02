@@ -38,11 +38,22 @@ pub fn init() -> Result<Tui> {
     }
 
     enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
+    
+    // If any subsequent operation fails, we must restore raw mode
+    let result = (|| {
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        Terminal::new(backend).map_err(Into::into)
+    })();
+    
+    // If initialization failed, restore terminal state before returning error
+    if result.is_err() {
+        let _ = disable_raw_mode();
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+    }
+    
+    result
 }
 
 /// Restore the terminal to its original state
