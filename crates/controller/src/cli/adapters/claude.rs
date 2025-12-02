@@ -452,8 +452,10 @@ impl ClaudeModelValidator {
             Regex::new(r"^opus$").unwrap(),
             Regex::new(r"^sonnet$").unwrap(),
             Regex::new(r"^haiku$").unwrap(),
-            // Future-proofing for Claude 4
+            // Claude 4.x models
             Regex::new(r"^claude-4.*").unwrap(),
+            Regex::new(r"^claude-sonnet-4.*").unwrap(),
+            Regex::new(r"^claude-opus-4.*").unwrap(),
         ];
 
         Self { valid_patterns }
