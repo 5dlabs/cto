@@ -174,7 +174,7 @@ spec:
         image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
         imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
         command: ["/bin/bash"]
-        args: ["/agent-templates/intake_unified-intake.sh"]
+        args: ["/agent-templates/intake_unified-intake.sh.hbs"]
         workingDir: /workspace
         volumeMounts:
           - name: intake-files
