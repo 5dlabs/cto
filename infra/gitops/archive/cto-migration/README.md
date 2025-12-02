@@ -84,3 +84,4 @@ If you need to rollback to the individual applications:
 - The unified chart deploys to both `cto` and `automation` namespaces
 - Image updater annotations are consolidated in the single application
 
+

@@ -85,3 +85,4 @@ subjects:
     namespace: {{ $automationNs }}
 {{- end }}
 
+
