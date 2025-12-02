@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/5dlabs/cto/compare/v0.12.0...v0.12.1) (2025-12-02)
+
+
+### ♻️ Refactoring
+
+* **templates:** implement shared partial system for DRY templates ([#2109](https://github.com/5dlabs/cto/issues/2109)) ([948d1fc](https://github.com/5dlabs/cto/commit/948d1fc664ff8b9e6fa8f1cdecefe910a67ea4d7))
+
 ## [0.12.0](https://github.com/5dlabs/cto/compare/v0.11.17...v0.12.0) (2025-12-02)
 
 
