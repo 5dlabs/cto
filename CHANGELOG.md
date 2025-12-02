@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/5dlabs/cto/compare/v0.12.3...v0.12.4) (2025-12-02)
+
+
+### ✨ Features
+
+* **notify:** add Discord notification system for platform events ([#2156](https://github.com/5dlabs/cto/issues/2156)) ([c86be8e](https://github.com/5dlabs/cto/commit/c86be8ead18819583ad8b23d568a2ea7cc2625e1))
+
 ## [0.12.3](https://github.com/5dlabs/cto/compare/v0.12.2...v0.12.3) (2025-12-02)
 
 
