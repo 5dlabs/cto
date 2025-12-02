@@ -219,7 +219,7 @@ if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
     cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
 fi
 
-# Configure TaskMaster models
+# Configure TaskMaster models with debug logging enabled
 cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -248,25 +248,54 @@ cat > .taskmaster/config.json << EOF
     }
   },
   "global": {
-    "defaultTag": "master"
+    "defaultTag": "master",
+    "logLevel": "debug",
+    "debug": true
   }
 }
 EOF
 
 echo "✅ TaskMaster configured"
+echo "📋 Config contents:"
+cat .taskmaster/config.json
 
 # =============================================================================
 # Phase 2.1: Parse PRD and Generate Tasks
 # =============================================================================
 echo ""
 echo "📄 Parsing PRD to generate tasks..."
+echo "  → Provider: $PRIMARY_PROVIDER"
+echo "  → Model: $PRIMARY_MODEL"
+echo "  → Research Provider: $RESEARCH_PROVIDER"
+echo "  → Research Model: $RESEARCH_MODEL"
+echo "  → Num Tasks: $NUM_TASKS"
+echo "  → This may take several minutes for large PRDs with research enabled..."
+echo ""
+
+# Start a background progress indicator
+(
+    i=0
+    while true; do
+        i=$((i + 1))
+        echo "  ⏳ TaskMaster running... (${i}m elapsed)"
+        sleep 60
+    done
+) &
+PROGRESS_PID=$!
+
+# Run parse-prd with verbose output
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
     --force \
-    --research || {
+    --num-tasks "$NUM_TASKS" \
+    --research 2>&1 || {
+    kill $PROGRESS_PID 2>/dev/null || true
     echo "❌ Failed to parse PRD"
     exit 1
 }
+
+# Stop progress indicator
+kill $PROGRESS_PID 2>/dev/null || true
 
 # Resolve tasks file path
 TASKS_FILE=".taskmaster/tasks/tasks.json"
