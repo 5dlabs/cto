@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.16](https://github.com/5dlabs/cto/compare/v0.12.15...v0.12.16) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **tweakcn:** skip prebuild to avoid database dependency ([#2469](https://github.com/5dlabs/cto/issues/2469)) ([172dc01](https://github.com/5dlabs/cto/commit/172dc019df76c1a534622fa65c8d5f09d1f5a181))
+
 ## [0.12.15](https://github.com/5dlabs/cto/compare/v0.12.14...v0.12.15) (2025-12-02)
 
 
