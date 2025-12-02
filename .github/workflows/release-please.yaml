@@ -74,26 +74,47 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger controller build
+      - name: Trigger downstream workflows
         uses: actions/github-script@v7
         with:
           script: |
-            // The binaries-release.yaml workflow triggers on v*.*.* tags
-            // which Release Please creates automatically
-            console.log('Release created: ${{ needs.release-please.outputs.tag_name }}');
-            console.log('Binaries release workflow will trigger automatically on tag push');
+            const version = '${{ needs.release-please.outputs.version }}';
+            const tagName = '${{ needs.release-please.outputs.tag_name }}';
+            console.log(`Release created: ${tagName}`);
             
-            // Optionally trigger agent builds to pick up new runtime
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'agents-build.yaml',
-              ref: 'main',
-              inputs: {
-                force_rebuild: 'false'
-              }
-            });
-            console.log('Triggered agents-build workflow');
+            // Trigger binaries-release workflow
+            // Note: Tags created by GITHUB_TOKEN don't auto-trigger workflows,
+            // so we must explicitly dispatch
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'binaries-release.yaml',
+                ref: 'main',
+                inputs: {
+                  version: version
+                }
+              });
+              console.log('Triggered binaries-release workflow');
+            } catch (e) {
+              console.log(`Failed to trigger binaries-release: ${e.message}`);
+            }
+            
+            // Trigger agent builds to pick up new runtime
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'agents-build.yaml',
+                ref: 'main',
+                inputs: {
+                  force_rebuild: 'false'
+                }
+              });
+              console.log('Triggered agents-build workflow');
+            } catch (e) {
+              console.log(`Failed to trigger agents-build: ${e.message}`);
+            }
 
       - name: Build summary
         run: |
@@ -101,6 +122,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "The following workflows have been triggered:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **binaries-release**: Triggered by tag \`${{ needs.release-please.outputs.tag_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **binaries-release**: Triggered via workflow_dispatch with version \`${{ needs.release-please.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **agents-build**: Triggered to rebuild with latest runtime" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Note: Tags created by GITHUB_TOKEN don't auto-trigger workflows, so we dispatch explicitly." >> $GITHUB_STEP_SUMMARY
 
