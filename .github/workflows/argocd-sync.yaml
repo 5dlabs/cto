@@ -28,26 +28,30 @@ jobs:
     steps:
       - name: Setup kubectl
         run: |
-          mkdir -p $HOME/bin
+          mkdir -p "$HOME/bin"
           if [ -f /shared/kubectl ]; then
-            cp /shared/kubectl $HOME/bin/
-            chmod +x $HOME/bin/kubectl
+            cp /shared/kubectl "$HOME/bin/"
+            chmod +x "$HOME/bin/kubectl"
           fi
-          echo "$HOME/bin" >> $GITHUB_PATH
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Trigger sync summary
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "## 🔄 ArgoCD Sync Triggered" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "**Trigger:** Push to main" >> $GITHUB_STEP_SUMMARY
-            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Trigger:** Manual dispatch" >> $GITHUB_STEP_SUMMARY
-            echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🔄 ArgoCD Sync Triggered"
+            echo ""
+            if [ "$EVENT_NAME" = "push" ]; then
+              echo "**Trigger:** Push to main"
+              echo "**Commit:** ${{ github.sha }}"
+              echo "**Author:** ${{ github.actor }}"
+            else
+              echo "**Trigger:** Manual dispatch"
+              echo "**Triggered by:** ${{ github.actor }}"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sync platform-apps (app-of-apps)
         run: |
@@ -66,7 +70,7 @@ jobs:
             -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"prune":true,"syncOptions":["ServerSideApply=true"]}}}'
 
           echo "✅ platform-apps sync triggered"
-          echo "- **platform-apps:** Sync triggered ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **platform-apps:** Sync triggered ✅" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Wait for platform-apps to sync
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.wait_for_sync == true)
@@ -112,9 +116,11 @@ jobs:
       - name: Sync all individual applications
         run: |
           echo "🔄 Syncing all individual ArgoCD applications..."
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Individual Application Syncs" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "### Individual Application Syncs"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Get all applications in argocd namespace (excluding platform-apps which is already synced)
           APPS=$(kubectl get applications -n argocd -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep -v '^platform-apps$' | sort)
@@ -131,7 +137,7 @@ jobs:
             kubectl patch application "$app" -n argocd --type merge \
               -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"prune":true,"syncOptions":["ServerSideApply=true"]}}}' 2>/dev/null || true
 
-            echo "- **$app:** Sync triggered ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **$app:** Sync triggered ✅" >> "$GITHUB_STEP_SUMMARY"
           done
 
           echo "✅ All applications sync triggered"
@@ -183,28 +189,34 @@ jobs:
       - name: Final status check
         run: |
           echo "🔍 Final application status..."
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Final Status" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "### Final Status"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           kubectl get applications -n argocd \
             -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.status.sync.revision' \
-            | tee -a $GITHUB_STEP_SUMMARY
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
 
           # Count statuses
           TOTAL=$(kubectl get applications -n argocd -o json | jq '.items | length')
           SYNCED=$(kubectl get applications -n argocd -o json | jq '[.items[] | select(.status.sync.status == "Synced")] | length')
           HEALTHY=$(kubectl get applications -n argocd -o json | jq '[.items[] | select(.status.health.status == "Healthy")] | length')
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Summary:** $SYNCED/$TOTAL synced, $HEALTHY/$TOTAL healthy" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "**Summary:** $SYNCED/$TOTAL synced, $HEALTHY/$TOTAL healthy"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summary
         run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "🎉 **ArgoCD sync completed!**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All applications have been synced. Check the ArgoCD UI for any issues." >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "---"
+            echo "🎉 **ArgoCD sync completed!**"
+            echo ""
+            echo "All applications have been synced. Check the ArgoCD UI for any issues."
+          } >> "$GITHUB_STEP_SUMMARY"

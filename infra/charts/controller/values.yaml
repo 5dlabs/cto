@@ -1230,17 +1230,17 @@ rbac:
   # Create RBAC resources
   create: true
 
-  # Controller RBAC (for managing CodeRun/DocsRun resources)
+  # Controller RBAC (for managing CodeRun resources)
   controller:
     # Use Role/RoleBinding (true) or ClusterRole/ClusterRoleBinding (false)
     namespaced: true
     rules:
-      # CodeRun and DocsRun CRD management
+      # CodeRun CRD management
       - apiGroups: ["agents.platform"]
-        resources: ["coderuns", "docsruns"]
+        resources: ["coderuns"]
         verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
       - apiGroups: ["agents.platform"]
-        resources: ["coderuns/status", "docsruns/status"]
+        resources: ["coderuns/status"]
         verbs: ["get", "update", "patch"]
       # Job management in cto namespace
       - apiGroups: ["batch"]
@@ -1303,9 +1303,9 @@ rbac:
       - apiGroups: ["argoproj.io"]
         resources: ["workflowtaskresults"]
         verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-      # Orchestrator CRDs (for creating DocsRun/CodeRun from workflows)
+      # Orchestrator CRDs (for creating CodeRun from workflows)
       - apiGroups: ["agents.platform"]
-        resources: ["docsruns", "coderuns"]
+        resources: ["coderuns"]
         verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   # Workflow Submitter RBAC (for orchestrator to submit workflows)

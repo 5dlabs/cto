@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'infra/charts/controller/agent-templates/**'
+      - 'templates/**'
       - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'
 
 permissions:
@@ -30,10 +30,10 @@ jobs:
         id: check_changes
         run: |
           if git diff --quiet -- infra/charts/controller/templates/agent-templates-*.yaml; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No changes to commit."
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changes detected in generated ConfigMaps."
           fi
       
@@ -61,7 +61,7 @@ jobs:
               - `agent-templates-integration.yaml` (Integration templates)
 
             ### Files Changed
-            - Template files in `infra/charts/controller/agent-templates/`
+            - Template files in `templates/`
             
             This is a routine update that ensures the ConfigMaps stay in sync with the template files.
           branch: auto-update-agent-templates

@@ -1,0 +1,12 @@
+---
+# actionlint configuration
+# https://github.com/rhysd/actionlint/blob/main/docs/config.md
+
+self-hosted-runner:
+  labels:
+    - k8s-runner
+
+# Ignore shellcheck info-level suggestions (SC2086 double-quoting, SC2129 grouped redirects)
+# These are style preferences, not errors
+config-variables: []
+

@@ -5,13 +5,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'heal/**'
+      - 'crates/heal/**'
       - 'infra/images/heal/**'
       - '.github/workflows/heal-ci.yaml'
   pull_request:
     branches: [main]
     paths:
-      - 'heal/**'
+      - 'crates/heal/**'
       - 'infra/images/heal/**'
       - '.github/workflows/heal-ci.yaml'
   workflow_dispatch:
@@ -29,13 +29,13 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             heal:
-              - 'heal/**'
-              - '!heal/**/*.md'
+              - 'crates/heal/**'
+              - '!crates/heal/**/*.md'
             docker:
               - 'infra/images/heal/**'
 
@@ -63,9 +63,9 @@ jobs:
           echo "🔧 Checking cargo fmt..."
           if ! cargo fmt -p heal -- --check; then
             echo "📝 Formatting issues detected"
-            echo "format-needed=true" >> $GITHUB_OUTPUT
+            echo "format-needed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "format-needed=false" >> $GITHUB_OUTPUT
+            echo "format-needed=false" >> "$GITHUB_OUTPUT"
             echo "✅ Code formatting is correct"
           fi
 
@@ -168,7 +168,7 @@ jobs:
       - name: Setup optimized Rust environment
         run: |
           echo "🚀 Setting up optimized Rust build environment..."
-          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
+          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
           export PATH="/home/runner/.cargo/bin:$PATH"
 
           # Check if both rustc and cargo are available and working
@@ -177,7 +177,7 @@ jobs:
           else
             echo "🔧 Installing/repairing Rust toolchain..."
             rustup toolchain uninstall stable 2>/dev/null || true
-            for i in 1 2 3; do
+            for _ in 1 2 3; do
               rustup toolchain install stable && \
               rustup toolchain install stable && \
               rustup default stable && break
@@ -229,10 +229,10 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path heal/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "heal") | .version')
+          VERSION=$(cargo metadata --manifest-path crates/heal/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "heal") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "short-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
@@ -248,9 +248,11 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## 🐳 Heal Docker Image Built" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.short-sha }}\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🐳 Heal Docker Image Built"
+            echo ""
+            echo "**Tags:**"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:latest\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.short-sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
