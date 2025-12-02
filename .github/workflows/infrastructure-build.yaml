@@ -17,6 +17,7 @@ on:
       - 'infra/images/redis/**'
       - 'infra/images/builder/**'
       - 'infra/images/openmemory/**'
+      - 'infra/images/tweakcn/**'
       - '.github/workflows/infrastructure-build.yaml'
 
   workflow_dispatch:
@@ -27,7 +28,7 @@ on:
         default: false
         type: boolean
       image:
-        description: 'Specific image to build (postgresql, rust-builder, openmemory, or leave blank for all)'
+        description: 'Specific image to build (postgresql, rust-builder, openmemory, tweakcn, or leave blank for all)'
         required: false
         type: string
 
@@ -67,6 +68,13 @@ jobs:
             file: ./infra/images/openmemory/Dockerfile
             version: "1.0.0"
             description: "OpenMemory long-term memory system for AI agents"
+          - id: tweakcn
+            name: Tweakcn
+            image: tweakcn
+            context: ./infra/images/tweakcn
+            file: ./infra/images/tweakcn/Dockerfile
+            version: "1.0.0"
+            description: "Visual theme editor for shadcn/ui components"
     steps:
       - uses: actions/checkout@v4
 
