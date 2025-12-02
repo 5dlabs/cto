@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.5](https://github.com/5dlabs/cto/compare/v0.12.4...v0.12.5) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add --target-pod to spawn-remediation for deduplication ([#2198](https://github.com/5dlabs/cto/issues/2198)) ([f9a11ac](https://github.com/5dlabs/cto/commit/f9a11ace8626b1f19d84bd827f44c786fd9cde80))
+* **heal:** use heal-remediation prefix and service for PVC sharing ([#2215](https://github.com/5dlabs/cto/issues/2215)) ([cbf8903](https://github.com/5dlabs/cto/commit/cbf8903b0902af684385b6e708da0132a6bd0367))
+
 ## [0.12.4](https://github.com/5dlabs/cto/compare/v0.12.3...v0.12.4) (2025-12-02)
 
 
