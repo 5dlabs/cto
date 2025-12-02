@@ -58,6 +58,14 @@ jobs:
           node-version: '20'
           check-latest: true
 
+      - name: Get TaskMaster version from npm
+        id: taskmaster-version
+        run: |
+          # Get latest TaskMaster version from npm registry
+          VERSION=$(npm view task-master-ai version 2>/dev/null || echo "0.36.0")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 TaskMaster version: $VERSION"
+
       - name: Compute base tag (git hash of Dockerfile)
         id: tag
         run: |
@@ -136,10 +144,14 @@ jobs:
           build-args: |
             TOOLS_VERSION=${{ steps.binaries-version.outputs.tools_version }}
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
+            TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
+          # Use both local cache (fast) and registry cache (persistent across runners)
           cache-from: |
             type=local,src=/cache/buildx/base
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
           cache-to: |
             type=local,dest=/cache/buildx/base,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache,mode=max
 
       - name: Set build output
         id: set-built
