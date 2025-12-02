@@ -133,5 +133,6 @@ echo "📝 Updated issue #${ISSUE_NUMBER} with analysis"
 heal spawn-remediation \
   --alert a2 \
   --task-id {{task_id}} \
+  --target-pod "{{pod_name}}" \
   --issue-number ${ISSUE_NUMBER}
 ```
