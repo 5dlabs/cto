@@ -747,6 +747,14 @@ struct FailureContext {
 /// Trigger remediation by creating a `CodeRun` for the remediation agent
 ///
 /// Returns the name of the created `CodeRun`
+///
+/// The `CodeRun` is created with:
+/// - Name prefix: `heal-remediation-` (for controller naming detection)
+/// - Label: `agents.platform/type: heal-remediation` (for controller detection)
+/// - Service: `heal` (for PVC sharing with heal deployment)
+///
+/// This ensures the remediation pod shares the `heal-workspace` PVC with the
+/// heal monitor deployment, allowing access to prompts and logs.
 fn trigger_remediation(
     config: &RemediationConfig,
     failure: &FailureContext,
@@ -755,7 +763,8 @@ fn trigger_remediation(
     namespace: &str,
 ) -> Result<String> {
     let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
-    let coderun_name = format!("remediation-t{task_id}-i{iteration}-{uid}");
+    // Use heal-remediation- prefix for controller detection and naming
+    let coderun_name = format!("heal-remediation-t{task_id}-i{iteration}-{uid}");
 
     // Serialize failure context to JSON for the agent
     let failure_json =
@@ -770,11 +779,20 @@ fn trigger_remediation(
     let docs_repository_url = format!("https://github.com/{docs_repo}");
     let docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs");
 
-    // Derive service from repository (e.g., "5dlabs/cto" -> "cto")
-    let service = config.repository.split('/').next_back().unwrap_or("cto");
+    // Ensure template starts with "heal/" for controller PVC detection
+    // If config template doesn't start with heal/, prepend it
+    let template = if config.template.starts_with("heal/") {
+        config.template.clone()
+    } else {
+        format!("heal/{}", config.template)
+    };
 
     // Create CodeRun YAML manifest
     // Uses correct CRD schema: repositoryUrl, cliConfig, env as map
+    // Key fields for heal PVC sharing:
+    // - Label: agents.platform/type: heal-remediation
+    // - Service: heal (triggers controller's is_heal detection)
+    // - Template: heal/... (also triggers is_heal detection)
     let coderun_yaml = format!(
         r#"apiVersion: agents.platform/v1
 kind: CodeRun
@@ -785,7 +803,7 @@ metadata:
     task-id: "{task_id}"
     remediation: "true"
     iteration: "{iteration}"
-    agents.platform/type: remediation
+    agents.platform/type: heal-remediation
 spec:
   taskId: {task_id}
   githubApp: "{agent}"
@@ -794,7 +812,7 @@ spec:
   docsRepositoryUrl: "{docs_repository_url}"
   docsProjectDirectory: "{docs_dir}"
   workingDirectory: "."
-  service: "{service}"
+  service: "heal"
   cliConfig:
     cliType: "{cli}"
     model: "{model}"
@@ -819,8 +837,7 @@ spec:
         repository_url = repository_url,
         docs_repository_url = docs_repository_url,
         docs_dir = docs_dir,
-        service = service,
-        template = config.template,
+        template = template,
         failure_json_escaped = serde_json::to_string(&failure_json)?,
         workflow_name = failure.workflow_name,
         failure_type = failure.resource_type,
