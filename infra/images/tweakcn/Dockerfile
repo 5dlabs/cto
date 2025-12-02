@@ -16,6 +16,7 @@ WORKDIR /app
 RUN git clone --depth 1 https://github.com/jnsahaj/tweakcn.git .
 
 # Install dependencies with pnpm (matches upstream package manager)
+# Note: tsx is needed for prebuild scripts
 RUN pnpm install --frozen-lockfile || pnpm install
 
 # Rebuild the source code only when needed
@@ -35,7 +36,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # At runtime, this gets replaced by the actual env var
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build?sslmode=disable"
 
-# Skip prebuild and run next build directly
+# Run prebuild to generate theme registries (required)
+RUN pnpm run prebuild
+
+# Build without turbopack (more stable for Docker)
+# Using exec next build instead of pnpm run build to avoid --turbopack flag
 RUN pnpm exec next build
 
 # Production image
