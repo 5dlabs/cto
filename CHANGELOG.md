@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.9](https://github.com/5dlabs/cto/compare/v0.12.8...v0.12.9) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **controller:** use heal-remediation- prefix for heal CodeRun pods ([#2386](https://github.com/5dlabs/cto/issues/2386)) ([4aa3430](https://github.com/5dlabs/cto/commit/4aa3430fa1fd5a7b49a2caf1dba040f01b1c2257))
+
 ## [0.12.8](https://github.com/5dlabs/cto/compare/v0.12.7...v0.12.8) (2025-12-02)
 
 
