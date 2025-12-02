@@ -61,7 +61,12 @@ if [ -d "${REPO_PATH}/.git" ]; then
     echo "✓ Repository synced to $(git rev-parse --short HEAD)"
 else
     echo "📥 Repository not found, cloning (shallow)..."
-    git clone --depth 1 "{{repository_url}}.git" "${REPO_PATH}"
+    # Derive clone URL - append .git only if not already present
+    CLONE_URL="{{repository_url}}"
+    if ! echo "${CLONE_URL}" | grep -q "\.git$"; then
+        CLONE_URL="${CLONE_URL}.git"
+    fi
+    git clone --depth 1 "${CLONE_URL}" "${REPO_PATH}"
     cd "${REPO_PATH}"
     echo "✓ Repository cloned to $(git rev-parse --short HEAD)"
 fi
