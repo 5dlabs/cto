@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.2](https://github.com/5dlabs/cto/compare/v0.12.1...v0.12.2) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* add -L flag to follow symlinks in template generation ([#2149](https://github.com/5dlabs/cto/issues/2149)) ([db82b78](https://github.com/5dlabs/cto/commit/db82b7823b10e5941e693335acd68e7f3b7b3c83))
+* **heal:** add in-memory deduplication for pod alerts ([#2152](https://github.com/5dlabs/cto/issues/2152)) ([08880f7](https://github.com/5dlabs/cto/commit/08880f76532f5c30e172f01034a9c016eea859a7))
+
 ## [0.12.1](https://github.com/5dlabs/cto/compare/v0.12.0...v0.12.1) (2025-12-02)
 
 
