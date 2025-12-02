@@ -5,6 +5,7 @@ use kube::api::ListParams;
 use kube::runtime::controller::{Action, Controller};
 use kube::runtime::watcher::Config;
 use kube::{Api, Client, ResourceExt};
+use notify::Notifier;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, Instrument};
 
@@ -70,11 +71,23 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
 
     debug!("Creating controller context...");
 
+    // Initialize notification system
+    let notifier = Notifier::from_env();
+    if notifier.has_channels() {
+        info!(
+            "Notification system enabled with {} channel(s)",
+            notifier.channel_count()
+        );
+    } else {
+        debug!("Notification system disabled (no channels configured)");
+    }
+
     // Create shared context
     let context = Arc::new(Context {
         client: client.clone(),
         namespace: namespace.clone(),
         config: Arc::new(config),
+        notifier: Arc::new(notifier),
     });
 
     debug!("Controller context created successfully");

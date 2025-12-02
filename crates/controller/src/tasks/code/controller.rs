@@ -12,6 +12,7 @@ use kube::api::{DeleteParams, Patch, PatchParams};
 use kube::runtime::controller::Action;
 use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
 use kube::{Api, Error as KubeError, ResourceExt};
+use notify::NotifyEvent;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
@@ -852,7 +853,75 @@ async fn update_code_status_with_completion(
         "Status updated successfully to '{}' with work_completed={}",
         new_phase, work_completed
     );
+
+    // Emit notification for significant state transitions
+    emit_agent_notification(code_run, ctx, current_phase, new_phase, finished_at);
+
     Ok(())
+}
+
+/// Emit notification events for agent lifecycle changes
+fn emit_agent_notification(
+    code_run: &CodeRun,
+    ctx: &Context,
+    old_phase: &str,
+    new_phase: &str,
+    finished_at: Option<DateTime<Utc>>,
+) {
+    // Skip if no actual phase change
+    if old_phase == new_phase {
+        return;
+    }
+
+    let agent = code_run
+        .spec
+        .github_app
+        .clone()
+        .unwrap_or_else(|| "unknown".to_string());
+    let task_id = code_run
+        .metadata
+        .labels
+        .as_ref()
+        .and_then(|l| l.get("task-id"))
+        .cloned()
+        .unwrap_or_else(|| "unknown".to_string());
+    let coderun_name = code_run.name_any();
+
+    let event = match new_phase {
+        "Running" if old_phase != "Running" => Some(NotifyEvent::AgentStarted {
+            agent,
+            task_id,
+            coderun_name,
+            timestamp: Utc::now(),
+        }),
+        "Succeeded" | "Failed" => {
+            let success = new_phase == "Succeeded";
+            // Use metadata creation timestamp as start time
+            let created_at = code_run.metadata.creation_timestamp.as_ref().map(|t| t.0);
+
+            let duration_secs = match (created_at, finished_at) {
+                (Some(start), Some(end)) => {
+                    let duration = end.signed_duration_since(start);
+                    duration.num_seconds().max(0) as u64
+                }
+                _ => 0,
+            };
+
+            Some(NotifyEvent::AgentCompleted {
+                agent,
+                task_id,
+                coderun_name,
+                success,
+                duration_secs,
+                timestamp: Utc::now(),
+            })
+        }
+        _ => None,
+    };
+
+    if let Some(event) = event {
+        ctx.notifier.notify(event);
+    }
 }
 
 /// Handle workflow resumption when `CodeRun` completes successfully

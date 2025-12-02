@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.12.0"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -479,6 +479,7 @@ dependencies = [
  "kube-derive",
  "lazy_static",
  "mockall",
+ "notify",
  "octocrab",
  "opentelemetry 0.30.0",
  "opentelemetry-otlp",
@@ -598,7 +599,7 @@ dependencies = [
 
 [[package]]
 name = "cto-cli"
-version = "0.12.0"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1198,12 +1199,13 @@ dependencies = [
 
 [[package]]
 name = "heal"
-version = "0.12.0"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "chrono",
  "clap",
  "colored",
+ "notify",
  "regex",
  "reqwest",
  "serde",
@@ -1962,6 +1964,20 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+]
+
+[[package]]
+name = "notify"
+version = "0.12.2"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3215,7 +3231,7 @@ dependencies = [
 
 [[package]]
 name = "tasks"
-version = "0.12.0"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3496,7 +3512,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.12.0"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "axum 0.8.7",
@@ -3811,7 +3827,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.12.0"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "clap",
