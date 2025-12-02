@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.8](https://github.com/5dlabs/cto/compare/v0.12.7...v0.12.8) (2025-12-02)
+
+
+### ✨ Features
+
+* **infra:** add self-hosted tweakcn theme editor ([#2329](https://github.com/5dlabs/cto/issues/2329)) ([71d011e](https://github.com/5dlabs/cto/commit/71d011e5083de9d1ab4e833653cc3582c7847688))
+* **infra:** add self-hosted tweakcn theme editor ([#2330](https://github.com/5dlabs/cto/issues/2330)) ([d234689](https://github.com/5dlabs/cto/commit/d2346891d16d62d8415ddad9550554c7b734b7dd))
+
 ## [0.12.7](https://github.com/5dlabs/cto/compare/v0.12.6...v0.12.7) (2025-12-02)
 
 
