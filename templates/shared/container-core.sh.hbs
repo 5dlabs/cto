@@ -1,0 +1,382 @@
+{{!--
+  Universal Container Core
+  
+  This is the base template for all CLI container scripts. It provides:
+  - Environment bootstrap (Rust, etc.)
+  - GitHub App authentication
+  - Repository clone and setup
+  - Task file preparation
+  - CLI-specific execution (via partial-block)
+  - Cleanup and completion
+  
+  Usage (in CLI-specific container):
+  
+  {{#> shared/container-core
+      cli_name="codex"
+      cli_banner="🔧 Initialising Codex environment"
+      retry_env_var="CODEX_MAX_RETRIES"
+      default_retries=5}}
+  
+    # CLI-specific initialization and execution goes here
+    codex exec --prompt "$PROMPT"
+  
+  {{/shared/container-core}}
+  
+  Required context:
+    - task_id: Task identifier
+    - service: Service name
+    - repository_url: Git repository URL
+    - github_app: GitHub App name
+    - workflow_name: Workflow identifier
+    - model: LLM model name
+  
+  Optional context:
+    - docs_repository_url: Docs repository (if separate)
+    - docs_branch: Docs branch (default: main)
+    - docs_project_directory: Project subdirectory in docs repo
+    - working_directory: Working directory (default: service name)
+    - agent_banner: Custom banner message
+    - agent_completion_message: Custom completion message
+--}}
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# Container Core - Universal Agent Container Bootstrap
+# CLI: {{cli_name}}
+# Task: {{task_id}}
+# Service: {{service}}
+# =========================================================================
+
+# Banner
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else if cli_banner}}
+echo "{{cli_banner}}"
+{{else}}
+echo "🔧 Initialising {{cli_name}} environment"
+{{/if}}
+
+# =========================================================================
+# Environment Bootstrap
+# =========================================================================
+
+{{> shared/bootstrap/rust-env}}
+
+echo "PATH: $PATH"
+
+# =========================================================================
+# Retry Configuration
+# =========================================================================
+
+MAX_RETRIES_CONFIG=${EXECUTION_MAX_RETRIES:-{{default_retries}}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🤖 CLI: {{cli_name}}"
+echo "🎯 Model: {{model}}"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration ({{default_retries}})"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# =========================================================================
+# GitHub App Authentication
+# =========================================================================
+
+{{> shared/functions/github-auth}}
+
+# =========================================================================
+# Docker Sidecar Management
+# =========================================================================
+
+{{> shared/functions/docker-sidecar}}
+
+trap 'stop_docker_sidecar || true' EXIT
+
+# =========================================================================
+# GitHub CLI Authentication
+# =========================================================================
+
+ensure_gh_authenticated() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
+    return 0
+  fi
+
+  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  gh auth setup-git >/dev/null 2>&1 || true
+
+  if gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "✅ GitHub CLI authenticated for $GH_HOST"
+  else
+    echo "⚠️ Unable to confirm GitHub CLI auth; GH_TOKEN will still be used for git operations"
+  fi
+}
+
+ensure_gh_authenticated
+
+# =========================================================================
+# Git Configuration
+# =========================================================================
+
+git config --global --add safe.directory /workspace
+GITHUB_APP="{{github_app}}"
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent ({{cli_name}} CLI)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_NAME
+export GIT_AUTHOR_EMAIL
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# =========================================================================
+# Repository Checkout
+# =========================================================================
+
+WORK_DIR="{{working_directory}}"
+if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  WORK_DIR="{{service}}"
+fi
+
+TARGET_DIR="/workspace/$WORK_DIR"
+mkdir -p "$TARGET_DIR"
+cd /workspace
+
+REPO_ROOT="/workspace/$REPO_NAME"
+git config --global --add safe.directory "$REPO_ROOT"
+
+if [ -d "$REPO_NAME/.git" ]; then
+  echo "🔁 Repository already cloned, fetching latest"
+  cd "$REPO_NAME"
+  refresh_token_if_needed
+  git fetch --all --prune
+else
+  echo "⬇️  Cloning repository"
+  refresh_token_if_needed
+  git clone "$REPO_HTTP_URL"
+  cd "$REPO_NAME"
+fi
+
+git config --global --add safe.directory "$REPO_ROOT"
+cd "$REPO_ROOT"
+
+# Remove stale automation-managed files
+MANAGED_PATHS=(
+  ".mcp.json"
+  "AGENTS.md"
+  "tools-config.json"
+  "coding-guidelines.md"
+  "github-guidelines.md"
+  "task"
+)
+
+for managed_path in "${MANAGED_PATHS[@]}"; do
+  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
+    continue
+  fi
+  if [ -e "$managed_path" ]; then
+    echo "🧹 Removing stale file to allow checkout: $managed_path"
+    rm -rf "$managed_path"
+  fi
+done
+
+# =========================================================================
+# Branch Setup
+# =========================================================================
+
+BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+REMOTE_BASE="origin/$BASE_BRANCH"
+
+if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+  if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+    BASE_BRANCH="master"
+    REMOTE_BASE="origin/$BASE_BRANCH"
+  else
+    DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if [ -n "$DEFAULT_REMOTE" ]; then
+      BASE_BRANCH="$DEFAULT_REMOTE"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      REMOTE_BASE=""
+    fi
+  fi
+fi
+
+if [ -n "$BASE_BRANCH" ]; then
+  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+fi
+
+FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
+  echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  git checkout "$FEATURE_BRANCH"
+  if [ -n "$REMOTE_BASE" ]; then
+    echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
+    if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
+      echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; creating fresh branch from $REMOTE_BASE"
+      NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+      git checkout -B "$NEW_BRANCH" "$REMOTE_BASE"
+      FEATURE_BRANCH="$NEW_BRANCH"
+    fi
+  fi
+else
+  echo "Creating new feature branch '$FEATURE_BRANCH'"
+  if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+  else
+    git checkout -b "$FEATURE_BRANCH"
+  fi
+fi
+
+git config --local user.name "$GIT_AUTHOR_NAME"
+git config --local user.email "$GIT_AUTHOR_EMAIL"
+git config --local push.autoSetupRemote true
+export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
+echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
+
+# Set up working directory
+CLI_WORK_DIR="$REPO_ROOT"
+if [ "$WORK_DIR" != "$REPO_NAME" ]; then
+  CLI_WORK_DIR="$CLI_WORK_DIR/$WORK_DIR"
+  mkdir -p "$CLI_WORK_DIR"
+fi
+
+cd "$CLI_WORK_DIR"
+echo "✓ Working directory: $CLI_WORK_DIR"
+
+echo "📦 git status"
+refresh_token_if_needed
+git status --short || true
+
+# =========================================================================
+# Task Context Materialization
+# =========================================================================
+
+echo "🧱 Syncing task assets"
+mkdir -p "$CLI_WORK_DIR/task"
+cp -R /task-files/task/* "$CLI_WORK_DIR/task/" 2>/dev/null || true
+
+# Sync docs repository if configured
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{docs_branch}}"
+DOCS_PROJECT_DIRECTORY="{{docs_project_directory}}"
+
+if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
+  refresh_token_if_needed
+  if [ -z "$DOCS_BRANCH" ] || [ "$DOCS_BRANCH" = "null" ]; then
+    DOCS_BRANCH="main"
+  fi
+
+  echo "📚 Syncing docs repository: $DOCS_REPO_URL (branch: $DOCS_BRANCH)"
+  DOCS_CLONE_DIR="/tmp/docs-repo"
+  rm -rf "$DOCS_CLONE_DIR"
+
+  read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
+  DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
+
+  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
+    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    fi
+
+    echo "🔍 Docs base path: $DOCS_BASE_PATH"
+    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+
+    if [ -d "$TASK_DIR" ]; then
+      echo "✓ Copying task definition from $TASK_DIR"
+      refresh_token_if_needed
+      cp -R "$TASK_DIR"/. "$CLI_WORK_DIR/task/" 2>/dev/null || true
+    else
+      echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
+    fi
+
+    if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
+      refresh_token_if_needed
+      cp "$DOCS_BASE_PATH/tasks.json" "$CLI_WORK_DIR/task/" 2>/dev/null || true
+    fi
+  fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
+fi
+
+# Copy task files
+if [ -f /task-files/AGENTS.md ]; then
+  cp /task-files/AGENTS.md "$CLI_WORK_DIR/AGENTS.md"
+fi
+
+if [ -f /task-files/coding-guidelines.md ]; then
+  cp /task-files/coding-guidelines.md "$CLI_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/github-guidelines.md ]; then
+  cp /task-files/github-guidelines.md "$CLI_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/tools-config.json ]; then
+  cp /task-files/tools-config.json "$CLI_WORK_DIR/"
+  echo "✓ Copied tools-config.json to working directory"
+fi
+
+if [ -f /task-files/mcp.json ]; then
+  cp /task-files/mcp.json "$CLI_WORK_DIR/.mcp.json"
+fi
+
+# Export working directory for CLI-specific code
+export CLI_WORK_DIR
+export REPO_ROOT
+export FEATURE_BRANCH
+export BASE_BRANCH
+
+# =========================================================================
+# CLI-Specific Execution (Partial Block)
+# =========================================================================
+
+{{> @partial-block}}
+
+# =========================================================================
+# Completion
+# =========================================================================
+
+touch /workspace/.agent_done 2>/dev/null || true
+
+{{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+{{else}}
+echo "✅ {{cli_name}} execution complete"
+{{/if}}
+
+exit 0
+

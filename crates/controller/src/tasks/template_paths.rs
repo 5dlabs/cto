@@ -16,6 +16,9 @@ pub const SHARED_FUNCTIONS_COMPLETION_MARKER: &str = "shared/functions/completio
 pub const SHARED_PROMPTS_CONTEXT7: &str = "shared/context7-instructions.md.hbs";
 pub const SHARED_PROMPTS_DESIGN_SYSTEM: &str = "shared/design-system.md";
 
+// Container core (universal CLI-agnostic container base)
+pub const SHARED_CONTAINER_CORE: &str = "shared/container-core.sh.hbs";
+
 // ============================================================================
 // CLI-specific templates
 // ============================================================================

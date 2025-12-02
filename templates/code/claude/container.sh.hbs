@@ -1,169 +1,39 @@
-#!/bin/sh
+#!/bin/bash
+set -euo pipefail
 
-# Ensure Rust environment is always properly set up
-echo "🔧 Setting up Rust environment..."
+# =========================================================================
+# Claude Container Base
+# 
+# This container uses shared partials for common functionality.
+# See templates/shared/ for the reusable building blocks.
+# =========================================================================
 
-# Source Rust environment if available (fixes cargo not found issues)
-if [ -f "$HOME/.cargo/env" ]; then
-    . "$HOME/.cargo/env"
-    echo "✓ Sourced Rust environment from $HOME/.cargo/env"
-fi
-
-# Also try root cargo env as fallback
-if [ -f "/root/.cargo/env" ]; then
-    . "/root/.cargo/env"
-    echo "✓ Sourced Rust environment from /root/.cargo/env"
-fi
-
-# Ensure rustup has a default toolchain set
-if command -v rustup >/dev/null 2>&1; then
-    rustup default stable 2>/dev/null || true
-    echo "✓ Ensured stable Rust toolchain is default"
-else
-    echo "⚠️ rustup not found in PATH"
-fi
-
-# Verify Rust is available
-if command -v cargo >/dev/null 2>&1; then
-    echo "✓ Cargo is available: $(cargo --version)"
-else
-    echo "❌ Cargo not found in PATH"
-    echo "Current PATH: $PATH"
-    echo "Attempting to find cargo..."
-    find /usr -name cargo 2>/dev/null | head -5 || echo "No cargo found in /usr"
-    find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
-fi
-
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else}}
 echo '════════════════════════════════════════════════════════════════'
 echo '║                 IMPLEMENTATION TASK STARTING                 ║'
 echo '════════════════════════════════════════════════════════════════'
+{{/if}}
+
+# Bootstrap Rust environment (shared partial)
+{{> shared/bootstrap/rust-env}}
+
+echo "PATH: $PATH"
 
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
 export SSH_ASKPASS=/bin/true
 
-# Repository URL
-REPO_URL="{{repository_url}}"
-
-# GitHub App authentication is configured via environment variables
-echo "Using GitHub App authentication"
-
-# Authenticate with GitHub App
-if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
-    echo "Authenticating with GitHub App..."
-
-    # Create temporary private key file (support escaped newlines)
-    TEMP_KEY_FILE="/tmp/github-app-key.pem"
-    printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
-    chmod 600 "$TEMP_KEY_FILE"
-
-    # Generate JWT token for GitHub App (fixed JWT generation for Linux containers)
-    # JWT header
-    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-
-    # JWT payload with current time and expiration (10 minutes)
-    NOW=$(date +%s)
-    EXP=$((NOW + 600))
-    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-
-    # Sign the JWT
-    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-
-    # Get installation ID for the repository (robust parsing of owner/repo)
-    INPUT_REPO="{{repository_url}}"
-    REPO_OWNER=""
-    REPO_NAME=""
-
-    if echo "$INPUT_REPO" | grep -qE '^https://github.com/'; then
-        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
-        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
-    elif echo "$INPUT_REPO" | grep -qE '^git@github.com:'; then
-        # SSH format git@github.com:owner/repo(.git)
-        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
-        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:[^/]+/([^/]+)(\.git)?|\1|')
-    else
-        # Fallback: assume slug owner/repo (possibly with .git)
-        SLUG=$(echo "$INPUT_REPO" | sed -E 's|\.git$||')
-        REPO_OWNER=$(echo "$SLUG" | cut -d'/' -f1)
-        REPO_NAME=$(echo "$SLUG" | cut -d'/' -f2)
-    fi
-
-    echo "DEBUG: Parsed repository - Owner: '$REPO_OWNER', Name: '$REPO_NAME'"
-
-    echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
-
-    # Get the installation ID (retry and follow redirects). Fallback to org installation.
-    INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
-        --connect-timeout 5 --max-time 12 \
-        -H "Authorization: Bearer $JWT_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
-
-    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
-
-    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-        echo "⚠️ Repo installation not found, trying org installation..."
-        ORG_INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
-            --connect-timeout 5 --max-time 12 \
-            -H "Authorization: Bearer $JWT_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/orgs/$REPO_OWNER/installation")
-        INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
-    fi
-
-    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-        echo "❌ Failed to get installation ID for $REPO_OWNER/$REPO_NAME"
-        echo "Response (repo): $INSTALLATION_RESPONSE"
-        echo "Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
-        rm -f "$TEMP_KEY_FILE"
-        exit 1
-    fi
-
-    echo "Installation ID: $INSTALLATION_ID"
-
-    # Get installation access token
-    TOKEN_RESPONSE=$(curl -s -X POST \
-        -H "Authorization: Bearer $JWT_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-
-    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-
-    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
-        echo "❌ Failed to get installation access token"
-        echo "Response: $TOKEN_RESPONSE"
-        rm -f "$TEMP_KEY_FILE"
-        exit 1
-    fi
-
-    # Clean up temporary key file
-    rm -f "$TEMP_KEY_FILE"
-
-    # Export the token for git to use
-    export GITHUB_TOKEN
-
-    # Configure git to use the token (use --replace-all to handle multiple existing helpers)
-    git config --global --replace-all credential.helper store
-    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-
-    # Also authenticate gh CLI with the token
-    echo "$GITHUB_TOKEN" | gh auth login --with-token
-
-    echo "✓ GitHub App authenticated successfully"
-
-else
-    echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
-    exit 1
-fi
+# GitHub App authentication (shared partial)
+{{> shared/functions/github-auth}}
 
 # Git configuration with proper GitHub App attribution
 git config --global --add safe.directory /workspace
 
 # Set GitHub App attribution - use generic format for all agents
 GITHUB_APP="{{github_app}}"
-# Generic attribution that works for any agent
 GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
 GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
 
