@@ -330,7 +330,7 @@ enum Commands {
         /// Target pod name (for deduplication and labeling)
         #[arg(long)]
         target_pod: Option<String>,
-        /// GitHub issue number (preferred - derives paths from /workspace/watch/issues/{number}/)
+        /// GitHub issue number (preferred - derives paths from /workspace/watch/issues/issue-{number}/)
         #[arg(long)]
         issue_number: Option<u64>,
         /// Path to issue file (legacy - use --issue-number instead)
@@ -5527,7 +5527,7 @@ fn spawn_remediation_agent(
 
     // Determine issue directory and files based on issue_number or issue_file
     let (issue_dir, prompt_file, acceptance_file) = if let Some(num) = issue_number {
-        let dir = format!("/workspace/watch/issues/{num}");
+        let dir = format!("/workspace/watch/issues/issue-{num}");
         // Validate directory exists before deriving file paths
         if !std::path::Path::new(&dir).exists() {
             println!(

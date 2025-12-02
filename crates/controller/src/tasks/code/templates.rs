@@ -3005,6 +3005,7 @@ impl CodeTemplateGenerator {
     fn get_agent_container_template(code_run: &CodeRun) -> String {
         let run_type = code_run.spec.run_type.as_str();
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let service = &code_run.spec.service;
 
         // Check if this is a documentation or intake run type
         if run_type == "documentation" || run_type == "intake" {
@@ -3012,6 +3013,25 @@ impl CodeTemplateGenerator {
             // The intake templates are in intake/{cli}/ directory
             debug!("Using {} template for run_type: {}", run_type, run_type);
             return "intake/claude/container.sh.hbs".to_string();
+        }
+
+        // Check if this is a Heal workflow:
+        // 1. Service name contains "heal", OR
+        // 2. cli_config.settings.template starts with "heal/"
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_heal = service.to_lowercase().contains("heal")
+            || template_setting.to_lowercase().starts_with("heal/");
+
+        // Heal-specific container template for remediation agents
+        if is_heal {
+            debug!("Using heal container template for service: {}", service);
+            return "heal/claude/container.sh.hbs".to_string();
         }
 
         // Check if this is a remediation cycle (retry > 0)
@@ -3259,8 +3279,8 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_heal =
-            service.to_lowercase().contains("heal") || template_setting.starts_with("heal/");
+        let is_heal = service.to_lowercase().contains("heal")
+            || template_setting.to_lowercase().starts_with("heal/");
 
         // Heal-specific templates for remediation agents
         if is_heal {
@@ -3296,8 +3316,8 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch =
-            service.to_lowercase().contains("watch") || template_setting.starts_with("watch/");
+        let is_watch = service.to_lowercase().contains("watch")
+            || template_setting.to_lowercase().starts_with("watch/");
 
         // Check if this is a remediation cycle
         let retry_count = code_run
@@ -3360,8 +3380,8 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_watch =
-            service.to_lowercase().contains("watch") || template_setting.starts_with("watch/");
+        let is_watch = service.to_lowercase().contains("watch")
+            || template_setting.to_lowercase().starts_with("watch/");
 
         // Watch-specific templates take precedence
         // Use watchRole from cli_config.settings to determine monitor vs remediation
@@ -3703,6 +3723,43 @@ mod tests {
         let code_run = create_test_code_run(None);
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(template_path, "code/claude/container.sh.hbs");
+    }
+
+    #[test]
+    fn test_heal_container_template_selection_by_service() {
+        // When service contains "heal", should use heal container template
+        let mut code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        code_run.spec.service = "heal".to_string();
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(
+            template_path, "heal/claude/container.sh.hbs",
+            "Service 'heal' should trigger heal container template"
+        );
+    }
+
+    #[test]
+    fn test_heal_container_template_selection_by_template_setting() {
+        // When cli_config.settings.template starts with "heal/", should use heal container template
+        use crate::cli::types::CLIType;
+        use crate::crds::coderun::CLIConfig;
+        use serde_json::json;
+
+        let mut code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let mut settings = HashMap::new();
+        settings.insert("template".to_string(), json!("heal/claude"));
+        code_run.spec.cli_config = Some(CLIConfig {
+            cli_type: CLIType::Claude,
+            model: "claude-opus-4-5-20251101".to_string(),
+            settings,
+            max_tokens: None,
+            temperature: None,
+            model_rotation: None,
+        });
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(
+            template_path, "heal/claude/container.sh.hbs",
+            "Template setting 'heal/claude' should trigger heal container template"
+        );
     }
 
     #[test]
