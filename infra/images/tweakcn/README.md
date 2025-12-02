@@ -10,8 +10,7 @@ for shadcn/ui components. It provides:
 - Visual no-code theme editing
 - Pre-built beautiful theme presets
 - Real-time component preview
-- Theme saving and management
-- AI theme generation (requires API keys)
+- Export generated CSS/Tailwind config
 
 ## Usage
 
@@ -19,7 +18,7 @@ for shadcn/ui components. It provides:
 
 ```bash
 docker build -t tweakcn .
-docker run -p 3000:3000 -v tweakcn-data:/data tweakcn
+docker run -p 3000:3000 tweakcn
 ```
 
 ### Access via Kubernetes
@@ -32,22 +31,18 @@ http://tweakcn.cto.svc.cluster.local:3000
 
 Via Kilo/WireGuard VPN, access directly at the service URL.
 
-## Configuration
+## Notes
 
-Environment variables:
+This is a stateless deployment for basic theme editing. Features requiring
+authentication (saving themes, AI generation) are not configured. For those
+features, you'd need to configure:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NODE_ENV` | Environment mode | `production` |
-| `DATABASE_URL` | SQLite database path | `file:/data/tweakcn.db` |
-| `PORT` | Server port | `3000` |
-
-## Persistence
-
-SQLite database stored at `/data/tweakcn.db`. Mount a persistent volume to `/data` to preserve themes.
+- `DATABASE_URL` - PostgreSQL connection
+- `BETTER_AUTH_SECRET` - Auth encryption key
+- OAuth credentials for GitHub/Google login
+- AI API keys for theme generation
 
 ## Source
 
 - **Upstream**: https://github.com/jnsahaj/tweakcn
 - **License**: Apache-2.0
-

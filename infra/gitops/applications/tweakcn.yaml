@@ -36,21 +36,16 @@ spec:
         ingress:
           enabled: false
 
+        # Minimal env vars - no secrets needed for basic theme editing
         env:
           - name: NODE_ENV
             value: "production"
           - name: PORT
             value: "3000"
-          - name: DATABASE_URL
-            value: "file:/data/tweakcn.db"
 
-        # Persistence for SQLite database
+        # No persistence needed for stateless theme editing
         persistence:
-          enabled: true
-          storageClass: "local-path"
-          accessMode: ReadWriteOnce
-          size: 5Gi
-          mountPath: /data
+          enabled: false
 
         resources:
           requests:
@@ -80,7 +75,7 @@ spec:
               - ALL
           readOnlyRootFilesystem: false
           runAsNonRoot: true
-          runAsUser: 1000
+          runAsUser: 1001
 
   destination:
     server: https://kubernetes.default.svc
