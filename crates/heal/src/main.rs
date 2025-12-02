@@ -4567,9 +4567,18 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         let mut lines = reader.lines();
 
         while let Ok(Some(line)) = lines.next_line().await {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                if tx_pods.send(AlertWatchEvent::PodEvent(json)).await.is_err() {
-                    break;
+            match serde_json::from_str::<serde_json::Value>(&line) {
+                Ok(json) => {
+                    if tx_pods.send(AlertWatchEvent::PodEvent(json)).await.is_err() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  Failed to parse pod watch JSON (len={}): {}",
+                        line.len(),
+                        e
+                    );
                 }
             }
         }
@@ -4608,13 +4617,22 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         let mut lines = reader.lines();
 
         while let Ok(Some(line)) = lines.next_line().await {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                if tx_coderuns
-                    .send(AlertWatchEvent::CodeRunEvent(json))
-                    .await
-                    .is_err()
-                {
-                    break;
+            match serde_json::from_str::<serde_json::Value>(&line) {
+                Ok(json) => {
+                    if tx_coderuns
+                        .send(AlertWatchEvent::CodeRunEvent(json))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  Failed to parse coderun watch JSON (len={}): {}",
+                        line.len(),
+                        e
+                    );
                 }
             }
         }
