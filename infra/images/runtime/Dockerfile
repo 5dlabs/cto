@@ -365,7 +365,7 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
     fi
 
 # Install TaskMaster globally (stable release)
-RUN npm install -g task-master-ai@0.26.0
+RUN npm install -g task-master-ai@0.36.0
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
