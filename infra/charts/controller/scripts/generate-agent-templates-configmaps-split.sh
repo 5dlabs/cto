@@ -16,7 +16,7 @@ cd "$CHART_DIR"
 echo "Generating split ConfigMaps from agent templates..."
 
 # Define CLI types and shared resources
-CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration" "watch" "review")
+CLI_TYPES=("claude-code" "claude-docs" "codex" "cursor" "factory" "opencode" "integration" "watch" "review" "intake")
 # Shared patterns include: coding guidelines, agents/, shared/, and root-level code_shared_* files
 SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/" "shared/" "code_shared_")
 
@@ -69,6 +69,9 @@ HEADER_EOF
     elif [ "$filter" = "review" ]; then
       # Review ConfigMap: all review/* and remediate/* templates for all CLIs (claude, factory, etc.)
       files_list=$(find -L "agent-templates/review" "agent-templates/remediate" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
+    elif [ "$filter" = "intake" ]; then
+      # Intake ConfigMap: all intake/* templates for unified project intake
+      files_list=$(find -L "agent-templates/intake" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     else
       # CLI-specific: collect files under code/, docs/, heal/ directories for this CLI
       # Note: review/ and remediate/ are handled by the separate "review" ConfigMap
