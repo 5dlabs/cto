@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.11](https://github.com/5dlabs/cto/compare/v0.12.10...v0.12.11) (2025-12-02)
+
+
+### ✨ Features
+
+* **controller:** add intake templates to ConfigMap ([#2451](https://github.com/5dlabs/cto/issues/2451)) ([2481281](https://github.com/5dlabs/cto/commit/248128123ef1d7fbd66b8a4247c516de0fba78d6))
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add MCP config and fix PVC path mismatch in templates ([#2450](https://github.com/5dlabs/cto/issues/2450)) ([41fbc2d](https://github.com/5dlabs/cto/commit/41fbc2df0a01a613bbb624db05fed61710f3e746))
+* **heal:** transform PVC paths for remediation pods ([#2441](https://github.com/5dlabs/cto/issues/2441)) ([96b1fe1](https://github.com/5dlabs/cto/commit/96b1fe17ace1c2e6b3c0d041770b2a24e0913521))
+
 ## [0.12.10](https://github.com/5dlabs/cto/compare/v0.12.9...v0.12.10) (2025-12-02)
 
 
