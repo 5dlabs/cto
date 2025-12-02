@@ -55,7 +55,7 @@ pub struct CLIConfig {
     #[serde(rename = "cliType")]
     pub cli_type: CLIType,
 
-    /// Model identifier (CLI-specific, e.g., "sonnet", "gpt-4", "claude-3-5-sonnet-20241022")
+    /// Model identifier (CLI-specific, e.g., "sonnet", "gpt-4", "claude-sonnet-4-5-20250929")
     pub model: String,
 
     /// CLI-specific settings (key-value pairs)
