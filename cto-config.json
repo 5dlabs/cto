@@ -22,16 +22,16 @@
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "primary": {
-        "model": "opus",
-        "provider": "claude-code"
+        "model": "claude-3-5-sonnet-20241022",
+        "provider": "anthropic"
       },
       "research": {
-        "model": "opus",
-        "provider": "claude-code"
+        "model": "claude-3-5-sonnet-20241022",
+        "provider": "anthropic"
       },
       "fallback": {
-        "model": "gpt-5",
-        "provider": "openai"
+        "model": "claude-3-5-sonnet-20241022",
+        "provider": "anthropic"
       }
     },
     "play": {
