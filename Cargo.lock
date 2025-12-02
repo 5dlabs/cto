@@ -479,6 +479,7 @@ dependencies = [
  "kube-derive",
  "lazy_static",
  "mockall",
+ "notify",
  "octocrab",
  "opentelemetry 0.30.0",
  "opentelemetry-otlp",
@@ -1204,6 +1205,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
+ "notify",
  "regex",
  "reqwest",
  "serde",
@@ -1962,6 +1964,20 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+]
+
+[[package]]
+name = "notify"
+version = "0.12.2"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

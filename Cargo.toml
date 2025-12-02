@@ -5,6 +5,7 @@ members = [
     "crates/controller",
     "crates/heal",
     "crates/mcp",
+    "crates/notify",
     "crates/tasks",
     "crates/tools",
     "crates/utils",

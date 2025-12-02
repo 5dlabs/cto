@@ -1,5 +1,6 @@
 use super::config::ControllerConfig;
 use kube::Client;
+use notify::Notifier;
 use std::sync::Arc;
 
 // Error type for the controller
@@ -33,6 +34,7 @@ pub struct Context {
     pub client: Client,
     pub namespace: String,
     pub config: Arc<ControllerConfig>,
+    pub notifier: Arc<Notifier>,
 }
 
 // Finalizer names for cleanup

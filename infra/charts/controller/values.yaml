@@ -1331,6 +1331,17 @@ rbac:
       create: true
       name: coderun-cluster-admin
 
+# Notification configuration
+notifications:
+  # Master switch to disable all notifications
+  enabled: true
+  # Discord webhook notifications
+  discord:
+    enabled: true
+    # Secret containing DISCORD_WEBHOOK_URL (synced from Vault)
+    secretName: "cto-notifications-secrets"
+    secretKey: "DISCORD_WEBHOOK_URL"
+
 # Health checks
 healthCheck:
   enabled: true

@@ -4489,6 +4489,19 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
         );
     }
 
+    // Initialize notification system
+    let notifier = notify::Notifier::from_env();
+    if notifier.has_channels() {
+        println!(
+            "{}",
+            format!(
+                "Notifications enabled with {} channel(s)",
+                notifier.channel_count()
+            )
+            .green()
+        );
+    }
+
     // Initialize alert registry and default context
     let registry = alerts::AlertRegistry::new();
     let github_state = github::GitHubState::default();
@@ -4684,6 +4697,19 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                         .red()
                     );
 
+                    // Emit notification for this alert
+                    notifier.notify(notify::NotifyEvent::HealAlert {
+                        alert_id: alert.id.as_str().to_string(),
+                        severity: match alert.severity {
+                            alerts::types::Severity::Info => notify::Severity::Info,
+                            alerts::types::Severity::Warning => notify::Severity::Warning,
+                            alerts::types::Severity::Critical => notify::Severity::Critical,
+                        },
+                        message: alert.message.clone(),
+                        context: alert.context.clone(),
+                        timestamp: chrono::Utc::now(),
+                    });
+
                     // Mark as alerted BEFORE handling to prevent races
                     alerted_pods.insert(dedup_key);
 
@@ -4762,6 +4788,19 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                                 )
                                 .red()
                             );
+
+                            // Emit notification for this CodeRun alert
+                            notifier.notify(notify::NotifyEvent::HealAlert {
+                                alert_id: alert.id.as_str().to_string(),
+                                severity: match alert.severity {
+                                    alerts::types::Severity::Info => notify::Severity::Info,
+                                    alerts::types::Severity::Warning => notify::Severity::Warning,
+                                    alerts::types::Severity::Critical => notify::Severity::Critical,
+                                },
+                                message: alert.message.clone(),
+                                context: alert.context.clone(),
+                                timestamp: chrono::Utc::now(),
+                            });
 
                             // Mark as alerted to avoid spam
                             alerted_coderuns.insert(coderun.name.clone());
