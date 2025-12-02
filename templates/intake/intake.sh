@@ -715,7 +715,7 @@ select_smart_providers() {
     # Set smart defaults prioritizing API-based providers over claude-code
     if [ "$anthropic_available" = true ]; then
         export PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-anthropic}"
-        export PRIMARY_MODEL="${PRIMARY_MODEL:-claude-3-5-sonnet-20241022}"
+        export PRIMARY_MODEL="${PRIMARY_MODEL:-claude-sonnet-4-5-20250929}"
     elif [ "$openai_available" = true ]; then
         export PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-openai}"
         export PRIMARY_MODEL="${PRIMARY_MODEL:-gpt-4o-mini}"
@@ -731,7 +731,7 @@ select_smart_providers() {
         export RESEARCH_MODEL="${RESEARCH_MODEL:-gpt-4o-mini}"
     elif [ "$anthropic_available" = true ]; then
         export RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-anthropic}"
-        export RESEARCH_MODEL="${RESEARCH_MODEL:-claude-3-5-sonnet-20241022}"
+        export RESEARCH_MODEL="${RESEARCH_MODEL:-claude-sonnet-4-5-20250929}"
     else
         export RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-claude-code}"
         export RESEARCH_MODEL="${RESEARCH_MODEL:-opus}"
@@ -901,9 +901,9 @@ get_provider_fallback() {
 get_model_fallback() {
     local provider="$1"
     case "$provider" in
-        "claude-code"|"anthropic") echo "claude-3-5-sonnet-20241022" ;;
+        "claude-code"|"anthropic") echo "claude-sonnet-4-5-20250929" ;;
         "openai") echo "gpt-4o-mini" ;;
-        *) echo "claude-3-5-sonnet-20241022" ;;
+        *) echo "claude-sonnet-4-5-20250929" ;;
     esac
 }
 
@@ -929,9 +929,9 @@ configure_provider_fallback() {
 
     local new_config=$(jq \
         --arg main_provider "${main_fallback_provider:-$main_provider}" \
-        --arg main_model "${main_fallback_model:-claude-3-5-sonnet-20241022}" \
+        --arg main_model "${main_fallback_model:-claude-sonnet-4-5-20250929}" \
         --arg research_provider "${research_fallback_provider:-$research_provider}" \
-        --arg research_model "${research_fallback_model:-claude-3-5-sonnet-20241022}" \
+        --arg research_model "${research_fallback_model:-claude-sonnet-4-5-20250929}" \
         --arg fallback_provider "${fallback_fallback_provider:-$fallback_provider}" \
         --arg fallback_model "${fallback_fallback_model:-gpt-4o-mini}" \
         '.models.main.provider = $main_provider |

@@ -106,7 +106,7 @@ fn test_code_templates(
         "platform_repository_url": "https://github.com/5dlabs/cto",
         "branch": "feature/example-project-and-cli",
         "working_directory": "_projects/simple-api",
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-5-20250929",
         "github_user": "pm0-5dlabs",
         "local_tools": "bash,edit,read",
         "remote_tools": "github_create_issue",

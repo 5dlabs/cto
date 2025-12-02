@@ -477,9 +477,9 @@ impl ClaudeModelValidator {
     #[must_use]
     pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
         vec![
-            "claude-3-5-sonnet-20241022".to_string(),
-            "claude-3-opus-20240229".to_string(),
-            "claude-3-sonnet-20240229".to_string(),
+            "claude-sonnet-4-5-20250929".to_string(),
+            "claude-opus-4-5-20251101".to_string(),
+            "claude-sonnet-4-20250514".to_string(),
             "claude-3-haiku-20240307".to_string(),
             "opus".to_string(),
             "sonnet".to_string(),
@@ -530,7 +530,7 @@ mod tests {
 
         // Valid models
         assert!(adapter
-            .validate_model("claude-3-5-sonnet-20241022")
+            .validate_model("claude-sonnet-4-5-20250929")
             .await
             .unwrap());
         assert!(adapter
@@ -640,7 +640,7 @@ The file has been read successfully."#;
         let validator = ClaudeModelValidator::new();
 
         // Test valid models
-        assert!(validator.validate("claude-3-5-sonnet-20241022").unwrap());
+        assert!(validator.validate("claude-sonnet-4-5-20250929").unwrap());
         assert!(validator.validate("claude-3-opus-20240229").unwrap());
         assert!(validator.validate("opus").unwrap());
 
@@ -697,7 +697,7 @@ Done!
         let suggestions = validator.get_model_suggestions("invalid-model");
 
         assert!(!suggestions.is_empty());
-        assert!(suggestions.contains(&"claude-3-5-sonnet-20241022".to_string()));
+        assert!(suggestions.contains(&"claude-sonnet-4-5-20250929".to_string()));
         assert!(suggestions.contains(&"opus".to_string()));
     }
 }

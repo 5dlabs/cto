@@ -627,7 +627,7 @@ spec:
                         if [ -z "$CURRENT_WORKFLOW" ]; then
                           echo "⚠️ Could not find workflow for task $TASK_ID, using defaults"
                           # Default values if no workflow found
-                          MODEL="claude-3-5-sonnet-20241022"
+                          MODEL="claude-sonnet-4-5-20250929"
                           IMPL_AGENT="5DLabs-Rex"
                           QUALITY_AGENT="5DLabs-Cleo"
                           TESTING_AGENT="5DLabs-Tess"
@@ -648,7 +648,7 @@ spec:
 
                           if [ "$INITIAL_PARAMS" = "{}" ] || [ -z "$INITIAL_PARAMS" ]; then
                             echo "⚠️ No parameters found in annotation, using defaults"
-                            MODEL="claude-3-5-sonnet-20241022"
+                            MODEL="claude-sonnet-4-5-20250929"
                             IMPL_AGENT="5DLabs-Rex"
                             QUALITY_AGENT="5DLabs-Cleo"
                             TESTING_AGENT="5DLabs-Tess"
@@ -663,7 +663,7 @@ spec:
                           else
                             echo "📦 Retrieved parameters from workflow annotation"
                             # Parse individual parameters with fallbacks
-                            MODEL=$(echo "$INITIAL_PARAMS" | jq -r '.model // "claude-3-5-sonnet-20241022"')
+                            MODEL=$(echo "$INITIAL_PARAMS" | jq -r '.model // "claude-sonnet-4-5-20250929"')
                             IMPL_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-agent" // "5DLabs-Rex"')
                             QUALITY_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."quality-agent" // "5DLabs-Cleo"')
                             TESTING_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."testing-agent" // "5DLabs-Tess"')
