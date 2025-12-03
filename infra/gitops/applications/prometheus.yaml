@@ -82,6 +82,30 @@ spec:
                     labels:
                       namespace: observability
                       service: otel-collector
+              # Loki metrics (for LokiDown alert)
+              - job_name: loki
+                static_configs:
+                  - targets:
+                      - loki-gateway.observability.svc.cluster.local:80
+                    labels:
+                      namespace: observability
+                      service: loki
+              # Alertmanager metrics (for AlertmanagerDown alert)
+              - job_name: alertmanager
+                static_configs:
+                  - targets:
+                      - alertmanager.observability.svc.cluster.local:9093
+                    labels:
+                      namespace: observability
+                      service: alertmanager
+              # Grafana metrics (for GrafanaDown alert)
+              - job_name: grafana
+                static_configs:
+                  - targets:
+                      - grafana.observability.svc.cluster.local:80
+                    labels:
+                      namespace: observability
+                      service: grafana
 
         # Disable components we don't need (using separate Alertmanager deployment)
         alertmanager:

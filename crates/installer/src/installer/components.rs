@@ -284,6 +284,7 @@ impl<'a> ComponentInstaller<'a> {
                 "grafana/grafana",
                 "-n",
                 "observability",
+                "--create-namespace",
                 "--wait",
             ])
             .output()

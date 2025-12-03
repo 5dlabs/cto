@@ -118,6 +118,33 @@ serverFiles:
             regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*'
             action: keep
 
+      # Scrape Loki metrics (for LokiDown alert)
+      - job_name: loki
+        static_configs:
+          - targets:
+              - loki-gateway.observability.svc.cluster.local:80
+            labels:
+              namespace: observability
+              service: loki
+
+      # Scrape Alertmanager metrics (for AlertmanagerDown alert)
+      - job_name: alertmanager
+        static_configs:
+          - targets:
+              - alertmanager.observability.svc.cluster.local:9093
+            labels:
+              namespace: observability
+              service: alertmanager
+
+      # Scrape Grafana metrics (for GrafanaDown alert)
+      - job_name: grafana
+        static_configs:
+          - targets:
+              - grafana.observability.svc.cluster.local:80
+            labels:
+              namespace: observability
+              service: grafana
+
       # Scrape Kubernetes metrics-server
       - job_name: metrics-server
         kubernetes_sd_configs:
