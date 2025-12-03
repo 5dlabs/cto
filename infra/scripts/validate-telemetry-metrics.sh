@@ -52,8 +52,11 @@ check_log_event() {
     
     echo -n "Checking $description: "
     
-    # Query Loki for the event using LogQL
-    result=$(curl -s "$LOKI_URL/loki/api/v1/query?query=%7Bapp%3D%22claude-code%22%7D&limit=1" | jq -r '.data.result | length' 2>/dev/null || echo "0")
+    # Query Loki for the event using LogQL - filter by app and search for event pattern
+    # LogQL: {app="claude-code"} |= "event_pattern"
+    local encoded_query
+    encoded_query=$(printf '%s' "{app=\"claude-code\"} |= \"${event_pattern}\"" | jq -sRr @uri)
+    result=$(curl -s "$LOKI_URL/loki/api/v1/query?query=${encoded_query}&limit=1" | jq -r '.data.result | length' 2>/dev/null || echo "0")
     
     if [ "$result" -gt 0 ]; then
         echo -e "${GREEN}✓ Found${NC}"
