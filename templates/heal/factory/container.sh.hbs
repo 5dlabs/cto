@@ -438,7 +438,7 @@ Focus on addressing the above items before re-checking acceptance criteria."
         MERGEABLE=$(gh pr view ${PR_NUMBER} --json mergeable -q '.mergeable' 2>/dev/null || echo "")
         if [ "${MERGEABLE}" = "CONFLICTING" ]; then
             echo "⚠️ Merge conflict detected - rebasing on main..."
-            git fetch origin main
+            git_with_retry fetch origin main
             if git rebase origin/main; then
                 git push origin HEAD --force-with-lease
                 echo "✅ Rebased and pushed successfully"
