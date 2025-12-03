@@ -332,9 +332,9 @@ Focus on addressing the above items before re-checking acceptance criteria."
     echo "🚀 Running Claude remediation agent..."
     
     # Build Claude command with MCP config if available
-    # Using --output-format text to stream human-readable output to stdout
-    # Using --verbose to show tool calls and other debug info
-    CLAUDE_CMD="claude --dangerously-skip-permissions --model {{model}} --output-format text --verbose"
+    # Using stream-json with --include-partial-messages for real-time streaming output
+    # Output is piped through jq to extract human-readable text
+    CLAUDE_CMD="claude -p --dangerously-skip-permissions --model {{model}} --output-format stream-json --include-partial-messages --verbose"
     CLAUDE_CMD="$CLAUDE_CMD --allowedTools Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit,mcp__*"
     
     # Add MCP configuration if available
@@ -350,13 +350,41 @@ Focus on addressing the above items before re-checking acceptance criteria."
     
     echo ""
     echo "═══ RUNNING REMEDIATION AGENT ═══"
-    echo "📋 Command: $CLAUDE_CMD -p [prompt]"
+    echo "📋 Command: $CLAUDE_CMD [prompt piped via stdin]"
     echo ""
     
     set +e
     set -f  # Disable glob expansion to prevent mcp__* from being expanded
-    $CLAUDE_CMD -p "${PROMPT_CONTENT}"
-    AGENT_EXIT=$?
+    
+    # Stream Claude output and extract text content in real-time
+    # The jq filter extracts assistant messages, tool calls, and results
+    echo "${PROMPT_CONTENT}" | $CLAUDE_CMD 2>&1 | while IFS= read -r line; do
+        # Try to parse as JSON and extract relevant content
+        if echo "$line" | jq -e . >/dev/null 2>&1; then
+            # Extract text from assistant messages
+            TEXT=$(echo "$line" | jq -r '
+                if .type == "assistant" then
+                    (.message.content[]? | select(.type == "text") | .text) // empty
+                elif .type == "content_block_delta" then
+                    .delta.text // empty
+                elif .type == "tool_use" then
+                    "🔧 Tool: " + (.name // "unknown")
+                elif .type == "tool_result" then
+                    "📋 Result: " + ((.content // "done") | tostring | .[0:200])
+                else
+                    empty
+                end
+            ' 2>/dev/null)
+            if [ -n "$TEXT" ]; then
+                printf '%s\n' "$TEXT"
+            fi
+        else
+            # Not JSON, print as-is (verbose output, errors, etc.)
+            printf '%s\n' "$line"
+        fi
+    done
+    AGENT_EXIT=${PIPESTATUS[1]:-$?}
+    
     set +f  # Re-enable glob expansion
     set -e
 
