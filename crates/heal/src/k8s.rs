@@ -35,6 +35,7 @@ const EXCLUDED_POD_PREFIXES: &[&str] = &[
     "openmemory",
     "event-cleaner",
     "workspace-pvc-cleaner",
+    "tweakcn",
 ];
 
 /// Check if a pod name should be excluded from alerts/completion checks.
