@@ -1809,7 +1809,16 @@ async fn main() -> Result<()> {
             dry_run,
         } => {
             // Default enable_docker to true for testing (matches CRD default)
-            test_alert_flow(&alert, &pod_name, &task_id, &agent, &prompts_dir, dry_run, true).await?;
+            test_alert_flow(
+                &alert,
+                &pod_name,
+                &task_id,
+                &agent,
+                &prompts_dir,
+                dry_run,
+                true,
+            )
+            .await?;
         }
         Commands::SpawnRemediation {
             alert,
@@ -4865,7 +4874,15 @@ async fn run_alert_watch(
                     alerted_pods.insert(dedup_key);
 
                     // Handle the alert (load prompt, fetch logs, spawn Factory)
-                    handle_detected_alert(&alert, &pod, namespace, prompts_dir, dry_run, enable_docker).await?;
+                    handle_detected_alert(
+                        &alert,
+                        &pod,
+                        namespace,
+                        prompts_dir,
+                        dry_run,
+                        enable_docker,
+                    )
+                    .await?;
                 }
 
                 // Also check for completion (pod succeeded) - this is a proactive check, not an alert
@@ -4878,7 +4895,8 @@ async fn run_alert_watch(
                         format!("✅ Pod {} succeeded - running completion check", pod.name).green()
                     );
 
-                    handle_completion_check(&pod, namespace, prompts_dir, dry_run, enable_docker).await?;
+                    handle_completion_check(&pod, namespace, prompts_dir, dry_run, enable_docker)
+                        .await?;
                 }
             }
             AlertWatchEvent::CodeRunEvent(event_json) => {
@@ -4957,8 +4975,15 @@ async fn run_alert_watch(
                             alerted_coderuns.insert(coderun.name.clone());
 
                             // Handle the alert for CodeRun
-                            handle_coderun_alert(&alert, &coderun, namespace, prompts_dir, dry_run, enable_docker)
-                                .await?;
+                            handle_coderun_alert(
+                                &alert,
+                                &coderun,
+                                namespace,
+                                prompts_dir,
+                                dry_run,
+                                enable_docker,
+                            )
+                            .await?;
                         }
                     }
                 }
