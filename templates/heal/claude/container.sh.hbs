@@ -260,7 +260,9 @@ Focus on addressing the above items before re-checking acceptance criteria."
     echo "🚀 Running Claude remediation agent..."
     
     # Build Claude command with MCP config if available
-    CLAUDE_CMD="claude --dangerously-skip-permissions --model {{model}}"
+    # Using --output-format text to stream human-readable output to stdout
+    # Using --verbose to show tool calls and other debug info
+    CLAUDE_CMD="claude --dangerously-skip-permissions --model {{model}} --output-format text --verbose"
     CLAUDE_CMD="$CLAUDE_CMD --allowedTools Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit,mcp__*"
     
     # Add MCP configuration if available
@@ -274,7 +276,10 @@ Focus on addressing the above items before re-checking acceptance criteria."
         echo "⚠️ No MCP configuration file found - MCP tools will not be available"
     fi
     
-    echo "📋 Running: $CLAUDE_CMD -p [prompt]"
+    echo ""
+    echo "═══ RUNNING REMEDIATION AGENT ═══"
+    echo "📋 Command: $CLAUDE_CMD -p [prompt]"
+    echo ""
     
     set +e
     set -f  # Disable glob expansion to prevent mcp__* from being expanded
