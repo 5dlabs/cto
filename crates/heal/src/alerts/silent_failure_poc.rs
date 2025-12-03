@@ -41,8 +41,12 @@ pub struct ContainerStatusExt {
 
 #[derive(Debug, Clone)]
 pub enum ContainerStateExt {
-    Waiting { reason: Option<String> },
-    Running { started_at: Option<DateTime<Utc>> },
+    Waiting {
+        reason: Option<String>,
+    },
+    Running {
+        started_at: Option<DateTime<Utc>>,
+    },
     Terminated {
         exit_code: i32,
         reason: Option<String>,
@@ -142,10 +146,7 @@ pub fn detect_by_ready_status(pod: &PodExt) -> Option<Detection> {
             return Some(Detection {
                 method: DetectionMethod::ReadyStatus,
                 container: container.name.clone(),
-                message: format!(
-                    "Container '{}' not ready while pod Running",
-                    container.name
-                ),
+                message: format!("Container '{}' not ready while pod Running", container.name),
                 priority: 2,
             });
         }
@@ -403,15 +404,13 @@ mod tests {
 
         // Exit code should be detected
         assert!(
-            all.iter()
-                .any(|d| d.method == DetectionMethod::ExitCode),
+            all.iter().any(|d| d.method == DetectionMethod::ExitCode),
             "Should detect by exit code"
         );
 
         // Ready status should be detected
         assert!(
-            all.iter()
-                .any(|d| d.method == DetectionMethod::ReadyStatus),
+            all.iter().any(|d| d.method == DetectionMethod::ReadyStatus),
             "Should detect by ready status"
         );
 
@@ -609,4 +608,3 @@ mod tests {
         assert!(detect_by_ready_status(&pod).is_none());
     }
 }
-

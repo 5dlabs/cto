@@ -82,7 +82,9 @@ pub struct ContainerStatus {
 /// Container state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ContainerState {
-    Waiting { reason: Option<String> },
+    Waiting {
+        reason: Option<String>,
+    },
     Running,
     Terminated {
         exit_code: i32,
