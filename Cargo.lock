@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -599,7 +599,7 @@ dependencies = [
 
 [[package]]
 name = "cto-cli"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "anyhow",
  "clap",
@@ -1199,7 +1199,7 @@ dependencies = [
 
 [[package]]
 name = "heal"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1969,7 +1969,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3232,7 +3232,7 @@ dependencies = [
 
 [[package]]
 name = "tasks"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3513,7 +3513,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "anyhow",
  "axum 0.8.7",
@@ -3828,7 +3828,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.12.19"
+version = "0.12.20"
 dependencies = [
  "anyhow",
  "clap",
