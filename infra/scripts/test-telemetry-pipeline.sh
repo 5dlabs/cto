@@ -75,10 +75,9 @@ curl -X POST http://otel-http.local:31251/v1/logs \
   }'
 
 echo ""
-echo "Test data sent successfully\!"
+echo "Test data sent successfully!"
 echo ""
 echo "You can now check:"
 echo "1. Grafana dashboards at http://grafana.local:31251"
-echo "2. VictoriaMetrics metrics at: http://grafana.local:31251/explore (select VictoriaMetrics datasource)"
-echo "3. VictoriaLogs logs at: http://grafana.local:31251/explore (select VictoriaLogs datasource)"
-EOF < /dev/null
+echo "2. Prometheus metrics at: http://grafana.local:31251/explore (select Prometheus datasource)"
+echo "3. Loki logs at: http://grafana.local:31251/explore (select Loki datasource)"

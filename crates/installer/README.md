@@ -18,7 +18,7 @@ Beautiful, interactive CLI for installing and managing the CTO multi-agent devel
 - Fast installation (~5-10 minutes)
 
 ### Standard (16GB RAM)
-- Full monitoring stack (Grafana, VictoriaMetrics)
+- Full monitoring stack (Prometheus, Loki, Alertmanager, Grafana)
 - Database operators (PostgreSQL, Redis, QuestDB)
 - Team development ready
 
@@ -67,7 +67,7 @@ cargo run -p cto-cli -- install --config cto-install.yaml
 - ✅ CTO Controller - Multi-agent orchestration
 
 ### Optional Components
-- 📊 **Monitoring Stack** - Grafana, VictoriaMetrics, VictoriaLogs
+- 📊 **Monitoring Stack** - Prometheus, Loki, Alertmanager, Grafana
 - 🗄️ **Database Operators** - PostgreSQL, Redis, QuestDB
 - 🔐 **Security Features** - Backup operators, secret management
 

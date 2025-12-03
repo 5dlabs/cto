@@ -332,18 +332,29 @@ config:
           # mcp-grafana uses GRAFANA_SERVICE_ACCOUNT_TOKEN for auth
           - "GRAFANA_SERVICE_ACCOUNT_TOKEN"
 
-    victoriametrics:
-      name: "VictoriaMetrics"
-      description: "VictoriaMetrics monitoring - metrics queries, analysis, alerting rules, and documentation"
+    prometheus:
+      name: "Prometheus"
+      description: "Prometheus metrics - PromQL queries, metric discovery, alerts, and analysis"
       transport: "stdio"
-      # Docker image from https://github.com/VictoriaMetrics-Community/mcp-victoriametrics
+      # Docker image from https://github.com/pab1it0/prometheus-mcp-server
       command: "docker"
-      args: ["run", "--rm", "-i", "--network", "host", "-e", "VM_INSTANCE_ENTRYPOINT", "-e", "VM_INSTANCE_TYPE", "ghcr.io/victoriametrics-community/mcp-victoriametrics"]
+      args: ["run", "--rm", "-i", "--network", "host", "-e", "PROMETHEUS_URL", "ghcr.io/pab1it0/prometheus-mcp-server:latest"]
       workingDirectory: "/tmp"
       env:
-        # In-cluster VictoriaMetrics URL - no auth needed for in-cluster access
-        VM_INSTANCE_ENTRYPOINT: "http://victoria-metrics-victoria-metrics-single-server.observability.svc.cluster.local:8428"
-        VM_INSTANCE_TYPE: "single"
+        # In-cluster Prometheus URL - no auth needed for in-cluster access
+        PROMETHEUS_URL: "http://prometheus-server.observability.svc.cluster.local:9090"
+
+    loki:
+      name: "Loki"
+      description: "Grafana Loki - LogQL queries for log analysis and exploration"
+      transport: "stdio"
+      # Docker image from https://github.com/grafana/loki-mcp
+      command: "docker"
+      args: ["run", "--rm", "-i", "--network", "host", "-e", "LOKI_URL", "ghcr.io/grafana/loki-mcp:latest"]
+      workingDirectory: "/tmp"
+      env:
+        # In-cluster Loki URL - no auth needed for in-cluster access
+        LOKI_URL: "http://loki-gateway.observability.svc.cluster.local:80"
 
     # --- GitOps ---
     argocd:

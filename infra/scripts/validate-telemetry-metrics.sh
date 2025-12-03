@@ -1,6 +1,6 @@
 #!/bin/bash
 # Telemetry Metrics Validation Script
-# Verifies that all expected Claude Code metrics are flowing to VictoriaMetrics
+# Verifies that all expected Claude Code metrics are flowing to Prometheus
 
 set -e
 
@@ -11,12 +11,14 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-VICTORIA_METRICS_URL="http://localhost:8428"
+PROMETHEUS_URL="http://localhost:9090"
+LOKI_URL="http://localhost:3100"
 FAILED_CHECKS=0
 TOTAL_CHECKS=0
 
 echo -e "${BLUE}=== Claude Code Telemetry Validation ===${NC}"
-echo "Checking VictoriaMetrics at: $VICTORIA_METRICS_URL"
+echo "Checking Prometheus at: $PROMETHEUS_URL"
+echo "Checking Loki at: $LOKI_URL"
 echo ""
 
 # Function to check if a metric exists
@@ -28,8 +30,8 @@ check_metric() {
     
     echo -n "Checking $description: "
     
-    # Query VictoriaMetrics for the metric
-    result=$(curl -s "$VICTORIA_METRICS_URL/api/v1/query?query=${metric_name}" | jq -r '.data.result | length')
+    # Query Prometheus for the metric
+    result=$(curl -s "$PROMETHEUS_URL/api/v1/query?query=${metric_name}" | jq -r '.data.result | length')
     
     if [ "$result" != "null" ] && [ "$result" -gt 0 ]; then
         echo -e "${GREEN}✓ Found ($result series)${NC}"
@@ -41,7 +43,7 @@ check_metric() {
     fi
 }
 
-# Function to check log events in VictoriaLogs
+# Function to check log events in Loki
 check_log_event() {
     local event_pattern="$1"
     local description="$2"
@@ -50,8 +52,11 @@ check_log_event() {
     
     echo -n "Checking $description: "
     
-    # Query VictoriaLogs for the event
-    result=$(curl -s "http://localhost:9428/select/logsql/query?query=${event_pattern}&limit=1" | jq -r '. | length' 2>/dev/null || echo "0")
+    # Query Loki for the event using LogQL - filter by app and search for event pattern
+    # LogQL: {app="claude-code"} |= "event_pattern"
+    local encoded_query
+    encoded_query=$(printf '%s' "{app=\"claude-code\"} |= \"${event_pattern}\"" | jq -sRr @uri)
+    result=$(curl -s "$LOKI_URL/loki/api/v1/query?query=${encoded_query}&limit=1" | jq -r '.data.result | length' 2>/dev/null || echo "0")
     
     if [ "$result" -gt 0 ]; then
         echo -e "${GREEN}✓ Found${NC}"
@@ -93,19 +98,19 @@ echo -e "${YELLOW}=== Cost Management Dashboard ===${NC}"
 check_metric "claude_code_cost_usage" "Detailed cost tracking"
 
 echo ""
-echo -e "${YELLOW}=== Log Events (VictoriaLogs) ===${NC}"
+echo -e "${YELLOW}=== Log Events (Loki) ===${NC}"
 
 # Check for key log events
-check_log_event "_msg:claude_code.api_request" "API request events"
-check_log_event "_msg:claude_code.tool_result" "Tool result events"
-check_log_event "_msg:claude_code.user_prompt" "User prompt events"
+check_log_event "claude_code.api_request" "API request events"
+check_log_event "claude_code.tool_result" "Tool result events"
+check_log_event "claude_code.user_prompt" "User prompt events"
 
 echo ""
 echo -e "${YELLOW}=== Component Health ===${NC}"
 
 # Check that telemetry components are running
 echo -n "OTLP Collector health: "
-if kubectl get pods -n telemetry -l app.kubernetes.io/name=opentelemetry-collector --no-headers | grep -q "1/1.*Running"; then
+if kubectl get pods -n observability -l app.kubernetes.io/name=opentelemetry-collector --no-headers | grep -q "1/1.*Running"; then
     echo -e "${GREEN}✓ Running${NC}"
 else
     echo -e "${RED}✗ Not running${NC}"
@@ -113,8 +118,8 @@ else
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
-echo -n "VictoriaMetrics health: "
-if kubectl get pods -n telemetry victoria-metrics-victoria-metrics-single-server-0 --no-headers | grep -q "1/1.*Running"; then
+echo -n "Prometheus health: "
+if kubectl get pods -n observability -l app.kubernetes.io/name=prometheus --no-headers | grep -q "Running"; then
     echo -e "${GREEN}✓ Running${NC}"
 else
     echo -e "${RED}✗ Not running${NC}"
@@ -122,8 +127,17 @@ else
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
-echo -n "VictoriaLogs health: "
-if kubectl get pods -n telemetry victoria-logs-victoria-logs-single-server-0 --no-headers | grep -q "1/1.*Running"; then
+echo -n "Loki health: "
+if kubectl get pods -n observability -l app.kubernetes.io/name=loki --no-headers | grep -q "Running"; then
+    echo -e "${GREEN}✓ Running${NC}"
+else
+    echo -e "${RED}✗ Not running${NC}"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+echo -n "Alertmanager health: "
+if kubectl get pods -n observability -l app.kubernetes.io/name=alertmanager --no-headers | grep -q "Running"; then
     echo -e "${GREEN}✓ Running${NC}"
 else
     echo -e "${RED}✗ Not running${NC}"
@@ -153,7 +167,7 @@ else
     echo "2. Metrics may take time to appear after first run"
     echo "3. Check Claude Code configuration: kubectl get configmap -n claude-code-dev claude-code-dev-config"
     echo "4. Verify endpoints are accessible:"
-    echo "   - VictoriaMetrics: curl http://localhost:8428/api/v1/query?query=up"
-    echo "   - VictoriaLogs: curl 'http://localhost:9428/select/logsql/query?query=*&limit=1'"
+    echo "   - Prometheus: curl http://localhost:9090/api/v1/query?query=up"
+    echo "   - Loki: curl 'http://localhost:3100/loki/api/v1/query?query=%7Bapp%3D%22test%22%7D&limit=1'"
     exit 1
 fi

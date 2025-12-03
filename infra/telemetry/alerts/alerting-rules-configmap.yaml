@@ -99,29 +99,40 @@ data:
               component: otel-collector
             annotations:
               summary: "OTLP Collector is down"
-              description: "OpenTelemetry Collector in namespace telemetry has been down for more than 2 minutes"
+              description: "OpenTelemetry Collector in namespace observability has been down for more than 2 minutes"
 
-          # VictoriaMetrics down
-          - alert: VictoriaMetricsDown
-            expr: up{job="victoria-metrics"} == 0
+          # Prometheus down
+          - alert: PrometheusDown
+            expr: up{job="prometheus"} == 0
             for: 2m
             labels:
               severity: critical
-              component: victoria-metrics
+              component: prometheus
             annotations:
-              summary: "VictoriaMetrics is down"
-              description: "VictoriaMetrics server has been down for more than 2 minutes"
+              summary: "Prometheus is down"
+              description: "Prometheus server has been down for more than 2 minutes"
 
-          # VictoriaLogs down
-          - alert: VictoriaLogsDown
-            expr: up{instance=~"victoria-logs.*"} == 0
+          # Loki down
+          - alert: LokiDown
+            expr: up{job=~"loki.*"} == 0
             for: 2m
             labels:
               severity: critical
-              component: victoria-logs
+              component: loki
             annotations:
-              summary: "VictoriaLogs is down"
-              description: "VictoriaLogs server has been down for more than 2 minutes"
+              summary: "Loki is down"
+              description: "Loki server has been down for more than 2 minutes"
+
+          # Alertmanager down
+          - alert: AlertmanagerDown
+            expr: up{job="alertmanager"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              component: alertmanager
+            annotations:
+              summary: "Alertmanager is down"
+              description: "Alertmanager has been down for more than 2 minutes"
 
           # Grafana down
           - alert: GrafanaDown
@@ -169,33 +180,33 @@ data:
               summary: "Critical memory usage in {{ $labels.pod }}"
               description: "Pod {{ $labels.pod }} container {{ $labels.container }} is using {{ $value | humanize }}% of its memory limit"
 
-          # Disk space usage (VictoriaMetrics)
-          - alert: VictoriaMetricsDiskSpaceWarning
+          # Disk space usage (Prometheus)
+          - alert: PrometheusDiskSpaceWarning
             expr: |
               (
-                1 - (node_filesystem_avail_bytes{mountpoint="/var/lib/victoria-metrics-data"} / node_filesystem_size_bytes{mountpoint="/var/lib/victoria-metrics-data"})
+                1 - (node_filesystem_avail_bytes{mountpoint="/prometheus"} / node_filesystem_size_bytes{mountpoint="/prometheus"})
               ) * 100 > 80
             for: 10m
             labels:
               severity: warning
-              component: victoria-metrics
+              component: prometheus
             annotations:
-              summary: "VictoriaMetrics disk space running low"
-              description: "VictoriaMetrics data directory is {{ $value | humanize }}% full"
+              summary: "Prometheus disk space running low"
+              description: "Prometheus data directory is {{ $value | humanize }}% full"
 
-          # Disk space usage (VictoriaLogs)
-          - alert: VictoriaLogsDiskSpaceWarning
+          # Disk space usage (Loki)
+          - alert: LokiDiskSpaceWarning
             expr: |
               (
-                1 - (node_filesystem_avail_bytes{mountpoint="/victoria-logs-data"} / node_filesystem_size_bytes{mountpoint="/victoria-logs-data"})
+                1 - (node_filesystem_avail_bytes{mountpoint="/var/loki"} / node_filesystem_size_bytes{mountpoint="/var/loki"})
               ) * 100 > 80
             for: 10m
             labels:
               severity: warning
-              component: victoria-logs
+              component: loki
             annotations:
-              summary: "VictoriaLogs disk space running low"
-              description: "VictoriaLogs data directory is {{ $value | humanize }}% full"
+              summary: "Loki disk space running low"
+              description: "Loki data directory is {{ $value | humanize }}% full"
 
       - name: data_ingestion
         interval: 30s
@@ -207,22 +218,22 @@ data:
             for: 10m
             labels:
               severity: warning
-              component: victoria-metrics
+              component: prometheus
             annotations:
               summary: "No metrics being ingested"
-              description: "VictoriaMetrics has not received any new metrics for 10 minutes"
+              description: "Prometheus has not received any new metrics for 10 minutes"
 
           # No logs ingestion
           - alert: NoLogsIngestion
             expr: |
-              rate(victoria_logs_rows_inserted_total[5m]) == 0
+              rate(loki_ingester_streams_created_total[5m]) == 0
             for: 10m
             labels:
               severity: warning
-              component: victoria-logs
+              component: loki
             annotations:
               summary: "No logs being ingested"
-              description: "VictoriaLogs has not received any new logs for 10 minutes"
+              description: "Loki has not received any new logs for 10 minutes"
 
           # High ingestion rate warning
           - alert: HighMetricsIngestionRate
@@ -231,7 +242,7 @@ data:
             for: 5m
             labels:
               severity: warning
-              component: victoria-metrics
+              component: prometheus
             annotations:
               summary: "High metrics ingestion rate"
               description: "Metrics ingestion rate is {{ $value | humanize }} samples/minute"

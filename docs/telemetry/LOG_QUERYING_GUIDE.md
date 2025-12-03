@@ -1,8 +1,8 @@
-# Victoria Logs Query Guide
+# Loki Log Query Guide
 
 ## Overview
 
-This guide provides comprehensive documentation for querying logs in Victoria Logs using LogQL syntax. Victoria Logs stores all container logs from your Kubernetes cluster, including agent CLIs (Rex, Cleo, Tess), controllers, and infrastructure components.
+This guide provides comprehensive documentation for querying logs in Grafana Loki using LogQL syntax. Loki stores all container logs from your Kubernetes cluster, including agent CLIs (Rex, Cleo, Tess), controllers, and infrastructure components.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ Container Logs (stdout/stderr)
          ↓
    OTEL Collector (batch + forward)
          ↓
-   Victoria Logs (store + index)
+   Loki (store + index)
          ↓
    Grafana (query + visualize)
 ```
@@ -23,20 +23,21 @@ Container Logs (stdout/stderr)
 ### Via Grafana (Recommended)
 
 1. Open Grafana: `http://grafana.local` (or port-forward)
-2. Navigate to "Explore" → Select "VictoriaLogs" data source
+2. Navigate to "Explore" → Select "Loki" data source
 3. Enter your LogQL query
 4. Select time range and click "Run query"
 
 ### Via API (For Debugging)
 
 ```bash
-# Port-forward Victoria Logs
-kubectl port-forward -n telemetry svc/victoria-logs-victoria-logs-single-server 9428:9428
+# Port-forward Loki
+kubectl port-forward -n observability svc/loki-gateway 3100:80
 
 # Query logs
-curl 'http://localhost:9428/select/logsql/query' \
-  -d 'query={kubernetes_namespace="cto"}' \
-  -d 'limit=50'
+curl 'http://localhost:3100/loki/api/v1/query_range' \
+  -G \
+  --data-urlencode 'query={namespace="cto"}' \
+  --data-urlencode 'limit=50'
 ```
 
 ## LogQL Query Syntax
@@ -53,19 +54,19 @@ Label filters select log streams based on metadata added by Kubernetes and Fluen
 
 ```logql
 # Single label match
-{kubernetes_namespace="cto"}
+{namespace="cto"}
 
 # Multiple labels (AND)
-{kubernetes_namespace="cto", app_kubernetes_io_name="agent-controller"}
+{namespace="cto", app="agent-controller"}
 
 # Regex match
-{kubernetes_pod_name=~"rex-.*"}
+{pod=~"rex-.*"}
 
 # Negative match
-{kubernetes_namespace!="kube-system"}
+{namespace!="kube-system"}
 
 # Regex negative match
-{kubernetes_pod_name!~"fluent-bit-.*"}
+{pod!~"fluent-bit-.*"}
 ```
 
 ### Text Filters (Log Line Search)
@@ -74,36 +75,35 @@ After selecting streams, filter by log content:
 
 ```logql
 # Contains text
-{kubernetes_namespace="cto"} |~ "error"
+{namespace="cto"} |= "error"
 
 # Case-insensitive contains
-{kubernetes_namespace="cto"} |~ "(?i)error"
+{namespace="cto"} |~ "(?i)error"
 
 # Does not contain
-{kubernetes_namespace="cto"} !~ "debug"
+{namespace="cto"} != "debug"
 
-# Exact match
-{kubernetes_namespace="cto"} | log == "Application started"
+# Regex match
+{namespace="cto"} |~ "error.*failed"
 ```
 
 ## Common Label Fields
 
 ### Kubernetes Labels (Added by Fluent-bit)
 
-- `kubernetes_namespace` - Namespace name
-- `kubernetes_pod_name` - Full pod name
-- `kubernetes_container_name` - Container name within pod
-- `kubernetes_namespace_name` - Same as kubernetes_namespace
-- `kubernetes_pod_id` - Pod UID
-- `kubernetes_host` - Node name
+- `namespace` - Namespace name
+- `pod` - Full pod name
+- `container` - Container name within pod
+- `node` - Node name
+- `stream` - stdout or stderr
 
-### Kubernetes Labels from Pod Metadata
+### Application Labels from Pod Metadata
 
-- `app_kubernetes_io_name` - Application name
-- `app_kubernetes_io_component` - Component type (e.g., "agent")
-- `app_kubernetes_io_instance` - Instance identifier
-- `agent_cto_io_type` - Agent type (rex, cleo, tess) - if added
-- `agent_cto_io_task_id` - Task ID - if added
+- `app` - Application name
+- `component` - Component type (e.g., "agent")
+- `instance` - Instance identifier
+- `agent_type` - Agent type (rex, cleo, tess) - if added
+- `task_id` - Task ID - if added
 
 ### Resource Labels (Added by OTEL Collector)
 
@@ -118,122 +118,105 @@ After selecting streams, filter by log content:
 
 #### All Rex Agent Logs
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"rex-.*"}
+{namespace="cto", pod=~"rex-.*"}
 ```
 
 #### Cleo Code Review Logs
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"cleo-.*"}
+{namespace="cto", pod=~"cleo-.*"}
 ```
 
 #### Tess QA Logs
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"tess-.*"}
+{namespace="cto", pod=~"tess-.*"}
 ```
 
 #### All Agent Logs (Rex + Cleo + Tess)
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"(rex|cleo|tess)-.*"}
+{namespace="cto", pod=~"(rex|cleo|tess)-.*"}
 ```
 
 #### Logs for Specific Task
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"task-.*-task-123-.*"}
+{namespace="cto", pod=~"task-.*-task-123-.*"}
 ```
 
 #### Agent Error Logs Only
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"(rex|cleo|tess)-.*"} |~ "(?i)(error|failed|failure)"
+{namespace="cto", pod=~"(rex|cleo|tess)-.*"} |~ "(?i)(error|failed|failure)"
 ```
 
 ### Controller Logs
 
 #### All Controller Logs
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"agent-controller-.*"}
+{namespace="cto", pod=~"agent-controller-.*"}
 ```
 
 #### Controller Errors
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"agent-controller-.*"} |~ "ERROR"
+{namespace="cto", pod=~"agent-controller-.*"} |= "ERROR"
 ```
 
 #### Controller Task Processing
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"agent-controller-.*"} |~ "Processing task"
+{namespace="cto", pod=~"agent-controller-.*"} |= "Processing task"
 ```
 
 ### Workflow Logs
 
 #### All Argo Workflows
 ```logql
-{kubernetes_namespace="argo"}
+{namespace="argo"}
 ```
 
 #### Specific Workflow Execution
 ```logql
-{kubernetes_namespace="argo", kubernetes_pod_name=~"task-.*-workflow-.*"}
+{namespace="argo", pod=~"task-.*-workflow-.*"}
 ```
 
 #### Workflow Errors
 ```logql
-{kubernetes_namespace="argo"} |~ "(?i)(error|failed)"
+{namespace="argo"} |~ "(?i)(error|failed)"
 ```
 
 ### Infrastructure Logs
 
 #### Fluent-bit Logs (Collection Issues)
 ```logql
-{kubernetes_namespace="telemetry", app_kubernetes_io_name="fluent-bit"}
+{namespace="observability", app="fluent-bit"}
 ```
 
 #### OTEL Collector Logs (Processing Issues)
 ```logql
-{kubernetes_namespace="telemetry", kubernetes_pod_name=~"otel-collector-.*"}
+{namespace="observability", pod=~"otel-collector-.*"}
 ```
 
 #### ArgoCD Sync Logs
 ```logql
-{kubernetes_namespace="argocd"} |~ "(?i)(sync|health|status)"
-```
-
-### Time-Based Queries
-
-#### Last Hour
-```logql
-{kubernetes_namespace="cto"} | __timestamp__ >= now() - 1h
-```
-
-#### Specific Time Range
-```logql
-{kubernetes_namespace="cto"} | __timestamp__ >= "2025-11-24T00:00:00Z" and __timestamp__ < "2025-11-24T23:59:59Z"
-```
-
-#### Today's Logs
-```logql
-{kubernetes_namespace="cto"} | __timestamp__ >= today()
+{namespace="argocd"} |~ "(?i)(sync|health|status)"
 ```
 
 ### Advanced Queries
 
 #### Find Pull Request Creation
 ```logql
-{kubernetes_namespace="cto"} |~ "(?i)(pull request|PR)" |~ "created"
+{namespace="cto"} |~ "(?i)(pull request|PR)" |= "created"
 ```
 
 #### Find GitHub API Errors
 ```logql
-{kubernetes_namespace="cto"} |~ "github" |~ "(?i)(error|failed|4[0-9]{2}|5[0-9]{2})"
+{namespace="cto"} |= "github" |~ "(?i)(error|failed|4[0-9]{2}|5[0-9]{2})"
 ```
 
 #### Find Long-Running Operations
 ```logql
-{kubernetes_namespace="cto"} |~ "duration" |~ "[0-9]+m"
+{namespace="cto"} |= "duration" |~ "[0-9]+m"
 ```
 
 #### Agent Startup/Shutdown
 ```logql
-{kubernetes_namespace="cto"} |~ "(?i)(starting|stopping|shutdown|terminated)"
+{namespace="cto"} |~ "(?i)(starting|stopping|shutdown|terminated)"
 ```
 
 ## JSON Log Parsing
@@ -242,54 +225,54 @@ If your logs are in JSON format, you can parse and filter by fields:
 
 ```logql
 # Parse JSON and filter by level
-{kubernetes_namespace="cto"} | json | level="error"
+{namespace="cto"} | json | level="error"
 
 # Parse JSON and filter by custom field
-{kubernetes_namespace="cto"} | json | status_code >= 400
+{namespace="cto"} | json | status_code >= 400
 
 # Parse JSON and extract specific fields
-{kubernetes_namespace="cto"} | json | line_format "{{.timestamp}} [{{.level}}] {{.message}}"
+{namespace="cto"} | json | line_format "{{.timestamp}} [{{.level}}] {{.message}}"
 ```
 
 ## Aggregation & Statistics
 
 ### Count Logs
 ```logql
-count_over_time({kubernetes_namespace="cto"}[5m])
+count_over_time({namespace="cto"}[5m])
 ```
 
 ### Rate of Logs
 ```logql
-rate({kubernetes_namespace="cto"}[5m])
+rate({namespace="cto"}[5m])
 ```
 
 ### Bytes per Second
 ```logql
-bytes_over_time({kubernetes_namespace="cto"}[5m])
+bytes_over_time({namespace="cto"}[5m])
 ```
 
 ### Count by Label
 ```logql
-sum(count_over_time({kubernetes_namespace="cto"}[1h])) by (kubernetes_pod_name)
+sum(count_over_time({namespace="cto"}[1h])) by (pod)
 ```
 
 ## Performance Tips
 
 1. **Use Specific Label Filters**: Start with namespace or pod name filters
-   - ✅ `{kubernetes_namespace="cto"}`
-   - ❌ `{} |~ "error"`
+   - ✅ `{namespace="cto"}`
+   - ❌ `{} |= "error"`
 
 2. **Limit Time Range**: Query shorter time periods for faster results
    - ✅ Last 1 hour
    - ❌ Last 7 days (unless necessary)
 
 3. **Use Regex Carefully**: Complex regex can be slow
-   - ✅ `kubernetes_pod_name=~"rex-.*"`
+   - ✅ `pod=~"rex-.*"`
    - ❌ `|~ "(?i)(error|warn|info|debug).*with.*complex.*pattern"`
 
 4. **Limit Result Count**: Use `limit` parameter
    - Default: 100 results
-   - Max recommended: 10,000 results
+   - Max recommended: 5,000 results
 
 5. **Use Aggregations for Large Datasets**: Instead of returning all logs, aggregate them
    - ✅ `count_over_time()` to count errors
@@ -301,68 +284,68 @@ sum(count_over_time({kubernetes_namespace="cto"}[1h])) by (kubernetes_pod_name)
 
 1. Find the task's pod:
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"task-.*-task-123-.*"}
+{namespace="cto", pod=~"task-.*-task-123-.*"}
 ```
 
 2. Look for errors:
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"task-.*-task-123-.*"} |~ "(?i)error"
+{namespace="cto", pod=~"task-.*-task-123-.*"} |~ "(?i)error"
 ```
 
 3. Check controller processing:
 ```logql
-{kubernetes_namespace="cto", kubernetes_pod_name=~"agent-controller-.*"} |~ "task-123"
+{namespace="cto", pod=~"agent-controller-.*"} |= "task-123"
 ```
 
 ### Debug Slow Performance
 
 1. Find long-running operations:
 ```logql
-{kubernetes_namespace="cto"} |~ "duration.*[0-9]+m"
+{namespace="cto"} |= "duration" |~ "[0-9]+m"
 ```
 
 2. Check for retries:
 ```logql
-{kubernetes_namespace="cto"} |~ "(?i)retr(y|ying|ied)"
+{namespace="cto"} |~ "(?i)retr(y|ying|ied)"
 ```
 
 3. Look for timeouts:
 ```logql
-{kubernetes_namespace="cto"} |~ "(?i)timeout"
+{namespace="cto"} |~ "(?i)timeout"
 ```
 
 ### Debug GitHub Integration
 
 1. Find GitHub API calls:
 ```logql
-{kubernetes_namespace="cto"} |~ "github.com/api"
+{namespace="cto"} |= "github.com/api"
 ```
 
 2. Check for rate limits:
 ```logql
-{kubernetes_namespace="cto"} |~ "rate limit"
+{namespace="cto"} |= "rate limit"
 ```
 
 3. Find authentication errors:
 ```logql
-{kubernetes_namespace="cto"} |~ "github" |~ "(?i)(unauthorized|forbidden|401|403)"
+{namespace="cto"} |= "github" |~ "(?i)(unauthorized|forbidden|401|403)"
 ```
 
 ### Debug ArgoCD Sync Issues
 
 1. Find sync operations:
 ```logql
-{kubernetes_namespace="argocd"} |~ "(?i)sync"
+{namespace="argocd"} |~ "(?i)sync"
 ```
 
 2. Check health status:
 ```logql
-{kubernetes_namespace="argocd"} |~ "(?i)health" |~ "(?i)(degraded|progressing|unknown)"
+{namespace="argocd"} |= "health" |~ "(?i)(degraded|progressing|unknown)"
 ```
 
 3. Find deployment errors:
 ```logql
-{kubernetes_namespace="argocd"} |~ "(?i)(error|failed)" |~ "(?i)(deploy|apply|create)"
+{namespace="argocd"} |~ "(?i)(error|failed)" |~ "(?i)(deploy|apply|create)"
 ```
 
 ## Creating Alerts
@@ -376,17 +359,17 @@ You can create alerts in Grafana based on log patterns:
 
 ### Example Alert Query
 ```logql
-sum(rate({kubernetes_namespace="cto"} |~ "(?i)error"[5m])) > 0.1
+sum(rate({namespace="cto"} |~ "(?i)error"[5m])) > 0.1
 ```
 
 This triggers if error rate exceeds 0.1 per second (6 per minute).
 
 ## Retention & Storage
 
-- **Retention Period**: 6 months (configured in Victoria Logs)
+- **Retention Period**: 7 days (configured in Loki)
 - **Storage**: 20Gi (local-path storage class)
 - **Compression**: Enabled by default
-- **Index Fields**: All labels are indexed for fast filtering
+- **Index Fields**: Labels are indexed for fast filtering
 
 ## Troubleshooting
 
@@ -394,30 +377,30 @@ This triggers if error rate exceeds 0.1 per second (6 per minute).
 
 1. Check Fluent-bit is running:
 ```bash
-kubectl get pods -n telemetry -l app.kubernetes.io/name=fluent-bit
+kubectl get pods -n observability -l app.kubernetes.io/name=fluent-bit
 ```
 
 2. Check Fluent-bit is collecting:
 ```bash
-kubectl logs -n telemetry <fluent-bit-pod> --tail=50
+kubectl logs -n observability <fluent-bit-pod> --tail=50
 ```
 
 3. Check OTEL Collector is receiving:
 ```bash
-kubectl logs -n telemetry <otel-collector-pod> --tail=50
+kubectl logs -n observability <otel-collector-pod> --tail=50
 ```
 
-4. Check Victoria Logs is healthy:
+4. Check Loki is healthy:
 ```bash
-kubectl get pods -n telemetry -l app.kubernetes.io/name=victoria-logs
-curl http://localhost:9428/health
+kubectl get pods -n observability -l app.kubernetes.io/name=loki
+curl http://localhost:3100/ready
 ```
 
 ### Logs Missing Metadata
 
 If logs don't have Kubernetes labels, check Fluent-bit filter configuration:
 ```bash
-kubectl get configmap -n telemetry fluent-bit -o yaml
+kubectl get configmap -n observability fluent-bit -o yaml
 ```
 
 Ensure the `kubernetes` filter is enabled and properly configured.
@@ -427,14 +410,14 @@ Ensure the `kubernetes` filter is enabled and properly configured.
 1. Add more specific label filters
 2. Reduce time range
 3. Use aggregations instead of raw logs
-4. Check Victoria Logs resource usage:
+4. Check Loki resource usage:
 ```bash
-kubectl top pod -n telemetry victoria-logs-victoria-logs-single-server-0
+kubectl top pod -n observability -l app.kubernetes.io/name=loki
 ```
 
 ## Resources
 
-- [Victoria Logs Documentation](https://docs.victoriametrics.com/VictoriaLogs/)
+- [Loki Documentation](https://grafana.com/docs/loki/latest/)
 - [LogQL Documentation](https://grafana.com/docs/loki/latest/logql/)
 - [Grafana Explore Documentation](https://grafana.com/docs/grafana/latest/explore/)
 
@@ -444,8 +427,3 @@ kubectl top pod -n telemetry victoria-logs-victoria-logs-single-server-0
 2. **Set Up Alerts**: Configure alerts for critical error patterns
 3. **Add Custom Labels**: Enhance agent pods with additional metadata labels
 4. **Integrate with OpenMemory**: Store important log insights in OpenMemory for context
-
-
-
-
-
