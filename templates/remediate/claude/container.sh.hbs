@@ -134,5 +134,5 @@ echo ""
 exec claude \
     --dangerously-skip-permissions \
     --model "{{model}}" \
-    --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(jq:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit" \
+    --allowedTools "Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(jq:*),Bash(cat:*),Bash(ls:*),Bash(utils:*),Read,Write,Edit" \
     -p "$(cat ${AGENT_PROMPT})"

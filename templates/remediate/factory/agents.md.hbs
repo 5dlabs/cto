@@ -99,8 +99,29 @@ Co-authored-by: {{github_app}} <noreply@github.com>"
 git push origin HEAD
 ```
 
-### Step 7: Report Completion
-After successful remediation, comment on the PR:
+### Step 7: Verify All CI Checks Pass
+After pushing, you MUST verify that all CI checks pass before completing the task.
+
+```bash
+# Wait for checks to complete and verify all pass (timeout: 10 minutes)
+utils checks --repo "$REPO_SLUG" --pr "$PR_NUMBER" --wait 600 --strict
+
+# If checks fail, examine the failures and iterate
+if [ $? -ne 0 ]; then
+    echo "❌ CI checks failed. Examining failures..."
+    utils checks --repo "$REPO_SLUG" --pr "$PR_NUMBER" --failed
+    # Go back to Step 4 to fix the new issues
+fi
+```
+
+**IMPORTANT**: Do NOT complete this task until all CI checks pass:
+- Use `utils checks` to monitor check status
+- The `--strict` flag exits with code 1 if any checks fail
+- If checks fail, examine the failures and apply fixes
+- Iterate until all checks pass
+
+### Step 8: Report Completion
+Only after all CI checks pass, comment on the PR:
 ```bash
 gh pr comment $PR_NUMBER --repo "$REPO_SLUG" --body "## ✅ Remediation Complete
 
@@ -110,8 +131,9 @@ I've addressed the review findings:
 - [List changes]
 
 ### Verification
-- ✅ Tests pass
+- ✅ Tests pass locally
 - ✅ Linter clean
+- ✅ All CI checks pass
 - ✅ No regressions introduced
 
 Please review the updated changes.
@@ -153,5 +175,6 @@ Please review and advise.
 
 ## Exit Behavior
 
-- Exit 0 when all (or most) fixes are successfully applied and pushed
-- Exit 1 if unable to apply any fixes due to blocking issues
+- Exit 0 ONLY when fixes are pushed AND all CI checks pass
+- Exit 1 if unable to apply fixes OR if CI checks fail after all retry attempts
+- Do NOT exit successfully until verified that all checks have passed
