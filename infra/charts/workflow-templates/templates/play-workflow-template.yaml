@@ -2332,14 +2332,22 @@ spec:
           echo "  Status: $STORED_STATUS"
           echo "  Workflow: $WORKFLOW_NAME"
 
-          # Check if workflow still exists (prevent concurrent execution)
+          # Check if workflow is still RUNNING (prevent concurrent execution)
           # IMPORTANT: Exclude current workflow from this check!
+          # FIX: Only block if workflow is Running/Pending, not just if it exists
           CURRENT_WORKFLOW="{{`{{workflow.name}}`}}"
           if [ -n "$WORKFLOW_NAME" ] && [ "$WORKFLOW_NAME" != "$CURRENT_WORKFLOW" ]; then
-            if kubectl get workflow "$WORKFLOW_NAME" -n {{ .Release.Namespace }} >/dev/null 2>&1; then
-              echo "⚠️  Workflow $WORKFLOW_NAME still exists!"
+            WORKFLOW_PHASE=$(kubectl get workflow "$WORKFLOW_NAME" -n {{ .Release.Namespace }} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+            if [ "$WORKFLOW_PHASE" = "Running" ] || [ "$WORKFLOW_PHASE" = "Pending" ]; then
+              echo "⚠️  Workflow $WORKFLOW_NAME still running (phase: $WORKFLOW_PHASE)"
               echo "This indicates concurrent execution attempt"
               exit 1  # Prevent duplicate workflows
+            elif [ -n "$WORKFLOW_PHASE" ]; then
+              echo "ℹ️  Previous workflow $WORKFLOW_NAME is $WORKFLOW_PHASE - safe to proceed"
+            else
+              # Workflow doesn't exist anymore - clean up stale ConfigMap
+              echo "🧹 Cleaning up stale ConfigMap (workflow $WORKFLOW_NAME no longer exists)"
+              kubectl delete configmap "$CM_NAME" -n {{ .Release.Namespace }} --ignore-not-found
             fi
           elif [ "$WORKFLOW_NAME" = "$CURRENT_WORKFLOW" ]; then
             echo "ℹ️  ConfigMap references current workflow - this is normal during execution"
