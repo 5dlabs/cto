@@ -12,7 +12,7 @@ resources:
   - tess-label-fallback-sensor.yaml
   - stage-aware-pr-merged-sensor.yaml
   - atlas-pr-monitor-sensor.yaml
-  - atlas-conflict-monitor-sensor.yaml
+  # atlas-conflict-monitor-sensor.yaml - REMOVED: HEAL now handles conflict detection
   - atlas-batch-integration-sensor.yaml
   - merge-to-main-sensor.yaml
   - remediation-feedback-sensor.yaml
