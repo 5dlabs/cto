@@ -140,7 +140,7 @@ cto-platform/                    # kind cluster
 │   ├── cto          # CTO components
 │   ├── argocd                  # GitOps
 │   ├── argo                    # Workflows & Events
-│   ├── monitoring (optional)   # Grafana, VictoriaMetrics
+│   ├── observability (optional) # Prometheus, Loki, Alertmanager, Grafana
 │   └── *-operator (optional)   # Database operators
 │
 └── cto-config.json             # Generated configuration

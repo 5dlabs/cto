@@ -21,8 +21,9 @@ impl<'a> ComponentInstaller<'a> {
             "argo-workflows" => self.install_argo_workflows(),
             "argo-events" => self.install_argo_events(),
             "controller" => self.install_controller(),
-            "victoria-metrics" => self.install_victoria_metrics(),
-            "victoria-logs" => self.install_victoria_logs(),
+            "prometheus" => self.install_prometheus(),
+            "loki" => self.install_loki(),
+            "alertmanager" => self.install_alertmanager(),
             "grafana" => self.install_grafana(),
             "postgres-operator" => self.install_postgres_operator(),
             "redis-operator" => self.install_redis_operator(),
@@ -182,56 +183,88 @@ impl<'a> ComponentInstaller<'a> {
     }
 
     #[allow(clippy::unused_self)]
-    fn install_victoria_metrics(&self) -> Result<()> {
-        ui::print_progress("Adding VictoriaMetrics Helm repository...");
+    fn install_prometheus(&self) -> Result<()> {
+        ui::print_progress("Adding Prometheus Community Helm repository...");
         Self::add_helm_repo(
-            "victoriametrics",
-            "https://victoriametrics.github.io/helm-charts/",
+            "prometheus-community",
+            "https://prometheus-community.github.io/helm-charts",
         )?;
 
-        ui::print_progress("Installing VictoriaMetrics...");
+        ui::print_progress("Installing Prometheus...");
         let output = Command::new("helm")
             .args([
                 "install",
-                "victoria-metrics",
-                "victoriametrics/victoria-metrics-single",
+                "prometheus",
+                "prometheus-community/prometheus",
                 "-n",
-                "monitoring",
+                "observability",
                 "--create-namespace",
                 "--wait",
             ])
             .output()
-            .context("Failed to install VictoriaMetrics")?;
+            .context("Failed to install Prometheus")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!(
-                "VictoriaMetrics installation failed: {stderr}"
-            ));
+            return Err(anyhow::anyhow!("Prometheus installation failed: {stderr}"));
         }
 
         Ok(())
     }
 
     #[allow(clippy::unused_self)]
-    fn install_victoria_logs(&self) -> Result<()> {
-        ui::print_progress("Installing VictoriaLogs...");
+    fn install_loki(&self) -> Result<()> {
+        ui::print_progress("Adding Grafana Helm repository...");
+        Self::add_helm_repo("grafana", "https://grafana.github.io/helm-charts")?;
+
+        ui::print_progress("Installing Loki...");
         let output = Command::new("helm")
             .args([
                 "install",
-                "victoria-logs",
-                "victoriametrics/victoria-logs-single",
+                "loki",
+                "grafana/loki",
                 "-n",
-                "monitoring",
+                "observability",
+                "--create-namespace",
                 "--wait",
             ])
             .output()
-            .context("Failed to install VictoriaLogs")?;
+            .context("Failed to install Loki")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Loki installation failed: {stderr}"));
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::unused_self)]
+    fn install_alertmanager(&self) -> Result<()> {
+        ui::print_progress("Adding Prometheus Community Helm repository...");
+        Self::add_helm_repo(
+            "prometheus-community",
+            "https://prometheus-community.github.io/helm-charts",
+        )?;
+
+        ui::print_progress("Installing Alertmanager...");
+        let output = Command::new("helm")
+            .args([
+                "install",
+                "alertmanager",
+                "prometheus-community/alertmanager",
+                "-n",
+                "observability",
+                "--create-namespace",
+                "--wait",
+            ])
+            .output()
+            .context("Failed to install Alertmanager")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "VictoriaLogs installation failed: {stderr}"
+                "Alertmanager installation failed: {stderr}"
             ));
         }
 
@@ -250,7 +283,7 @@ impl<'a> ComponentInstaller<'a> {
                 "grafana",
                 "grafana/grafana",
                 "-n",
-                "monitoring",
+                "observability",
                 "--wait",
             ])
             .output()

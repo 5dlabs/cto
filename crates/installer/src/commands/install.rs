@@ -212,7 +212,7 @@ impl InstallCommand {
             InstallProfile::Minimal => (false, false),
             InstallProfile::Standard | InstallProfile::Production => {
                 let monitoring = Confirm::with_theme(&theme)
-                    .with_prompt("Install monitoring stack? (Grafana, VictoriaMetrics)")
+                    .with_prompt("Install monitoring stack? (Prometheus, Loki, Alertmanager, Grafana)")
                     .default(true)
                     .interact()?;
 

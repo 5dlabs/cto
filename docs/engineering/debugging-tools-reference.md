@@ -6,7 +6,7 @@ This document provides a reference for MCP tools available for debugging the CTO
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| Logs | `grafana_query_loki_logs`, `victoriametrics_query` | Query application logs and metrics |
+| Logs | `grafana_query_loki_logs`, `prometheus_query` | Query application logs and metrics |
 | ArgoCD | `argocd_get_application`, `argocd_list_applications` | Check deployment status and sync state |
 | Kubernetes | `kubernetes_pods_log`, `kubernetes_events_list` | Debug pod issues and cluster events |
 | GitHub | `github_get_pull_request`, `github_list_issues` | Track PR status and issues |
@@ -24,16 +24,17 @@ Lists available datasources. Use this first to get datasource UIDs.
 ```
 
 **Example Response:**
-- `VictoriaLogs` (UID: `PD775F2863313E6C7`) - Log storage
-- `VictoriaMetrics` (UID: `P4169E866C3094E38`) - Metrics storage
+- `Loki` - Log storage
+- `Prometheus` - Metrics storage
+- `Alertmanager` - Alert management
 
 ### grafana_query_loki_logs
 
-Query logs from VictoriaLogs/Loki datasource.
+Query logs from Loki datasource.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `datasourceUid` | string | Yes | Datasource UID (use `PD775F2863313E6C7` for VictoriaLogs) |
+| `datasourceUid` | string | Yes | Datasource UID (use Loki datasource UID) |
 | `logql` | string | Yes | LogQL query expression |
 | `limit` | integer | No | Max log lines (default: 10, max: 100) |
 | `startRfc3339` | string | No | Start time in RFC3339 format |
@@ -43,16 +44,16 @@ Query logs from VictoriaLogs/Loki datasource.
 
 ```logql
 # Controller logs
-{service.name="agent-controller"}
+{service_name="agent-controller"}
 
 # Error logs only
-{service.name="agent-controller"} |= "error"
+{service_name="agent-controller"} |= "error"
 
 # Specific workflow logs
-{service.name="agent-controller"} |= "workflow" |= "play-"
+{service_name="agent-controller"} |= "workflow" |= "play-"
 
 # Filter by log level
-{service.name="agent-controller"} | json | level="ERROR"
+{service_name="agent-controller"} | json | level="ERROR"
 ```
 
 ### grafana_list_loki_label_names
@@ -70,7 +71,7 @@ Get values for a specific label.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `datasourceUid` | string | Yes | Datasource UID |
-| `labelName` | string | Yes | Label to get values for (e.g., `service.name`) |
+| `labelName` | string | Yes | Label to get values for (e.g., `service_name`) |
 
 ### grafana_find_error_pattern_logs
 
@@ -91,15 +92,15 @@ Search for Grafana dashboards by name.
 
 ---
 
-## VictoriaMetrics Tools
+## Prometheus Tools
 
-### victoriametrics_query
+### prometheus_query
 
-Execute instant PromQL/MetricsQL query.
+Execute instant PromQL query.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | PromQL/MetricsQL expression |
+| `query` | string | Yes | PromQL expression |
 | `time` | string | No | Evaluation timestamp |
 
 **Common Queries:**
@@ -118,22 +119,22 @@ rate(container_cpu_usage_seconds_total{namespace="cto"}[5m])
 kube_pod_container_status_restarts_total{namespace="cto"}
 ```
 
-### victoriametrics_query_range
+### prometheus_query_range
 
 Execute range query over time period.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | PromQL/MetricsQL expression |
+| `query` | string | Yes | PromQL expression |
 | `start` | string | Yes | Start timestamp |
 | `end` | string | No | End timestamp (defaults to now) |
 | `step` | string | No | Query resolution (e.g., `1m`, `5m`) |
 
-### victoriametrics_labels
+### prometheus_labels
 
 List all available metric label names.
 
-### victoriametrics_label_values
+### prometheus_label_values
 
 Get values for a specific label.
 
@@ -141,7 +142,7 @@ Get values for a specific label.
 |-----------|------|----------|-------------|
 | `label_name` | string | Yes | Label name to query |
 
-### victoriametrics_alerts
+### prometheus_alerts
 
 List firing and pending alerts.
 
@@ -399,7 +400,7 @@ Search for code across repositories.
    → Check for pod scheduling or resource issues
 
 2. grafana_query_loki_logs with query:
-   {service.name="agent-controller"} |= "workflow-name" |= "error"
+   {service_name="agent-controller"} |= "workflow-name" |= "error"
    → Find error messages
 
 3. kubernetes_pods_log for workflow pod
@@ -425,7 +426,7 @@ Search for code across repositories.
 1. kubernetes_pods_top(namespace: "cto")
    → Check CPU/memory usage
 
-2. victoriametrics_query with:
+2. prometheus_query with:
    container_memory_usage_bytes{namespace="cto"}
    → Get detailed memory metrics
 
@@ -435,13 +436,6 @@ Search for code across repositories.
 
 ---
 
-## Important Datasource UIDs
-
-| Datasource | UID | Type |
-|------------|-----|------|
-| VictoriaLogs | `PD775F2863313E6C7` | Logs |
-| VictoriaMetrics | `P4169E866C3094E38` | Metrics (Prometheus) |
-
 ## Key Namespaces
 
 | Namespace | Purpose |
@@ -449,7 +443,7 @@ Search for code across repositories.
 | `cto` | Controller, tools, workflows |
 | `automation` | Argo Workflows, Events |
 | `argocd` | ArgoCD applications |
-| `observability` | VictoriaMetrics, Grafana |
+| `observability` | Prometheus, Loki, Alertmanager, Grafana |
 
 ## Key Service Names (for log queries)
 
@@ -459,4 +453,3 @@ Search for code across repositories.
 | `tools-mcp` | MCP tools server |
 | `argo-workflow-controller` | Argo Workflows |
 | `argocd-server` | ArgoCD server |
-

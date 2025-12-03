@@ -40,16 +40,16 @@ ingress:
   pathType: Prefix
   tls: []
 
-# Data sources configuration
+# Data sources configuration - Prometheus and Loki
 datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
-      # VictoriaMetrics as Prometheus datasource
-      - name: VictoriaMetrics
+      # Prometheus datasource
+      - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://victoria-metrics-victoria-metrics-single-server:8428
+        url: http://prometheus-server.observability.svc.cluster.local:9090
         isDefault: true
         editable: false
         jsonData:
@@ -57,12 +57,23 @@ datasources:
           queryTimeout: "60s"
           httpMethod: POST
 
-      # VictoriaLogs datasource
-      - name: VictoriaLogs
-        type: victoriametrics-logs-datasource
+      # Loki datasource
+      - name: Loki
+        type: loki
         access: proxy
-        url: http://victoria-logs-victoria-logs-single-server:9428
+        url: http://loki-gateway.observability.svc.cluster.local:80
         editable: false
+        jsonData:
+          maxLines: 1000
+
+      # Alertmanager datasource
+      - name: Alertmanager
+        type: alertmanager
+        access: proxy
+        url: http://alertmanager.observability.svc.cluster.local:9093
+        editable: false
+        jsonData:
+          implementation: prometheus
 
 # Dashboard providers configuration
 # dashboardProviders:
@@ -82,11 +93,10 @@ datasources:
 # dashboardsConfigMaps:
 #   engineering-metrics: engineering-metrics-dashboard
 
-# Plugins to install
+# Plugins to install (Loki is built-in, no special plugin needed)
 plugins:
   - grafana-piechart-panel
   - grafana-worldmap-panel
-  - victoriametrics-logs-datasource
 
 # RBAC configuration
 rbac:
@@ -109,7 +119,6 @@ env:
   GF_EXPLORE_ENABLED: true
   GF_ALERTING_ENABLED: true
   GF_UNIFIED_ALERTING_ENABLED: true
-  GF_INSTALL_PLUGINS: victoriametrics-logs-datasource
 
 # Init containers - removed custom init to avoid permission issues
 
