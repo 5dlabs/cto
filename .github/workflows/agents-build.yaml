@@ -66,13 +66,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 TaskMaster version: $VERSION"
 
-      - name: Compute base tag (git hash of Dockerfile)
-        id: tag
-        run: |
-          set -euo pipefail
-          HASH=$(git log -1 --format="%h" -- infra/images/runtime/Dockerfile)
-          echo "tag=$HASH" >> "$GITHUB_OUTPUT"
-
       - name: Get latest binaries release version
         id: binaries-version
         env:
@@ -131,6 +124,34 @@ jobs:
             echo "⚠️ No release with play-monitor found, skipping play-monitor"
             echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Compute base tag (Dockerfile hash + binary versions)
+        id: tag
+        run: |
+          set -euo pipefail
+          # Include Dockerfile hash and binary versions in tag to ensure rebuilds
+          # when tools-client or play-monitor becomes available or version changes
+          DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/runtime/Dockerfile)
+          TOOLS_VER="${{ steps.binaries-version.outputs.tools_version }}"
+          MONITOR_VER="${{ steps.binaries-version.outputs.play_monitor_version }}"
+
+          # Build version suffix from available binaries
+          VERSION_SUFFIX=""
+          if [ "$TOOLS_VER" != "skip" ] && [ -n "$TOOLS_VER" ]; then
+            VERSION_SUFFIX="${VERSION_SUFFIX}-t$(echo "$TOOLS_VER" | tr '.' '-')"
+          fi
+          if [ "$MONITOR_VER" != "skip" ] && [ -n "$MONITOR_VER" ]; then
+            VERSION_SUFFIX="${VERSION_SUFFIX}-m$(echo "$MONITOR_VER" | tr '.' '-')"
+          fi
+
+          # Fallback if no binaries available
+          if [ -z "$VERSION_SUFFIX" ]; then
+            VERSION_SUFFIX="-nobin"
+          fi
+
+          TAG="${DOCKERFILE_HASH}${VERSION_SUFFIX}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "📦 Computed runtime tag: $TAG"
 
       - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
