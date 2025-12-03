@@ -678,39 +678,51 @@ else
 fi
 
 echo "=== MCP PRECHECKS ==="
-if ! command -v tools >/dev/null 2>&1; then
+
+# Check tools CLI availability - warn and proceed instead of failing
+TOOLS_CLI_AVAILABLE=false
+if command -v tools >/dev/null 2>&1; then
+  TOOLS_CLI_AVAILABLE=true
+else
   echo "" >&2
   echo "════════════════════════════════════════════════════════════════" >&2
-  echo "║              FATAL: MISSING REQUIRED DEPENDENCY              ║" >&2
+  echo "║             WARNING: OPTIONAL DEPENDENCY MISSING             ║" >&2
   echo "════════════════════════════════════════════════════════════════" >&2
-  echo "❌ 'tools' CLI not found in PATH; required for MCP" >&2
+  echo "⚠️ 'tools' CLI not found in PATH; MCP remote tools will not be available" >&2
   echo "" >&2
   echo "Diagnostic info:" >&2
   echo "  PATH: $PATH" >&2
   echo "  Expected locations: /usr/local/bin/tools, /usr/bin/tools" >&2
   echo "  Installed tools: $(ls -la /usr/local/bin/tools /usr/bin/tools 2>&1 || echo 'not found')" >&2
   echo "" >&2
-  echo "This typically indicates the container image was built before" >&2
-  echo "tools-client binaries were available. Rebuild the image or" >&2
-  echo "verify the tools-client release exists." >&2
+  echo "Proceeding without MCP tools support. Agent will function with" >&2
+  echo "reduced capabilities. To enable MCP tools, rebuild the container" >&2
+  echo "image with tools-client binaries available." >&2
   echo "════════════════════════════════════════════════════════════════" >&2
-  exit 1
 fi
 
-TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
-TOOLS_URL="${TOOLS_URL%/}"
-echo "🔍 Checking Tools endpoint: $TOOLS_URL"
-if ! curl -sSf --connect-timeout 2 --max-time 6 \
-  -X POST "$TOOLS_URL" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
-  echo "❌ Unable to reach Tools server at $TOOLS_URL"
-  cat /tmp/tools-ping.log >&2 || true
-  rm -f /tmp/tools-ping.log
-  exit 1
+# Only perform Tools endpoint check if tools CLI is available
+TOOLS_SUCCESS=false
+if [ "$TOOLS_CLI_AVAILABLE" = "true" ]; then
+  TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
+  TOOLS_URL="${TOOLS_URL%/}"
+  echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+  if curl -sSf --connect-timeout 2 --max-time 6 \
+    -X POST "$TOOLS_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+    TOOLS_SUCCESS=true
+    rm -f /tmp/tools-ping.log
+    echo "✓ Tools endpoint reachable"
+  else
+    echo "⚠️ Unable to reach Tools server at $TOOLS_URL"
+    cat /tmp/tools-ping.log >&2 || true
+    rm -f /tmp/tools-ping.log
+    echo "   Proceeding anyway, but MCP tools may not work."
+  fi
+else
+  echo "⚠️ Skipping Tools endpoint check (tools CLI not available)"
 fi
-rm -f /tmp/tools-ping.log
-echo "✓ Tools endpoint reachable"
 
 # Verify OpenCode provider API key is set based on config
 OPENCODE_CONFIG_PATH="$HOME/.opencode/config.json"
