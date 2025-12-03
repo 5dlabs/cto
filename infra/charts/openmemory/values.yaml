@@ -49,6 +49,13 @@ embeddings:
 
 # Memory configuration
 memory:
+  # OpenMemory tier (hybrid|fast|smart|deep)
+  # hybrid: balanced mode for general use
+  # fast: optimized for speed, less memory
+  # smart: intelligent caching and retrieval
+  # deep: comprehensive memory with full context
+  tier: "hybrid"
+
   # Default decay parameters
   decay:
     enabled: true
