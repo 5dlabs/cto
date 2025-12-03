@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.30](https://github.com/5dlabs/cto/compare/v0.12.29...v0.12.30) (2025-12-03)
+
+
+### ✨ Features
+
+* **telemetry:** migrate from Victoria Metrics/Logs to Grafana stack ([#2571](https://github.com/5dlabs/cto/issues/2571)) ([db6710a](https://github.com/5dlabs/cto/commit/db6710a08d3604eb6b0eef46148ab21358e578b4))
+
+
+### 🐛 Bug Fixes
+
+* **heal:** remediate stale ConfigMap detection, GC timing, and dedup logic ([#2560](https://github.com/5dlabs/cto/issues/2560)) ([f81074a](https://github.com/5dlabs/cto/commit/f81074a6a220c6e42530972821b70d40055350d2))
+* **telemetry:** fix alertmanager security context, loki caching, and otel-collector exporters ([#2588](https://github.com/5dlabs/cto/issues/2588)) ([74dde75](https://github.com/5dlabs/cto/commit/74dde7507349481de486aff1c0d847afc0ff1a92))
+
 ## [0.12.29](https://github.com/5dlabs/cto/compare/v0.12.28...v0.12.29) (2025-12-03)
 
 
