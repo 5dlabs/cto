@@ -49,7 +49,7 @@ datasources:
       - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://prometheus-server.observability.svc.cluster.local:9090
+        url: http://prometheus-server.observability.svc.cluster.local:80
         isDefault: true
         editable: false
         jsonData:
