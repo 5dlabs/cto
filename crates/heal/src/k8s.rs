@@ -52,29 +52,49 @@ pub struct Pod {
     pub namespace: String,
     pub phase: String,
     pub labels: HashMap<String, String>,
+    pub conditions: Vec<PodCondition>,
     pub container_statuses: Vec<ContainerStatus>,
     pub started_at: Option<DateTime<Utc>>,
+}
+
+/// Pod condition from Kubernetes status.conditions[]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PodCondition {
+    /// Condition type: "Ready", "ContainersReady", "Initialized", etc.
+    pub condition_type: String,
+    /// Status: "True", "False", "Unknown"
+    pub status: String,
+    /// Machine-readable reason for the condition
+    pub reason: Option<String>,
+    /// Human-readable message with details
+    pub message: Option<String>,
 }
 
 /// Container status within a pod
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ContainerStatus {
     pub name: String,
+    pub ready: bool,
     pub state: ContainerState,
     pub restart_count: i32,
 }
 
 /// Container state
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ContainerState {
-    #[default]
-    Waiting,
+    Waiting { reason: Option<String> },
     Running,
     Terminated {
         exit_code: i32,
         reason: Option<String>,
         finished_at: Option<DateTime<Utc>>,
     },
+}
+
+impl Default for ContainerState {
+    fn default() -> Self {
+        Self::Waiting { reason: None }
+    }
 }
 
 /// Simplified Workflow representation
