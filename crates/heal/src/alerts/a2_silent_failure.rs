@@ -186,6 +186,12 @@ fn detect_by_ready_status(pod: &Pod) -> Option<Detection> {
                 continue;
             }
 
+            // Skip if container terminated successfully (exit code 0)
+            // This happens when main container completes but sidecars keep pod Running
+            if let ContainerState::Terminated { exit_code: 0, .. } = &container.state {
+                continue;
+            }
+
             // Skip if container is in running state but within startup grace period.
             // This prevents false positives during normal pod initialization when
             // readiness probes haven't passed yet.
@@ -213,6 +219,25 @@ fn detect_by_ready_status(pod: &Pod) -> Option<Detection> {
 
 /// Method 3: Pod condition ContainersReady=False
 fn detect_by_pod_conditions(pod: &Pod) -> Option<Detection> {
+    // If all terminated containers have exit code 0, this is a successful completion
+    // (e.g., main container finished successfully but sidecars keep pod Running)
+    let has_failed_terminated = pod.container_statuses.iter().any(|cs| {
+        matches!(
+            &cs.state,
+            ContainerState::Terminated { exit_code, .. } if *exit_code != 0
+        )
+    });
+    let has_successful_terminated = pod
+        .container_statuses
+        .iter()
+        .any(|cs| matches!(&cs.state, ContainerState::Terminated { exit_code: 0, .. }));
+
+    // If we have successful terminations but no failed ones, skip pod condition check
+    // This prevents false positives when main container completes successfully
+    if has_successful_terminated && !has_failed_terminated {
+        return None;
+    }
+
     // Skip if pod is within startup grace period.
     // This prevents false positives during normal pod initialization.
     if let Some(started_at) = pod.started_at {
@@ -299,6 +324,12 @@ fn detect_by_terminated_duration(pod: &Pod) -> Option<Detection> {
             reason,
         } = &container.state
         {
+            // Skip containers that terminated successfully (exit code 0)
+            // This happens when main container completes but sidecars keep pod Running
+            if *exit_code == 0 {
+                continue;
+            }
+
             let duration = now.signed_duration_since(*finished);
             if duration > Duration::seconds(TERMINATED_DURATION_SECS) {
                 return Some(Detection {
@@ -652,5 +683,225 @@ mod tests {
             ..Default::default()
         };
         assert!(detect_by_pod_conditions(&old_pod).is_some());
+    }
+
+    #[test]
+    fn test_successful_termination_with_running_sidecars() {
+        // This is the false positive scenario:
+        // Main container completed successfully (exit code 0) but pod is still Running
+        // because sidecars keep it alive. Should NOT trigger A2 alert.
+        let handler = Handler::new();
+
+        let event = K8sEvent::PodModified(Pod {
+            name: "heal-remediation-t123-rex".into(),
+            phase: "Running".into(),
+            conditions: vec![
+                PodCondition {
+                    condition_type: "Ready".into(),
+                    status: "False".into(),
+                    reason: Some("ContainersNotReady".into()),
+                    ..Default::default()
+                },
+                PodCondition {
+                    condition_type: "ContainersReady".into(),
+                    status: "False".into(),
+                    reason: Some("ContainersNotReady".into()),
+                    message: Some("containers with unready status: [agent]".into()),
+                },
+            ],
+            container_statuses: vec![
+                ContainerStatus {
+                    name: "agent".into(),
+                    ready: false, // Terminated containers are not ready
+                    state: ContainerState::Terminated {
+                        exit_code: 0, // SUCCESS!
+                        reason: Some("Completed".into()),
+                        finished_at: Some(Utc::now() - Duration::minutes(5)),
+                    },
+                    restart_count: 0,
+                },
+                ContainerStatus {
+                    name: "docker-sidecar".into(),
+                    ready: true,
+                    state: ContainerState::Running { started_at: None },
+                    restart_count: 0,
+                },
+            ],
+            ..Default::default()
+        });
+
+        let github = GitHubState::default();
+        let ctx = AlertContext {
+            task_id: "123".into(),
+            repository: "5dlabs/test".into(),
+            namespace: "cto".into(),
+            pr_number: None,
+            workflow_name: None,
+            config: AlertConfig::default(),
+        };
+
+        // Should NOT fire alert - this is a successful completion
+        let alert = handler.evaluate(&event, &github, &ctx);
+        assert!(
+            alert.is_none(),
+            "Should not alert on successful termination (exit code 0)"
+        );
+    }
+
+    #[test]
+    fn test_failed_termination_with_running_sidecars() {
+        // Main container FAILED (exit code 1) but pod is still Running.
+        // This SHOULD trigger A2 alert.
+        let handler = Handler::new();
+
+        let event = K8sEvent::PodModified(Pod {
+            name: "my-agent-pod-t456-rex".into(), // Not excluded by is_excluded_pod
+            phase: "Running".into(),
+            conditions: vec![
+                PodCondition {
+                    condition_type: "Ready".into(),
+                    status: "False".into(),
+                    reason: Some("ContainersNotReady".into()),
+                    ..Default::default()
+                },
+                PodCondition {
+                    condition_type: "ContainersReady".into(),
+                    status: "False".into(),
+                    reason: Some("ContainersNotReady".into()),
+                    message: Some("containers with unready status: [agent]".into()),
+                },
+            ],
+            container_statuses: vec![
+                ContainerStatus {
+                    name: "agent".into(),
+                    ready: false,
+                    state: ContainerState::Terminated {
+                        exit_code: 1, // FAILURE
+                        reason: Some("Error".into()),
+                        finished_at: Some(Utc::now() - Duration::minutes(5)),
+                    },
+                    restart_count: 0,
+                },
+                ContainerStatus {
+                    name: "docker-sidecar".into(),
+                    ready: true,
+                    state: ContainerState::Running { started_at: None },
+                    restart_count: 0,
+                },
+            ],
+            ..Default::default()
+        });
+
+        let github = GitHubState::default();
+        let ctx = AlertContext {
+            task_id: "456".into(),
+            repository: "5dlabs/test".into(),
+            namespace: "cto".into(),
+            pr_number: None,
+            workflow_name: None,
+            config: AlertConfig::default(),
+        };
+
+        // SHOULD fire alert - this is a real failure
+        let alert = handler.evaluate(&event, &github, &ctx);
+        assert!(
+            alert.is_some(),
+            "Should alert on failed termination (exit code 1)"
+        );
+        let alert = alert.unwrap();
+        assert_eq!(alert.id, AlertId::A2);
+        assert_eq!(
+            alert.context.get("detection_method"),
+            Some(&"exit_code".to_string())
+        );
+    }
+
+    #[test]
+    fn test_ready_status_skips_successful_termination() {
+        // Test that detect_by_ready_status skips containers with exit code 0
+        let pod = Pod {
+            name: "completed-agent".into(),
+            phase: "Running".into(),
+            container_statuses: vec![ContainerStatus {
+                name: "agent".into(),
+                ready: false, // Terminated containers are not ready
+                state: ContainerState::Terminated {
+                    exit_code: 0,
+                    reason: Some("Completed".into()),
+                    finished_at: None,
+                },
+                restart_count: 0,
+            }],
+            ..Default::default()
+        };
+
+        assert!(
+            detect_by_ready_status(&pod).is_none(),
+            "Should not detect ready status issue for exit code 0"
+        );
+    }
+
+    #[test]
+    fn test_terminated_duration_skips_successful_termination() {
+        // Test that detect_by_terminated_duration skips containers with exit code 0
+        let pod = Pod {
+            name: "completed-agent".into(),
+            phase: "Running".into(),
+            container_statuses: vec![ContainerStatus {
+                name: "agent".into(),
+                ready: false,
+                state: ContainerState::Terminated {
+                    exit_code: 0,
+                    reason: Some("Completed".into()),
+                    finished_at: Some(Utc::now() - Duration::minutes(10)), // Long time ago
+                },
+                restart_count: 0,
+            }],
+            ..Default::default()
+        };
+
+        assert!(
+            detect_by_terminated_duration(&pod).is_none(),
+            "Should not detect duration issue for exit code 0"
+        );
+    }
+
+    #[test]
+    fn test_pod_conditions_skips_successful_termination() {
+        // Test that detect_by_pod_conditions skips when only successful terminations exist
+        let pod = Pod {
+            name: "completed-agent".into(),
+            phase: "Running".into(),
+            conditions: vec![PodCondition {
+                condition_type: "ContainersReady".into(),
+                status: "False".into(),
+                reason: Some("ContainersNotReady".into()),
+                message: Some("containers with unready status: [agent]".into()),
+            }],
+            container_statuses: vec![
+                ContainerStatus {
+                    name: "agent".into(),
+                    ready: false,
+                    state: ContainerState::Terminated {
+                        exit_code: 0, // Success
+                        reason: Some("Completed".into()),
+                        finished_at: None,
+                    },
+                    restart_count: 0,
+                },
+                ContainerStatus {
+                    name: "sidecar".into(),
+                    ready: true,
+                    state: ContainerState::Running { started_at: None },
+                    restart_count: 0,
+                },
+            ],
+            ..Default::default()
+        };
+
+        assert!(
+            detect_by_pod_conditions(&pod).is_none(),
+            "Should not detect pod condition issue when only successful terminations exist"
+        );
     }
 }
