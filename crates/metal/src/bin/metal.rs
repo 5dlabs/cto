@@ -658,13 +658,23 @@ async fn main() -> Result<()> {
                 ssh_keys,
             };
 
-            let (cp_server, worker_server) =
-                tokio::try_join!(provider.create_server(cp_req), provider2.create_server(worker_req),)?;
+            let (cp_server, worker_server) = tokio::try_join!(
+                provider.create_server(cp_req),
+                provider2.create_server(worker_req),
+            )?;
 
             let cp_id = cp_server.id.clone();
             let worker_id = worker_server.id.clone();
-            println!("   Control Plane: {} ({})", cp_id, cp_server.ipv4.clone().unwrap_or_default());
-            println!("   Worker:        {} ({})", worker_id, worker_server.ipv4.clone().unwrap_or_default());
+            println!(
+                "   Control Plane: {} ({})",
+                cp_id,
+                cp_server.ipv4.clone().unwrap_or_default()
+            );
+            println!(
+                "   Worker:        {} ({})",
+                worker_id,
+                worker_server.ipv4.clone().unwrap_or_default()
+            );
 
             // Step 2: Wait for BOTH servers to be ready in parallel
             println!("\n⏳ Step 2/9: Waiting for both servers to be ready...");
@@ -680,10 +690,11 @@ async fn main() -> Result<()> {
 
             // Step 3: Trigger Talos iPXE on BOTH in parallel
             println!("\n🔄 Step 3/9: Triggering Talos iPXE boot on both...");
-            let talos_cfg = TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
-                &talos_version,
-                cto_metal::talos::DEFAULT_SCHEMATIC_ID,
-            ));
+            let talos_cfg =
+                TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
+                    &talos_version,
+                    cto_metal::talos::DEFAULT_SCHEMATIC_ID,
+                ));
             let ipxe_url = talos_cfg.ipxe_url();
 
             let cp_ipxe = ReinstallIpxeRequest {
@@ -763,7 +774,11 @@ async fn main() -> Result<()> {
 
             // Step 9: Wait for worker to join
             println!("\n⏳ Step 9/9: Waiting for worker to join cluster...");
-            talos::wait_for_install(&worker_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+            talos::wait_for_install(
+                &worker_addr,
+                &configs.talosconfig,
+                Duration::from_secs(timeout),
+            )?;
             talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(300))?;
 
             println!("\n🎉 2-node cluster provisioned successfully!");
