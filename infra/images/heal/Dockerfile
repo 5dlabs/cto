@@ -1,11 +1,12 @@
 # Heal Monitor Dockerfile
 #
-# Expects a pre-built binary at infra/images/heal/heal-linux
-# The CI workflow builds the binary with sccache caching before Docker build.
+# The CI workflow builds the binary and copies it + prompts to repo root.
+# Docker build context is the repo root (.).
 #
 # To build locally:
 #   cargo build --release --package heal
-#   cp target/release/heal infra/images/heal/heal-linux
+#   cp target/release/heal heal
+#   cp -r crates/heal/prompts prompts
 #   docker build -f infra/images/heal/Dockerfile -t heal .
 
 # hadolint ignore=DL3029,DL3007

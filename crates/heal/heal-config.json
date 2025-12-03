@@ -10,7 +10,7 @@
     "workingDirectory": ".",
     "service": "heal",
     "runType": "implementation",
-    "enableDocker": false,
+    "enableDocker": true,
     "remoteTools": "mcp_tools_github_*,mcp_tools_kubernetes_*,mcp_tools_argocd_*,mcp_tools_cto_*,mcp_tools_context7_*,mcp_tools_firecrawl_*,mcp_tools_grafana_*",
     "localTools": "",
     "cliConfig": {

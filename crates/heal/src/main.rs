@@ -699,7 +699,7 @@ impl Default for HealConfig {
                 working_directory: ".".to_string(),
                 service: "heal".to_string(),
                 run_type: "implementation".to_string(),
-                enable_docker: false,
+                enable_docker: true,
                 remote_tools: "mcp_tools_github_*,mcp_tools_kubernetes_*".to_string(),
                 local_tools: String::new(),
                 cli_config: CliConfig {
@@ -5505,17 +5505,30 @@ async fn spawn_factory_with_prompt(
     writeln!(file, "=== FACTORY OUTPUT ===")?;
     drop(file); // Close before spawning
 
+    // Use stdin to pass prompt content to avoid "Argument list too long" errors
+    // when prompts include large pod logs (OS arg limit is typically 128KB-2MB)
+    // droid exec reads from stdin when no prompt argument is provided
     let output = AsyncCommand::new("droid")
-        .args([
-            "exec",
-            "--output-format",
-            "text",
-            "--auto",
-            "high",
-            &prompt_content,
-        ])
-        .output()
-        .await;
+        .args(["exec", "--output-format", "text", "--auto", "high"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+
+    let output = match output {
+        Ok(mut child) => {
+            // Write prompt to stdin
+            if let Some(mut stdin) = child.stdin.take() {
+                use tokio::io::AsyncWriteExt;
+                if let Err(e) = stdin.write_all(prompt_content.as_bytes()).await {
+                    anyhow::bail!("Failed to write prompt to stdin: {e}");
+                }
+                drop(stdin); // Close stdin to signal EOF
+            }
+            child.wait_with_output().await
+        }
+        Err(e) => Err(e),
+    };
 
     // Append output to log file
     let mut file = std::fs::OpenOptions::new()

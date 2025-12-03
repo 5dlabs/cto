@@ -208,11 +208,14 @@ jobs:
           echo "🔨 Building heal for linux/amd64..."
           cargo build -p heal --release --bin heal
 
-          # Copy binary to Docker context
-          cp target/release/heal infra/images/heal/heal-linux
-          chmod +x infra/images/heal/heal-linux
+          # Copy binary to Docker context root (Dockerfile expects 'heal' at root)
+          cp target/release/heal heal
+          chmod +x heal
 
-          echo "✅ Binary copied to Docker context"
+          # Copy prompts to Docker context root (Dockerfile expects 'prompts/' at root)
+          cp -r crates/heal/prompts prompts
+
+          echo "✅ Binary and prompts copied to Docker context"
           echo "📊 Final sccache stats:"
           sccache --show-stats
 

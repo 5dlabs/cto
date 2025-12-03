@@ -359,6 +359,77 @@ The probe expects you to respond with:
 - **Exit 0**: All acceptance criteria verified
 - **Exit 1**: Incomplete after max attempts
 
+## Docker Capability (Image Debugging)
+
+{{#if enable_docker}}
+**Docker is ENABLED for this remediation session.** You have a Docker-in-Docker sidecar running, giving you full Docker capabilities.
+
+### Use Cases for Docker Debugging
+
+When investigating issues like "binary not found" or container startup failures:
+
+1. **Pull and inspect the problematic image**
+   ```bash
+   # Pull the image that's failing
+   docker pull ghcr.io/anthropics/claude-code:latest
+   
+   # Inspect the image structure
+   docker inspect ghcr.io/anthropics/claude-code:latest
+   
+   # List files to verify binaries exist
+   docker run --rm ghcr.io/anthropics/claude-code:latest ls -la /usr/local/bin/
+   docker run --rm ghcr.io/anthropics/claude-code:latest which claude
+   docker run --rm ghcr.io/anthropics/claude-code:latest cat /etc/os-release
+   ```
+
+2. **Verify binary paths and permissions**
+   ```bash
+   # Check if binary is executable and in PATH
+   docker run --rm ghcr.io/anthropics/claude-code:latest sh -c 'echo $PATH'
+   docker run --rm ghcr.io/anthropics/claude-code:latest sh -c 'ls -la $(which claude 2>/dev/null || echo /bin/claude)'
+   ```
+
+3. **Test container startup behavior**
+   ```bash
+   # Run the entrypoint to see what happens
+   docker run --rm ghcr.io/anthropics/claude-code:latest
+   
+   # Override entrypoint to debug
+   docker run --rm --entrypoint /bin/sh ghcr.io/anthropics/claude-code:latest -c 'ls -la /; cat /etc/passwd'
+   ```
+
+4. **Compare working vs broken images**
+   ```bash
+   # If a previous version worked, compare them
+   docker pull ghcr.io/anthropics/claude-code:v1.0.0
+   docker run --rm ghcr.io/anthropics/claude-code:v1.0.0 ls -la /usr/local/bin/
+   docker run --rm ghcr.io/anthropics/claude-code:latest ls -la /usr/local/bin/
+   ```
+
+### When to Use Docker Debugging
+
+- **Pod CrashLoopBackOff**: Pull the image and test if binaries work
+- **Binary not found errors**: Verify the binary exists and is in PATH
+- **Permission denied**: Check file permissions in the image
+- **Startup script failures**: Run the entrypoint manually to see errors
+- **Environment variable issues**: Inspect the image's default ENV vars
+
+**TIP**: Always wait for Docker daemon to be ready:
+```bash
+# Wait for Docker to be available
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if docker info >/dev/null 2>&1; then
+    echo "Docker daemon ready"
+    break
+  fi
+  echo "Waiting for Docker daemon... ($i/10)"
+  sleep 3
+done
+```
+{{else}}
+Docker is disabled for this session. If you need to debug container images, request a new CodeRun with `enableDocker: true`.
+{{/if}}
+
 ## Tooling Snapshot
 {{#if tools.tools}}
 Available Tools:
