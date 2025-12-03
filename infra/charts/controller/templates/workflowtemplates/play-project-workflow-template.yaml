@@ -218,16 +218,46 @@ spec:
         - name: next-task-id
           valueFrom:
             path: /tmp/next-task-id.txt
+            default: "1"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ PLAY-STATE-CHECKER FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "Last command failed at line: ${BASH_LINENO:-unknown}"
+            echo ""
+            # Ensure output file exists with fallback value so Argo can continue
+            if [ ! -f /tmp/next-task-id.txt ]; then
+              echo "⚠️ Output file missing - writing fallback value '1'"
+              echo "1" > /tmp/next-task-id.txt
+            fi
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "🔍 Checking play state for resume..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Repository: {{`{{workflow.parameters.repository}}`}}"
+          echo ""
 
-          apk add --no-cache jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache jq >/dev/null 2>&1; then
+            echo "❌ Failed to install jq via apk"
+            exit 1
+          fi
+          echo "✅ Dependencies installed"
 
           # State config map name is based on repository
           REPO_SLUG="{{`{{workflow.parameters.repository}}`}}"
@@ -293,6 +323,11 @@ spec:
             echo "✅ Created initial play state config map"
           fi
 
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Play state checker completed successfully"
+
     # Task discovery template
     - name: task-discovery
       inputs:
@@ -305,9 +340,11 @@ spec:
         - name: task-list
           valueFrom:
             path: /tmp/task-list.txt
+            default: ""  # Fallback if script fails before writing output
         - name: task-count
           valueFrom:
             path: /tmp/task-count.txt
+            default: "0"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         env:
@@ -324,12 +361,45 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ TASK-DISCOVERY FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo ""
+            # Ensure output files exist with fallback values
+            if [ ! -f /tmp/task-list.txt ]; then
+              echo "⚠️ Task list file missing - writing empty fallback"
+              echo "" > /tmp/task-list.txt
+            fi
+            if [ ! -f /tmp/task-count.txt ]; then
+              echo "⚠️ Task count file missing - writing fallback '0'"
+              echo "0" > /tmp/task-count.txt
+            fi
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "🔍 Discovering tasks in workspace..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Docs repository: {{`{{workflow.parameters.docs-repository}}`}}"
+          echo "   Docs directory: {{`{{inputs.parameters.docs-directory}}`}}"
+          echo ""
 
           # Clone repository to get task structure
-          apk add --no-cache git curl openssl jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache git curl openssl jq >/dev/null 2>&1; then
+            echo "❌ Failed to install dependencies via apk"
+            exit 1
+          fi
+          echo "✅ Dependencies installed"
 
           # Normalize docs-repository: accept either org/repo or full URL
           DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
@@ -470,6 +540,11 @@ spec:
           echo "$tasks" > /tmp/task-list.txt
           echo "$count" > /tmp/task-count.txt
 
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Task discovery completed successfully"
+
     # Dependency graph builder - parses tasks.json and builds execution levels
     - name: dependency-graph-builder
       inputs:
@@ -480,9 +555,11 @@ spec:
         - name: execution-levels
           valueFrom:
             path: /tmp/execution-levels.json
+            default: "[[]]"  # Fallback if script fails before writing output
         - name: parallelism-stats
           valueFrom:
             path: /tmp/parallelism-stats.json
+            default: "{}"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         env:
@@ -499,12 +576,45 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ DEPENDENCY-GRAPH-BUILDER FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo ""
+            # Ensure output files exist with fallback values
+            if [ ! -f /tmp/execution-levels.json ]; then
+              echo "⚠️ Execution levels file missing - writing empty fallback"
+              echo "[[]]" > /tmp/execution-levels.json
+            fi
+            if [ ! -f /tmp/parallelism-stats.json ]; then
+              echo "⚠️ Parallelism stats file missing - writing empty fallback"
+              echo "{}" > /tmp/parallelism-stats.json
+            fi
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "📊 Building dependency graph from TaskMaster data..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Docs repository: {{`{{workflow.parameters.docs-repository}}`}}"
+          echo "   Docs directory: {{`{{inputs.parameters.docs-directory}}`}}"
+          echo ""
 
           # Install Python and required packages
-          apk add --no-cache python3 git curl openssl jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache python3 git curl openssl jq >/dev/null 2>&1; then
+            echo "❌ Failed to install dependencies via apk"
+            exit 1
+          fi
+          echo "✅ Dependencies installed"
 
           # Normalize docs-repository: accept either org/repo or full URL
           DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
@@ -612,6 +722,11 @@ spec:
           echo "✅ Dependency graph built successfully"
           echo "📊 Parallelism stats:"
           jq '.' /tmp/parallelism-stats.json
+
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Dependency graph builder completed successfully"
 
     # Parallel task processor - processes tasks by execution level
     - name: parallel-task-processor
@@ -1360,9 +1475,28 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ SEQUENTIAL-TASK-PROCESSOR FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "Workflow: {{`{{workflow.name}}`}}"
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "📋 Processing {{`{{inputs.parameters.task-count}}`}} tasks sequentially..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Repository: {{`{{workflow.parameters.repository}}`}}"
+          echo ""
 
           # Convert comma-separated list to space-separated for iteration
           task_list="{{`{{inputs.parameters.task-list}}`}}"
@@ -1645,6 +1779,11 @@ spec:
           echo "════════════════════════════════════════"
           echo "🎉 ALL TASKS COMPLETED SUCCESSFULLY!"
           echo "════════════════════════════════════════"
+
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Sequential task processor completed successfully"
 
     # Morgan Project Manager - Runs once during workflow initialization
     - name: morgan-project-manager
