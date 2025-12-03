@@ -43,9 +43,12 @@ spec:
           logs.platform.5dlabs.io/collect: "true"
           logs.platform.5dlabs.io/service: alertmanager
 
-        # Security context
-        securityContext:
+        # Pod security context (pod-level, not container-level)
+        podSecurityContext:
           fsGroup: 65534
+
+        # Container security context
+        securityContext:
           runAsUser: 65534
           runAsGroup: 65534
           runAsNonRoot: true

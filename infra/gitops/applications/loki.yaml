@@ -100,8 +100,14 @@ spec:
         monitoring:
           selfMonitoring:
             enabled: false
-          lokiCanary:
-            enabled: false
+        lokiCanary:
+          enabled: false
+
+        # Disable caching (not needed for single binary mode)
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
 
   destination:
     server: https://kubernetes.default.svc

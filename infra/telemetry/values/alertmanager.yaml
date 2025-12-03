@@ -33,9 +33,12 @@ service:
     prometheus.io/scrape: "true"
     prometheus.io/port: "9093"
 
-# Security context
-securityContext:
+# Pod security context (pod-level)
+podSecurityContext:
   fsGroup: 65534
+
+# Container security context
+securityContext:
   runAsUser: 65534
   runAsGroup: 65534
   runAsNonRoot: true

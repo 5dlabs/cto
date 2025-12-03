@@ -143,8 +143,14 @@ monitoring:
     enabled: false
     grafanaAgent:
       installOperator: false
-  lokiCanary:
-    enabled: false
+lokiCanary:
+  enabled: false
+
+# Disable caching (not needed for single binary mode)
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
 
 # Service configuration
 service:
