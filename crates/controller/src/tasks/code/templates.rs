@@ -3025,7 +3025,7 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_heal = service.to_lowercase().contains("heal")
+        let is_heal = service.to_lowercase() == "heal"
             || template_setting.to_lowercase().starts_with("heal/");
 
         // Heal-specific container template for remediation agents
@@ -3279,7 +3279,7 @@ impl CodeTemplateGenerator {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_heal = service.to_lowercase().contains("heal")
+        let is_heal = service.to_lowercase() == "heal"
             || template_setting.to_lowercase().starts_with("heal/");
 
         // Heal-specific templates for remediation agents

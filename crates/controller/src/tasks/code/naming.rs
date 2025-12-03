@@ -110,7 +110,7 @@ impl ResourceNaming {
             .unwrap_or("");
         let is_heal = heal_remediation_label
             || template_setting.to_lowercase().starts_with("heal/")
-            || code_run.spec.service.to_lowercase().contains("heal");
+            || code_run.spec.service.to_lowercase() == "heal";
 
         // For heal remediation CodeRuns, use heal-remediation- prefix
         if is_heal {
