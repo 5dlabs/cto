@@ -1,0 +1,185 @@
+---
+# Alertmanager Helm Values for Claude Code Telemetry
+
+# Replica count
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: quay.io/prometheus/alertmanager
+  tag: v0.27.0
+  pullPolicy: IfNotPresent
+
+# Resource allocation
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 2Gi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 9093
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9093"
+
+# Pod security context (pod-level)
+podSecurityContext:
+  fsGroup: 65534
+
+# Container security context
+securityContext:
+  runAsUser: 65534
+  runAsGroup: 65534
+  runAsNonRoot: true
+
+# Pod annotations for log collection
+podAnnotations:
+  logs.platform.5dlabs.io/collect: "true"
+  logs.platform.5dlabs.io/service: alertmanager
+
+# Alertmanager configuration
+config:
+  global:
+    # Default SMTP settings (placeholder)
+    # smtp_smarthost: 'smtp.example.com:587'
+    # smtp_from: 'alertmanager@example.com'
+    resolve_timeout: 5m
+
+  # Routing tree
+  route:
+    # Group alerts by these labels
+    group_by: ['alertname', 'severity', 'namespace']
+    # Wait before sending initial notification
+    group_wait: 30s
+    # Wait before sending updated notification
+    group_interval: 5m
+    # Wait before re-sending same notification
+    repeat_interval: 4h
+    # Default receiver
+    receiver: 'default-receiver'
+    # Child routes
+    routes:
+      # Critical alerts - immediate attention
+      - match:
+          severity: critical
+        receiver: 'critical-receiver'
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: true
+
+      # Warning alerts - standard handling
+      - match:
+          severity: warning
+        receiver: 'warning-receiver'
+        continue: true
+
+      # Cost alerts - specific handling
+      - match:
+          cost_alert: "true"
+        receiver: 'cost-receiver'
+        continue: true
+
+      # Infrastructure alerts
+      - match_re:
+          component: (prometheus|loki|otel-collector|grafana)
+        receiver: 'infrastructure-receiver'
+        continue: true
+
+  # Receivers - configure with actual notification channels
+  receivers:
+    - name: 'default-receiver'
+      # Default receiver - catches all unmatched alerts
+      # Configure webhook or email as needed
+      # webhook_configs:
+      #   - url: 'http://heal.cto.svc.cluster.local:8080/webhook/alerts'
+      #     send_resolved: true
+
+    - name: 'critical-receiver'
+      # Critical alerts - requires immediate attention
+      # webhook_configs:
+      #   - url: 'http://heal.cto.svc.cluster.local:8080/webhook/critical'
+      #     send_resolved: true
+      # slack_configs:
+      #   - api_url: '<slack-webhook-url>'
+      #     channel: '#alerts-critical'
+      #     title: '{{ template "slack.default.title" . }}'
+      #     text: '{{ template "slack.default.text" . }}'
+
+    - name: 'warning-receiver'
+      # Warning alerts - needs attention but not urgent
+      # slack_configs:
+      #   - api_url: '<slack-webhook-url>'
+      #     channel: '#alerts-warning'
+
+    - name: 'cost-receiver'
+      # Cost-related alerts
+      # slack_configs:
+      #   - api_url: '<slack-webhook-url>'
+      #     channel: '#cost-alerts'
+
+    - name: 'infrastructure-receiver'
+      # Infrastructure alerts
+      # webhook_configs:
+      #   - url: 'http://heal.cto.svc.cluster.local:8080/webhook/infrastructure'
+
+  # Inhibit rules - prevent alert storms
+  inhibit_rules:
+    # Inhibit warning alerts when critical alerts are firing for same component
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'namespace']
+
+    # Inhibit all alerts when the cluster is down
+    - source_match:
+        alertname: 'ClusterDown'
+      target_match_re:
+        alertname: '.+'
+      equal: ['cluster']
+
+# Templates for alert notifications
+templates: []
+# templates:
+#   - '/etc/alertmanager/templates/*.tmpl'
+
+# Ingress configuration
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: alertmanager.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Liveness and readiness probes
+livenessProbe:
+  httpGet:
+    path: /-/healthy
+    port: 9093
+  initialDelaySeconds: 30
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /-/ready
+    port: 9093
+  initialDelaySeconds: 5
+  periodSeconds: 5
+

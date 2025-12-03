@@ -1,0 +1,173 @@
+---
+# Grafana Loki Helm Values for Claude Code Telemetry
+
+# Deployment mode - Single Binary for simplicity
+deploymentMode: SingleBinary
+
+# Single binary configuration
+singleBinary:
+  replicas: 1
+
+  # Persistence
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 20Gi
+
+  # Resource allocation - adjusted for development environment
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Extra environment variables
+  extraEnv: []
+
+  # Pod annotations for log collection
+  podAnnotations:
+    logs.platform.5dlabs.io/collect: "true"
+    logs.platform.5dlabs.io/service: loki
+
+# Loki configuration
+loki:
+  # Authentication disabled for internal cluster use
+  auth_enabled: false
+
+  # Common configuration
+  commonConfig:
+    replication_factor: 1
+    path_prefix: /var/loki
+
+  # Storage configuration - filesystem for single binary
+  storage:
+    type: filesystem
+
+  # Schema configuration
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
+  # Ingester configuration
+  ingester:
+    chunk_encoding: snappy
+    chunk_idle_period: 30m
+    chunk_block_size: 262144
+    chunk_retain_period: 1m
+    max_transfer_retries: 0
+    wal:
+      enabled: true
+      dir: /var/loki/wal
+
+  # Limits configuration
+  limits_config:
+    # Ingestion limits
+    ingestion_rate_mb: 16
+    ingestion_burst_size_mb: 32
+    per_stream_rate_limit: 3MB
+    per_stream_rate_limit_burst: 15MB
+    # Query limits
+    max_query_length: 721h  # 30 days
+    max_query_parallelism: 32
+    max_entries_limit_per_query: 5000
+    # Stream limits
+    max_streams_per_user: 10000
+    max_global_streams_per_user: 10000
+    # Retention
+    retention_period: 168h  # 7 days
+
+  # Query range configuration
+  query_range:
+    align_queries_with_step: true
+    cache_results: true
+    results_cache:
+      cache:
+        embedded_cache:
+          enabled: true
+          max_size_mb: 100
+
+  # Frontend configuration
+  frontend:
+    compress_responses: true
+    max_outstanding_per_tenant: 2048
+
+  # Enable OTLP receiver for OpenTelemetry logs
+  otlp:
+    enabled: true
+
+  # Server configuration
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9095
+    log_level: info
+
+  # Analytics - disable phone home
+  analytics:
+    reporting_enabled: false
+
+# Gateway configuration
+gateway:
+  enabled: true
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+# Disable components not needed for single binary mode
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# Disable test pod
+test:
+  enabled: false
+
+# Disable self-monitoring (we have our own monitoring)
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+lokiCanary:
+  enabled: false
+
+# Disable caching (not needed for single binary mode)
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 3100
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: loki.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+

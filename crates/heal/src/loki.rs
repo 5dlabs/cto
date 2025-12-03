@@ -95,6 +95,10 @@ pub struct LokiClient {
 
 impl LokiClient {
     /// Create a new Loki client with the given configuration
+    ///
+    /// # Panics
+    /// Panics if the HTTP client cannot be created (should never happen in practice).
+    #[must_use]
     pub fn new(config: LokiConfig) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_secs))
@@ -105,6 +109,10 @@ impl LokiClient {
     }
 
     /// Create a new Loki client with default configuration
+    ///
+    /// # Panics
+    /// Panics if the HTTP client cannot be created (should never happen in practice).
+    #[must_use]
     pub fn with_defaults() -> Self {
         Self::new(LokiConfig::default())
     }
@@ -120,6 +128,9 @@ impl LokiClient {
     ///
     /// # Returns
     /// A vector of log entries sorted by timestamp (oldest first)
+    ///
+    /// # Errors
+    /// Returns an error if the Loki query fails or returns an invalid response.
     pub async fn query_pod_logs(
         &self,
         namespace: &str,
@@ -141,6 +152,9 @@ impl LokiClient {
     /// * `start` - Start time for the query
     /// * `end` - End time for the query
     /// * `limit` - Maximum number of entries to return (0 = use default)
+    ///
+    /// # Errors
+    /// Returns an error if the Loki query fails or returns an invalid response.
     pub async fn query_container_logs(
         &self,
         namespace: &str,
@@ -165,6 +179,9 @@ impl LokiClient {
     /// * `start` - Start time for the query
     /// * `end` - End time for the query
     /// * `limit` - Maximum number of entries to return (0 = use default)
+    ///
+    /// # Errors
+    /// Returns an error if the Loki query fails or returns an invalid response.
     pub async fn query_logs_by_label(
         &self,
         namespace: &str,
@@ -178,7 +195,7 @@ impl LokiClient {
         self.query_logs(&query, start, end, limit).await
     }
 
-    /// Query logs for a workflow (all pods with the workflow label)
+    /// Query logs for a workflow (all pods matching the workflow name prefix)
     ///
     /// # Arguments
     /// * `namespace` - Kubernetes namespace
@@ -186,6 +203,15 @@ impl LokiClient {
     /// * `start` - Start time for the query
     /// * `end` - End time for the query
     /// * `limit` - Maximum number of entries to return (0 = use default)
+    ///
+    /// # Note
+    /// Argo workflows label pods with `workflows.argoproj.io/workflow`, but log
+    /// collectors often relabel this to different keys. This function uses pod
+    /// name regex matching (`pod =~ "workflow_name.*"`) which works regardless
+    /// of how workflow labels are relabeled in the log pipeline.
+    ///
+    /// # Errors
+    /// Returns an error if the Loki query fails or returns an invalid response.
     pub async fn query_workflow_logs(
         &self,
         namespace: &str,
@@ -194,20 +220,26 @@ impl LokiClient {
         end: DateTime<Utc>,
         limit: u32,
     ) -> Result<Vec<LogEntry>> {
-        // Argo workflows label pods with workflows.argoproj.io/workflow
+        // Use pod name regex matching instead of workflow labels.
+        // Argo workflow pod names follow the pattern: {workflow_name}-{step}-{random}
+        // This is more reliable than depending on label relabeling configuration.
         let query = format!(
-            r#"{{namespace="{namespace}", workflow="{workflow_name}"}}"#
+            r#"{{namespace="{namespace}", pod=~"{workflow_name}.*"}}"#
         );
         self.query_logs(&query, start, end, limit).await
     }
 
-    /// Execute a raw LogQL query
+    /// Execute a raw `LogQL` query
     ///
     /// # Arguments
-    /// * `query` - LogQL query string
+    /// * `query` - `LogQL` query string
     /// * `start` - Start time for the query
     /// * `end` - End time for the query
     /// * `limit` - Maximum number of entries to return (0 = use default)
+    ///
+    /// # Errors
+    /// Returns an error if the Loki query fails, the response cannot be parsed,
+    /// or the Loki API returns a non-success status.
     pub async fn query_logs(
         &self,
         query: &str,
@@ -275,6 +307,7 @@ impl LokiClient {
                 // Parse nanosecond timestamp
                 if let Ok(ns) = timestamp_ns.parse::<i64>() {
                     let secs = ns / 1_000_000_000;
+                    #[allow(clippy::cast_sign_loss)]
                     let nsecs = (ns % 1_000_000_000) as u32;
                     if let Some(dt) = DateTime::from_timestamp(secs, nsecs) {
                         entries.push(LogEntry {
@@ -295,6 +328,10 @@ impl LokiClient {
     }
 
     /// Check if Loki is reachable
+    ///
+    /// # Errors
+    /// Returns an error if there's an issue building the request (but not
+    /// if the server is unreachable - that returns `Ok(false)`).
     pub async fn health_check(&self) -> Result<bool> {
         let url = format!(
             "{}/ready",
@@ -321,6 +358,10 @@ impl LokiClient {
     /// * `failure_time` - The time when the failure occurred
     /// * `minutes_before` - Minutes before failure to include (must be non-negative)
     /// * `minutes_after` - Minutes after failure to include (must be non-negative)
+    ///
+    /// # Errors
+    /// Returns an error if the Loki query fails or returns an invalid response.
+    #[allow(clippy::cast_possible_wrap)]
     pub async fn query_logs_around_failure(
         &self,
         namespace: &str,
@@ -330,6 +371,7 @@ impl LokiClient {
         minutes_after: u64,
     ) -> Result<Vec<LogEntry>> {
         // Use i64 for Duration but values are guaranteed non-negative via u64 params
+        // and realistically won't exceed i64::MAX minutes
         let start = failure_time - chrono::Duration::minutes(minutes_before as i64);
         let end = failure_time + chrono::Duration::minutes(minutes_after as i64);
         self.query_pod_logs(namespace, pod_name, start, end, 0).await
@@ -341,6 +383,7 @@ impl LokiClient {
 /// # Arguments
 /// * `entries` - Log entries to format
 /// * `max_lines` - Maximum number of lines to show (0 = show all)
+#[must_use]
 pub fn format_logs_for_issue(entries: &[LogEntry], max_lines: usize) -> String {
     use std::fmt::Write;
     
@@ -374,6 +417,7 @@ pub fn format_logs_for_issue(entries: &[LogEntry], max_lines: usize) -> String {
 }
 
 /// Extract error lines from log entries
+#[must_use]
 pub fn extract_error_lines(entries: &[LogEntry]) -> Vec<&LogEntry> {
     entries
         .iter()

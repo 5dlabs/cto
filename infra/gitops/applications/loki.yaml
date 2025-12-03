@@ -1,0 +1,123 @@
+---
+# Argo CD Application for Grafana Loki
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 6.16.0
+    chart: loki
+    helm:
+      values: |
+        # Loki configuration - Single Binary deployment mode
+        deploymentMode: SingleBinary
+
+        # Single binary configuration
+        singleBinary:
+          replicas: 1
+          persistence:
+            enabled: true
+            storageClass: local-path
+            size: 20Gi
+          # Resource allocation
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+          # Pod labels/annotations for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: loki
+          # Pod security context
+          securityContext:
+            fsGroup: 10001
+            runAsUser: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+
+        # Loki configuration
+        loki:
+          # Authentication disabled for internal cluster use
+          auth_enabled: false
+          # Common configuration
+          commonConfig:
+            replication_factor: 1
+          # Storage configuration - filesystem for single binary
+          storage:
+            type: filesystem
+          # Schema configuration
+          schemaConfig:
+            configs:
+              - from: "2024-01-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+          # Limits configuration
+          limits_config:
+            ingestion_rate_mb: 16
+            ingestion_burst_size_mb: 32
+            max_streams_per_user: 10000
+            retention_period: 168h  # 7 days
+          # Enable OTLP receiver
+          otlp:
+            enabled: true
+
+        # Gateway configuration
+        gateway:
+          enabled: true
+          replicas: 1
+
+        # Disable components not needed for single binary
+        backend:
+          replicas: 0
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+
+        # Disable test pod
+        test:
+          enabled: false
+
+        # Disable monitoring (we have our own)
+        monitoring:
+          selfMonitoring:
+            enabled: false
+        lokiCanary:
+          enabled: false
+
+        # Disable caching (not needed for single binary mode)
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+

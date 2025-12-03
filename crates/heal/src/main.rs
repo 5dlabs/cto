@@ -5459,15 +5459,12 @@ async fn get_pod_logs_with_loki_fallback(
     let loki_client = loki::LokiClient::with_defaults();
     
     // Check if Loki is reachable
-    match loki_client.health_check().await {
-        Ok(true) => {}
-        Ok(false) | Err(_) => {
-            println!(
-                "{}",
-                "⚠️  Loki not reachable, returning kubectl error".yellow()
-            );
-            return kubectl_logs;
-        }
+    if !matches!(loki_client.health_check().await, Ok(true)) {
+        println!(
+            "{}",
+            "⚠️  Loki not reachable, returning kubectl error".yellow()
+        );
+        return kubectl_logs;
     }
 
     // Query Loki for logs from the last 30 minutes
