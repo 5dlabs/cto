@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.23](https://github.com/5dlabs/cto/compare/v0.12.22...v0.12.23) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output to stdout in remediation ([#2522](https://github.com/5dlabs/cto/issues/2522)) ([dacd4eb](https://github.com/5dlabs/cto/commit/dacd4eb13e96d9906f2dca7d91417156a28866a2))
+
+
+### 🐛 Bug Fixes
+
+* **heal:** docker build context and argument list overflow ([#2520](https://github.com/5dlabs/cto/issues/2520)) ([f9d03e4](https://github.com/5dlabs/cto/commit/f9d03e4c0e7027bf8ba45d10d0ecd0b0a59dad72))
+
 ## [0.12.22](https://github.com/5dlabs/cto/compare/v0.12.21...v0.12.22) (2025-12-03)
 
 
