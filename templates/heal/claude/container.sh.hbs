@@ -12,6 +12,78 @@ set -e
 echo '════════════════════════════════════════════════════════════════'
 echo '║             REX HEAL REMEDIATION (CLAUDE) STARTING           ║'
 echo '════════════════════════════════════════════════════════════════'
+
+# ============================================================================
+# DOCKER SIDECAR MANAGEMENT
+# ============================================================================
+{{#if enable_docker}}
+# Docker is enabled - wait for daemon and set up cleanup
+
+wait_for_docker() {
+  echo "🐳 Waiting for Docker daemon..."
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    if docker info >/dev/null 2>&1; then
+      echo "✅ Docker daemon ready"
+      return 0
+    fi
+    echo "   Waiting... ($i/15)"
+    sleep 2
+  done
+  echo "⚠️ Docker daemon not available after 30s (continuing anyway)"
+  return 1
+}
+
+stop_docker_sidecar() {
+  if [ ! -S /var/run/docker.sock ]; then
+    return
+  fi
+
+  echo "🛑 Stopping Docker sidecar"
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill dockerd >/dev/null 2>&1 || true
+    sleep 1
+    if pidof dockerd >/dev/null 2>&1; then
+      pkill -9 dockerd >/dev/null 2>&1 || true
+    fi
+    if pidof docker-init >/dev/null 2>&1; then
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+  else
+    PID=$(pidof dockerd 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+      kill "$PID" >/dev/null 2>&1 || true
+    fi
+    PID_INIT=$(pidof docker-init 2>/dev/null || true)
+    if [ -n "$PID_INIT" ]; then
+      kill "$PID_INIT" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  for _ in 1 2 3 4 5; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped"
+      return
+    fi
+    sleep 1
+  done
+
+  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
+  echo "⚠️ Docker sidecar still running (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+}
+
+# Set up EXIT trap to ensure Docker sidecar cleanup
+trap 'stop_docker_sidecar || true' EXIT
+
+# Wait for Docker daemon to be ready
+wait_for_docker || true
+echo "🐳 Docker enabled: You can use 'docker pull', 'docker run', etc. for image debugging"
+{{else}}
+echo "🐳 Docker disabled: Set enableDocker: true in heal-config.json to enable image debugging"
+{{/if}}
 echo "🎯 Agent: {{github_app}}"
 echo "📋 Task ID: {{task_id}}"
 echo "🔧 Alert Type: ${ALERT_TYPE:-unknown}"
@@ -479,6 +551,12 @@ Attempts: ${ATTEMPT}" 2>/dev/null || echo "   (could not comment on issue)"
         git worktree remove "${WORKTREE_PATH}" --force 2>/dev/null || rm -rf "${WORKTREE_PATH}" 2>/dev/null || true
     fi
 
+    # Explicitly stop Docker sidecar before exiting
+    {{#if enable_docker}}
+    echo "🛑 Explicitly stopping Docker sidecar..."
+    stop_docker_sidecar || true
+    {{/if}}
+    
     exit 0
 else
     # This branch should not be reached since we iterate until success
@@ -502,5 +580,11 @@ ${LAST_REASON}
 Agent: ${CODERUN_NAME}" 2>/dev/null || echo "   (could not comment on issue)"
     fi
 
+    # Explicitly stop Docker sidecar before exiting
+    {{#if enable_docker}}
+    echo "🛑 Explicitly stopping Docker sidecar..."
+    stop_docker_sidecar || true
+    {{/if}}
+    
     exit 1
 fi
