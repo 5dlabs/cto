@@ -2,10 +2,11 @@
 //!
 //! Detects when a workflow step has been running longer than
 //! the configured threshold for that agent type.
+//! Excludes infrastructure pods that restart during deployments.
 
 use super::types::{Alert, AlertContext, AlertHandler, AlertId, Severity};
 use crate::github::GitHubState;
-use crate::k8s::K8sEvent;
+use crate::k8s::{is_excluded_pod, K8sEvent};
 use chrono::{Duration, Utc};
 
 pub struct Handler;
@@ -54,6 +55,11 @@ impl AlertHandler for Handler {
 
         // Check if pod is still running
         if pod.phase != "Running" {
+            return None;
+        }
+
+        // Skip excluded infrastructure pods (heal, cto-tools, etc.)
+        if is_excluded_pod(&pod.name) {
             return None;
         }
 
