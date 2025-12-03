@@ -5523,7 +5523,17 @@ fn format_loki_entries_as_logs(entries: &[loki::LogEntry], max_entries: usize) -
     let mut logs = String::from(
         "# Historical logs from Loki (pod may have been garbage collected)\n\n"
     );
-    for entry in entries.iter().take(max_entries) {
+    
+    // Take the LAST max_entries entries (most recent) to match kubectl --tail behavior
+    // Entries are sorted oldest-first, so slice from the end
+    let total = entries.len();
+    let entries_to_show = if max_entries > 0 && total > max_entries {
+        &entries[total - max_entries..]
+    } else {
+        entries
+    };
+    
+    for entry in entries_to_show {
         let time = entry.timestamp.format("%Y-%m-%d %H:%M:%S%.3f");
         let _ = writeln!(logs, "[{}] {}", time, entry.line);
     }
