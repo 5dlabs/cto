@@ -1416,7 +1416,21 @@ cp \$FACTORY_WORK_DIR/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/d
 
 echo "=== MCP PRECHECKS ==="
 if ! command -v tools >/dev/null 2>&1; then
-  echo "❌ 'tools' CLI not found in PATH; required for MCP"
+  echo "" >&2
+  echo "════════════════════════════════════════════════════════════════" >&2
+  echo "║              FATAL: MISSING REQUIRED DEPENDENCY              ║" >&2
+  echo "════════════════════════════════════════════════════════════════" >&2
+  echo "❌ 'tools' CLI not found in PATH; required for MCP" >&2
+  echo "" >&2
+  echo "Diagnostic info:" >&2
+  echo "  PATH: $PATH" >&2
+  echo "  Expected locations: /usr/local/bin/tools, /usr/bin/tools" >&2
+  echo "  Installed tools: $(ls -la /usr/local/bin/tools /usr/bin/tools 2>&1 || echo 'not found')" >&2
+  echo "" >&2
+  echo "This typically indicates the container image was built before" >&2
+  echo "tools-client binaries were available. Rebuild the image or" >&2
+  echo "verify the tools-client release exists." >&2
+  echo "════════════════════════════════════════════════════════════════" >&2
   exit 1
 fi
 

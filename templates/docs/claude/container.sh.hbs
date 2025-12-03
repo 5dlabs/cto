@@ -741,7 +741,21 @@ MCP_FILE_PROJECT="$CLAUDE_WORK_DIR/.mcp.json"
 MCP_FILE_WORKSPACE="/workspace/.mcp.json"
 if [ -f "$MCP_FILE_WORKSPACE" ] || [ -f "$MCP_FILE_PROJECT" ]; then
   if ! command -v tools >/dev/null 2>&1; then
-    echo "❌ 'tools' CLI not found in PATH but required by .mcp.json. Aborting."
+    echo "" >&2
+    echo "════════════════════════════════════════════════════════════════" >&2
+    echo "║              FATAL: MISSING REQUIRED DEPENDENCY              ║" >&2
+    echo "════════════════════════════════════════════════════════════════" >&2
+    echo "❌ 'tools' CLI not found in PATH but required by .mcp.json. Aborting." >&2
+    echo "" >&2
+    echo "Diagnostic info:" >&2
+    echo "  PATH: $PATH" >&2
+    echo "  Expected locations: /usr/local/bin/tools, /usr/bin/tools" >&2
+    echo "  Installed tools: $(ls -la /usr/local/bin/tools /usr/bin/tools 2>&1 || echo 'not found')" >&2
+    echo "" >&2
+    echo "This typically indicates the container image was built before" >&2
+    echo "tools-client binaries were available. Rebuild the image or" >&2
+    echo "verify the tools-client release exists." >&2
+    echo "════════════════════════════════════════════════════════════════" >&2
     exit 1
   fi
   # If TOOLS_SERVER_URL present, attempt quick connectivity check
