@@ -4549,14 +4549,7 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
 
             // Get all pods with kubectl and look for silent failures
             let output = match AsyncCommand::new("kubectl")
-                .args([
-                    "get",
-                    "pods",
-                    "-n",
-                    &namespace_poller,
-                    "-o",
-                    "json",
-                ])
+                .args(["get", "pods", "-n", &namespace_poller, "-o", "json"])
                 .output()
                 .await
             {
@@ -4587,7 +4580,8 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                     continue;
                 }
 
-                let Some(container_statuses) = item["status"]["containerStatuses"].as_array() else {
+                let Some(container_statuses) = item["status"]["containerStatuses"].as_array()
+                else {
                     continue;
                 };
 
@@ -4609,7 +4603,11 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                         "type": "MODIFIED",
                         "object": item
                     });
-                    if tx_poller.send(AlertWatchEvent::PodEvent(event)).await.is_err() {
+                    if tx_poller
+                        .send(AlertWatchEvent::PodEvent(event))
+                        .await
+                        .is_err()
+                    {
                         return; // Channel closed
                     }
                 }
