@@ -53,9 +53,10 @@ spec:
                 serviceAccountName: argo-workflow
                 ttlStrategy:
                   secondsAfterCompletion: 300
-                  secondsAfterFailure: 3600
+                  secondsAfterFailure: 7200   # Keep failed workflows for 2 hours to allow log capture
                 podGC:
                   strategy: OnPodCompletion
+                  deleteDelayDuration: 60s    # Delay pod deletion to allow heal to capture logs
                 templates:
                   - name: atlas-pr-monitor
                     script:
