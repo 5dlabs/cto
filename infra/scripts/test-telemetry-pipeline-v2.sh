@@ -15,12 +15,12 @@ echo ""
 
 # 3. Check OTLP Collector status
 echo "3. OTLP Collector Status:"
-kubectl get pods -n telemetry -l app.kubernetes.io/name=opentelemetry-collector
+kubectl get pods -n observability -l app.kubernetes.io/name=opentelemetry-collector
 echo ""
 
 # 4. Test OTLP collector metrics endpoint
 echo "4. Testing OTLP Collector Prometheus Endpoint:"
-kubectl port-forward -n telemetry svc/otel-collector-opentelemetry-collector 8889:8889 > /dev/null 2>&1 &
+kubectl port-forward -n observability svc/otel-collector-opentelemetry-collector 8889:8889 > /dev/null 2>&1 &
 PF_PID=$!
 sleep 3
 echo "Checking for any metrics..."
@@ -28,26 +28,32 @@ curl -s http://localhost:8889/metrics | grep -E "^(claude_code|# TYPE)" | head -
 kill $PF_PID 2>/dev/null
 echo ""
 
-# 5. Check VictoriaMetrics native OTLP ingestion
-echo "5. Checking VictoriaMetrics OTLP Endpoint:"
-kubectl logs -n telemetry victoria-metrics-victoria-metrics-single-server-0 --tail=20 | grep -i "opentelemetry"
+# 5. Check Prometheus remote write ingestion
+echo "5. Checking Prometheus Status:"
+kubectl logs -n observability deploy/prometheus-server --tail=20 | grep -i "remote" || echo "No remote write logs found"
 echo ""
 
-# 6. Query VictoriaMetrics for metrics
-echo "6. Querying VictoriaMetrics for Claude Code metrics:"
-kubectl port-forward -n telemetry victoria-metrics-victoria-metrics-single-server-0 8428:8428 > /dev/null 2>&1 &
+# 6. Query Prometheus for metrics
+echo "6. Querying Prometheus for Claude Code metrics:"
+kubectl port-forward -n observability svc/prometheus-server 9090:9090 > /dev/null 2>&1 &
 PF_PID=$!
 sleep 3
-curl -s "http://localhost:8428/api/v1/label/__name__/values" | jq -r '.data[]' | grep -E "claude_code" || echo "No claude_code metrics found"
+curl -s "http://localhost:9090/api/v1/label/__name__/values" | jq -r '.data[]' | grep -E "claude_code" || echo "No claude_code metrics found"
 kill $PF_PID 2>/dev/null
 echo ""
 
-# 7. Check OTLP collector logs for errors
-echo "7. OTLP Collector Recent Logs:"
-kubectl logs -n telemetry deploy/otel-collector-opentelemetry-collector --tail=10
+# 7. Check Loki log ingestion
+echo "7. Checking Loki Status:"
+kubectl get pods -n observability -l app.kubernetes.io/name=loki
+echo ""
+
+# 8. Check OTLP collector logs for errors
+echo "8. OTLP Collector Recent Logs:"
+kubectl logs -n observability deploy/otel-collector-opentelemetry-collector --tail=10
 echo ""
 
 echo "=== Summary ==="
 echo "The telemetry pipeline should flow as:"
-echo "Claude Code -> OTLP Collector (HTTP) -> VictoriaMetrics (Native OTLP)"
-echo "Additionally, VictoriaMetrics scrapes OTLP Collector's Prometheus endpoint"
+echo "Claude Code -> OTLP Collector (HTTP) -> Prometheus (Remote Write)"
+echo "Claude Code -> OTLP Collector (HTTP) -> Loki (OTLP)"
+echo "Additionally, Prometheus scrapes OTLP Collector's metrics endpoint"

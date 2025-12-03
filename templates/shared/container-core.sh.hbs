@@ -129,6 +129,12 @@ ensure_gh_authenticated() {
 ensure_gh_authenticated
 
 # =========================================================================
+# Git Operations (retry logic for transient errors)
+# =========================================================================
+
+{{> shared/functions/git-operations}}
+
+# =========================================================================
 # Git Configuration
 # =========================================================================
 
@@ -167,11 +173,11 @@ if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
   cd "$REPO_NAME"
   refresh_token_if_needed
-  git fetch --all --prune
+  safe_git_fetch --all --prune
 else
   echo "⬇️  Cloning repository"
   refresh_token_if_needed
-  git clone "$REPO_HTTP_URL"
+  safe_git_clone "$REPO_HTTP_URL"
   cd "$REPO_NAME"
 fi
 
@@ -221,7 +227,7 @@ if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
 fi
 
 if [ -n "$BASE_BRANCH" ]; then
-  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  safe_git_fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
 fi
 
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
@@ -292,11 +298,11 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
   read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
   DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
 
-  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+  if safe_git_clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
     echo "✓ Docs repository cloned"
   else
     echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
-    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    if safe_git_clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
       echo "✓ Docs repository cloned using default branch"
     else
       echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"

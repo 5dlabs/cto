@@ -18,6 +18,12 @@ spec:
   # Service account with proper permissions
   serviceAccountName: argo-workflow
 
+  # TTL Strategy - retain failed workflows for debugging
+  ttlStrategy:
+    secondsAfterCompletion: 86400    # Keep completed workflows for 24 hours
+    secondsAfterFailure: 259200      # Keep failed workflows for 3 days for debugging
+    secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
+
   # Ensure labels are applied to instantiated Workflows created from this template
   workflowMetadata:
     labels:
@@ -212,16 +218,46 @@ spec:
         - name: next-task-id
           valueFrom:
             path: /tmp/next-task-id.txt
+            default: "1"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ PLAY-STATE-CHECKER FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "Last command failed at line: ${BASH_LINENO:-unknown}"
+            echo ""
+            # Ensure output file exists with fallback value so Argo can continue
+            if [ ! -f /tmp/next-task-id.txt ]; then
+              echo "⚠️ Output file missing - writing fallback value '1'"
+              echo "1" > /tmp/next-task-id.txt
+            fi
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "🔍 Checking play state for resume..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Repository: {{`{{workflow.parameters.repository}}`}}"
+          echo ""
 
-          apk add --no-cache jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache jq >/dev/null 2>&1; then
+            echo "❌ Failed to install jq via apk"
+            exit 1
+          fi
+          echo "✅ Dependencies installed"
 
           # State config map name is based on repository
           REPO_SLUG="{{`{{workflow.parameters.repository}}`}}"
@@ -287,6 +323,11 @@ spec:
             echo "✅ Created initial play state config map"
           fi
 
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Play state checker completed successfully"
+
     # Task discovery template
     - name: task-discovery
       inputs:
@@ -299,9 +340,11 @@ spec:
         - name: task-list
           valueFrom:
             path: /tmp/task-list.txt
+            default: ""  # Fallback if script fails before writing output
         - name: task-count
           valueFrom:
             path: /tmp/task-count.txt
+            default: "0"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         env:
@@ -318,12 +361,45 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ TASK-DISCOVERY FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo ""
+            # Ensure output files exist with fallback values
+            if [ ! -f /tmp/task-list.txt ]; then
+              echo "⚠️ Task list file missing - writing empty fallback"
+              echo "" > /tmp/task-list.txt
+            fi
+            if [ ! -f /tmp/task-count.txt ]; then
+              echo "⚠️ Task count file missing - writing fallback '0'"
+              echo "0" > /tmp/task-count.txt
+            fi
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "🔍 Discovering tasks in workspace..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Docs repository: {{`{{workflow.parameters.docs-repository}}`}}"
+          echo "   Docs directory: {{`{{inputs.parameters.docs-directory}}`}}"
+          echo ""
 
           # Clone repository to get task structure
-          apk add --no-cache git curl openssl jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache git curl openssl jq >/dev/null 2>&1; then
+            echo "❌ Failed to install dependencies via apk"
+            exit 1
+          fi
+          echo "✅ Dependencies installed"
 
           # Normalize docs-repository: accept either org/repo or full URL
           DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
@@ -464,6 +540,11 @@ spec:
           echo "$tasks" > /tmp/task-list.txt
           echo "$count" > /tmp/task-count.txt
 
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Task discovery completed successfully"
+
     # Dependency graph builder - parses tasks.json and builds execution levels
     - name: dependency-graph-builder
       inputs:
@@ -474,9 +555,11 @@ spec:
         - name: execution-levels
           valueFrom:
             path: /tmp/execution-levels.json
+            default: "[[]]"  # Fallback if script fails before writing output
         - name: parallelism-stats
           valueFrom:
             path: /tmp/parallelism-stats.json
+            default: "{}"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         env:
@@ -493,12 +576,45 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ DEPENDENCY-GRAPH-BUILDER FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo ""
+            # Ensure output files exist with fallback values
+            if [ ! -f /tmp/execution-levels.json ]; then
+              echo "⚠️ Execution levels file missing - writing empty fallback"
+              echo "[[]]" > /tmp/execution-levels.json
+            fi
+            if [ ! -f /tmp/parallelism-stats.json ]; then
+              echo "⚠️ Parallelism stats file missing - writing empty fallback"
+              echo "{}" > /tmp/parallelism-stats.json
+            fi
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "📊 Building dependency graph from TaskMaster data..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Docs repository: {{`{{workflow.parameters.docs-repository}}`}}"
+          echo "   Docs directory: {{`{{inputs.parameters.docs-directory}}`}}"
+          echo ""
 
           # Install Python and required packages
-          apk add --no-cache python3 git curl openssl jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache python3 git curl openssl jq >/dev/null 2>&1; then
+            echo "❌ Failed to install dependencies via apk"
+            exit 1
+          fi
+          echo "✅ Dependencies installed"
 
           # Normalize docs-repository: accept either org/repo or full URL
           DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
@@ -589,10 +705,74 @@ spec:
             exit 1
           fi
 
-          # Download dependency graph builder script
+          # Download dependency graph builder script using authenticated GitHub API
+          # (raw.githubusercontent.com doesn't work for private repositories)
           echo "📥 Fetching dependency graph builder..."
-          curl -sSL https://raw.githubusercontent.com/5dlabs/cto/main/scripts/build-dependency-graph.py \
-            -o /tmp/build-dependency-graph.py
+
+          # Build JWT and get installation token for 5dlabs/cto repository
+          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+            echo "🔐 Using authenticated GitHub API to fetch script..."
+            SCRIPT_KEY="/tmp/github-script-key.pem"
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$SCRIPT_KEY"
+            chmod 600 "$SCRIPT_KEY"
+
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            SCRIPT_JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || base64)
+            SCRIPT_JWT_HEADER=$(echo -n "$SCRIPT_JWT_HEADER" | tr '+/' '-_' | tr -d '=')
+            SCRIPT_JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
+            SCRIPT_JWT_PAYLOAD=$(echo -n "$SCRIPT_JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
+            SCRIPT_JWT_SIGNATURE=$(printf '%s.%s' "$SCRIPT_JWT_HEADER" "$SCRIPT_JWT_PAYLOAD" | openssl dgst -sha256 -sign "$SCRIPT_KEY" -binary | base64 -w 0 2>/dev/null || base64)
+            SCRIPT_JWT_SIGNATURE=$(echo -n "$SCRIPT_JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
+            SCRIPT_JWT_TOKEN="$SCRIPT_JWT_HEADER.$SCRIPT_JWT_PAYLOAD.$SCRIPT_JWT_SIGNATURE"
+
+            # Get installation ID for 5dlabs/cto repository
+            SCRIPT_INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/5dlabs/cto/installation" | jq -r '.id')
+
+            if [ -z "$SCRIPT_INSTALLATION_ID" ] || [ "$SCRIPT_INSTALLATION_ID" = "null" ]; then
+              echo "ℹ️ Repo installation not found, trying org installation"
+              SCRIPT_INSTALLATION_ID=$(curl -s -L \
+                -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/5dlabs/installation" | jq -r '.id')
+            fi
+
+            SCRIPT_TOKEN=""
+            if [ -n "$SCRIPT_INSTALLATION_ID" ] && [ "$SCRIPT_INSTALLATION_ID" != "null" ]; then
+              SCRIPT_TOKEN=$(curl -s -X POST \
+                -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/$SCRIPT_INSTALLATION_ID/access_tokens" | jq -r '.token')
+            fi
+
+            rm -f "$SCRIPT_KEY"
+
+            if [ -n "$SCRIPT_TOKEN" ] && [ "$SCRIPT_TOKEN" != "null" ]; then
+              # Fetch script content via GitHub API (returns base64 encoded content)
+              SCRIPT_CONTENT=$(curl -s -L \
+                -H "Authorization: Bearer $SCRIPT_TOKEN" \
+                -H "Accept: application/vnd.github.v3.raw" \
+                "https://api.github.com/repos/5dlabs/cto/contents/scripts/build-dependency-graph.py?ref=main")
+
+              if [ -n "$SCRIPT_CONTENT" ] && ! echo "$SCRIPT_CONTENT" | grep -q '"message".*"Not Found"'; then
+                echo "$SCRIPT_CONTENT" > /tmp/build-dependency-graph.py
+                echo "✅ Script downloaded via authenticated GitHub API"
+              else
+                echo "❌ Failed to download script via GitHub API"
+                exit 1
+              fi
+            else
+              echo "❌ Failed to obtain installation token for script download"
+              exit 1
+            fi
+          else
+            echo "❌ GitHub App credentials not available for authenticated script download"
+            exit 1
+          fi
+
           chmod +x /tmp/build-dependency-graph.py
 
           # Run dependency graph builder
@@ -606,6 +786,11 @@ spec:
           echo "✅ Dependency graph built successfully"
           echo "📊 Parallelism stats:"
           jq '.' /tmp/parallelism-stats.json
+
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Dependency graph builder completed successfully"
 
     # Parallel task processor - processes tasks by execution level
     - name: parallel-task-processor
@@ -629,19 +814,75 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
-          set -e
+          # Use set -u for unset variable detection but not -e to allow error handling
+          set -u
+
+          # Error handling function
+          log_error() {
+            echo "❌ ERROR at line $1: $2" >&2
+            echo "❌ Script: parallel-task-processor" >&2
+            echo "❌ Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >&2
+          }
+
+          # Trap to catch errors and provide context
+          trap 'log_error ${LINENO:-unknown} "Script failed"' ERR
+
+          # Retry function for kubectl commands
+          kubectl_retry() {
+            local max_attempts=3
+            local delay=5
+            local attempt=1
+
+            while [ $attempt -le $max_attempts ]; do
+              if "$@"; then
+                return 0
+              fi
+              echo "⚠️ kubectl command failed (attempt $attempt/$max_attempts): $*" >&2
+              if [ $attempt -lt $max_attempts ]; then
+                echo "   Retrying in ${delay}s..." >&2
+                sleep $delay
+                delay=$((delay * 2))
+              fi
+              attempt=$((attempt + 1))
+            done
+
+            echo "❌ kubectl command failed after $max_attempts attempts: $*" >&2
+            return 1
+          }
 
           echo "🚀 Processing tasks in parallel by dependency levels..."
+          echo "📋 Template: parallel-task-processor"
+          echo "📋 Workflow: {{`{{workflow.name}}`}}"
+          echo "📋 Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo ""
 
-          apk add --no-cache jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache jq bc 2>/dev/null; then
+            echo "⚠️ bc not available, will use integer arithmetic"
+          fi
 
           # Parse execution levels
           LEVELS='{{`{{inputs.parameters.execution-levels}}`}}'
           echo "📊 Execution levels: $LEVELS"
 
-          # Count total levels
+          # Validate and count total levels
+          echo "🔍 Validating execution levels JSON..."
+          if ! echo "$LEVELS" | jq '.' >/dev/null 2>&1; then
+            echo "❌ ERROR: Invalid execution levels JSON: $LEVELS"
+            exit 1
+          fi
+
           NUM_LEVELS=$(echo "$LEVELS" | jq '. | length')
+          if [ -z "$NUM_LEVELS" ] || [ "$NUM_LEVELS" = "null" ]; then
+            echo "❌ ERROR: Could not parse number of levels from: $LEVELS"
+            exit 1
+          fi
           echo "📊 Total execution levels: $NUM_LEVELS"
+
+          if [ "$NUM_LEVELS" -eq 0 ]; then
+            echo "⚠️ No execution levels found. Nothing to process."
+            exit 0
+          fi
 
           # Process each level
           level_index=0
@@ -778,21 +1019,54 @@ spec:
                   value: "$IS_FINAL_LEVEL"
           EOF
 
-              workflow_name=$(kubectl create -f /tmp/workflow-task-${task_id}.yaml -o jsonpath='{.metadata.name}')
-              
-              if [ -z "$workflow_name" ]; then
-                echo "❌ Failed to create workflow for task-$task_id"
+              # Validate workflow YAML before creation
+              echo "    📋 Validating workflow YAML for task-$task_id..."
+              if ! cat /tmp/workflow-task-${task_id}.yaml | head -20; then
+                echo "    ⚠️ Could not display workflow YAML"
+              fi
+
+              # Create workflow with retry logic
+              echo "    🚀 Creating workflow for task-$task_id..."
+              workflow_name=""
+              create_attempts=0
+              max_create_attempts=3
+
+              while [ $create_attempts -lt $max_create_attempts ]; do
+                create_attempts=$((create_attempts + 1))
+                workflow_name=$(kubectl create -f /tmp/workflow-task-${task_id}.yaml -o jsonpath='{.metadata.name}' 2>&1) || true
+
+                if [ -n "$workflow_name" ] && [ "$workflow_name" != "" ] && ! echo "$workflow_name" | grep -qi "error"; then
+                  break
+                fi
+
+                if [ $create_attempts -lt $max_create_attempts ]; then
+                  echo "    ⚠️ Failed to create workflow (attempt $create_attempts/$max_create_attempts)"
+                  echo "    ⚠️ Error: $workflow_name"
+                  echo "    ⏳ Retrying in 5s..."
+                  sleep 5
+                  workflow_name=""
+                fi
+              done
+
+              if [ -z "$workflow_name" ] || echo "$workflow_name" | grep -qi "error"; then
+                echo "❌ Failed to create workflow for task-$task_id after $max_create_attempts attempts"
+                echo "❌ Last error: $workflow_name"
+                echo "❌ Workflow YAML content:"
+                cat /tmp/workflow-task-${task_id}.yaml >&2
                 exit 1
               fi
-              
+
               echo "    ✅ Created workflow: $workflow_name"
-              
+
               if [ -z "$workflow_names" ]; then
                 workflow_names="$workflow_name"
               else
                 workflow_names="$workflow_names $workflow_name"
               fi
             done
+
+            echo ""
+            echo "📋 All workflows for level $level_index created: $workflow_names"
 
           # Wait for all tasks in this level to complete
           echo ""
@@ -1265,9 +1539,28 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
+
+          # Error handler for better diagnostics on failure
+          cleanup_on_error() {
+            EXIT_CODE=$?
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            echo "❌ SEQUENTIAL-TASK-PROCESSOR FAILED (exit code: $EXIT_CODE)"
+            echo "════════════════════════════════════════════════════════════"
+            echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "Workflow: {{`{{workflow.name}}`}}"
+            echo ""
+            echo "════════════════════════════════════════════════════════════"
+            exit $EXIT_CODE
+          }
+          trap cleanup_on_error EXIT
+
           set -e
 
           echo "📋 Processing {{`{{inputs.parameters.task-count}}`}} tasks sequentially..."
+          echo "   Workflow: {{`{{workflow.name}}`}}"
+          echo "   Repository: {{`{{workflow.parameters.repository}}`}}"
+          echo ""
 
           # Convert comma-separated list to space-separated for iteration
           task_list="{{`{{inputs.parameters.task-list}}`}}"
@@ -1550,6 +1843,11 @@ spec:
           echo "════════════════════════════════════════"
           echo "🎉 ALL TASKS COMPLETED SUCCESSFULLY!"
           echo "════════════════════════════════════════"
+
+          # Success - disable error trap
+          trap - EXIT
+          echo ""
+          echo "✅ Sequential task processor completed successfully"
 
     # Morgan Project Manager - Runs once during workflow initialization
     - name: morgan-project-manager

@@ -5092,7 +5092,13 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
                         .map(|dt| dt.with_timezone(&Utc)),
                 }
             } else if status["state"]["running"].is_object() {
-                k8s::ContainerState::Running
+                let running = &status["state"]["running"];
+                k8s::ContainerState::Running {
+                    started_at: running["startedAt"]
+                        .as_str()
+                        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&Utc)),
+                }
             } else {
                 let waiting = &status["state"]["waiting"];
                 k8s::ContainerState::Waiting {

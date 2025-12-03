@@ -110,8 +110,9 @@ impl Installer {
 
         if self.config.install_monitoring {
             ui::print_component("Monitoring Stack");
-            installer.install_component("victoria-metrics").await?;
-            installer.install_component("victoria-logs").await?;
+            installer.install_component("prometheus").await?;
+            installer.install_component("loki").await?;
+            installer.install_component("alertmanager").await?;
             installer.install_component("grafana").await?;
             ui::print_success("Monitoring stack installed");
         }

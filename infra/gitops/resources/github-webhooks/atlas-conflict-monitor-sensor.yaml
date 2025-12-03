@@ -37,6 +37,55 @@ spec:
     - template:
         name: atlas-conflict-monitor
         conditions: "atlas-conflict-event"
+        parameters:
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.pull_request.number
+            dest: spec.arguments.parameters.0.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.pull_request.html_url
+            dest: spec.arguments.parameters.1.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.repository.owner.login
+            dest: spec.arguments.parameters.2.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.repository.name
+            dest: spec.arguments.parameters.3.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.repository.clone_url
+            dest: spec.arguments.parameters.4.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.pull_request.head.ref
+            dest: spec.arguments.parameters.5.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.pull_request.title
+            dest: spec.arguments.parameters.6.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataTemplate: "{{ .Input.body.pull_request.labels | toJson }}"
+            dest: spec.arguments.parameters.7.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.action
+            dest: spec.arguments.parameters.8.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataKey: body.sender.login
+            dest: spec.arguments.parameters.9.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataTemplate: "{{ .Input.body.pull_request.mergeable }}"
+            dest: spec.arguments.parameters.10.value
+          - src:
+              dependencyName: atlas-conflict-event
+              dataTemplate: "{{ .Input.body.pull_request.mergeable_state }}"
+            dest: spec.arguments.parameters.11.value
         k8s:
           operation: create
           source:
@@ -53,11 +102,37 @@ spec:
                 entrypoint: ensure-conflict-guardian
                 serviceAccountName: argo-workflow
                 ttlStrategy:
-                  secondsAfterCompletion: 60
-                  secondsAfterFailure: 300
+                  secondsAfterCompletion: 300
+                  secondsAfterFailure: 7200   # Keep failed workflows for 2 hours to allow log capture
                 podGC:
                   strategy: OnPodCompletion
-                  deleteOnPodCompletion: true
+                  deleteDelayDuration: 60s    # Delay pod deletion to allow heal to capture logs
+                arguments:
+                  parameters:
+                    - name: pr-number
+                      value: ""
+                    - name: pr-url
+                      value: ""
+                    - name: repo-owner
+                      value: ""
+                    - name: repo-name
+                      value: ""
+                    - name: repo-clone-url
+                      value: ""
+                    - name: pr-branch
+                      value: ""
+                    - name: pr-title
+                      value: ""
+                    - name: pr-labels
+                      value: "[]"
+                    - name: action
+                      value: ""
+                    - name: sender-login
+                      value: ""
+                    - name: mergeable
+                      value: ""
+                    - name: mergeable-state
+                      value: ""
                 templates:
                   - name: ensure-conflict-guardian
                     script:
@@ -74,54 +149,54 @@ spec:
                           if command -v apk >/dev/null 2>&1; then
                             apk add --no-cache jq >/dev/null 2>&1 && return 0
                           fi
-                          echo "❌ Failed to install jq"
+                          echo "Failed to install jq"
                           return 1
                         }
 
                         ensure_jq
 
-                        # Extract fields directly using Argo Events sprig templates
-                        # This avoids shell escaping issues with large JSON payloads
-                        PR_NUMBER='{{ .Input.body.pull_request.number }}'
-                        PR_URL='{{ .Input.body.pull_request.html_url }}'
-                        REPO_OWNER='{{ .Input.body.repository.owner.login }}'
-                        REPO_NAME='{{ .Input.body.repository.name }}'
-                        REPO_URL='{{ .Input.body.repository.clone_url }}'
-                        PR_BRANCH='{{ .Input.body.pull_request.head.ref }}'
-                        PR_TITLE='{{ .Input.body.pull_request.title }}'
-                        PR_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        ACTION='{{ .Input.body.action }}'
-                        SENDER_LOGIN='{{ .Input.body.sender.login }}'
-                        MERGEABLE='{{ .Input.body.pull_request.mergeable }}'
-                        MERGE_STATE='{{ .Input.body.pull_request.mergeable_state }}'
+                        # Extract workflow parameters (populated by Argo Events sensor)
+                        PR_NUMBER='{{workflow.parameters.pr-number}}'
+                        PR_URL='{{workflow.parameters.pr-url}}'
+                        REPO_OWNER='{{workflow.parameters.repo-owner}}'
+                        REPO_NAME='{{workflow.parameters.repo-name}}'
+                        REPO_URL='{{workflow.parameters.repo-clone-url}}'
+                        PR_BRANCH='{{workflow.parameters.pr-branch}}'
+                        PR_TITLE='{{workflow.parameters.pr-title}}'
+                        PR_LABELS_JSON='{{workflow.parameters.pr-labels}}'
+                        ACTION='{{workflow.parameters.action}}'
+                        SENDER_LOGIN='{{workflow.parameters.sender-login}}'
+                        MERGEABLE='{{workflow.parameters.mergeable}}'
+                        MERGE_STATE='{{workflow.parameters.mergeable-state}}'
 
-                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
-                          echo "ℹ️ No PR number in payload, skipping"
-                          exit 0
+                        # Validate required parameters are present
+                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ] || [ "$PR_NUMBER" = "" ]; then
+                          echo "ERROR: PR number not provided - parameters not interpolated correctly"
+                          exit 1
                         fi
 
                         if [ "$SENDER_LOGIN" = "atlas-5dlabs" ] || [ "$SENDER_LOGIN" = "atlas-5dlabs[bot]" ]; then
-                          echo "ℹ️ Event emitted by Atlas, skipping to avoid loops"
+                          echo "Event emitted by Atlas, skipping to avoid loops"
                           exit 0
                         fi
 
                         # Check conflict status - only skip if explicitly mergeable AND clean
                         NORMALIZED_STATE=$(echo "${MERGE_STATE:-}" | tr '[:upper:]' '[:lower:]')
 
-                        echo "📊 PR #$PR_NUMBER status: mergeable=${MERGEABLE:-null}, state=${NORMALIZED_STATE:-null}"
+                        echo "PR #$PR_NUMBER status: mergeable=${MERGEABLE:-null}, state=${NORMALIZED_STATE:-null}"
 
                         # Only skip if we're CERTAIN there are no conflicts
                         if [ "$MERGEABLE" = "true" ] && [ "$NORMALIZED_STATE" != "dirty" ] && \
                            [ "$NORMALIZED_STATE" != "unstable" ] && [ "$NORMALIZED_STATE" != "behind" ]; then
-                          echo "ℹ️ PR is mergeable and clean, no conflict handling required"
+                          echo "PR is mergeable and clean, no conflict handling required"
                           exit 0
                         fi
 
                         # If mergeable is null/false OR state is dirty/unstable, proceed
                         if [ "$MERGEABLE" = "null" ] || [ -z "$MERGEABLE" ]; then
-                          echo "⚠️ Mergeable status is null - will create guardian to monitor"
+                          echo "Mergeable status is null - will create guardian to monitor"
                         elif [ "$MERGEABLE" = "false" ]; then
-                          echo "🔴 PR has merge conflicts detected"
+                          echo "PR has merge conflicts detected"
                         fi
 
                         REPO_FULL="${REPO_OWNER}/${REPO_NAME}"
@@ -159,10 +234,10 @@ spec:
                           --from-literal=workflow="{{workflow.name}}" \
                           -n cto \
                           -o yaml --dry-run=client | kubectl create -f - 2>/dev/null; then
-                          echo "✅ Acquired lock $LOCK_NAME"
+                          echo "Acquired lock $LOCK_NAME"
                           trap "kubectl delete configmap $LOCK_NAME -n cto --ignore-not-found=true >/dev/null 2>&1 || true" EXIT
                         else
-                          echo "🔒 Lock already held for PR #$PR_NUMBER, another workflow is handling conflicts"
+                          echo "Lock already held for PR #$PR_NUMBER, another workflow is handling conflicts"
                           exit 0
                         fi
 
@@ -177,7 +252,7 @@ spec:
                         ) | .metadata.name' | head -n1)
 
                         if [ -n "$ACTIVE" ]; then
-                          echo "ℹ️ Guardian already active ($ACTIVE); conflict will be handled there"
+                          echo "Guardian already active ($ACTIVE); conflict will be handled there"
                           exit 0
                         fi
 
@@ -219,10 +294,10 @@ spec:
                         EOF_MANIFEST
 
                         if grep -qi "created" /tmp/atlas-guardian.log; then
-                          echo "✅ Started Atlas guardian for conflicted PR #$PR_NUMBER"
+                          echo "Started Atlas guardian for conflicted PR #$PR_NUMBER"
                           cat /tmp/atlas-guardian.log
                         else
-                          echo "⚠️ Unable to confirm CodeRun creation"
+                          echo "Unable to confirm CodeRun creation"
                           cat /tmp/atlas-guardian.log
                           exit 1
                         fi
@@ -230,4 +305,3 @@ spec:
         steps: 3
         duration: "10s"
         factor: 2
-

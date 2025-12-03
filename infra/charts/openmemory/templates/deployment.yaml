@@ -50,6 +50,8 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
+        - name: OM_TIER
+          value: "{{ .Values.tier }}"
         - name: PORT
           value: "{{ .Values.service.targetPort }}"
         - name: DATABASE_PATH

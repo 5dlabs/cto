@@ -114,27 +114,132 @@ cleanup_locked_refs_from_log() {
   return 1
 }
 
-# Safe git fetch with automatic locked ref cleanup
-safe_git_fetch() {
-  local log_file
-  log_file=$(mktemp)
+# Check if error is transient (retryable)
+is_transient_git_error() {
+  local log_file="$1"
 
-  if git fetch "$@" >"$log_file" 2>&1; then
-    rm -f "$log_file"
+  # HTTP 5xx errors are transient
+  if grep -qE "(500|502|503|504|Internal Server Error|Bad Gateway|Service Unavailable|Gateway Timeout)" "$log_file" 2>/dev/null; then
     return 0
   fi
 
-  if cleanup_locked_refs_from_log "$log_file"; then
-    echo "🔧 Cleaned stale remote refs; retrying git fetch $*"
-    if git fetch "$@" >>"$log_file" 2>&1; then
+  # Network/connection errors are transient
+  if grep -qE "(Could not resolve host|Connection refused|Connection timed out|Connection reset|Network is unreachable|Temporary failure|SSL connection)" "$log_file" 2>/dev/null; then
+    return 0
+  fi
+
+  # Rate limiting is transient
+  if grep -qE "(rate limit|429|Too Many Requests)" "$log_file" 2>/dev/null; then
+    return 0
+  fi
+
+  return 1
+}
+
+# Generic retry wrapper for git commands with exponential backoff
+# Usage: git_retry <max_attempts> <initial_delay> <command> [args...]
+git_retry() {
+  local max_attempts="${1:-3}"
+  local initial_delay="${2:-2}"
+  shift 2
+
+  local attempt=1
+  local delay="$initial_delay"
+  local log_file
+  log_file=$(mktemp)
+
+  while [ $attempt -le "$max_attempts" ]; do
+    if "$@" >"$log_file" 2>&1; then
       rm -f "$log_file"
       return 0
     fi
-  fi
 
-  cat "$log_file"
+    local exit_code=$?
+
+    # Check if error is transient and worth retrying
+    if ! is_transient_git_error "$log_file"; then
+      # Non-transient error - fail immediately
+      cat "$log_file"
+      rm -f "$log_file"
+      return $exit_code
+    fi
+
+    if [ $attempt -lt "$max_attempts" ]; then
+      echo "⚠️ Git operation failed (attempt $attempt/$max_attempts), retrying in ${delay}s..."
+      head -5 "$log_file"
+      sleep "$delay"
+      delay=$((delay * 2))  # Exponential backoff
+      attempt=$((attempt + 1))
+    else
+      echo "❌ Git operation failed after $max_attempts attempts"
+      cat "$log_file"
+      rm -f "$log_file"
+      return $exit_code
+    fi
+  done
+
   rm -f "$log_file"
   return 1
+}
+
+# Safe git fetch with automatic locked ref cleanup and transient error retry
+safe_git_fetch() {
+  local log_file
+  log_file=$(mktemp)
+  local max_attempts=3
+  local attempt=1
+  local delay=2
+
+  while [ $attempt -le $max_attempts ]; do
+    if git fetch "$@" >"$log_file" 2>&1; then
+      rm -f "$log_file"
+      return 0
+    fi
+
+    # Try to clean locked refs first
+    if cleanup_locked_refs_from_log "$log_file"; then
+      echo "🔧 Cleaned stale remote refs; retrying git fetch $*"
+      if git fetch "$@" >"$log_file" 2>&1; then
+        rm -f "$log_file"
+        return 0
+      fi
+    fi
+
+    # Check if error is transient and worth retrying
+    if is_transient_git_error "$log_file"; then
+      if [ $attempt -lt $max_attempts ]; then
+        echo "⚠️ Git fetch failed due to transient error (attempt $attempt/$max_attempts), retrying in ${delay}s..."
+        head -3 "$log_file"
+        sleep "$delay"
+        delay=$((delay * 2))
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    # Non-transient error or max attempts reached
+    cat "$log_file"
+    rm -f "$log_file"
+    return 1
+  done
+
+  rm -f "$log_file"
+  return 1
+}
+
+# Safe git clone with transient error retry
+safe_git_clone() {
+  git_retry 3 2 git clone "$@"
+}
+
+# Safe git pull with transient error retry
+safe_git_pull() {
+  git_retry 3 2 git pull "$@"
+}
+
+# Safe git push with transient error retry
+safe_git_push() {
+  git_retry 3 2 git push "$@"
 }
 
 # Resolve merge conflicts by rebasing on main with fallback to manual resolution

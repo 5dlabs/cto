@@ -1,6 +1,12 @@
 # OpenMemory Configuration
 replicaCount: 1
 
+# Operation tier: hybrid, local, or cloud
+# hybrid - uses local embeddings with optional cloud fallback
+# local - fully local operation only
+# cloud - cloud-only operation
+tier: "hybrid"
+
 image:
   repository: ghcr.io/5dlabs/openmemory
   pullPolicy: IfNotPresent
@@ -49,6 +55,13 @@ embeddings:
 
 # Memory configuration
 memory:
+  # OpenMemory tier (hybrid|fast|smart|deep)
+  # hybrid: balanced mode for general use
+  # fast: optimized for speed, less memory
+  # smart: intelligent caching and retrieval
+  # deep: comprehensive memory with full context
+  tier: "hybrid"
+
   # Default decay parameters
   decay:
     enabled: true

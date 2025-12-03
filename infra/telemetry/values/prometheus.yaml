@@ -192,4 +192,3 @@ ingress:
 # Service Monitor for Prometheus Operator (if available)
 serviceMonitor:
   enabled: false
-

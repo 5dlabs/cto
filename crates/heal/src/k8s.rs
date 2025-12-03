@@ -35,6 +35,9 @@ const EXCLUDED_POD_PREFIXES: &[&str] = &[
     "openmemory",
     "event-cleaner",
     "workspace-pvc-cleaner",
+    "tweakcn",
+    "atlas-guardian",
+    "atlas-batch-integration",
 ];
 
 /// Check if a pod name should be excluded from alerts/completion checks.
@@ -85,7 +88,9 @@ pub enum ContainerState {
     Waiting {
         reason: Option<String>,
     },
-    Running,
+    Running {
+        started_at: Option<DateTime<Utc>>,
+    },
     Terminated {
         exit_code: i32,
         reason: Option<String>,

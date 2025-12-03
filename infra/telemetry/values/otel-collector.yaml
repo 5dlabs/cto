@@ -88,15 +88,14 @@ config:
             - set(metric.name, "claude_code_code_edit_tool_decision") where metric.name == "code_edit_tool.decision"
 
   exporters:
+    # Prometheus exporter for scraping
     prometheus:
       endpoint: "0.0.0.0:8889"
       send_timestamps: true
 
-    # VictoriaMetrics native OpenTelemetry exporter
-    otlphttp/victoriametrics:
-      metrics_endpoint: http://victoria-metrics-victoria-metrics-single-server:8428/opentelemetry/v1/metrics
-      compression: gzip
-      encoding: proto
+    # Prometheus Remote Write exporter for sending metrics to Prometheus
+    prometheusremotewrite:
+      endpoint: http://prometheus-server.observability.svc.cluster.local:9090/api/v1/write
       tls:
         insecure: true
       timeout: 30s
@@ -106,9 +105,9 @@ config:
         max_interval: 30s
         max_elapsed_time: 300s
 
-    # VictoriaLogs exporter using OTLP/HTTP
-    otlphttp:
-      logs_endpoint: http://victoria-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
+    # Loki exporter for logs using OTLP/HTTP
+    otlphttp/loki:
+      endpoint: http://loki-gateway.observability.svc.cluster.local:80/otlp
       tls:
         insecure: true
       retry_on_failure:
@@ -116,8 +115,6 @@ config:
         initial_interval: 5s
         max_interval: 30s
         max_elapsed_time: 300s
-      headers:
-        VL-Stream-Fields: "cluster.name,deployment.environment,service.name,service.namespace"
 
     # Debug exporter for troubleshooting
     debug:
@@ -139,11 +136,11 @@ config:
       metrics:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource, transform/metrics]
-        exporters: [otlphttp/victoriametrics, prometheus, debug]
+        exporters: [prometheusremotewrite, prometheus, debug]
       logs:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
-        exporters: [otlphttp, debug]
+        exporters: [otlphttp/loki, debug]
       traces:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]

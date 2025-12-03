@@ -2349,7 +2349,7 @@ spec:
             else
               # Workflow doesn't exist anymore - clean up stale ConfigMap
               echo "🧹 Cleaning up stale ConfigMap (workflow $WORKFLOW_NAME no longer exists)"
-              kubectl delete configmap "$CM_NAME" -n {{ .Release.Namespace }} --ignore-not-found
+              kubectl delete configmap "$CONFIGMAP_NAME" -n {{ .Release.Namespace }} --ignore-not-found
             fi
           elif [ "$WORKFLOW_NAME" = "$CURRENT_WORKFLOW" ]; then
             echo "ℹ️  ConfigMap references current workflow - this is normal during execution"
@@ -2789,7 +2789,9 @@ spec:
     secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
 
   # Pod garbage collection
+  # Delete delay increased from 60s to 300s to allow heal system to capture logs
+  # before pods are cleaned up (fixes issue #2576 - A2 alerts with missing logs)
   podGC:
     strategy: OnPodCompletion
-    deleteDelayDuration: 60s
+    deleteDelayDuration: 300s
 {{- end }}

@@ -51,16 +51,22 @@ spec:
           type: ClusterIP
           port: 80
 
-        # Data sources - Victoria Metrics and Victoria Logs
+        # Data sources - Prometheus, Loki, Alertmanager
+        # Note: deleteDatasources removes old Victoria* datasources on provision
         datasources:
           datasources.yaml:
             apiVersion: 1
-            datasources:
-              # VictoriaMetrics as Prometheus datasource
+            deleteDatasources:
               - name: VictoriaMetrics
+                orgId: 1
+              - name: VictoriaLogs
+                orgId: 1
+            datasources:
+              # Prometheus datasource
+              - name: Prometheus
                 type: prometheus
                 access: proxy
-                url: http://victoria-metrics-victoria-metrics-single-server:8428
+                url: http://prometheus-server.observability.svc.cluster.local:80
                 isDefault: true
                 editable: false
                 jsonData:
@@ -68,18 +74,28 @@ spec:
                   queryTimeout: "60s"
                   httpMethod: POST
 
-              # VictoriaLogs datasource
-              - name: VictoriaLogs
-                type: victoriametrics-logs-datasource
+              # Loki datasource
+              - name: Loki
+                type: loki
                 access: proxy
-                url: http://victoria-logs-victoria-logs-single-server:9428
+                url: http://loki-gateway.observability.svc.cluster.local:80
                 editable: false
+                jsonData:
+                  maxLines: 1000
 
-        # Plugins to install
+              # Alertmanager datasource
+              - name: Alertmanager
+                type: alertmanager
+                access: proxy
+                url: http://alertmanager.observability.svc.cluster.local:9093
+                editable: false
+                jsonData:
+                  implementation: prometheus
+
+        # Plugins to install (Loki is built-in, no special plugin needed)
         plugins:
           - grafana-piechart-panel
           - grafana-worldmap-panel
-          - victoriametrics-logs-datasource
 
         # RBAC configuration
         rbac:
