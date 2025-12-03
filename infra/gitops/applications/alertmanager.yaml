@@ -100,6 +100,14 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
+  # Ignore differences for fields defaulted by Kubernetes API server
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
   syncPolicy:
     automated:
       prune: true
@@ -108,3 +116,4 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
+
