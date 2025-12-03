@@ -1178,29 +1178,35 @@ if declare -F ensure_default_client_config >/dev/null 2>&1; then
 fi
 
 # Check if tools-config.json exists in working directory
-if [ ! -f "$CURSOR_WORK_DIR/tools-config.json" ]; then
-  echo "❌ tools-config.json missing from workspace; required for MCP/tools"
-  exit 1
+TOOLS_CONFIG_AVAILABLE=false
+if [ -f "$CURSOR_WORK_DIR/tools-config.json" ]; then
+  TOOLS_CONFIG_AVAILABLE=true
+else
+  echo "⚠️ tools-config.json missing from workspace; MCP/tools may not be fully functional"
 fi
 
 echo "=== MCP PRECHECKS ==="
-if ! command -v tools >/dev/null 2>&1; then
+
+# Check tools CLI availability - warn and proceed instead of failing
+TOOLS_CLI_AVAILABLE=false
+if command -v tools >/dev/null 2>&1; then
+  TOOLS_CLI_AVAILABLE=true
+else
   echo "" >&2
   echo "════════════════════════════════════════════════════════════════" >&2
-  echo "║              FATAL: MISSING REQUIRED DEPENDENCY              ║" >&2
+  echo "║             WARNING: OPTIONAL DEPENDENCY MISSING             ║" >&2
   echo "════════════════════════════════════════════════════════════════" >&2
-  echo "❌ 'tools' CLI not found in PATH; required for MCP" >&2
+  echo "⚠️ 'tools' CLI not found in PATH; MCP remote tools will not be available" >&2
   echo "" >&2
   echo "Diagnostic info:" >&2
   echo "  PATH: $PATH" >&2
   echo "  Expected locations: /usr/local/bin/tools, /usr/bin/tools" >&2
   echo "  Installed tools: $(ls -la /usr/local/bin/tools /usr/bin/tools 2>&1 || echo 'not found')" >&2
   echo "" >&2
-  echo "This typically indicates the container image was built before" >&2
-  echo "tools-client binaries were available. Rebuild the image or" >&2
-  echo "verify the tools-client release exists." >&2
+  echo "Proceeding without MCP tools support. Agent will function with" >&2
+  echo "reduced capabilities. To enable MCP tools, rebuild the container" >&2
+  echo "image with tools-client binaries available." >&2
   echo "════════════════════════════════════════════════════════════════" >&2
-  exit 1
 fi
 
 WORKSPACE_CFG="$MCP_TOOLS_CONFIG"
@@ -1246,40 +1252,45 @@ fi
 MCP_TOOLS_CONFIG="$TARGET_CFG"
 export MCP_TOOLS_CONFIG
 
-TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
-TOOLS_URL="${TOOLS_URL%/}"
-echo "🔍 Checking Tools endpoint: $TOOLS_URL"
-TOOLS_RETRIES=3
-TOOLS_WAIT=2
+# Only perform Tools endpoint check if tools CLI is available
 TOOLS_SUCCESS=false
-for i in $(seq 1 $TOOLS_RETRIES); do
-  if curl -sSf --connect-timeout 5 --max-time 10 \
-    -X POST "$TOOLS_URL" \
-    -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
-    TOOLS_SUCCESS=true
-    rm -f /tmp/tools-ping.log
-    break
-  fi
-  if [ $i -lt $TOOLS_RETRIES ]; then
-    echo "⚠️ Tools connectivity check failed (attempt $i/$TOOLS_RETRIES), retrying in ${TOOLS_WAIT}s..."
+if [ "$TOOLS_CLI_AVAILABLE" = "true" ]; then
+  TOOLS_URL=${TOOLS_SERVER_URL:-"http://tools.cto.svc.cluster.local:3000/mcp"}
+  TOOLS_URL="${TOOLS_URL%/}"
+  echo "🔍 Checking Tools endpoint: $TOOLS_URL"
+  TOOLS_RETRIES=3
+  TOOLS_WAIT=2
+  for i in $(seq 1 $TOOLS_RETRIES); do
+    if curl -sSf --connect-timeout 5 --max-time 10 \
+      -X POST "$TOOLS_URL" \
+      -H 'Content-Type: application/json' \
+      -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/tools-ping.log 2>&1; then
+      TOOLS_SUCCESS=true
+      rm -f /tmp/tools-ping.log
+      break
+    fi
+    if [ $i -lt $TOOLS_RETRIES ]; then
+      echo "⚠️ Tools connectivity check failed (attempt $i/$TOOLS_RETRIES), retrying in ${TOOLS_WAIT}s..."
+      cat /tmp/tools-ping.log >&2 || true
+      rm -f /tmp/tools-ping.log
+      sleep $TOOLS_WAIT
+      TOOLS_WAIT=$((TOOLS_WAIT * 2))  # Exponential backoff
+    fi
+  done
+
+  if [ "$TOOLS_SUCCESS" != "true" ]; then
+    echo "❌ Unable to reach Tools server at $TOOLS_URL after $TOOLS_RETRIES attempts"
     cat /tmp/tools-ping.log >&2 || true
     rm -f /tmp/tools-ping.log
-    sleep $TOOLS_WAIT
-    TOOLS_WAIT=$((TOOLS_WAIT * 2))  # Exponential backoff
+    echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
+    echo "⚠️ If Cursor execution fails, check Tools service health and DNS resolution."
+    # Don't exit - allow Cursor to proceed in case Tools comes back online
+    # The MCP client will handle connection failures gracefully
   fi
-done
-
-if [ "$TOOLS_SUCCESS" != "true" ]; then
-  echo "❌ Unable to reach Tools server at $TOOLS_URL after $TOOLS_RETRIES attempts"
-  cat /tmp/tools-ping.log >&2 || true
-  rm -f /tmp/tools-ping.log
-  echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
-  echo "⚠️ If Cursor execution fails, check Tools service health and DNS resolution."
-  # Don't exit - allow Cursor to proceed in case Tools comes back online
-  # The MCP client will handle connection failures gracefully
+  echo "✓ Tools endpoint check completed"
+else
+  echo "⚠️ Skipping Tools endpoint check (tools CLI not available)"
 fi
-echo "✓ Tools endpoint check completed"
 
 if command -v jq >/dev/null 2>&1; then
   echo "[client-config] summary:"
