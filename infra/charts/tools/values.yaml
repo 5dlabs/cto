@@ -342,7 +342,8 @@ config:
       workingDirectory: "/tmp"
       env:
         # In-cluster Prometheus URL - no auth needed for in-cluster access
-        PROMETHEUS_URL: "http://prometheus-server.observability.svc.cluster.local:9090"
+        # Service port is 80 (targets container 9090)
+        PROMETHEUS_URL: "http://prometheus-server.observability.svc.cluster.local:80"
 
     loki:
       name: "Loki"

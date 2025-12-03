@@ -44,6 +44,12 @@ ingress:
 datasources:
   datasources.yaml:
     apiVersion: 1
+    # Remove old Victoria datasources on provision
+    deleteDatasources:
+      - name: VictoriaMetrics
+        orgId: 1
+      - name: VictoriaLogs
+        orgId: 1
     datasources:
       # Prometheus datasource
       - name: Prometheus
