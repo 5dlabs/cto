@@ -137,6 +137,86 @@ safe_git_fetch() {
   return 1
 }
 
+# Resolve merge conflicts by rebasing on main with fallback to manual resolution
+# Returns 0 on success, 1 if manual intervention needed
+resolve_merge_conflicts() {
+  local branch_name
+  branch_name=$(git branch --show-current 2>/dev/null)
+  
+  if [ -z "$branch_name" ]; then
+    echo "❌ Not on a branch - cannot resolve conflicts"
+    return 1
+  fi
+
+  echo "🔀 Attempting to resolve merge conflicts for $branch_name..."
+  
+  # Fetch latest main
+  if ! git fetch origin main 2>/dev/null; then
+    echo "⚠️ Failed to fetch origin main"
+    return 1
+  fi
+
+  # Try rebase first (cleanest approach)
+  if git rebase origin/main 2>/dev/null; then
+    echo "✅ Rebase successful"
+    if git push origin HEAD --force-with-lease 2>/dev/null; then
+      echo "✅ Pushed rebased branch"
+      return 0
+    fi
+  fi
+
+  # Rebase failed - abort and try merge
+  git rebase --abort 2>/dev/null || true
+
+  # Try merge as fallback
+  if git merge origin/main --no-edit 2>/dev/null; then
+    echo "✅ Merge successful"
+    if git push origin HEAD 2>/dev/null; then
+      echo "✅ Pushed merged branch"
+      return 0
+    fi
+  fi
+
+  # Both failed - need manual intervention
+  git merge --abort 2>/dev/null || true
+  
+  echo "❌ Automatic conflict resolution failed"
+  echo "📋 Manual resolution required:"
+  echo "   1. git fetch origin main"
+  echo "   2. git rebase origin/main"
+  echo "   3. Resolve conflicts in each file (remove <<<<<<<, =======, >>>>>>> markers)"
+  echo "   4. git add <resolved-files>"
+  echo "   5. git rebase --continue"
+  echo "   6. git push origin HEAD --force-with-lease"
+  
+  return 1
+}
+
+# Check if a PR has merge conflicts
+check_pr_mergeable() {
+  local pr_number="$1"
+  
+  if [ -z "$pr_number" ]; then
+    # Try to get PR number from current branch
+    pr_number=$(gh pr view --json number -q '.number' 2>/dev/null || echo "")
+  fi
+  
+  if [ -z "$pr_number" ]; then
+    echo "UNKNOWN"
+    return 1
+  fi
+  
+  local mergeable
+  mergeable=$(gh pr view "$pr_number" --json mergeable -q '.mergeable' 2>/dev/null || echo "UNKNOWN")
+  echo "$mergeable"
+  
+  case "$mergeable" in
+    "MERGEABLE") return 0 ;;
+    "CONFLICTING") return 2 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Safe git config with retry logic and lock file cleanup
 safe_git_config() {
   local max_attempts=5
