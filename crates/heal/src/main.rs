@@ -5040,19 +5040,6 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
         }
     }
 
-    // Parse pod conditions
-    let mut conditions = Vec::new();
-    if let Some(conds) = json["status"]["conditions"].as_array() {
-        for cond in conds {
-            conditions.push(k8s::PodCondition {
-                condition_type: cond["type"].as_str().unwrap_or("").to_string(),
-                status: cond["status"].as_str().unwrap_or("Unknown").to_string(),
-                reason: cond["reason"].as_str().map(String::from),
-                message: cond["message"].as_str().map(String::from),
-            });
-        }
-    }
-
     let mut container_statuses = Vec::new();
     if let Some(statuses) = json["status"]["containerStatuses"].as_array() {
         for status in statuses {
@@ -5064,28 +5051,54 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
                     reason: terminated["reason"]
                         .as_str()
                         .map(std::string::ToString::to_string),
-                    finished_at: None,
+                    finished_at: terminated["finishedAt"]
+                        .as_str()
+                        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&Utc)),
                 }
             } else if status["state"]["running"].is_object() {
                 k8s::ContainerState::Running
             } else {
-                let reason = status["state"]["waiting"]["reason"]
-                    .as_str()
-                    .map(String::from);
-                k8s::ContainerState::Waiting { reason }
+                let waiting = &status["state"]["waiting"];
+                k8s::ContainerState::Waiting {
+                    reason: waiting["reason"]
+                        .as_str()
+                        .map(std::string::ToString::to_string),
+                }
             };
-
-            let ready = status["ready"].as_bool().unwrap_or(false);
 
             #[allow(clippy::cast_possible_truncation)] // restart counts are small i32 values
             container_statuses.push(k8s::ContainerStatus {
                 name: status["name"].as_str().unwrap_or("").to_string(),
-                ready,
+                ready: status["ready"].as_bool().unwrap_or(false),
                 state,
                 restart_count: status["restartCount"].as_i64().unwrap_or(0) as i32,
             });
         }
     }
+
+    // Parse pod conditions
+    let mut conditions = Vec::new();
+    if let Some(conds) = json["status"]["conditions"].as_array() {
+        for cond in conds {
+            conditions.push(k8s::PodCondition {
+                condition_type: cond["type"].as_str().unwrap_or("").to_string(),
+                status: cond["status"].as_str().unwrap_or("Unknown").to_string(),
+                reason: cond["reason"]
+                    .as_str()
+                    .map(std::string::ToString::to_string),
+                message: cond["message"]
+                    .as_str()
+                    .map(std::string::ToString::to_string),
+            });
+        }
+    }
+
+    // Parse pod start time
+    let started_at = json["status"]["startTime"]
+        .as_str()
+        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.with_timezone(&Utc));
 
     k8s::Pod {
         name: json["metadata"]["name"]
@@ -5100,7 +5113,7 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
         labels,
         conditions,
         container_statuses,
-        started_at: None,
+        started_at,
     }
 }
 
@@ -5118,6 +5131,41 @@ async fn handle_detected_alert(
         .get("task_id")
         .map_or("unknown", String::as_str);
     let agent = alert.context.get("agent").map_or("unknown", String::as_str);
+
+    // Check for recent GitHub issue with same alert type (prevents issue spam)
+    if !dry_run {
+        match dedup::check_recent_alert_type_issue(&alert_id, "5dlabs/cto") {
+            Ok(Some((issue_num, title))) => {
+                println!(
+                    "{}",
+                    format!(
+                        "⏭️  Skipping {} for {} - recent issue #{} exists: {}",
+                        alert_id.to_uppercase(),
+                        pod.name,
+                        issue_num,
+                        title
+                    )
+                    .yellow()
+                );
+                // TODO: Consider adding a comment to the existing issue instead
+                return Ok(());
+            }
+            Ok(None) => {
+                println!(
+                    "{}",
+                    format!("✅ No recent {} issues found, proceeding", alert_id.to_uppercase())
+                        .dimmed()
+                );
+            }
+            Err(e) => {
+                println!(
+                    "{}",
+                    format!("⚠️  Alert-type dedup check failed: {e}").yellow()
+                );
+                // Continue anyway - don't block on dedup failures
+            }
+        }
+    }
 
     handle_alert(
         &alert_id,
