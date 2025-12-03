@@ -8,6 +8,7 @@ mod alerts;
 mod dedup;
 mod github;
 mod k8s;
+pub mod loki;
 mod templates;
 
 use anyhow::{Context, Result};
