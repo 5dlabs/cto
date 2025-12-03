@@ -8,7 +8,10 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use utils::{AnnotationLevel, ClippyErrors, PrAlerts, PrComment, PrConversations, PrReviews};
+use utils::{
+    AnnotationLevel, CiCheck, ClippyErrors, PrAlerts, PrCheckStatus, PrChecks, PrComment,
+    PrConversations, PrReviews,
+};
 
 #[derive(Parser)]
 #[command(name = "utils")]
