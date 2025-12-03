@@ -846,11 +846,12 @@ impl<'a> CodeResourceManager<'a> {
         });
 
         if enable_docker {
+            // NOTE: Do NOT run the main container as root (runAsUser: 0).
+            // Claude CLI refuses --dangerously-skip-permissions when running as root.
+            // The Docker daemon sidecar runs as root separately; the main container
+            // only needs KILL capability to signal it, not root privileges.
             container_spec["securityContext"] = json!({
-                "allowPrivilegeEscalation": true,
-                "runAsUser": 0,
-                "runAsGroup": 0,
-                "runAsNonRoot": false,
+                "allowPrivilegeEscalation": false,
                 "capabilities": {
                     "add": ["KILL"]
                 }
