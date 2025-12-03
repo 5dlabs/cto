@@ -51,10 +51,16 @@ spec:
           type: ClusterIP
           port: 80
 
-        # Data sources - Prometheus and Loki
+        # Data sources - Prometheus, Loki, Alertmanager
+        # Note: deleteDatasources removes old Victoria* datasources on provision
         datasources:
           datasources.yaml:
             apiVersion: 1
+            deleteDatasources:
+              - name: VictoriaMetrics
+                orgId: 1
+              - name: VictoriaLogs
+                orgId: 1
             datasources:
               # Prometheus datasource
               - name: Prometheus
