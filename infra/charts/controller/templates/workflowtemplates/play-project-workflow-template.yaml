@@ -18,6 +18,12 @@ spec:
   # Service account with proper permissions
   serviceAccountName: argo-workflow
 
+  # TTL Strategy - retain failed workflows for debugging
+  ttlStrategy:
+    secondsAfterCompletion: 86400    # Keep completed workflows for 24 hours
+    secondsAfterFailure: 259200      # Keep failed workflows for 3 days for debugging
+    secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
+
   # Ensure labels are applied to instantiated Workflows created from this template
   workflowMetadata:
     labels:
@@ -629,19 +635,75 @@ spec:
         command: [sh]
         source: |
           #!/bin/sh
-          set -e
+          # Use set -u for unset variable detection but not -e to allow error handling
+          set -u
+
+          # Error handling function
+          log_error() {
+            echo "❌ ERROR at line $1: $2" >&2
+            echo "❌ Script: parallel-task-processor" >&2
+            echo "❌ Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >&2
+          }
+
+          # Trap to catch errors and provide context
+          trap 'log_error ${LINENO:-unknown} "Script failed"' ERR
+
+          # Retry function for kubectl commands
+          kubectl_retry() {
+            local max_attempts=3
+            local delay=5
+            local attempt=1
+
+            while [ $attempt -le $max_attempts ]; do
+              if "$@"; then
+                return 0
+              fi
+              echo "⚠️ kubectl command failed (attempt $attempt/$max_attempts): $*" >&2
+              if [ $attempt -lt $max_attempts ]; then
+                echo "   Retrying in ${delay}s..." >&2
+                sleep $delay
+                delay=$((delay * 2))
+              fi
+              attempt=$((attempt + 1))
+            done
+
+            echo "❌ kubectl command failed after $max_attempts attempts: $*" >&2
+            return 1
+          }
 
           echo "🚀 Processing tasks in parallel by dependency levels..."
+          echo "📋 Template: parallel-task-processor"
+          echo "📋 Workflow: {{`{{workflow.name}}`}}"
+          echo "📋 Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo ""
 
-          apk add --no-cache jq
+          echo "📦 Installing dependencies..."
+          if ! apk add --no-cache jq bc 2>/dev/null; then
+            echo "⚠️ bc not available, will use integer arithmetic"
+          fi
 
           # Parse execution levels
           LEVELS='{{`{{inputs.parameters.execution-levels}}`}}'
           echo "📊 Execution levels: $LEVELS"
 
-          # Count total levels
+          # Validate and count total levels
+          echo "🔍 Validating execution levels JSON..."
+          if ! echo "$LEVELS" | jq '.' >/dev/null 2>&1; then
+            echo "❌ ERROR: Invalid execution levels JSON: $LEVELS"
+            exit 1
+          fi
+
           NUM_LEVELS=$(echo "$LEVELS" | jq '. | length')
+          if [ -z "$NUM_LEVELS" ] || [ "$NUM_LEVELS" = "null" ]; then
+            echo "❌ ERROR: Could not parse number of levels from: $LEVELS"
+            exit 1
+          fi
           echo "📊 Total execution levels: $NUM_LEVELS"
+
+          if [ "$NUM_LEVELS" -eq 0 ]; then
+            echo "⚠️ No execution levels found. Nothing to process."
+            exit 0
+          fi
 
           # Process each level
           level_index=0
@@ -778,21 +840,54 @@ spec:
                   value: "$IS_FINAL_LEVEL"
           EOF
 
-              workflow_name=$(kubectl create -f /tmp/workflow-task-${task_id}.yaml -o jsonpath='{.metadata.name}')
-              
-              if [ -z "$workflow_name" ]; then
-                echo "❌ Failed to create workflow for task-$task_id"
+              # Validate workflow YAML before creation
+              echo "    📋 Validating workflow YAML for task-$task_id..."
+              if ! cat /tmp/workflow-task-${task_id}.yaml | head -20; then
+                echo "    ⚠️ Could not display workflow YAML"
+              fi
+
+              # Create workflow with retry logic
+              echo "    🚀 Creating workflow for task-$task_id..."
+              workflow_name=""
+              create_attempts=0
+              max_create_attempts=3
+
+              while [ $create_attempts -lt $max_create_attempts ]; do
+                create_attempts=$((create_attempts + 1))
+                workflow_name=$(kubectl create -f /tmp/workflow-task-${task_id}.yaml -o jsonpath='{.metadata.name}' 2>&1) || true
+
+                if [ -n "$workflow_name" ] && [ "$workflow_name" != "" ] && ! echo "$workflow_name" | grep -qi "error"; then
+                  break
+                fi
+
+                if [ $create_attempts -lt $max_create_attempts ]; then
+                  echo "    ⚠️ Failed to create workflow (attempt $create_attempts/$max_create_attempts)"
+                  echo "    ⚠️ Error: $workflow_name"
+                  echo "    ⏳ Retrying in 5s..."
+                  sleep 5
+                  workflow_name=""
+                fi
+              done
+
+              if [ -z "$workflow_name" ] || echo "$workflow_name" | grep -qi "error"; then
+                echo "❌ Failed to create workflow for task-$task_id after $max_create_attempts attempts"
+                echo "❌ Last error: $workflow_name"
+                echo "❌ Workflow YAML content:"
+                cat /tmp/workflow-task-${task_id}.yaml >&2
                 exit 1
               fi
-              
+
               echo "    ✅ Created workflow: $workflow_name"
-              
+
               if [ -z "$workflow_names" ]; then
                 workflow_names="$workflow_name"
               else
                 workflow_names="$workflow_names $workflow_name"
               fi
             done
+
+            echo ""
+            echo "📋 All workflows for level $level_index created: $workflow_names"
 
           # Wait for all tasks in this level to complete
           echo ""
