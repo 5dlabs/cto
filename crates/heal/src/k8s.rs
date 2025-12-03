@@ -36,6 +36,8 @@ const EXCLUDED_POD_PREFIXES: &[&str] = &[
     "event-cleaner",
     "workspace-pvc-cleaner",
     "tweakcn",
+    "atlas-guardian",
+    "atlas-batch-integration",
 ];
 
 /// Check if a pod name should be excluded from alerts/completion checks.

@@ -12,7 +12,7 @@
 
 use super::types::{Alert, AlertContext, AlertHandler, AlertId, Severity};
 use crate::github::GitHubState;
-use crate::k8s::{ContainerState, K8sEvent, Pod};
+use crate::k8s::{is_excluded_pod, ContainerState, K8sEvent, Pod};
 use chrono::{Duration, Utc};
 
 /// Restart count threshold for crash loop detection
@@ -92,6 +92,11 @@ impl AlertHandler for Handler {
 
         // Only check pods that are still "Running"
         if pod.phase != "Running" {
+            return None;
+        }
+
+        // Skip excluded infrastructure pods (heal, cto-tools, atlas-guardian, etc.)
+        if is_excluded_pod(&pod.name) {
             return None;
         }
 
