@@ -11,17 +11,18 @@ use tracing_subscriber::EnvFilter;
 use cto_metal::providers::latitude::Latitude;
 use cto_metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
 use cto_metal::talos::{self, BootstrapConfig, TalosConfig};
+use tokio::task::JoinSet;
 
 /// Metal CLI - Bare metal provisioning for CTO Platform.
 #[derive(Parser)]
 #[command(name = "metal")]
 #[command(about = "Provision and manage bare metal servers")]
 struct Cli {
-    /// Latitude.sh API key (or set LATITUDE_API_KEY env var).
+    /// Latitude.sh API key (or set `LATITUDE_API_KEY` env var).
     #[arg(long, env = "LATITUDE_API_KEY")]
     api_key: String,
 
-    /// Latitude.sh Project ID (or set LATITUDE_PROJECT_ID env var).
+    /// Latitude.sh Project ID (or set `LATITUDE_PROJECT_ID` env var).
     #[arg(long, env = "LATITUDE_PROJECT_ID")]
     project_id: String,
 
@@ -193,6 +194,48 @@ enum Commands {
         timeout: u64,
     },
 
+    /// Provision a full 2-node cluster (CP + worker) in parallel.
+    ///
+    /// Creates both servers simultaneously, waits for both to be ready,
+    /// boots Talos on both, then bootstraps CP and joins worker.
+    Cluster {
+        /// Cluster name.
+        #[arg(long)]
+        name: String,
+
+        /// Region/site (e.g., MIA2, DAL, LAX).
+        #[arg(long, default_value = "MIA2")]
+        region: String,
+
+        /// Control plane server plan.
+        #[arg(long, default_value = "c2-small-x86")]
+        cp_plan: String,
+
+        /// Worker server plan.
+        #[arg(long, default_value = "c2-small-x86")]
+        worker_plan: String,
+
+        /// SSH key IDs for initial Ubuntu boot (comma-separated).
+        #[arg(long, value_delimiter = ',')]
+        ssh_keys: Vec<String>,
+
+        /// Talos version (e.g., v1.9.0).
+        #[arg(long, default_value = "v1.9.0")]
+        talos_version: String,
+
+        /// Install disk (e.g., /dev/sda, /dev/nvme0n1).
+        #[arg(long, default_value = "/dev/sda")]
+        install_disk: String,
+
+        /// Output directory for generated configs.
+        #[arg(long, default_value = "/tmp/cto-cluster")]
+        output_dir: PathBuf,
+
+        /// Timeout in seconds to wait for each step.
+        #[arg(long, default_value = "1200")]
+        timeout: u64,
+    },
+
     /// Join a worker node to an existing Talos cluster.
     ///
     /// This provisions a new server, boots Talos via iPXE, and joins it
@@ -241,6 +284,7 @@ enum Commands {
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -557,6 +601,167 @@ async fn main() -> Result<()> {
             println!("   Server ID:    {}", server.id);
             println!("   Server IP:    {server_ip}");
             println!("   Cluster:      {cluster_name}");
+            println!("\n📁 Generated files:");
+            println!("   - {}", configs.controlplane.display());
+            println!("   - {}", configs.worker.display());
+            println!("   - {}", configs.talosconfig.display());
+            println!("   - {}", kubeconfig_path.display());
+            println!("\n📋 Next steps:");
+            println!("   export KUBECONFIG={}", kubeconfig_path.display());
+            println!("   kubectl get nodes");
+        }
+
+        Commands::Cluster {
+            name,
+            region,
+            cp_plan,
+            worker_plan,
+            ssh_keys,
+            talos_version,
+            install_disk,
+            output_dir,
+            timeout,
+        } => {
+            info!("Provisioning 2-node cluster: {name}");
+
+            let cp_hostname = format!("{name}-cp1");
+            let worker_hostname = format!("{name}-worker1");
+
+            // Create second provider instance for parallel ops
+            let provider2 = Latitude::new(&cli.api_key, &cli.project_id)
+                .context("Failed to create second Latitude provider")?;
+
+            // Step 1: Create BOTH servers in parallel
+            println!("\n🖥️  Step 1/9: Creating both servers in parallel...");
+
+            let cp_req = CreateServerRequest {
+                hostname: cp_hostname.clone(),
+                plan: cp_plan,
+                region: region.clone(),
+                os: "ubuntu_24_04_x64_lts".to_string(),
+                ssh_keys: ssh_keys.clone(),
+            };
+            let worker_req = CreateServerRequest {
+                hostname: worker_hostname.clone(),
+                plan: worker_plan,
+                region,
+                os: "ubuntu_24_04_x64_lts".to_string(),
+                ssh_keys,
+            };
+
+            let (cp_server, worker_server) =
+                tokio::try_join!(provider.create_server(cp_req), provider2.create_server(worker_req),)?;
+
+            let cp_id = cp_server.id.clone();
+            let worker_id = worker_server.id.clone();
+            println!("   Control Plane: {} ({})", cp_id, cp_server.ipv4.clone().unwrap_or_default());
+            println!("   Worker:        {} ({})", worker_id, worker_server.ipv4.clone().unwrap_or_default());
+
+            // Step 2: Wait for BOTH servers to be ready in parallel
+            println!("\n⏳ Step 2/9: Waiting for both servers to be ready...");
+            let (cp_ready, worker_ready) = tokio::try_join!(
+                provider.wait_ready(&cp_id, timeout),
+                provider2.wait_ready(&worker_id, timeout),
+            )?;
+
+            let cp_addr = cp_ready.ipv4.clone().unwrap_or_default();
+            let worker_addr = worker_ready.ipv4.clone().unwrap_or_default();
+            println!("   ✅ Control plane ready: {cp_addr}");
+            println!("   ✅ Worker ready: {worker_addr}");
+
+            // Step 3: Trigger Talos iPXE on BOTH in parallel
+            println!("\n🔄 Step 3/9: Triggering Talos iPXE boot on both...");
+            let talos_cfg = TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
+                &talos_version,
+                cto_metal::talos::DEFAULT_SCHEMATIC_ID,
+            ));
+            let ipxe_url = talos_cfg.ipxe_url();
+
+            let cp_ipxe = ReinstallIpxeRequest {
+                hostname: cp_hostname.clone(),
+                ipxe_url: ipxe_url.clone(),
+            };
+            let worker_ipxe = ReinstallIpxeRequest {
+                hostname: worker_hostname.clone(),
+                ipxe_url,
+            };
+
+            tokio::try_join!(
+                provider.reinstall_ipxe(&cp_id, cp_ipxe),
+                provider2.reinstall_ipxe(&worker_id, worker_ipxe),
+            )?;
+            println!("   ✅ iPXE triggered on both servers!");
+
+            // Step 4: Wait for BOTH to enter Talos maintenance mode in parallel
+            println!("\n📡 Step 4/9: Waiting for Talos maintenance mode on both...");
+            println!("   (This typically takes 10-15 minutes for iPXE boot)");
+
+            // Use a JoinSet to poll both in parallel
+            let cp_poll = cp_addr.clone();
+            let worker_poll = worker_addr.clone();
+            let timeout_duration = Duration::from_secs(timeout);
+
+            let mut set = JoinSet::new();
+            set.spawn(async move {
+                talos::wait_for_talos(&cp_poll, timeout_duration)?;
+                Ok::<_, anyhow::Error>(("cp", cp_poll))
+            });
+            set.spawn(async move {
+                talos::wait_for_talos(&worker_poll, timeout_duration)?;
+                Ok::<_, anyhow::Error>(("worker", worker_poll))
+            });
+
+            while let Some(result) = set.join_next().await {
+                match result {
+                    Ok(Ok((node, addr))) => println!("   ✅ {node} Talos ready: {addr}"),
+                    Ok(Err(e)) => anyhow::bail!("Failed waiting for Talos: {e}"),
+                    Err(e) => anyhow::bail!("Task panicked: {e}"),
+                }
+            }
+
+            // Step 5: Generate secrets and config
+            println!("\n🔐 Step 5/9: Generating secrets and configs...");
+            talos::generate_secrets(&output_dir)?;
+
+            let config = BootstrapConfig::new(&name, &cp_addr)
+                .with_install_disk(&install_disk)
+                .with_output_dir(&output_dir)
+                .with_talos_version(&talos_version);
+            let configs = talos::generate_config(&config)?;
+
+            // Step 6: Apply config to control plane
+            println!("\n🚀 Step 6/9: Applying config to control plane...");
+            talos::apply_config(&cp_addr, &configs.controlplane)?;
+
+            // Step 7: Wait for control plane install and bootstrap
+            println!("\n⏳ Step 7/9: Waiting for control plane installation...");
+            talos::wait_for_install(&cp_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+
+            println!("\n🎯 Bootstrapping control plane...");
+            talos::bootstrap_cluster(&cp_addr, &configs.talosconfig)?;
+
+            println!("\n☸️  Waiting for Kubernetes API...");
+            talos::wait_for_kubernetes(&cp_addr, &configs.talosconfig, Duration::from_secs(300))?;
+
+            // Get kubeconfig
+            let kubeconfig_path = output_dir.join("kubeconfig");
+            talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
+            println!("   ✅ Control plane bootstrapped!");
+
+            // Step 8: Apply config to worker and join
+            println!("\n🔄 Step 8/9: Applying config to worker node...");
+            talos::apply_config(&worker_addr, &configs.worker)?;
+
+            // Step 9: Wait for worker to join
+            println!("\n⏳ Step 9/9: Waiting for worker to join cluster...");
+            talos::wait_for_install(&worker_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+            talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(300))?;
+
+            println!("\n🎉 2-node cluster provisioned successfully!");
+            println!("\n📊 Summary:");
+            println!("   Cluster:        {name}");
+            println!("   Control Plane:  {cp_addr} ({cp_id})");
+            println!("   Worker:         {worker_addr} ({worker_id})");
             println!("\n📁 Generated files:");
             println!("   - {}", configs.controlplane.display());
             println!("   - {}", configs.worker.display());
