@@ -334,6 +334,7 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 
 # Install tools client from CTO monorepo unified release (skip if version is "skip" or empty)
 # Downloads binary directly from v*.*.* unified releases
+# Note: tools CLI is required for MCP prechecks in agent entrypoints
 ARG TOOLS_VERSION=skip
 RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
@@ -343,6 +344,7 @@ RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
         curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
           "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-${DL_ARCH}" && \
         chmod +x /usr/local/bin/tools && \
+        tools --version && \
         echo "✅ tools client installed"; \
       else \
         echo "⏭️ Skipping tools client installation (unsupported architecture: ${ARCH})"; \
