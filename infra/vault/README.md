@@ -99,6 +99,14 @@ Example `.dockerconfigjson` value:
 | `secret/tools-context7` | `CONTEXT7_API_KEY` |
 | `secret/tools-github` | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 
+### Bare Metal Providers
+
+| Path | Keys | Description |
+|------|------|-------------|
+| `secret/providers/latitude` | `api_key` | Latitude.sh API key for bare metal provisioning |
+
+> **Note**: Provider credentials are synced to the `cto` namespace as `provider-latitude` secret.
+
 ## Initialization Steps
 
 1. Ensure Vault and VSO are deployed via ArgoCD

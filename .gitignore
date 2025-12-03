@@ -125,3 +125,6 @@ docs/platform-packaging/
 
 # Documentation cache (build artifacts)
 .docs-cache/
+
+# Cloned reference repos (for research only)
+docs/bare-metal/latitude-cli/
