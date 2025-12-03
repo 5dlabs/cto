@@ -281,7 +281,7 @@ mod tests {
     fn test_supported_models() {
         let provider = AnthropicProvider::default();
         // Claude 4.5 models
-        assert!(provider.supports_model("claude-opus-4-5-20250929"));
+        assert!(provider.supports_model("claude-opus-4-5-20251101"));
         assert!(provider.supports_model("claude-sonnet-4-5-20250929"));
         // Claude 4.1 models
         assert!(provider.supports_model("claude-opus-4-1-20250805"));

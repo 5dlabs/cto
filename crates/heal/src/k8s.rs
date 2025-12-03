@@ -60,7 +60,7 @@ pub struct Pod {
 /// Pod condition from Kubernetes status.conditions[]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PodCondition {
-    /// Condition type: "Ready", "ContainersReady", "Initialized", etc.
+    /// Condition type: "Ready", "`ContainersReady`", "Initialized", etc.
     pub condition_type: String,
     /// Status: "True", "False", "Unknown"
     pub status: String,

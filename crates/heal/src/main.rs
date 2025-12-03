@@ -5040,6 +5040,19 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
         }
     }
 
+    // Parse pod conditions
+    let mut conditions = Vec::new();
+    if let Some(conds) = json["status"]["conditions"].as_array() {
+        for cond in conds {
+            conditions.push(k8s::PodCondition {
+                condition_type: cond["type"].as_str().unwrap_or("").to_string(),
+                status: cond["status"].as_str().unwrap_or("Unknown").to_string(),
+                reason: cond["reason"].as_str().map(String::from),
+                message: cond["message"].as_str().map(String::from),
+            });
+        }
+    }
+
     let mut container_statuses = Vec::new();
     if let Some(statuses) = json["status"]["containerStatuses"].as_array() {
         for status in statuses {
@@ -5056,12 +5069,18 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
             } else if status["state"]["running"].is_object() {
                 k8s::ContainerState::Running
             } else {
-                k8s::ContainerState::Waiting
+                let reason = status["state"]["waiting"]["reason"]
+                    .as_str()
+                    .map(String::from);
+                k8s::ContainerState::Waiting { reason }
             };
+
+            let ready = status["ready"].as_bool().unwrap_or(false);
 
             #[allow(clippy::cast_possible_truncation)] // restart counts are small i32 values
             container_statuses.push(k8s::ContainerStatus {
                 name: status["name"].as_str().unwrap_or("").to_string(),
+                ready,
                 state,
                 restart_count: status["restartCount"].as_i64().unwrap_or(0) as i32,
             });
@@ -5079,6 +5098,7 @@ fn parse_pod_from_json(json: &serde_json::Value, namespace: &str) -> k8s::Pod {
             .unwrap_or("Unknown")
             .to_string(),
         labels,
+        conditions,
         container_statuses,
         started_at: None,
     }
