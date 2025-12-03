@@ -106,15 +106,14 @@ spec:
                     - set(metric.name, "claude_code_code_edit_tool_decision") where metric.name == "code_edit_tool.decision"
 
           exporters:
+            # Prometheus exporter for scraping
             prometheus:
               endpoint: "0.0.0.0:8889"
               send_timestamps: true
 
-            # VictoriaMetrics native OpenTelemetry exporter
-            otlphttp/victoriametrics:
-              metrics_endpoint: http://victoria-metrics-victoria-metrics-single-server:8428/opentelemetry/v1/metrics
-              compression: gzip
-              encoding: proto
+            # Prometheus Remote Write exporter for sending metrics to Prometheus
+            prometheusremotewrite:
+              endpoint: http://prometheus-server.observability.svc.cluster.local:9090/api/v1/write
               tls:
                 insecure: true
               timeout: 30s
@@ -124,9 +123,9 @@ spec:
                 max_interval: 30s
                 max_elapsed_time: 300s
 
-            # VictoriaLogs exporter using OTLP/HTTP
-            otlphttp:
-              logs_endpoint: http://victoria-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
+            # Loki exporter for logs using OTLP/HTTP
+            otlphttp/loki:
+              endpoint: http://loki-gateway.observability.svc.cluster.local:80/otlp
               tls:
                 insecure: true
               retry_on_failure:
@@ -134,13 +133,6 @@ spec:
                 initial_interval: 5s
                 max_interval: 30s
                 max_elapsed_time: 300s
-              headers:
-                # Stream fields for efficient Victoria Logs indexing
-                # These fields are used for log partitioning and fast queries
-                VL-Stream-Fields: "cluster.name,platform.name,service.name,service.component,service.namespace,kubernetes.namespace_name,kubernetes.pod_name,kubernetes.container_name"
-                # Tell Victoria Logs to use 'message' field as the log message
-                # This fixes "missing _msg field" warnings
-                VL-Msg-Field: "message"
 
             # Debug exporter for troubleshooting
             debug:
@@ -162,11 +154,11 @@ spec:
               metrics:
                 receivers: [otlp]
                 processors: [memory_limiter, batch, resource, transform/metrics]
-                exporters: [otlphttp/victoriametrics, prometheus, debug]
+                exporters: [prometheusremotewrite, prometheus, debug]
               logs:
                 receivers: [otlp]
                 processors: [memory_limiter, batch, resource]
-                exporters: [otlphttp, debug]
+                exporters: [otlphttp/loki, debug]
               traces:
                 receivers: [otlp]
                 processors: [memory_limiter, batch, resource]
