@@ -117,23 +117,33 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
   fi
   echo "   Confirmed deletion of $CM_NAME"
   
-  # Create with retry logic
-  MAX_RETRIES=3
+  # Create with retry logic (handles race condition where CM may reappear)
+  MAX_RETRIES=5
   RETRY=0
   SUCCESS=false
   
   while [ $RETRY -lt $MAX_RETRIES ]; do
-    if kubectl create -f "$TMP_FILE" 2>&1; then
+    OUTPUT=$(kubectl create -f "$TMP_FILE" 2>&1) && {
       echo "✅ Applied: $template"
       SUCCESS=true
       break
+    }
+    
+    RETRY=$((RETRY + 1))
+    
+    # Check if failure was due to AlreadyExists (race condition with ArgoCD/Helm)
+    if echo "$OUTPUT" | grep -q "AlreadyExists"; then
+      echo "⚠️  Attempt $RETRY: ConfigMap recreated by external controller, re-deleting..."
+      kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --wait=true --timeout=10s >/dev/null 2>&1 || true
+      sleep 1
     else
-      RETRY=$((RETRY + 1))
-      if [ $RETRY -lt $MAX_RETRIES ]; then
-        WAIT=$((2 ** RETRY))
-        echo "⚠️  Attempt $RETRY failed, retrying in ${WAIT}s..."
-        sleep $WAIT
-      fi
+      echo "⚠️  Attempt $RETRY failed: $OUTPUT"
+    fi
+    
+    if [ $RETRY -lt $MAX_RETRIES ]; then
+      WAIT=$((RETRY))
+      echo "   Retrying in ${WAIT}s..."
+      sleep $WAIT
     fi
   done
   
