@@ -21,9 +21,11 @@ echo '════════════════════════�
 
 wait_for_docker() {
   echo "🐳 Waiting for Docker daemon..."
+  # Use the configured DOCKER_HOST socket path
+  export DOCKER_HOST="${DOCKER_HOST:-unix:///var/run/docker/docker.sock}"
   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
     if docker info >/dev/null 2>&1; then
-      echo "✅ Docker daemon ready"
+      echo "✅ Docker daemon ready (socket: ${DOCKER_HOST})"
       return 0
     fi
     echo "   Waiting... ($i/15)"
@@ -34,45 +36,52 @@ wait_for_docker() {
 }
 
 stop_docker_sidecar() {
-  if [ ! -S /var/run/docker.sock ]; then
+  echo "🛑 Stopping Docker sidecar"
+  
+  # Create signal file that the Docker sidecar watches for graceful shutdown
+  # The sidecar monitors /workspace/task-{id}/.agent_done
+  TASK_ID="{{task_id}}"
+  if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
+    SIGNAL_DIR="/workspace/task-${TASK_ID}"
+    mkdir -p "$SIGNAL_DIR" 2>/dev/null || true
+    touch "${SIGNAL_DIR}/.agent_done" 2>/dev/null || true
+    echo "   Created signal file: ${SIGNAL_DIR}/.agent_done"
+  fi
+
+  # Check if Docker socket exists
+  DOCKER_SOCK="${DOCKER_HOST:-unix:///var/run/docker/docker.sock}"
+  SOCK_PATH="${DOCKER_SOCK#unix://}"
+  if [ ! -S "$SOCK_PATH" ] && [ ! -S /var/run/docker.sock ]; then
+    echo "   No Docker socket found, skipping"
     return
   fi
 
-  echo "🛑 Stopping Docker sidecar"
-
-  if command -v pkill >/dev/null 2>&1; then
-    pkill dockerd >/dev/null 2>&1 || true
-    sleep 1
-    if pidof dockerd >/dev/null 2>&1; then
-      pkill -9 dockerd >/dev/null 2>&1 || true
-    fi
-    if pidof docker-init >/dev/null 2>&1; then
-      pkill docker-init >/dev/null 2>&1 || true
-    fi
-  elif command -v killall >/dev/null 2>&1; then
-    killall dockerd >/dev/null 2>&1 || true
-  else
-    PID=$(pidof dockerd 2>/dev/null || true)
-    if [ -n "$PID" ]; then
-      kill "$PID" >/dev/null 2>&1 || true
-    fi
-    PID_INIT=$(pidof docker-init 2>/dev/null || true)
-    if [ -n "$PID_INIT" ]; then
-      kill "$PID_INIT" >/dev/null 2>&1 || true
-    fi
-  fi
-
-  for _ in 1 2 3 4 5; do
+  # Wait for sidecar to notice signal file and shut down gracefully
+  for i in 1 2 3 4 5 6; do
     if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
-      echo "✅ Docker sidecar stopped"
+      echo "✅ Docker sidecar stopped gracefully"
       return
     fi
-    sleep 1
+    echo "   Waiting for sidecar to stop... ($i/6)"
+    sleep 2
   done
 
-  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
-  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
-  echo "⚠️ Docker sidecar still running (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+  # Fallback: try to kill directly (works with shareProcessNamespace)
+  echo "   Sidecar didn't stop gracefully, sending signals..."
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -TERM dockerd >/dev/null 2>&1 || true
+    sleep 2
+    pkill -KILL dockerd >/dev/null 2>&1 || true
+    pkill -KILL docker-init >/dev/null 2>&1 || true
+  fi
+
+  # Final check
+  if ! pidof dockerd >/dev/null 2>&1; then
+    echo "✅ Docker sidecar stopped"
+  else
+    REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+    echo "⚠️ Docker sidecar still running (pid: ${REMAINING_DOCKER:-unknown})"
+  fi
 }
 
 # Set up EXIT trap to ensure Docker sidecar cleanup
