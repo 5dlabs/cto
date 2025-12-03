@@ -223,9 +223,7 @@ impl LokiClient {
         // Use pod name regex matching instead of workflow labels.
         // Argo workflow pod names follow the pattern: {workflow_name}-{step}-{random}
         // This is more reliable than depending on label relabeling configuration.
-        let query = format!(
-            r#"{{namespace="{namespace}", pod=~"{workflow_name}.*"}}"#
-        );
+        let query = format!(r#"{{namespace="{namespace}", pod=~"{workflow_name}.*"}}"#);
         self.query_logs(&query, start, end, limit).await
     }
 
@@ -333,10 +331,7 @@ impl LokiClient {
     /// Returns an error if there's an issue building the request (but not
     /// if the server is unreachable - that returns `Ok(false)`).
     pub async fn health_check(&self) -> Result<bool> {
-        let url = format!(
-            "{}/ready",
-            self.config.base_url.trim_end_matches('/')
-        );
+        let url = format!("{}/ready", self.config.base_url.trim_end_matches('/'));
 
         match self.client.get(&url).send().await {
             Ok(response) => Ok(response.status().is_success()),
@@ -374,7 +369,8 @@ impl LokiClient {
         // and realistically won't exceed i64::MAX minutes
         let start = failure_time - chrono::Duration::minutes(minutes_before as i64);
         let end = failure_time + chrono::Duration::minutes(minutes_after as i64);
-        self.query_pod_logs(namespace, pod_name, start, end, 0).await
+        self.query_pod_logs(namespace, pod_name, start, end, 0)
+            .await
     }
 }
 
@@ -386,14 +382,14 @@ impl LokiClient {
 #[must_use]
 pub fn format_logs_for_issue(entries: &[LogEntry], max_lines: usize) -> String {
     use std::fmt::Write;
-    
+
     if entries.is_empty() {
         return "No logs available.".to_string();
     }
 
     let mut output = String::new();
     let total = entries.len();
-    
+
     // If max_lines is 0, show all entries; otherwise truncate to max_lines
     let entries_to_show: &[LogEntry] = if max_lines > 0 && total > max_lines {
         let _ = writeln!(
@@ -513,4 +509,3 @@ mod tests {
         assert!(errors[1].line.contains("fatal"));
     }
 }
-

@@ -5436,14 +5436,10 @@ fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String 
 ///
 /// Tries kubectl logs first (for live pods), then falls back to Loki
 /// for historical logs if the pod has been garbage collected.
-async fn get_pod_logs_with_loki_fallback(
-    pod_name: &str,
-    namespace: &str,
-    tail: u32,
-) -> String {
+async fn get_pod_logs_with_loki_fallback(pod_name: &str, namespace: &str, tail: u32) -> String {
     // First, try kubectl logs (works for live pods)
     let kubectl_logs = get_pod_logs_for_alert(pod_name, namespace, tail);
-    
+
     // If kubectl succeeded (doesn't contain error markers), return those logs
     if !kubectl_logs.contains("[Failed to fetch logs:")
         && !kubectl_logs.contains("[Error fetching logs:")
@@ -5463,7 +5459,7 @@ async fn get_pod_logs_with_loki_fallback(
     );
 
     let loki_client = loki::LokiClient::with_defaults();
-    
+
     // Check if Loki is reachable
     if !matches!(loki_client.health_check().await, Ok(true)) {
         println!(
@@ -5476,7 +5472,7 @@ async fn get_pod_logs_with_loki_fallback(
     // Query Loki for logs from the last 30 minutes
     let end = Utc::now();
     let start = end - chrono::Duration::minutes(30);
-    
+
     match loki_client
         .query_pod_logs(namespace, pod_name, start, end, tail)
         .await
@@ -5491,10 +5487,10 @@ async fn get_pod_logs_with_loki_fallback(
                 )
                 .green()
             );
-            
+
             // Format logs with timestamps
             let logs = format_loki_entries_as_logs(&entries, tail as usize);
-            
+
             // Redact secrets before returning
             redact_secrets(&logs)
         }
@@ -5522,11 +5518,10 @@ async fn get_pod_logs_with_loki_fallback(
 /// Format Loki log entries as a string for inclusion in prompts
 fn format_loki_entries_as_logs(entries: &[loki::LogEntry], max_entries: usize) -> String {
     use std::fmt::Write;
-    
-    let mut logs = String::from(
-        "# Historical logs from Loki (pod may have been garbage collected)\n\n"
-    );
-    
+
+    let mut logs =
+        String::from("# Historical logs from Loki (pod may have been garbage collected)\n\n");
+
     // Take the LAST max_entries entries (most recent) to match kubectl --tail behavior
     // Entries are sorted oldest-first, so slice from the end
     let total = entries.len();
@@ -5535,7 +5530,7 @@ fn format_loki_entries_as_logs(entries: &[loki::LogEntry], max_entries: usize) -
     } else {
         entries
     };
-    
+
     for entry in entries_to_show {
         let time = entry.timestamp.format("%Y-%m-%d %H:%M:%S%.3f");
         let _ = writeln!(logs, "[{}] {}", time, entry.line);
