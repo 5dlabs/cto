@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.21](https://github.com/5dlabs/cto/compare/v0.12.20...v0.12.21) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** enhance Pod and ContainerStatus structures with conditions and readiness ([f3e2a30](https://github.com/5dlabs/cto/commit/f3e2a30a8b03d3a6a03e88d7bf41a810ee9f8822))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** iterate releases to find one with assets ([#2503](https://github.com/5dlabs/cto/issues/2503)) ([e25877e](https://github.com/5dlabs/cto/commit/e25877ec5e117631a3da880ae3c25485a5441f5b))
+* **heal:** add periodic pod poller to catch silent failures ([6e628fa](https://github.com/5dlabs/cto/commit/6e628faa0f43b48f2fe4c66291d0ab6c324527d6))
+
 ## [0.12.20](https://github.com/5dlabs/cto/compare/v0.12.19...v0.12.20) (2025-12-03)
 
 
