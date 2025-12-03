@@ -21,6 +21,7 @@ pub mod a5_post_tess_ci;
 pub mod a7_pod_failure;
 pub mod a8_step_timeout;
 pub mod a9_stuck_coderun;
+pub mod silent_failure_poc;
 pub mod types;
 
 // Public API re-exports

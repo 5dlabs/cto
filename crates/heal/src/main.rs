@@ -4532,7 +4532,90 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
     let mut alerted_pods: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // Create a channel for events from both watches
-    let (tx, mut rx) = mpsc::channel::<AlertWatchEvent>(100);
+    // Increased buffer to reduce chance of dropped events
+    let (tx, mut rx) = mpsc::channel::<AlertWatchEvent>(500);
+
+    // Start periodic pod poller as fallback for missed watch events
+    // This catches silent failures that the watch stream might miss
+    let tx_poller = tx.clone();
+    let namespace_poller = namespace.to_string();
+    let poller_handle = tokio::spawn(async move {
+        // Wait 30s before first poll to let watch stabilize
+        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+
+        loop {
+            // Poll every 60 seconds
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+
+            // Get all pods with kubectl and look for silent failures
+            let output = match AsyncCommand::new("kubectl")
+                .args([
+                    "get",
+                    "pods",
+                    "-n",
+                    &namespace_poller,
+                    "-o",
+                    "json",
+                ])
+                .output()
+                .await
+            {
+                Ok(o) => o,
+                Err(e) => {
+                    eprintln!("⚠️  Pod poller kubectl error: {e}");
+                    continue;
+                }
+            };
+
+            if !output.status.success() {
+                continue;
+            }
+
+            let json: serde_json::Value = match serde_json::from_slice(&output.stdout) {
+                Ok(j) => j,
+                Err(_) => continue,
+            };
+
+            let Some(items) = json["items"].as_array() else {
+                continue;
+            };
+
+            for item in items {
+                // Check for silent failure: phase=Running, container terminated with non-zero exit
+                let phase = item["status"]["phase"].as_str().unwrap_or("");
+                if phase != "Running" {
+                    continue;
+                }
+
+                let Some(container_statuses) = item["status"]["containerStatuses"].as_array() else {
+                    continue;
+                };
+
+                let has_failed_container = container_statuses.iter().any(|cs| {
+                    if let Some(terminated) = cs["state"]["terminated"].as_object() {
+                        let exit_code = terminated
+                            .get("exitCode")
+                            .and_then(serde_json::Value::as_i64)
+                            .unwrap_or(0);
+                        exit_code != 0
+                    } else {
+                        false
+                    }
+                });
+
+                if has_failed_container {
+                    // Wrap in watch event format and send
+                    let event = serde_json::json!({
+                        "type": "MODIFIED",
+                        "object": item
+                    });
+                    if tx_poller.send(AlertWatchEvent::PodEvent(event)).await.is_err() {
+                        return; // Channel closed
+                    }
+                }
+            }
+        }
+    });
 
     // Start kubectl watch for pods
     let tx_pods = tx.clone();
@@ -4881,6 +4964,7 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
     // Wait for watch tasks (they'll run until the channel closes)
     let _ = pod_watch_handle.await;
     let _ = coderun_watch_handle.await;
+    let _ = poller_handle.await;
 
     Ok(())
 }
