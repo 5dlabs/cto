@@ -48,11 +48,11 @@ enum Method {
 impl Method {
     fn priority(self) -> u8 {
         match self {
-            Self::ExitCode => 1,      // Most definitive
-            Self::ReadyStatus => 2,   // Strong signal
-            Self::PodCondition => 3,  // Good fallback
-            Self::RestartCount => 4,  // Indicates instability
-            Self::Duration => 5,      // Catch-all for stale failures
+            Self::ExitCode => 1,     // Most definitive
+            Self::ReadyStatus => 2,  // Strong signal
+            Self::PodCondition => 3, // Good fallback
+            Self::RestartCount => 4, // Indicates instability
+            Self::Duration => 5,     // Catch-all for stale failures
         }
     }
 
@@ -176,10 +176,7 @@ fn detect_by_ready_status(pod: &Pod) -> Option<Detection> {
             return Some(Detection {
                 method: Method::ReadyStatus,
                 container: container.name.clone(),
-                message: format!(
-                    "Container '{}' not ready while pod Running",
-                    container.name
-                ),
+                message: format!("Container '{}' not ready while pod Running", container.name),
                 exit_code: None,
                 reason: None,
             });
@@ -435,9 +432,9 @@ mod tests {
             }],
             container_statuses: vec![ContainerStatus {
                 name: "unstable".into(),
-                ready: true, // Ready (no ready status trigger)
+                ready: true,                    // Ready (no ready status trigger)
                 state: ContainerState::Running, // Running (no exit code trigger)
-                restart_count: 5, // High restart count
+                restart_count: 5,               // High restart count
             }],
             ..Default::default()
         });
