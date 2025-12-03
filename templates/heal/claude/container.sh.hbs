@@ -357,8 +357,20 @@ Focus on addressing the above items before re-checking acceptance criteria."
     set -f  # Disable glob expansion to prevent mcp__* from being expanded
     
     # Stream Claude output and extract text content in real-time
+    # Use named pipe (FIFO) for POSIX-compatible exit code capture while streaming
+    CLAUDE_FIFO=$(mktemp -u)
+    CLAUDE_EXIT_FILE=$(mktemp)
+    mkfifo "$CLAUDE_FIFO"
+    
+    # Run Claude in background, capturing exit code to temp file
+    {
+        echo "${PROMPT_CONTENT}" | $CLAUDE_CMD 2>&1
+        echo $? > "$CLAUDE_EXIT_FILE"
+    } > "$CLAUDE_FIFO" &
+    CLAUDE_BG_PID=$!
+    
     # The jq filter extracts assistant messages, tool calls, and results
-    echo "${PROMPT_CONTENT}" | $CLAUDE_CMD 2>&1 | while IFS= read -r line; do
+    while IFS= read -r line; do
         # Try to parse as JSON and extract relevant content
         if echo "$line" | jq -e . >/dev/null 2>&1; then
             # Extract text from assistant messages
@@ -382,8 +394,14 @@ Focus on addressing the above items before re-checking acceptance criteria."
             # Not JSON, print as-is (verbose output, errors, etc.)
             printf '%s\n' "$line"
         fi
-    done
-    AGENT_EXIT=${PIPESTATUS[1]:-$?}
+    done < "$CLAUDE_FIFO"
+    
+    # Wait for background process and retrieve exit code
+    wait $CLAUDE_BG_PID 2>/dev/null || true
+    AGENT_EXIT=$(cat "$CLAUDE_EXIT_FILE" 2>/dev/null)
+    # Default to exit code 1 if file is empty or unreadable
+    AGENT_EXIT="${AGENT_EXIT:-1}"
+    rm -f "$CLAUDE_FIFO" "$CLAUDE_EXIT_FILE"
     
     set +f  # Re-enable glob expansion
     set -e
