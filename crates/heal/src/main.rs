@@ -5153,8 +5153,11 @@ async fn handle_detected_alert(
             Ok(None) => {
                 println!(
                     "{}",
-                    format!("✅ No recent {} issues found, proceeding", alert_id.to_uppercase())
-                        .dimmed()
+                    format!(
+                        "✅ No recent {} issues found, proceeding",
+                        alert_id.to_uppercase()
+                    )
+                    .dimmed()
                 );
             }
             Err(e) => {
