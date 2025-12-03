@@ -90,3 +90,28 @@ CRITERIA
 - Both `prompt.md` and `acceptance-criteria.md` are synced to GitHub
 - The remediation agent will link its PR to this issue with `Fixes #${ISSUE_NUMBER}`
 
+{{#if enable_docker}}
+## Docker Debugging for Image Issues
+
+If the failure is related to container images (binary not found, exec format error, missing files):
+
+```bash
+# Pull and inspect the failing image
+docker pull <image>:<tag>
+
+# Check if binary exists and is executable
+docker run --rm --entrypoint sh <image>:<tag> -c "ls -la /usr/local/bin/"
+
+# Run interactively to explore
+docker run --rm -it --entrypoint sh <image>:<tag>
+
+# Check image architecture
+docker inspect <image>:<tag> | jq '.[0].Architecture'
+
+# View Dockerfile history
+docker history <image>:<tag>
+```
+
+Include Docker debugging findings in your analysis when relevant.
+{{/if}}
+

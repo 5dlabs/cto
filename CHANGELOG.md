@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.12.27](https://github.com/5dlabs/cto/compare/v0.12.26...v0.12.27) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output in real-time with text extraction ([#2535](https://github.com/5dlabs/cto/issues/2535)) ([0763689](https://github.com/5dlabs/cto/commit/0763689c81e79954e6db6b940581dec4c8f87359))
+
+## [0.12.26](https://github.com/5dlabs/cto/compare/v0.12.25...v0.12.26) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add Docker runtime access and streaming output ([#2532](https://github.com/5dlabs/cto/issues/2532)) ([bc1cdfb](https://github.com/5dlabs/cto/commit/bc1cdfb98fa871a0be3ec6b816a8f36d770dcb14))
+
+## [0.12.25](https://github.com/5dlabs/cto/compare/v0.12.24...v0.12.25) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output in real-time with text extraction ([#2530](https://github.com/5dlabs/cto/issues/2530)) ([2bb842c](https://github.com/5dlabs/cto/commit/2bb842c2a62c5c8a97a2c7b766a4b30f7b4bc9df))
+
+## [0.12.24](https://github.com/5dlabs/cto/compare/v0.12.23...v0.12.24) (2025-12-03)
+
+
+### 📚 Documentation
+
+* add Latitude.sh bare metal POC design and research ([#2525](https://github.com/5dlabs/cto/issues/2525)) ([2337549](https://github.com/5dlabs/cto/commit/23375494882f35004326470f5abf911af11266eb))
+
 ## [0.12.23](https://github.com/5dlabs/cto/compare/v0.12.22...v0.12.23) (2025-12-03)
 
 

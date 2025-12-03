@@ -112,6 +112,51 @@ echo "📁 Worktree: ${WORKTREE_PATH}"
 mkdir -p /workspace/worktrees
 
 # ============================================================================
+# WORKSPACE CLEANUP (PVC persists between runs)
+# ============================================================================
+echo ""
+echo "═══ WORKSPACE CLEANUP ═══"
+
+# Configure git safe.directory to avoid "dubious ownership" errors on shared PVC
+# This is needed because the PVC may have been created by a different user/pod
+git config --global --add safe.directory '*' 2>/dev/null || true
+echo "✓ Git safe.directory configured"
+
+# Clean up stale worktrees from previous runs
+if [ -d "/workspace/worktrees" ]; then
+    echo "🧹 Cleaning stale worktrees..."
+    WORKTREE_COUNT=$(find /workspace/worktrees -maxdepth 1 -type d 2>/dev/null | wc -l)
+    if [ "$WORKTREE_COUNT" -gt 1 ]; then
+        # Remove worktrees older than 24 hours (exclude current)
+        find /workspace/worktrees -maxdepth 1 -type d -mmin +1440 -not -name "$(basename ${WORKTREE_PATH})" 2>/dev/null | while read -r old_wt; do
+            if [ -d "$old_wt" ] && [ "$old_wt" != "/workspace/worktrees" ]; then
+                echo "   Removing stale worktree: $old_wt"
+                rm -rf "$old_wt" 2>/dev/null || true
+            fi
+        done
+    fi
+    echo "✓ Worktree cleanup complete"
+fi
+
+# Clean up stale git lock files
+find /workspace -name "*.lock" -type f -mmin +30 2>/dev/null | while read -r lockfile; do
+    echo "   Removing stale lock: $lockfile"
+    rm -f "$lockfile" 2>/dev/null || true
+done
+
+# Clean up archived issues older than 7 days
+if [ -d "/workspace/archived" ]; then
+    echo "🧹 Cleaning old archived issues..."
+    find /workspace/archived -maxdepth 1 -type d -mtime +7 2>/dev/null | while read -r old_archive; do
+        if [ -d "$old_archive" ] && [ "$old_archive" != "/workspace/archived" ]; then
+            echo "   Removing old archive: $old_archive"
+            rm -rf "$old_archive" 2>/dev/null || true
+        fi
+    done
+    echo "✓ Archive cleanup complete"
+fi
+
+# ============================================================================
 # REPOSITORY PRE-STAGING (Optimization: reset instead of clone)
 # ============================================================================
 echo ""
@@ -122,6 +167,12 @@ echo "📂 Local path: ${REPO_PATH}"
 if [ -d "${REPO_PATH}/.git" ]; then
     echo "✓ Repository exists, syncing with origin/main..."
     cd "${REPO_PATH}"
+    
+    # Ensure safe.directory is set for this specific repo
+    git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+    
+    # Clean up any stale worktrees registered in git
+    git worktree prune 2>/dev/null || true
     
     # Fetch latest (shallow to save bandwidth)
     git fetch --depth 1 origin main 2>/dev/null || git fetch origin main
@@ -140,6 +191,10 @@ else
     fi
     git clone --depth 1 "${CLONE_URL}" "${REPO_PATH}"
     cd "${REPO_PATH}"
+    
+    # Configure safe.directory for the newly cloned repo
+    git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+    
     echo "✓ Repository cloned to $(git rev-parse --short HEAD)"
 fi
 
@@ -332,9 +387,9 @@ Focus on addressing the above items before re-checking acceptance criteria."
     echo "🚀 Running Claude remediation agent..."
     
     # Build Claude command with MCP config if available
-    # Using --output-format text to stream human-readable output to stdout
-    # Using --verbose to show tool calls and other debug info
-    CLAUDE_CMD="claude --dangerously-skip-permissions --model {{model}} --output-format text --verbose"
+    # Using stream-json with --include-partial-messages for real-time streaming output
+    # Output is piped through jq to extract human-readable text
+    CLAUDE_CMD="claude -p --dangerously-skip-permissions --model {{model}} --output-format stream-json --include-partial-messages --verbose"
     CLAUDE_CMD="$CLAUDE_CMD --allowedTools Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit,mcp__*"
     
     # Add MCP configuration if available
@@ -350,13 +405,59 @@ Focus on addressing the above items before re-checking acceptance criteria."
     
     echo ""
     echo "═══ RUNNING REMEDIATION AGENT ═══"
-    echo "📋 Command: $CLAUDE_CMD -p [prompt]"
+    echo "📋 Command: $CLAUDE_CMD [prompt piped via stdin]"
     echo ""
     
     set +e
     set -f  # Disable glob expansion to prevent mcp__* from being expanded
-    $CLAUDE_CMD -p "${PROMPT_CONTENT}"
-    AGENT_EXIT=$?
+    
+    # Stream Claude output and extract text content in real-time
+    # Use named pipe (FIFO) for POSIX-compatible exit code capture while streaming
+    CLAUDE_FIFO=$(mktemp -u)
+    CLAUDE_EXIT_FILE=$(mktemp)
+    mkfifo "$CLAUDE_FIFO"
+    
+    # Run Claude in background, capturing exit code to temp file
+    {
+        echo "${PROMPT_CONTENT}" | $CLAUDE_CMD 2>&1
+        echo $? > "$CLAUDE_EXIT_FILE"
+    } > "$CLAUDE_FIFO" &
+    CLAUDE_BG_PID=$!
+    
+    # The jq filter extracts assistant messages, tool calls, and results
+    while IFS= read -r line; do
+        # Try to parse as JSON and extract relevant content
+        if echo "$line" | jq -e . >/dev/null 2>&1; then
+            # Extract text from assistant messages
+            TEXT=$(echo "$line" | jq -r '
+                if .type == "assistant" then
+                    (.message.content[]? | select(.type == "text") | .text) // empty
+                elif .type == "content_block_delta" then
+                    .delta.text // empty
+                elif .type == "tool_use" then
+                    "🔧 Tool: " + (.name // "unknown")
+                elif .type == "tool_result" then
+                    "📋 Result: " + ((.content // "done") | tostring | .[0:200])
+                else
+                    empty
+                end
+            ' 2>/dev/null)
+            if [ -n "$TEXT" ]; then
+                printf '%s\n' "$TEXT"
+            fi
+        else
+            # Not JSON, print as-is (verbose output, errors, etc.)
+            printf '%s\n' "$line"
+        fi
+    done < "$CLAUDE_FIFO"
+    
+    # Wait for background process and retrieve exit code
+    wait $CLAUDE_BG_PID 2>/dev/null || true
+    AGENT_EXIT=$(cat "$CLAUDE_EXIT_FILE" 2>/dev/null || echo "1")
+    # Handle empty file case (mktemp creates empty file; if process dies before writing $?, cat succeeds but outputs nothing)
+    AGENT_EXIT="${AGENT_EXIT:-1}"
+    rm -f "$CLAUDE_FIFO" "$CLAUDE_EXIT_FILE"
+    
     set +f  # Re-enable glob expansion
     set -e
 

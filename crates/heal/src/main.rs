@@ -1797,7 +1797,8 @@ async fn main() -> Result<()> {
             prompts_dir,
             dry_run,
         } => {
-            run_alert_watch(&namespace, &prompts_dir, dry_run).await?;
+            // Default enable_docker to true (matches CRD default)
+            run_alert_watch(&namespace, &prompts_dir, dry_run, true).await?;
         }
         Commands::TestAlert {
             alert,
@@ -1807,7 +1808,17 @@ async fn main() -> Result<()> {
             prompts_dir,
             dry_run,
         } => {
-            test_alert_flow(&alert, &pod_name, &task_id, &agent, &prompts_dir, dry_run).await?;
+            // Default enable_docker to true for testing (matches CRD default)
+            test_alert_flow(
+                &alert,
+                &pod_name,
+                &task_id,
+                &agent,
+                &prompts_dir,
+                dry_run,
+                true,
+            )
+            .await?;
         }
         Commands::SpawnRemediation {
             alert,
@@ -4490,7 +4501,12 @@ enum AlertWatchEvent {
 
 /// Watch for alerts and spawn Factory when detected.
 #[allow(clippy::too_many_lines)]
-async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> Result<()> {
+async fn run_alert_watch(
+    namespace: &str,
+    prompts_dir: &str,
+    dry_run: bool,
+    enable_docker: bool,
+) -> Result<()> {
     use tokio::io::{AsyncBufReadExt, BufReader};
     use tokio::process::Command as AsyncCommand;
     use tokio::sync::mpsc;
@@ -4858,7 +4874,15 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                     alerted_pods.insert(dedup_key);
 
                     // Handle the alert (load prompt, fetch logs, spawn Factory)
-                    handle_detected_alert(&alert, &pod, namespace, prompts_dir, dry_run).await?;
+                    handle_detected_alert(
+                        &alert,
+                        &pod,
+                        namespace,
+                        prompts_dir,
+                        dry_run,
+                        enable_docker,
+                    )
+                    .await?;
                 }
 
                 // Also check for completion (pod succeeded) - this is a proactive check, not an alert
@@ -4871,7 +4895,8 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                         format!("✅ Pod {} succeeded - running completion check", pod.name).green()
                     );
 
-                    handle_completion_check(&pod, namespace, prompts_dir, dry_run).await?;
+                    handle_completion_check(&pod, namespace, prompts_dir, dry_run, enable_docker)
+                        .await?;
                 }
             }
             AlertWatchEvent::CodeRunEvent(event_json) => {
@@ -4950,8 +4975,15 @@ async fn run_alert_watch(namespace: &str, prompts_dir: &str, dry_run: bool) -> R
                             alerted_coderuns.insert(coderun.name.clone());
 
                             // Handle the alert for CodeRun
-                            handle_coderun_alert(&alert, &coderun, namespace, prompts_dir, dry_run)
-                                .await?;
+                            handle_coderun_alert(
+                                &alert,
+                                &coderun,
+                                namespace,
+                                prompts_dir,
+                                dry_run,
+                                enable_docker,
+                            )
+                            .await?;
                         }
                     }
                 }
@@ -5005,6 +5037,7 @@ async fn handle_coderun_alert(
     namespace: &str,
     prompts_dir: &str,
     dry_run: bool,
+    enable_docker: bool,
 ) -> Result<()> {
     let alert_id = alert.id.as_str().to_lowercase();
     let task_id = &coderun.task_id;
@@ -5025,6 +5058,7 @@ async fn handle_coderun_alert(
         prompts_dir,
         dry_run,
         Some(&alert.context), // Pass full alert context for template rendering
+        enable_docker,
     )
     .await
 }
@@ -5124,6 +5158,7 @@ async fn handle_detected_alert(
     namespace: &str,
     prompts_dir: &str,
     dry_run: bool,
+    enable_docker: bool,
 ) -> Result<()> {
     let alert_id = alert.id.as_str().to_lowercase();
     let task_id = alert
@@ -5180,6 +5215,7 @@ async fn handle_detected_alert(
         prompts_dir,
         dry_run,
         Some(&alert.context), // Pass full alert context for template rendering
+        enable_docker,
     )
     .await
 }
@@ -5190,6 +5226,7 @@ async fn handle_completion_check(
     namespace: &str,
     prompts_dir: &str,
     dry_run: bool,
+    enable_docker: bool,
 ) -> Result<()> {
     let task_id = pod.labels.get("task-id").map_or("unknown", String::as_str);
     let agent = pod.labels.get("agent").map_or("unknown", String::as_str);
@@ -5204,6 +5241,7 @@ async fn handle_completion_check(
         prompts_dir,
         dry_run,
         None, // No additional context for completion checks
+        enable_docker,
     )
     .await
 }
@@ -5220,6 +5258,7 @@ async fn handle_alert(
     prompts_dir: &str,
     dry_run: bool,
     alert_context: Option<&std::collections::HashMap<String, String>>,
+    enable_docker: bool,
 ) -> Result<()> {
     // Fetch pod logs
     let logs = get_pod_logs_for_alert(pod_name, namespace, 500);
@@ -5245,6 +5284,7 @@ async fn handle_alert(
         logs,
         expected_behaviors,
         duration: "N/A".to_string(),
+        enable_docker,
         extra: alert_context.cloned().unwrap_or_default(),
     };
 
@@ -5608,6 +5648,7 @@ async fn test_alert_flow(
     agent: &str,
     prompts_dir: &str,
     dry_run: bool,
+    enable_docker: bool,
 ) -> Result<()> {
     println!(
         "{}",
@@ -5624,6 +5665,7 @@ async fn test_alert_flow(
         prompts_dir,
         dry_run,
         None, // No context for test alerts
+        enable_docker,
     )
     .await?;
 

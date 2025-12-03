@@ -397,6 +397,7 @@ impl CodeTemplateGenerator {
             "workflow_name": workflow_name,
             "model": model.clone(),
             "cli_type": cli_type,
+            "enable_docker": code_run.spec.enable_docker,
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -732,6 +733,7 @@ impl CodeTemplateGenerator {
             "output_format": render_settings.output_format,
             "model_rotation": render_settings.model_rotation,
             "list_tools_on_start": render_settings.list_tools_on_start,
+            "enable_docker": code_run.spec.enable_docker,
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
@@ -944,6 +946,7 @@ impl CodeTemplateGenerator {
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": code_run.spec.model,
             "cli_config": cli_config,
+            "enable_docker": code_run.spec.enable_docker,
         });
 
         handlebars
