@@ -5167,9 +5167,10 @@ async fn handle_detected_alert(
         .map_or("unknown", String::as_str);
     let agent = alert.context.get("agent").map_or("unknown", String::as_str);
 
-    // Check for recent GitHub issue with same alert type (prevents issue spam)
+    // Check for recent GitHub issue with same alert type AND workflow family (prevents issue spam)
+    // Different workflows (e.g., atlas-* vs play-*) get separate issues
     if !dry_run {
-        match dedup::check_recent_alert_type_issue(&alert_id, "5dlabs/cto") {
+        match dedup::check_recent_alert_type_issue(&alert_id, &pod.name, "5dlabs/cto") {
             Ok(Some((issue_num, title))) => {
                 println!(
                     "{}",

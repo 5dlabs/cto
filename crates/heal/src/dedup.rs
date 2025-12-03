@@ -3,6 +3,10 @@
 //! Prevents duplicate remediation `CodeRuns` and GitHub issues for the same alert/pod.
 //! Also provides alert-type level deduplication to prevent issue spam when multiple
 //! pods fail with the same root cause.
+//!
+//! Deduplication is scoped by "workflow family" - pods from the same workflow (e.g.,
+//! `play-task-4-*`) are grouped together, but pods from different workflows (e.g.,
+//! `atlas-*` vs `play-*`) are treated separately.
 
 use anyhow::{Context, Result};
 use std::process::Command;
@@ -12,6 +16,46 @@ pub const EXCLUDE_LABEL: &str = "heal.platform/exclude";
 
 /// Time window (in minutes) for grouping similar alerts into one issue
 const DEDUP_WINDOW_MINS: u64 = 30;
+
+/// Extract the workflow family from a pod name.
+///
+/// Examples:
+/// - `play-task-4-abc-step-123` -> `play-task-4`
+/// - `atlas-conflict-monitor-xyz` -> `atlas-conflict-monitor`
+/// - `heal-remediation-task1-a7-abc` -> `heal-remediation`
+/// - `cto-tools-67db5dff7-hn8xh` -> `cto-tools`
+///
+/// The workflow family is used to group related pod failures together.
+#[must_use]
+pub fn extract_workflow_family(pod_name: &str) -> String {
+    let parts: Vec<&str> = pod_name.split('-').collect();
+
+    // Special cases for known workflow patterns
+    if pod_name.starts_with("play-task-") && parts.len() >= 3 {
+        // play-task-N-* -> play-task-N
+        return format!("{}-{}-{}", parts[0], parts[1], parts[2]);
+    }
+    if pod_name.starts_with("heal-remediation-") && parts.len() >= 2 {
+        // heal-remediation-* -> heal-remediation
+        return format!("{}-{}", parts[0], parts[1]);
+    }
+    if pod_name.starts_with("atlas-") && parts.len() >= 2 {
+        // atlas-conflict-monitor-* -> atlas-conflict-monitor
+        // atlas-batch-integration-* -> atlas-batch-integration
+        // atlas-guardian-* -> atlas-guardian
+        if parts.len() >= 3 && (parts[1] == "conflict" || parts[1] == "batch") {
+            return format!("{}-{}-{}", parts[0], parts[1], parts[2]);
+        }
+        return format!("{}-{}", parts[0], parts[1]);
+    }
+
+    // Default: take first 2 segments (handles cto-tools, cto-controller, etc.)
+    if parts.len() >= 2 {
+        format!("{}-{}", parts[0], parts[1])
+    } else {
+        pod_name.to_string()
+    }
+}
 
 /// Check if a pod should be excluded from heal monitoring
 pub fn should_exclude_pod(labels: &std::collections::HashMap<String, String>) -> bool {
@@ -138,14 +182,24 @@ pub fn check_existing_github_issue(
     Ok(number_str.parse::<u64>().ok())
 }
 
-/// Check if there's a recent open GitHub issue for this alert TYPE (regardless of pod).
+/// Check if there's a recent open GitHub issue for this alert TYPE within the same workflow family.
 ///
-/// This prevents issue spam when multiple pods fail with the same root cause.
-/// Returns `Some((issue_number, title))` if a recent open issue exists.
+/// This prevents issue spam when multiple pods from the SAME workflow fail with the same
+/// root cause, while still allowing separate issues for unrelated workflows.
+///
+/// For example:
+/// - Two `play-task-4-*` pods failing with A2 will share one issue
+/// - An `atlas-*` pod and a `play-*` pod failing with A2 will get separate issues
+///
+/// Returns `Some((issue_number, title))` if a recent open issue exists for the same family.
 pub fn check_recent_alert_type_issue(
     alert_type: &str,
+    pod_name: &str,
     repo: &str,
 ) -> Result<Option<(u64, String)>> {
+    // Extract workflow family for filtering
+    let current_family = extract_workflow_family(pod_name);
+
     // Query for any open issues with this alert type created recently
     let output = Command::new("gh")
         .args([
@@ -182,7 +236,7 @@ pub fn check_recent_alert_type_issue(
         Err(_) => return Ok(None),
     };
 
-    // Find the most recent issue created within the dedup window
+    // Find the most recent issue created within the dedup window for the same workflow family
     let now = chrono::Utc::now();
     for issue in issues {
         let number = issue["number"].as_u64();
@@ -196,15 +250,38 @@ pub fn check_recent_alert_type_issue(
                     .num_minutes()
                     .unsigned_abs();
 
-                // If issue was created within the dedup window, return it
+                // Only dedup if within time window AND same workflow family
                 if age_mins <= DEDUP_WINDOW_MINS {
-                    return Ok(Some((num, t.to_string())));
+                    // Extract pod name from title: "[HEAL-A2] Silent Failure: pod-name-here"
+                    // and check if it's from the same workflow family
+                    if let Some(issue_pod) = extract_pod_from_title(t) {
+                        let issue_family = extract_workflow_family(&issue_pod);
+                        if issue_family == current_family {
+                            return Ok(Some((num, t.to_string())));
+                        }
+                    }
                 }
             }
         }
     }
 
     Ok(None)
+}
+
+/// Extract pod name from a heal issue title.
+///
+/// Titles follow the pattern: `[HEAL-A2] Silent Failure: pod-name-here`
+fn extract_pod_from_title(title: &str) -> Option<String> {
+    // Look for ": " followed by the pod name
+    if let Some(idx) = title.rfind(": ") {
+        let pod_part = &title[idx + 2..];
+        // Take until first space or end
+        let pod_name = pod_part.split_whitespace().next()?;
+        if !pod_name.is_empty() {
+            return Some(pod_name.to_string());
+        }
+    }
+    None
 }
 
 /// Check if there's an active remediation for this alert TYPE (any pod).
@@ -291,5 +368,88 @@ mod tests {
         );
         assert_eq!(sanitize_label_value("pod-name---"), "pod-name");
         assert_eq!(sanitize_label_value("pod@with#special"), "podwithspecial");
+    }
+
+    #[test]
+    fn test_extract_workflow_family_play_tasks() {
+        // Play task pods should group by task number
+        assert_eq!(
+            extract_workflow_family("play-task-4-abc-step-123"),
+            "play-task-4"
+        );
+        assert_eq!(
+            extract_workflow_family("play-task-4-xyz-determine-resume-point-456"),
+            "play-task-4"
+        );
+        assert_eq!(extract_workflow_family("play-task-1-jqc6d"), "play-task-1");
+    }
+
+    #[test]
+    fn test_extract_workflow_family_atlas() {
+        // Atlas workflows should group by type
+        assert_eq!(
+            extract_workflow_family("atlas-conflict-monitor-xyz"),
+            "atlas-conflict-monitor"
+        );
+        assert_eq!(
+            extract_workflow_family("atlas-batch-integration-abc"),
+            "atlas-batch-integration"
+        );
+        assert_eq!(
+            extract_workflow_family("atlas-guardian-tcf6d"),
+            "atlas-guardian"
+        );
+    }
+
+    #[test]
+    fn test_extract_workflow_family_heal() {
+        // Heal remediations should group together
+        assert_eq!(
+            extract_workflow_family("heal-remediation-task1-a7-abc"),
+            "heal-remediation"
+        );
+        assert_eq!(
+            extract_workflow_family("heal-remediation-taskunknown-a2-xyz"),
+            "heal-remediation"
+        );
+    }
+
+    #[test]
+    fn test_extract_workflow_family_services() {
+        // Service pods should group by service
+        assert_eq!(
+            extract_workflow_family("cto-tools-67db5dff7-hn8xh"),
+            "cto-tools"
+        );
+        assert_eq!(
+            extract_workflow_family("cto-controller-794646b4c7-tg28b"),
+            "cto-controller"
+        );
+    }
+
+    #[test]
+    fn test_extract_pod_from_title() {
+        assert_eq!(
+            extract_pod_from_title("[HEAL-A2] Silent Failure: atlas-batch-integration-nxp5c"),
+            Some("atlas-batch-integration-nxp5c".to_string())
+        );
+        assert_eq!(
+            extract_pod_from_title("[HEAL-A7] Pod Failure: play-task-4-abc-step-123"),
+            Some("play-task-4-abc-step-123".to_string())
+        );
+        assert_eq!(extract_pod_from_title("No colon here"), None);
+    }
+
+    #[test]
+    fn test_workflow_families_different() {
+        // These should be different families (not deduped together)
+        let play_family = extract_workflow_family("play-task-4-abc-step-123");
+        let atlas_family = extract_workflow_family("atlas-conflict-monitor-xyz");
+        assert_ne!(play_family, atlas_family);
+
+        // Different task numbers are different families
+        let task4 = extract_workflow_family("play-task-4-abc");
+        let task6 = extract_workflow_family("play-task-6-xyz");
+        assert_ne!(task4, task6);
     }
 }

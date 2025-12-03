@@ -71,10 +71,10 @@ spec:
                 secondsAfterCompletion: 1800   # Clean up after 30 minutes
                 secondsAfterSuccess: 1800      # Clean up successful after 30 minutes
                 secondsAfterFailure: 7200      # Keep failed workflows for 2 hours
-              # Pod garbage collection to free up resources immediately
+              # Pod garbage collection - give heal time to capture logs before cleanup
               podGC:
                 strategy: OnPodCompletion
-                deleteDelayDuration: 30s       # Faster pod cleanup (was 60s)
+                deleteDelayDuration: 300s      # 5 minutes - allows heal to capture logs
         server:
           image:
             tag: v3.7.1

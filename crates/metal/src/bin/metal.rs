@@ -303,7 +303,10 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::List => {
             let servers = provider.list_servers().await?;
-            println!("\n{:<20} {:<20} {:<10} {:<16}", "ID", "HOSTNAME", "STATUS", "IPv4");
+            println!(
+                "\n{:<20} {:<20} {:<10} {:<16}",
+                "ID", "HOSTNAME", "STATUS", "IPv4"
+            );
             println!("{}", "-".repeat(70));
             for server in servers {
                 println!(
@@ -395,8 +398,8 @@ async fn main() -> Result<()> {
 
             // Step 3: Reinstall with Talos iPXE
             info!("Step 3/3: Triggering Talos iPXE boot...");
-            let talos = TalosConfig::new("cto-cluster")
-                .with_version(cto_metal::talos::TalosVersion::new(
+            let talos =
+                TalosConfig::new("cto-cluster").with_version(cto_metal::talos::TalosVersion::new(
                     &talos_version,
                     cto_metal::talos::DEFAULT_SCHEMATIC_ID,
                 ));
@@ -414,8 +417,10 @@ async fn main() -> Result<()> {
             println!("✅ Talos iPXE reinstall triggered!");
             println!("\n📋 Next steps:");
             println!("  1. Wait ~10-15 min for Talos to boot");
-            println!("  2. Connect with: talosctl --nodes {} version --insecure", 
-                     server.ipv4.unwrap_or_default());
+            println!(
+                "  2. Connect with: talosctl --nodes {} version --insecure",
+                server.ipv4.unwrap_or_default()
+            );
             println!("  3. Apply machine config to install to disk");
             println!("\n  Server ID: {}", server.id);
         }
@@ -427,8 +432,8 @@ async fn main() -> Result<()> {
         } => {
             info!("Triggering Talos iPXE reinstall on server: {id}");
 
-            let talos = TalosConfig::new("cto-cluster")
-                .with_version(cto_metal::talos::TalosVersion::new(
+            let talos =
+                TalosConfig::new("cto-cluster").with_version(cto_metal::talos::TalosVersion::new(
                     &talos_version,
                     cto_metal::talos::DEFAULT_SCHEMATIC_ID,
                 ));
@@ -543,8 +548,8 @@ async fn main() -> Result<()> {
 
             // Step 3: Reinstall with Talos iPXE
             println!("\n🔄 Step 3/10: Triggering Talos iPXE boot...");
-            let talos = TalosConfig::new(&cluster_name)
-                .with_version(cto_metal::talos::TalosVersion::new(
+            let talos =
+                TalosConfig::new(&cluster_name).with_version(cto_metal::talos::TalosVersion::new(
                     &talos_version,
                     cto_metal::talos::DEFAULT_SCHEMATIC_ID,
                 ));
@@ -582,7 +587,11 @@ async fn main() -> Result<()> {
 
             // Step 8: Wait for install
             println!("\n⏳ Step 8/10: Waiting for installation to complete...");
-            talos::wait_for_install(&server_ip, &configs.talosconfig, Duration::from_secs(timeout))?;
+            talos::wait_for_install(
+                &server_ip,
+                &configs.talosconfig,
+                Duration::from_secs(timeout),
+            )?;
 
             // Step 9: Bootstrap cluster
             println!("\n🎯 Step 9/10: Bootstrapping cluster...");
@@ -818,8 +827,8 @@ async fn main() -> Result<()> {
 
             // Step 3: Reinstall with Talos iPXE
             println!("\n🔄 Step 3/6: Triggering Talos iPXE boot...");
-            let talos = TalosConfig::new("worker")
-                .with_version(cto_metal::talos::TalosVersion::new(
+            let talos =
+                TalosConfig::new("worker").with_version(cto_metal::talos::TalosVersion::new(
                     &talos_version,
                     cto_metal::talos::DEFAULT_SCHEMATIC_ID,
                 ));
@@ -863,4 +872,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

@@ -79,7 +79,10 @@ pub fn wait_for_talos(ip: &str, timeout: Duration) -> Result<()> {
     let start = Instant::now();
     let addr = format!("{ip}:{TALOS_API_PORT}");
 
-    info!("Waiting for Talos at {addr} (timeout: {}s)...", timeout.as_secs());
+    info!(
+        "Waiting for Talos at {addr} (timeout: {}s)...",
+        timeout.as_secs()
+    );
 
     loop {
         if start.elapsed() > timeout {
@@ -166,7 +169,10 @@ pub fn generate_config(config: &BootstrapConfig) -> Result<GeneratedConfigs> {
 
     let endpoint = format!("https://{}:{K8S_API_PORT}", config.node_ip);
 
-    info!("Generating Talos config for cluster '{}'...", config.cluster_name);
+    info!(
+        "Generating Talos config for cluster '{}'...",
+        config.cluster_name
+    );
     let output = Command::new("talosctl")
         .args([
             "gen",
@@ -366,7 +372,15 @@ pub fn wait_for_kubernetes(node_ip: &str, talosconfig: &Path, timeout: Duration)
             let output = Command::new("talosctl")
                 .args(["--talosconfig"])
                 .arg(talosconfig)
-                .args(["-e", node_ip, "-n", node_ip, "health", "--wait-timeout", "30s"])
+                .args([
+                    "-e",
+                    node_ip,
+                    "-n",
+                    node_ip,
+                    "health",
+                    "--wait-timeout",
+                    "30s",
+                ])
                 .output();
 
             if let Ok(out) = output {
@@ -431,7 +445,12 @@ pub fn wait_for_node_ready(kubeconfig: &Path, timeout: Duration) -> Result<()> {
         let output = Command::new("kubectl")
             .args(["--kubeconfig"])
             .arg(kubeconfig)
-            .args(["get", "nodes", "-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"])
+            .args([
+                "get",
+                "nodes",
+                "-o",
+                "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}",
+            ])
             .output();
 
         if let Ok(out) = output {
@@ -479,13 +498,21 @@ pub fn full_bootstrap(config: &BootstrapConfig) -> Result<PathBuf> {
     apply_config(&config.node_ip, &configs.controlplane)?;
 
     // Step 5: Wait for install
-    wait_for_install(&config.node_ip, &configs.talosconfig, Duration::from_secs(600))?;
+    wait_for_install(
+        &config.node_ip,
+        &configs.talosconfig,
+        Duration::from_secs(600),
+    )?;
 
     // Step 6: Bootstrap cluster
     bootstrap_cluster(&config.node_ip, &configs.talosconfig)?;
 
     // Step 7: Wait for Kubernetes
-    wait_for_kubernetes(&config.node_ip, &configs.talosconfig, Duration::from_secs(300))?;
+    wait_for_kubernetes(
+        &config.node_ip,
+        &configs.talosconfig,
+        Duration::from_secs(300),
+    )?;
 
     // Step 8: Get kubeconfig
     let kubeconfig_path = config.output_dir.join("kubeconfig");
@@ -510,4 +537,3 @@ mod tests {
         assert_eq!(config.output_dir, PathBuf::from("/tmp/test"));
     }
 }
-
