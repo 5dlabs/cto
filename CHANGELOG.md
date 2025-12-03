@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.20](https://github.com/5dlabs/cto/compare/v0.12.19...v0.12.20) (2025-12-03)
+
+
+### 🔧 Maintenance
+
+* update package versions to 0.12.19 in Cargo.lock and improve retry logic in apply-agent-templates-configmap.sh ([78b36b5](https://github.com/5dlabs/cto/commit/78b36b50941f6d4501f7aaa28dd59821ae2740f7))
+
 ## [0.12.19](https://github.com/5dlabs/cto/compare/v0.12.18...v0.12.19) (2025-12-03)
 
 
