@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.26](https://github.com/5dlabs/cto/compare/v0.12.25...v0.12.26) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add Docker runtime access and streaming output ([#2532](https://github.com/5dlabs/cto/issues/2532)) ([bc1cdfb](https://github.com/5dlabs/cto/commit/bc1cdfb98fa871a0be3ec6b816a8f36d770dcb14))
+
+## [0.12.25](https://github.com/5dlabs/cto/compare/v0.12.24...v0.12.25) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output in real-time with text extraction ([#2530](https://github.com/5dlabs/cto/issues/2530)) ([2bb842c](https://github.com/5dlabs/cto/commit/2bb842c2a62c5c8a97a2c7b766a4b30f7b4bc9df))
+
 ## [0.12.24](https://github.com/5dlabs/cto/compare/v0.12.23...v0.12.24) (2025-12-03)
 
 

@@ -453,9 +453,7 @@ Focus on addressing the above items before re-checking acceptance criteria."
     
     # Wait for background process and retrieve exit code
     wait $CLAUDE_BG_PID 2>/dev/null || true
-    AGENT_EXIT=$(cat "$CLAUDE_EXIT_FILE" 2>/dev/null)
-    # Default to exit code 1 if file is empty or unreadable
-    AGENT_EXIT="${AGENT_EXIT:-1}"
+    AGENT_EXIT=$(cat "$CLAUDE_EXIT_FILE" 2>/dev/null || echo "1")
     rm -f "$CLAUDE_FIFO" "$CLAUDE_EXIT_FILE"
     
     set +f  # Re-enable glob expansion
