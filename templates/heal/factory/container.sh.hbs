@@ -157,6 +157,55 @@ if [ -d "/workspace/archived" ]; then
 fi
 
 # ============================================================================
+# GIT RETRY LOGIC (handles transient GitHub outages like HTTP 500)
+# ============================================================================
+# Retry git operations with exponential backoff for transient errors (5xx, network)
+# Fails fast on permanent errors (4xx, auth, invalid ref)
+git_with_retry() {
+    _gwr_max_attempts=5
+    _gwr_attempt=1
+    _gwr_base_delay=2
+    _gwr_max_delay=60
+    _gwr_delay=$_gwr_base_delay
+
+    while [ $_gwr_attempt -le $_gwr_max_attempts ]; do
+        echo "   git_with_retry: attempt $_gwr_attempt/$_gwr_max_attempts: git $*"
+
+        # Run the git command and capture output
+        _gwr_output=$(git "$@" 2>&1) && {
+            echo "$_gwr_output"
+            return 0
+        }
+
+        # Check if this is a transient error (5xx, network issues)
+        if echo "$_gwr_output" | grep -qiE "(500|502|503|504|internal server error|connection refused|connection reset|network|timed out|couldn't connect)"; then
+            echo "   Transient error detected (attempt $_gwr_attempt/$_gwr_max_attempts)"
+            echo "   Error: $_gwr_output"
+
+            if [ $_gwr_attempt -lt $_gwr_max_attempts ]; then
+                echo "   Waiting ${_gwr_delay}s before retry..."
+                sleep $_gwr_delay
+                # Exponential backoff (capped at max_delay)
+                _gwr_delay=$((_gwr_delay * 2))
+                if [ $_gwr_delay -gt $_gwr_max_delay ]; then
+                    _gwr_delay=$_gwr_max_delay
+                fi
+            fi
+        else
+            # Permanent error (4xx, auth issues, invalid ref, etc.) - fail fast
+            echo "   Permanent error detected, not retrying"
+            echo "   Error: $_gwr_output"
+            return 1
+        fi
+
+        _gwr_attempt=$((_gwr_attempt + 1))
+    done
+
+    echo "   All $_gwr_max_attempts attempts failed"
+    return 1
+}
+
+# ============================================================================
 # REPOSITORY PRE-STAGING (Optimization: reset instead of clone)
 # ============================================================================
 echo ""
@@ -167,20 +216,26 @@ echo "📂 Local path: ${REPO_PATH}"
 if [ -d "${REPO_PATH}/.git" ]; then
     echo "✓ Repository exists, syncing with origin/main..."
     cd "${REPO_PATH}"
-    
+
     # Ensure safe.directory is set for this specific repo
     git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
-    
+
     # Clean up any stale worktrees registered in git
     git worktree prune 2>/dev/null || true
-    
-    # Fetch latest (shallow to save bandwidth)
-    git fetch --depth 1 origin main 2>/dev/null || git fetch origin main
-    
+
+    # Fetch latest with retry (handles GitHub outages)
+    echo "📥 Fetching latest changes..."
+    if ! git_with_retry fetch --depth 1 origin main; then
+        echo "❌ Failed to fetch from origin after retries"
+        echo "   This may indicate a persistent network issue or GitHub outage"
+        echo "   Check https://www.githubstatus.com/ for service status"
+        exit 1
+    fi
+
     # Clean any uncommitted changes and reset to origin/main
     git reset --hard origin/main
     git clean -fd
-    
+
     echo "✓ Repository synced to $(git rev-parse --short HEAD)"
 else
     echo "📥 Repository not found, cloning (shallow)..."
@@ -189,12 +244,18 @@ else
     if ! echo "${CLONE_URL}" | grep -q "\.git$"; then
         CLONE_URL="${CLONE_URL}.git"
     fi
-    git clone --depth 1 "${CLONE_URL}" "${REPO_PATH}"
+    # Clone with retry (handles GitHub outages)
+    if ! git_with_retry clone --depth 1 "${CLONE_URL}" "${REPO_PATH}"; then
+        echo "❌ Failed to clone repository after retries"
+        echo "   This may indicate a persistent network issue or GitHub outage"
+        echo "   Check https://www.githubstatus.com/ for service status"
+        exit 1
+    fi
     cd "${REPO_PATH}"
-    
+
     # Configure safe.directory for the newly cloned repo
     git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
-    
+
     echo "✓ Repository cloned to $(git rev-parse --short HEAD)"
 fi
 
