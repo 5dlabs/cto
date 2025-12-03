@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.12.19](https://github.com/5dlabs/cto/compare/v0.12.18...v0.12.19) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** infinite iteration with acceptance criteria probes and merge conflict handling ([#2497](https://github.com/5dlabs/cto/issues/2497)) ([d226c6b](https://github.com/5dlabs/cto/commit/d226c6b993002cc89f9c915df00c0f2c643b5ca2))
+
+
+### 🐛 Bug Fixes
+
+* address PR review comments from cursor bot ([86cfada](https://github.com/5dlabs/cto/commit/86cfadafd29332ca3afdee49987d401e952e68ef))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([5fcfaeb](https://github.com/5dlabs/cto/commit/5fcfaeb4d6a4708543e597ffdd612edbea79f97d))
+* **chart:** regenerate agent templates ConfigMaps ([#2495](https://github.com/5dlabs/cto/issues/2495)) ([65e1e8a](https://github.com/5dlabs/cto/commit/65e1e8aecc9b5094e24f4596de6353a39b560eab))
+* update package versions to 0.12.18 in Cargo.lock ([80bffe5](https://github.com/5dlabs/cto/commit/80bffe58f36c21169687346cd9423513346ad67f))
+
 ## [0.12.18](https://github.com/5dlabs/cto/compare/v0.12.17...v0.12.18) (2025-12-03)
 
 
