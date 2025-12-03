@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.12.22](https://github.com/5dlabs/cto/compare/v0.12.21...v0.12.22) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add alert-type level deduplication to prevent issue spam ([#2510](https://github.com/5dlabs/cto/issues/2510)) ([04a288c](https://github.com/5dlabs/cto/commit/04a288c77d41d7760e4e8895f4ae06c18260b6cf))
+
+
+### 🐛 Bug Fixes
+
+* improve error messaging when tools CLI is missing ([#2511](https://github.com/5dlabs/cto/issues/2511)) ([43ec88c](https://github.com/5dlabs/cto/commit/43ec88cae4897bfd0e9b2afed3550ac70539703f)), closes [#2506](https://github.com/5dlabs/cto/issues/2506)
+* include tools-client version in runtime image tag to trigger rebuilds ([#2508](https://github.com/5dlabs/cto/issues/2508)) ([43c29bc](https://github.com/5dlabs/cto/commit/43c29bcf2baf7e1ec10d33be16ace685a5ebf00a)), closes [#2504](https://github.com/5dlabs/cto/issues/2504)
+* make MCP tools CLI check non-fatal to allow agent to proceed ([#2513](https://github.com/5dlabs/cto/issues/2513)) ([f834e9e](https://github.com/5dlabs/cto/commit/f834e9ecda6c89159dc359f30ce5edff905636af)), closes [#2505](https://github.com/5dlabs/cto/issues/2505)
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([5de7ea9](https://github.com/5dlabs/cto/commit/5de7ea91b16e5b87b76ce9269a61e541ef454330))
+* auto-update agent-templates ConfigMap ([4b21e41](https://github.com/5dlabs/cto/commit/4b21e41d09240ccc729a2a2cae9c7972e20e91e6))
+* **chart:** regenerate agent templates ConfigMaps ([#2512](https://github.com/5dlabs/cto/issues/2512)) ([9a910b9](https://github.com/5dlabs/cto/commit/9a910b9f33f70e437fbab3cb0f5cf0a319699a27))
+* **chart:** regenerate agent templates ConfigMaps ([#2515](https://github.com/5dlabs/cto/issues/2515)) ([6d63bbe](https://github.com/5dlabs/cto/commit/6d63bbe2395f26a21b04458708b11d15dd6387fe))
+
 ## [0.12.21](https://github.com/5dlabs/cto/compare/v0.12.20...v0.12.21) (2025-12-03)
 
 
