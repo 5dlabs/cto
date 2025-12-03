@@ -5262,8 +5262,8 @@ async fn handle_alert(
     alert_context: Option<&std::collections::HashMap<String, String>>,
     enable_docker: bool,
 ) -> Result<()> {
-    // Fetch pod logs
-    let logs = get_pod_logs_for_alert(pod_name, namespace, 500);
+    // Fetch pod logs (with Loki fallback for GC'd pods)
+    let logs = get_pod_logs_with_loki_fallback(pod_name, namespace, 500).await;
 
     // For completion checks, load agent-specific expected behaviors
     let expected_behaviors = if alert_id == "completion" {
@@ -5397,7 +5397,7 @@ fn render_legacy_template(
     Ok(rendered)
 }
 
-/// Fetch recent logs for a pod
+/// Fetch recent logs for a pod (sync version, kubectl only)
 fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String {
     let output = std::process::Command::new("kubectl")
         .args([
@@ -5424,6 +5424,110 @@ fn get_pod_logs_for_alert(pod_name: &str, namespace: &str, tail: u32) -> String 
 
     // Redact secrets before returning
     redact_secrets(&logs)
+}
+
+/// Fetch logs for a pod with Loki fallback (async version)
+///
+/// Tries kubectl logs first (for live pods), then falls back to Loki
+/// for historical logs if the pod has been garbage collected.
+async fn get_pod_logs_with_loki_fallback(
+    pod_name: &str,
+    namespace: &str,
+    tail: u32,
+) -> String {
+    // First, try kubectl logs (works for live pods)
+    let kubectl_logs = get_pod_logs_for_alert(pod_name, namespace, tail);
+    
+    // If kubectl succeeded (doesn't contain error markers), return those logs
+    if !kubectl_logs.contains("[Failed to fetch logs:")
+        && !kubectl_logs.contains("[Error fetching logs:")
+        && !kubectl_logs.is_empty()
+    {
+        return kubectl_logs;
+    }
+
+    // kubectl failed - try Loki for historical logs
+    println!(
+        "{}",
+        format!(
+            "📚 Pod {} logs unavailable via kubectl, querying Loki for historical logs...",
+            pod_name
+        )
+        .cyan()
+    );
+
+    let loki_client = loki::LokiClient::with_defaults();
+    
+    // Check if Loki is reachable
+    match loki_client.health_check().await {
+        Ok(true) => {}
+        Ok(false) | Err(_) => {
+            println!(
+                "{}",
+                "⚠️  Loki not reachable, returning kubectl error".yellow()
+            );
+            return kubectl_logs;
+        }
+    }
+
+    // Query Loki for logs from the last 30 minutes
+    let end = Utc::now();
+    let start = end - chrono::Duration::minutes(30);
+    
+    match loki_client
+        .query_pod_logs(namespace, pod_name, start, end, tail)
+        .await
+    {
+        Ok(entries) if !entries.is_empty() => {
+            println!(
+                "{}",
+                format!(
+                    "✅ Retrieved {} log entries from Loki for {}",
+                    entries.len(),
+                    pod_name
+                )
+                .green()
+            );
+            
+            // Format logs with timestamps
+            let logs = format_loki_entries_as_logs(&entries, tail as usize);
+            
+            // Redact secrets before returning
+            redact_secrets(&logs)
+        }
+        Ok(_) => {
+            println!(
+                "{}",
+                format!("⚠️  No logs found in Loki for {}", pod_name).yellow()
+            );
+            format!(
+                "[No logs available - pod {} not found in kubectl or Loki]",
+                pod_name
+            )
+        }
+        Err(e) => {
+            println!(
+                "{}",
+                format!("⚠️  Loki query failed for {}: {}", pod_name, e).yellow()
+            );
+            // Return the original kubectl error
+            kubectl_logs
+        }
+    }
+}
+
+/// Format Loki log entries as a string for inclusion in prompts
+fn format_loki_entries_as_logs(entries: &[loki::LogEntry], max_entries: usize) -> String {
+    use std::fmt::Write;
+    
+    let mut logs = String::from(
+        "# Historical logs from Loki (pod may have been garbage collected)\n\n"
+    );
+    for entry in entries.iter().take(max_entries) {
+        let time = entry.timestamp.format("%Y-%m-%d %H:%M:%S%.3f");
+        let _ = writeln!(logs, "[{}] {}", time, entry.line);
+    }
+    logs
 }
 
 /// Redact sensitive information from logs to prevent secret leakage
