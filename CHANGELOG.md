@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.29](https://github.com/5dlabs/cto/compare/v0.12.28...v0.12.29) (2025-12-03)
+
+
+### 🔧 Maintenance
+
+* update dependencies to version 0.12.27 and add Cluster command to metal CLI ([52e4db9](https://github.com/5dlabs/cto/commit/52e4db97f9d1f0fd14a23b820d76f795885fe2ba))
+
+## [0.12.28](https://github.com/5dlabs/cto/compare/v0.12.27...v0.12.28) (2025-12-03)
+
+
+### 🔧 Maintenance
+
+* update dependencies to version 0.12.23 and add cto-metal package ([a1a697e](https://github.com/5dlabs/cto/commit/a1a697e73789c9eef4995089c1c143b786cb7ffb))
+
 ## [0.12.27](https://github.com/5dlabs/cto/compare/v0.12.26...v0.12.27) (2025-12-03)
 
 
