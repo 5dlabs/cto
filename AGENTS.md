@@ -71,3 +71,143 @@ Always consult Context7 when:
 - Use `cto-config.json` (see `cto-config-example.json`) and `.cursor/mcp.json` to configure local runs; avoid committing user-specific tokens.
 - Large files and generated artifacts should not be committed unless explicitly required.
 
+## MCP Tools for Observability & GitOps
+
+The platform provides MCP (Model Context Protocol) tools for interacting with observability and GitOps systems. These tools require port-forwards to be active.
+
+### Port-Forward Requirements
+
+```bash
+# Prometheus (metrics)
+kubectl port-forward svc/prometheus-server -n observability 9090:80
+
+# Loki (logs)
+kubectl port-forward svc/loki-gateway -n observability 3100:80
+
+# Grafana (dashboards)
+kubectl port-forward svc/grafana -n observability 3000:80
+
+# ArgoCD (GitOps)
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+
+# Argo Workflows
+kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
+```
+
+### Prometheus (Metrics)
+
+Query metrics for performance analysis:
+
+```bash
+# Check service health
+prometheus_execute_query({ query: "up{job=\"cto-controller\"}" })
+
+# Error rates
+prometheus_execute_query({ query: "rate(http_requests_total{status=~\"5..\"}[5m])" })
+
+# Range queries for trends
+prometheus_execute_range_query({
+  query: "rate(http_requests_total[5m])",
+  start: "now-1h", end: "now", step: "1m"
+})
+
+# List available metrics
+prometheus_list_metrics({ filter_pattern: "cto_" })
+```
+
+### Loki (Logs)
+
+Search and analyze application logs:
+
+```bash
+# Query logs with filters
+loki_query({
+  query: "{namespace=\"cto\"} |~ \"error|ERROR\"",
+  limit: 100
+})
+
+# Get available labels
+loki_label_names()
+loki_label_values({ label: "pod" })
+```
+
+**LogQL Patterns:**
+- `{namespace="cto"}` - Label selector
+- `|~ "pattern"` - Regex match
+- `|= "exact"` - Exact match
+- `| json | level="error"` - Parse JSON and filter
+
+### Grafana (Dashboards & Alerts)
+
+Access dashboards, alerts, and query datasources:
+
+```bash
+# Search dashboards
+grafana_search_dashboards({ query: "CTO" })
+
+# Query metrics via Grafana
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "up",
+  queryType: "instant"
+})
+
+# Query logs via Grafana
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"}",
+  limit: 50
+})
+
+# List alert rules
+grafana_list_alert_rules()
+```
+
+### ArgoCD (GitOps)
+
+Manage GitOps deployments:
+
+```bash
+# List applications
+argocd_list_applications()
+
+# Get application status (sync, health)
+argocd_get_application({ applicationName: "cto-controller" })
+
+# Check resources and events
+argocd_get_application_resource_tree({ applicationName: "app" })
+argocd_get_application_events({ applicationName: "app" })
+
+# Trigger sync
+argocd_sync_application({ applicationName: "app" })
+```
+
+### Argo Workflows
+
+Monitor and manage workflow executions:
+
+```bash
+# List workflows
+argo_workflows_list_workflows({ namespace: "cto", limit: 20 })
+
+# Get workflow details and logs
+argo_workflows_get_workflow({ namespace: "cto", name: "workflow-name" })
+argo_workflows_get_workflow_logs({ namespace: "cto", workflow_name: "name" })
+
+# List templates and cron workflows
+argo_workflows_list_workflow_templates({ namespace: "cto" })
+argo_workflows_list_cron_workflows({ namespace: "automation" })
+
+# Retry failed workflow
+argo_workflows_retry_workflow({ namespace: "cto", name: "failed-workflow" })
+```
+
+### Debugging Workflow
+
+When investigating issues:
+
+1. **Metrics** - `prometheus_execute_query({ query: "up{job=\"...\"}" })`
+2. **Logs** - `loki_query({ query: "{pod=~\"...\"}|~\"error\"" })`
+3. **Deployment** - `argocd_get_application({ applicationName: "..." })`
+4. **Workflows** - `argo_workflows_list_workflows({ status: "Failed" })`
+
