@@ -86,7 +86,9 @@ pub enum ContainerState {
     Waiting {
         reason: Option<String>,
     },
-    Running,
+    Running {
+        started_at: Option<DateTime<Utc>>,
+    },
     Terminated {
         exit_code: i32,
         reason: Option<String>,

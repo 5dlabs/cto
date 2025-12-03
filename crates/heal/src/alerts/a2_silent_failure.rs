@@ -21,6 +21,12 @@ const RESTART_THRESHOLD: i32 = 3;
 /// Seconds before terminated container is flagged by duration check
 const TERMINATED_DURATION_SECS: i64 = 60;
 
+/// Startup grace period in seconds.
+/// Containers not ready within this period after starting are not flagged as silent failures.
+/// This prevents false positives during normal pod initialization when readiness probes
+/// haven't passed yet.
+const STARTUP_GRACE_PERIOD_SECS: i64 = 30;
+
 pub struct Handler;
 
 impl Handler {
@@ -166,11 +172,26 @@ fn detect_by_exit_code(pod: &Pod) -> Option<Detection> {
 
 /// Method 2: Container not ready while pod is Running
 fn detect_by_ready_status(pod: &Pod) -> Option<Detection> {
+    let now = Utc::now();
+
     for container in &pod.container_statuses {
         if !container.ready {
             // Skip if container is in waiting state (startup phase)
             if matches!(container.state, ContainerState::Waiting { .. }) {
                 continue;
+            }
+
+            // Skip if container is in running state but within startup grace period.
+            // This prevents false positives during normal pod initialization when
+            // readiness probes haven't passed yet.
+            if let ContainerState::Running {
+                started_at: Some(start_time),
+            } = &container.state
+            {
+                let running_duration = now.signed_duration_since(*start_time);
+                if running_duration < Duration::seconds(STARTUP_GRACE_PERIOD_SECS) {
+                    continue;
+                }
             }
 
             return Some(Detection {
@@ -187,6 +208,16 @@ fn detect_by_ready_status(pod: &Pod) -> Option<Detection> {
 
 /// Method 3: Pod condition ContainersReady=False
 fn detect_by_pod_conditions(pod: &Pod) -> Option<Detection> {
+    // Skip if pod is within startup grace period.
+    // This prevents false positives during normal pod initialization.
+    if let Some(started_at) = pod.started_at {
+        let now = Utc::now();
+        let pod_age = now.signed_duration_since(started_at);
+        if pod_age < Duration::seconds(STARTUP_GRACE_PERIOD_SECS) {
+            return None;
+        }
+    }
+
     // Check ContainersReady condition first (more specific)
     for condition in &pod.conditions {
         if condition.condition_type == "ContainersReady" && condition.status == "False" {
@@ -310,7 +341,7 @@ mod tests {
                 ContainerStatus {
                     name: "docker-daemon".into(),
                     ready: true,
-                    state: ContainerState::Running,
+                    state: ContainerState::Running { started_at: None },
                     restart_count: 0,
                 },
             ],
@@ -385,6 +416,8 @@ mod tests {
         let event = K8sEvent::PodModified(Pod {
             name: "rex-pod-123".into(),
             phase: "Running".into(),
+            // Pod started well before grace period (2 minutes ago)
+            started_at: Some(Utc::now() - Duration::minutes(2)),
             conditions: vec![PodCondition {
                 condition_type: "ContainersReady".into(),
                 status: "False".into(),
@@ -432,9 +465,9 @@ mod tests {
             }],
             container_statuses: vec![ContainerStatus {
                 name: "unstable".into(),
-                ready: true,                    // Ready (no ready status trigger)
-                state: ContainerState::Running, // Running (no exit code trigger)
-                restart_count: 5,               // High restart count
+                ready: true, // Ready (no ready status trigger)
+                state: ContainerState::Running { started_at: None }, // Running (no exit code trigger)
+                restart_count: 5,                                    // High restart count
             }],
             ..Default::default()
         });
@@ -510,13 +543,13 @@ mod tests {
                 ContainerStatus {
                     name: "main".into(),
                     ready: true,
-                    state: ContainerState::Running,
+                    state: ContainerState::Running { started_at: None },
                     restart_count: 0,
                 },
                 ContainerStatus {
                     name: "sidecar".into(),
                     ready: true,
-                    state: ContainerState::Running,
+                    state: ContainerState::Running { started_at: None },
                     restart_count: 0,
                 },
             ],
@@ -544,5 +577,75 @@ mod tests {
 
         // Ready status check should NOT fire during startup
         assert!(detect_by_ready_status(&pod).is_none());
+    }
+
+    #[test]
+    fn test_startup_grace_period_ready_status() {
+        // Container just started (10 seconds ago) - should NOT trigger alert
+        let recent_pod = Pod {
+            name: "starting".into(),
+            phase: "Running".into(),
+            container_statuses: vec![ContainerStatus {
+                name: "main".into(),
+                ready: false, // Not ready yet
+                state: ContainerState::Running {
+                    started_at: Some(Utc::now() - Duration::seconds(10)),
+                },
+                restart_count: 0,
+            }],
+            ..Default::default()
+        };
+        assert!(detect_by_ready_status(&recent_pod).is_none());
+
+        // Container started long ago (2 minutes) - SHOULD trigger alert
+        let old_pod = Pod {
+            name: "stale".into(),
+            phase: "Running".into(),
+            container_statuses: vec![ContainerStatus {
+                name: "main".into(),
+                ready: false, // Still not ready after 2 minutes
+                state: ContainerState::Running {
+                    started_at: Some(Utc::now() - Duration::minutes(2)),
+                },
+                restart_count: 0,
+            }],
+            ..Default::default()
+        };
+        assert!(detect_by_ready_status(&old_pod).is_some());
+    }
+
+    #[test]
+    fn test_startup_grace_period_pod_conditions() {
+        // Pod just started (10 seconds ago) - should NOT trigger alert via conditions
+        let recent_pod = Pod {
+            name: "starting".into(),
+            phase: "Running".into(),
+            started_at: Some(Utc::now() - Duration::seconds(10)),
+            conditions: vec![PodCondition {
+                condition_type: "ContainersReady".into(),
+                status: "False".into(),
+                reason: Some("ContainersNotReady".into()),
+                message: Some("containers with unready status: [main]".into()),
+            }],
+            container_statuses: vec![],
+            ..Default::default()
+        };
+        assert!(detect_by_pod_conditions(&recent_pod).is_none());
+
+        // Pod started long ago (2 minutes) - SHOULD trigger alert via conditions
+        let old_pod = Pod {
+            name: "stale".into(),
+            phase: "Running".into(),
+            started_at: Some(Utc::now() - Duration::minutes(2)),
+            conditions: vec![PodCondition {
+                condition_type: "ContainersReady".into(),
+                status: "False".into(),
+                reason: Some("ContainersNotReady".into()),
+                message: Some("containers with unready status: [main]".into()),
+            }],
+            container_statuses: vec![],
+            ..Default::default()
+        };
+        assert!(detect_by_pod_conditions(&old_pod).is_some());
     }
 }
