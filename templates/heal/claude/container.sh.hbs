@@ -399,6 +399,8 @@ Focus on addressing the above items before re-checking acceptance criteria."
     # Wait for background process and retrieve exit code
     wait $CLAUDE_BG_PID 2>/dev/null || true
     AGENT_EXIT=$(cat "$CLAUDE_EXIT_FILE" 2>/dev/null || echo "1")
+    # Handle empty file case (mktemp creates empty file; if process dies before writing $?, cat succeeds but outputs nothing)
+    AGENT_EXIT="${AGENT_EXIT:-1}"
     rm -f "$CLAUDE_FIFO" "$CLAUDE_EXIT_FILE"
     
     set +f  # Re-enable glob expansion
