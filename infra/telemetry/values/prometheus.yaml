@@ -41,12 +41,13 @@ server:
     evaluation_interval: 15s
 
   # Service configuration
+  # Note: Using helm default port 80 (targets container 9090)
   service:
     type: ClusterIP
-    servicePort: 9090
+    servicePort: 80
     annotations:
       prometheus.io/scrape: "true"
-      prometheus.io/port: "9090"
+      prometheus.io/port: "80"
       prometheus.io/path: "/metrics"
 
   # Security context
