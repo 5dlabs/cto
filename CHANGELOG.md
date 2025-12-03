@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.24](https://github.com/5dlabs/cto/compare/v0.12.23...v0.12.24) (2025-12-03)
+
+
+### 📚 Documentation
+
+* add Latitude.sh bare metal POC design and research ([#2525](https://github.com/5dlabs/cto/issues/2525)) ([2337549](https://github.com/5dlabs/cto/commit/23375494882f35004326470f5abf911af11266eb))
+
 ## [0.12.23](https://github.com/5dlabs/cto/compare/v0.12.22...v0.12.23) (2025-12-03)
 
 
