@@ -76,6 +76,8 @@ pub struct AlertContext {
     pub logs: String,
     pub expected_behaviors: String,
     pub duration: String,
+    /// Whether Docker is enabled for this remediation
+    pub enable_docker: bool,
     /// Additional alert-specific variables
     #[serde(flatten)]
     pub extra: HashMap<String, String>,
@@ -216,6 +218,7 @@ mod tests {
             logs: "Some logs".to_string(),
             expected_behaviors: String::new(),
             duration: "5m".to_string(),
+            enable_docker: true,
             extra: HashMap::new(),
         };
 
@@ -240,6 +243,7 @@ mod tests {
             logs: String::new(),
             expected_behaviors: String::new(),
             duration: "5m".to_string(),
+            enable_docker: true,
             extra: HashMap::new(),
         };
 
@@ -270,6 +274,7 @@ mod tests {
             logs: String::new(),
             expected_behaviors: String::new(),
             duration: "5m".to_string(),
+            enable_docker: true,
             extra: HashMap::new(), // missing_agent is NOT in extra
         };
 
@@ -299,6 +304,7 @@ mod tests {
             logs: String::new(),
             expected_behaviors: String::new(),
             duration: "5m".to_string(),
+            enable_docker: true,
             extra: HashMap::new(),
         };
 

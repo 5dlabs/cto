@@ -112,6 +112,51 @@ echo "📁 Worktree: ${WORKTREE_PATH}"
 mkdir -p /workspace/worktrees
 
 # ============================================================================
+# WORKSPACE CLEANUP (PVC persists between runs)
+# ============================================================================
+echo ""
+echo "═══ WORKSPACE CLEANUP ═══"
+
+# Configure git safe.directory to avoid "dubious ownership" errors on shared PVC
+# This is needed because the PVC may have been created by a different user/pod
+git config --global --add safe.directory '*' 2>/dev/null || true
+echo "✓ Git safe.directory configured"
+
+# Clean up stale worktrees from previous runs
+if [ -d "/workspace/worktrees" ]; then
+    echo "🧹 Cleaning stale worktrees..."
+    WORKTREE_COUNT=$(find /workspace/worktrees -maxdepth 1 -type d 2>/dev/null | wc -l)
+    if [ "$WORKTREE_COUNT" -gt 1 ]; then
+        # Remove worktrees older than 24 hours (exclude current)
+        find /workspace/worktrees -maxdepth 1 -type d -mmin +1440 -not -name "$(basename ${WORKTREE_PATH})" 2>/dev/null | while read -r old_wt; do
+            if [ -d "$old_wt" ] && [ "$old_wt" != "/workspace/worktrees" ]; then
+                echo "   Removing stale worktree: $old_wt"
+                rm -rf "$old_wt" 2>/dev/null || true
+            fi
+        done
+    fi
+    echo "✓ Worktree cleanup complete"
+fi
+
+# Clean up stale git lock files
+find /workspace -name "*.lock" -type f -mmin +30 2>/dev/null | while read -r lockfile; do
+    echo "   Removing stale lock: $lockfile"
+    rm -f "$lockfile" 2>/dev/null || true
+done
+
+# Clean up archived issues older than 7 days
+if [ -d "/workspace/archived" ]; then
+    echo "🧹 Cleaning old archived issues..."
+    find /workspace/archived -maxdepth 1 -type d -mtime +7 2>/dev/null | while read -r old_archive; do
+        if [ -d "$old_archive" ] && [ "$old_archive" != "/workspace/archived" ]; then
+            echo "   Removing old archive: $old_archive"
+            rm -rf "$old_archive" 2>/dev/null || true
+        fi
+    done
+    echo "✓ Archive cleanup complete"
+fi
+
+# ============================================================================
 # REPOSITORY PRE-STAGING (Optimization: reset instead of clone)
 # ============================================================================
 echo ""
@@ -122,6 +167,12 @@ echo "📂 Local path: ${REPO_PATH}"
 if [ -d "${REPO_PATH}/.git" ]; then
     echo "✓ Repository exists, syncing with origin/main..."
     cd "${REPO_PATH}"
+    
+    # Ensure safe.directory is set for this specific repo
+    git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+    
+    # Clean up any stale worktrees registered in git
+    git worktree prune 2>/dev/null || true
     
     # Fetch latest (shallow to save bandwidth)
     git fetch --depth 1 origin main 2>/dev/null || git fetch origin main
@@ -140,6 +191,10 @@ else
     fi
     git clone --depth 1 "${CLONE_URL}" "${REPO_PATH}"
     cd "${REPO_PATH}"
+    
+    # Configure safe.directory for the newly cloned repo
+    git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+    
     echo "✓ Repository cloned to $(git rev-parse --short HEAD)"
 fi
 
