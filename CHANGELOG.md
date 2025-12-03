@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.12.18](https://github.com/5dlabs/cto/compare/v0.12.17...v0.12.18) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add merge conflict handling and CI iteration to Rex remediation agent ([#2492](https://github.com/5dlabs/cto/issues/2492)) ([67ded38](https://github.com/5dlabs/cto/commit/67ded38c706e6601c2aa892b2f2c021ed66b12b5))
+* **heal:** iterate until acceptance criteria met with merge conflict handling ([3ad5c65](https://github.com/5dlabs/cto/commit/3ad5c65e50717fe126b42b0e51e986cc3f981945))
+
+
+### 🐛 Bug Fixes
+
+* auto-correct deprecated Anthropic model IDs in MCP intake ([#2496](https://github.com/5dlabs/cto/issues/2496)) ([c920f0c](https://github.com/5dlabs/cto/commit/c920f0c9b5a49f098cf67f38d1eaf870ae1bce35)), closes [#2488](https://github.com/5dlabs/cto/issues/2488)
+* **heal:** prevent glob expansion of mcp__* in Claude command ([cf5916e](https://github.com/5dlabs/cto/commit/cf5916e13799cd0cb04c7e0aaf7c9eeb66f343e0))
+* **intake:** update deprecated model name claude-3-5-sonnet-20241022 ([#2493](https://github.com/5dlabs/cto/issues/2493)) ([88c0b06](https://github.com/5dlabs/cto/commit/88c0b06c753626c3acda1dde75a74689bbf701ff)), closes [#2490](https://github.com/5dlabs/cto/issues/2490)
+* **intake:** update model name to claude-sonnet-4-5-20250929 ([#2489](https://github.com/5dlabs/cto/issues/2489)) ([11edd86](https://github.com/5dlabs/cto/commit/11edd86692b3275b3444a6b4be0052a2c9454d05))
+* **tweakcn:** add missing build-time env vars for Next.js ([#2483](https://github.com/5dlabs/cto/issues/2483)) ([0f10e4d](https://github.com/5dlabs/cto/commit/0f10e4d32279ae93ad53e5821c410e6ffc0952e9)), closes [#2475](https://github.com/5dlabs/cto/issues/2475)
+* **tweakcn:** trigger CI to build and push initial GHCR image ([#2487](https://github.com/5dlabs/cto/issues/2487)) ([7aed9bc](https://github.com/5dlabs/cto/commit/7aed9bc43b86ce7dc3b599ceb80973ac10b5f098))
+* update coderun.rs doc comment and add claude-sonnet-4/opus-4 model patterns ([#2494](https://github.com/5dlabs/cto/issues/2494)) ([d2afd81](https://github.com/5dlabs/cto/commit/d2afd81e5aba0bbe6475b5b300c3dfe2ecdaf089))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([e4f8e01](https://github.com/5dlabs/cto/commit/e4f8e015aeba32ead71a92f918acd6b654baa3f0))
+* **chart:** regenerate agent templates ConfigMaps ([#2479](https://github.com/5dlabs/cto/issues/2479)) ([e06eec1](https://github.com/5dlabs/cto/commit/e06eec1f1a4eda8e0b15247127b3a700ffb0fd8d))
+
 ## [0.12.17](https://github.com/5dlabs/cto/compare/v0.12.16...v0.12.17) (2025-12-02)
 
 
