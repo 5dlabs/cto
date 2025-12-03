@@ -109,8 +109,8 @@ impl ResourceNaming {
             .and_then(|v| v.as_str())
             .unwrap_or("");
         let is_heal = heal_remediation_label
-            || template_setting.starts_with("heal/")
-            || code_run.spec.service == "heal";
+            || template_setting.to_lowercase().starts_with("heal/")
+            || code_run.spec.service.to_lowercase().contains("heal");
 
         // For heal remediation CodeRuns, use heal-remediation- prefix
         if is_heal {
