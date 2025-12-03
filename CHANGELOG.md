@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.25](https://github.com/5dlabs/cto/compare/v0.12.24...v0.12.25) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output in real-time with text extraction ([#2530](https://github.com/5dlabs/cto/issues/2530)) ([2bb842c](https://github.com/5dlabs/cto/commit/2bb842c2a62c5c8a97a2c7b766a4b30f7b4bc9df))
+
 ## [0.12.24](https://github.com/5dlabs/cto/compare/v0.12.23...v0.12.24) (2025-12-03)
 
 
