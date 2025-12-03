@@ -246,7 +246,7 @@ impl LokiClient {
                 ("start", &start_ns.to_string()),
                 ("end", &end_ns.to_string()),
                 ("limit", &limit.to_string()),
-                ("direction", "forward"), // Oldest first
+                ("direction", "backward"), // Most recent first (like kubectl logs --tail)
             ])
             .send()
             .await
@@ -319,23 +319,28 @@ impl LokiClient {
     /// * `namespace` - Kubernetes namespace
     /// * `pod_name` - Name of the pod
     /// * `failure_time` - The time when the failure occurred
-    /// * `minutes_before` - Minutes before failure to include
-    /// * `minutes_after` - Minutes after failure to include
+    /// * `minutes_before` - Minutes before failure to include (must be non-negative)
+    /// * `minutes_after` - Minutes after failure to include (must be non-negative)
     pub async fn query_logs_around_failure(
         &self,
         namespace: &str,
         pod_name: &str,
         failure_time: DateTime<Utc>,
-        minutes_before: i64,
-        minutes_after: i64,
+        minutes_before: u64,
+        minutes_after: u64,
     ) -> Result<Vec<LogEntry>> {
-        let start = failure_time - chrono::Duration::minutes(minutes_before);
-        let end = failure_time + chrono::Duration::minutes(minutes_after);
+        // Use i64 for Duration but values are guaranteed non-negative via u64 params
+        let start = failure_time - chrono::Duration::minutes(minutes_before as i64);
+        let end = failure_time + chrono::Duration::minutes(minutes_after as i64);
         self.query_pod_logs(namespace, pod_name, start, end, 0).await
     }
 }
 
 /// Format log entries as a string suitable for GitHub issues or analysis
+///
+/// # Arguments
+/// * `entries` - Log entries to format
+/// * `max_lines` - Maximum number of lines to show (0 = show all)
 pub fn format_logs_for_issue(entries: &[LogEntry], max_lines: usize) -> String {
     use std::fmt::Write;
     
@@ -345,7 +350,9 @@ pub fn format_logs_for_issue(entries: &[LogEntry], max_lines: usize) -> String {
 
     let mut output = String::new();
     let total = entries.len();
-    let entries_to_show: &[LogEntry] = if total > max_lines {
+    
+    // If max_lines is 0, show all entries; otherwise truncate to max_lines
+    let entries_to_show: &[LogEntry] = if max_lines > 0 && total > max_lines {
         let _ = writeln!(
             output,
             "⚠️ Showing last {} of {} log entries\n",
@@ -412,6 +419,23 @@ mod tests {
         assert!(output.contains("Showing last 5 of 10"));
         assert!(output.contains("Log line 9")); // Last line should be included
         assert!(!output.contains("Log line 0")); // First line should be excluded
+    }
+
+    #[test]
+    fn test_format_logs_zero_max_lines_shows_all() {
+        let entries: Vec<LogEntry> = (0..10)
+            .map(|i| LogEntry {
+                timestamp: Utc::now(),
+                line: format!("Log line {}", i),
+                labels: std::collections::HashMap::new(),
+            })
+            .collect();
+
+        // max_lines=0 should show all entries
+        let output = format_logs_for_issue(&entries, 0);
+        assert!(!output.contains("Showing last")); // No truncation warning
+        assert!(output.contains("Log line 0")); // First line included
+        assert!(output.contains("Log line 9")); // Last line included
     }
 
     #[test]
