@@ -79,34 +79,57 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Query GitHub API for latest unified release (tags matching v*.*.*)
-          # This release contains both tools-client and play-monitor binaries
-          # Extract version from tag column (3rd tab-separated column) which is the clean tag like v0.2.1
-          RELEASE_VERSION=$(gh release list --limit 20 | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || echo "")
-          if [ -z "$RELEASE_VERSION" ]; then
-            echo "⚠️ No v*.*.* release found, tools and play-monitor will be skipped"
-            echo "tools_version=skip" >> "$GITHUB_OUTPUT"
-            echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
-          else
-            # Verify the tools-client binary exists in the release
-            TOOLS_URL="https://github.com/5dlabs/cto/releases/download/v${RELEASE_VERSION}/tools-client-linux-x86_64"
-            if curl -L --output /dev/null --silent --head --fail "$TOOLS_URL"; then
-              echo "📦 Latest tools release: $RELEASE_VERSION (verified)"
-              echo "tools_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
-            else
-              echo "⚠️ Release v${RELEASE_VERSION} found but tools-client asset missing, skipping tools"
-              echo "tools_version=skip" >> "$GITHUB_OUTPUT"
+          # Query GitHub API for recent unified releases (tags matching v*.*.*)
+          # Iterate through releases to find the first one with actual assets
+          # (new releases may not have binaries uploaded yet)
+          RELEASES=$(gh release list --limit 20 | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+
+          TOOLS_VERSION=""
+          MONITOR_VERSION=""
+
+          for TAG in $RELEASES; do
+            VERSION="${TAG#v}"  # Strip leading 'v'
+
+            # Check for tools-client if not yet found
+            if [ -z "$TOOLS_VERSION" ]; then
+              TOOLS_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/tools-client-linux-x86_64"
+              if curl -L --output /dev/null --silent --head --fail "$TOOLS_URL"; then
+                echo "📦 Found tools-client in release: $VERSION"
+                TOOLS_VERSION="$VERSION"
+              fi
             fi
 
-            # Verify the play-monitor binary exists in the release
-            MONITOR_URL="https://github.com/5dlabs/cto/releases/download/v${RELEASE_VERSION}/play-monitor-linux-x86_64"
-            if curl -L --output /dev/null --silent --head --fail "$MONITOR_URL"; then
-              echo "📦 Latest play-monitor release: $RELEASE_VERSION (verified)"
-              echo "play_monitor_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
-            else
-              echo "⚠️ Release v${RELEASE_VERSION} found but play-monitor asset missing, skipping play-monitor"
-              echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
+            # Check for play-monitor if not yet found
+            if [ -z "$MONITOR_VERSION" ]; then
+              MONITOR_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/play-monitor-linux-x86_64"
+              if curl -L --output /dev/null --silent --head --fail "$MONITOR_URL"; then
+                echo "📦 Found play-monitor in release: $VERSION"
+                MONITOR_VERSION="$VERSION"
+              fi
             fi
+
+            # Exit early if both found
+            if [ -n "$TOOLS_VERSION" ] && [ -n "$MONITOR_VERSION" ]; then
+              break
+            fi
+          done
+
+          # Output tools version
+          if [ -n "$TOOLS_VERSION" ]; then
+            echo "✅ Using tools version: $TOOLS_VERSION"
+            echo "tools_version=$TOOLS_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "⚠️ No release with tools-client found, skipping tools"
+            echo "tools_version=skip" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Output play-monitor version
+          if [ -n "$MONITOR_VERSION" ]; then
+            echo "✅ Using play-monitor version: $MONITOR_VERSION"
+            echo "play_monitor_version=$MONITOR_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "⚠️ No release with play-monitor found, skipping play-monitor"
+            echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to Container Registry
