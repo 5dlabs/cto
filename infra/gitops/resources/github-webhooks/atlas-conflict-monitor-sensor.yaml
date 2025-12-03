@@ -53,8 +53,8 @@ spec:
                 entrypoint: ensure-conflict-guardian
                 serviceAccountName: argo-workflow
                 ttlStrategy:
-                  secondsAfterCompletion: 60
-                  secondsAfterFailure: 300
+                  secondsAfterCompletion: 300
+                  secondsAfterFailure: 3600
                 podGC:
                   strategy: OnPodCompletion
                   deleteOnPodCompletion: true
