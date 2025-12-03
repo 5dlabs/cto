@@ -67,8 +67,9 @@ impl AlertHandler for Handler {
         let started_at = pod.started_at?;
         let elapsed = Utc::now() - started_at;
 
-        // Get agent from labels
+        // Get agent and task_id from labels
         let agent = pod.labels.get("agent").cloned().unwrap_or_default();
+        let task_id = pod.labels.get("task-id").cloned().unwrap_or_default();
         let threshold = Self::get_timeout_for_agent(&agent, ctx);
 
         if elapsed > threshold {
@@ -85,6 +86,7 @@ impl AlertHandler for Handler {
                 .with_severity(Severity::Warning)
                 .with_context("pod_name", pod.name.clone())
                 .with_context("agent", agent)
+                .with_context("task_id", task_id)
                 .with_context("elapsed_minutes", elapsed.num_minutes().to_string())
                 .with_context("threshold_minutes", threshold.num_minutes().to_string()),
             );
