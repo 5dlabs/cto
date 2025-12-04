@@ -12,6 +12,50 @@ Healer becomes the **single remediation hub** for all issues across the platform
 
 ---
 
+## Scope & Phasing
+
+Healer operates across two distinct domains with different timelines:
+
+### Domain 1: CTO Platform CI (Current Focus)
+
+| Attribute | Value |
+|-----------|-------|
+| **Repository** | `5dlabs/cto` |
+| **Scope** | CI remediation for the CTO platform itself |
+| **Failures** | Rust builds, Docker images, Helm charts, GitHub Actions |
+| **Status** | Implementing now |
+
+This phase focuses on getting the CTO platform's own CI green without human intervention.
+
+### Domain 2: CTO-Managed Applications (Future)
+
+| Attribute | Value |
+|-----------|-------|
+| **Repository** | `5dlabs/cto-apps` |
+| **Scope** | Deployed applications created by CTO |
+| **Failures** | App health, sync failures, resource issues, runtime errors |
+| **Status** | After CTO platform is stable |
+
+The [`cto-apps`](https://github.com/5dlabs/cto-apps) repo uses an App-of-Apps pattern:
+
+```
+cto-apps/
+├── app-of-apps.yaml          # Main ArgoCD app watching this repo
+├── preview/                   # Preview deployments (task-{id}-preview)
+├── production/                # Production deployments (task-{id}-prod)
+└── templates/                 # Templates for Bolt to use
+```
+
+**Domain 2 will require:**
+- ArgoCD application health monitoring (not just CI)
+- Runtime log analysis from deployed pods
+- Multi-repository awareness (cto vs cto-apps)
+- Bolt integration for deployment fixes
+
+**Note:** This design document focuses on Domain 1. Domain 2 will be designed separately once the CTO platform reaches stability.
+
+---
+
 ## Current State vs Desired State
 
 ### Current State Overview
