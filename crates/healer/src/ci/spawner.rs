@@ -196,6 +196,7 @@ impl CodeRunSpawner {
         // Get CodeRuns created after cutoff
         let label_selector = format!("app.kubernetes.io/name=healer,healer/branch={branch}");
 
+        // Use tab delimiter to avoid conflicts with RFC 3339 timestamps (which contain colons)
         let output = Command::new("kubectl")
             .args([
                 "get",
@@ -205,7 +206,7 @@ impl CodeRunSpawner {
                 "-l",
                 &label_selector,
                 "-o",
-                "jsonpath={range .items[*]}{.metadata.creationTimestamp}:{.metadata.name}{\"\\n\"}{end}",
+                "jsonpath={range .items[*]}{.metadata.creationTimestamp}\t{.metadata.name}{\"\\n\"}{end}",
             ])
             .output()
             .context("Failed to check for recent CodeRuns")?;
@@ -220,7 +221,8 @@ impl CodeRunSpawner {
                 continue;
             }
 
-            let parts: Vec<&str> = line.splitn(2, ':').collect();
+            // Split on tab delimiter (safe - tabs don't appear in timestamps or K8s names)
+            let parts: Vec<&str> = line.splitn(2, '\t').collect();
             if parts.len() < 2 {
                 continue;
             }
@@ -244,13 +246,22 @@ impl CodeRunSpawner {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - A remediation already exists for this workflow run
-    /// - A recent remediation exists for this branch
+    /// - A remediation already exists for this workflow run (unless retry)
+    /// - A recent remediation exists for this branch (unless retry)
     /// - Prompt rendering fails
     /// - kubectl apply fails
     pub fn spawn(&self, agent: Agent, ctx: &RemediationContext) -> Result<String> {
-        // Check for existing remediation
-        if let Some(failure) = &ctx.failure {
+        // Skip deduplication checks for retries - the previous CodeRun will still exist
+        // but we intentionally want to spawn a new one for the retry attempt
+        let is_retry = !ctx.previous_attempts.is_empty();
+
+        // Check for existing remediation (skip for retries)
+        if is_retry {
+            debug!(
+                "Skipping deduplication checks for retry attempt #{}",
+                ctx.previous_attempts.len() + 1
+            );
+        } else if let Some(failure) = &ctx.failure {
             if self.has_existing_remediation(failure.workflow_run_id)? {
                 bail!(
                     "CodeRun already exists for workflow run {}",

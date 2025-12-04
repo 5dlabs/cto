@@ -420,7 +420,8 @@ impl CiRouter {
             return Some(CiFailureType::RustBuild);
         }
 
-        if name.contains("eslint") || name.contains("lint") && name.contains("frontend") {
+        // ESLint is always frontend; generic "lint" needs "frontend" qualifier
+        if name.contains("eslint") || (name.contains("lint") && name.contains("frontend")) {
             return Some(CiFailureType::FrontendLint);
         }
         if name.contains("typescript") || name.contains("tsc") {
