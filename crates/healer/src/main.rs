@@ -5,6 +5,7 @@
 //! Emits unified JSON events for Cursor agent E2E feedback loop automation.
 
 mod alerts;
+pub mod ci;
 mod dedup;
 mod github;
 mod k8s;
@@ -366,6 +367,24 @@ enum Commands {
     Insights {
         #[command(subcommand)]
         action: InsightsCommands,
+    },
+    /// [SERVER] Run CI remediation HTTP server
+    Server {
+        /// Address to bind to
+        #[arg(long, default_value = "0.0.0.0:8080")]
+        addr: String,
+
+        /// Repository to monitor (e.g., 5dlabs/cto)
+        #[arg(long, default_value = "5dlabs/cto")]
+        repository: String,
+
+        /// Kubernetes namespace
+        #[arg(long, default_value = "cto")]
+        namespace: String,
+
+        /// Path to remediation config file
+        #[arg(long)]
+        config: Option<String>,
     },
 }
 
@@ -2095,6 +2114,14 @@ async fn main() -> Result<()> {
         }
         Commands::Insights { action } => {
             handle_insights_command(action)?;
+        }
+        Commands::Server {
+            addr,
+            repository,
+            namespace,
+            config: config_path,
+        } => {
+            run_server_command(&addr, &repository, &namespace, config_path.as_deref()).await?;
         }
     }
 
@@ -7097,6 +7124,57 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
             }
         }
     }
+
+    Ok(())
+}
+
+// =============================================================================
+// Server Command Handler
+// =============================================================================
+
+/// Run the CI remediation HTTP server.
+async fn run_server_command(
+    addr: &str,
+    repository: &str,
+    namespace: &str,
+    config_path: Option<&str>,
+) -> Result<()> {
+    use std::sync::Arc;
+
+    println!("{}", "═".repeat(60).cyan());
+    println!("{}", "HEALER CI REMEDIATION SERVER".cyan().bold());
+    println!("{}", "═".repeat(60).cyan());
+    println!();
+    println!("  Address:    {}", addr.green());
+    println!("  Repository: {}", repository.green());
+    println!("  Namespace:  {}", namespace.green());
+    println!();
+
+    // Load configuration
+    let config = if let Some(path) = config_path {
+        let content = std::fs::read_to_string(path)
+            .context("Failed to read config file")?;
+        serde_json::from_str(&content)
+            .context("Failed to parse config file")?
+    } else {
+        ci::RemediationConfig::default()
+    };
+
+    println!("  CLI:        {}", config.cli.cyan());
+    println!("  Model:      {}", config.model.cyan());
+    println!("  Max Attempts: {}", config.max_attempts);
+    println!("  Time Window: {}m", config.time_window_mins);
+    println!("  Memory:     {}", if config.memory_enabled { "enabled".green() } else { "disabled".red() });
+    println!();
+
+    // Create server state
+    let state = ci::ServerState::new(config, repository, namespace)
+        .context("Failed to initialize server state")?;
+    let state = Arc::new(state);
+
+    // Run the server
+    println!("{}", format!("Starting server on {addr}...").cyan());
+    ci::run_server(state, addr).await?;
 
     Ok(())
 }

@@ -1,4 +1,16 @@
 ---
+# CI Failure Remediation Sensor
+#
+# Routes CI failures to the Healer service for intelligent remediation.
+# Healer classifies failures and dispatches to specialized agents:
+# - Rex: Rust failures (clippy, tests, builds)
+# - Blaze: Frontend failures (TypeScript, ESLint, npm)
+# - Bolt: Infrastructure failures (Docker, Helm, K8s)
+# - Cipher: Security alerts (Dependabot, code scanning)
+# - Atlas: Git/GitHub issues (merge conflicts, workflows)
+#
+# The sensor forwards the raw GitHub webhook payload to Healer's HTTP API,
+# which handles classification, context gathering, and CodeRun creation.
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -48,7 +60,6 @@ spec:
             value: ["5dlabs/cto"]
         exprs:
           # Exclude workflows with skip-ci-remediation in commit message
-          # Using expr instead of unsupported !~ comparator
           - expr: '!(body.workflow_run.head_commit.message contains "[skip-ci-remediation]")'
             fields:
               - name: skip_check
@@ -62,105 +73,106 @@ spec:
             fields:
               - name: head_branch
                 path: body.workflow_run.head_branch
+
+    # Also listen for workflow_job events (more granular failure info)
+    - name: job-failure
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: body.X-GitHub-Event
+            type: string
+            value: ["workflow_job"]
+          - path: body.action
+            type: string
+            value: ["completed"]
+          - path: body.workflow_job.conclusion
+            type: string
+            value: ["failure"]
+          - path: body.repository.full_name
+            type: string
+            value: ["5dlabs/cto"]
+
+    # Security alerts
+    - name: security-alert
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: body.X-GitHub-Event
+            type: string
+            value: ["dependabot_alert", "code_scanning_alert", "secret_scanning_alert"]
+          - path: body.action
+            type: string
+            value: ["created", "reopened"]
+          - path: body.repository.full_name
+            type: string
+            value: ["5dlabs/cto"]
+
   triggers:
+    # Route workflow failures to Healer
     - template:
-        name: trigger-ci-remediation
+        name: healer-workflow-failure
         conditions: "workflow-failure"
-        k8s:
-          operation: create
-          source:
-            resource:
-              apiVersion: agents.platform.5dlabs.ai/v1alpha1
-              kind: CodeRun
-              metadata:
-                generateName: coderun-ci-fix-
-                namespace: cto
-                labels:
-                  agent: atlas
-                  role: ci-remediation
-                  workflow-run-id: ""  # Extracted from webhook
-                  workflow-name: ""    # Extracted from webhook
-                  repository: "cto"
-              spec:
-                githubApp: "5DLabs-Atlas"
-                cli: "Claude"
-                model: "claude-sonnet-4-5-20250929"
-                maxTokens: 16384
-                temperature: 0.2  # Lower temperature for focused fixes
-                repositoryUrl: "https://github.com/5dlabs/cto"
-                workingDirectory: "."
-                continueSession: false  # Fresh context per failure
-                overwriteMemory: false
-                env:
-                  - name: ATLAS_MODE
-                    value: "ci-remediation"
-                  - name: WORKFLOW_NAME
-                    value: ""  # Extracted from webhook
-                  - name: WORKFLOW_RUN_ID
-                    value: ""  # Extracted from webhook
-                  - name: WORKFLOW_RUN_URL
-                    value: ""  # Extracted from webhook
-                  - name: FAILURE_BRANCH
-                    value: ""  # Branch where failure occurred
-                  - name: FAILURE_COMMIT_SHA
-                    value: ""  # Commit that triggered failure
-                  - name: FAILURE_COMMIT_MESSAGE
-                    value: ""  # Commit message
-                  - name: WORKFLOW_CONCLUSION
-                    value: "failure"
-          parameters:
-            # Extract workflow name
+        http:
+          url: http://healer.cto.svc.cluster.local:8080/api/remediate/ci-failure
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
             - src:
                 dependencyName: workflow-failure
-                dataKey: body.workflow_run.name
-              dest: spec.env.1.value
-
-            # Extract workflow run ID
-            - src:
-                dependencyName: workflow-failure
-                dataTemplate: "{{ .Input.body.workflow_run.id }}"
-              dest: spec.env.2.value
-
-            # Extract workflow run URL
-            - src:
-                dependencyName: workflow-failure
-                dataKey: body.workflow_run.html_url
-              dest: spec.env.3.value
-
-            # Extract failure branch
-            - src:
-                dependencyName: workflow-failure
-                dataKey: body.workflow_run.head_branch
-              dest: spec.env.4.value
-
-            # Extract failure commit SHA
-            - src:
-                dependencyName: workflow-failure
-                dataKey: body.workflow_run.head_sha
-              dest: spec.env.5.value
-
-            # Extract commit message
-            - src:
-                dependencyName: workflow-failure
-                dataKey: body.workflow_run.head_commit.message
-              dest: spec.env.6.value
-
-            # Add workflow run ID label
-            - src:
-                dependencyName: workflow-failure
-                dataTemplate: "{{ .Input.body.workflow_run.id }}"
-              dest: metadata.labels.workflow-run-id
-
-            # Add workflow name label (sanitized)
-            - src:
-                dependencyName: workflow-failure
-                dataTemplate: "{{ .Input.body.workflow_run.name | lower | replace \" \" \"-\" }}"
-              dest: metadata.labels.workflow-name
+                dataKey: body
+              dest: ""
+          timeout: 30s
         retryStrategy:
-          steps: 2
+          steps: 3
           duration: "10s"
           factor: 2
           jitter: 0.1
+
+    # Route job failures to Healer (more detailed)
+    - template:
+        name: healer-job-failure
+        conditions: "job-failure"
+        http:
+          url: http://healer.cto.svc.cluster.local:8080/api/remediate/ci-failure
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: job-failure
+                dataKey: body
+              dest: ""
+          timeout: 30s
+        retryStrategy:
+          steps: 3
+          duration: "10s"
+          factor: 2
+          jitter: 0.1
+
+    # Route security alerts to Healer
+    - template:
+        name: healer-security-alert
+        conditions: "security-alert"
+        http:
+          url: http://healer.cto.svc.cluster.local:8080/api/remediate/security-alert
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: security-alert
+                dataKey: body
+              dest: ""
+          timeout: 30s
+        retryStrategy:
+          steps: 3
+          duration: "10s"
+          factor: 2
+          jitter: 0.1
+
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -171,74 +183,44 @@ data:
   remediation-strategy.md: |
     # CI Failure Remediation Strategy
 
-    ## Mission
-    Automatically detect and fix GitHub Actions workflow failures in the 5dlabs/cto repository.
+    ## Architecture
+    The CI remediation system uses a sensor → Healer → agent architecture:
 
-    ## Activation
-    - **Trigger**: workflow_run event with conclusion=failure
-    - **Scope**: Only 5dlabs/cto repository
-    - **Exclusions**: Commits with [skip-ci-remediation] in message
+    1. **Sensor** (this resource): Captures GitHub webhook events
+    2. **Healer**: Central intelligence hub that:
+       - Classifies failure types
+       - Gathers context (logs, files, ArgoCD status)
+       - Routes to specialist agents
+       - Manages retry loops
+       - Escalates to humans after failures
+    3. **Agents**: Specialist CodeRuns for different failure types
 
-    ## Workflow Coverage
-    - Infrastructure Images (Docker builds, GHCR pushes)
-    - Controller CI (Rust clippy, tests, formatting)
-    - Agent Templates Check (Handlebars validation)
-    - Markdown Lint (Documentation quality)
-    - Helm Publish (Chart packaging)
-    - All other CI/CD workflows
+    ## Agent Specializations
+    - **Rex**: Rust (clippy, cargo test, build errors)
+    - **Blaze**: Frontend (TypeScript, ESLint, npm/pnpm)
+    - **Bolt**: Infrastructure (Docker, Helm, K8s, ArgoCD)
+    - **Cipher**: Security (Dependabot, code scanning, secrets)
+    - **Atlas**: Git/GitHub (merge conflicts, workflows, general)
 
-    ## Remediation Process
+    ## Event Types Captured
+    - `workflow_run.completed.failure`: Full workflow failures
+    - `workflow_job.completed.failure`: Individual job failures
+    - `dependabot_alert.created/reopened`: Dependency vulnerabilities
+    - `code_scanning_alert.created/reopened`: Code security issues
+    - `secret_scanning_alert.created/reopened`: Exposed secrets
 
-    ### 1. Failure Analysis
-    - Fetch workflow logs via GitHub CLI
-    - Identify failure type (build, test, lint, permission, etc.)
-    - Extract error messages and context
-    - Review changed files in failing commit
+    ## Deduplication
+    Healer prevents duplicate remediations via:
+    - Workflow run ID tracking
+    - Branch + time window checks
+    - Existing CodeRun label queries
 
-    ### 2. Root Cause Identification
-    Common patterns:
-    - **Docker Build Failures**: Missing deps, cache issues, registry auth
-    - **Clippy Failures**: New warnings, pedantic violations
-    - **Test Failures**: Broken tests, environment issues
-    - **Permission Errors**: Missing GitHub token scopes
-    - **Lint Failures**: Formatting, style violations
-    - **Resource Issues**: Timeouts, OOM, disk space
+    ## Retry Strategy
+    - Max 3 attempts per failure
+    - Different agent on each retry if appropriate
+    - Historical context from OpenMemory on retries
+    - Human escalation after max attempts
 
-    ### 3. Targeted Fix Application
-    - Apply minimal, focused fix
-    - No scope creep beyond failure resolution
-    - Maintain code quality standards
-    - Document root cause in commit
-
-    ### 4. Validation
-    - Create fix branch or PR
-    - Wait for CI to run on fix
-    - Verify all checks pass
-    - Ensure no new issues introduced
-
-    ### 5. Reporting
-    - Comment on original commit with fix details
-    - Link to fix PR if created
-    - Document root cause and solution
-    - Tag original author if human help needed
-
-    ## Success Criteria
-    - ✅ CI passes on fix branch/PR
-    - ✅ Root cause documented
-    - ✅ Fix is minimal and targeted
-    - ✅ No new issues introduced
-    - ✅ Original commit updated with fix reference
-
-    ## Safety Limits
-    - Max 3 remediation attempts per workflow run
-    - Never push directly to main
-    - Always create PR for review
-    - Respect branch protection rules
-    - Honor skip-ci-remediation flag
-
-    ## Monitoring
-    - Track success rate per workflow type
-    - Measure time to fix
-    - Monitor false positive rate
-    - Alert on repeated failures
-
+    ## Exclusions
+    - Commits with `[skip-ci-remediation]` in message
+    - Already-remediated workflow runs
