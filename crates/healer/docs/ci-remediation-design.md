@@ -296,35 +296,41 @@ Add these events:
                                   │
                                   ▼
                     ┌─────────────────────────┐
-                    │   Analyze Failure Type   │
+                    │   Healer Analyzes &     │
+                    │   Routes to Specialist  │
                     └─────────────────────────┘
                                   │
-        ┌─────────────┬───────────┼───────────┬─────────────┐
-        ▼             ▼           ▼           ▼             ▼
-   ┌─────────┐  ┌──────────┐  ┌────────┐  ┌────────┐  ┌──────────┐
-   │  Rust   │  │ Frontend │  │ Infra  │  │  Git   │  │ Unknown  │
-   │ Clippy  │  │   npm    │  │ Docker │  │ Merge  │  │          │
-   │  Test   │  │   pnpm   │  │  Helm  │  │Conflict│  │          │
-   │  Build  │  │   tsx    │  │ ArgoCD │  │ Perms  │  │          │
-   └────┬────┘  └────┬─────┘  └───┬────┘  └───┬────┘  └────┬─────┘
-        │            │            │           │            │
-        ▼            ▼            ▼           ▼            ▼
-   ┌─────────┐  ┌──────────┐  ┌────────┐  ┌────────┐  ┌──────────┐
-   │   Rex   │  │  Blaze   │  │  Bolt  │  │ Atlas  │  │  Atlas   │
-   └─────────┘  └──────────┘  └────────┘  └────────┘  └──────────┘
+        ┌─────────────┬───────────┴───────────┬─────────────┐
+        ▼             ▼                       ▼             ▼
+   ┌─────────┐  ┌──────────┐            ┌────────┐    ┌────────┐
+   │  Rust   │  │ Frontend │            │ Infra  │    │  Git/  │
+   │ Clippy  │  │   npm    │            │ Docker │    │ GitHub │
+   │  Test   │  │   pnpm   │            │  Helm  │    │ Merge  │
+   │  Build  │  │   tsx    │            │ ArgoCD │    │Conflict│
+   └────┬────┘  └────┬─────┘            └───┬────┘    └───┬────┘
+        │            │                      │             │
+        ▼            ▼                      ▼             ▼
+   ┌─────────┐  ┌──────────┐            ┌────────┐   ┌─────────┐
+   │   Rex   │  │  Blaze   │            │  Bolt  │   │  Atlas  │
+   └─────────┘  └──────────┘            └────────┘   │(default)│
+                                                     └─────────┘
 ```
+
+**Note:** Atlas serves as the default/fallback agent. Healer always routes to one of the four agents - there is no "unknown" category.
 
 ### Detailed Routing Matrix
 
-| Workflow Pattern | Log Pattern | Changed Files | → Agent |
-|------------------|-------------|---------------|---------|
-| `*-ci`, `controller-*`, `healer-*` | `clippy`, `cargo test`, `rustc` | `*.rs`, `Cargo.toml` | Rex |
-| `frontend-*`, `ui-*` | `npm`, `pnpm`, `tsc`, `eslint` | `*.ts`, `*.tsx`, `*.js`, `package.json` | Blaze |
-| `infrastructure-*`, `docker-*`, `helm-*` | `docker build`, `helm`, `kubectl` | `Dockerfile`, `*.yaml`, `Chart.yaml` | Bolt |
-| `argocd-*`, `gitops-*`, `sync-*` | `argocd`, `sync failed`, `OutOfSync` | `infra/gitops/*`, `applications/*` | Bolt |
-| `*-release`, `deploy-*` | `push`, `ghcr.io`, `permission` | `.github/workflows/*` | Atlas |
-| (any) | `merge conflict`, `CONFLICT`, `cannot merge` | (any) | Atlas |
-| (fallback) | (any) | (any) | Atlas |
+Healer evaluates patterns in order. First match wins; Atlas is the default if no pattern matches.
+
+| Priority | Workflow Pattern | Log Pattern | Changed Files | → Agent |
+|----------|------------------|-------------|---------------|---------|
+| 1 | `*-ci`, `controller-*`, `healer-*` | `clippy`, `cargo test`, `rustc` | `*.rs`, `Cargo.toml` | **Rex** |
+| 2 | `frontend-*`, `ui-*` | `npm`, `pnpm`, `tsc`, `eslint` | `*.ts`, `*.tsx`, `*.js`, `package.json` | **Blaze** |
+| 3 | `infrastructure-*`, `docker-*`, `helm-*` | `docker build`, `helm`, `kubectl` | `Dockerfile`, `*.yaml`, `Chart.yaml` | **Bolt** |
+| 4 | `argocd-*`, `gitops-*`, `sync-*` | `argocd`, `sync failed`, `OutOfSync` | `infra/gitops/*`, `applications/*` | **Bolt** |
+| 5 | (any) | `merge conflict`, `CONFLICT`, `cannot merge` | (any) | **Atlas** |
+| 6 | `*-release`, `deploy-*` | `push`, `ghcr.io`, `permission` | `.github/workflows/*` | **Atlas** |
+| — | *(default)* | *(no match)* | *(no match)* | **Atlas** |
 
 ---
 
