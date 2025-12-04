@@ -1,6 +1,6 @@
 ---
-# ConfigMap containing healer configuration for remediation CodeRuns
-# Maps directly to CodeRun CRD fields
+# ConfigMap containing healer configuration for CI remediation server
+# Maps to ci::RemediationConfig struct
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,27 +12,11 @@ metadata:
 data:
   healer-config.json: |
     {
-      "coderun": {
-        "namespace": "cto",
-        "githubApp": "5DLabs-Rex",
-        "model": "claude-opus-4-5-20251101",
-        "repositoryUrl": "https://github.com/5dlabs/cto",
-        "docsRepositoryUrl": "https://github.com/5dlabs/cto",
-        "docsProjectDirectory": "docs",
-        "docsBranch": "main",
-        "workingDirectory": ".",
-        "service": "healer",
-        "runType": "implementation",
-        "enableDocker": true,
-        "remoteTools": "mcp_tools_github_*,mcp_tools_kubernetes_*,mcp_tools_argocd_*,mcp_tools_cto_*,mcp_tools_context7_*,mcp_tools_firecrawl_*,mcp_tools_grafana_*",
-        "localTools": "",
-        "cliConfig": {
-          "cliType": "claude",
-          "model": "claude-opus-4-5-20251101",
-          "settings": {
-            "template": "healer/claude"
-          }
-        }
-      }
+      "cli": "Factory",
+      "model": "claude-opus-4-5-20250929",
+      "max_attempts": 3,
+      "time_window_mins": 10,
+      "memory_url": "http://openmemory.cto-system.svc:3000",
+      "memory_enabled": true
     }
 
