@@ -376,7 +376,10 @@ mod tests {
     #[test]
     fn test_healer_pvc_naming() {
         // Healer PVC uses a static name shared with ArgoCD-managed healer deployment
-        assert_eq!(AgentClassifier::get_healer_pvc_name("cto"), "healer-workspace");
+        assert_eq!(
+            AgentClassifier::get_healer_pvc_name("cto"),
+            "healer-workspace"
+        );
 
         // Service name is ignored - always returns static PVC name
         assert_eq!(
