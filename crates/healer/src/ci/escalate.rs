@@ -14,7 +14,7 @@ use super::types::{CiFailure, RemediationAttempt};
 /// Escalation configuration.
 #[derive(Debug, Clone)]
 pub struct EscalationConfig {
-    /// Discord webhook URL (via notify crate)
+    /// Discord notifications enabled (via notify crate)
     pub discord_enabled: bool,
     /// GitHub issue creation enabled
     pub github_issue_enabled: bool,
@@ -35,13 +35,17 @@ impl Default for EscalationConfig {
 /// Escalator for handling human escalation.
 pub struct Escalator {
     config: EscalationConfig,
+    notifier: notify::Notifier,
 }
 
 impl Escalator {
     /// Create a new escalator.
     #[must_use]
     pub fn new(config: EscalationConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            notifier: notify::Notifier::from_env(),
+        }
     }
 
     /// Escalate a failed remediation to humans.
@@ -49,7 +53,7 @@ impl Escalator {
         &self,
         failure: &CiFailure,
         attempts: &[RemediationAttempt],
-        pr_number: Option<u64>,
+        pr_number: Option<u32>,
     ) -> Result<()> {
         info!(
             "Escalating failed remediation for workflow {} after {} attempts",
@@ -71,9 +75,7 @@ impl Escalator {
 
         // Send Discord notification
         if self.config.discord_enabled {
-            if let Err(e) = self.send_discord_notification(failure, attempts).await {
-                warn!("Failed to send Discord notification: {e}");
-            }
+            self.send_discord_notification(failure, attempts);
         }
 
         // Create GitHub issue if enabled
@@ -87,7 +89,11 @@ impl Escalator {
     }
 
     /// Build the escalation message for PR comments.
-    fn build_escalation_message(&self, failure: &CiFailure, attempts: &[RemediationAttempt]) -> String {
+    fn build_escalation_message(
+        &self,
+        failure: &CiFailure,
+        attempts: &[RemediationAttempt],
+    ) -> String {
         let mut msg = String::new();
 
         msg.push_str("## 🚨 CI Remediation Escalation\n\n");
@@ -102,7 +108,10 @@ impl Escalator {
             msg.push_str(&format!("- **Job**: {job}\n"));
         }
         msg.push_str(&format!("- **Branch**: `{}`\n", failure.branch));
-        msg.push_str(&format!("- **Commit**: `{}`\n", &failure.head_sha[..7.min(failure.head_sha.len())]));
+        msg.push_str(&format!(
+            "- **Commit**: `{}`\n",
+            &failure.head_sha[..7.min(failure.head_sha.len())]
+        ));
         msg.push_str(&format!("- **[View Workflow]({})**\n\n", failure.html_url));
 
         msg.push_str("### Remediation Attempts\n\n");
@@ -111,18 +120,20 @@ impl Escalator {
 
         for attempt in attempts {
             let duration = attempt
-                .completed_at
-                .map(|c| {
-                    let dur = c - attempt.started_at;
-                    format!("{}s", dur.num_seconds())
-                })
+                .duration()
+                .map(|d| format!("{}s", d.as_secs()))
                 .unwrap_or_else(|| "N/A".to_string());
 
+            let outcome = attempt
+                .outcome
+                .map(|o| format!("{o:?}"))
+                .unwrap_or_else(|| "Unknown".to_string());
+
             msg.push_str(&format!(
-                "| {} | {} | {:?} | {} |\n",
+                "| {} | {} | {} | {} |\n",
                 attempt.attempt_number,
                 attempt.agent.name(),
-                attempt.outcome,
+                outcome,
                 duration
             ));
         }
@@ -131,7 +142,7 @@ impl Escalator {
 
         // Add last error if available
         if let Some(last) = attempts.last() {
-            if let Some(error) = &last.error_message {
+            if let Some(error) = &last.failure_reason {
                 msg.push_str("### Last Error\n\n");
                 msg.push_str("```\n");
                 // Truncate very long errors
@@ -153,7 +164,7 @@ impl Escalator {
     }
 
     /// Post a comment to a GitHub PR.
-    fn post_pr_comment(&self, repository: &str, pr_number: u64, message: &str) -> Result<()> {
+    fn post_pr_comment(&self, repository: &str, pr_number: u32, message: &str) -> Result<()> {
         let output = Command::new("gh")
             .args([
                 "pr",
@@ -178,47 +189,41 @@ impl Escalator {
     }
 
     /// Send a Discord notification via the notify crate.
-    async fn send_discord_notification(
-        &self,
-        failure: &CiFailure,
-        attempts: &[RemediationAttempt],
-    ) -> Result<()> {
-        // Use the notify crate for Discord notifications
-        use notify::{DiscordConfig, NotifyEvent};
+    fn send_discord_notification(&self, failure: &CiFailure, attempts: &[RemediationAttempt]) {
+        use std::collections::HashMap;
 
-        let config = DiscordConfig::default();
-        
-        // Build a summary for Discord
-        let agents_tried: Vec<&str> = attempts.iter().map(|a| a.agent.name()).collect();
-        let summary = format!(
-            "**CI Remediation Failed**\n\
-            Workflow: `{}`\n\
-            Branch: `{}`\n\
-            Attempts: {} (agents: {})\n\
-            [View Workflow]({})",
-            failure.workflow_name,
-            failure.branch,
-            attempts.len(),
-            agents_tried.join(" → "),
-            failure.html_url
+        // Build context for the notification
+        let mut context = HashMap::new();
+        context.insert("repository".to_string(), failure.repository.clone());
+        context.insert("branch".to_string(), failure.branch.clone());
+        context.insert(
+            "commit".to_string(),
+            failure.head_sha[..7.min(failure.head_sha.len())].to_string(),
         );
+        context.insert("attempts".to_string(), attempts.len().to_string());
+        context.insert("workflow_url".to_string(), failure.html_url.clone());
 
-        // Create and send the event
-        let event = NotifyEvent::Custom {
-            title: "🚨 CI Remediation Escalation".to_string(),
-            description: summary,
-            color: Some(0xFF0000), // Red
-            fields: vec![
-                ("Repository".to_string(), failure.repository.clone()),
-                ("Commit".to_string(), failure.head_sha[..7.min(failure.head_sha.len())].to_string()),
-            ],
+        let agents_tried: Vec<&str> = attempts.iter().map(|a| a.agent.name()).collect();
+        context.insert("agents".to_string(), agents_tried.join(" → "));
+
+        // Create and send the HealAlert event
+        let event = notify::NotifyEvent::HealAlert {
+            alert_id: format!("CI-{}", failure.workflow_run_id),
+            severity: notify::Severity::Critical,
+            message: format!(
+                "CI remediation failed for {} after {} attempts: {}",
+                failure.repository,
+                attempts.len(),
+                failure.workflow_name
+            ),
+            context,
+            timestamp: chrono::Utc::now(),
         };
 
-        notify::send_discord(&config, &event).await?;
+        // Fire and forget
+        self.notifier.notify(event);
 
         info!("Sent Discord escalation notification");
-
-        Ok(())
     }
 
     /// Create a GitHub issue for tracking.
@@ -293,20 +298,22 @@ mod tests {
             RemediationAttempt {
                 attempt_number: 1,
                 agent: Agent::Rex,
-                outcome: AttemptOutcome::Failed,
+                coderun_name: "healer-ci-rex-abc".to_string(),
                 started_at: Utc::now(),
                 completed_at: Some(Utc::now()),
-                error_message: Some("Compilation error".to_string()),
-                changes_made: Vec::new(),
+                outcome: Some(AttemptOutcome::AgentFailed),
+                failure_reason: Some("Compilation error".to_string()),
+                agent_output: None,
             },
             RemediationAttempt {
                 attempt_number: 2,
                 agent: Agent::Atlas,
-                outcome: AttemptOutcome::Failed,
+                coderun_name: "healer-ci-atlas-def".to_string(),
                 started_at: Utc::now(),
                 completed_at: Some(Utc::now()),
-                error_message: Some("Test failure".to_string()),
-                changes_made: Vec::new(),
+                outcome: Some(AttemptOutcome::CiStillFailing),
+                failure_reason: Some("Test failure".to_string()),
+                agent_output: None,
             },
         ]
     }
@@ -326,4 +333,3 @@ mod tests {
         assert!(message.contains("feat/test"));
     }
 }
-
