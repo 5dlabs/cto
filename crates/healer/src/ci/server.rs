@@ -93,7 +93,7 @@ pub fn build_router(state: Arc<ServerState>) -> Router {
             post(security_alert_handler),
         )
         .route("/api/status", get(status_handler))
-        .route("/api/status/:task_id", get(task_status_handler))
+        .route("/api/status/{task_id}", get(task_status_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
