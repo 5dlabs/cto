@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.35](https://github.com/5dlabs/cto/compare/v0.12.34...v0.12.35) (2025-12-04)
+
+
+### ✨ Features
+
+* **healer:** add OpenMemory integration for cross-session learning ([#2687](https://github.com/5dlabs/cto/issues/2687)) ([82219b6](https://github.com/5dlabs/cto/commit/82219b65dd62973cef04e135b86206de14783bbf))
+
+
+### 🔧 Maintenance
+
+* remove Atlas batch integration workflow ([#2689](https://github.com/5dlabs/cto/issues/2689)) ([cba816b](https://github.com/5dlabs/cto/commit/cba816baab8743295d14eca6ff241b0563ca23fd))
+
 ## [0.12.34](https://github.com/5dlabs/cto/compare/v0.12.33...v0.12.34) (2025-12-04)
 
 
