@@ -6405,6 +6405,7 @@ fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
 // =============================================================================
 
 /// Handle play orchestration commands.
+#[allow(clippy::too_many_lines)]
 fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
     use play::{PlayBatch, PlayTracker};
     use play::cleanup::PlayCleanup;
