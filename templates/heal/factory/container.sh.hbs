@@ -166,6 +166,113 @@ if [ -d "/workspace/archived" ]; then
 fi
 
 # ============================================================================
+# GITHUB APP AUTHENTICATION
+# ============================================================================
+# Generate GitHub token from App credentials (required for private repos)
+generate_github_token() {
+    echo "🔐 Generating GitHub App token..."
+
+    # Check if credentials are available
+    if [ -z "${GITHUB_APP_ID:-}" ] || [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+        echo "⚠️ GitHub App credentials not available"
+        echo "   GITHUB_APP_ID: ${GITHUB_APP_ID:+set}"
+        echo "   GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:+[REDACTED]}"
+        return 1
+    fi
+
+    # Create temporary private key file
+    TEMP_KEY_FILE="/tmp/github-app-key-$$"
+    printf '%s' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+
+    # Generate JWT token header and payload
+    HEADER='{"alg":"RS256","typ":"JWT"}'
+    NOW=$(date +%s)
+    IAT=$((NOW - 60))
+    EXP=$((NOW + 600))
+    PAYLOAD="{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}"
+
+    # Base64url encode header and payload
+    B64_HEADER=$(printf '%s' "$HEADER" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    B64_PAYLOAD=$(printf '%s' "$PAYLOAD" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+    # Create signature
+    SIGNATURE=$(printf '%s.%s' "$B64_HEADER" "$B64_PAYLOAD" | \
+        openssl dgst -sha256 -sign "$TEMP_KEY_FILE" | \
+        base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+    JWT_TOKEN="${B64_HEADER}.${B64_PAYLOAD}.${SIGNATURE}"
+
+    # Get installation ID
+    INSTALLATIONS_RESPONSE=$(curl -sS -L --retry 3 --retry-delay 2 \
+        --connect-timeout 10 --max-time 30 \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations")
+
+    INSTALLATION_ID=$(echo "$INSTALLATIONS_RESPONSE" | jq -r '.[0].id')
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "❌ Failed to get installation ID"
+        echo "Response: $INSTALLATIONS_RESPONSE"
+        rm -f "$TEMP_KEY_FILE"
+        return 1
+    fi
+
+    # Get installation access token
+    TOKEN_RESPONSE=$(curl -sS -L --retry 3 --retry-delay 2 \
+        --connect-timeout 10 --max-time 30 \
+        -X POST \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+        echo "❌ Failed to get installation access token"
+        echo "Response: $TOKEN_RESPONSE"
+        rm -f "$TEMP_KEY_FILE"
+        return 1
+    fi
+
+    rm -f "$TEMP_KEY_FILE"
+
+    # Export the token for git and gh to use
+    export GITHUB_TOKEN
+    export GH_TOKEN="$GITHUB_TOKEN"
+
+    # Store token generation time for potential refresh
+    export TOKEN_GENERATED_AT=$(date +%s)
+
+    # Configure git to use the token
+    git config --global --replace-all credential.helper store
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+    chmod 600 ~/.git-credentials
+
+    # Also authenticate gh CLI with the token
+    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
+
+    echo "✅ GitHub App authenticated successfully"
+}
+
+# Authenticate with GitHub App
+echo ""
+echo "═══ GITHUB APP AUTHENTICATION ═══"
+if [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ] && [ -n "${GITHUB_APP_ID:-}" ]; then
+    if ! generate_github_token; then
+        echo "❌ Failed to authenticate with GitHub App"
+        echo "   This is required for private repository access"
+        exit 1
+    fi
+else
+    echo "⚠️ GitHub App credentials not found"
+    echo "   GITHUB_APP_ID: ${GITHUB_APP_ID:-not set}"
+    echo "   GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:+[REDACTED]}"
+    echo "   Git operations may fail if repository is private"
+fi
+
+# ============================================================================
 # GIT RETRY LOGIC (handles transient GitHub outages like HTTP 500)
 # ============================================================================
 # Retry git operations with exponential backoff for transient errors (5xx, network)
