@@ -4,7 +4,7 @@
 # Builds and releases all CTO platform CLI tools:
 # - cto-mcp: MCP server for Argo Workflows integration
 # - tools-server/tools-client: Dynamic MCP tool management
-# - heal: Self-healing platform monitor
+# - healer: Self-healing platform monitor
 # - controller: Agent platform controller
 # - utils: Micro-utilities for GitHub operations (CI alerts, PR comments)
 #
@@ -102,9 +102,9 @@ jobs:
           - name: tools
             binary: tools-client
             dir: crates/tools
-          - name: heal
-            binary: heal
-            dir: crates/heal
+          - name: healer
+            binary: healer
+            dir: crates/healer
           - name: controller
             binary: agent-controller
             dir: crates/controller
@@ -139,9 +139,9 @@ jobs:
             suffix: windows-x86_64
             ext: .exe
         exclude:
-          # heal, controller, utils, cto-cli, and tasks don't need Windows builds
+          # healer, controller, utils, cto-cli, and tasks don't need Windows builds
           - package:
-              name: heal
+              name: healer
             target:
               os: windows-latest
           - package:
@@ -318,28 +318,28 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
 
-  # Build heal Docker image
-  build-docker-heal:
+  # Build healer Docker image
+  build-docker-healer:
     needs: [plan, build-binaries]
     if: needs.plan.outputs.publishing == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Linux x86_64 heal binary
+      - name: Download Linux x86_64 healer binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-heal-linux-x86_64
+          name: binary-healer-linux-x86_64
           path: artifacts/
 
       - name: Prepare binary and prompts for Docker
         run: |
-          cp artifacts/heal-linux-x86_64 infra/images/heal/heal
-          chmod +x infra/images/heal/heal
-          ls -lh infra/images/heal/heal
+          cp artifacts/healer-linux-x86_64 infra/images/healer/healer
+          chmod +x infra/images/healer/healer
+          ls -lh infra/images/healer/healer
           # Copy prompts to build context
-          cp -r crates/heal/prompts infra/images/heal/prompts
-          ls -lh infra/images/heal/prompts/
+          cp -r crates/healer/prompts infra/images/healer/prompts
+          ls -lh infra/images/healer/prompts/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
@@ -354,25 +354,25 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
-          context: ./infra/images/heal
-          file: ./infra/images/heal/Dockerfile
+          context: ./infra/images/healer
+          file: ./infra/images/healer/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:v${{ needs.plan.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Docker summary
         run: |
-          echo "## 🐳 Heal Docker Image" >> $GITHUB_STEP_SUMMARY
+          echo "## 🐳 Healer Docker Image" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
 
   # Create GitHub Release with all artifacts
   release:
-    needs: [plan, build-binaries, build-docker, build-docker-controller, build-docker-heal]
+    needs: [plan, build-binaries, build-docker, build-docker-controller, build-docker-healer]
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' }}
     runs-on: ubuntu-22.04
     env:
@@ -411,7 +411,7 @@ jobs:
           ### 🔧 tools-server / tools-client
           Dynamic MCP (Model Context Protocol) tool management and proxy server.
 
-          ### 🩺 heal
+          ### 🩺 healer
           Self-healing platform monitor - detects issues and spawns remediation agents.
 
           ### 🎮 controller
@@ -432,8 +432,8 @@ jobs:
           # Install tools
           curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/tools-installer.sh | sh
 
-          # Install heal
-          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/heal-installer.sh | sh
+          # Install healer
+          curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/healer-installer.sh | sh
 
           # Install utils
           curl -LsSf https://github.com/5dlabs/cto/releases/download/${{ needs.plan.outputs.tag }}/utils-installer.sh | sh
@@ -447,7 +447,7 @@ jobs:
           **Manual download:**
           Download the appropriate binary for your platform from the assets below.
 
-          | Platform | cto-mcp | tools-server | tools-client | heal | controller | utils |
+          | Platform | cto-mcp | tools-server | tools-client | healer | controller | utils |
           |----------|---------|--------------|--------------|------|------------|-------|
           | Linux x86_64 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
           | Linux ARM64 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |

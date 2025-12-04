@@ -1,5 +1,5 @@
 [package]
-name = "heal"
+name = "healer"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -9,7 +9,7 @@ description = "Self-healing platform monitor - detects issues and spawns remedia
 homepage = "https://github.com/5dlabs/cto"
 
 [[bin]]
-name = "heal"
+name = "healer"
 path = "src/main.rs"
 
 [dependencies]
