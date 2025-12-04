@@ -62,12 +62,12 @@ impl Escalator {
         );
 
         // Build the escalation message
-        let message = self.build_escalation_message(failure, attempts);
+        let message = Self::build_escalation_message(failure, attempts);
 
         // Post PR comment if we have a PR
         if self.config.pr_comment_enabled {
             if let Some(pr) = pr_number {
-                if let Err(e) = self.post_pr_comment(&failure.repository, pr, &message) {
+                if let Err(e) = Self::post_pr_comment(&failure.repository, pr, &message) {
                     warn!("Failed to post PR comment: {e}");
                 }
             }
@@ -80,7 +80,7 @@ impl Escalator {
 
         // Create GitHub issue if enabled
         if self.config.github_issue_enabled {
-            if let Err(e) = self.create_github_issue(&failure.repository, failure, attempts) {
+            if let Err(e) = Self::create_github_issue(&failure.repository, failure, attempts) {
                 warn!("Failed to create GitHub issue: {e}");
             }
         }
@@ -90,29 +90,32 @@ impl Escalator {
 
     /// Build the escalation message for PR comments.
     fn build_escalation_message(
-        &self,
         failure: &CiFailure,
         attempts: &[RemediationAttempt],
     ) -> String {
+        use std::fmt::Write as _;
+
         let mut msg = String::new();
 
         msg.push_str("## 🚨 CI Remediation Escalation\n\n");
-        msg.push_str(&format!(
-            "Automated remediation failed after **{} attempts**.\n\n",
+        let _ = writeln!(
+            msg,
+            "Automated remediation failed after **{} attempts**.\n",
             attempts.len()
-        ));
+        );
 
         msg.push_str("### Failure Details\n\n");
-        msg.push_str(&format!("- **Workflow**: {}\n", failure.workflow_name));
+        let _ = writeln!(msg, "- **Workflow**: {}", failure.workflow_name);
         if let Some(job) = &failure.job_name {
-            msg.push_str(&format!("- **Job**: {job}\n"));
+            let _ = writeln!(msg, "- **Job**: {job}");
         }
-        msg.push_str(&format!("- **Branch**: `{}`\n", failure.branch));
-        msg.push_str(&format!(
-            "- **Commit**: `{}`\n",
+        let _ = writeln!(msg, "- **Branch**: `{}`", failure.branch);
+        let _ = writeln!(
+            msg,
+            "- **Commit**: `{}`",
             &failure.head_sha[..7.min(failure.head_sha.len())]
-        ));
-        msg.push_str(&format!("- **[View Workflow]({})**\n\n", failure.html_url));
+        );
+        let _ = writeln!(msg, "- **[View Workflow]({})**\n", failure.html_url);
 
         msg.push_str("### Remediation Attempts\n\n");
         msg.push_str("| # | Agent | Outcome | Duration |\n");
@@ -129,13 +132,14 @@ impl Escalator {
                 .map(|o| format!("{o:?}"))
                 .unwrap_or_else(|| "Unknown".to_string());
 
-            msg.push_str(&format!(
-                "| {} | {} | {} | {} |\n",
+            let _ = writeln!(
+                msg,
+                "| {} | {} | {} | {} |",
                 attempt.attempt_number,
                 attempt.agent.name(),
                 outcome,
                 duration
-            ));
+            );
         }
 
         msg.push('\n');
@@ -164,7 +168,7 @@ impl Escalator {
     }
 
     /// Post a comment to a GitHub PR.
-    fn post_pr_comment(&self, repository: &str, pr_number: u32, message: &str) -> Result<()> {
+    fn post_pr_comment(repository: &str, pr_number: u32, message: &str) -> Result<()> {
         let output = Command::new("gh")
             .args([
                 "pr",
@@ -228,7 +232,6 @@ impl Escalator {
 
     /// Create a GitHub issue for tracking.
     fn create_github_issue(
-        &self,
         repository: &str,
         failure: &CiFailure,
         attempts: &[RemediationAttempt],
@@ -238,7 +241,7 @@ impl Escalator {
             failure.workflow_name
         );
 
-        let body = self.build_escalation_message(failure, attempts);
+        let body = Self::build_escalation_message(failure, attempts);
 
         let labels = "healer,ci-failure,needs-attention";
 
@@ -324,12 +327,12 @@ mod tests {
         let failure = create_test_failure();
         let attempts = create_test_attempts();
 
-        let message = escalator.build_escalation_message(&failure, &attempts);
+        let message = Escalator::build_escalation_message(&failure, &attempts);
 
         assert!(message.contains("CI Remediation Escalation"));
         assert!(message.contains("2 attempts"));
-        assert!(message.contains("Rex"));
-        assert!(message.contains("Atlas"));
+        assert!(message.contains("rex"));
+        assert!(message.contains("atlas"));
         assert!(message.contains("feat/test"));
     }
 }

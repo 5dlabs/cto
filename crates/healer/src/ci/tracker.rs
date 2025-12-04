@@ -343,7 +343,7 @@ impl RemediationTracker {
                 .await
                 .unwrap_or_default()
         } else {
-            Default::default()
+            super::types::HistoricalContext::default()
         };
 
         Ok(RemediationContext {
@@ -401,6 +401,7 @@ impl RemediationTracker {
 
 /// Action to take after a CodeRun completes.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum CompletionAction {
     /// Remediation succeeded
     Success,
