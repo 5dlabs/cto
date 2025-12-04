@@ -167,10 +167,7 @@ impl Issue {
                 stage,
                 failure_reason,
             } => {
-                format!(
-                    "Task {} failed in {:?}: {}",
-                    task_id, stage, failure_reason
-                )
+                format!("Task {task_id} failed in {stage:?}: {failure_reason}")
             }
             Self::OptimizationOpportunity {
                 task_id,
@@ -178,10 +175,7 @@ impl Issue {
                 observation,
                 ..
             } => {
-                format!(
-                    "Task {} ({}) optimization: {}",
-                    task_id, agent, observation
-                )
+                format!("Task {task_id} ({agent}) optimization: {observation}")
             }
         }
     }

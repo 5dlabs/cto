@@ -87,7 +87,7 @@ impl PlayBatch {
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                anyhow::bail!("kubectl get configmaps failed: {}", stderr);
+                anyhow::bail!("kubectl get configmaps failed: {stderr}");
             }
 
             return Self::parse_configmaps(&output.stdout, namespace);
@@ -287,7 +287,7 @@ impl std::fmt::Display for PlayBatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let status_str = match &self.status {
             BatchStatus::InProgress { completed, total } => {
-                format!("In Progress ({}/{} tasks)", completed, total)
+                format!("In Progress ({completed}/{total} tasks)")
             }
             BatchStatus::Completed => "Completed".to_string(),
             BatchStatus::Failed { failed_tasks } => {

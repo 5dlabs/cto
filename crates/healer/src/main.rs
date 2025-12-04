@@ -6451,7 +6451,7 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
             // Find the task
             let task = tracker.get_task(&task_id);
             if task.is_none() {
-                anyhow::bail!("Task {} not found", task_id);
+                anyhow::bail!("Task {task_id} not found");
             }
 
             // Check health to get issues
@@ -6669,12 +6669,12 @@ fn print_task_detail(task: &play::TaskState) {
 
     // Workflow
     if let Some(ref wf) = task.workflow_name {
-        println!("  Workflow: {}", wf);
+        println!("  Workflow: {wf}");
     }
 
     // PR
     if let Some(pr) = task.pr_number {
-        println!("  PR: #{}", pr);
+        println!("  PR: #{pr}");
     }
 
     // Status details
@@ -6682,8 +6682,8 @@ fn print_task_detail(task: &play::TaskState) {
     match &task.status {
         play::types::TaskStatus::Failed { stage, reason, remediation } => {
             println!("  {}", "Issue Detected:".red().bold());
-            println!("    Type: Failed at {:?}", stage);
-            println!("    Reason: {}", reason);
+            println!("    Type: Failed at {stage:?}");
+            println!("    Reason: {reason}");
 
             if let Some(r) = remediation {
                 println!();
@@ -6700,7 +6700,7 @@ fn print_task_detail(task: &play::TaskState) {
         play::types::TaskStatus::InProgress { .. } if task.is_stuck() => {
             println!("  {}", "Issue Detected:".red().bold());
             println!("    Type: StageTimeout");
-            println!("    Stage: {}", stage);
+            println!("    Stage: {stage}");
             println!("    Threshold: 30 minutes");
         }
         _ => {}
@@ -6724,7 +6724,7 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
             let stats = collector.agent_stats(&agent);
 
             println!("{}", "═".repeat(60).cyan());
-            println!("{}", format!("AGENT INSIGHTS: {}", agent).cyan().bold());
+            println!("{}", format!("AGENT INSIGHTS: {agent}").cyan().bold());
             println!("{}", "═".repeat(60).cyan());
             println!();
             println!("  Runs Analyzed: {}", stats.runs_analyzed);
