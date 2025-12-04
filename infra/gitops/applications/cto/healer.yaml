@@ -176,8 +176,8 @@ spec:
 
         args:
           - server
-          - --port
-          - "8080"
+          - --addr
+          - "0.0.0.0:8080"
           - --config
           - /app/healer-config.json
 
