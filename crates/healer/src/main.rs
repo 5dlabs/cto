@@ -5948,10 +5948,10 @@ async fn spawn_factory_with_prompt(
 
     let output = match output {
         Ok(mut child) => {
-            // Write prompt to stdin
+            // Write prompt to stdin (use augmented_prompt which includes memory instructions if enabled)
             if let Some(mut stdin) = child.stdin.take() {
                 use tokio::io::AsyncWriteExt;
-                if let Err(e) = stdin.write_all(prompt_content.as_bytes()).await {
+                if let Err(e) = stdin.write_all(augmented_prompt.as_bytes()).await {
                     anyhow::bail!("Failed to write prompt to stdin: {e}");
                 }
                 drop(stdin); // Close stdin to signal EOF
