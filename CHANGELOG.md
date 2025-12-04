@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.36](https://github.com/5dlabs/cto/compare/v0.12.35...v0.12.36) (2025-12-04)
+
+
+### 🐛 Bug Fixes
+
+* **healer:** correct config schema to match RemediationConfig struct ([#2694](https://github.com/5dlabs/cto/issues/2694)) ([5d13545](https://github.com/5dlabs/cto/commit/5d13545682487ddaf0aae557fe1a927479b027bf))
+* **healer:** use --addr instead of --port for server command ([#2692](https://github.com/5dlabs/cto/issues/2692)) ([6a41f50](https://github.com/5dlabs/cto/commit/6a41f5000382ac2159cfca17dc370975c6032eb4))
+* **healer:** use Axum 0.7 route syntax {task_id} instead of :task_id ([#2695](https://github.com/5dlabs/cto/issues/2695)) ([a26ef3b](https://github.com/5dlabs/cto/commit/a26ef3b565f142517b562058419783c026d3bb6a))
+
 ## [0.12.35](https://github.com/5dlabs/cto/compare/v0.12.34...v0.12.35) (2025-12-04)
 
 
