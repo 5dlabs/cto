@@ -1153,6 +1153,343 @@ spec:
 
 ---
 
+## Configuration Defaults
+
+### CLI & Model
+
+For initial implementation, use consistent defaults:
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| **CLI** | Factory | Our primary agent runtime |
+| **Model** | `claude-opus-4-5-20250929` | Best reasoning until fine-tuned |
+| **Max Attempts** | 3 | Avoid wasting credits while building |
+| **Time Window** | 10 minutes | Prevent rapid retry spam |
+
+```rust
+pub struct RemediationConfig {
+    pub cli: String,           // "Factory"
+    pub model: String,         // "claude-opus-4-5-20250929"
+    pub max_attempts: u32,     // 3
+    pub time_window_mins: u32, // 10
+}
+
+impl Default for RemediationConfig {
+    fn default() -> Self {
+        Self {
+            cli: "Factory".into(),
+            model: "claude-opus-4-5-20250929".into(),
+            max_attempts: 3,
+            time_window_mins: 10,
+        }
+    }
+}
+```
+
+### Branch Strategy
+
+**Fixes go to the existing PR branch** - the goal is to get PRs green without human intervention.
+
+```rust
+fn determine_target_branch(&self, ctx: &RemediationContext) -> String {
+    // If there's an existing PR for this branch, push to that PR's branch
+    if let Some(pr) = &ctx.pr {
+        return pr.head_ref.clone();
+    }
+    
+    // If it's a push to main that failed, create a fix branch
+    if ctx.event.branch == "main" {
+        return format!("fix/{}-{}", ctx.failure_type.short_name(), &ctx.event.head_sha[..8]);
+    }
+    
+    // Otherwise push to the failing branch
+    ctx.event.branch.clone()
+}
+```
+
+---
+
+## Recursive Remediation Loop
+
+Healer implements a **recursive remediation loop** where failed agent attempts trigger re-analysis with more context, not just blind retries.
+
+### Loop Flow
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        RECURSIVE REMEDIATION LOOP                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│   ┌─────────────┐                                                            │
+│   │  CI Failure │                                                            │
+│   │   Event     │                                                            │
+│   └──────┬──────┘                                                            │
+│          │                                                                   │
+│          ▼                                                                   │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                           HEALER                                     │   │
+│   │  1. Gather context (logs, PR, ArgoCD, metrics)                      │   │
+│   │  2. Route to specialist agent                                        │   │
+│   │  3. Spawn CodeRun with enriched prompt                               │   │
+│   └──────────────────────────────────┬──────────────────────────────────┘   │
+│                                      │                                       │
+│                                      ▼                                       │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                        SPECIALIST AGENT                              │   │
+│   │  (Rex / Blaze / Bolt / Cipher / Atlas)                              │   │
+│   │  Attempts to fix the issue, pushes to PR branch                     │   │
+│   └──────────────────────────────────┬──────────────────────────────────┘   │
+│                                      │                                       │
+│                    ┌─────────────────┴─────────────────┐                    │
+│                    ▼                                   ▼                    │
+│            ┌───────────────┐                   ┌───────────────┐            │
+│            │   SUCCESS     │                   │   FAILURE     │            │
+│            │ CI passes ✓   │                   │ Agent failed  │            │
+│            └───────┬───────┘                   └───────┬───────┘            │
+│                    │                                   │                    │
+│                    ▼                                   ▼                    │
+│            ┌───────────────┐                   ┌───────────────┐            │
+│            │   Complete    │                   │  attempt < 3? │            │
+│            │   Log insight │                   └───────┬───────┘            │
+│            └───────────────┘                   ┌───────┴───────┐            │
+│                                                ▼               ▼            │
+│                                         ┌──────────┐   ┌──────────────┐    │
+│                                         │   YES    │   │     NO       │    │
+│                                         │ Re-enter │   │  ESCALATE    │    │
+│                                         │  loop    │   │  to human    │    │
+│                                         └────┬─────┘   └──────┬───────┘    │
+│                                              │                │            │
+│                                              │                ▼            │
+│                                              │         ┌──────────────┐    │
+│                                              │         │   Notify     │    │
+│                                              │         │   (Discord)  │    │
+│                                              │         └──────────────┘    │
+│                                              │                             │
+│   ┌──────────────────────────────────────────┴──────────────────────────┐  │
+│   │                     RE-ANALYSIS PHASE                                │  │
+│   │  • Fetch agent's failure output/logs                                │  │
+│   │  • Query additional context (what did agent try? what went wrong?) │  │
+│   │  • Augment prompt with "Previous attempt failed because..."         │  │
+│   │  • Possibly route to different agent                                │  │
+│   └─────────────────────────────────────────────────────────────────────┘  │
+│                                      │                                      │
+│                                      └──────────────────────────────────────┘
+│                                         (loops back to HEALER)
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Implementation
+
+```rust
+pub struct RemediationAttempt {
+    pub attempt_number: u32,
+    pub agent: Agent,
+    pub coderun_name: String,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub outcome: Option<AttemptOutcome>,
+    pub failure_reason: Option<String>,
+    pub agent_output: Option<String>,
+}
+
+pub enum AttemptOutcome {
+    Success,           // CI passed after fix
+    AgentFailed,       // Agent crashed or errored
+    CiStillFailing,    // Agent pushed but CI still fails
+    Timeout,           // Agent exceeded time limit
+}
+
+impl Healer {
+    pub async fn handle_agent_completion(&self, coderun: &CodeRun) -> Result<()> {
+        let task_id = coderun.labels.get("healer/task-id")?;
+        let mut state = self.get_remediation_state(task_id).await?;
+        
+        // Record this attempt
+        let outcome = self.determine_outcome(coderun).await?;
+        state.record_attempt(outcome.clone(), coderun);
+        
+        match outcome {
+            AttemptOutcome::Success => {
+                // 🎉 Fixed! Log insight for learning
+                self.insights.record_success(&state).await;
+                tracing::info!(task_id, "Remediation succeeded on attempt {}", state.attempts.len());
+            }
+            
+            _ if state.attempts.len() >= self.config.max_attempts => {
+                // ❌ Max attempts reached - escalate to human
+                self.escalate_to_human(&state).await?;
+            }
+            
+            _ => {
+                // 🔄 Re-enter loop with more context
+                self.retry_with_more_context(&state).await?;
+            }
+        }
+        
+        self.save_remediation_state(&state).await
+    }
+    
+    async fn retry_with_more_context(&self, state: &RemediationState) -> Result<()> {
+        // Gather what the agent tried and why it failed
+        let last_attempt = state.attempts.last().unwrap();
+        let agent_logs = self.fetch_coderun_logs(&last_attempt.coderun_name).await?;
+        let what_changed = self.github.get_commits_since(&state.original_sha).await?;
+        
+        // Re-gather context with new information
+        let mut ctx = self.gather_context(&state.event).await?;
+        ctx.previous_attempts = state.attempts.clone();
+        ctx.agent_failure_output = Some(agent_logs);
+        ctx.changes_made_so_far = what_changed;
+        
+        // Possibly route to a different agent if current one is struggling
+        let agent = if state.attempts.len() >= 2 && state.same_agent_failed_twice() {
+            self.try_different_agent(&ctx)
+        } else {
+            state.current_agent()
+        };
+        
+        // Spawn new CodeRun with augmented context
+        let prompt = self.build_retry_prompt(&ctx, &state);
+        self.spawn_coderun(agent, &ctx, &prompt).await
+    }
+    
+    async fn escalate_to_human(&self, state: &RemediationState) -> Result<()> {
+        // Send notification via notify module
+        let message = format!(
+            "🚨 **CI Remediation Failed** - Human intervention needed\n\n\
+             **Workflow**: {}\n\
+             **Branch**: {}\n\
+             **Attempts**: {} (max {})\n\
+             **Last Agent**: {:?}\n\
+             **PR**: {}\n\n\
+             Agents tried but couldn't fix this. Please investigate.",
+            state.event.workflow_name,
+            state.event.branch,
+            state.attempts.len(),
+            self.config.max_attempts,
+            state.current_agent(),
+            state.pr_url().unwrap_or("(no PR)".into()),
+        );
+        
+        self.notify.send(NotifyChannel::Discord, &message).await?;
+        
+        // Also comment on the PR if one exists
+        if let Some(pr_number) = state.pr_number {
+            self.github.comment_pr(
+                pr_number,
+                &format!(
+                    "## ⚠️ Healer: Automatic remediation failed\n\n\
+                     I tried {} times to fix the CI failures but wasn't successful.\n\n\
+                     **What I tried**:\n{}\n\n\
+                     A human needs to take a look at this one.\n\n\
+                     ---\n*Escalated by Healer*",
+                    state.attempts.len(),
+                    state.summarize_attempts(),
+                ),
+            ).await?;
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Augmented Retry Prompt
+
+When retrying, the prompt includes previous attempt context:
+
+```handlebars
+# CI Rust Fix - Rex (Retry Attempt {{attempt_number}})
+
+You are Rex, the Rust specialist. This is **retry attempt {{attempt_number}}** of {{max_attempts}}.
+
+## ⚠️ Previous Attempt Failed
+
+The previous attempt by {{previous_agent}} did not resolve the issue.
+
+### What Was Tried
+{{#each changes_made_so_far}}
+- {{this.message}} ({{this.sha}})
+{{/each}}
+
+### Why It Failed
+```
+{{agent_failure_output}}
+```
+
+### Current CI Status
+```
+{{current_logs}}
+```
+
+## Instructions
+
+1. **Analyze why the previous fix didn't work**
+2. Review the error output above carefully
+3. Apply a **different approach** - don't repeat the same fix
+4. Ensure `cargo clippy --all-targets -- -D warnings -W clippy::pedantic` passes
+5. Push directly to the PR branch: `{{target_branch}}`
+
+**CRITICAL**: Do not repeat failed approaches. Try something new.
+```
+
+---
+
+## Human Escalation via Notify
+
+When max attempts are exhausted, Healer uses the `notify` module to alert humans:
+
+```rust
+// In crates/healer/src/notify.rs (existing module)
+
+pub enum NotifyChannel {
+    Discord,
+    Slack,
+    Email,
+}
+
+pub struct NotifyMessage {
+    pub channel: NotifyChannel,
+    pub title: String,
+    pub body: String,
+    pub severity: NotifySeverity,
+    pub context: HashMap<String, String>,
+}
+
+pub enum NotifySeverity {
+    Info,
+    Warning,
+    Critical,  // Used for escalations
+}
+```
+
+### Discord Notification Example
+
+```
+🚨 **CI Remediation Failed** - Human intervention needed
+
+**Workflow**: Controller CI
+**Branch**: feat/new-feature
+**PR**: #1234
+**Attempts**: 3 (max 3)
+**Agents Tried**: Rex (2x), Atlas (1x)
+
+**Summary of attempts**:
+1. Rex: Fixed clippy lint, but new test failure appeared
+2. Rex: Fixed test, but introduced new clippy error  
+3. Atlas: Tried general fix approach, still failing
+
+**Current Failure**:
+```
+error[E0382]: borrow of moved value: `config`
+```
+
+Please investigate: https://github.com/5dlabs/cto/pull/1234
+```
+
+---
+
 ## Success Metrics
 
 | Metric | Target |
@@ -1160,16 +1497,48 @@ spec:
 | Correct agent routing | >90% |
 | Duplicate prevention | 100% |
 | Time to fix (P50) | <15 min |
-| Fix success rate | >70% |
+| Fix success rate (attempt 1) | >50% |
+| Fix success rate (within 3 attempts) | >80% |
+| Human escalation rate | <10% |
 
 ---
 
-## Open Questions
+## Implementation Phases
 
-1. **Model selection per agent?** Should each agent use a different model, or all use the same?
-2. **Escalation path?** If an agent fails to fix, should Healer escalate to a different agent or human?
-3. **Retry limits?** How many remediation attempts per failure before giving up?
-4. **Branch strategy?** Should fixes go to the failing branch or a new fix branch?
+### Phase 1: Core Router (MVP)
+- [ ] Add `ci/` module with router logic
+- [ ] Add `healer server` command
+- [ ] Implement `/api/remediate/ci-failure` endpoint
+- [ ] Basic failure detection (workflow name only)
+- [ ] Route to specialist agents (Rex/Blaze/Bolt/Cipher/Atlas)
+- [ ] Default to Factory CLI + Opus 4.5
+
+### Phase 2: Enhanced Detection
+- [ ] Fetch and analyze workflow logs via `gh` CLI
+- [ ] Pattern matching on log content
+- [ ] Changed files analysis
+
+### Phase 3: Recursive Loop & Tracking
+- [ ] Watch CodeRun completions
+- [ ] Implement retry-with-more-context logic
+- [ ] Track attempts per task
+- [ ] Max 3 attempts default
+
+### Phase 4: Escalation & Notifications
+- [ ] Human escalation after max attempts
+- [ ] Discord notifications via notify module
+- [ ] PR comments explaining what was tried
+
+### Phase 5: Learning & Insights
+- [ ] Record success/failure by agent
+- [ ] Identify routing improvements
+- [ ] Track time-to-fix metrics
+- [ ] Feed insights back to prompts
+
+### Phase 6: Sensor Migration
+- [ ] Update sensor to call Healer HTTP endpoint
+- [ ] Remove direct CodeRun creation from sensor
+- [ ] Deploy and validate end-to-end
 
 ---
 
@@ -1177,5 +1546,6 @@ spec:
 
 - `/infra/gitops/resources/sensors/ci-failure-remediation-sensor.yaml` - Current sensor
 - `/crates/healer/src/play/remediate.rs` - Existing remediation engine
+- `/crates/healer/src/notify.rs` - Notification module
 - `/infra/charts/controller/agent-templates/` - Agent prompt templates
 
