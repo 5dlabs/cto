@@ -1,19 +1,19 @@
 ---
-name: Heal CI
+name: Healer CI
 
 on:
   push:
     branches: [main]
     paths:
-      - 'crates/heal/**'
-      - 'infra/images/heal/**'
-      - '.github/workflows/heal-ci.yaml'
+      - 'crates/healer/**'
+      - 'infra/images/healer/**'
+      - '.github/workflows/healer-ci.yaml'
   pull_request:
     branches: [main]
     paths:
-      - 'crates/heal/**'
-      - 'infra/images/heal/**'
-      - '.github/workflows/heal-ci.yaml'
+      - 'crates/healer/**'
+      - 'infra/images/healer/**'
+      - '.github/workflows/healer-ci.yaml'
   workflow_dispatch:
 
 env:
@@ -25,7 +25,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      heal: ${{ steps.filter.outputs.heal }}
+      healer: ${{ steps.filter.outputs.healer }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@v4
@@ -33,16 +33,16 @@ jobs:
         id: filter
         with:
           filters: |
-            heal:
-              - 'crates/heal/**'
-              - '!crates/heal/**/*.md'
+            healer:
+              - 'crates/healer/**'
+              - '!crates/healer/**/*.md'
             docker:
-              - 'infra/images/heal/**'
+              - 'infra/images/healer/**'
 
   # Rust linting (format + clippy pedantic)
   lint-rust:
     needs: changes
-    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
     runs-on: ubuntu-22.04
     outputs:
       format-needed: ${{ steps.format-check.outputs.format-needed }}
@@ -55,13 +55,13 @@ jobs:
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
           workspaces: ". -> target"
-          shared-key: "rust-cache-heal-ci"
+          shared-key: "rust-cache-healer-ci"
 
       - name: Check formatting
         id: format-check
         run: |
           echo "🔧 Checking cargo fmt..."
-          if ! cargo fmt -p heal -- --check; then
+          if ! cargo fmt -p healer -- --check; then
             echo "📝 Formatting issues detected"
             echo "format-needed=true" >> "$GITHUB_OUTPUT"
           else
@@ -72,12 +72,12 @@ jobs:
       - name: Run Clippy (pedantic)
         run: |
           echo "🔍 Running clippy with pedantic warnings..."
-          cargo clippy -p heal --all-targets -- -D warnings -W clippy::pedantic
+          cargo clippy -p healer --all-targets -- -D warnings -W clippy::pedantic
 
   # Run tests
   test-rust:
     needs: changes
-    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -87,17 +87,17 @@ jobs:
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
           workspaces: ". -> target"
-          shared-key: "rust-cache-heal-ci"
+          shared-key: "rust-cache-healer-ci"
 
       - name: Run all tests
         run: |
-          echo "🧪 Running all heal tests..."
-          cargo test -p heal --all-targets
+          echo "🧪 Running all healer tests..."
+          cargo test -p healer --all-targets
 
   # Build check (ensure it compiles for release)
   build-check:
     needs: changes
-    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -107,18 +107,18 @@ jobs:
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
           workspaces: ". -> target"
-          shared-key: "rust-cache-heal-ci"
+          shared-key: "rust-cache-healer-ci"
 
       - name: Build release binary
         run: |
-          echo "🔨 Building heal binary..."
-          cargo build -p heal --release --bin heal
+          echo "🔨 Building healer binary..."
+          cargo build -p healer --release --bin healer
           echo "✅ Release build successful"
 
   # Security audit (non-blocking)
   security-audit:
     needs: changes
-    if: needs.changes.outputs.heal == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
     runs-on: ubuntu-22.04
     continue-on-error: true
     steps:
@@ -151,7 +151,7 @@ jobs:
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: infra/images/heal/Dockerfile
+          dockerfile: infra/images/healer/Dockerfile
           failure-threshold: warning
 
   # Build and push Docker image (only on push to main, not PRs)
@@ -205,15 +205,15 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
         run: |
-          echo "🔨 Building heal for linux/amd64..."
-          cargo build -p heal --release --bin heal
+          echo "🔨 Building healer for linux/amd64..."
+          cargo build -p healer --release --bin healer
 
-          # Copy binary to Docker context root (Dockerfile expects 'heal' at root)
-          cp target/release/heal heal
-          chmod +x heal
+          # Copy binary to Docker context root (Dockerfile expects 'healer' at root)
+          cp target/release/healer healer
+          chmod +x healer
 
           # Copy prompts to Docker context root (Dockerfile expects 'prompts/' at root)
-          cp -r crates/heal/prompts prompts
+          cp -r crates/healer/prompts prompts
 
           echo "✅ Binary and prompts copied to Docker context"
           echo "📊 Final sccache stats:"
@@ -232,7 +232,7 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path crates/heal/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "heal") | .version')
+          VERSION=$(cargo metadata --manifest-path crates/healer/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "healer") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
@@ -241,21 +241,21 @@ jobs:
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
-          file: ./infra/images/heal/Dockerfile
+          file: ./infra/images/healer/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.short-sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}
 
       - name: Summary
         run: |
           {
-            echo "## 🐳 Heal Docker Image Built"
+            echo "## 🐳 Healer Docker Image Built"
             echo ""
             echo "**Tags:**"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:latest\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.version }}\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/heal:${{ steps.version.outputs.short-sha }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
