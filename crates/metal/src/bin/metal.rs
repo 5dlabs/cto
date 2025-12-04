@@ -1,5 +1,7 @@
 //! Metal CLI - Bare metal provisioning tool for CTO Platform.
 
+#![allow(clippy::similar_names)]
+
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -11,7 +13,7 @@ use tracing_subscriber::EnvFilter;
 use cto_metal::providers::latitude::Latitude;
 use cto_metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
 use cto_metal::stack;
-use cto_metal::state::{ClusterState, ProvisionStep, RetryConfig, with_retry_async};
+use cto_metal::state::{with_retry_async, ClusterState, ProvisionStep, RetryConfig};
 use cto_metal::talos::{self, BootstrapConfig, TalosConfig};
 use tokio::task::JoinSet;
 
@@ -242,7 +244,7 @@ enum Commands {
         resume: bool,
 
         /// Deploy the platform stack after cluster bootstrap.
-        /// Installs: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows.
+        /// Installs: Cert-Manager, `ArgoCD`, Vault, Ingress-NGINX, Argo Workflows.
         #[arg(long, default_value = "false")]
         deploy_stack: bool,
 
@@ -731,96 +733,110 @@ async fn main() -> Result<()> {
                 .context("Failed to create second Latitude provider")?;
 
             // Variables to track server state (may be restored from saved state)
-            let (cp_id, worker_id, cp_addr, worker_addr) = if state.step >= ProvisionStep::WaitingServersReady {
-                // Restore from saved state
-                let cp = state.control_plane.as_ref()
-                    .context("No control plane in saved state")?;
-                let wk = state.worker.as_ref()
-                    .context("No worker in saved state")?;
-                println!("📂 Restored server info from state:");
-                println!("   Control Plane: {} ({})", cp.id, cp.ip);
-                println!("   Worker:        {} ({})", wk.id, wk.ip);
-                (cp.id.clone(), wk.id.clone(), cp.ip.clone(), wk.ip.clone())
-            } else {
-                // Step 1: Create BOTH servers in parallel
-                state.set_step(ProvisionStep::CreatingServers)?;
-                println!("\n🖥️  Step 1/9: Creating both servers in parallel...");
+            let (cp_id, worker_id, cp_addr, worker_addr) =
+                if state.step >= ProvisionStep::WaitingServersReady {
+                    // Restore from saved state
+                    let cp = state
+                        .control_plane
+                        .as_ref()
+                        .context("No control plane in saved state")?;
+                    let wk = state.worker.as_ref().context("No worker in saved state")?;
+                    println!("📂 Restored server info from state:");
+                    println!("   Control Plane: {} ({})", cp.id, cp.ip);
+                    println!("   Worker:        {} ({})", wk.id, wk.ip);
+                    (cp.id.clone(), wk.id.clone(), cp.ip.clone(), wk.ip.clone())
+                } else {
+                    // Step 1: Create BOTH servers in parallel
+                    state.set_step(ProvisionStep::CreatingServers)?;
+                    println!("\n🖥️  Step 1/9: Creating both servers in parallel...");
 
-                let cp_req = CreateServerRequest {
-                    hostname: cp_hostname.clone(),
-                    plan: cp_plan,
-                    region: region.clone(),
-                    os: "ubuntu_24_04_x64_lts".to_string(),
-                    ssh_keys: ssh_keys.clone(),
+                    let cp_req = CreateServerRequest {
+                        hostname: cp_hostname.clone(),
+                        plan: cp_plan,
+                        region: region.clone(),
+                        os: "ubuntu_24_04_x64_lts".to_string(),
+                        ssh_keys: ssh_keys.clone(),
+                    };
+                    let worker_req = CreateServerRequest {
+                        hostname: worker_hostname.clone(),
+                        plan: worker_plan,
+                        region,
+                        os: "ubuntu_24_04_x64_lts".to_string(),
+                        ssh_keys,
+                    };
+
+                    // Use retry for API calls
+                    let (cp_server, worker_server) =
+                        with_retry_async(&retry_config, "Create servers", || {
+                            let p1 = &provider;
+                            let p2 = &provider2;
+                            let cp = cp_req.clone();
+                            let wk = worker_req.clone();
+                            async move {
+                                tokio::try_join!(p1.create_server(cp), p2.create_server(wk))
+                                    .map_err(|e| anyhow::anyhow!("{e}"))
+                            }
+                        })
+                        .await?;
+
+                    let cp_id = cp_server.id.clone();
+                    let worker_id = worker_server.id.clone();
+                    let cp_ip = cp_server.ipv4.clone().unwrap_or_default();
+                    let wk_ip = worker_server.ipv4.clone().unwrap_or_default();
+
+                    println!("   Control Plane: {cp_id} ({cp_ip})");
+                    println!("   Worker:        {worker_id} ({wk_ip})");
+
+                    // Save server info to state
+                    state.set_control_plane(cp_id.clone(), cp_ip.clone(), cp_hostname.clone())?;
+                    state.set_worker(worker_id.clone(), wk_ip.clone(), worker_hostname.clone())?;
+
+                    // Step 2: Wait for BOTH servers to be ready in parallel
+                    state.set_step(ProvisionStep::WaitingServersReady)?;
+                    println!("\n⏳ Step 2/9: Waiting for both servers to be ready...");
+
+                    let (cp_ready, worker_ready) =
+                        with_retry_async(&retry_config, "Wait for servers", || {
+                            let p1 = &provider;
+                            let p2 = &provider2;
+                            let cid = cp_id.clone();
+                            let wid = worker_id.clone();
+                            async move {
+                                tokio::try_join!(
+                                    p1.wait_ready(&cid, timeout),
+                                    p2.wait_ready(&wid, timeout)
+                                )
+                                .map_err(|e| anyhow::anyhow!("{e}"))
+                            }
+                        })
+                        .await?;
+
+                    let cp_addr = cp_ready.ipv4.clone().unwrap_or_default();
+                    let worker_addr = worker_ready.ipv4.clone().unwrap_or_default();
+                    println!("   ✅ Control plane ready: {cp_addr}");
+                    println!("   ✅ Worker ready: {worker_addr}");
+
+                    // Update state with actual IPs
+                    state.set_control_plane(cp_id.clone(), cp_addr.clone(), cp_hostname.clone())?;
+                    state.set_worker(
+                        worker_id.clone(),
+                        worker_addr.clone(),
+                        worker_hostname.clone(),
+                    )?;
+
+                    (cp_id, worker_id, cp_addr, worker_addr)
                 };
-                let worker_req = CreateServerRequest {
-                    hostname: worker_hostname.clone(),
-                    plan: worker_plan,
-                    region,
-                    os: "ubuntu_24_04_x64_lts".to_string(),
-                    ssh_keys,
-                };
-
-                // Use retry for API calls
-                let (cp_server, worker_server) = with_retry_async(&retry_config, "Create servers", || {
-                    let p1 = &provider;
-                    let p2 = &provider2;
-                    let cp = cp_req.clone();
-                    let wk = worker_req.clone();
-                    async move {
-                        tokio::try_join!(p1.create_server(cp), p2.create_server(wk))
-                            .map_err(|e| anyhow::anyhow!("{e}"))
-                    }
-                }).await?;
-
-                let cp_id = cp_server.id.clone();
-                let worker_id = worker_server.id.clone();
-                let cp_ip = cp_server.ipv4.clone().unwrap_or_default();
-                let wk_ip = worker_server.ipv4.clone().unwrap_or_default();
-
-                println!("   Control Plane: {cp_id} ({cp_ip})");
-                println!("   Worker:        {worker_id} ({wk_ip})");
-
-                // Save server info to state
-                state.set_control_plane(cp_id.clone(), cp_ip.clone(), cp_hostname.clone())?;
-                state.set_worker(worker_id.clone(), wk_ip.clone(), worker_hostname.clone())?;
-
-                // Step 2: Wait for BOTH servers to be ready in parallel
-                state.set_step(ProvisionStep::WaitingServersReady)?;
-                println!("\n⏳ Step 2/9: Waiting for both servers to be ready...");
-
-                let (cp_ready, worker_ready) = with_retry_async(&retry_config, "Wait for servers", || {
-                    let p1 = &provider;
-                    let p2 = &provider2;
-                    let cid = cp_id.clone();
-                    let wid = worker_id.clone();
-                    async move {
-                        tokio::try_join!(p1.wait_ready(&cid, timeout), p2.wait_ready(&wid, timeout))
-                            .map_err(|e| anyhow::anyhow!("{e}"))
-                    }
-                }).await?;
-
-                let cp_addr = cp_ready.ipv4.clone().unwrap_or_default();
-                let worker_addr = worker_ready.ipv4.clone().unwrap_or_default();
-                println!("   ✅ Control plane ready: {cp_addr}");
-                println!("   ✅ Worker ready: {worker_addr}");
-
-                // Update state with actual IPs
-                state.set_control_plane(cp_id.clone(), cp_addr.clone(), cp_hostname.clone())?;
-                state.set_worker(worker_id.clone(), worker_addr.clone(), worker_hostname.clone())?;
-
-                (cp_id, worker_id, cp_addr, worker_addr)
-            };
 
             // Step 3: Trigger Talos iPXE on BOTH (skip if already past this step)
             if state.step < ProvisionStep::WaitingTalos {
                 state.set_step(ProvisionStep::WaitingTalos)?;
                 println!("\n🔄 Step 3/9: Triggering Talos iPXE boot on both...");
 
-                let talos_cfg = TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
-                    &talos_version,
-                    cto_metal::talos::DEFAULT_SCHEMATIC_ID,
-                ));
+                let talos_cfg =
+                    TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
+                        &talos_version,
+                        cto_metal::talos::DEFAULT_SCHEMATIC_ID,
+                    ));
                 let ipxe_url = talos_cfg.ipxe_url();
 
                 let cp_ipxe = ReinstallIpxeRequest {
@@ -840,10 +856,14 @@ async fn main() -> Result<()> {
                     let cipxe = cp_ipxe.clone();
                     let wipxe = worker_ipxe.clone();
                     async move {
-                        tokio::try_join!(p1.reinstall_ipxe(&cid, cipxe), p2.reinstall_ipxe(&wid, wipxe))
-                            .map_err(|e| anyhow::anyhow!("{e}"))
+                        tokio::try_join!(
+                            p1.reinstall_ipxe(&cid, cipxe),
+                            p2.reinstall_ipxe(&wid, wipxe)
+                        )
+                        .map_err(|e| anyhow::anyhow!("{e}"))
                     }
-                }).await?;
+                })
+                .await?;
                 println!("   ✅ iPXE triggered on both servers!");
             } else {
                 println!("\n⏭️  Step 3/9: Skipping iPXE (already triggered)");
@@ -915,7 +935,11 @@ async fn main() -> Result<()> {
             if state.step < ProvisionStep::Bootstrapping {
                 state.set_step(ProvisionStep::WaitingCpInstall)?;
                 println!("\n⏳ Step 7/9: Waiting for control plane installation...");
-                talos::wait_for_install(&cp_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+                talos::wait_for_install(
+                    &cp_addr,
+                    &configs.talosconfig,
+                    Duration::from_secs(timeout),
+                )?;
 
                 state.set_step(ProvisionStep::Bootstrapping)?;
                 println!("\n🎯 Bootstrapping control plane...");
@@ -923,7 +947,11 @@ async fn main() -> Result<()> {
 
                 state.set_step(ProvisionStep::WaitingKubernetes)?;
                 println!("\n☸️  Waiting for Kubernetes API...");
-                talos::wait_for_kubernetes(&cp_addr, &configs.talosconfig, Duration::from_secs(300))?;
+                talos::wait_for_kubernetes(
+                    &cp_addr,
+                    &configs.talosconfig,
+                    Duration::from_secs(300),
+                )?;
 
                 // Get kubeconfig
                 talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
@@ -946,7 +974,11 @@ async fn main() -> Result<()> {
             if state.step < ProvisionStep::Complete {
                 state.set_step(ProvisionStep::WaitingWorkerJoin)?;
                 println!("\n⏳ Step 9/{total_steps}: Waiting for worker to join cluster...");
-                talos::wait_for_install(&worker_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+                talos::wait_for_install(
+                    &worker_addr,
+                    &configs.talosconfig,
+                    Duration::from_secs(timeout),
+                )?;
                 talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(300))?;
                 state.set_step(ProvisionStep::Complete)?;
             } else {
@@ -967,7 +999,9 @@ async fn main() -> Result<()> {
             // Step 10: Deploy platform stack (optional)
             if deploy_stack {
                 println!("\n📦 Step 10/{total_steps}: Deploying platform stack...");
-                println!("   This installs: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows");
+                println!(
+                    "   This installs: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows"
+                );
 
                 // Install local-path-provisioner for bare metal PVCs
                 println!("\n   Installing local-path-provisioner (for bare metal storage)...");
@@ -1036,7 +1070,10 @@ async fn main() -> Result<()> {
                 println!("   metal stack --kubeconfig {}", kubeconfig_path.display());
             }
             println!("\n💡 To resume if interrupted:");
-            println!("   metal cluster --name {name} --resume --output-dir {}", output_dir.display());
+            println!(
+                "   metal cluster --name {name} --resume --output-dir {}",
+                output_dir.display()
+            );
         }
 
         Commands::Join {
@@ -1158,7 +1195,9 @@ async fn main() -> Result<()> {
             } else {
                 // Deploy full stack
                 println!("\n📦 Deploying full CTO platform stack...");
-                println!("   Components: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows");
+                println!(
+                    "   Components: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows"
+                );
 
                 println!("\n🔐 Step 1/5: Deploying Cert-Manager...");
                 stack::deploy_cert_manager(&kubeconfig)?;
@@ -1193,7 +1232,10 @@ async fn main() -> Result<()> {
                         Ok(vault_creds) => {
                             println!("   ✅ Vault initialized and unsealed!");
                             println!("\n🔑 Vault Credentials (SAVE THESE!):");
-                            println!("   Unseal Key: {}", vault_creds.unseal_keys.first().unwrap_or(&String::new()));
+                            println!(
+                                "   Unseal Key: {}",
+                                vault_creds.unseal_keys.first().unwrap_or(&String::new())
+                            );
                             println!("   Root Token: {}", vault_creds.root_token);
                         }
                         Err(e) => {
@@ -1224,7 +1266,10 @@ async fn main() -> Result<()> {
                 Ok(vault_creds) => {
                     println!("\n🔐 Vault initialized and unsealed!");
                     println!("\n🔑 Vault Credentials:");
-                    println!("   Unseal Key: {}", vault_creds.unseal_keys.first().unwrap_or(&String::new()));
+                    println!(
+                        "   Unseal Key: {}",
+                        vault_creds.unseal_keys.first().unwrap_or(&String::new())
+                    );
                     println!("   Root Token: {}", vault_creds.root_token);
 
                     // Save to file

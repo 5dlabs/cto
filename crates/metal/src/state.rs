@@ -103,10 +103,8 @@ impl ClusterState {
             return Ok(None);
         }
 
-        let content = std::fs::read_to_string(&path)
-            .context("Failed to read state file")?;
-        let state: Self = serde_json::from_str(&content)
-            .context("Failed to parse state file")?;
+        let content = std::fs::read_to_string(&path).context("Failed to read state file")?;
+        let state: Self = serde_json::from_str(&content).context("Failed to parse state file")?;
 
         info!("Loaded cluster state: step={:?}", state.step);
         Ok(Some(state))
@@ -120,13 +118,10 @@ impl ClusterState {
         self.updated_at = chrono::Utc::now().to_rfc3339();
 
         let path = Self::state_file(&self.output_dir);
-        std::fs::create_dir_all(&self.output_dir)
-            .context("Failed to create output directory")?;
+        std::fs::create_dir_all(&self.output_dir).context("Failed to create output directory")?;
 
-        let content = serde_json::to_string_pretty(self)
-            .context("Failed to serialize state")?;
-        std::fs::write(&path, content)
-            .context("Failed to write state file")?;
+        let content = serde_json::to_string_pretty(self).context("Failed to serialize state")?;
+        std::fs::write(&path, content).context("Failed to write state file")?;
 
         Ok(())
     }
@@ -195,7 +190,10 @@ impl ClusterState {
     /// Check if we can resume from the current state.
     #[must_use]
     pub fn can_resume(&self) -> bool {
-        !matches!(self.step, ProvisionStep::NotStarted | ProvisionStep::Complete | ProvisionStep::Failed)
+        !matches!(
+            self.step,
+            ProvisionStep::NotStarted | ProvisionStep::Complete | ProvisionStep::Failed
+        )
     }
 
     /// Get the next step to execute based on current state.
@@ -212,9 +210,9 @@ impl ClusterState {
             ProvisionStep::Bootstrapping => ProvisionStep::WaitingKubernetes,
             ProvisionStep::WaitingKubernetes => ProvisionStep::ApplyingWorkerConfig,
             ProvisionStep::ApplyingWorkerConfig => ProvisionStep::WaitingWorkerJoin,
-            ProvisionStep::WaitingWorkerJoin
-            | ProvisionStep::Complete
-            | ProvisionStep::Failed => ProvisionStep::Complete,
+            ProvisionStep::WaitingWorkerJoin | ProvisionStep::Complete | ProvisionStep::Failed => {
+                ProvisionStep::Complete
+            }
         }
     }
 }
@@ -260,9 +258,8 @@ where
             Ok(result) => return Ok(result),
             Err(e) => {
                 if attempt >= config.max_attempts {
-                    return Err(e).context(format!(
-                        "{operation_name} failed after {attempt} attempts"
-                    ));
+                    return Err(e)
+                        .context(format!("{operation_name} failed after {attempt} attempts"));
                 }
 
                 info!(
@@ -273,7 +270,9 @@ where
                 std::thread::sleep(delay);
                 delay = std::cmp::min(
                     config.max_delay,
-                    std::time::Duration::from_secs_f64(delay.as_secs_f64() * config.backoff_multiplier),
+                    std::time::Duration::from_secs_f64(
+                        delay.as_secs_f64() * config.backoff_multiplier,
+                    ),
                 );
             }
         }
@@ -302,9 +301,8 @@ where
             Ok(result) => return Ok(result),
             Err(e) => {
                 if attempt >= config.max_attempts {
-                    return Err(e).context(format!(
-                        "{operation_name} failed after {attempt} attempts"
-                    ));
+                    return Err(e)
+                        .context(format!("{operation_name} failed after {attempt} attempts"));
                 }
 
                 info!(
@@ -315,7 +313,9 @@ where
                 tokio::time::sleep(delay).await;
                 delay = std::cmp::min(
                     config.max_delay,
-                    std::time::Duration::from_secs_f64(delay.as_secs_f64() * config.backoff_multiplier),
+                    std::time::Duration::from_secs_f64(
+                        delay.as_secs_f64() * config.backoff_multiplier,
+                    ),
                 );
             }
         }
@@ -348,10 +348,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_retry_config_default() {
         let config = RetryConfig::default();
         assert_eq!(config.max_attempts, 5);
         assert_eq!(config.backoff_multiplier, 2.0);
     }
 }
-
