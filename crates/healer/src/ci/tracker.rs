@@ -264,11 +264,15 @@ impl RemediationTracker {
                     attempts_made + 1
                 );
 
-                // Build retry context
-                let ctx = self.build_retry_context(tracked).await?;
+                // Clone data needed for retry context BEFORE releasing lock
+                // This prevents holding the write lock across an await point
+                let tracked_clone = tracked.clone();
 
-                // Spawn will happen outside this function
-                drop(active); // Release lock before spawning
+                // Release lock BEFORE async operation to prevent deadlock
+                drop(active);
+
+                // Now safe to call async function without holding the lock
+                let ctx = self.build_retry_context(&tracked_clone).await?;
 
                 // Spawn new CodeRun
                 match spawner.spawn(next_agent, &ctx) {
