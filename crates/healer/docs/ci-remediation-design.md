@@ -1,8 +1,80 @@
-# CI Remediation Hub Design
+# Healer: Unified Remediation Hub Design
 
 ## Overview
 
-Healer becomes the intelligent triage layer for all CI failures, routing remediation to the most appropriate specialist agent based on failure type.
+Healer becomes the **single remediation hub** for all issues across the platform, replacing the separate remediation templates. It receives issues from multiple sources and routes them to the most appropriate specialist agent.
+
+### Architecture Consolidation
+
+| Before | After |
+|--------|-------|
+| Stitch (review) | **Stitch** (review) - KEEP |
+| Rex remediation templates | **Healer** routes to Rex |
+| Atlas PR Guardian / Bugbot resolution | **Healer** routes to Atlas |
+| Separate CI remediation sensor | **Healer** handles CI failures |
+| Manual security fixes | **Healer** routes to Cipher |
+
+### Key Principle
+
+- **Stitch** = Detection (finds issues, posts comments)
+- **Healer** = Remediation (fixes issues, tracks progress)
+
+---
+
+## Issue Sources
+
+Healer receives issues from multiple detection sources:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        DETECTION LAYER                              │
+├─────────────┬─────────────┬─────────────┬─────────────┬────────────┤
+│   Stitch    │  CI Checks  │   GitHub    │  Security   │   Play     │
+│  (Review)   │ (Workflows) │  (Bugbot?)  │   Alerts    │  Workflow  │
+└──────┬──────┴──────┬──────┴──────┬──────┴──────┬──────┴─────┬──────┘
+       │             │             │             │            │
+       └─────────────┴─────────────┴─────────────┴────────────┘
+                                   │
+                                   ▼
+                    ┌─────────────────────────┐
+                    │         HEALER          │
+                    │   (Remediation Hub)     │
+                    └─────────────────────────┘
+                                   │
+       ┌───────────┬───────────────┼───────────────┬───────────┐
+       ▼           ▼               ▼               ▼           ▼
+   ┌───────┐   ┌───────┐       ┌───────┐       ┌───────┐   ┌───────┐
+   │  Rex  │   │ Blaze │       │ Bolt  │       │Cipher │   │ Atlas │
+   │(Rust) │   │(Front)│       │(Infra)│       │ (Sec) │   │(Git)  │
+   └───────┘   └───────┘       └───────┘       └───────┘   └───────┘
+```
+
+### Source Details
+
+| Source | Trigger | Event Type | Notes |
+|--------|---------|------------|-------|
+| **Stitch** | PR review posted | `issue_comment`, `pull_request_review` | Our review bot |
+| **CI Checks** | Workflow failure | `workflow_job`, `check_run` | GitHub Actions |
+| **Bugbot** | Comment posted | `issue_comment` | Cursor's bot (consider replacing with Stitch) |
+| **Security** | Alert created | `dependabot_alert`, `code_scanning_alert` | GitHub Security |
+| **Play** | Stage failure | Internal event | Play workflow monitoring |
+
+### Bugbot Consideration
+
+**Option A: Keep Bugbot as external trigger**
+- Healer watches for `@bugbot` comments
+- Routes findings to appropriate agent
+- Simpler, leverages existing Cursor integration
+
+**Option B: Replace Bugbot with Stitch**
+- Stitch already does code review
+- Remove dependency on external service
+- Unified detection in our control
+- Healer only needs to watch Stitch comments
+
+**Recommendation**: Option B - Stitch already provides superior review capabilities. We can deprecate Bugbot dependency and have Stitch be the sole PR review mechanism.
+
+---
 
 ## Current State
 
@@ -35,6 +107,7 @@ GitHub CI Failure → Argo Sensor → Healer → CodeRun (Rex/Blaze/Bolt/Atlas)
 | **Rex** | Rust | 5DLabs-Rex | Clippy errors, test failures, build errors, Cargo issues |
 | **Blaze** | Frontend | 5DLabs-Blaze | JavaScript, TypeScript, npm/pnpm, React, CSS |
 | **Bolt** | Infrastructure | 5DLabs-Bolt | Docker builds, Helm charts, K8s manifests, Argo CD, GitOps, YAML |
+| **Cipher** | Security | 5DLabs-Cipher | Dependabot alerts, code scanning, secret scanning, vulnerability fixes |
 | **Atlas** | GitHub/Git | 5DLabs-Atlas | Merge conflicts, GitHub API, permissions, workflow syntax, fallback |
 
 ### Agent Tooling
@@ -44,6 +117,7 @@ GitHub CI Failure → Argo Sensor → Healer → CodeRun (Rex/Blaze/Bolt/Atlas)
 | **Rex** | Rust analyzer, Cargo | Code analysis, dependency management, test running |
 | **Blaze** | npm/pnpm, ESLint, TypeScript | Package management, linting, type checking |
 | **Bolt** | Docker, Helm, kubectl, **Argo CD** | Container builds, chart management, cluster ops, GitOps sync |
+| **Cipher** | GitHub Security, Dependabot | Vulnerability remediation, dependency updates, secret rotation |
 | **Atlas** | GitHub CLI, Git | PR management, merge conflict resolution, workflow editing |
 
 ---
@@ -92,14 +166,14 @@ Healer can respond to various GitHub webhook events. The events are categorized 
 | **Push** | Any push to monitored branches | Detect problematic commits early | Router decides |
 | **Issue comments** | `/healer fix`, `/healer retry` | Manual trigger via comment commands | Command parser |
 
-### Security Events (Future)
+### Security Events → Cipher
 
 | Event | Trigger | Use Case | Agent |
 |-------|---------|----------|-------|
-| **Dependabot alerts** | `created`, `reopened` | Auto-fix dependency vulnerabilities | Bolt |
-| **Code scanning alerts** | `created` | Security issue remediation | Atlas |
-| **Secret scanning alerts** | `created` | Rotate/revoke leaked secrets | Atlas |
-| **Repository vulnerability alerts** | `created` | Dependency security fixes | Bolt |
+| **Dependabot alerts** | `created`, `reopened` | Auto-fix dependency vulnerabilities | **Cipher** |
+| **Code scanning alerts** | `created` | Security issue remediation | **Cipher** |
+| **Secret scanning alerts** | `created` | Rotate/revoke leaked secrets | **Cipher** |
+| **Repository vulnerability alerts** | `created` | Dependency security fixes | **Cipher** |
 
 ### Lifecycle Events (Tracking)
 
@@ -291,7 +365,7 @@ Add these events:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        CI Failure Event                             │
+│                        CI Failure / Security Event                  │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -300,36 +374,38 @@ Add these events:
                     │   Routes to Specialist  │
                     └─────────────────────────┘
                                   │
-        ┌─────────────┬───────────┴───────────┬─────────────┐
-        ▼             ▼                       ▼             ▼
-   ┌─────────┐  ┌──────────┐            ┌────────┐    ┌────────┐
-   │  Rust   │  │ Frontend │            │ Infra  │    │  Git/  │
-   │ Clippy  │  │   npm    │            │ Docker │    │ GitHub │
-   │  Test   │  │   pnpm   │            │  Helm  │    │ Merge  │
-   │  Build  │  │   tsx    │            │ ArgoCD │    │Conflict│
-   └────┬────┘  └────┬─────┘            └───┬────┘    └───┬────┘
-        │            │                      │             │
-        ▼            ▼                      ▼             ▼
-   ┌─────────┐  ┌──────────┐            ┌────────┐   ┌─────────┐
-   │   Rex   │  │  Blaze   │            │  Bolt  │   │  Atlas  │
-   └─────────┘  └──────────┘            └────────┘   │(default)│
+        ┌───────────┬─────────────┼─────────────┬───────────┐
+        ▼           ▼             ▼             ▼           ▼
+   ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐
+   │  Rust   │ │ Frontend │ │  Infra   │ │ Security │ │  Git/   │
+   │ Clippy  │ │   npm    │ │  Docker  │ │Dependabot│ │ GitHub  │
+   │  Test   │ │   pnpm   │ │   Helm   │ │CodeScan  │ │ Merge   │
+   │  Build  │ │   tsx    │ │  ArgoCD  │ │ Secrets  │ │Conflict │
+   └────┬────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬────┘
+        │           │            │            │            │
+        ▼           ▼            ▼            ▼            ▼
+   ┌─────────┐ ┌──────────┐ ┌────────┐  ┌──────────┐ ┌─────────┐
+   │   Rex   │ │  Blaze   │ │  Bolt  │  │  Cipher  │ │  Atlas  │
+   └─────────┘ └──────────┘ └────────┘  └──────────┘ │(default)│
                                                      └─────────┘
 ```
 
-**Note:** Atlas serves as the default/fallback agent. Healer always routes to one of the four agents - there is no "unknown" category.
+**Note:** Atlas serves as the default/fallback agent. Healer always routes to one of the five agents - there is no "unknown" category.
 
 ### Detailed Routing Matrix
 
 Healer evaluates patterns in order. First match wins; Atlas is the default if no pattern matches.
 
-| Priority | Workflow Pattern | Log Pattern | Changed Files | → Agent |
-|----------|------------------|-------------|---------------|---------|
+| Priority | Workflow Pattern | Log/Event Pattern | Changed Files | → Agent |
+|----------|------------------|-------------------|---------------|---------|
 | 1 | `*-ci`, `controller-*`, `healer-*` | `clippy`, `cargo test`, `rustc` | `*.rs`, `Cargo.toml` | **Rex** |
 | 2 | `frontend-*`, `ui-*` | `npm`, `pnpm`, `tsc`, `eslint` | `*.ts`, `*.tsx`, `*.js`, `package.json` | **Blaze** |
 | 3 | `infrastructure-*`, `docker-*`, `helm-*` | `docker build`, `helm`, `kubectl` | `Dockerfile`, `*.yaml`, `Chart.yaml` | **Bolt** |
 | 4 | `argocd-*`, `gitops-*`, `sync-*` | `argocd`, `sync failed`, `OutOfSync` | `infra/gitops/*`, `applications/*` | **Bolt** |
-| 5 | (any) | `merge conflict`, `CONFLICT`, `cannot merge` | (any) | **Atlas** |
-| 6 | `*-release`, `deploy-*` | `push`, `ghcr.io`, `permission` | `.github/workflows/*` | **Atlas** |
+| 5 | (security event) | `dependabot_alert`, `code_scanning_alert`, `secret_scanning_alert` | (any) | **Cipher** |
+| 6 | (security event) | `vulnerability`, `CVE-`, `security advisory` | `Cargo.lock`, `package-lock.json` | **Cipher** |
+| 7 | (any) | `merge conflict`, `CONFLICT`, `cannot merge` | (any) | **Atlas** |
+| 8 | `*-release`, `deploy-*` | `push`, `ghcr.io`, `permission` | `.github/workflows/*` | **Atlas** |
 | — | *(default)* | *(no match)* | *(no match)* | **Atlas** |
 
 ---
@@ -357,10 +433,11 @@ Healer evaluates patterns in order. First match wins; Atlas is the default if no
 │         ▼                                                         │
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │                    Prompt Templates                          │ │
-│  │  prompts/ci/rust-fix.hbs                                     │ │
-│  │  prompts/ci/frontend-fix.hbs                                 │ │
-│  │  prompts/ci/infra-fix.hbs                                    │ │
-│  │  prompts/ci/github-fix.hbs                                   │ │
+│  │  prompts/ci/rust-fix.hbs      → Rex                          │ │
+│  │  prompts/ci/frontend-fix.hbs  → Blaze                        │ │
+│  │  prompts/ci/infra-fix.hbs     → Bolt                         │ │
+│  │  prompts/ci/security-fix.hbs  → Cipher                       │ │
+│  │  prompts/ci/github-fix.hbs    → Atlas                        │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                   │
 └──────────────────────────────────────────────────────────────────┘
@@ -517,6 +594,42 @@ You are Bolt, the infrastructure specialist. A CI workflow has failed with Docke
 5. Create a PR with clear description
 
 Focus only on fixing the CI failure. Do not change application code.
+```
+
+### Cipher (Security)
+
+```handlebars
+# Security Fix - Cipher
+
+You are Cipher, the security specialist. A security alert has been raised that requires remediation.
+
+## Alert Details
+- **Type**: {{alert_type}}
+- **Severity**: {{severity}}
+- **Package**: {{package_name}}
+- **CVE**: {{cve_id}}
+- **Branch**: {{branch}}
+
+## Alert Description
+```
+{{alert_description}}
+```
+
+## Instructions
+1. Analyze the security alert and identify the vulnerable component
+2. Determine the appropriate fix:
+   - **Dependency vulnerability**: Update to patched version in Cargo.toml/package.json
+   - **Code scanning alert**: Fix the vulnerable code pattern
+   - **Secret leak**: Rotate the secret and update references
+3. Apply the minimal fix to resolve the vulnerability
+4. Ensure the fix doesn't break existing functionality
+5. Create a PR with clear description of the security impact
+
+## Security Best Practices
+- Always update to the latest patched version, not just minimum safe version
+- Check for breaking changes in major version updates
+- Verify no new vulnerabilities are introduced by the update
+- Document the CVE and remediation in the commit message
 ```
 
 ### Atlas (GitHub/General)
