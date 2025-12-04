@@ -9,6 +9,7 @@ mod dedup;
 mod github;
 mod k8s;
 pub mod loki;
+pub mod play;
 mod templates;
 
 use anyhow::{Context, Result};
@@ -356,6 +357,16 @@ enum Commands {
         #[arg(long, default_value = "10000")]
         tail: u32,
     },
+    /// [PLAY] Track parallel task batches and remediate issues
+    Play {
+        #[command(subcommand)]
+        action: PlayCommands,
+    },
+    /// [INSIGHTS] Agent optimization intelligence
+    Insights {
+        #[command(subcommand)]
+        action: InsightsCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -403,6 +414,59 @@ enum MemoryCommands {
         /// Memory ID
         #[arg(long)]
         id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum PlayCommands {
+    /// Show batch and task status
+    Status {
+        /// Show specific task details
+        #[arg(long)]
+        task_id: Option<String>,
+        /// Show only stuck/unhealthy tasks
+        #[arg(long)]
+        stuck: bool,
+    },
+    /// Trigger remediation for a task
+    Remediate {
+        /// Task ID to remediate
+        #[arg(long)]
+        task_id: String,
+    },
+    /// Show active remediations
+    Remediations,
+    /// Cancel an active remediation
+    CancelRemediation {
+        /// Task ID to cancel remediation for
+        #[arg(long)]
+        task_id: String,
+    },
+    /// Cleanup play state after completion
+    Cleanup {
+        /// Force cleanup even if tasks still running
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum InsightsCommands {
+    /// Show agent performance insights
+    Show {
+        /// Agent name to show insights for
+        #[arg(long)]
+        agent: String,
+    },
+    /// Show optimization suggestions
+    Suggest,
+    /// Show common failure patterns
+    Failures,
+    /// Export insights data
+    Export {
+        /// Output format (json, csv)
+        #[arg(long, default_value = "json")]
+        format: String,
     },
 }
 
@@ -1845,6 +1909,12 @@ async fn main() -> Result<()> {
             tail,
         } => {
             fetch_pod_logs(&pod_name, &namespace, &output_dir, tail)?;
+        }
+        Commands::Play { action } => {
+            handle_play_command(action, &cli.namespace)?;
+        }
+        Commands::Insights { action } => {
+            handle_insights_command(action)?;
         }
     }
 
@@ -6328,6 +6398,423 @@ fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
     let content = &output.stdout;
     std::fs::write(output_file, content).context(format!("Failed to write to {output_file}"))?;
     Ok(content.len())
+}
+
+// =============================================================================
+// Play Command Handlers
+// =============================================================================
+
+/// Handle play orchestration commands.
+fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
+    use play::{PlayBatch, PlayTracker};
+    use play::cleanup::PlayCleanup;
+
+    match action {
+        PlayCommands::Status { task_id, stuck } => {
+            let batch = PlayBatch::load_from_k8s(namespace)?;
+            let tracker = PlayTracker::new(batch);
+
+            if let Some(tid) = task_id {
+                // Show specific task
+                if let Some(task) = tracker.get_task(&tid) {
+                    print_task_detail(task);
+                } else {
+                    println!("{}", format!("Task {tid} not found").red());
+                }
+            } else if stuck {
+                // Show only stuck tasks
+                let summary = tracker.health_summary();
+                let stuck_tasks = tracker.batch.stuck_tasks();
+
+                if stuck_tasks.is_empty() {
+                    println!("{}", "No stuck tasks found".green());
+                } else {
+                    println!("{}", format!("Found {} stuck tasks:", stuck_tasks.len()).red().bold());
+                    for task in stuck_tasks {
+                        print_task_row(task);
+                    }
+                }
+
+                // Also show issues
+                for issue in &summary.issues {
+                    println!("{}", format!("  Issue: {}", issue.description()).yellow());
+                }
+            } else {
+                // Show full batch status
+                print_batch_status(&tracker);
+            }
+        }
+        PlayCommands::Remediate { task_id } => {
+            let batch = PlayBatch::load_from_k8s(namespace)?;
+            let tracker = PlayTracker::new(batch);
+
+            // Find the task
+            let task = tracker.get_task(&task_id);
+            if task.is_none() {
+                anyhow::bail!("Task {} not found", task_id);
+            }
+
+            // Check health to get issues
+            let issues = tracker.check_health();
+            let task_issue = issues.iter().find(|i| i.task_id() == task_id);
+
+            if let Some(issue) = task_issue {
+                println!("{}", format!("Spawning remediation for task {task_id}...").cyan());
+
+                // Run async remediation
+                let rt = tokio::runtime::Runtime::new()?;
+                let result = rt.block_on(tracker.remediate(issue))?;
+
+                println!("{}", "Remediation spawned:".green().bold());
+                println!("  CodeRun: {}", result.coderun_name.cyan());
+                println!("  Diagnosis: {}", result.diagnosis);
+            } else {
+                println!("{}", format!("Task {task_id} has no active issues to remediate").yellow());
+            }
+        }
+        PlayCommands::Remediations => {
+            let batch = PlayBatch::load_from_k8s(namespace)?;
+
+            println!("{}", "Active Remediations:".cyan().bold());
+            let mut found = false;
+
+            for task in &batch.tasks {
+                if let play::types::TaskStatus::Failed { remediation: Some(r), .. } = &task.status {
+                    found = true;
+                    println!("  Task {}: {} (started {})",
+                        task.task_id.cyan(),
+                        r.coderun_name.yellow(),
+                        r.started_at.format("%H:%M:%S")
+                    );
+                    println!("    Diagnosis: {}", r.diagnosis);
+                }
+            }
+
+            if !found {
+                println!("{}", "  No active remediations".dimmed());
+            }
+        }
+        PlayCommands::CancelRemediation { task_id } => {
+            // Cancel by deleting the CodeRun
+            println!("{}", format!("Cancelling remediation for task {task_id}...").yellow());
+
+            let output = Command::new("kubectl")
+                .args([
+                    "delete", "coderun",
+                    "-n", namespace,
+                    "-l", &format!("task-id={task_id},app.kubernetes.io/name=healer"),
+                ])
+                .output()
+                .context("Failed to delete CodeRun")?;
+
+            if output.status.success() {
+                println!("{}", "Remediation cancelled".green());
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                println!("{}", format!("Failed to cancel: {stderr}").red());
+            }
+        }
+        PlayCommands::Cleanup { force } => {
+            let batch = PlayBatch::load_from_k8s(namespace)?;
+            let cleanup = if force {
+                PlayCleanup::new(namespace).force()
+            } else {
+                PlayCleanup::new(namespace)
+            };
+
+            println!("{}", "Cleaning up play state...".cyan());
+            let report = cleanup.cleanup(&batch)?;
+
+            println!("{}", format!("Cleanup complete: {report}").green());
+        }
+    }
+
+    Ok(())
+}
+
+/// Print batch status overview.
+fn print_batch_status(tracker: &play::PlayTracker) {
+    let summary = tracker.health_summary();
+    let batch = &tracker.batch;
+
+    // Header
+    println!("{}", "═".repeat(70).cyan());
+    println!("{}", format!("PLAY BATCH: {}", batch.project_name).cyan().bold());
+    println!("{}", "═".repeat(70).cyan());
+    println!();
+
+    // Batch info
+    println!("  Repository: {}", batch.repository.yellow());
+    println!("  Started: {}", batch.started_at.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!("  Elapsed: {}m", summary.elapsed_mins);
+    println!();
+
+    // Progress bar
+    let progress_filled = (summary.progress / 100.0 * 30.0) as usize;
+    let progress_empty = 30 - progress_filled;
+    println!(
+        "  Progress: [{}{}] {:.0}% ({}/{})",
+        "█".repeat(progress_filled).green(),
+        "░".repeat(progress_empty),
+        summary.progress,
+        summary.completed,
+        summary.total
+    );
+    println!();
+
+    // Task table header
+    println!("  {:─<66}", "");
+    println!(
+        "  {:5} │ {:15} │ {:10} │ {:8} │ {:6} │ {:8}",
+        "Task", "Stage", "Status", "Duration", "PR", "Health"
+    );
+    println!("  {:─<66}", "");
+
+    // Task rows
+    for task in &batch.tasks {
+        print_task_row(task);
+    }
+
+    println!("  {:─<66}", "");
+
+    // Alerts
+    if !summary.issues.is_empty() {
+        println!();
+        for issue in &summary.issues {
+            println!("{}", format!("  ⚠ {}", issue.description()).red());
+        }
+    }
+
+    // Overall status
+    println!();
+    let status_color = match summary.status_str() {
+        "Completed" => "green",
+        "Critical" => "red",
+        "Warning" => "yellow",
+        _ => "white",
+    };
+    println!(
+        "  Status: {}",
+        match status_color {
+            "green" => summary.status_str().green().bold(),
+            "red" => summary.status_str().red().bold(),
+            "yellow" => summary.status_str().yellow().bold(),
+            _ => summary.status_str().white().bold(),
+        }
+    );
+}
+
+/// Print a single task row.
+fn print_task_row(task: &play::TaskState) {
+    let stage = task.current_stage()
+        .map(|s| s.display_name().to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    let status = match &task.status {
+        play::types::TaskStatus::Pending => "Pending".dimmed(),
+        play::types::TaskStatus::InProgress { .. } => "Active".cyan(),
+        play::types::TaskStatus::Completed => "Done".green(),
+        play::types::TaskStatus::Failed { .. } => "Failed".red(),
+    };
+
+    let duration = task.stage_duration()
+        .map(|d| format!("{}m", d.num_minutes()))
+        .unwrap_or_else(|| "-".to_string());
+
+    let pr = task.pr_number
+        .map(|n| format!("#{n}"))
+        .unwrap_or_else(|| "-".to_string());
+
+    let health = match task.health_indicator() {
+        "healthy" => "OK".green(),
+        "critical" => "CRIT".red(),
+        "warning" => "WARN".yellow(),
+        "pending" => "...".dimmed(),
+        _ => "?".white(),
+    };
+
+    println!(
+        "  {:5} │ {:15} │ {:10} │ {:8} │ {:6} │ {:8}",
+        task.task_id, stage, status, duration, pr, health
+    );
+}
+
+/// Print detailed task information.
+fn print_task_detail(task: &play::TaskState) {
+    println!("{}", "═".repeat(70).cyan());
+    println!("{}", format!("TASK {} DETAIL", task.task_id).cyan().bold());
+    println!("{}", "═".repeat(70).cyan());
+    println!();
+
+    // Stage info
+    let stage = task.current_stage()
+        .map(|s| s.display_name().to_string())
+        .unwrap_or_else(|| "-".to_string());
+    let agent = task.current_stage()
+        .and_then(|s| s.agent())
+        .unwrap_or("-");
+
+    println!("  Stage: {} ({})", stage.yellow(), agent);
+
+    // Duration
+    if let Some(duration) = task.stage_duration() {
+        let warn = if task.is_stuck() { " ⚠ OVER THRESHOLD" } else { "" };
+        println!("  Duration: {}m{}", duration.num_minutes(), warn.red());
+    }
+
+    // CodeRun
+    if let Some(ref cr) = task.active_coderun {
+        println!("  CodeRun: {}", cr.cyan());
+    }
+
+    // Workflow
+    if let Some(ref wf) = task.workflow_name {
+        println!("  Workflow: {}", wf);
+    }
+
+    // PR
+    if let Some(pr) = task.pr_number {
+        println!("  PR: #{}", pr);
+    }
+
+    // Status details
+    println!();
+    match &task.status {
+        play::types::TaskStatus::Failed { stage, reason, remediation } => {
+            println!("  {}", "Issue Detected:".red().bold());
+            println!("    Type: Failed at {:?}", stage);
+            println!("    Reason: {}", reason);
+
+            if let Some(r) = remediation {
+                println!();
+                println!("  {}", "Remediation:".yellow().bold());
+                println!("    Status: In Progress");
+                println!("    CodeRun: {}", r.coderun_name.cyan());
+                println!("    Diagnosis: {}", r.diagnosis);
+                println!("    Started: {}", r.started_at.format("%H:%M:%S"));
+            } else {
+                println!();
+                println!("  {}", "No active remediation".dimmed());
+            }
+        }
+        play::types::TaskStatus::InProgress { .. } if task.is_stuck() => {
+            println!("  {}", "Issue Detected:".red().bold());
+            println!("    Type: StageTimeout");
+            println!("    Stage: {}", stage);
+            println!("    Threshold: 30 minutes");
+        }
+        _ => {}
+    }
+}
+
+// =============================================================================
+// Insights Command Handlers
+// =============================================================================
+
+/// Handle insights commands.
+fn handle_insights_command(action: InsightsCommands) -> Result<()> {
+    use play::insights::InsightCollector;
+
+    // For now, we use an in-memory collector
+    // Future: load from persistent storage
+    let collector = InsightCollector::new();
+
+    match action {
+        InsightsCommands::Show { agent } => {
+            let stats = collector.agent_stats(&agent);
+
+            println!("{}", "═".repeat(60).cyan());
+            println!("{}", format!("AGENT INSIGHTS: {}", agent).cyan().bold());
+            println!("{}", "═".repeat(60).cyan());
+            println!();
+            println!("  Runs Analyzed: {}", stats.runs_analyzed);
+            println!("  Success Rate: {:.1}%", stats.success_rate);
+            println!("  Avg Duration: {}m", stats.avg_duration_mins);
+            println!();
+
+            if stats.top_issues.is_empty() {
+                println!("  {}", "No issues recorded yet".dimmed());
+            } else {
+                println!("  {}", "Top Issues:".yellow());
+                for issue in &stats.top_issues {
+                    println!("    • {} ({} occurrences)", issue.description, issue.occurrences);
+                }
+            }
+        }
+        InsightsCommands::Suggest => {
+            let suggestions = collector.suggest_optimizations();
+
+            println!("{}", "═".repeat(60).cyan());
+            println!("{}", "OPTIMIZATION SUGGESTIONS".cyan().bold());
+            println!("{}", "═".repeat(60).cyan());
+            println!();
+
+            if suggestions.is_empty() {
+                println!("  {}", "No suggestions yet - need more observations".dimmed());
+            } else {
+                for (i, s) in suggestions.iter().enumerate() {
+                    println!("  {}. {} ({})", i + 1, s.agent.yellow(), s.confidence);
+                    println!("     Observation: {}", s.observation);
+                    println!("     Suggestion: {}", s.suggested_change.green());
+                    println!();
+                }
+            }
+        }
+        InsightsCommands::Failures => {
+            let patterns = collector.failure_patterns();
+
+            println!("{}", "═".repeat(60).cyan());
+            println!("{}", "COMMON FAILURE PATTERNS".cyan().bold());
+            println!("{}", "═".repeat(60).cyan());
+            println!();
+
+            if patterns.is_empty() {
+                println!("  {}", "No failure patterns recorded yet".dimmed());
+            } else {
+                for p in &patterns {
+                    println!(
+                        "  {} │ {} │ {} occurrences",
+                        p.agent.yellow(),
+                        p.description,
+                        p.occurrences
+                    );
+                }
+            }
+        }
+        InsightsCommands::Export { format } => {
+            let patterns = collector.failure_patterns();
+            let suggestions = collector.suggest_optimizations();
+
+            if format == "json" {
+                let export = serde_json::json!({
+                    "failure_patterns": patterns.iter().map(|p| {
+                        serde_json::json!({
+                            "agent": p.agent,
+                            "description": p.description,
+                            "occurrences": p.occurrences,
+                        })
+                    }).collect::<Vec<_>>(),
+                    "suggestions": suggestions.iter().map(|s| {
+                        serde_json::json!({
+                            "agent": s.agent,
+                            "observation": s.observation,
+                            "suggested_change": s.suggested_change,
+                            "confidence": s.confidence.to_string(),
+                        })
+                    }).collect::<Vec<_>>(),
+                });
+                println!("{}", serde_json::to_string_pretty(&export)?);
+            } else {
+                // CSV format
+                println!("agent,type,description,count");
+                for p in &patterns {
+                    println!("{},failure,\"{}\",{}", p.agent, p.description, p.occurrences);
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
