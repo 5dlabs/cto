@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.32](https://github.com/5dlabs/cto/compare/v0.12.31...v0.12.32) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* complete heal → healer rename in infra ([#2676](https://github.com/5dlabs/cto/issues/2676)) ([6d90031](https://github.com/5dlabs/cto/commit/6d9003181ce1edf61ba65a3178bd7981e50649c0))
+
 ## [0.12.31](https://github.com/5dlabs/cto/compare/v0.12.30...v0.12.31) (2025-12-04)
 
 
