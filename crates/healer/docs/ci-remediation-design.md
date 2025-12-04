@@ -34,8 +34,17 @@ GitHub CI Failure → Argo Sensor → Healer → CodeRun (Rex/Blaze/Bolt/Atlas)
 |-------|--------|------------|-----------|
 | **Rex** | Rust | 5DLabs-Rex | Clippy errors, test failures, build errors, Cargo issues |
 | **Blaze** | Frontend | 5DLabs-Blaze | JavaScript, TypeScript, npm/pnpm, React, CSS |
-| **Bolt** | Infrastructure | 5DLabs-Bolt | Docker builds, Helm charts, K8s manifests, GitOps, YAML |
-| **Atlas** | GitHub/General | 5DLabs-Atlas | GitHub API issues, permissions, workflow syntax, fallback |
+| **Bolt** | Infrastructure | 5DLabs-Bolt | Docker builds, Helm charts, K8s manifests, Argo CD, GitOps, YAML |
+| **Atlas** | GitHub/Git | 5DLabs-Atlas | Merge conflicts, GitHub API, permissions, workflow syntax, fallback |
+
+### Agent Tooling
+
+| Agent | MCP Tools | Capabilities |
+|-------|-----------|--------------|
+| **Rex** | Rust analyzer, Cargo | Code analysis, dependency management, test running |
+| **Blaze** | npm/pnpm, ESLint, TypeScript | Package management, linting, type checking |
+| **Bolt** | Docker, Helm, kubectl, **Argo CD** | Container builds, chart management, cluster ops, GitOps sync |
+| **Atlas** | GitHub CLI, Git | PR management, merge conflict resolution, workflow editing |
 
 ---
 
@@ -293,10 +302,10 @@ Add these events:
         ┌─────────────┬───────────┼───────────┬─────────────┐
         ▼             ▼           ▼           ▼             ▼
    ┌─────────┐  ┌──────────┐  ┌────────┐  ┌────────┐  ┌──────────┐
-   │  Rust   │  │ Frontend │  │ Infra  │  │ GitHub │  │ Unknown  │
-   │ Clippy  │  │   npm    │  │ Docker │  │  API   │  │          │
-   │  Test   │  │   pnpm   │  │  Helm  │  │ Perms  │  │          │
-   │  Build  │  │   tsx    │  │  K8s   │  │ Syntax │  │          │
+   │  Rust   │  │ Frontend │  │ Infra  │  │  Git   │  │ Unknown  │
+   │ Clippy  │  │   npm    │  │ Docker │  │ Merge  │  │          │
+   │  Test   │  │   pnpm   │  │  Helm  │  │Conflict│  │          │
+   │  Build  │  │   tsx    │  │ ArgoCD │  │ Perms  │  │          │
    └────┬────┘  └────┬─────┘  └───┬────┘  └───┬────┘  └────┬─────┘
         │            │            │           │            │
         ▼            ▼            ▼           ▼            ▼
@@ -312,7 +321,9 @@ Add these events:
 | `*-ci`, `controller-*`, `healer-*` | `clippy`, `cargo test`, `rustc` | `*.rs`, `Cargo.toml` | Rex |
 | `frontend-*`, `ui-*` | `npm`, `pnpm`, `tsc`, `eslint` | `*.ts`, `*.tsx`, `*.js`, `package.json` | Blaze |
 | `infrastructure-*`, `docker-*`, `helm-*` | `docker build`, `helm`, `kubectl` | `Dockerfile`, `*.yaml`, `Chart.yaml` | Bolt |
+| `argocd-*`, `gitops-*`, `sync-*` | `argocd`, `sync failed`, `OutOfSync` | `infra/gitops/*`, `applications/*` | Bolt |
 | `*-release`, `deploy-*` | `push`, `ghcr.io`, `permission` | `.github/workflows/*` | Atlas |
+| (any) | `merge conflict`, `CONFLICT`, `cannot merge` | (any) | Atlas |
 | (fallback) | (any) | (any) | Atlas |
 
 ---
