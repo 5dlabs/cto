@@ -349,7 +349,9 @@ spec:
             Ok(None)
         } else {
             // Return the first existing CodeRun name
-            Ok(Some(name.split_whitespace().next().unwrap_or(name).to_string()))
+            Ok(Some(
+                name.split_whitespace().next().unwrap_or(name).to_string(),
+            ))
         }
     }
 }
