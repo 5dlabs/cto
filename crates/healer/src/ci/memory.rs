@@ -362,7 +362,11 @@ impl MemoryClient {
                 selected_agent.name(),
                 actual_agent.map_or("unknown", Agent::name),
                 failure_type.map_or("general", CiFailureType::short_name),
-                if success { "eventually succeeded" } else { "failed" }
+                if success {
+                    "eventually succeeded"
+                } else {
+                    "failed"
+                }
             )
         } else {
             format!(

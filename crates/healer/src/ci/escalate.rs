@@ -93,10 +93,7 @@ impl Escalator {
     }
 
     /// Build the escalation message for PR comments.
-    fn build_escalation_message(
-        failure: &CiFailure,
-        attempts: &[RemediationAttempt],
-    ) -> String {
+    fn build_escalation_message(failure: &CiFailure, attempts: &[RemediationAttempt]) -> String {
         use std::fmt::Write as _;
 
         let mut msg = String::new();
@@ -238,10 +235,7 @@ impl Escalator {
         failure: &CiFailure,
         attempts: &[RemediationAttempt],
     ) -> Result<()> {
-        let title = format!(
-            "[Healer] CI Remediation Failed: {}",
-            failure.workflow_name
-        );
+        let title = format!("[Healer] CI Remediation Failed: {}", failure.workflow_name);
 
         let body = Self::build_escalation_message(failure, attempts);
 
@@ -249,16 +243,8 @@ impl Escalator {
 
         let output = Command::new("gh")
             .args([
-                "issue",
-                "create",
-                "--repo",
-                repository,
-                "--title",
-                &title,
-                "--body",
-                &body,
-                "--label",
-                labels,
+                "issue", "create", "--repo", repository, "--title", &title, "--body", &body,
+                "--label", labels,
             ])
             .output()
             .context("Failed to execute gh issue create")?;

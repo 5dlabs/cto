@@ -7,9 +7,7 @@
 
 use anyhow::{bail, Context as _, Result};
 use chrono::Utc;
-use handlebars::{
-    Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext,
-};
+use handlebars::{Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::process::Command;
@@ -304,9 +302,7 @@ impl CodeRunSpawner {
 
         info!(
             "Spawned CodeRun {} for {:?} with agent {:?}",
-            coderun_name,
-            ctx.failure_type,
-            agent
+            coderun_name, ctx.failure_type, agent
         );
 
         Ok(coderun_name)
@@ -436,7 +432,10 @@ impl CodeRunSpawner {
             "agent_failure_output".into(),
             json!(&ctx.agent_failure_output),
         );
-        data.insert("changes_made_so_far".into(), json!(&ctx.changes_made_so_far));
+        data.insert(
+            "changes_made_so_far".into(),
+            json!(&ctx.changes_made_so_far),
+        );
         data.insert("is_retry".into(), json!(is_retry));
 
         // Agent info
@@ -605,7 +604,9 @@ spec:
                 .context("Failed to write YAML to kubectl stdin")?;
         }
 
-        let output = child.wait_with_output().context("Failed to wait for kubectl")?;
+        let output = child
+            .wait_with_output()
+            .context("Failed to wait for kubectl")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

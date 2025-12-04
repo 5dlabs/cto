@@ -177,8 +177,7 @@ impl ContextGatherer {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let prs: Vec<serde_json::Value> =
-            serde_json::from_str(&stdout).unwrap_or_default();
+        let prs: Vec<serde_json::Value> = serde_json::from_str(&stdout).unwrap_or_default();
 
         if prs.is_empty() {
             return Ok(None);
@@ -192,22 +191,20 @@ impl ContextGatherer {
             head_ref: pr["headRefName"].as_str().unwrap_or("").to_string(),
             base_ref: pr["baseRefName"].as_str().unwrap_or("").to_string(),
             mergeable: pr["mergeable"].as_str().map(|s| s == "MERGEABLE"),
-            checks_status: pr["statusCheckRollup"]
-                .as_array()
-                .map_or_else(
-                    || "unknown".to_string(),
-                    |checks| {
-                        let failed = checks
-                            .iter()
-                            .filter(|c| c["conclusion"].as_str() == Some("FAILURE"))
-                            .count();
-                        if failed > 0 {
-                            format!("{failed} checks failing")
-                        } else {
-                            "all passing".to_string()
-                        }
-                    },
-                ),
+            checks_status: pr["statusCheckRollup"].as_array().map_or_else(
+                || "unknown".to_string(),
+                |checks| {
+                    let failed = checks
+                        .iter()
+                        .filter(|c| c["conclusion"].as_str() == Some("FAILURE"))
+                        .count();
+                    if failed > 0 {
+                        format!("{failed} checks failing")
+                    } else {
+                        "all passing".to_string()
+                    }
+                },
+            ),
             html_url: pr["url"].as_str().unwrap_or("").to_string(),
         }))
     }
@@ -304,9 +301,7 @@ impl ContextGatherer {
             .output();
 
         match output {
-            Ok(out) if out.status.success() => {
-                Ok(String::from_utf8_lossy(&out.stdout).to_string())
-            }
+            Ok(out) if out.status.success() => Ok(String::from_utf8_lossy(&out.stdout).to_string()),
             _ => Ok(String::new()), // Empty string if we can't get logs
         }
     }
@@ -366,7 +361,11 @@ impl ContextGatherer {
     /// # Errors
     ///
     /// Returns an error if the `gh` CLI command fails.
-    pub fn fetch_commits_since(&self, original_sha: &str, branch: &str) -> Result<Vec<serde_json::Value>> {
+    pub fn fetch_commits_since(
+        &self,
+        original_sha: &str,
+        branch: &str,
+    ) -> Result<Vec<serde_json::Value>> {
         let output = Command::new("gh")
             .args([
                 "api",

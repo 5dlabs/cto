@@ -9,7 +9,9 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use super::types::{Agent, ChangedFile, CiFailure, CiFailureType, RemediationContext, SecurityAlert};
+use super::types::{
+    Agent, ChangedFile, CiFailure, CiFailureType, RemediationContext, SecurityAlert,
+};
 
 /// Regex patterns for failure classification.
 static RUST_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
@@ -17,8 +19,8 @@ static RUST_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         Regex::new(r"(?i)clippy").unwrap(),
         Regex::new(r"(?i)cargo\s+(test|build|check)").unwrap(),
         Regex::new(r"(?i)rustc").unwrap(),
-        Regex::new(r"error\[E\d+\]").unwrap(),                        // Rust compiler errors
-        Regex::new(r"warning:\s*unused").unwrap(),                    // Rust warnings
+        Regex::new(r"error\[E\d+\]").unwrap(), // Rust compiler errors
+        Regex::new(r"warning:\s*unused").unwrap(), // Rust warnings
         Regex::new(r"cannot\s+find\s+(crate|type|value)").unwrap(),
         Regex::new(r"Cargo\.toml").unwrap(),
     ]
@@ -31,7 +33,7 @@ static FRONTEND_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         Regex::new(r"(?i)yarn").unwrap(),
         Regex::new(r"(?i)typescript|tsc").unwrap(),
         Regex::new(r"(?i)eslint").unwrap(),
-        Regex::new(r"TS\d{4}:").unwrap(),                             // TypeScript errors
+        Regex::new(r"TS\d{4}:").unwrap(), // TypeScript errors
         Regex::new(r"SyntaxError.*\.tsx?").unwrap(),
         Regex::new(r"Module not found").unwrap(),
     ]
@@ -225,7 +227,10 @@ impl CiRouter {
         }
 
         // Check frontend patterns
-        let frontend_matches = FRONTEND_PATTERNS.iter().filter(|p| p.is_match(logs)).count();
+        let frontend_matches = FRONTEND_PATTERNS
+            .iter()
+            .filter(|p| p.is_match(logs))
+            .count();
         if frontend_matches > 0 {
             Self::add_score(scores, Agent::Blaze, 0.2 * frontend_matches as f32);
         }
@@ -237,13 +242,19 @@ impl CiRouter {
         }
 
         // Check security patterns
-        let security_matches = SECURITY_PATTERNS.iter().filter(|p| p.is_match(logs)).count();
+        let security_matches = SECURITY_PATTERNS
+            .iter()
+            .filter(|p| p.is_match(logs))
+            .count();
         if security_matches > 0 {
             Self::add_score(scores, Agent::Cipher, 0.3 * security_matches as f32);
         }
 
         // Check merge conflict patterns
-        let merge_matches = MERGE_CONFLICT_PATTERNS.iter().filter(|p| p.is_match(logs)).count();
+        let merge_matches = MERGE_CONFLICT_PATTERNS
+            .iter()
+            .filter(|p| p.is_match(logs))
+            .count();
         if merge_matches > 0 {
             Self::add_score(scores, Agent::Atlas, 0.3 * merge_matches as f32);
         }
@@ -373,16 +384,28 @@ impl CiRouter {
         }
 
         // Infrastructure patterns
-        if Regex::new(r"(?i)docker\s+build.*failed").unwrap().is_match(logs) {
+        if Regex::new(r"(?i)docker\s+build.*failed")
+            .unwrap()
+            .is_match(logs)
+        {
             return Some(CiFailureType::DockerBuild);
         }
-        if Regex::new(r"(?i)helm.*template.*error").unwrap().is_match(logs) {
+        if Regex::new(r"(?i)helm.*template.*error")
+            .unwrap()
+            .is_match(logs)
+        {
             return Some(CiFailureType::HelmTemplate);
         }
-        if Regex::new(r"(?i)OutOfSync|sync\s+failed").unwrap().is_match(logs) {
+        if Regex::new(r"(?i)OutOfSync|sync\s+failed")
+            .unwrap()
+            .is_match(logs)
+        {
             return Some(CiFailureType::ArgoCdSync);
         }
-        if Regex::new(r"(?i)yaml.*error|error.*yaml").unwrap().is_match(logs) {
+        if Regex::new(r"(?i)yaml.*error|error.*yaml")
+            .unwrap()
+            .is_match(logs)
+        {
             return Some(CiFailureType::YamlSyntax);
         }
 

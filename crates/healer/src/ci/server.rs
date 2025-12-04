@@ -88,7 +88,10 @@ pub fn build_router(state: Arc<ServerState>) -> Router {
     Router::new()
         .route("/health", get(health_handler))
         .route("/api/remediate/ci-failure", post(ci_failure_handler))
-        .route("/api/remediate/security-alert", post(security_alert_handler))
+        .route(
+            "/api/remediate/security-alert",
+            post(security_alert_handler),
+        )
         .route("/api/status", get(status_handler))
         .route("/api/status/:task_id", get(task_status_handler))
         .layer(TraceLayer::new_for_http())
@@ -249,9 +252,7 @@ async fn ci_failure_handler(
     };
 
     // Classify the failure
-    let failure_type = state
-        .router
-        .classify_failure(&failure, &ctx.workflow_logs);
+    let failure_type = state.router.classify_failure(&failure, &ctx.workflow_logs);
     ctx.failure_type = Some(failure_type.clone());
 
     // Route to agent
@@ -449,11 +450,13 @@ fn parse_security_alert(event: &serde_json::Value) -> super::types::SecurityAler
                 .get("severity")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
-            let cve = alert.get("security_advisory")
+            let cve = alert
+                .get("security_advisory")
                 .and_then(|sa| sa.get("cve_id"))
                 .and_then(|v| v.as_str())
                 .map(String::from);
-            let pkg = alert.get("security_vulnerability")
+            let pkg = alert
+                .get("security_vulnerability")
                 .and_then(|sv| sv.get("package"))
                 .and_then(|p| p.get("name"))
                 .and_then(|v| v.as_str())
@@ -464,7 +467,13 @@ fn parse_security_alert(event: &serde_json::Value) -> super::types::SecurityAler
                 .and_then(|v| v.as_str())
                 .unwrap_or("Security alert");
 
-            ("dependabot_alert".to_string(), severity.to_string(), cve, pkg, desc.to_string())
+            (
+                "dependabot_alert".to_string(),
+                severity.to_string(),
+                cve,
+                pkg,
+                desc.to_string(),
+            )
         } else if let Some(secret) = event.get("secret_scanning_alert") {
             // Secret scanning alert
             let secret_type = secret

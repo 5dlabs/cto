@@ -7152,10 +7152,8 @@ async fn run_server_command(
 
     // Load configuration
     let config = if let Some(path) = config_path {
-        let content = std::fs::read_to_string(path)
-            .context("Failed to read config file")?;
-        serde_json::from_str(&content)
-            .context("Failed to parse config file")?
+        let content = std::fs::read_to_string(path).context("Failed to read config file")?;
+        serde_json::from_str(&content).context("Failed to parse config file")?
     } else {
         ci::RemediationConfig::default()
     };
@@ -7164,7 +7162,14 @@ async fn run_server_command(
     println!("  Model:      {}", config.model.cyan());
     println!("  Max Attempts: {}", config.max_attempts);
     println!("  Time Window: {}m", config.time_window_mins);
-    println!("  Memory:     {}", if config.memory_enabled { "enabled".green() } else { "disabled".red() });
+    println!(
+        "  Memory:     {}",
+        if config.memory_enabled {
+            "enabled".green()
+        } else {
+            "disabled".red()
+        }
+    );
     println!();
 
     // Create server state

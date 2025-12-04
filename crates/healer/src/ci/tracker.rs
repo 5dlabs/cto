@@ -210,10 +210,7 @@ impl RemediationTracker {
 
         // Store outcome in memory
         if let Some(memory) = &self.memory {
-            let description = completion
-                .error_message
-                .as_deref()
-                .unwrap_or("No details");
+            let description = completion.error_message.as_deref().unwrap_or("No details");
             let _ = memory
                 .store_remediation_outcome(
                     &tracked.failure,
@@ -238,12 +235,7 @@ impl RemediationTracker {
             // Store routing success
             if let Some(memory) = &self.memory {
                 let _ = memory
-                    .store_routing_decision(
-                        Some(&tracked.failure_type),
-                        agent,
-                        None,
-                        true,
-                    )
+                    .store_routing_decision(Some(&tracked.failure_type), agent, None, true)
                     .await;
             }
 
@@ -344,7 +336,10 @@ impl RemediationTracker {
     }
 
     /// Build context for a retry attempt.
-    async fn build_retry_context(&self, tracked: &TrackedRemediation) -> Result<RemediationContext> {
+    async fn build_retry_context(
+        &self,
+        tracked: &TrackedRemediation,
+    ) -> Result<RemediationContext> {
         // Get historical context from memory
         let historical = if let Some(memory) = &self.memory {
             memory
@@ -363,10 +358,7 @@ impl RemediationTracker {
                 title: String::new(),
                 head_ref: tracked.branch.clone(),
                 base_ref: "main".to_string(),
-                html_url: format!(
-                    "https://github.com/{}/pull/{}",
-                    tracked.repository, n
-                ),
+                html_url: format!("https://github.com/{}/pull/{}", tracked.repository, n),
                 state: "open".to_string(),
                 mergeable: None,
                 checks_status: String::new(),
@@ -415,10 +407,7 @@ pub enum CompletionAction {
     /// Remediation succeeded
     Success,
     /// Retry with a different agent
-    Retry {
-        agent: Agent,
-        coderun: String,
-    },
+    Retry { agent: Agent, coderun: String },
     /// Escalate to human
     Escalate {
         failure: CiFailure,

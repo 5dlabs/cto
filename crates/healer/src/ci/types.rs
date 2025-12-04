@@ -465,11 +465,7 @@ impl RemediationContext {
         if let Some(failure) = &self.failure {
             format!("ci-{}", failure.workflow_run_id)
         } else if let Some(alert) = &self.security_alert {
-            format!(
-                "sec-{}-{}",
-                alert.alert_type,
-                alert.detected_at.timestamp()
-            )
+            format!("sec-{}-{}", alert.alert_type, alert.detected_at.timestamp())
         } else {
             format!("unknown-{}", Utc::now().timestamp())
         }
@@ -727,12 +723,8 @@ impl RemediationState {
     /// Get PR URL if available.
     #[must_use]
     pub fn pr_url(&self) -> Option<String> {
-        self.pr_number.map(|n| {
-            format!(
-                "https://github.com/{}/pull/{}",
-                self.failure.repository, n
-            )
-        })
+        self.pr_number
+            .map(|n| format!("https://github.com/{}/pull/{}", self.failure.repository, n))
     }
 
     /// Summarize all attempts for notifications.
@@ -912,13 +904,20 @@ mod tests {
         let mut state = RemediationState::new(failure, CiFailureType::RustClippy);
         assert!(state.attempts.is_empty());
 
-        state.record_attempt(AttemptOutcome::CiStillFailing, "healer-ci-rex-123", Agent::Rex);
+        state.record_attempt(
+            AttemptOutcome::CiStillFailing,
+            "healer-ci-rex-123",
+            Agent::Rex,
+        );
         assert_eq!(state.attempts.len(), 1);
         assert_eq!(state.current_agent(), Some(Agent::Rex));
         assert!(!state.same_agent_failed_twice());
 
-        state.record_attempt(AttemptOutcome::CiStillFailing, "healer-ci-rex-456", Agent::Rex);
+        state.record_attempt(
+            AttemptOutcome::CiStillFailing,
+            "healer-ci-rex-456",
+            Agent::Rex,
+        );
         assert!(state.same_agent_failed_twice());
     }
 }
-
