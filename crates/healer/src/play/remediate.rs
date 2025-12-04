@@ -221,11 +221,21 @@ impl RemediationEngine {
     /// Spawn a Healer `CodeRun` to fix the diagnosed issue.
     ///
     /// The `task_id` is used to label the `CodeRun` for later cancellation.
+    /// Checks for existing active `CodeRuns` with the same `task-id` to prevent duplicates.
     ///
     /// # Errors
     ///
-    /// Returns an error if kubectl fails to apply the `CodeRun` resource.
+    /// Returns an error if a remediation `CodeRun` already exists for this task,
+    /// or if kubectl fails to apply the `CodeRun` resource.
     pub fn spawn_fix_coderun(&self, task_id: &str, diagnosis: &Diagnosis) -> Result<String> {
+        // Check for existing CodeRun with same task-id to prevent duplicates
+        if let Some(existing) = self.check_existing_remediation(task_id)? {
+            anyhow::bail!(
+                "Remediation CodeRun already exists for task {task_id}: {existing}. \
+                 Use 'healer play cancel-remediation --task-id {task_id}' to cancel it first."
+            );
+        }
+
         let coderun_name = format!(
             "healer-fix-{}",
             uuid::Uuid::new_v4()
@@ -307,6 +317,40 @@ spec:
         }
 
         Ok(coderun_name)
+    }
+
+    /// Check if an active remediation `CodeRun` already exists for this task.
+    ///
+    /// Returns the name of the existing `CodeRun` if found, `None` otherwise.
+    fn check_existing_remediation(&self, task_id: &str) -> Result<Option<String>> {
+        let output = Command::new("kubectl")
+            .args([
+                "get",
+                "coderuns",
+                "-n",
+                &self.namespace,
+                "-l",
+                &format!("task-id={task_id},app.kubernetes.io/name=healer"),
+                "-o",
+                "jsonpath={.items[*].metadata.name}",
+            ])
+            .output()
+            .context("Failed to check for existing CodeRun")?;
+
+        if !output.status.success() {
+            // If kubectl fails, assume no existing CodeRun and proceed
+            return Ok(None);
+        }
+
+        let names = String::from_utf8_lossy(&output.stdout);
+        let name = names.trim();
+
+        if name.is_empty() {
+            Ok(None)
+        } else {
+            // Return the first existing CodeRun name
+            Ok(Some(name.split_whitespace().next().unwrap_or(name).to_string()))
+        }
     }
 }
 
