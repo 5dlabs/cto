@@ -6473,25 +6473,43 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
             }
         }
         PlayCommands::Remediations => {
-            let batch = PlayBatch::load_from_k8s(namespace)?;
-
+            // Query CodeRuns directly since batch state doesn't track remediations
             println!("{}", "Active Remediations:".cyan().bold());
-            let mut found = false;
 
-            for task in &batch.tasks {
-                if let play::types::TaskStatus::Failed { remediation: Some(r), .. } = &task.status {
-                    found = true;
-                    println!("  Task {}: {} (started {})",
-                        task.task_id.cyan(),
-                        r.coderun_name.yellow(),
-                        r.started_at.format("%H:%M:%S")
-                    );
-                    println!("    Diagnosis: {}", r.diagnosis);
+            let output = Command::new("kubectl")
+                .args([
+                    "get", "coderuns",
+                    "-n", namespace,
+                    "-l", "app.kubernetes.io/name=healer,app.kubernetes.io/component=remediation",
+                    "-o", "jsonpath={range .items[*]}{.metadata.name}|{.metadata.labels.task-id}|{.metadata.creationTimestamp}\\n{end}",
+                ])
+                .output()
+                .context("Failed to query CodeRuns")?;
+
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+
+                if lines.is_empty() {
+                    println!("{}", "  No active remediations".dimmed());
+                } else {
+                    for line in lines {
+                        let parts: Vec<&str> = line.split('|').collect();
+                        if parts.len() >= 3 {
+                            let name = parts[0];
+                            let task_id = parts[1];
+                            let created = parts[2];
+                            println!("  Task {}: {} (created {})",
+                                task_id.cyan(),
+                                name.yellow(),
+                                created
+                            );
+                        }
+                    }
                 }
-            }
-
-            if !found {
-                println!("{}", "  No active remediations".dimmed());
+            } else {
+                // CodeRun CRD might not exist
+                println!("{}", "  No active remediations (or CodeRun CRD not installed)".dimmed());
             }
         }
         PlayCommands::CancelRemediation { task_id } => {

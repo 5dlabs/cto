@@ -152,6 +152,9 @@ impl InsightCollector {
                     if obs.timestamp > pattern.last_seen {
                         pattern.last_seen = obs.timestamp;
                     }
+                    if obs.timestamp < pattern.first_seen {
+                        pattern.first_seen = obs.timestamp;
+                    }
                 }
             }
         }
@@ -240,7 +243,12 @@ impl InsightCollector {
             runs_analyzed: total,
             success_rate,
             avg_duration_mins,
-            top_issues: self.failure_patterns().into_iter().take(3).collect(),
+            top_issues: self
+                .failure_patterns()
+                .into_iter()
+                .filter(|p| p.agent == agent)
+                .take(3)
+                .collect(),
         }
     }
 

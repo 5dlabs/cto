@@ -24,10 +24,11 @@ impl PlayTracker {
     /// Create a new tracker for a batch.
     #[must_use]
     pub fn new(batch: PlayBatch) -> Self {
+        let remediation = RemediationEngine::with_namespace(&batch.namespace);
         Self {
             batch,
             insights: InsightCollector::new(),
-            remediation: RemediationEngine::new(),
+            remediation,
         }
     }
 
