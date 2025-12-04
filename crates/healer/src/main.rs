@@ -338,8 +338,8 @@ enum Commands {
         /// Path to issue file (legacy - use --issue-number instead)
         #[arg(long)]
         issue_file: Option<String>,
-        /// Path to healer-config.json
-        #[arg(long, default_value = "/app/healer-config.json")]
+        /// Path to heal-config.json
+        #[arg(long, default_value = "/app/heal-config.json")]
         config: String,
     },
     /// [ALERTS] Fetch all logs for a pod (current, previous, events, describe)
