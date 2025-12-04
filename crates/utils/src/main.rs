@@ -241,8 +241,10 @@ async fn main() -> Result<()> {
             interval,
             strict,
         } => {
-            let exit_code =
-                run_checks(&repo, pr, failed, pending, wait, interval, strict, cli.format).await?;
+            let exit_code = run_checks(
+                &repo, pr, failed, pending, wait, interval, strict, cli.format,
+            )
+            .await?;
             if exit_code != 0 {
                 std::process::exit(exit_code);
             }
