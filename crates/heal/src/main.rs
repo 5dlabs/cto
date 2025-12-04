@@ -5452,8 +5452,7 @@ async fn get_pod_logs_with_loki_fallback(pod_name: &str, namespace: &str, tail: 
     println!(
         "{}",
         format!(
-            "📚 Pod {} logs unavailable via kubectl, querying Loki for historical logs...",
-            pod_name
+            "📚 Pod {pod_name} logs unavailable via kubectl, querying Loki for historical logs..."
         )
         .cyan()
     );
@@ -5497,17 +5496,14 @@ async fn get_pod_logs_with_loki_fallback(pod_name: &str, namespace: &str, tail: 
         Ok(_) => {
             println!(
                 "{}",
-                format!("⚠️  No logs found in Loki for {}", pod_name).yellow()
+                format!("⚠️  No logs found in Loki for {pod_name}").yellow()
             );
-            format!(
-                "[No logs available - pod {} not found in kubectl or Loki]",
-                pod_name
-            )
+            format!("[No logs available - pod {pod_name} not found in kubectl or Loki]")
         }
         Err(e) => {
             println!(
                 "{}",
-                format!("⚠️  Loki query failed for {}: {}", pod_name, e).yellow()
+                format!("⚠️  Loki query failed for {pod_name}: {e}").yellow()
             );
             // Return the original kubectl error
             kubectl_logs

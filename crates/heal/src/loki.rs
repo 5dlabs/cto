@@ -285,7 +285,7 @@ impl LokiClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Loki query failed with status {}: {}", status, body);
+            anyhow::bail!("Loki query failed with status {status}: {body}");
         }
 
         let loki_response: LokiResponse = response
@@ -394,8 +394,7 @@ pub fn format_logs_for_issue(entries: &[LogEntry], max_lines: usize) -> String {
     let entries_to_show: &[LogEntry] = if max_lines > 0 && total > max_lines {
         let _ = writeln!(
             output,
-            "⚠️ Showing last {} of {} log entries\n",
-            max_lines, total
+            "⚠️ Showing last {max_lines} of {total} log entries\n",
         );
         &entries[total - max_lines..]
     } else {
@@ -450,7 +449,7 @@ mod tests {
         let entries: Vec<LogEntry> = (0..10)
             .map(|i| LogEntry {
                 timestamp: Utc::now(),
-                line: format!("Log line {}", i),
+                line: format!("Log line {i}"),
                 labels: std::collections::HashMap::new(),
             })
             .collect();
@@ -466,7 +465,7 @@ mod tests {
         let entries: Vec<LogEntry> = (0..10)
             .map(|i| LogEntry {
                 timestamp: Utc::now(),
-                line: format!("Log line {}", i),
+                line: format!("Log line {i}"),
                 labels: std::collections::HashMap::new(),
             })
             .collect();
