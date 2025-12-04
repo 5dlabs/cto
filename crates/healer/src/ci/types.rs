@@ -562,8 +562,16 @@ impl ChangedFile {
             || self.filename.starts_with(".github/")
             || self.filename.ends_with(".yaml")
             || self.filename.ends_with(".yml")
-            || self.filename.starts_with("Dockerfile")
+            || self.is_dockerfile()
             || self.filename == "Chart.yaml"
+    }
+
+    /// Check if this is a Dockerfile.
+    #[must_use]
+    fn is_dockerfile(&self) -> bool {
+        // Match: "Dockerfile", "Dockerfile.prod", "path/to/Dockerfile", "path/to/Dockerfile.dev"
+        let name = self.filename.rsplit('/').next().unwrap_or(&self.filename);
+        name == "Dockerfile" || name.starts_with("Dockerfile.")
     }
 }
 
