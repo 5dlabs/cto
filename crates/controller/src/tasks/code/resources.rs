@@ -67,8 +67,8 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_healer =
-            template_setting.starts_with("healer/") || service_name.to_lowercase().contains("healer");
+        let is_healer = template_setting.starts_with("healer/")
+            || service_name.to_lowercase().contains("healer");
 
         // Get the appropriate PVC name
         let pvc_name = if is_healer {
