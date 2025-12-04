@@ -5859,8 +5859,8 @@ async fn spawn_factory_with_prompt(
     use std::io::Write;
     use tokio::process::Command as AsyncCommand;
 
-    // Load healer config for server settings
-    let config = load_healer_config("heal-config.json");
+    // Load healer config for server settings (use absolute path to match CLI default)
+    let config = load_healer_config("/app/heal-config.json");
     let server = &config.server;
 
     let prompt_content =
