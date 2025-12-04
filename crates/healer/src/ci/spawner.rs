@@ -92,10 +92,8 @@ impl CodeRunSpawner {
     ///
     /// Returns an error if kubectl command fails.
     pub fn has_existing_remediation(&self, workflow_run_id: u64) -> Result<bool> {
-        let label_selector = format!(
-            "app.kubernetes.io/name=healer,healer/workflow-run-id={}",
-            workflow_run_id
-        );
+        let label_selector =
+            format!("app.kubernetes.io/name=healer,healer/workflow-run-id={workflow_run_id}");
 
         let output = Command::new("kubectl")
             .args([
