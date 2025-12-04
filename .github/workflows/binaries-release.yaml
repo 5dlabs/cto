@@ -215,21 +215,16 @@ jobs:
   build-docker:
     needs: [plan, build-binaries]
     if: needs.plan.outputs.publishing == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
-      - name: Free up disk space
-        run: |
-          echo "Before cleanup:"
-          df -h /
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker system prune -af || true
-          echo "After cleanup:"
-          df -h /
-
       - uses: actions/checkout@v4
+
+      - name: Check disk space
+        run: |
+          echo "📊 Disk space on k8s-runner:"
+          df -h /cache || df -h /
+          echo "📊 Cache contents:"
+          ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 tools binary
         uses: actions/download-artifact@v4
@@ -272,8 +267,11 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=local,src=/cache/buildx/tools
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache
+          cache-to: |
+            type=local,dest=/cache/buildx/tools,mode=max
 
       - name: Docker summary
         run: |
@@ -285,21 +283,16 @@ jobs:
   build-docker-controller:
     needs: [plan, build-binaries]
     if: needs.plan.outputs.publishing == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
-      - name: Free up disk space
-        run: |
-          echo "Before cleanup:"
-          df -h /
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker system prune -af || true
-          echo "After cleanup:"
-          df -h /
-
       - uses: actions/checkout@v4
+
+      - name: Check disk space
+        run: |
+          echo "📊 Disk space on k8s-runner:"
+          df -h /cache || df -h /
+          echo "📊 Cache contents:"
+          ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 controller binary
         uses: actions/download-artifact@v4
@@ -333,8 +326,11 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=local,src=/cache/buildx/controller
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache
+          cache-to: |
+            type=local,dest=/cache/buildx/controller,mode=max
 
       - name: Docker summary
         run: |
@@ -346,22 +342,16 @@ jobs:
   build-docker-healer:
     needs: [plan, build-binaries]
     if: needs.plan.outputs.publishing == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
-      - name: Free up disk space
-        run: |
-          echo "Before cleanup:"
-          df -h /
-          # Remove unnecessary large packages
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker system prune -af || true
-          echo "After cleanup:"
-          df -h /
-
       - uses: actions/checkout@v4
+
+      - name: Check disk space
+        run: |
+          echo "📊 Disk space on k8s-runner:"
+          df -h /cache || df -h /
+          echo "📊 Cache contents:"
+          ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 healer binary
         uses: actions/download-artifact@v4
@@ -398,8 +388,11 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=local,src=/cache/buildx/healer
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache
+          cache-to: |
+            type=local,dest=/cache/buildx/healer,mode=max
 
       - name: Docker summary
         run: |
