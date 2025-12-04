@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_build_escalation_message() {
-        let escalator = Escalator::new(EscalationConfig::default());
+        let _escalator = Escalator::new(EscalationConfig::default());
         let failure = create_test_failure();
         let attempts = create_test_attempts();
 

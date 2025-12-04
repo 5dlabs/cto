@@ -94,16 +94,18 @@ spec:
             cpu: 100m
             memory: 256Mi
 
-        # Healer is a watch loop, not an HTTP server - use exec probes
+        # Healer HTTP server probes
         livenessProbe:
-          exec:
-            command: ["pgrep", "-f", "healer"]
+          httpGet:
+            path: /health
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 30
           failureThreshold: 3
         readinessProbe:
-          exec:
-            command: ["pgrep", "-f", "healer"]
+          httpGet:
+            path: /health
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 3
@@ -173,11 +175,11 @@ spec:
           - /usr/local/bin/healer
 
         args:
-          - alert-watch
-          - --namespace
-          - cto
-          - --prompts-dir
-          - /app/prompts
+          - server
+          - --port
+          - "8080"
+          - --config
+          - /app/healer-config.json
 
         # Skip default claude-config init (not needed for healer)
         skipDefaultInitContainers: true

@@ -65,6 +65,7 @@ pub fn build_router(state: Arc<ServerState>) -> Router {
     Router::new()
         .route("/health", get(health_handler))
         .route("/api/remediate/ci-failure", post(ci_failure_handler))
+        .route("/api/remediate/security-alert", post(security_alert_handler))
         .route("/api/status", get(status_handler))
         .route("/api/status/:task_id", get(task_status_handler))
         .layer(TraceLayer::new_for_http())
@@ -287,6 +288,78 @@ async fn ci_failure_handler(
     }
 }
 
+/// Security alert handler.
+async fn security_alert_handler(
+    State(state): State<Arc<ServerState>>,
+    Json(request): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    info!("Received security alert event");
+
+    // Parse the security alert
+    let alert = match parse_security_alert(&request) {
+        Some(a) => a,
+        None => {
+            warn!("Could not parse security alert event");
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(CiFailureResponse {
+                    status: ResponseStatus::Failed,
+                    coderun_name: None,
+                    agent: None,
+                    failure_type: None,
+                    reason: Some("Could not parse security alert".to_string()),
+                }),
+            );
+        }
+    };
+
+    // Security alerts always go to Cipher
+    let agent = super::types::Agent::Cipher;
+
+    // Build context
+    let ctx = RemediationContext {
+        security_alert: Some(alert.clone()),
+        failure_type: Some(super::types::CiFailureType::SecurityCodeScan),
+        ..Default::default()
+    };
+
+    info!(
+        "Routing security alert {} ({}) to {:?}",
+        alert.alert_type, alert.severity, agent
+    );
+
+    // Spawn CodeRun
+    let spawner = state.spawner.read().await;
+    match spawner.spawn(agent, &ctx) {
+        Ok(coderun_name) => {
+            info!("Spawned CodeRun for security alert: {coderun_name}");
+            (
+                StatusCode::ACCEPTED,
+                Json(CiFailureResponse {
+                    status: ResponseStatus::Accepted,
+                    coderun_name: Some(coderun_name),
+                    agent: Some(agent.name().to_string()),
+                    failure_type: Some("security".to_string()),
+                    reason: None,
+                }),
+            )
+        }
+        Err(e) => {
+            error!("Failed to spawn CodeRun for security alert: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CiFailureResponse {
+                    status: ResponseStatus::Failed,
+                    coderun_name: None,
+                    agent: Some(agent.name().to_string()),
+                    failure_type: Some("security".to_string()),
+                    reason: Some(e.to_string()),
+                }),
+            )
+        }
+    }
+}
+
 /// Server status handler.
 async fn status_handler(State(state): State<Arc<ServerState>>) -> impl IntoResponse {
     Json(ServerStatus {
@@ -346,6 +419,93 @@ fn parse_ci_failure(event: &serde_json::Value) -> Option<CiFailure> {
     }
 
     None
+}
+
+/// Parse a security alert from webhook event.
+fn parse_security_alert(event: &serde_json::Value) -> Option<super::types::SecurityAlert> {
+    use chrono::Utc;
+
+    // Get alert type from GitHub event header
+    let event_type = event
+        .get("X-GitHub-Event")
+        .or_else(|| event.get("action"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    // Handle different alert types
+    let (alert_type, severity, cve_id, package_name, description) =
+        if let Some(alert) = event.get("alert") {
+            // Dependabot or code scanning alert
+            let severity = alert
+                .get("severity")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let cve = alert.get("security_advisory")
+                .and_then(|sa| sa.get("cve_id"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let pkg = alert.get("security_vulnerability")
+                .and_then(|sv| sv.get("package"))
+                .and_then(|p| p.get("name"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let desc = alert
+                .get("security_advisory")
+                .and_then(|sa| sa.get("summary"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("Security alert");
+
+            ("dependabot_alert".to_string(), severity.to_string(), cve, pkg, desc.to_string())
+        } else if let Some(secret) = event.get("secret_scanning_alert") {
+            // Secret scanning alert
+            let secret_type = secret
+                .get("secret_type_display_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown secret");
+            (
+                "secret_scanning_alert".to_string(),
+                "critical".to_string(),
+                None,
+                None,
+                format!("Exposed secret: {secret_type}"),
+            )
+        } else {
+            // Generic security event
+            (
+                event_type.to_string(),
+                "medium".to_string(),
+                None,
+                None,
+                "Security alert detected".to_string(),
+            )
+        };
+
+    let repository = event
+        .get("repository")
+        .and_then(|r| r.get("full_name"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let html_url = event
+        .get("alert")
+        .and_then(|a| a.get("html_url"))
+        .or_else(|| event.get("html_url"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("https://github.com")
+        .to_string();
+
+    Some(super::types::SecurityAlert {
+        alert_type,
+        severity,
+        cve_id,
+        package_name,
+        description,
+        repository,
+        branch: None,
+        html_url,
+        detected_at: Utc::now(),
+    })
 }
 
 /// Check if we should process this failure.
