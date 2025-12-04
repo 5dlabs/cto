@@ -7,13 +7,63 @@
 
 use anyhow::{bail, Context as _, Result};
 use chrono::Utc;
-use handlebars::Handlebars;
+use handlebars::{
+    Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext,
+};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::process::Command;
 use tracing::{debug, info, warn};
 
 use super::types::{Agent, CiFailureType, RemediationConfig, RemediationContext};
+
+// =============================================================================
+// Handlebars Helpers
+// =============================================================================
+
+/// Greater-than-or-equal helper for Handlebars templates.
+/// Usage: `{{#if (gte attempt_number max_attempts)}}...{{/if}}`
+fn gte_helper(
+    h: &Helper,
+    _: &Handlebars,
+    _: &HbsContext,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let left = h
+        .param(0)
+        .and_then(|v| v.value().as_i64())
+        .unwrap_or(0);
+    let right = h
+        .param(1)
+        .and_then(|v| v.value().as_i64())
+        .unwrap_or(0);
+
+    out.write(if left >= right { "true" } else { "" })?;
+    Ok(())
+}
+
+/// Subtract helper for Handlebars templates.
+/// Usage: `{{subtract max_attempts 1}}`
+fn subtract_helper(
+    h: &Helper,
+    _: &Handlebars,
+    _: &HbsContext,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let left = h
+        .param(0)
+        .and_then(|v| v.value().as_i64())
+        .unwrap_or(0);
+    let right = h
+        .param(1)
+        .and_then(|v| v.value().as_i64())
+        .unwrap_or(0);
+
+    out.write(&(left - right).to_string())?;
+    Ok(())
+}
 
 /// `CodeRun` spawner for CI remediation.
 pub struct CodeRunSpawner {
@@ -41,6 +91,10 @@ impl CodeRunSpawner {
         templates.register_helper("concat", Box::new(crate::templates::concat_helper));
         templates.register_helper("lowercase", Box::new(crate::templates::lowercase_helper));
 
+        // Register comparison helpers for retry.hbs template
+        templates.register_helper("gte", Box::new(gte_helper));
+        templates.register_helper("subtract", Box::new(subtract_helper));
+
         Ok(Self {
             config,
             templates,
@@ -50,6 +104,9 @@ impl CodeRunSpawner {
     }
 
     /// Load templates from a directory.
+    ///
+    /// Templates are registered with a "ci/" prefix to match the lookup pattern
+    /// in `render_prompt` (e.g., "rust-fix.hbs" becomes "ci/rust-fix").
     ///
     /// # Errors
     ///
@@ -61,14 +118,16 @@ impl CodeRunSpawner {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "hbs") {
-                let name = path
+                let stem = path
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown");
+                // Register with "ci/" prefix to match lookup pattern
+                let name = format!("ci/{stem}");
                 let content = fs::read_to_string(&path)
                     .context(format!("Failed to read template: {}", path.display()))?;
                 self.templates
-                    .register_template_string(name, &content)
+                    .register_template_string(&name, &content)
                     .context(format!("Failed to register template: {name}"))?;
             }
         }
