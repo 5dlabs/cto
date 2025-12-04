@@ -39,6 +39,236 @@ GitHub CI Failure → Argo Sensor → Healer → CodeRun (Rex/Blaze/Bolt/Atlas)
 
 ---
 
+## GitHub Webhook Events
+
+Healer can respond to various GitHub webhook events. The events are categorized by priority and use case.
+
+### Primary Events (CI Remediation)
+
+| Event | Trigger | Use Case | Agent |
+|-------|---------|----------|-------|
+| **Workflow jobs** | `completed` with `conclusion: failure` | Primary CI failure signal - most detailed | Router decides |
+| **Check runs** | `completed` with `conclusion: failure` | Individual check failures (lint, test, build) | Router decides |
+| **Check suites** | `completed` with `conclusion: failure` | Aggregate check status | Router decides |
+| **Statuses** | `failure` or `error` | Commit status from external CI | Router decides |
+
+#### Workflow Jobs Event (Recommended Primary)
+
+```json
+{
+  "action": "completed",
+  "workflow_job": {
+    "id": 12345,
+    "name": "clippy",
+    "conclusion": "failure",
+    "workflow_name": "Controller CI",
+    "steps": [
+      { "name": "Run clippy", "conclusion": "failure" }
+    ]
+  },
+  "repository": { "full_name": "5dlabs/cto" }
+}
+```
+
+**Advantages over `workflow_run`:**
+- Fires per job, not per workflow (more granular)
+- Includes step-level failure details
+- Faster feedback (don't wait for entire workflow)
+
+### Secondary Events (Extended Remediation)
+
+| Event | Trigger | Use Case | Agent |
+|-------|---------|----------|-------|
+| **Pull requests** | `opened`, `synchronize` | Pre-emptive checks, auto-fix on push | Router decides |
+| **Push** | Any push to monitored branches | Detect problematic commits early | Router decides |
+| **Issue comments** | `/healer fix`, `/healer retry` | Manual trigger via comment commands | Command parser |
+
+### Security Events (Future)
+
+| Event | Trigger | Use Case | Agent |
+|-------|---------|----------|-------|
+| **Dependabot alerts** | `created`, `reopened` | Auto-fix dependency vulnerabilities | Bolt |
+| **Code scanning alerts** | `created` | Security issue remediation | Atlas |
+| **Secret scanning alerts** | `created` | Rotate/revoke leaked secrets | Atlas |
+| **Repository vulnerability alerts** | `created` | Dependency security fixes | Bolt |
+
+### Lifecycle Events (Tracking)
+
+| Event | Trigger | Use Case | Agent |
+|-------|---------|----------|-------|
+| **Pull request reviews** | `submitted` | Track fix PR approval | - (tracking only) |
+| **Check runs** | `completed` with `success` | Confirm fix worked | - (tracking only) |
+| **Merge groups** | `checks_requested` | Merge queue monitoring | - (tracking only) |
+
+---
+
+## Event Payload Examples
+
+### Workflow Job Failure
+
+```json
+{
+  "action": "completed",
+  "workflow_job": {
+    "id": 29679449526,
+    "run_id": 12216892003,
+    "workflow_name": "Controller CI",
+    "name": "lint-rust",
+    "conclusion": "failure",
+    "started_at": "2025-01-15T10:30:00Z",
+    "completed_at": "2025-01-15T10:32:15Z",
+    "steps": [
+      {
+        "name": "Run Clippy (pedantic)",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 4
+      }
+    ],
+    "labels": ["k8s-runner"],
+    "runner_name": "k8s-runner-abc123"
+  },
+  "repository": {
+    "full_name": "5dlabs/cto",
+    "default_branch": "main"
+  },
+  "sender": {
+    "login": "dependabot[bot]"
+  }
+}
+```
+
+### Check Run Failure
+
+```json
+{
+  "action": "completed",
+  "check_run": {
+    "id": 12345678,
+    "name": "clippy",
+    "status": "completed",
+    "conclusion": "failure",
+    "output": {
+      "title": "Clippy found 3 errors",
+      "summary": "error: unused variable `x`\n..."
+    },
+    "check_suite": {
+      "head_branch": "feat/new-feature",
+      "head_sha": "abc123def456"
+    }
+  },
+  "repository": {
+    "full_name": "5dlabs/cto"
+  }
+}
+```
+
+### Pull Request Event (for `/healer` commands)
+
+```json
+{
+  "action": "created",
+  "comment": {
+    "body": "/healer fix clippy",
+    "user": { "login": "developer" }
+  },
+  "issue": {
+    "number": 123,
+    "pull_request": { "url": "..." }
+  },
+  "repository": {
+    "full_name": "5dlabs/cto"
+  }
+}
+```
+
+---
+
+## Event Filtering Strategy
+
+### Argo Events Sensor Filters
+
+```yaml
+dependencies:
+  - name: ci-failure
+    eventSourceName: github
+    eventName: org
+    filters:
+      data:
+        # Workflow job completed events
+        - path: headers.X-GitHub-Event
+          type: string
+          value: ["workflow_job"]
+        - path: body.action
+          type: string
+          value: ["completed"]
+        - path: body.workflow_job.conclusion
+          type: string
+          value: ["failure"]
+        # Only our repository
+        - path: body.repository.full_name
+          type: string
+          value: ["5dlabs/cto"]
+      exprs:
+        # Skip if commit message contains skip flag
+        - expr: '!(body.workflow_job.head_commit.message contains "[skip-healer]")'
+```
+
+### Healer-Side Validation
+
+Even with sensor filtering, Healer performs additional validation:
+
+```rust
+fn should_process(&self, event: &GitHubEvent) -> bool {
+    // Verify event type
+    if !matches!(event.event_type, EventType::WorkflowJob | EventType::CheckRun) {
+        return false;
+    }
+    
+    // Verify failure
+    if event.conclusion != "failure" {
+        return false;
+    }
+    
+    // Skip bot-generated commits (prevent loops)
+    if event.sender.ends_with("[bot]") && !self.config.process_bot_commits {
+        return false;
+    }
+    
+    // Skip if already being remediated
+    if self.has_active_remediation(&event.run_id) {
+        return false;
+    }
+    
+    true
+}
+```
+
+---
+
+## Recommended Event Configuration
+
+### Phase 1: CI Failures Only
+
+Enable these events on the GitHub App:
+- ✅ **Workflow jobs** - Primary CI signal
+- ✅ **Check runs** - Granular check failures
+
+### Phase 2: Extended Triggers
+
+Add these events:
+- ✅ **Issue comments** - For `/healer` commands
+- ✅ **Pull requests** - For auto-fix on sync
+
+### Phase 3: Security Remediation
+
+Add these events:
+- ✅ **Dependabot alerts** - Dependency fixes
+- ✅ **Code scanning alerts** - Security fixes
+- ✅ **Secret scanning alerts** - Secret rotation
+
+---
+
 ## Failure Detection & Routing
 
 ### Detection Sources
