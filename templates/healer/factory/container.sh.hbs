@@ -91,7 +91,7 @@ trap 'stop_docker_sidecar || true' EXIT
 wait_for_docker || true
 echo "🐳 Docker enabled: You can use 'docker pull', 'docker run', etc. for image debugging"
 {{else}}
-echo "🐳 Docker disabled: Set enableDocker: true in heal-config.json to enable image debugging"
+echo "🐳 Docker disabled: Set enableDocker: true in healer-config.json to enable image debugging"
 {{/if}}
 echo "🎯 Agent: {{github_app}}"
 echo "📋 Task ID: {{task_id}}"
@@ -477,7 +477,7 @@ fi
 
 # List configured remote tools from heal config
 echo ""
-echo "📋 Configured remote tools (from heal-config):"
+echo "📋 Configured remote tools (from healer-config):"
 echo "   - mcp_tools_github_*"
 echo "   - mcp_tools_kubernetes_*"
 echo "   - mcp_tools_argocd_*"

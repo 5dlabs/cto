@@ -40,13 +40,13 @@ impl AlertHandler for Handler {
             return None;
         };
 
-        // Skip Heal's own remediation CodeRuns to prevent self-monitoring loops
-        // These have label `remediation: "true"` or name prefix `heal-remediation-`
+        // Skip Healer's own remediation CodeRuns to prevent self-monitoring loops
+        // These have label `remediation: "true"` or name prefix `healer-remediation-`
         if coderun
             .labels
             .get("remediation")
             .is_some_and(|v| v == "true")
-            || coderun.name.starts_with("heal-remediation-")
+            || coderun.name.starts_with("healer-remediation-")
         {
             return None;
         }

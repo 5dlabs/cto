@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.31](https://github.com/5dlabs/cto/compare/v0.12.30...v0.12.31) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* **ci:** update workflow to reflect 'healer' naming convention ([#2674](https://github.com/5dlabs/cto/issues/2674)) ([eb85b91](https://github.com/5dlabs/cto/commit/eb85b9163c892781f16feaf305b451df6d3ea17d))
+* **heal:** rename 'heal' to 'healer' and remove obsolete files ([adc2b95](https://github.com/5dlabs/cto/commit/adc2b9556caf5012982a4ea59c6f0b8210004baa))
+
+
+### 🔧 Maintenance
+
+* **chart:** regenerate agent templates ConfigMaps ([#2672](https://github.com/5dlabs/cto/issues/2672)) ([5bde3dd](https://github.com/5dlabs/cto/commit/5bde3ddfada55135d73264075238e175c9c5ac41))
+
 ## [0.12.30](https://github.com/5dlabs/cto/compare/v0.12.29...v0.12.30) (2025-12-04)
 
 

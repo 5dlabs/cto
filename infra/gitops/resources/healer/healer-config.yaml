@@ -1,16 +1,16 @@
 ---
-# ConfigMap containing heal configuration for remediation CodeRuns
+# ConfigMap containing healer configuration for remediation CodeRuns
 # Maps directly to CodeRun CRD fields
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: heal-config
+  name: healer-config
   namespace: cto
   labels:
-    app.kubernetes.io/name: heal
+    app.kubernetes.io/name: healer
     app.kubernetes.io/component: config
 data:
-  heal-config.json: |
+  healer-config.json: |
     {
       "coderun": {
         "namespace": "cto",
@@ -21,7 +21,7 @@ data:
         "docsProjectDirectory": "docs",
         "docsBranch": "main",
         "workingDirectory": ".",
-        "service": "heal",
+        "service": "healer",
         "runType": "implementation",
         "enableDocker": true,
         "remoteTools": "mcp_tools_github_*,mcp_tools_kubernetes_*,mcp_tools_argocd_*,mcp_tools_cto_*,mcp_tools_context7_*,mcp_tools_firecrawl_*,mcp_tools_grafana_*",
@@ -30,7 +30,7 @@ data:
           "cliType": "claude",
           "model": "claude-opus-4-5-20251101",
           "settings": {
-            "template": "heal/claude"
+            "template": "healer/claude"
           }
         }
       }

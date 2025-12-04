@@ -159,7 +159,7 @@ Define projected volume for agent templates (merges all ConfigMaps)
         name: {{ include "controller.fullname" . }}-agent-templates-watch
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-heal
+        name: {{ include "controller.fullname" . }}-agent-templates-healer
         optional: true
     - configMap:
         name: {{ include "controller.fullname" . }}-agent-templates-intake

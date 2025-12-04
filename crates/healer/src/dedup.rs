@@ -1,4 +1,4 @@
-//! Deduplication module for heal remediation
+//! Deduplication module for healer remediation
 //!
 //! Prevents duplicate remediation `CodeRuns` and GitHub issues for the same alert/pod.
 //! Also provides alert-type level deduplication to prevent issue spam when multiple
@@ -11,8 +11,8 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
-/// Label used to exclude pods from heal monitoring
-pub const EXCLUDE_LABEL: &str = "heal.platform/exclude";
+/// Label used to exclude pods from healer monitoring
+pub const EXCLUDE_LABEL: &str = "healer.platform/exclude";
 
 /// Time window (in minutes) for grouping similar alerts into one issue
 const DEDUP_WINDOW_MINS: u64 = 30;
@@ -22,7 +22,7 @@ const DEDUP_WINDOW_MINS: u64 = 30;
 /// Examples:
 /// - `play-task-4-abc-step-123` -> `play-task-4`
 /// - `atlas-conflict-monitor-xyz` -> `atlas-conflict-monitor`
-/// - `heal-remediation-task1-a7-abc` -> `heal-remediation`
+/// - `healer-remediation-task1-a7-abc` -> `healer-remediation`
 /// - `cto-tools-67db5dff7-hn8xh` -> `cto-tools`
 ///
 /// The workflow family is used to group related pod failures together.
@@ -35,8 +35,8 @@ pub fn extract_workflow_family(pod_name: &str) -> String {
         // play-task-N-* -> play-task-N
         return format!("{}-{}-{}", parts[0], parts[1], parts[2]);
     }
-    if pod_name.starts_with("heal-remediation-") && parts.len() >= 2 {
-        // heal-remediation-* -> heal-remediation
+    if pod_name.starts_with("healer-remediation-") && parts.len() >= 2 {
+        // healer-remediation-* -> healer-remediation
         return format!("{}-{}", parts[0], parts[1]);
     }
     if pod_name.starts_with("atlas-") && parts.len() >= 2 {
@@ -57,7 +57,7 @@ pub fn extract_workflow_family(pod_name: &str) -> String {
     }
 }
 
-/// Check if a pod should be excluded from heal monitoring
+/// Check if a pod should be excluded from healer monitoring
 pub fn should_exclude_pod(labels: &std::collections::HashMap<String, String>) -> bool {
     labels.get(EXCLUDE_LABEL).is_some_and(|v| v == "true")
 }
@@ -350,10 +350,10 @@ mod tests {
         let mut labels = std::collections::HashMap::new();
         assert!(!should_exclude_pod(&labels));
 
-        labels.insert("heal.platform/exclude".to_string(), "false".to_string());
+        labels.insert("healer.platform/exclude".to_string(), "false".to_string());
         assert!(!should_exclude_pod(&labels));
 
-        labels.insert("heal.platform/exclude".to_string(), "true".to_string());
+        labels.insert("healer.platform/exclude".to_string(), "true".to_string());
         assert!(should_exclude_pod(&labels));
     }
 
@@ -405,12 +405,12 @@ mod tests {
     fn test_extract_workflow_family_heal() {
         // Heal remediations should group together
         assert_eq!(
-            extract_workflow_family("heal-remediation-task1-a7-abc"),
-            "heal-remediation"
+            extract_workflow_family("healer-remediation-task1-a7-abc"),
+            "healer-remediation"
         );
         assert_eq!(
-            extract_workflow_family("heal-remediation-taskunknown-a2-xyz"),
-            "heal-remediation"
+            extract_workflow_family("healer-remediation-taskunknown-a2-xyz"),
+            "healer-remediation"
         );
     }
 

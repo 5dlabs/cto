@@ -28,7 +28,7 @@ pub enum K8sEvent {
 /// Pod name prefixes to exclude from alerts and completion checks.
 /// These are infrastructure pods that restart during deployments or `CronJobs`.
 const EXCLUDED_POD_PREFIXES: &[&str] = &[
-    "heal",
+    "healer",
     "cto-tools",
     "cto-controller",
     "vault-mcp-server",

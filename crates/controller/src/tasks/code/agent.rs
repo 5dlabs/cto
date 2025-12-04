@@ -79,17 +79,17 @@ impl AgentClassifier {
         !self.is_implementation_agent(agent_name)
     }
 
-    /// Get the PVC name for heal CodeRuns (Remediation agents).
+    /// Get the PVC name for healer CodeRuns (Remediation agents).
     ///
-    /// Heal agents share a dedicated PVC with the heal monitor deployment.
+    /// Healer agents share a dedicated PVC with the healer monitor deployment.
     /// This is a static PVC managed by ArgoCD, not dynamically named per-service.
     ///
     /// # Returns
-    /// - `heal-workspace` (shared between Heal monitor deployment and Remediation CodeRuns)
+    /// - `healer-workspace` (shared between Healer monitor deployment and Remediation CodeRuns)
     #[must_use]
-    pub fn get_heal_pvc_name(_service: &str) -> String {
-        // Static PVC name - matches the ArgoCD-managed heal deployment
-        "heal-workspace".to_string()
+    pub fn get_healer_pvc_name(_service: &str) -> String {
+        // Static PVC name - matches the ArgoCD-managed healer deployment
+        "healer-workspace".to_string()
     }
 
     /// Get the appropriate PVC name based on agent classification.
@@ -98,7 +98,7 @@ impl AgentClassifier {
     /// - `workspace-{service}` for implementation agents (shared workspace)
     /// - `workspace-{service}-{agent}` for non-implementation agents (isolated workspace)
     ///
-    /// Note: For heal CodeRuns, use `get_heal_pvc_name` instead.
+    /// Note: For healer CodeRuns, use `get_healer_pvc_name` instead.
     pub fn get_pvc_name(&self, service: &str, github_app: &str) -> Result<String, String> {
         let agent_name = self.extract_agent_name(github_app)?;
 
@@ -374,14 +374,14 @@ mod tests {
     }
 
     #[test]
-    fn test_heal_pvc_naming() {
-        // Heal PVC uses a static name shared with ArgoCD-managed heal deployment
-        assert_eq!(AgentClassifier::get_heal_pvc_name("cto"), "heal-workspace");
+    fn test_healer_pvc_naming() {
+        // Healer PVC uses a static name shared with ArgoCD-managed healer deployment
+        assert_eq!(AgentClassifier::get_healer_pvc_name("cto"), "healer-workspace");
 
         // Service name is ignored - always returns static PVC name
         assert_eq!(
-            AgentClassifier::get_heal_pvc_name("my-service"),
-            "heal-workspace"
+            AgentClassifier::get_healer_pvc_name("my-service"),
+            "healer-workspace"
         );
     }
 }
