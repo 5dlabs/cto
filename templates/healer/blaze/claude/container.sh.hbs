@@ -1,0 +1,718 @@
+#!/bin/sh
+# Claude Heal Remediation - Blaze
+# Executes remediation tasks identified by the heal monitoring system
+# Spawned via CodeRun CRD when heal detects frontend issues requiring intervention
+#
+# IMPORTANT: This template does NOT use the docs workflow.
+# Issue context comes from heal-generated files on the shared PVC.
+# Completion is verified against acceptance criteria with retry loop.
+
+set -e
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║            BLAZE HEAL REMEDIATION (CLAUDE) STARTING          ║'
+echo '════════════════════════════════════════════════════════════════'
+
+# ============================================================================
+# DOCKER SIDECAR MANAGEMENT
+# ============================================================================
+{{#if enable_docker}}
+# Docker is enabled - wait for daemon and set up cleanup
+
+wait_for_docker() {
+  echo "🐳 Waiting for Docker daemon..."
+  export DOCKER_HOST="${DOCKER_HOST:-unix:///var/run/docker/docker.sock}"
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    if docker info >/dev/null 2>&1; then
+      echo "✅ Docker daemon ready (socket: ${DOCKER_HOST})"
+      return 0
+    fi
+    echo "   Waiting... ($i/15)"
+    sleep 2
+  done
+  echo "⚠️ Docker daemon not available after 30s (continuing anyway)"
+  return 1
+}
+
+stop_docker_sidecar() {
+  echo "🛑 Stopping Docker sidecar"
+  TASK_ID="{{task_id}}"
+  if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "0" ]; then
+    SIGNAL_DIR="/workspace/task-${TASK_ID}"
+    mkdir -p "$SIGNAL_DIR" 2>/dev/null || true
+    touch "${SIGNAL_DIR}/.agent_done" 2>/dev/null || true
+    echo "   Created signal file: ${SIGNAL_DIR}/.agent_done"
+  fi
+
+  DOCKER_SOCK="${DOCKER_HOST:-unix:///var/run/docker/docker.sock}"
+  SOCK_PATH="${DOCKER_SOCK#unix://}"
+  if [ ! -S "$SOCK_PATH" ] && [ ! -S /var/run/docker.sock ]; then
+    echo "   No Docker socket found, skipping"
+    return
+  fi
+
+  for i in 1 2 3 4 5 6; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped gracefully"
+      return
+    fi
+    echo "   Waiting for sidecar to stop... ($i/6)"
+    sleep 2
+  done
+
+  echo "   Sidecar didn't stop gracefully, sending signals..."
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -TERM dockerd >/dev/null 2>&1 || true
+    sleep 2
+    pkill -KILL dockerd >/dev/null 2>&1 || true
+    pkill -KILL docker-init >/dev/null 2>&1 || true
+  fi
+
+  if ! pidof dockerd >/dev/null 2>&1; then
+    echo "✅ Docker sidecar stopped"
+  else
+    REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+    echo "⚠️ Docker sidecar still running (pid: ${REMAINING_DOCKER:-unknown})"
+  fi
+}
+
+trap 'stop_docker_sidecar || true' EXIT
+wait_for_docker || true
+echo "🐳 Docker enabled: You can use 'docker pull', 'docker run', etc."
+{{else}}
+echo "🐳 Docker disabled: Set enableDocker: true in healer-config.json to enable"
+{{/if}}
+echo "🎯 Agent: {{github_app}}"
+echo "📋 Task ID: {{task_id}}"
+echo "🔧 Alert Type: ${ALERT_TYPE:-unknown}"
+echo "📂 Repository: {{repository_url}}"
+echo "🌳 CodeRun: ${CODERUN_NAME:-unknown}"
+if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+    echo "🔗 GitHub Issue: #${HEAL_ISSUE_NUMBER}"
+fi
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+COMPLETION_TIMEOUT=${HEAL_COMPLETION_TIMEOUT:-60}
+REPO_NAME=$(basename "{{repository_url}}" .git | tr '/' '-')
+REPO_PATH="/workspace/${REPO_NAME}"
+export REPO_PATH
+export WORKTREE_PATH="/workspace/worktrees/${CODERUN_NAME}"
+echo "📁 Worktree: ${WORKTREE_PATH}"
+mkdir -p /workspace/worktrees
+
+# ============================================================================
+# WORKSPACE CLEANUP (PVC persists between runs)
+# ============================================================================
+echo ""
+echo "═══ WORKSPACE CLEANUP ═══"
+git config --global --add safe.directory '*' 2>/dev/null || true
+echo "✓ Git safe.directory configured"
+
+if [ -d "/workspace/worktrees" ]; then
+    echo "🧹 Cleaning stale worktrees..."
+    WORKTREE_COUNT=$(find /workspace/worktrees -maxdepth 1 -type d 2>/dev/null | wc -l)
+    if [ "$WORKTREE_COUNT" -gt 1 ]; then
+        find /workspace/worktrees -maxdepth 1 -type d -mmin +1440 -not -name "$(basename ${WORKTREE_PATH})" 2>/dev/null | while read -r old_wt; do
+            if [ -d "$old_wt" ] && [ "$old_wt" != "/workspace/worktrees" ]; then
+                echo "   Removing stale worktree: $old_wt"
+                rm -rf "$old_wt" 2>/dev/null || true
+            fi
+        done
+    fi
+    echo "✓ Worktree cleanup complete"
+fi
+
+find /workspace -name "*.lock" -type f -mmin +30 2>/dev/null | while read -r lockfile; do
+    echo "   Removing stale lock: $lockfile"
+    rm -f "$lockfile" 2>/dev/null || true
+done
+
+if [ -d "/workspace/archived" ]; then
+    echo "🧹 Cleaning old archived issues..."
+    find /workspace/archived -maxdepth 1 -type d -mtime +7 2>/dev/null | while read -r old_archive; do
+        if [ -d "$old_archive" ] && [ "$old_archive" != "/workspace/archived" ]; then
+            echo "   Removing old archive: $old_archive"
+            rm -rf "$old_archive" 2>/dev/null || true
+        fi
+    done
+    echo "✓ Archive cleanup complete"
+fi
+
+# ============================================================================
+# GIT RETRY LOGIC
+# ============================================================================
+git_with_retry() {
+    _gwr_max_attempts=5
+    _gwr_attempt=1
+    _gwr_base_delay=2
+    _gwr_max_delay=60
+    _gwr_delay=$_gwr_base_delay
+
+    while [ $_gwr_attempt -le $_gwr_max_attempts ]; do
+        echo "   git_with_retry: attempt $_gwr_attempt/$_gwr_max_attempts: git $*"
+        _gwr_output=$(git "$@" 2>&1) && {
+            echo "$_gwr_output"
+            return 0
+        }
+
+        if echo "$_gwr_output" | grep -qiE "(500|502|503|504|internal server error|connection refused|connection reset|network|timed out|couldn't connect)"; then
+            echo "   Transient error detected (attempt $_gwr_attempt/$_gwr_max_attempts)"
+            echo "   Error: $_gwr_output"
+
+            if [ $_gwr_attempt -lt $_gwr_max_attempts ]; then
+                echo "   Waiting ${_gwr_delay}s before retry..."
+                sleep $_gwr_delay
+                _gwr_delay=$((_gwr_delay * 2))
+                if [ $_gwr_delay -gt $_gwr_max_delay ]; then
+                    _gwr_delay=$_gwr_max_delay
+                fi
+            fi
+        else
+            echo "   Permanent error detected, not retrying"
+            echo "   Error: $_gwr_output"
+            return 1
+        fi
+
+        _gwr_attempt=$((_gwr_attempt + 1))
+    done
+
+    echo "   All $_gwr_max_attempts attempts failed"
+    return 1
+}
+
+# ============================================================================
+# REPOSITORY PRE-STAGING
+# ============================================================================
+echo ""
+echo "═══ REPOSITORY PRE-STAGING ═══"
+echo "📦 Repository: {{repository_url}}"
+echo "📂 Local path: ${REPO_PATH}"
+
+if [ -d "${REPO_PATH}/.git" ]; then
+    echo "✓ Repository exists, syncing with origin/main..."
+    cd "${REPO_PATH}"
+    git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+    git worktree prune 2>/dev/null || true
+    echo "📥 Fetching latest changes..."
+    if ! git_with_retry fetch --depth 1 origin main; then
+        echo "❌ Failed to fetch from origin after retries"
+        exit 1
+    fi
+    git reset --hard origin/main
+    git clean -fd
+    echo "✓ Repository synced to $(git rev-parse --short HEAD)"
+else
+    echo "📥 Repository not found, cloning (shallow)..."
+    CLONE_URL="{{repository_url}}"
+    if ! echo "${CLONE_URL}" | grep -q "\.git$"; then
+        CLONE_URL="${CLONE_URL}.git"
+    fi
+    if ! git_with_retry clone --depth 1 "${CLONE_URL}" "${REPO_PATH}"; then
+        echo "❌ Failed to clone repository after retries"
+        exit 1
+    fi
+    cd "${REPO_PATH}"
+    git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+    echo "✓ Repository cloned to $(git rev-parse --short HEAD)"
+fi
+
+git config core.bare false 2>/dev/null || true
+echo "✓ Repository ready at ${REPO_PATH}"
+
+# ============================================================================
+# VERIFY HEAL CONTEXT FILES
+# ============================================================================
+PROMPT_FILE="${HEAL_PROMPT_FILE:-/workspace/issues/issue-${HEAL_ISSUE_NUMBER:-unknown}/prompt.md}"
+LOG_FILE="${HEAL_LOG_FILE:-/workspace/logs/${ALERT_TYPE:-A7}-*.log}"
+
+if [ -n "${HEAL_ACCEPTANCE_FILE}" ]; then
+    ACCEPTANCE_FILE="${HEAL_ACCEPTANCE_FILE}"
+    LEGACY_MODE="false"
+elif [ -n "${HEAL_ISSUE_DIR}" ]; then
+    ACCEPTANCE_FILE="${HEAL_ISSUE_DIR}/acceptance-criteria.md"
+    LEGACY_MODE="false"
+elif [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+    ACCEPTANCE_FILE="/workspace/issues/issue-${HEAL_ISSUE_NUMBER}/acceptance-criteria.md"
+    LEGACY_MODE="false"
+else
+    ACCEPTANCE_FILE=""
+    LEGACY_MODE="true"
+fi
+
+echo ""
+echo "═══ HEAL CONTEXT FILES ═══"
+echo "📄 Prompt file: ${PROMPT_FILE}"
+echo "📋 Log pattern: ${LOG_FILE}"
+if [ "${LEGACY_MODE}" = "true" ]; then
+    echo "⚠️  Legacy mode: No acceptance criteria"
+else
+    echo "✅ Acceptance: ${ACCEPTANCE_FILE}"
+fi
+
+if [ -f "${PROMPT_FILE}" ]; then
+    echo "   ✓ Prompt file exists"
+else
+    echo "   ⚠️  Prompt file not found at ${PROMPT_FILE}"
+fi
+
+LATEST_LOG=$(ls -t ${LOG_FILE} 2>/dev/null | head -1 || true)
+if [ -n "${LATEST_LOG}" ]; then
+    echo "   ✓ Log file: ${LATEST_LOG}"
+    export HEAL_LOG_FILE="${LATEST_LOG}"
+else
+    echo "   ⚠️  No log files matching ${LOG_FILE}"
+fi
+
+if [ -f "${ACCEPTANCE_FILE}" ]; then
+    echo "   ✓ Acceptance criteria exists"
+else
+    echo "   ⚠️  No acceptance criteria at ${ACCEPTANCE_FILE}"
+fi
+
+if [ -f /workspace/scripts/lib/common.sh ]; then
+    . /workspace/scripts/lib/common.sh
+fi
+
+# ============================================================================
+# VALIDATE AGENT PROMPT FILE
+# ============================================================================
+AGENT_PROMPT="/task-files/CLAUDE.md"
+if [ ! -f "${AGENT_PROMPT}" ]; then
+    echo "❌ Agent prompt file not found: ${AGENT_PROMPT}"
+    exit 1
+fi
+echo "✅ Agent prompt file exists: ${AGENT_PROMPT}"
+
+# ============================================================================
+# MCP CONFIGURATION SETUP
+# ============================================================================
+echo ""
+echo "═══ MCP CONFIGURATION SETUP ═══"
+
+CLAUDE_WORK_DIR="${REPO_PATH}"
+
+if [ -f "/task-files/mcp.json" ]; then
+    cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+    echo "✓ Copied mcp.json to ${CLAUDE_WORK_DIR}/.mcp.json (project scope)"
+else
+    echo "⚠️  mcp.json template not found in /task-files"
+    if [ -f "/task-files/heal_mcp.json" ]; then
+        cp /task-files/heal_mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+        echo "✓ Copied heal_mcp.json to ${CLAUDE_WORK_DIR}/.mcp.json"
+    fi
+fi
+
+if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ] && [ "$CLAUDE_WORK_DIR" != "/workspace" ]; then
+    cp "$CLAUDE_WORK_DIR/.mcp.json" /workspace/.mcp.json 2>/dev/null || true
+    echo "✓ Also copied to /workspace/.mcp.json"
+fi
+
+if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
+    echo "📋 MCP configuration:"
+    cat "$CLAUDE_WORK_DIR/.mcp.json" | head -30
+fi
+
+# ============================================================================
+# MCP TOOLS VALIDATION
+# ============================================================================
+echo ""
+echo "═══ MCP TOOLS VALIDATION ═══"
+echo "🔍 Checking MCP servers..."
+
+if command -v claude >/dev/null 2>&1; then
+    if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
+        cd "$CLAUDE_WORK_DIR"
+    fi
+    MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+    
+    if echo "$MCP_LIST" | grep -q "Connected\|tools"; then
+        echo "✅ MCP servers available:"
+        echo "$MCP_LIST" | head -20
+    else
+        echo "⚠️  No MCP servers connected (proceeding anyway)"
+    fi
+else
+    echo "⚠️  Claude CLI not found - MCP validation skipped"
+fi
+
+echo ""
+echo "📋 Configured remote tools (via toolman):"
+echo "   - mcp_tools_github_*"
+echo "   - mcp_tools_kubernetes_*"
+echo "   - mcp_tools_argocd_*"
+echo "   - mcp_tools_cto_*"
+echo "   - mcp_tools_context7_*"
+echo "   - mcp_tools_firecrawl_*"
+echo "   - mcp_tools_grafana_*"
+
+# ============================================================================
+# COMPLETION PROBE LOOP
+# ============================================================================
+ATTEMPT=1
+SUCCESS=0
+
+PERSISTENT_LOG_DIR="/workspace/completion/${CODERUN_NAME:-unknown}"
+mkdir -p "${PERSISTENT_LOG_DIR}"
+COMPLETION_LAST_MESSAGE="${PERSISTENT_LOG_DIR}/last-message.txt"
+COMPLETION_LOG="${PERSISTENT_LOG_DIR}/completion.log"
+AGENT_OUTPUT_LOG="${PERSISTENT_LOG_DIR}/agent-output.log"
+
+echo "📁 Persistent logs: ${PERSISTENT_LOG_DIR}"
+
+# ============================================================================
+# SIGTERM HANDLER
+# ============================================================================
+flush_logs_and_exit() {
+    EXIT_CODE="${1:-130}"
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ ⚠️ SIGTERM RECEIVED - Flushing state before exit            ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    TERM_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    echo "Terminated at: ${TERM_TIME}"
+
+    {
+        echo "=== TERMINATION RECORD ==="
+        echo "Time: ${TERM_TIME}"
+        echo "Exit Code: ${EXIT_CODE}"
+        echo "Iteration: ${ATTEMPT:-1}"
+        echo "CodeRun: ${CODERUN_NAME:-unknown}"
+        echo "Issue: ${HEAL_ISSUE_NUMBER:-unknown}"
+        echo ""
+        echo "=== LAST KNOWN STATE ==="
+        if [ -f "${COMPLETION_LAST_MESSAGE}" ]; then
+            cat "${COMPLETION_LAST_MESSAGE}"
+        else
+            echo "No completion state recorded"
+        fi
+    } >> "${PERSISTENT_LOG_DIR}/termination.log" 2>/dev/null || true
+
+    sync 2>/dev/null || true
+    echo "✅ State flushed to ${PERSISTENT_LOG_DIR}"
+
+    {{#if enable_docker}}
+    stop_docker_sidecar || true
+    {{/if}}
+
+    exit "${EXIT_CODE}"
+}
+
+trap 'flush_logs_and_exit 130' TERM INT
+
+echo ""
+echo "═══ STARTING REMEDIATION (iterating until acceptance criteria met) ═══"
+
+while [ $SUCCESS -eq 0 ]; do
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ ITERATION ${ATTEMPT}                                                ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    PROMPT_CONTENT=$(cat "${AGENT_PROMPT}")
+
+    if [ $ATTEMPT -gt 1 ] && [ -f "${COMPLETION_LAST_MESSAGE}" ]; then
+        LAST_REASON=$(cat "${COMPLETION_LAST_MESSAGE}" 2>/dev/null || echo "")
+        if [ -n "${LAST_REASON}" ]; then
+            PROMPT_CONTENT="${PROMPT_CONTENT}
+
+🔁 **ITERATION ${ATTEMPT} - Previous attempt incomplete**
+
+The previous completion probe indicated these items remain:
+${LAST_REASON}
+
+Focus on addressing the above items before re-checking acceptance criteria."
+        fi
+    fi
+
+    echo "🚀 Running Claude remediation agent (Blaze - Frontend)..."
+    
+    CLAUDE_CMD="claude -p --dangerously-skip-permissions --model {{model}} --output-format stream-json --include-partial-messages --verbose"
+    CLAUDE_CMD="$CLAUDE_CMD --allowedTools Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(pnpm:*),Bash(npx:*),Bash(tsc:*),Bash(eslint:*),Bash(prettier:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit,mcp__*"
+    
+    if [ -f "${CLAUDE_WORK_DIR}/.mcp.json" ]; then
+        echo "✓ Adding MCP configuration from ${CLAUDE_WORK_DIR}/.mcp.json"
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config ${CLAUDE_WORK_DIR}/.mcp.json"
+    elif [ -f "/workspace/.mcp.json" ]; then
+        echo "✓ Adding MCP configuration from /workspace/.mcp.json"
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/.mcp.json"
+    else
+        echo "⚠️ No MCP configuration file found"
+    fi
+    
+    echo ""
+    echo "═══ RUNNING REMEDIATION AGENT ═══"
+    echo "📋 Command: $CLAUDE_CMD [prompt piped via stdin]"
+    echo ""
+    
+    set +e
+    set -f
+
+    CLAUDE_FIFO=$(mktemp -u)
+    CLAUDE_EXIT_FILE=$(mktemp)
+    mkfifo "$CLAUDE_FIFO"
+    
+    {
+        echo "${PROMPT_CONTENT}" | $CLAUDE_CMD 2>&1
+        echo $? > "$CLAUDE_EXIT_FILE"
+    } > "$CLAUDE_FIFO" &
+    CLAUDE_BG_PID=$!
+    
+    echo "=== Iteration ${ATTEMPT} started at $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" >> "${AGENT_OUTPUT_LOG}"
+
+    while IFS= read -r line; do
+        if echo "$line" | jq -e . >/dev/null 2>&1; then
+            TEXT=$(echo "$line" | jq -r '
+                if .type == "assistant" then
+                    (.message.content[]? | select(.type == "text") | .text) // empty
+                elif .type == "content_block_delta" then
+                    .delta.text // empty
+                elif .type == "tool_use" then
+                    "🔧 Tool: " + (.name // "unknown")
+                elif .type == "tool_result" then
+                    "📋 Result: " + ((.content // "done") | tostring | .[0:200])
+                else
+                    empty
+                end
+            ' 2>/dev/null)
+            if [ -n "$TEXT" ]; then
+                printf '%s\n' "$TEXT"
+                printf '%s\n' "$TEXT" >> "${AGENT_OUTPUT_LOG}"
+            fi
+        else
+            printf '%s\n' "$line"
+            printf '%s\n' "$line" >> "${AGENT_OUTPUT_LOG}"
+        fi
+    done < "$CLAUDE_FIFO"
+
+    echo "=== Iteration ${ATTEMPT} agent exited ===" >> "${AGENT_OUTPUT_LOG}"
+    
+    wait $CLAUDE_BG_PID 2>/dev/null || true
+    AGENT_EXIT=$(cat "$CLAUDE_EXIT_FILE" 2>/dev/null || echo "1")
+    AGENT_EXIT="${AGENT_EXIT:-1}"
+    rm -f "$CLAUDE_FIFO" "$CLAUDE_EXIT_FILE"
+    
+    set +f
+    set -e
+
+    echo ""
+    echo "🧭 Agent exited with code: ${AGENT_EXIT}"
+
+    # ========================================================================
+    # MERGE CONFLICT & CI CHECK
+    # ========================================================================
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ CHECKING PR STATUS & MERGE CONFLICTS                         ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    cd "${WORKTREE_PATH}" 2>/dev/null || cd "${REPO_PATH}" || true
+    PR_NUMBER=$(gh pr view --json number -q '.number' 2>/dev/null || echo "")
+    
+    if [ -n "${PR_NUMBER}" ]; then
+        echo "📋 Found PR #${PR_NUMBER}"
+        
+        MERGEABLE=$(gh pr view ${PR_NUMBER} --json mergeable -q '.mergeable' 2>/dev/null || echo "")
+        if [ "${MERGEABLE}" = "CONFLICTING" ]; then
+            echo "⚠️ Merge conflict detected - rebasing on main..."
+            git_with_retry fetch origin main
+            if git rebase origin/main; then
+                git push origin HEAD --force-with-lease
+                echo "✅ Rebased and pushed successfully"
+            else
+                echo "❌ Rebase failed - conflicts need manual resolution"
+                git rebase --abort 2>/dev/null || true
+                echo "Merge conflict with main branch - need to resolve conflicts" > "${COMPLETION_LAST_MESSAGE}"
+            fi
+            sleep 10
+        fi
+        
+        echo "🔍 Checking CI status..."
+        CI_ATTEMPTS=0
+        MAX_CI_WAIT=20
+        while [ $CI_ATTEMPTS -lt $MAX_CI_WAIT ]; do
+            CI_STATUS=$(gh pr checks ${PR_NUMBER} --json state -q '.[].state' 2>/dev/null | sort -u || echo "")
+            
+            if echo "${CI_STATUS}" | grep -q "FAILURE"; then
+                echo "❌ CI failed - agent should fix in next iteration"
+                break
+            elif echo "${CI_STATUS}" | grep -q "PENDING"; then
+                echo "⏳ CI still running... (${CI_ATTEMPTS}/${MAX_CI_WAIT})"
+                sleep 30
+                CI_ATTEMPTS=$((CI_ATTEMPTS + 1))
+            else
+                echo "✅ CI checks passed or no checks running"
+                break
+            fi
+        done
+        
+        MERGED=$(gh pr view ${PR_NUMBER} --json merged -q '.merged' 2>/dev/null || echo "false")
+        if [ "${MERGED}" = "true" ]; then
+            echo "✅ PR already merged!"
+        fi
+    else
+        echo "📝 No PR found yet - agent may create one in next iteration"
+    fi
+
+    # ========================================================================
+    # COMPLETION PROBE
+    # ========================================================================
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ COMPLETION PROBE - Checking Acceptance Criteria              ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    if [ -n "${ACCEPTANCE_FILE}" ] && [ -f "${ACCEPTANCE_FILE}" ]; then
+        ACCEPTANCE_CONTENT=$(cat "${ACCEPTANCE_FILE}")
+    elif [ "${LEGACY_MODE}" = "true" ]; then
+        ACCEPTANCE_CONTENT="**Legacy Mode** - No formal acceptance criteria available.
+
+Use basic health checks:
+- [ ] Fix has been deployed (PR merged)
+- [ ] ArgoCD sync successful
+- [ ] Target pod running without errors
+- [ ] No new alerts for this issue type"
+    else
+        ACCEPTANCE_CONTENT="No acceptance criteria file found at: ${ACCEPTANCE_FILE}
+
+Use basic health checks:
+- [ ] Fix has been deployed (PR merged)
+- [ ] ArgoCD sync successful
+- [ ] Target pod running without errors
+- [ ] No new alerts for this issue"
+    fi
+
+    COMPLETION_PROMPT="You are a completion probe for a heal remediation task.
+
+## Acceptance Criteria
+${ACCEPTANCE_CONTENT}
+
+## Instructions
+Review the current state and determine if ALL acceptance criteria are met.
+
+Check:
+1. Was a PR created and merged? (use: gh pr list --state merged --search 'fix heal')
+2. Did ArgoCD sync successfully? (use: kubectl get application -n argocd)
+3. Is the target pod running without errors? (use: kubectl get pods -n cto)
+4. Are there any new errors in the logs?
+
+Respond with ONLY:
+- **yes** - if ALL criteria are satisfied
+- **no** - if ANY criteria are NOT satisfied
+
+If no, add:
+REASON: [list the specific criteria that are not met]
+
+Your response:"
+
+    echo "📋 Running completion probe..."
+    set +e
+    COMPLETION_OUTPUT=$(claude --dangerously-skip-permissions --model "{{model}}" -p "${COMPLETION_PROMPT}" 2>&1 | tee "${COMPLETION_LOG}")
+    COMPLETION_EXIT=$?
+    set -e
+
+    echo "🧭 Completion probe response:"
+    printf '%s\n' "${COMPLETION_OUTPUT}"
+
+    COMPLETION_RESPONSE=$(printf '%s\n' "${COMPLETION_OUTPUT}" | tr -d '\r' | grep -Eio '\*\*(yes|no)\*\*|(^|[[:space:]])(yes|no)([[:space:]]|$)' | sed 's/\*//g; s/^[[:space:]]*//; s/[[:space:]]*$//' | head -n1 | tr '[:upper:]' '[:lower:]')
+
+    if [ "${COMPLETION_RESPONSE}" = "yes" ]; then
+        echo ""
+        echo "✅ Completion probe confirmed: ALL acceptance criteria met!"
+        SUCCESS=1
+        break
+    elif [ "${COMPLETION_RESPONSE}" = "no" ]; then
+        CURRENT_REASON=$(printf '%s\n' "${COMPLETION_OUTPUT}" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+        if [ -n "${CURRENT_REASON}" ]; then
+            echo ""
+            echo "⚠️ Completion probe found incomplete criteria:"
+            echo "${CURRENT_REASON}"
+            printf '%s\n' "${CURRENT_REASON}" > "${COMPLETION_LAST_MESSAGE}"
+        else
+            echo "⚠️ Completion probe reported 'no' without specific reason"
+            echo "Task incomplete - review acceptance criteria" > "${COMPLETION_LAST_MESSAGE}"
+        fi
+    else
+        echo "⚠️ Could not parse completion probe response: ${COMPLETION_RESPONSE:-<empty>}"
+        echo "Treating as incomplete..."
+        echo "Unable to verify completion" > "${COMPLETION_LAST_MESSAGE}"
+    fi
+
+    ATTEMPT=$((ATTEMPT + 1))
+done
+
+# ============================================================================
+# FINAL STATUS
+# ============================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+    echo "║ ✅ REMEDIATION COMPLETE                                       ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo "Completed in ${ATTEMPT} attempt(s)"
+
+    if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+        echo "📝 Adding completion comment to issue #${HEAL_ISSUE_NUMBER}..."
+        gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "✅ **Remediation Complete**
+
+All acceptance criteria have been verified:
+- PR merged to main
+- ArgoCD sync successful
+- Target system healthy
+
+Completed by: ${CODERUN_NAME}
+Attempts: ${ATTEMPT}" 2>/dev/null || echo "   (could not comment on issue)"
+
+        echo "🔒 Closing issue #${HEAL_ISSUE_NUMBER}..."
+        gh issue close "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --reason completed 2>/dev/null || echo "   (could not close issue)"
+    fi
+
+    if [ -n "${HEAL_ISSUE_DIR}" ] && [ -d "${HEAL_ISSUE_DIR}" ]; then
+        echo "🧹 Archiving issue folder: ${HEAL_ISSUE_DIR}"
+        ARCHIVE_DIR="/workspace/archived/${HEAL_ISSUE_NUMBER:-unknown}"
+        mkdir -p "$(dirname ${ARCHIVE_DIR})"
+        mv "${HEAL_ISSUE_DIR}" "${ARCHIVE_DIR}" 2>/dev/null || echo "   (folder already moved or missing)"
+    fi
+
+    if [ -n "${WORKTREE_PATH}" ] && [ -d "${WORKTREE_PATH}" ]; then
+        echo "🧹 Removing worktree: ${WORKTREE_PATH}"
+        cd "${REPO_PATH:-/workspace/5dlabs-cto}" 2>/dev/null || true
+        git worktree remove "${WORKTREE_PATH}" --force 2>/dev/null || rm -rf "${WORKTREE_PATH}" 2>/dev/null || true
+    fi
+
+    {{#if enable_docker}}
+    echo "🛑 Explicitly stopping Docker sidecar..."
+    stop_docker_sidecar || true
+    {{/if}}
+    
+    exit 0
+else
+    echo "║ ⚠️ REMEDIATION LOOP EXITED UNEXPECTEDLY                        ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo "Loop exited after ${ATTEMPT} iterations without success flag"
+
+    if [ -n "${HEAL_ISSUE_NUMBER}" ]; then
+        echo "📝 Adding status comment to issue #${HEAL_ISSUE_NUMBER}..."
+        LAST_REASON=$(cat "${COMPLETION_LAST_MESSAGE}" 2>/dev/null || echo "Unknown")
+        gh issue comment "${HEAL_ISSUE_NUMBER}" --repo 5dlabs/cto --body "⚠️ **Remediation Loop Exited**
+
+Loop exited unexpectedly after ${ATTEMPT} iterations.
+
+**Last known status:**
+${LAST_REASON}
+
+**Next steps:** Check agent logs for errors.
+
+Agent: ${CODERUN_NAME}" 2>/dev/null || echo "   (could not comment on issue)"
+    fi
+
+    {{#if enable_docker}}
+    echo "🛑 Explicitly stopping Docker sidecar..."
+    stop_docker_sidecar || true
+    {{/if}}
+    
+    exit 1
+fi
+
