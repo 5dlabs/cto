@@ -37,6 +37,47 @@ spec:
     - template:
         name: atlas-guardian-launcher
         conditions: "atlas-pr-event"
+        parameters:
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.pull_request.number
+            dest: spec.arguments.parameters.0.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.pull_request.html_url
+            dest: spec.arguments.parameters.1.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.repository.owner.login
+            dest: spec.arguments.parameters.2.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.repository.name
+            dest: spec.arguments.parameters.3.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.repository.clone_url
+            dest: spec.arguments.parameters.4.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.pull_request.head.ref
+            dest: spec.arguments.parameters.5.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.pull_request.title
+            dest: spec.arguments.parameters.6.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataTemplate: "{{ .Input.body.pull_request.labels | toJson }}"
+            dest: spec.arguments.parameters.7.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.action
+            dest: spec.arguments.parameters.8.value
+          - src:
+              dependencyName: atlas-pr-event
+              dataKey: body.sender.login
+            dest: spec.arguments.parameters.9.value
         k8s:
           operation: create
           source:
@@ -57,6 +98,28 @@ spec:
                 podGC:
                   strategy: OnPodCompletion
                   deleteDelayDuration: 60s    # Delay pod deletion to allow heal to capture logs
+                arguments:
+                  parameters:
+                    - name: pr-number
+                      value: ""
+                    - name: pr-url
+                      value: ""
+                    - name: repo-owner
+                      value: ""
+                    - name: repo-name
+                      value: ""
+                    - name: repo-clone-url
+                      value: ""
+                    - name: pr-branch
+                      value: ""
+                    - name: pr-title
+                      value: ""
+                    - name: pr-labels
+                      value: "[]"
+                    - name: action
+                      value: ""
+                    - name: sender-login
+                      value: ""
                 templates:
                   - name: atlas-pr-monitor
                     script:
@@ -85,20 +148,22 @@ spec:
 
                         ensure_jq
 
-                        PR_NUMBER='{{ .Input.body.pull_request.number }}'
-                        PR_URL='{{ .Input.body.pull_request.html_url }}'
-                        REPO_OWNER='{{ .Input.body.repository.owner.login }}'
-                        REPO_NAME='{{ .Input.body.repository.name }}'
-                        REPO_URL='{{ .Input.body.repository.clone_url }}'
-                        PR_BRANCH='{{ .Input.body.pull_request.head.ref }}'
-                        PR_TITLE='{{ .Input.body.pull_request.title }}'
-                        PR_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        ACTION='{{ .Input.body.action }}'
-                        SENDER_LOGIN='{{ .Input.body.sender.login }}'
+                        # Extract workflow parameters (populated by Argo Events sensor)
+                        PR_NUMBER='{{workflow.parameters.pr-number}}'
+                        PR_URL='{{workflow.parameters.pr-url}}'
+                        REPO_OWNER='{{workflow.parameters.repo-owner}}'
+                        REPO_NAME='{{workflow.parameters.repo-name}}'
+                        REPO_URL='{{workflow.parameters.repo-clone-url}}'
+                        PR_BRANCH='{{workflow.parameters.pr-branch}}'
+                        PR_TITLE='{{workflow.parameters.pr-title}}'
+                        PR_LABELS_JSON='{{workflow.parameters.pr-labels}}'
+                        ACTION='{{workflow.parameters.action}}'
+                        SENDER_LOGIN='{{workflow.parameters.sender-login}}'
 
-                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
-                          echo "ℹ️ No PR number in payload, skipping"
-                          exit 0
+                        # Validate required parameters are present
+                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ] || [ "$PR_NUMBER" = "" ]; then
+                          echo "❌ ERROR: PR number not provided - parameters not interpolated correctly"
+                          exit 1
                         fi
 
                         if [ "$SENDER_LOGIN" = "atlas-5dlabs" ] || [ "$SENDER_LOGIN" = "atlas-5dlabs[bot]" ]; then

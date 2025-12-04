@@ -69,11 +69,13 @@ spec:
                 index:
                   prefix: index_
                   period: 24h
-          # Limits configuration
+          # Limits configuration (increased for high-volume log ingestion)
           limits_config:
-            ingestion_rate_mb: 16
-            ingestion_burst_size_mb: 32
-            max_streams_per_user: 10000
+            ingestion_rate_mb: 128
+            ingestion_burst_size_mb: 256
+            max_streams_per_user: 50000
+            per_stream_rate_limit: 50MB
+            per_stream_rate_limit_burst: 100MB
             retention_period: 168h  # 7 days
           # Enable OTLP receiver
           otlp:
@@ -120,3 +122,4 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
+

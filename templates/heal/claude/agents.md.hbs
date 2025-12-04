@@ -269,40 +269,286 @@ kubectl logs -n cto -l app=cto-controller --tail=50
 
 **MCP Tools Available:**
 
-1. **ArgoCD** (`argocd_*`): GitOps deployment validation
-   - `argocd_get_application` - Check sync status and health
-   - `argocd_sync_application` - Trigger manual sync if needed
-   - `argocd_get_application_events` - View deployment events
+### 1. Prometheus (Metrics) - `prometheus_*`
 
-2. **Kubernetes** (`kubernetes_*`): Cluster management
-   - `kubernetes_pods_list` - Get pods in namespace
-   - `kubernetes_pods_log` - Check for errors in logs
-   - `kubernetes_events_list` - View cluster events
-   - `kubernetes_resources_get` - Get any K8s resource
+Query metrics for performance analysis and alerting verification:
 
-3. **GitHub** (`github_*`): Repository and PR management
-   - `github_create_pull_request` - Create PR
-   - `github_get_pull_request_status` - Check CI status
-   - `github_merge_pull_request` - Merge when ready
-   - `github_create_issue`, `github_update_issue` - Issue tracking
+```bash
+# Check if a service is up
+prometheus_execute_query({ query: "up{job=\"cto-controller\"}" })
 
-4. **CTO** (`cto_*`): Platform workflow control
-   - `cto_jobs` - List running/recent jobs
-   - `cto_stop_job` - Stop a stuck job
-   - `cto_play_status` - Check workflow status
+# Get error rates
+prometheus_execute_query({ query: "rate(http_requests_total{status=~\"5..\"}[5m])" })
 
-5. **Grafana** (`grafana_*`): Monitoring and observability
-   - `grafana_query_loki_logs` - Search application logs
-   - `grafana_list_incidents` - View active incidents
-   - `grafana_get_alert_rule_by_uid` - Check alert status
+# Memory usage
+prometheus_execute_query({ query: "container_memory_usage_bytes{pod=~\"cto-.*\"}" })
 
-6. **Context7** (`context7_*`): Documentation lookup
-   - `context7_resolve_library_id` - Find library docs
-   - `context7_get_library_docs` - Get API references
+# Range query for trends
+prometheus_execute_range_query({
+  query: "rate(http_requests_total[5m])",
+  start: "now-1h",
+  end: "now",
+  step: "1m"
+})
 
-7. **Firecrawl** (`firecrawl_*`): Web research
-   - `firecrawl_search` - Search the web for solutions
-   - `firecrawl_scrape` - Read documentation pages
+# List available metrics
+prometheus_list_metrics({ filter_pattern: "cto_" })
+```
+
+**Common Use Cases:**
+- Verify service health after deployment (`up{job="..."}`)
+- Check error rates before/after fix
+- Monitor resource usage trends
+- Validate alert conditions
+
+### 2. Loki (Logs) - `loki_*`
+
+Search and analyze application logs:
+
+```bash
+# Query recent logs for a pod
+loki_query({
+  query: "{pod=~\"cto-controller.*\"} |~ \"error|ERROR\"",
+  limit: 100
+})
+
+# Search logs with JSON parsing
+loki_query({
+  query: "{namespace=\"cto\"} | json | level=\"error\"",
+  limit: 50
+})
+
+# Get available labels
+loki_label_names()
+loki_label_values({ label: "pod" })
+
+# Time-bounded search
+loki_query({
+  query: "{app=\"cto-controller\"}",
+  start: "1h",  # 1 hour ago
+  limit: 200
+})
+```
+
+**Log Query Patterns:**
+- `{namespace="cto"}` - All logs from namespace
+- `|~ "pattern"` - Regex match
+- `|= "exact"` - Exact string match
+- `!~ "exclude"` - Exclude pattern
+- `| json | field="value"` - Parse JSON and filter
+
+### 3. Grafana (Dashboards & Alerts) - `grafana_*`
+
+Access dashboards, datasources, and alerting:
+
+```bash
+# Search dashboards
+grafana_search_dashboards({ query: "CTO" })
+
+# Get dashboard details
+grafana_get_dashboard_by_uid({ uid: "cto-overview" })
+
+# List datasources
+grafana_list_datasources()
+
+# Query Prometheus via Grafana
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "up",
+  queryType: "instant",
+  startTime: "now-5m"
+})
+
+# Query Loki via Grafana
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"error\"",
+  limit: 50
+})
+
+# List alert rules
+grafana_list_alert_rules()
+grafana_get_alert_rule_by_uid({ uid: "alert-uid" })
+
+# Check incidents
+grafana_list_incidents({ status: "active" })
+```
+
+### 4. ArgoCD (GitOps) - `argocd_*`
+
+Manage GitOps deployments and verify sync status:
+
+```bash
+# List all applications
+argocd_list_applications()
+
+# Get application details (health, sync status)
+argocd_get_application({ applicationName: "cto-controller" })
+
+# Check application resources
+argocd_get_application_resource_tree({ applicationName: "cto-controller" })
+argocd_get_application_managed_resources({ applicationName: "cto-controller" })
+
+# Get application events
+argocd_get_application_events({ applicationName: "cto-controller" })
+
+# Trigger sync (use sparingly)
+argocd_sync_application({ applicationName: "cto-controller" })
+
+# Get workload logs via ArgoCD
+argocd_get_application_workload_logs({
+  applicationName: "cto-controller",
+  applicationNamespace: "argocd",
+  resourceRef: { kind: "Pod", name: "cto-controller-xxx", namespace: "cto" },
+  container: "controller"
+})
+```
+
+**Deployment Verification Flow:**
+1. `argocd_get_application` - Check sync status is "Synced" and health is "Healthy"
+2. `argocd_get_application_events` - Verify no errors in recent events
+3. `argocd_get_application_managed_resources` - Confirm all resources deployed
+
+### 5. Argo Workflows - `argo_workflows_*`
+
+Monitor and manage workflow executions:
+
+```bash
+# List workflows in namespace
+argo_workflows_list_workflows({ namespace: "cto", limit: 20 })
+
+# Get workflow details
+argo_workflows_get_workflow({ namespace: "cto", name: "workflow-name" })
+
+# Get workflow logs
+argo_workflows_get_workflow_logs({
+  namespace: "cto",
+  workflow_name: "workflow-name",
+  max_lines: 200
+})
+
+# List workflow templates
+argo_workflows_list_workflow_templates({ namespace: "cto" })
+
+# List cron workflows
+argo_workflows_list_cron_workflows({ namespace: "automation" })
+
+# Get cron workflow history
+argo_workflows_get_cron_history({
+  namespace: "automation",
+  name: "scheduled-workflow",
+  limit: 10
+})
+
+# Retry failed workflow
+argo_workflows_retry_workflow({ namespace: "cto", name: "failed-workflow" })
+```
+
+**Workflow Debugging:**
+- Check `status.phase` for Failed/Succeeded/Running
+- Review `status.nodes` for step-by-step execution
+- Get logs from specific pods for error details
+
+### 6. Kubernetes - `kubernetes_*`
+
+Direct cluster access when MCP tools aren't sufficient:
+
+```bash
+# Get pods
+kubernetes_pods_list({ namespace: "cto" })
+
+# Get pod logs
+kubernetes_pods_log({ namespace: "cto", name: "pod-name", tail: 100 })
+
+# Get events
+kubernetes_events_list({ namespace: "cto" })
+
+# Get any resource
+kubernetes_resources_get({ kind: "Deployment", namespace: "cto", name: "cto-controller" })
+```
+
+### 7. GitHub - `github_*`
+
+Repository and PR management:
+
+```bash
+# Create PR
+github_create_pull_request({ title: "fix: ...", body: "...", head: "branch", base: "main" })
+
+# Check PR status
+github_get_pull_request_status({ number: 123 })
+
+# Merge PR
+github_merge_pull_request({ number: 123, method: "squash" })
+
+# Issue management
+github_create_issue({ title: "...", body: "...", labels: ["bug"] })
+github_update_issue({ number: 456, state: "closed" })
+```
+
+### 8. CTO Platform - `cto_*`
+
+Platform-specific workflow control:
+
+- `cto_jobs` - List running/recent jobs
+- `cto_stop_job` - Stop a stuck job
+- `cto_play_status` - Check workflow status
+
+### 9. Context7 - `context7_*`
+
+Documentation lookup for Rust libraries:
+
+```bash
+# Resolve library ID first
+context7_resolve_library_id({ libraryName: "tokio rust" })
+
+# Then get docs
+context7_get_library_docs({
+  context7CompatibleLibraryID: "/websites/rs_tokio_tokio",
+  topic: "error handling"
+})
+```
+
+### 10. Firecrawl - `firecrawl_*`
+
+Web research for solutions:
+
+- `firecrawl_search` - Search the web for solutions
+- `firecrawl_scrape` - Read documentation pages
+
+---
+
+## Observability Debugging Workflow
+
+When investigating issues, follow this pattern:
+
+1. **Check Metrics First** (Prometheus)
+   ```bash
+   # Is the service up?
+   prometheus_execute_query({ query: "up{job=\"service-name\"}" })
+   # Any error spikes?
+   prometheus_execute_query({ query: "rate(errors_total[5m])" })
+   ```
+
+2. **Search Logs** (Loki)
+   ```bash
+   # Find errors
+   loki_query({ query: "{pod=~\"service.*\"} |~ \"error|panic|fatal\"", limit: 100 })
+   ```
+
+3. **Check Deployment** (ArgoCD)
+   ```bash
+   # Sync status?
+   argocd_get_application({ applicationName: "service-name" })
+   # Recent events?
+   argocd_get_application_events({ applicationName: "service-name" })
+   ```
+
+4. **Review Workflows** (Argo Workflows)
+   ```bash
+   # Any failed workflows?
+   argo_workflows_list_workflows({ namespace: "cto", status: "Failed" })
+   ```
 
 ### Phase 7: Cleanup
 ```bash

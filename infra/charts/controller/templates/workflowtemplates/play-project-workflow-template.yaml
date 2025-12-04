@@ -705,10 +705,74 @@ spec:
             exit 1
           fi
 
-          # Download dependency graph builder script
+          # Download dependency graph builder script using authenticated GitHub API
+          # (raw.githubusercontent.com doesn't work for private repositories)
           echo "📥 Fetching dependency graph builder..."
-          curl -sSL https://raw.githubusercontent.com/5dlabs/cto/main/scripts/build-dependency-graph.py \
-            -o /tmp/build-dependency-graph.py
+
+          # Build JWT and get installation token for 5dlabs/cto repository
+          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+            echo "🔐 Using authenticated GitHub API to fetch script..."
+            SCRIPT_KEY="/tmp/github-script-key.pem"
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$SCRIPT_KEY"
+            chmod 600 "$SCRIPT_KEY"
+
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            SCRIPT_JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || base64)
+            SCRIPT_JWT_HEADER=$(echo -n "$SCRIPT_JWT_HEADER" | tr '+/' '-_' | tr -d '=')
+            SCRIPT_JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
+            SCRIPT_JWT_PAYLOAD=$(echo -n "$SCRIPT_JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
+            SCRIPT_JWT_SIGNATURE=$(printf '%s.%s' "$SCRIPT_JWT_HEADER" "$SCRIPT_JWT_PAYLOAD" | openssl dgst -sha256 -sign "$SCRIPT_KEY" -binary | base64 -w 0 2>/dev/null || base64)
+            SCRIPT_JWT_SIGNATURE=$(echo -n "$SCRIPT_JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
+            SCRIPT_JWT_TOKEN="$SCRIPT_JWT_HEADER.$SCRIPT_JWT_PAYLOAD.$SCRIPT_JWT_SIGNATURE"
+
+            # Get installation ID for 5dlabs/cto repository
+            SCRIPT_INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/5dlabs/cto/installation" | jq -r '.id')
+
+            if [ -z "$SCRIPT_INSTALLATION_ID" ] || [ "$SCRIPT_INSTALLATION_ID" = "null" ]; then
+              echo "ℹ️ Repo installation not found, trying org installation"
+              SCRIPT_INSTALLATION_ID=$(curl -s -L \
+                -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/5dlabs/installation" | jq -r '.id')
+            fi
+
+            SCRIPT_TOKEN=""
+            if [ -n "$SCRIPT_INSTALLATION_ID" ] && [ "$SCRIPT_INSTALLATION_ID" != "null" ]; then
+              SCRIPT_TOKEN=$(curl -s -X POST \
+                -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/$SCRIPT_INSTALLATION_ID/access_tokens" | jq -r '.token')
+            fi
+
+            rm -f "$SCRIPT_KEY"
+
+            if [ -n "$SCRIPT_TOKEN" ] && [ "$SCRIPT_TOKEN" != "null" ]; then
+              # Fetch script content via GitHub API (returns base64 encoded content)
+              SCRIPT_CONTENT=$(curl -s -L \
+                -H "Authorization: Bearer $SCRIPT_TOKEN" \
+                -H "Accept: application/vnd.github.v3.raw" \
+                "https://api.github.com/repos/5dlabs/cto/contents/scripts/build-dependency-graph.py?ref=main")
+
+              if [ -n "$SCRIPT_CONTENT" ] && ! echo "$SCRIPT_CONTENT" | grep -q '"message".*"Not Found"'; then
+                echo "$SCRIPT_CONTENT" > /tmp/build-dependency-graph.py
+                echo "✅ Script downloaded via authenticated GitHub API"
+              else
+                echo "❌ Failed to download script via GitHub API"
+                exit 1
+              fi
+            else
+              echo "❌ Failed to obtain installation token for script download"
+              exit 1
+            fi
+          else
+            echo "❌ GitHub App credentials not available for authenticated script download"
+            exit 1
+          fi
+
           chmod +x /tmp/build-dependency-graph.py
 
           # Run dependency graph builder

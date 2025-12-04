@@ -32,6 +32,31 @@ spec:
     - template:
         name: resume-waiting-pr-created
         conditions: "pr-created-event"
+        parameters:
+          - src:
+              dependencyName: pr-created-event
+              dataKey: body.pull_request.number
+            dest: spec.arguments.parameters.0.value
+          - src:
+              dependencyName: pr-created-event
+              dataKey: body.pull_request.html_url
+            dest: spec.arguments.parameters.1.value
+          - src:
+              dependencyName: pr-created-event
+              dataKey: body.pull_request.head.ref
+            dest: spec.arguments.parameters.2.value
+          - src:
+              dependencyName: pr-created-event
+              dataKey: body.pull_request.title
+            dest: spec.arguments.parameters.3.value
+          - src:
+              dependencyName: pr-created-event
+              dataTemplate: "{{ .Input.body.pull_request.labels | toJson }}"
+            dest: spec.arguments.parameters.4.value
+          - src:
+              dependencyName: pr-created-event
+              dataKey: body.repository.full_name
+            dest: spec.arguments.parameters.5.value
         k8s:
           operation: create
           source:
@@ -53,6 +78,20 @@ spec:
                   secondsAfterFailure: 3600    # 1 hour
                 podGC:
                   strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - name: pr-number
+                      value: ""
+                    - name: pr-url
+                      value: ""
+                    - name: pr-branch
+                      value: ""
+                    - name: pr-title
+                      value: ""
+                    - name: pr-labels
+                      value: "[]"
+                    - name: repo-full
+                      value: ""
                 templates:
                   - name: resume-workflow
                     script:
@@ -117,27 +156,40 @@ spec:
                           kubectl patch workflow "$workflow_name" -n cto --type='merge' -p "$PATCH_JSON"
                         }
 
+                        # Extract workflow parameters (populated by Argo Events sensor)
+                        PR_NUMBER='{{workflow.parameters.pr-number}}'
+                        PR_URL='{{workflow.parameters.pr-url}}'
+                        PR_BRANCH='{{workflow.parameters.pr-branch}}'
+                        PR_TITLE='{{workflow.parameters.pr-title}}'
+                        PR_LABELS='{{workflow.parameters.pr-labels}}'
+                        REPO_FULL='{{workflow.parameters.repo-full}}'
+
+                        # Validate required parameters are present
+                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ] || [ "$PR_NUMBER" = "" ]; then
+                          echo "❌ ERROR: PR number not provided - parameters not interpolated correctly"
+                          exit 1
+                        fi
+
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-pr-created"
-                        echo "PR Number: {{ .Input.body.pull_request.number }}"
+                        echo "PR Number: $PR_NUMBER"
 
                         extract_task_id() {
                           echo "$1" | tr '[:upper:]' '[:lower:]' | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || true
                         }
 
                         TASK_ID=""
-                        TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
-                          TASK_ID=$(echo "$TASK_LABELS_JSON" |
+                        if [ "$PR_LABELS" != "null" ] && [ -n "$PR_LABELS" ] && [ "$PR_LABELS" != "[]" ]; then
+                          TASK_ID=$(echo "$PR_LABELS" |
                             jq -er '.[] | (.name // "") | ascii_downcase | capture("task[-_/ ]*(?<id>[0-9]+)") | .id' 2>/dev/null | head -1 || true)
                         fi
 
-                        if [ -z "$TASK_ID" ]; then
-                          TASK_ID=$(extract_task_id '{{ .Input.body.pull_request.head.ref }}')
+                        if [ -z "$TASK_ID" ] && [ -n "$PR_BRANCH" ] && [ "$PR_BRANCH" != "null" ]; then
+                          TASK_ID=$(extract_task_id "$PR_BRANCH")
                         fi
 
-                        if [ -z "$TASK_ID" ]; then
-                          TASK_ID=$(extract_task_id '{{ .Input.body.pull_request.title }}')
+                        if [ -z "$TASK_ID" ] && [ -n "$PR_TITLE" ] && [ "$PR_TITLE" != "null" ]; then
+                          TASK_ID=$(extract_task_id "$PR_TITLE")
                         fi
 
                         if [ -z "$TASK_ID" ]; then
@@ -148,7 +200,6 @@ spec:
                         echo "Task ID: $TASK_ID"
 
                         # Extract repository for precise correlation (critical for parallel batch execution)
-                        REPO_FULL='{{ .Input.body.repository.full_name }}'
                         REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
                         echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
 
@@ -186,8 +237,8 @@ spec:
 
                           # Update workflow parameters with PR details
                           if ! update_workflow_pr_metadata "$WORKFLOW_NAME" \
-                              "{{ .Input.body.pull_request.html_url }}" \
-                              "{{ .Input.body.pull_request.number }}"; then
+                              "$PR_URL" \
+                              "$PR_NUMBER"; then
                             echo "⚠️ Failed to update PR metadata on $WORKFLOW_NAME"
                             echo "   Workflow will continue polling GitHub API for PR"
                           else
