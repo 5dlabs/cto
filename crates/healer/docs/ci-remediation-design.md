@@ -2,22 +2,441 @@
 
 ## Overview
 
-Healer becomes the **single remediation hub** for all issues across the platform, replacing the separate remediation templates. It receives issues from multiple sources and routes them to the most appropriate specialist agent.
-
-### Architecture Consolidation
-
-| Before | After |
-|--------|-------|
-| Stitch (review) | **Stitch** (review) - KEEP |
-| Rex remediation templates | **Healer** routes to Rex |
-| Atlas PR Guardian / Bugbot resolution | **Healer** routes to Atlas |
-| Separate CI remediation sensor | **Healer** handles CI failures |
-| Manual security fixes | **Healer** routes to Cipher |
+Healer becomes the **single remediation hub** for all issues across the platform. It acts as an intelligent dispatcher with comprehensive tooling access to make informed routing decisions and provide maximum context to specialist agents.
 
 ### Key Principle
 
-- **Stitch** = Detection (finds issues, posts comments)
-- **Healer** = Remediation (fixes issues, tracks progress)
+- **Stitch** = Detection (finds issues, posts review comments)
+- **Healer** = Remediation (analyzes, routes, tracks, enriches context)
+- **Specialist Agents** = Execution (Rex, Blaze, Bolt, Cipher, Atlas)
+
+---
+
+## Current State vs Desired State
+
+### Current State Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            CURRENT STATE                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  DETECTION                    REMEDIATION                   EXECUTION         │
+│  ─────────                    ───────────                   ─────────         │
+│                                                                               │
+│  ┌─────────┐                 ┌──────────────────┐          ┌─────────┐       │
+│  │ Stitch  │──PR Review───▶  │ templates/       │────────▶ │   Rex   │       │
+│  │ (Review)│                 │ remediate/       │          │(direct) │       │
+│  └─────────┘                 │ *.hbs            │          └─────────┘       │
+│                              └──────────────────┘                             │
+│                                                                               │
+│  ┌─────────┐                 ┌──────────────────┐          ┌─────────┐       │
+│  │ CI      │──Workflow───▶   │ ci-remediation-  │────────▶ │  Atlas  │       │
+│  │ Failures│  Failure        │ sensor.yaml      │          │(direct) │       │
+│  └─────────┘                 │ (creates CodeRun)│          └─────────┘       │
+│                              └──────────────────┘                             │
+│                                                                               │
+│  ┌─────────┐                 ┌──────────────────┐          ┌─────────┐       │
+│  │ Bugbot  │──Comment────▶   │ Atlas PR Guardian│────────▶ │  Atlas  │       │
+│  │(Cursor) │                 │ (values.yaml)    │          │(direct) │       │
+│  └─────────┘                 └──────────────────┘                             │
+│                                                                               │
+│  ┌─────────┐                                               ┌─────────┐       │
+│  │Security │──Manual────────────────────────────────────▶  │ Manual  │       │
+│  │ Alerts  │                                               │  Fixes  │       │
+│  └─────────┘                                               └─────────┘       │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Current State Components
+
+| Component | Location | Purpose | Issues |
+|-----------|----------|---------|--------|
+| **Stitch (Review)** | `templates/review/` | PR code review & bug detection | ✅ KEEP - Works well |
+| **Rex Remediation** | `templates/remediate/` | Fixes Stitch findings | ❌ REMOVE - Healer takes over |
+| **CI Sensor** | `infra/gitops/resources/sensors/ci-failure-remediation-sensor.yaml` | Creates Atlas CodeRun on CI failure | ❌ MODIFY - Route through Healer |
+| **Atlas PR Guardian** | `infra/charts/controller/values.yaml` (atlas.guardianMode) | Bugbot resolution, merge conflicts | ❌ ABSORB into Healer routing |
+| **Bugbot** | External (Cursor) | Code review comments | ❌ REPLACE with Stitch |
+| **Security Remediation** | None | Manual process | ❌ ADD - Healer routes to Cipher |
+
+### Current Flow Problems
+
+1. **No intelligent routing** - Atlas handles all CI failures regardless of type
+2. **No central tracking** - Remediation attempts are scattered, no correlation
+3. **No deduplication** - Multiple failures can spawn duplicate fix attempts
+4. **No learning** - Insights from fixes aren't captured or used
+5. **Limited context** - Agents get minimal diagnostic information
+6. **Multiple entry points** - Different templates for different sources
+7. **External dependency** - Bugbot is outside our control
+
+---
+
+### Desired State Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            DESIRED STATE                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  DETECTION              INTELLIGENT HUB                EXECUTION              │
+│  ─────────              ───────────────                ─────────              │
+│                                                                               │
+│  ┌─────────┐                                          ┌─────────┐            │
+│  │ Stitch  │────┐                                ┌───▶│   Rex   │            │
+│  │ (Review)│    │                                │    │ (Rust)  │            │
+│  └─────────┘    │                                │    └─────────┘            │
+│                 │                                │                            │
+│  ┌─────────┐    │    ┌──────────────────────┐   │    ┌─────────┐            │
+│  │   CI    │────┼───▶│                      │───┼───▶│  Blaze  │            │
+│  │ Failures│    │    │        HEALER        │   │    │(Frontend)│           │
+│  └─────────┘    │    │                      │   │    └─────────┘            │
+│                 │    │  ┌────────────────┐  │   │                            │
+│  ┌─────────┐    │    │  │   TOOLING      │  │   │    ┌─────────┐            │
+│  │ Security│────┼───▶│  │ • ArgoCD API   │  │───┼───▶│  Bolt   │            │
+│  │ Alerts  │    │    │  │ • Prometheus   │  │   │    │(Infra)  │            │
+│  └─────────┘    │    │  │ • Loki Logs    │  │   │    └─────────┘            │
+│                 │    │  │ • GitHub API   │  │   │                            │
+│  ┌─────────┐    │    │  │ • Kubernetes   │  │   │    ┌─────────┐            │
+│  │  Play   │────┘    │  └────────────────┘  │───┼───▶│ Cipher  │            │
+│  │Workflow │         │                      │   │    │(Security)│           │
+│  └─────────┘         │  • Smart Routing     │   │    └─────────┘            │
+│                      │  • Deduplication     │   │                            │
+│                      │  • Context Enrichment│   │    ┌─────────┐            │
+│                      │  • Tracking/Insights │   └───▶│  Atlas  │            │
+│                      │                      │        │(Git/GH) │            │
+│                      └──────────────────────┘        └─────────┘            │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Desired State Components
+
+| Component | Location | Purpose | Status |
+|-----------|----------|---------|--------|
+| **Stitch (Review)** | `templates/review/` | PR code review & bug detection | ✅ KEEP unchanged |
+| **Healer Hub** | `crates/healer/src/ci/` | Central remediation router | 🆕 NEW |
+| **Healer HTTP API** | `crates/healer/src/server.rs` | Receive events from sensors | 🆕 NEW |
+| **CI Sensor** | Modified to call Healer API | Routes through Healer | 🔄 MODIFY |
+| **Agent Prompts** | `crates/healer/prompts/ci/` | Agent-specific fix prompts | 🆕 NEW |
+
+### Files to Remove
+
+| Path | Reason |
+|------|--------|
+| `templates/remediate/claude/` | Healer takes over routing |
+| `templates/remediate/factory/` | Healer takes over routing |
+| `infra/charts/controller/agent-templates/remediate/` | Duplicated in Healer |
+
+### Files to Modify
+
+| Path | Change |
+|------|--------|
+| `infra/gitops/resources/sensors/ci-failure-remediation-sensor.yaml` | Call Healer HTTP API instead of creating CodeRun directly |
+| `infra/charts/controller/values.yaml` | Remove Atlas `guardianMode` (Healer handles) |
+
+---
+
+## Healer Comprehensive Tooling
+
+Healer needs access to the full platform observability stack to make intelligent routing decisions and enrich the context provided to specialist agents.
+
+### Tool Categories
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         HEALER TOOLING STACK                                │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        GitOps & Deployment                           │   │
+│  │  • ArgoCD API: App status, sync state, health, resource tree        │   │
+│  │  • Argo Workflows: Workflow status, logs, retry                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        Telemetry & Logs                              │   │
+│  │  • Prometheus: Metrics, error rates, resource usage                 │   │
+│  │  • Loki: Application logs, workflow logs, container logs            │   │
+│  │  • Grafana: Dashboard queries, alert state                          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        GitHub & Code                                 │   │
+│  │  • GitHub CLI: PR state, CI checks, workflow logs, file diffs       │   │
+│  │  • GitHub API: Reviews, comments, labels, commit history            │   │
+│  │  • Code Analysis: Changed files, file types, patterns               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        Kubernetes                                    │   │
+│  │  • kubectl: Pod state, events, logs, ConfigMaps, CodeRuns           │   │
+│  │  • K8s API: Watch resources, list deployments, check health         │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Tool Usage by Phase
+
+#### Phase 1: Event Receipt & Validation
+
+```rust
+// When Healer receives a CI failure event
+async fn handle_ci_failure(&self, event: CiFailureEvent) -> Result<RemediationResponse> {
+    // 1. Validate event
+    if !self.should_process(&event) {
+        return Ok(RemediationResponse::skipped("already handled"));
+    }
+    
+    // 2. Check for existing remediation (deduplication)
+    if self.has_active_coderun_for(&event.workflow_run_id).await? {
+        return Ok(RemediationResponse::skipped("existing remediation"));
+    }
+    
+    // 3. Gather comprehensive context
+    let context = self.gather_context(&event).await?;
+    
+    // 4. Route to appropriate agent
+    let agent = self.route_to_agent(&context);
+    
+    // 5. Spawn enriched CodeRun
+    let coderun = self.spawn_coderun(agent, &context).await?;
+    
+    Ok(RemediationResponse::accepted(coderun))
+}
+```
+
+#### Phase 2: Context Gathering (The Intelligence)
+
+```rust
+async fn gather_context(&self, event: &CiFailureEvent) -> Result<RemediationContext> {
+    // Parallel fetch from all sources
+    let (
+        gh_workflow_logs,
+        gh_pr_state,
+        gh_changed_files,
+        argocd_app_status,
+        loki_recent_logs,
+        k8s_pod_state,
+        prometheus_error_rate,
+    ) = tokio::try_join!(
+        // GitHub: Workflow logs, PR state, changed files
+        self.github.get_workflow_logs(&event.workflow_run_id),
+        self.github.get_pr_for_branch(&event.branch),
+        self.github.get_changed_files(&event.head_sha),
+        
+        // ArgoCD: Is there an app out of sync? Health issues?
+        self.argocd.get_app_status("cto-controller"),
+        
+        // Loki: Recent error logs from related pods
+        self.loki.query_errors(&event.branch, Duration::minutes(30)),
+        
+        // Kubernetes: Pod state, events
+        self.k8s.get_related_pods(&event.workflow_name),
+        
+        // Prometheus: Error rate spike? Resource issues?
+        self.prometheus.query_error_rate(&event.workflow_name),
+    )?;
+    
+    Ok(RemediationContext {
+        event: event.clone(),
+        workflow_logs: gh_workflow_logs,
+        pr: gh_pr_state,
+        changed_files: gh_changed_files,
+        argocd_status: argocd_app_status,
+        recent_logs: loki_recent_logs,
+        pod_state: k8s_pod_state,
+        metrics: prometheus_error_rate,
+        failure_type: self.classify_failure(&gh_workflow_logs),
+    })
+}
+```
+
+#### Phase 3: Intelligent Routing
+
+```rust
+fn route_to_agent(&self, ctx: &RemediationContext) -> Agent {
+    // Priority order - first match wins
+    
+    // 1. Security events always go to Cipher
+    if ctx.is_security_event() {
+        return Agent::Cipher;
+    }
+    
+    // 2. Rust failures go to Rex
+    if ctx.failure_type.is_rust() || ctx.changed_files.mostly_rust() {
+        return Agent::Rex;
+    }
+    
+    // 3. Frontend failures go to Blaze
+    if ctx.failure_type.is_frontend() || ctx.changed_files.mostly_frontend() {
+        return Agent::Blaze;
+    }
+    
+    // 4. Infrastructure failures go to Bolt
+    if ctx.failure_type.is_infra() || ctx.changed_files.mostly_infra() {
+        return Agent::Bolt;
+    }
+    
+    // 5. ArgoCD sync issues go to Bolt (has ArgoCD tooling)
+    if ctx.argocd_status.is_out_of_sync() || ctx.argocd_status.has_health_issues() {
+        return Agent::Bolt;
+    }
+    
+    // 6. Merge conflicts go to Atlas
+    if ctx.failure_type.is_merge_conflict() {
+        return Agent::Atlas;
+    }
+    
+    // 7. Default: Atlas handles everything else
+    Agent::Atlas
+}
+```
+
+#### Phase 4: Enriched CodeRun Creation
+
+```rust
+fn spawn_coderun(&self, agent: Agent, ctx: &RemediationContext) -> Result<CodeRun> {
+    // Build comprehensive prompt with all gathered context
+    let prompt = self.template_engine.render(
+        &format!("ci/{}-fix.hbs", agent.name()),
+        &json!({
+            // Basic failure info
+            "workflow_name": ctx.event.workflow_name,
+            "workflow_url": ctx.event.workflow_url,
+            "branch": ctx.event.branch,
+            "commit_sha": ctx.event.head_sha,
+            "commit_message": ctx.event.commit_message,
+            
+            // GitHub context
+            "workflow_logs": ctx.workflow_logs,
+            "pr_number": ctx.pr.as_ref().map(|p| p.number),
+            "pr_title": ctx.pr.as_ref().map(|p| &p.title),
+            "changed_files": ctx.changed_files,
+            "file_diff_summary": ctx.summarize_diff(),
+            
+            // ArgoCD context (for Bolt especially)
+            "argocd_app_status": ctx.argocd_status.health,
+            "argocd_sync_status": ctx.argocd_status.sync,
+            "argocd_resources_unhealthy": ctx.argocd_status.unhealthy_resources(),
+            
+            // Telemetry context
+            "recent_error_logs": ctx.recent_logs.take(50),
+            "error_rate_spike": ctx.metrics.has_spike(),
+            
+            // Kubernetes context
+            "related_pods": ctx.pod_state.names(),
+            "pod_events": ctx.pod_state.recent_events(),
+            
+            // Classification
+            "failure_type": ctx.failure_type.name(),
+            "failure_category": ctx.failure_type.category(),
+            "suggested_fix_approach": ctx.failure_type.fix_approach(),
+        }),
+    )?;
+
+    // Create CodeRun with full context
+    let coderun = CodeRun {
+        metadata: ObjectMeta {
+            generate_name: Some(format!("healer-ci-{}-", agent.name())),
+            namespace: Some("cto".into()),
+            labels: Some(btreemap! {
+                "app.kubernetes.io/name" => "healer",
+                "healer/agent" => agent.name(),
+                "healer/failure-type" => ctx.failure_type.name(),
+                "healer/workflow-run-id" => ctx.event.workflow_run_id.to_string(),
+                "healer/branch" => &ctx.event.branch,
+            }),
+            ..Default::default()
+        },
+        spec: CodeRunSpec {
+            github_app: agent.github_app(),
+            cli: "Claude".into(),
+            model: agent.model(),
+            repository_url: "https://github.com/5dlabs/cto".into(),
+            prompt: Some(prompt),
+            env: vec![
+                EnvVar::new("HEALER_TASK_ID", ctx.task_id()),
+                EnvVar::new("FAILURE_TYPE", ctx.failure_type.name()),
+                EnvVar::new("WORKFLOW_RUN_ID", ctx.event.workflow_run_id),
+                EnvVar::new("PR_NUMBER", ctx.pr.as_ref().map(|p| p.number).unwrap_or(0)),
+            ],
+            ..Default::default()
+        },
+    };
+
+    self.k8s.create_coderun(coderun).await
+}
+```
+
+### Tool Access Configuration
+
+```yaml
+# Healer deployment with all required tool access
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healer
+  namespace: cto
+spec:
+  template:
+    spec:
+      serviceAccountName: healer  # Needs K8s permissions
+      containers:
+        - name: healer
+          image: ghcr.io/5dlabs/healer:latest
+          env:
+            # GitHub
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: healer-github
+                  key: app-id
+            - name: GITHUB_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: healer-github
+                  key: private-key
+            
+            # ArgoCD
+            - name: ARGOCD_SERVER
+              value: "argocd-server.argocd.svc:443"
+            - name: ARGOCD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: healer-argocd
+                  key: token
+            
+            # Prometheus
+            - name: PROMETHEUS_URL
+              value: "http://prometheus-server.observability.svc:80"
+            
+            # Loki
+            - name: LOKI_URL
+              value: "http://loki-gateway.observability.svc:80"
+            
+            # Grafana (optional - for dashboard queries)
+            - name: GRAFANA_URL
+              value: "http://grafana.observability.svc:80"
+            - name: GRAFANA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: healer-grafana
+                  key: token
+```
+
+### MCP Tools Available to Healer
+
+Healer should have access to these MCP server tools:
+
+| MCP Server | Tools | Use Case |
+|------------|-------|----------|
+| **argocd** | `list_applications`, `get_application`, `sync_application`, `get_application_events` | Check deployment state, sync status |
+| **prometheus** | `execute_query`, `execute_range_query`, `list_metrics` | Error rates, resource usage |
+| **loki** | `query`, `label_names`, `label_values` | Application logs, error patterns |
+| **grafana** | `search_dashboards`, `query_prometheus`, `query_loki_logs` | Dashboard data, alert state |
+| **github** | Via `gh` CLI | PR state, workflow logs, changed files |
 
 ---
 
@@ -29,8 +448,8 @@ Healer receives issues from multiple detection sources:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        DETECTION LAYER                              │
 ├─────────────┬─────────────┬─────────────┬─────────────┬────────────┤
-│   Stitch    │  CI Checks  │   GitHub    │  Security   │   Play     │
-│  (Review)   │ (Workflows) │  (Bugbot?)  │   Alerts    │  Workflow  │
+│   Stitch    │  CI Checks  │  Security   │   Play      │  Manual    │
+│  (Review)   │ (Workflows) │   Alerts    │  Workflow   │ Commands   │
 └──────┬──────┴──────┬──────┴──────┬──────┴──────┬──────┴─────┬──────┘
        │             │             │             │            │
        └─────────────┴─────────────┴─────────────┴────────────┘
@@ -53,49 +472,22 @@ Healer receives issues from multiple detection sources:
 
 | Source | Trigger | Event Type | Notes |
 |--------|---------|------------|-------|
-| **Stitch** | PR review posted | `issue_comment`, `pull_request_review` | Our review bot |
-| **CI Checks** | Workflow failure | `workflow_job`, `check_run` | GitHub Actions |
-| **Bugbot** | Comment posted | `issue_comment` | Cursor's bot (consider replacing with Stitch) |
-| **Security** | Alert created | `dependabot_alert`, `code_scanning_alert` | GitHub Security |
-| **Play** | Stage failure | Internal event | Play workflow monitoring |
+| **Stitch** | PR review posted | `pull_request_review`, `check_run` action button | Our review bot - posts findings, creates check run with "Remediate" button |
+| **CI Checks** | Workflow failure | `workflow_job`, `check_run` | GitHub Actions workflow failures |
+| **Security** | Alert created | `dependabot_alert`, `code_scanning_alert`, `secret_scanning_alert` | GitHub Security features |
+| **Play** | Stage failure | Internal event | Play workflow monitoring (existing Healer feature) |
+| **Manual** | Comment command | `issue_comment` | `/healer fix`, `/healer retry` commands |
 
-### Bugbot Consideration
-
-**Option A: Keep Bugbot as external trigger**
-- Healer watches for `@bugbot` comments
-- Routes findings to appropriate agent
-- Simpler, leverages existing Cursor integration
-
-**Option B: Replace Bugbot with Stitch**
-- Stitch already does code review
-- Remove dependency on external service
-- Unified detection in our control
-- Healer only needs to watch Stitch comments
-
-**Recommendation**: Option B - Stitch already provides superior review capabilities. We can deprecate Bugbot dependency and have Stitch be the sole PR review mechanism.
-
----
-
-## Current State
-
-The `ci-remediation-sensor` directly creates `CodeRun` resources with Atlas whenever a GitHub Actions workflow fails:
+### Stitch → Healer Flow
 
 ```
-GitHub CI Failure → Argo Sensor → CodeRun (Atlas)
-```
-
-**Problems:**
-- No intelligent routing - Atlas handles everything
-- No deduplication - multiple failures can spawn duplicate fixes
-- No tracking - remediation attempts aren't correlated
-- No learning - insights from fixes aren't captured
-
-## Proposed State
-
-Healer receives all CI failure events, analyzes them, and routes to the appropriate specialist:
-
-```
-GitHub CI Failure → Argo Sensor → Healer → CodeRun (Rex/Blaze/Bolt/Atlas)
+1. PR opened/synchronized
+2. Stitch reviews code, posts findings as PR review
+3. Stitch creates check run with "Remediate with Rex" button
+4. User clicks button → `check_run.requested_action` event
+5. Healer receives event, analyzes findings
+6. Healer routes to appropriate agent (usually Rex for Stitch findings)
+7. Agent fixes issues, pushes to PR
 ```
 
 ---
