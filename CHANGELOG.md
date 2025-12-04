@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.38](https://github.com/5dlabs/cto/compare/v0.12.37...v0.12.38) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* enhance Handlebars helpers and improve CI router logic ([c68a12e](https://github.com/5dlabs/cto/commit/c68a12e72940994fd728312b76da537f7f5e46c0))
+
+
+### 🔧 Maintenance
+
+* remove deprecated templates for coding and GitHub guidelines, agent configurations, and container scripts ([1bd84ce](https://github.com/5dlabs/cto/commit/1bd84ce97d54e1a749b4a7a321aa1be7f2024305))
+* remove deprecated templates for coding and GitHub guidelines, agent configurations, and container scripts ([feb899a](https://github.com/5dlabs/cto/commit/feb899a18d884374c073743bd92deb77254b5ef7))
+
 ## [0.12.37](https://github.com/5dlabs/cto/compare/v0.12.36...v0.12.37) (2025-12-04)
 
 
