@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.34](https://github.com/5dlabs/cto/compare/v0.12.33...v0.12.34) (2025-12-04)
+
+
+### ✨ Features
+
+* **healer:** add play orchestration module for tracking parallel tasks ([#2684](https://github.com/5dlabs/cto/issues/2684)) ([0453eca](https://github.com/5dlabs/cto/commit/0453ecacb52e5bb47f937358a1449f48ebf72542))
+
 ## [0.12.33](https://github.com/5dlabs/cto/compare/v0.12.32...v0.12.33) (2025-12-04)
 
 
