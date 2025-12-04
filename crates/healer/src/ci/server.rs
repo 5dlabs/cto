@@ -296,22 +296,7 @@ async fn security_alert_handler(
     info!("Received security alert event");
 
     // Parse the security alert
-    let alert = match parse_security_alert(&request) {
-        Some(a) => a,
-        None => {
-            warn!("Could not parse security alert event");
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(CiFailureResponse {
-                    status: ResponseStatus::Failed,
-                    coderun_name: None,
-                    agent: None,
-                    failure_type: None,
-                    reason: Some("Could not parse security alert".to_string()),
-                }),
-            );
-        }
-    };
+    let alert = parse_security_alert(&request);
 
     // Security alerts always go to Cipher
     let agent = super::types::Agent::Cipher;
@@ -422,7 +407,7 @@ fn parse_ci_failure(event: &serde_json::Value) -> Option<CiFailure> {
 }
 
 /// Parse a security alert from webhook event.
-fn parse_security_alert(event: &serde_json::Value) -> Option<super::types::SecurityAlert> {
+fn parse_security_alert(event: &serde_json::Value) -> super::types::SecurityAlert {
     use chrono::Utc;
 
     // Get alert type from GitHub event header
@@ -495,7 +480,7 @@ fn parse_security_alert(event: &serde_json::Value) -> Option<super::types::Secur
         .unwrap_or("https://github.com")
         .to_string();
 
-    Some(super::types::SecurityAlert {
+    super::types::SecurityAlert {
         alert_type,
         severity,
         cve_id,
@@ -505,7 +490,7 @@ fn parse_security_alert(event: &serde_json::Value) -> Option<super::types::Secur
         branch: None,
         html_url,
         detected_at: Utc::now(),
-    })
+    }
 }
 
 /// Check if we should process this failure.
