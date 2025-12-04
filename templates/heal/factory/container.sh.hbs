@@ -384,8 +384,70 @@ echo "   - mcp_tools_grafana_*"
 # ============================================================================
 ATTEMPT=1
 SUCCESS=0
-COMPLETION_LAST_MESSAGE="/tmp/heal-completion-last.txt"
-COMPLETION_LOG="/tmp/heal-completion.log"
+
+# Create persistent log directory using CODERUN_NAME to avoid collisions
+PERSISTENT_LOG_DIR="/workspace/completion/${CODERUN_NAME:-unknown}"
+mkdir -p "${PERSISTENT_LOG_DIR}"
+
+# Store completion state on persistent PVC (not /tmp which is ephemeral)
+COMPLETION_LAST_MESSAGE="${PERSISTENT_LOG_DIR}/last-message.txt"
+COMPLETION_LOG="${PERSISTENT_LOG_DIR}/completion.log"
+AGENT_OUTPUT_LOG="${PERSISTENT_LOG_DIR}/agent-output.log"
+
+echo "📁 Persistent logs: ${PERSISTENT_LOG_DIR}"
+
+# ============================================================================
+# SIGTERM HANDLER - Flush logs on termination
+# ============================================================================
+# This ensures logs are persisted even if pod is terminated mid-execution
+flush_logs_and_exit() {
+    EXIT_CODE="${1:-130}"  # 130 = SIGTERM
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ ⚠️ SIGTERM RECEIVED - Flushing state before exit            ║"
+    echo "════════════════════════════════════════════════════════════════"
+
+    # Record termination timestamp
+    TERM_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    echo "Terminated at: ${TERM_TIME}"
+
+    # Save current state to persistent storage
+    {
+        echo "=== TERMINATION RECORD ==="
+        echo "Time: ${TERM_TIME}"
+        echo "Exit Code: ${EXIT_CODE}"
+        echo "Iteration: ${ATTEMPT:-1}"
+        echo "CodeRun: ${CODERUN_NAME:-unknown}"
+        echo "Issue: ${HEAL_ISSUE_NUMBER:-unknown}"
+        echo ""
+        echo "=== LAST KNOWN STATE ==="
+        if [ -f "${COMPLETION_LAST_MESSAGE}" ]; then
+            cat "${COMPLETION_LAST_MESSAGE}"
+        else
+            echo "No completion state recorded"
+        fi
+        echo ""
+        echo "=== ENVIRONMENT ==="
+        echo "WORKTREE_PATH: ${WORKTREE_PATH:-not set}"
+        echo "REPO_PATH: ${REPO_PATH:-not set}"
+        echo "PR_NUMBER: ${PR_NUMBER:-not found}"
+    } >> "${PERSISTENT_LOG_DIR}/termination.log" 2>/dev/null || true
+
+    # Flush any pending writes
+    sync 2>/dev/null || true
+
+    echo "✅ State flushed to ${PERSISTENT_LOG_DIR}"
+
+    {{#if enable_docker}}
+    # Stop Docker sidecar
+    stop_docker_sidecar || true
+    {{/if}}
+
+    exit "${EXIT_CODE}"
+}
+
+# Install SIGTERM handler (also catches SIGINT for interactive testing)
+trap 'flush_logs_and_exit 130' TERM INT
 
 echo ""
 echo "═══ STARTING REMEDIATION (iterating until acceptance criteria met) ═══"
