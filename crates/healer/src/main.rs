@@ -337,8 +337,8 @@ enum Commands {
         /// Path to issue file (legacy - use --issue-number instead)
         #[arg(long)]
         issue_file: Option<String>,
-        /// Path to heal-config.json
-        #[arg(long, default_value = "/app/heal-config.json")]
+        /// Path to healer-config.json
+        #[arg(long, default_value = "/app/healer-config.json")]
         config: String,
     },
     /// [ALERTS] Fetch all logs for a pod (current, previous, events, describe)
@@ -626,11 +626,11 @@ fn default_sync_timeout() -> u64 {
     300
 }
 
-/// Heal configuration for spawning remediation `CodeRuns`.
-/// Loaded from `heal-config.json` - maps directly to `CodeRun` CRD fields.
+/// Healer configuration for spawning remediation `CodeRuns`.
+/// Loaded from `healer-config.json` - maps directly to `CodeRun` CRD fields.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HealConfig {
+struct HealerConfig {
     coderun: CodeRunConfig,
 }
 
@@ -686,7 +686,7 @@ struct CliSettings {
     template: String,
 }
 
-impl Default for HealConfig {
+impl Default for HealerConfig {
     fn default() -> Self {
         Self {
             coderun: CodeRunConfig {
@@ -698,7 +698,7 @@ impl Default for HealConfig {
                 docs_project_directory: "docs".to_string(),
                 docs_branch: "main".to_string(),
                 working_directory: ".".to_string(),
-                service: "heal".to_string(),
+                service: "healer".to_string(),
                 run_type: "implementation".to_string(),
                 enable_docker: true,
                 remote_tools: "mcp_tools_github_*,mcp_tools_kubernetes_*".to_string(),
@@ -707,7 +707,7 @@ impl Default for HealConfig {
                     cli_type: "claude".to_string(),
                     model: "claude-opus-4-5-20251101".to_string(),
                     settings: CliSettings {
-                        template: "heal/claude".to_string(),
+                        template: "healer/claude".to_string(),
                     },
                 },
             },
@@ -751,12 +751,12 @@ struct FailureContext {
 /// Returns the name of the created `CodeRun`
 ///
 /// The `CodeRun` is created with:
-/// - Name prefix: `heal-remediation-` (for controller naming detection)
-/// - Label: `agents.platform/type: heal-remediation` (for controller detection)
-/// - Service: `heal` (for PVC sharing with heal deployment)
+/// - Name prefix: `healer-remediation-` (for controller naming detection)
+/// - Label: `agents.platform/type: healer-remediation` (for controller detection)
+/// - Service: `healer` (for PVC sharing with healer deployment)
 ///
-/// This ensures the remediation pod shares the `heal-workspace` PVC with the
-/// heal monitor deployment, allowing access to prompts and logs.
+/// This ensures the remediation pod shares the `healer-workspace` PVC with the
+/// healer monitor deployment, allowing access to prompts and logs.
 fn trigger_remediation(
     config: &RemediationConfig,
     failure: &FailureContext,
@@ -765,8 +765,8 @@ fn trigger_remediation(
     namespace: &str,
 ) -> Result<String> {
     let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
-    // Use heal-remediation- prefix for controller detection and naming
-    let coderun_name = format!("heal-remediation-t{task_id}-i{iteration}-{uid}");
+    // Use healer-remediation- prefix for controller detection and naming
+    let coderun_name = format!("healer-remediation-t{task_id}-i{iteration}-{uid}");
 
     // Serialize failure context to JSON for the agent
     let failure_json =
@@ -781,20 +781,20 @@ fn trigger_remediation(
     let docs_repository_url = format!("https://github.com/{docs_repo}");
     let docs_dir = config.docs_project_directory.as_deref().unwrap_or("docs");
 
-    // Ensure template starts with "heal/" for controller PVC detection
-    // If config template doesn't start with heal/, prepend it
-    let template = if config.template.starts_with("heal/") {
+    // Ensure template starts with "healer/" for controller PVC detection
+    // If config template doesn't start with healer/, prepend it
+    let template = if config.template.starts_with("healer/") {
         config.template.clone()
     } else {
-        format!("heal/{}", config.template)
+        format!("healer/{}", config.template)
     };
 
     // Create CodeRun YAML manifest
     // Uses correct CRD schema: repositoryUrl, cliConfig, env as map
-    // Key fields for heal PVC sharing:
-    // - Label: agents.platform/type: heal-remediation
-    // - Service: heal (triggers controller's is_heal detection)
-    // - Template: heal/... (also triggers is_heal detection)
+    // Key fields for healer PVC sharing:
+    // - Label: agents.platform/type: healer-remediation
+    // - Service: healer (triggers controller's is_healer detection)
+    // - Template: healer/... (also triggers is_healer detection)
     let coderun_yaml = format!(
         r#"apiVersion: agents.platform/v1
 kind: CodeRun
@@ -805,7 +805,7 @@ metadata:
     task-id: "{task_id}"
     remediation: "true"
     iteration: "{iteration}"
-    agents.platform/type: heal-remediation
+    agents.platform/type: healer-remediation
 spec:
   taskId: {task_id}
   githubApp: "{agent}"
@@ -814,7 +814,7 @@ spec:
   docsRepositoryUrl: "{docs_repository_url}"
   docsProjectDirectory: "{docs_dir}"
   workingDirectory: "."
-  service: "heal"
+  service: "healer"
   cliConfig:
     cliType: "{cli}"
     model: "{model}"
@@ -5802,7 +5802,7 @@ fn spawn_remediation_agent(
     println!("{}", "═".repeat(60).cyan());
 
     // Load heal config (fall back to defaults if not found)
-    let config = load_heal_config(config_path);
+    let config = load_healer_config(config_path);
 
     // Check for existing remediation (deduplication)
     if let Some(pod_name) = target_pod {
@@ -5897,10 +5897,10 @@ fn spawn_remediation_agent(
     }
 
     // Generate unique CodeRun name with new naming pattern:
-    // heal-remediation-task{task_id}-{alert_type}-{alert_id}
+    // healer-remediation-task{task_id}-{alert_type}-{alert_id}
     let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
     let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
-    let coderun_name = format!("heal-remediation-task{task_id}-{alert}-{uid}");
+    let coderun_name = format!("healer-remediation-task{task_id}-{alert}-{uid}");
 
     println!("{}", format!("🏷️  CodeRun name: {coderun_name}").dimmed());
     println!("{}", format!("⏰ Timestamp: {timestamp}").dimmed());
@@ -5932,7 +5932,7 @@ fn spawn_remediation_agent(
 }
 
 /// Load heal configuration from file, falling back to defaults if not found.
-fn load_heal_config(config_path: &str) -> HealConfig {
+fn load_healer_config(config_path: &str) -> HealerConfig {
     match std::fs::read_to_string(config_path) {
         Ok(content) => match serde_json::from_str(&content) {
             Ok(config) => config,
@@ -5941,12 +5941,12 @@ fn load_heal_config(config_path: &str) -> HealConfig {
                     "{}",
                     format!("⚠️  Config parse error, using defaults: {e}").yellow()
                 );
-                HealConfig::default()
+                HealerConfig::default()
             }
         },
         Err(_) => {
             // Config file not found - use defaults silently
-            HealConfig::default()
+            HealerConfig::default()
         }
     }
 }
@@ -5964,7 +5964,7 @@ fn build_coderun_yaml(
     issue_number: Option<u64>,
     issue_dir: Option<&str>,
     acceptance_file: Option<&str>,
-    config: &HealConfig,
+    config: &HealerConfig,
 ) -> String {
     // Hash task_id to numeric (CodeRun requires integer taskId)
     let task_id_numeric: u32 = task_id.bytes().fold(0u32, |acc, b| {
@@ -6021,7 +6021,7 @@ metadata:
     task-id: "{task_id}"
     remediation: "true"
     created-at: "{timestamp}"
-    agents.platform/type: heal-remediation
+    agents.platform/type: healer-remediation
 {target_pod_label}{issue_number_label}spec:
   taskId: {task_id_numeric}
   runType: "{run_type}"

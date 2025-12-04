@@ -1,24 +1,24 @@
 ---
-# Heal ServiceAccount
+# Healer ServiceAccount
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: heal
+  name: healer
   namespace: cto
   labels:
-    app.kubernetes.io/name: heal
+    app.kubernetes.io/name: healer
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/component: monitor
 
 ---
-# Heal Role - permissions within cto namespace
+# Healer Role - permissions within cto namespace
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: heal
+  name: healer
   namespace: cto
   labels:
-    app.kubernetes.io/name: heal
+    app.kubernetes.io/name: healer
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/component: monitor
 rules:
@@ -53,22 +53,22 @@ rules:
     verbs: ["get", "list", "watch"]
 
 ---
-# Heal RoleBinding
+# Healer RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: heal
+  name: healer
   namespace: cto
   labels:
-    app.kubernetes.io/name: heal
+    app.kubernetes.io/name: healer
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/component: monitor
 subjects:
   - kind: ServiceAccount
-    name: heal
+    name: healer
     namespace: cto
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: heal
+  name: healer
 

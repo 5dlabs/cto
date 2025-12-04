@@ -59,7 +59,7 @@ impl<'a> CodeResourceManager<'a> {
         let service_name = &code_run_ref.spec.service;
         let classifier = AgentClassifier::new();
 
-        // Check if this is a heal CodeRun (Remediation)
+        // Check if this is a healer CodeRun (Remediation)
         let template_setting = code_run_ref
             .spec
             .cli_config
@@ -67,18 +67,18 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_heal =
-            template_setting.starts_with("heal/") || service_name.to_lowercase().contains("heal");
+        let is_healer =
+            template_setting.starts_with("healer/") || service_name.to_lowercase().contains("healer");
 
         // Get the appropriate PVC name
-        let pvc_name = if is_heal {
-            // Heal CodeRuns (Remediation agents) share a dedicated PVC
-            let heal_pvc = AgentClassifier::get_heal_pvc_name(service_name);
+        let pvc_name = if is_healer {
+            // Healer CodeRuns (Remediation agents) share a dedicated PVC
+            let healer_pvc = AgentClassifier::get_healer_pvc_name(service_name);
             info!(
-                "🏥 Heal CodeRun detected, using dedicated heal PVC: {}",
-                heal_pvc
+                "🏥 Healer CodeRun detected, using dedicated healer PVC: {}",
+                healer_pvc
             );
-            heal_pvc
+            healer_pvc
         } else if let Some(github_app) = &code_run_ref.spec.github_app {
             match classifier.get_pvc_name(service_name, github_app) {
                 Ok(name) => {
@@ -505,17 +505,17 @@ impl<'a> CodeResourceManager<'a> {
         // This allows Atlas/Bolt to access integration templates from /agent-templates
         let shared_templates_cm_name = format!("{cm_prefix}-agent-templates-shared");
         let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
-        let heal_templates_cm_name = format!("{cm_prefix}-agent-templates-heal");
+        let healer_templates_cm_name = format!("{cm_prefix}-agent-templates-healer");
 
-        // Check if this is a Heal workflow (service contains "heal" or template starts with "heal/")
-        let is_heal_workflow = code_run.spec.service.to_lowercase().contains("heal")
+        // Check if this is a Healer workflow (service contains "healer" or template starts with "healer/")
+        let is_healer_workflow = code_run.spec.service.to_lowercase().contains("healer")
             || code_run
                 .spec
                 .cli_config
                 .as_ref()
                 .and_then(|c| c.settings.get("template"))
                 .and_then(|v| v.as_str())
-                .is_some_and(|t| t.starts_with("heal/"));
+                .is_some_and(|t| t.starts_with("healer/"));
 
         // Build projected volume sources - always include shared and integration
         let mut projected_sources = vec![
@@ -531,11 +531,11 @@ impl<'a> CodeResourceManager<'a> {
             }),
         ];
 
-        // Add heal templates for heal workflows
-        if is_heal_workflow {
+        // Add healer templates for healer workflows
+        if is_healer_workflow {
             projected_sources.push(json!({
                 "configMap": {
-                    "name": heal_templates_cm_name
+                    "name": healer_templates_cm_name
                 }
             }));
         }
@@ -602,7 +602,7 @@ impl<'a> CodeResourceManager<'a> {
         // Use conditional naming based on CodeRun type and agent classification
         let classifier = AgentClassifier::new();
 
-        // Check if this is a heal CodeRun
+        // Check if this is a healer CodeRun
         let template_setting = code_run
             .spec
             .cli_config
@@ -610,12 +610,12 @@ impl<'a> CodeResourceManager<'a> {
             .and_then(|c| c.settings.get("template"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let is_heal = template_setting.starts_with("heal/")
-            || code_run.spec.service.to_lowercase().contains("heal");
+        let is_healer = template_setting.starts_with("healer/")
+            || code_run.spec.service.to_lowercase().contains("healer");
 
-        let pvc_name = if is_heal {
-            // Heal CodeRuns share a dedicated PVC
-            AgentClassifier::get_heal_pvc_name(&code_run.spec.service)
+        let pvc_name = if is_healer {
+            // Healer CodeRuns share a dedicated PVC
+            AgentClassifier::get_healer_pvc_name(&code_run.spec.service)
         } else if let Some(github_app) = &code_run.spec.github_app {
             match classifier.get_pvc_name(&code_run.spec.service, github_app) {
                 Ok(name) => name,

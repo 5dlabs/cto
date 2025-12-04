@@ -1,13 +1,13 @@
 ---
-# PersistentVolumeClaim for heal workspace
-# Used by heal monitor (local-path only supports ReadWriteOnce)
+# PersistentVolumeClaim for healer workspace
+# Used by healer monitor (local-path only supports ReadWriteOnce)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: heal-workspace
+  name: healer-workspace
   namespace: cto
   labels:
-    app.kubernetes.io/name: heal-workspace
+    app.kubernetes.io/name: healer-workspace
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/component: storage
 spec:

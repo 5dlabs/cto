@@ -693,7 +693,7 @@ mod tests {
         let handler = Handler::new();
 
         let event = K8sEvent::PodModified(Pod {
-            name: "heal-remediation-t123-rex".into(),
+            name: "healer-remediation-t123-rex".into(),
             phase: "Running".into(),
             conditions: vec![
                 PodCondition {
