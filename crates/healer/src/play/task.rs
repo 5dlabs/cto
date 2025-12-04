@@ -181,10 +181,9 @@ impl std::fmt::Display for TaskState {
             .current_stage()
             .map_or_else(|| "-".to_string(), |s| s.to_string());
 
-        let duration_str = self.stage_duration().map_or_else(
-            || "-".to_string(),
-            |d| format!("{}m", d.num_minutes()),
-        );
+        let duration_str = self
+            .stage_duration()
+            .map_or_else(|| "-".to_string(), |d| format!("{}m", d.num_minutes()));
 
         let pr_str = self
             .pr_number
@@ -237,4 +236,3 @@ mod tests {
         assert!(task.has_active_remediation());
     }
 }
-

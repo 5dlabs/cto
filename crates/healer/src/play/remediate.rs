@@ -69,13 +69,7 @@ impl RemediationEngine {
     fn fetch_pod_logs(&self, pod_name: &str) -> Result<String> {
         // Use kubectl logs as fallback (Loki query would be better)
         let output = Command::new("kubectl")
-            .args([
-                "logs",
-                pod_name,
-                "-n",
-                &self.namespace,
-                "--tail=100",
-            ])
+            .args(["logs", pod_name, "-n", &self.namespace, "--tail=100"])
             .output()
             .context("Failed to fetch pod logs")?;
 
@@ -134,23 +128,27 @@ impl RemediationEngine {
             .context("Failed to fetch PR context")?;
 
         if !output.status.success() {
-            anyhow::bail!("gh pr view failed: {}", String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!(
+                "gh pr view failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
 
-        let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .context("Failed to parse PR JSON")?;
+        let json: serde_json::Value =
+            serde_json::from_slice(&output.stdout).context("Failed to parse PR JSON")?;
 
         Ok(PrContext {
             number: pr_number,
             state: json["state"].as_str().unwrap_or("unknown").to_string(),
             mergeable: json["mergeable"].as_str() == Some("MERGEABLE"),
-            checks_status: json["statusCheckRollup"]
-                .as_array()
-                .map_or_else(|| "unknown".to_string(), |arr| {
+            checks_status: json["statusCheckRollup"].as_array().map_or_else(
+                || "unknown".to_string(),
+                |arr| {
                     let passed = arr.iter().filter(|c| c["conclusion"] == "SUCCESS").count();
                     let total = arr.len();
                     format!("{passed}/{total} passed")
-                }),
+                },
+            ),
         })
     }
 
@@ -174,10 +172,7 @@ impl RemediationEngine {
                 "Git merge conflict detected".to_string(),
                 "Add pre-commit rebase step or conflict resolution logic".to_string(),
             )
-        } else if logs.contains("authentication")
-            || logs.contains("401")
-            || logs.contains("403")
-        {
+        } else if logs.contains("authentication") || logs.contains("401") || logs.contains("403") {
             (
                 DiagnosisCategory::InfraIssue,
                 "Authentication/authorization error".to_string(),
@@ -233,7 +228,11 @@ impl RemediationEngine {
     pub fn spawn_fix_coderun(&self, task_id: &str, diagnosis: &Diagnosis) -> Result<String> {
         let coderun_name = format!(
             "healer-fix-{}",
-            uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown")
+            uuid::Uuid::new_v4()
+                .to_string()
+                .split('-')
+                .next()
+                .unwrap_or("unknown")
         );
 
         // Build the prompt for the fix
@@ -280,7 +279,11 @@ spec:
             coderun_name,
             self.namespace,
             task_id,
-            prompt.lines().map(|l| format!("    {l}")).collect::<Vec<_>>().join("\n")
+            prompt
+                .lines()
+                .map(|l| format!("    {l}"))
+                .collect::<Vec<_>>()
+                .join("\n")
         );
 
         // Apply the CodeRun

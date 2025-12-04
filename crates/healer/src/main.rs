@@ -690,12 +690,168 @@ fn default_sync_timeout() -> u64 {
     300
 }
 
-/// Healer configuration for spawning remediation `CodeRuns`.
-/// Loaded from `healer-config.json` - maps directly to `CodeRun` CRD fields.
+/// Healer configuration for both server (inline Factory) and remediation `CodeRuns`.
+/// Loaded from `heal-config.json`.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HealerConfig {
+    /// Server config for the healer server's inline Factory usage (alert analysis/triage)
+    #[serde(default)]
+    server: ServerConfig,
+    /// CodeRun config for spawning remediation agents
     coderun: CodeRunConfig,
+}
+
+/// Server configuration for the healer server's inline Factory usage.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerConfig {
+    #[serde(default = "default_model")]
+    model: String,
+    #[serde(default = "default_auto_level")]
+    auto_level: String,
+    #[serde(default = "default_output_format")]
+    output_format: String,
+    /// Remote tools for the server (future: pass to droid exec via MCP config)
+    #[serde(default = "default_server_remote_tools")]
+    #[allow(dead_code)]
+    remote_tools: Vec<String>,
+    #[serde(default)]
+    memory: MemoryConfig,
+}
+
+fn default_server_remote_tools() -> Vec<String> {
+    vec![
+        "mcp_tools_kubernetes_*".to_string(),
+        "mcp_tools_argocd_*".to_string(),
+        "mcp_tools_grafana_*".to_string(),
+        "mcp_tools_openmemory_*".to_string(),
+    ]
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            model: default_model(),
+            auto_level: default_auto_level(),
+            output_format: default_output_format(),
+            remote_tools: default_server_remote_tools(),
+            memory: MemoryConfig::default(),
+        }
+    }
+}
+
+fn default_model() -> String {
+    "claude-opus-4-5-20251101".to_string()
+}
+
+fn default_auto_level() -> String {
+    "high".to_string()
+}
+
+fn default_output_format() -> String {
+    "text".to_string()
+}
+
+/// Memory configuration for OpenMemory integration.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MemoryConfig {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default = "default_agent_name")]
+    agent_name: String,
+    #[serde(default = "default_session_prefix")]
+    session_prefix: String,
+    #[serde(default)]
+    retrieve_on_start: bool,
+    #[serde(default)]
+    persist_on_complete: bool,
+}
+
+fn default_agent_name() -> String {
+    "healer".to_string()
+}
+
+fn default_session_prefix() -> String {
+    "heal-session".to_string()
+}
+
+/// Build a memory-augmented prompt that includes session retrieval and persistence instructions.
+fn build_memory_augmented_prompt(
+    original_prompt: &str,
+    alert_id: &str,
+    pod_name: &str,
+    memory_config: &MemoryConfig,
+) -> String {
+    use std::fmt::Write;
+
+    let mut augmented = String::new();
+
+    // Add memory retrieval instructions at the start
+    if memory_config.retrieve_on_start {
+        let _ = write!(
+            augmented,
+            r#"## 🧠 Memory Context (OpenMemory Integration)
+
+Before starting, query OpenMemory for relevant context:
+
+1. **Retrieve similar past alerts:**
+   Use `openmemory_query` with query: "healer alert {alert_id} {pod_name} remediation"
+
+2. **Check for known solutions:**
+   Use `openmemory_query` with query: "solution fix {alert_id} platform issue"
+
+3. **Review session history:**
+   Use `openmemory_list` filtered by agent="{agent_name}" to see recent sessions
+
+If relevant memories are found, use them to inform your analysis. Reinforce helpful memories with `openmemory_reinforce`.
+
+---
+
+"#,
+            alert_id = alert_id,
+            pod_name = pod_name,
+            agent_name = memory_config.agent_name,
+        );
+    }
+
+    // Add the original prompt
+    augmented.push_str(original_prompt);
+
+    // Add memory persistence instructions at the end
+    if memory_config.persist_on_complete {
+        let _ = write!(
+            augmented,
+            r#"
+
+---
+
+## 🧠 Memory Persistence
+
+After completing your analysis, store key insights for future sessions:
+
+1. **Store the alert pattern:**
+   Use `openmemory_store` with content describing:
+   - Alert type: {alert_id}
+   - Root cause identified
+   - Solution applied or recommended
+   - Metadata: {{"agent": "{agent_name}", "alert_type": "{alert_id}", "pod": "{pod_name}", "session": "{session_prefix}-{alert_id}"}}
+
+2. **Store any new patterns discovered:**
+   If you identified a recurring issue or new failure mode, store it for future reference.
+
+3. **Reinforce successful solutions:**
+   If a memory-based solution worked, use `openmemory_reinforce` to increase its salience.
+"#,
+            alert_id = alert_id,
+            pod_name = pod_name,
+            agent_name = memory_config.agent_name,
+            session_prefix = memory_config.session_prefix,
+        );
+    }
+
+    augmented
 }
 
 /// `CodeRun` configuration matching the CRD spec fields.
@@ -717,11 +873,27 @@ struct CodeRunConfig {
     run_type: String,
     #[serde(default)]
     enable_docker: bool,
+    #[serde(default = "default_coderun_remote_tools")]
+    remote_tools: Vec<String>,
     #[serde(default)]
-    remote_tools: String,
-    #[serde(default)]
-    local_tools: String,
+    local_tools: Vec<String>,
     cli_config: CliConfig,
+    /// Memory configuration for remediation agent - passed to CodeRun cliConfig.settings
+    #[serde(default)]
+    memory: MemoryConfig,
+}
+
+fn default_coderun_remote_tools() -> Vec<String> {
+    vec![
+        "mcp_tools_github_*".to_string(),
+        "mcp_tools_kubernetes_*".to_string(),
+        "mcp_tools_argocd_*".to_string(),
+        "mcp_tools_cto_*".to_string(),
+        "mcp_tools_context7_*".to_string(),
+        "mcp_tools_firecrawl_*".to_string(),
+        "mcp_tools_grafana_*".to_string(),
+        "mcp_tools_openmemory_*".to_string(),
+    ]
 }
 
 fn default_docs_branch() -> String {
@@ -753,6 +925,7 @@ struct CliSettings {
 impl Default for HealerConfig {
     fn default() -> Self {
         Self {
+            server: ServerConfig::default(),
             coderun: CodeRunConfig {
                 namespace: "cto".to_string(),
                 github_app: "rex".to_string(),
@@ -765,14 +938,21 @@ impl Default for HealerConfig {
                 service: "healer".to_string(),
                 run_type: "implementation".to_string(),
                 enable_docker: true,
-                remote_tools: "mcp_tools_github_*,mcp_tools_kubernetes_*".to_string(),
-                local_tools: String::new(),
+                remote_tools: default_coderun_remote_tools(),
+                local_tools: Vec::new(),
                 cli_config: CliConfig {
-                    cli_type: "claude".to_string(),
+                    cli_type: "factory".to_string(),
                     model: "claude-opus-4-5-20251101".to_string(),
                     settings: CliSettings {
-                        template: "healer/claude".to_string(),
+                        template: "heal/factory".to_string(),
                     },
+                },
+                memory: MemoryConfig {
+                    enabled: true,
+                    agent_name: "healer-remediation".to_string(),
+                    session_prefix: "heal-remediation".to_string(),
+                    retrieve_on_start: true,
+                    persist_on_complete: true,
                 },
             },
         }
@@ -5679,8 +5859,19 @@ async fn spawn_factory_with_prompt(
     use std::io::Write;
     use tokio::process::Command as AsyncCommand;
 
+    // Load healer config for server settings
+    let config = load_healer_config("heal-config.json");
+    let server = &config.server;
+
     let prompt_content =
         std::fs::read_to_string(prompt_path).context("Failed to read prompt file")?;
+
+    // Build memory-augmented prompt if memory is enabled
+    let augmented_prompt = if server.memory.enabled {
+        build_memory_augmented_prompt(&prompt_content, alert_id, pod_name, &server.memory)
+    } else {
+        prompt_content.clone()
+    };
 
     // Create log directory and file
     let log_dir = "/workspace/watch/logs";
@@ -5700,6 +5891,16 @@ async fn spawn_factory_with_prompt(
         "{}",
         format!("🚀 Spawning Factory for alert {alert_id} on pod {pod_name} → {log_file}").cyan()
     );
+    if server.memory.enabled {
+        println!(
+            "{}",
+            format!(
+                "🧠 Memory enabled: agent={}, session={}-{alert_id}",
+                server.memory.agent_name, server.memory.session_prefix
+            )
+            .dimmed()
+        );
+    }
 
     // Write header to log file
     let mut file = std::fs::File::create(&log_file).context("Failed to create log file")?;
@@ -5716,20 +5917,30 @@ async fn spawn_factory_with_prompt(
     writeln!(file, "TIME: {}", chrono::Utc::now().to_rfc3339())?;
     writeln!(
         file,
+        "MODEL: {} | AUTO: {}",
+        server.model, server.auto_level
+    )?;
+    writeln!(
+        file,
         "═══════════════════════════════════════════════════════════════"
     )?;
     writeln!(file)?;
     writeln!(file, "=== PROMPT ===")?;
-    writeln!(file, "{prompt_content}")?;
+    writeln!(file, "{augmented_prompt}")?;
     writeln!(file)?;
     writeln!(file, "=== FACTORY OUTPUT ===")?;
     drop(file); // Close before spawning
+
+    // Build droid exec args from config
+    let auto_arg = format!("--auto={}", server.auto_level);
+    let format_arg = format!("--output-format={}", server.output_format);
+    let model_arg = format!("--model={}", server.model);
 
     // Use stdin to pass prompt content to avoid "Argument list too long" errors
     // when prompts include large pod logs (OS arg limit is typically 128KB-2MB)
     // droid exec reads from stdin when no prompt argument is provided
     let output = AsyncCommand::new("droid")
-        .args(["exec", "--output-format", "text", "--auto", "high"])
+        .args(["exec", &format_arg, &auto_arg, &model_arg])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -6054,15 +6265,16 @@ fn build_coderun_yaml(
         .unwrap_or_default();
 
     // Build optional fields only if non-empty
+    // Join arrays into comma-separated strings for CRD spec
     let remote_tools_line = if c.remote_tools.is_empty() {
         String::new()
     } else {
-        format!("  remoteTools: \"{}\"\n", c.remote_tools)
+        format!("  remoteTools: \"{}\"\n", c.remote_tools.join(","))
     };
     let local_tools_line = if c.local_tools.is_empty() {
         String::new()
     } else {
-        format!("  localTools: \"{}\"\n", c.local_tools)
+        format!("  localTools: \"{}\"\n", c.local_tools.join(","))
     };
 
     // Build issue-related env vars
@@ -6109,6 +6321,11 @@ metadata:
     model: "{cli_model}"
     settings:
       template: "{template}"
+      memoryEnabled: {memory_enabled}
+      memoryAgentName: "{memory_agent_name}"
+      memorySessionPrefix: "{memory_session_prefix}"
+      memoryRetrieveOnStart: {memory_retrieve_on_start}
+      memoryPersistOnComplete: {memory_persist_on_complete}
   env:
     ALERT_TYPE: "{alert}"
     TASK_ID: "{task_id}"
@@ -6134,6 +6351,11 @@ metadata:
         cli_type = c.cli_config.cli_type,
         cli_model = c.cli_config.model,
         template = c.cli_config.settings.template,
+        memory_enabled = c.memory.enabled,
+        memory_agent_name = c.memory.agent_name,
+        memory_session_prefix = c.memory.session_prefix,
+        memory_retrieve_on_start = c.memory.retrieve_on_start,
+        memory_persist_on_complete = c.memory.persist_on_complete,
         prompt_file_transformed = transform_path(prompt_file),
         log_file_transformed = transform_path(log_file),
         coderun_name = coderun_name,
@@ -6407,8 +6629,8 @@ fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
 /// Handle play orchestration commands.
 #[allow(clippy::too_many_lines)]
 fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
-    use play::{PlayBatch, PlayTracker};
     use play::cleanup::PlayCleanup;
+    use play::{PlayBatch, PlayTracker};
 
     match action {
         PlayCommands::Status { task_id, stuck } => {
@@ -6430,7 +6652,12 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                 if stuck_tasks.is_empty() {
                     println!("{}", "No stuck tasks found".green());
                 } else {
-                    println!("{}", format!("Found {} stuck tasks:", stuck_tasks.len()).red().bold());
+                    println!(
+                        "{}",
+                        format!("Found {} stuck tasks:", stuck_tasks.len())
+                            .red()
+                            .bold()
+                    );
                     for task in stuck_tasks {
                         print_task_row(task);
                     }
@@ -6460,7 +6687,10 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
             let task_issue = issues.iter().find(|i| i.task_id() == task_id);
 
             if let Some(issue) = task_issue {
-                println!("{}", format!("Spawning remediation for task {task_id}...").cyan());
+                println!(
+                    "{}",
+                    format!("Spawning remediation for task {task_id}...").cyan()
+                );
 
                 // Run remediation
                 let result = tracker.remediate(issue)?;
@@ -6469,7 +6699,10 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                 println!("  CodeRun: {}", result.coderun_name.cyan());
                 println!("  Diagnosis: {}", result.diagnosis);
             } else {
-                println!("{}", format!("Task {task_id} has no active issues to remediate").yellow());
+                println!(
+                    "{}",
+                    format!("Task {task_id} has no active issues to remediate").yellow()
+                );
             }
         }
         PlayCommands::Remediations => {
@@ -6499,7 +6732,8 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                             let name = parts[0];
                             let task_id = parts[1];
                             let created = parts[2];
-                            println!("  Task {}: {} (created {})",
+                            println!(
+                                "  Task {}: {} (created {})",
                                 task_id.cyan(),
                                 name.yellow(),
                                 created
@@ -6509,18 +6743,27 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                 }
             } else {
                 // CodeRun CRD might not exist
-                println!("{}", "  No active remediations (or CodeRun CRD not installed)".dimmed());
+                println!(
+                    "{}",
+                    "  No active remediations (or CodeRun CRD not installed)".dimmed()
+                );
             }
         }
         PlayCommands::CancelRemediation { task_id } => {
             // Cancel by deleting the CodeRun
-            println!("{}", format!("Cancelling remediation for task {task_id}...").yellow());
+            println!(
+                "{}",
+                format!("Cancelling remediation for task {task_id}...").yellow()
+            );
 
             let output = Command::new("kubectl")
                 .args([
-                    "delete", "coderun",
-                    "-n", namespace,
-                    "-l", &format!("task-id={task_id},app.kubernetes.io/name=healer"),
+                    "delete",
+                    "coderun",
+                    "-n",
+                    namespace,
+                    "-l",
+                    &format!("task-id={task_id},app.kubernetes.io/name=healer"),
                 ])
                 .output()
                 .context("Failed to delete CodeRun")?;
@@ -6557,13 +6800,19 @@ fn print_batch_status(tracker: &play::PlayTracker) {
 
     // Header
     println!("{}", "═".repeat(70).cyan());
-    println!("{}", format!("PLAY BATCH: {}", batch.project_name).cyan().bold());
+    println!(
+        "{}",
+        format!("PLAY BATCH: {}", batch.project_name).cyan().bold()
+    );
     println!("{}", "═".repeat(70).cyan());
     println!();
 
     // Batch info
     println!("  Repository: {}", batch.repository.yellow());
-    println!("  Started: {}", batch.started_at.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!(
+        "  Started: {}",
+        batch.started_at.format("%Y-%m-%d %H:%M:%S UTC")
+    );
     println!("  Elapsed: {}m", summary.elapsed_mins);
     println!();
 
@@ -6669,15 +6918,17 @@ fn print_task_detail(task: &play::TaskState) {
     let stage = task
         .current_stage()
         .map_or_else(|| "-".to_string(), |s| s.display_name().to_string());
-    let agent = task.current_stage()
-        .and_then(|s| s.agent())
-        .unwrap_or("-");
+    let agent = task.current_stage().and_then(|s| s.agent()).unwrap_or("-");
 
     println!("  Stage: {} ({})", stage.yellow(), agent);
 
     // Duration
     if let Some(duration) = task.stage_duration() {
-        let warn = if task.is_stuck() { " ⚠ OVER THRESHOLD" } else { "" };
+        let warn = if task.is_stuck() {
+            " ⚠ OVER THRESHOLD"
+        } else {
+            ""
+        };
         println!("  Duration: {}m{}", duration.num_minutes(), warn.red());
     }
 
@@ -6699,7 +6950,11 @@ fn print_task_detail(task: &play::TaskState) {
     // Status details
     println!();
     match &task.status {
-        play::types::TaskStatus::Failed { stage, reason, remediation } => {
+        play::types::TaskStatus::Failed {
+            stage,
+            reason,
+            remediation,
+        } => {
             println!("  {}", "Issue Detected:".red().bold());
             println!("    Type: Failed at {stage:?}");
             println!("    Reason: {reason}");
@@ -6756,7 +7011,10 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
             } else {
                 println!("  {}", "Top Issues:".yellow());
                 for issue in &stats.top_issues {
-                    println!("    • {} ({} occurrences)", issue.description, issue.occurrences);
+                    println!(
+                        "    • {} ({} occurrences)",
+                        issue.description, issue.occurrences
+                    );
                 }
             }
         }
@@ -6769,7 +7027,10 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
             println!();
 
             if suggestions.is_empty() {
-                println!("  {}", "No suggestions yet - need more observations".dimmed());
+                println!(
+                    "  {}",
+                    "No suggestions yet - need more observations".dimmed()
+                );
             } else {
                 for (i, s) in suggestions.iter().enumerate() {
                     println!("  {}. {} ({})", i + 1, s.agent.yellow(), s.confidence);
@@ -6827,7 +7088,10 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
                 // CSV format
                 println!("agent,type,description,count");
                 for p in &patterns {
-                    println!("{},failure,\"{}\",{}", p.agent, p.description, p.occurrences);
+                    println!(
+                        "{},failure,\"{}\",{}",
+                        p.agent, p.description, p.occurrences
+                    );
                 }
             }
         }

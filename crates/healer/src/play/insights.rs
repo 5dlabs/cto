@@ -415,4 +415,3 @@ mod tests {
         assert!((stats.success_rate - 66.67).abs() < 1.0);
     }
 }
-

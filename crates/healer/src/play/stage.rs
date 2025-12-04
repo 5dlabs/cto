@@ -97,9 +97,7 @@ impl Stage {
     pub fn from_configmap_value(value: &str) -> Option<Self> {
         match value.to_lowercase().as_str() {
             "pending" => Some(Self::Pending),
-            "implementation-in-progress" | "implementation" => {
-                Some(Self::ImplementationInProgress)
-            }
+            "implementation-in-progress" | "implementation" => Some(Self::ImplementationInProgress),
             "quality-in-progress" | "quality" => Some(Self::QualityInProgress),
             "security-in-progress" | "security" => Some(Self::SecurityInProgress),
             "testing-in-progress" | "testing" => Some(Self::TestingInProgress),
@@ -167,4 +165,3 @@ mod tests {
         assert_eq!(Stage::from_configmap_value("unknown"), None);
     }
 }
-

@@ -236,4 +236,3 @@ pub enum DiagnosisCategory {
     /// Unknown/needs investigation
     Unknown,
 }
-

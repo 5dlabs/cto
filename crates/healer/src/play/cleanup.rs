@@ -79,14 +79,7 @@ impl PlayCleanup {
     fn delete_task_configmaps(&self) -> Result<usize> {
         // First, list the ConfigMaps
         let output = Command::new("kubectl")
-            .args([
-                "get",
-                "configmaps",
-                "-n",
-                &self.namespace,
-                "-o",
-                "name",
-            ])
+            .args(["get", "configmaps", "-n", &self.namespace, "-o", "name"])
             .output()
             .context("Failed to list ConfigMaps")?;
 
@@ -166,14 +159,7 @@ impl PlayCleanup {
     fn delete_play_workflows(&self) -> usize {
         // List play-* workflows
         let output = Command::new("kubectl")
-            .args([
-                "get",
-                "workflows",
-                "-n",
-                &self.namespace,
-                "-o",
-                "name",
-            ])
+            .args(["get", "workflows", "-n", &self.namespace, "-o", "name"])
             .output();
 
         let output = match output {
@@ -182,10 +168,7 @@ impl PlayCleanup {
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let workflows: Vec<&str> = stdout
-            .lines()
-            .filter(|l| l.contains("play-"))
-            .collect();
+        let workflows: Vec<&str> = stdout.lines().filter(|l| l.contains("play-")).collect();
 
         if workflows.is_empty() {
             return 0;

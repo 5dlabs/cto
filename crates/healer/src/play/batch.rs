@@ -74,14 +74,7 @@ impl PlayBatch {
         if !output.status.success() {
             // Try alternative: get by name pattern
             let output = Command::new("kubectl")
-                .args([
-                    "get",
-                    "configmaps",
-                    "-n",
-                    namespace,
-                    "-o",
-                    "json",
-                ])
+                .args(["get", "configmaps", "-n", namespace, "-o", "json"])
                 .output()
                 .context("Failed to query ConfigMaps")?;
 
@@ -117,10 +110,7 @@ impl PlayBatch {
             }
 
             // Extract task ID from name (play-task-{id})
-            let task_id = name
-                .strip_prefix("play-task-")
-                .unwrap_or(name)
-                .to_string();
+            let task_id = name.strip_prefix("play-task-").unwrap_or(name).to_string();
 
             // Parse data fields
             let data = &item["data"];
@@ -188,9 +178,7 @@ impl PlayBatch {
         }
 
         // Sort tasks by ID
-        batch
-            .tasks
-            .sort_by(|a, b| a.task_id.cmp(&b.task_id));
+        batch.tasks.sort_by(|a, b| a.task_id.cmp(&b.task_id));
 
         // Update repository
         if !repository.is_empty() {
@@ -215,7 +203,9 @@ impl PlayBatch {
         let total = self.tasks.len();
 
         if !failed.is_empty() && completed + failed.len() == total {
-            self.status = BatchStatus::Failed { failed_tasks: failed };
+            self.status = BatchStatus::Failed {
+                failed_tasks: failed,
+            };
         } else if completed == total && total > 0 {
             self.status = BatchStatus::Completed;
         } else {
@@ -244,7 +234,10 @@ impl PlayBatch {
     /// Get tasks that need remediation.
     #[must_use]
     pub fn tasks_needing_remediation(&self) -> Vec<&TaskState> {
-        self.tasks.iter().filter(|t| t.needs_remediation()).collect()
+        self.tasks
+            .iter()
+            .filter(|t| t.needs_remediation())
+            .collect()
     }
 
     /// Get tasks that are currently running.
@@ -364,4 +357,3 @@ mod tests {
         assert!(matches!(batch.status, BatchStatus::Completed));
     }
 }
-

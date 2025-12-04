@@ -217,6 +217,18 @@ jobs:
     if: needs.plan.outputs.publishing == 'true'
     runs-on: ubuntu-22.04
     steps:
+      - name: Free up disk space
+        run: |
+          echo "Before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af || true
+          echo "After cleanup:"
+          df -h /
+
       - uses: actions/checkout@v4
 
       - name: Download Linux x86_64 tools binary
@@ -275,6 +287,18 @@ jobs:
     if: needs.plan.outputs.publishing == 'true'
     runs-on: ubuntu-22.04
     steps:
+      - name: Free up disk space
+        run: |
+          echo "Before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af || true
+          echo "After cleanup:"
+          df -h /
+
       - uses: actions/checkout@v4
 
       - name: Download Linux x86_64 controller binary
@@ -324,6 +348,19 @@ jobs:
     if: needs.plan.outputs.publishing == 'true'
     runs-on: ubuntu-22.04
     steps:
+      - name: Free up disk space
+        run: |
+          echo "Before cleanup:"
+          df -h /
+          # Remove unnecessary large packages
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker system prune -af || true
+          echo "After cleanup:"
+          df -h /
+
       - uses: actions/checkout@v4
 
       - name: Download Linux x86_64 healer binary
