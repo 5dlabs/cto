@@ -6407,8 +6407,8 @@ fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
 /// Handle play orchestration commands.
 #[allow(clippy::too_many_lines)]
 fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
-    use play::{PlayBatch, PlayTracker};
     use play::cleanup::PlayCleanup;
+    use play::{PlayBatch, PlayTracker};
 
     match action {
         PlayCommands::Status { task_id, stuck } => {
@@ -6430,7 +6430,12 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                 if stuck_tasks.is_empty() {
                     println!("{}", "No stuck tasks found".green());
                 } else {
-                    println!("{}", format!("Found {} stuck tasks:", stuck_tasks.len()).red().bold());
+                    println!(
+                        "{}",
+                        format!("Found {} stuck tasks:", stuck_tasks.len())
+                            .red()
+                            .bold()
+                    );
                     for task in stuck_tasks {
                         print_task_row(task);
                     }
@@ -6460,7 +6465,10 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
             let task_issue = issues.iter().find(|i| i.task_id() == task_id);
 
             if let Some(issue) = task_issue {
-                println!("{}", format!("Spawning remediation for task {task_id}...").cyan());
+                println!(
+                    "{}",
+                    format!("Spawning remediation for task {task_id}...").cyan()
+                );
 
                 // Run remediation
                 let result = tracker.remediate(issue)?;
@@ -6469,7 +6477,10 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                 println!("  CodeRun: {}", result.coderun_name.cyan());
                 println!("  Diagnosis: {}", result.diagnosis);
             } else {
-                println!("{}", format!("Task {task_id} has no active issues to remediate").yellow());
+                println!(
+                    "{}",
+                    format!("Task {task_id} has no active issues to remediate").yellow()
+                );
             }
         }
         PlayCommands::Remediations => {
@@ -6499,7 +6510,8 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                             let name = parts[0];
                             let task_id = parts[1];
                             let created = parts[2];
-                            println!("  Task {}: {} (created {})",
+                            println!(
+                                "  Task {}: {} (created {})",
                                 task_id.cyan(),
                                 name.yellow(),
                                 created
@@ -6509,18 +6521,27 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
                 }
             } else {
                 // CodeRun CRD might not exist
-                println!("{}", "  No active remediations (or CodeRun CRD not installed)".dimmed());
+                println!(
+                    "{}",
+                    "  No active remediations (or CodeRun CRD not installed)".dimmed()
+                );
             }
         }
         PlayCommands::CancelRemediation { task_id } => {
             // Cancel by deleting the CodeRun
-            println!("{}", format!("Cancelling remediation for task {task_id}...").yellow());
+            println!(
+                "{}",
+                format!("Cancelling remediation for task {task_id}...").yellow()
+            );
 
             let output = Command::new("kubectl")
                 .args([
-                    "delete", "coderun",
-                    "-n", namespace,
-                    "-l", &format!("task-id={task_id},app.kubernetes.io/name=healer"),
+                    "delete",
+                    "coderun",
+                    "-n",
+                    namespace,
+                    "-l",
+                    &format!("task-id={task_id},app.kubernetes.io/name=healer"),
                 ])
                 .output()
                 .context("Failed to delete CodeRun")?;
@@ -6557,13 +6578,19 @@ fn print_batch_status(tracker: &play::PlayTracker) {
 
     // Header
     println!("{}", "═".repeat(70).cyan());
-    println!("{}", format!("PLAY BATCH: {}", batch.project_name).cyan().bold());
+    println!(
+        "{}",
+        format!("PLAY BATCH: {}", batch.project_name).cyan().bold()
+    );
     println!("{}", "═".repeat(70).cyan());
     println!();
 
     // Batch info
     println!("  Repository: {}", batch.repository.yellow());
-    println!("  Started: {}", batch.started_at.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!(
+        "  Started: {}",
+        batch.started_at.format("%Y-%m-%d %H:%M:%S UTC")
+    );
     println!("  Elapsed: {}m", summary.elapsed_mins);
     println!();
 
@@ -6669,15 +6696,17 @@ fn print_task_detail(task: &play::TaskState) {
     let stage = task
         .current_stage()
         .map_or_else(|| "-".to_string(), |s| s.display_name().to_string());
-    let agent = task.current_stage()
-        .and_then(|s| s.agent())
-        .unwrap_or("-");
+    let agent = task.current_stage().and_then(|s| s.agent()).unwrap_or("-");
 
     println!("  Stage: {} ({})", stage.yellow(), agent);
 
     // Duration
     if let Some(duration) = task.stage_duration() {
-        let warn = if task.is_stuck() { " ⚠ OVER THRESHOLD" } else { "" };
+        let warn = if task.is_stuck() {
+            " ⚠ OVER THRESHOLD"
+        } else {
+            ""
+        };
         println!("  Duration: {}m{}", duration.num_minutes(), warn.red());
     }
 
@@ -6699,7 +6728,11 @@ fn print_task_detail(task: &play::TaskState) {
     // Status details
     println!();
     match &task.status {
-        play::types::TaskStatus::Failed { stage, reason, remediation } => {
+        play::types::TaskStatus::Failed {
+            stage,
+            reason,
+            remediation,
+        } => {
             println!("  {}", "Issue Detected:".red().bold());
             println!("    Type: Failed at {stage:?}");
             println!("    Reason: {reason}");
@@ -6756,7 +6789,10 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
             } else {
                 println!("  {}", "Top Issues:".yellow());
                 for issue in &stats.top_issues {
-                    println!("    • {} ({} occurrences)", issue.description, issue.occurrences);
+                    println!(
+                        "    • {} ({} occurrences)",
+                        issue.description, issue.occurrences
+                    );
                 }
             }
         }
@@ -6769,7 +6805,10 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
             println!();
 
             if suggestions.is_empty() {
-                println!("  {}", "No suggestions yet - need more observations".dimmed());
+                println!(
+                    "  {}",
+                    "No suggestions yet - need more observations".dimmed()
+                );
             } else {
                 for (i, s) in suggestions.iter().enumerate() {
                     println!("  {}. {} ({})", i + 1, s.agent.yellow(), s.confidence);
@@ -6827,7 +6866,10 @@ fn handle_insights_command(action: InsightsCommands) -> Result<()> {
                 // CSV format
                 println!("agent,type,description,count");
                 for p in &patterns {
-                    println!("{},failure,\"{}\",{}", p.agent, p.description, p.occurrences);
+                    println!(
+                        "{},failure,\"{}\",{}",
+                        p.agent, p.description, p.occurrences
+                    );
                 }
             }
         }

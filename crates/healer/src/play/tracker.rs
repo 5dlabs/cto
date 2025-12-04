@@ -226,4 +226,3 @@ pub struct TasksByHealth<'a> {
     /// Pending tasks
     pub pending: Vec<&'a TaskState>,
 }
-
