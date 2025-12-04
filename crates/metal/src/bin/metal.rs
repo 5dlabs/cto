@@ -1230,7 +1230,17 @@ async fn main() -> Result<()> {
                     println!("\n🔐 Initializing Vault...");
                     match stack::init_vault(&kubeconfig) {
                         Ok(vault_creds) => {
-                            println!("   ✅ Vault initialized and unsealed!");
+                            // Unseal Vault with the first key
+                            if let Some(key) = vault_creds.unseal_keys.first() {
+                                if let Err(e) = stack::unseal_vault(&kubeconfig, key) {
+                                    println!("   ⚠️  Vault unseal failed: {e}");
+                                    println!("   Run manually: metal vault-unseal --kubeconfig {} --unseal-key {key}", kubeconfig.display());
+                                } else {
+                                    println!("   ✅ Vault initialized and unsealed!");
+                                }
+                            } else {
+                                println!("   ⚠️  No unseal keys returned from Vault init");
+                            }
                             println!("\n🔑 Vault Credentials (SAVE THESE!):");
                             println!(
                                 "   Unseal Key: {}",
@@ -1264,7 +1274,13 @@ async fn main() -> Result<()> {
 
             match stack::init_vault(&kubeconfig) {
                 Ok(vault_creds) => {
-                    println!("\n🔐 Vault initialized and unsealed!");
+                    // Unseal Vault with the first key
+                    if let Some(key) = vault_creds.unseal_keys.first() {
+                        stack::unseal_vault(&kubeconfig, key)?;
+                        println!("\n🔐 Vault initialized and unsealed!");
+                    } else {
+                        println!("\n🔐 Vault initialized (no unseal keys returned)!");
+                    }
                     println!("\n🔑 Vault Credentials:");
                     println!(
                         "   Unseal Key: {}",
