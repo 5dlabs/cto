@@ -244,52 +244,8 @@ EOF
     fi
 }
 
-# Test 4: Batch Integration Trigger
-test_batch_integration() {
-    log_info "Testing Atlas Batch Integration Sensor..."
-    
-    # Simulate batch completion comment
-    cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Event
-metadata:
-  name: test-batch-complete-$TEST_PR_NUMBER
-  namespace: argo
-spec:
-  eventSourceName: github
-  eventName: org
-  data:
-    headers:
-      X-GitHub-Event: issue_comment
-    body:
-      action: created
-      repository:
-        full_name: $TEST_REPO
-        owner:
-          login: 5dlabs
-        name: cto
-        clone_url: https://github.com/5dlabs/cto.git
-      issue:
-        number: $TEST_PR_NUMBER
-        pull_request:
-          html_url: https://github.com/5dlabs/cto/pull/$TEST_PR_NUMBER
-      comment:
-        body: "Batch 1 Complete - 3 PRs created"
-        user:
-          login: workflow-bot
-EOF
-    
-    sleep 5
-    
-    # Check if batch integration triggered
-    if kubectl get workflows -n "$TEST_NAMESPACE" \
-        -l type=atlas-integration,trigger=batch -o name | grep -q "workflow"; then
-        log_info "✅ Batch integration workflow created"
-    else
-        log_error "❌ Batch integration workflow not created"
-        return 1
-    fi
-}
+# Test 4: Batch Integration Trigger - REMOVED
+# Atlas batch integration has been phased out
 
 # Test 5: Deduplication Logic
 test_deduplication() {
@@ -361,8 +317,7 @@ main() {
     test_integration_gate || ((FAILED++))
     echo
     
-    test_batch_integration || ((FAILED++))
-    echo
+    # test_batch_integration - REMOVED (phased out)
     
     test_deduplication || ((FAILED++))
     echo

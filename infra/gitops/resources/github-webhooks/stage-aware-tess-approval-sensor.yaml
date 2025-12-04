@@ -608,11 +608,8 @@ spec:
                         ATLAS_NEEDED=false
                         ATLAS_REASON=""
 
-                        if [ "$APPROVED_COUNT" -gt 1 ]; then
-                          ATLAS_NEEDED=true
-                          ATLAS_REASON="batch-integration"
-                          echo "🔀 Multiple approved PRs detected - Atlas batch integration required"
-                        elif [ "$MERGEABLE" = "false" ] || [ "$MERGE_STATE" = "dirty" ]; then
+                        # Note: Batch integration was phased out - multiple approved PRs are handled individually
+                        if [ "$MERGEABLE" = "false" ] || [ "$MERGE_STATE" = "dirty" ]; then
                           ATLAS_NEEDED=true
                           ATLAS_REASON="conflict-resolution"
                           echo "⚠️ Merge conflicts detected - Atlas conflict resolution required"

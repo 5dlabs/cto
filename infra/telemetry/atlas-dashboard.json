@@ -402,11 +402,6 @@
           "expr": "sum(increase(atlas_integration_gate_activations_total[24h]))",
           "legendFormat": "Integration Gates",
           "refId": "B"
-        },
-        {
-          "expr": "sum(increase(atlas_batch_integrations_total[24h]))",
-          "legendFormat": "Batch Integrations",
-          "refId": "C"
         }
       ],
       "title": "Atlas Activity Distribution (24h)",
