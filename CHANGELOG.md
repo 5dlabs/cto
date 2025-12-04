@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.37](https://github.com/5dlabs/cto/compare/v0.12.36...v0.12.37) (2025-12-04)
+
+
+### 📚 Documentation
+
+* add Healer CI Remediation Hub summary ([#2696](https://github.com/5dlabs/cto/issues/2696)) ([6ade998](https://github.com/5dlabs/cto/commit/6ade9985e49aa39f740ddbd234387fe6e8a15d70))
+
 ## [0.12.36](https://github.com/5dlabs/cto/compare/v0.12.35...v0.12.36) (2025-12-04)
 
 
