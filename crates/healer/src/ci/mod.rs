@@ -6,7 +6,7 @@
 //! - Routes to specialist agents (Rex, Blaze, Bolt, Cipher, Atlas)
 //! - Tracks remediation attempts and implements retry logic
 //! - Escalates to humans after max attempts
-//! - Stores outcomes to OpenMemory for learning
+//! - Stores outcomes to `OpenMemory` for learning
 
 pub mod context;
 pub mod escalate;
@@ -30,4 +30,3 @@ pub use types::{
     PullRequest, RemediationAttempt, RemediationConfig, RemediationContext, RemediationState,
     RemediationStatus, SecurityAlert,
 };
-

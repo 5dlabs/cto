@@ -1,9 +1,9 @@
 //! Remediation tracker for managing retry loops and state.
 //!
 //! This module tracks the lifecycle of CI remediation attempts:
-//! - Monitors CodeRun completion status
+//! - Monitors `CodeRun` completion status
 //! - Manages retry logic with different agents
-//! - Coordinates with OpenMemory for learning
+//! - Coordinates with `OpenMemory` for learning
 //! - Triggers escalation after max attempts
 
 use anyhow::{Context as _, Result};
@@ -45,7 +45,7 @@ pub struct TrackedRemediation {
     pub failure_type: CiFailureType,
     /// Current remediation state
     pub state: RemediationState,
-    /// Active CodeRun name (if any)
+    /// Active `CodeRun` name (if any)
     pub active_coderun: Option<String>,
     /// Repository
     pub repository: String,
@@ -59,10 +59,10 @@ pub struct TrackedRemediation {
     pub updated_at: DateTime<Utc>,
 }
 
-/// CodeRun completion event.
+/// `CodeRun` completion event.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CodeRunCompletion {
-    /// CodeRun name
+    /// `CodeRun` name
     pub name: String,
     /// Workflow run ID from label
     pub workflow_run_id: u64,
@@ -78,7 +78,7 @@ pub struct CodeRunCompletion {
     pub duration_secs: u64,
 }
 
-/// CodeRun completion status.
+/// `CodeRun` completion status.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CodeRunStatus {
@@ -90,6 +90,10 @@ pub enum CodeRunStatus {
 
 impl RemediationTracker {
     /// Create a new tracker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the memory client cannot be created.
     pub fn new(config: RemediationConfig, memory_config: Option<MemoryConfig>) -> Result<Self> {
         let memory = memory_config
             .map(MemoryClient::new)
@@ -138,7 +142,7 @@ impl RemediationTracker {
         workflow_run_id
     }
 
-    /// Record a CodeRun spawn.
+    /// Record a `CodeRun` spawn.
     pub async fn record_spawn(&self, workflow_run_id: u64, coderun_name: &str, agent: Agent) {
         let mut active = self.active.write().await;
         if let Some(tracked) = active.get_mut(&workflow_run_id) {
@@ -155,9 +159,14 @@ impl RemediationTracker {
         }
     }
 
-    /// Handle CodeRun completion.
+    /// Handle `CodeRun` completion.
     ///
     /// Returns the next action to take.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if spawning a retry `CodeRun` fails.
+    #[allow(clippy::too_many_lines)]
     pub async fn handle_completion(
         &self,
         completion: CodeRunCompletion,
@@ -166,15 +175,12 @@ impl RemediationTracker {
         let workflow_run_id = completion.workflow_run_id;
 
         let mut active = self.active.write().await;
-        let tracked = match active.get_mut(&workflow_run_id) {
-            Some(t) => t,
-            None => {
-                warn!(
-                    "Received completion for unknown workflow run {}",
-                    workflow_run_id
-                );
-                return Ok(CompletionAction::Unknown);
-            }
+        let Some(tracked) = active.get_mut(&workflow_run_id) else {
+            warn!(
+                "Received completion for unknown workflow run {}",
+                workflow_run_id
+            );
+            return Ok(CompletionAction::Unknown);
         };
 
         tracked.active_coderun = None;
@@ -186,7 +192,6 @@ impl RemediationTracker {
             "blaze" => Agent::Blaze,
             "bolt" => Agent::Bolt,
             "cipher" => Agent::Cipher,
-            "atlas" => Agent::Atlas,
             _ => Agent::Atlas,
         };
 
@@ -221,107 +226,107 @@ impl RemediationTracker {
         }
 
         // Determine next action
-        match completion.status {
-            CodeRunStatus::Success => {
-                tracked.state.status = RemediationStatus::Succeeded;
+        if completion.status == CodeRunStatus::Success {
+            tracked.state.status = RemediationStatus::Succeeded;
+
+            info!(
+                "Remediation succeeded for workflow {} after {} attempts",
+                workflow_run_id,
+                tracked.state.attempts.len()
+            );
+
+            // Store routing success
+            if let Some(memory) = &self.memory {
+                let _ = memory
+                    .store_routing_decision(
+                        Some(&tracked.failure_type),
+                        agent,
+                        None,
+                        true,
+                    )
+                    .await;
+            }
+
+            Ok(CompletionAction::Success)
+        } else {
+            // Check if we should retry
+            #[allow(clippy::cast_possible_truncation)]
+            let attempts_made = tracked.state.attempts.len() as u32;
+            let should_retry = attempts_made < self.config.max_attempts;
+
+            if should_retry {
+                let next_agent = self.select_next_agent(tracked, agent);
 
                 info!(
-                    "Remediation succeeded for workflow {} after {} attempts",
+                    "Retrying workflow {} with agent {} (attempt {})",
                     workflow_run_id,
-                    tracked.state.attempts.len()
+                    next_agent.name(),
+                    attempts_made + 1
                 );
 
-                // Store routing success
+                // Build retry context
+                let ctx = self.build_retry_context(tracked).await?;
+
+                // Spawn will happen outside this function
+                drop(active); // Release lock before spawning
+
+                // Spawn new CodeRun
+                match spawner.spawn(next_agent, &ctx) {
+                    Ok(coderun_name) => {
+                        // Re-acquire lock to update
+                        let mut active = self.active.write().await;
+                        if let Some(tracked) = active.get_mut(&workflow_run_id) {
+                            tracked.active_coderun = Some(coderun_name.clone());
+                        }
+
+                        Ok(CompletionAction::Retry {
+                            agent: next_agent,
+                            coderun: coderun_name,
+                        })
+                    }
+                    Err(e) => {
+                        warn!("Failed to spawn retry CodeRun: {e}");
+                        Ok(CompletionAction::SpawnFailed(e.to_string()))
+                    }
+                }
+            } else {
+                // Max attempts reached, escalate
+                tracked.state.status = RemediationStatus::Escalated;
+
+                warn!(
+                    "Max attempts reached for workflow {}, escalating",
+                    workflow_run_id
+                );
+
+                // Store escalation in memory
                 if let Some(memory) = &self.memory {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let attempts_count = tracked.state.attempts.len() as u32;
                     let _ = memory
-                        .store_routing_decision(
+                        .store_escalation(
+                            &tracked.failure,
                             Some(&tracked.failure_type),
-                            agent,
-                            None,
-                            true,
+                            attempts_count,
+                            &completion.error_message.unwrap_or_default(),
                         )
                         .await;
                 }
 
-                Ok(CompletionAction::Success)
-            }
-            _ => {
-                // Check if we should retry
-                let attempts_made = tracked.state.attempts.len() as u32;
-                let should_retry = attempts_made < self.config.max_attempts;
+                let failure = tracked.failure.clone();
+                let attempts = tracked.state.attempts.clone();
+                let pr_number = tracked.pr_number;
 
-                if should_retry {
-                    let next_agent = self.select_next_agent(tracked, agent).await;
-
-                    info!(
-                        "Retrying workflow {} with agent {} (attempt {})",
-                        workflow_run_id,
-                        next_agent.name(),
-                        attempts_made + 1
-                    );
-
-                    // Build retry context
-                    let ctx = self.build_retry_context(tracked).await?;
-
-                    // Spawn will happen outside this function
-                    drop(active); // Release lock before spawning
-
-                    // Spawn new CodeRun
-                    match spawner.spawn(next_agent, &ctx) {
-                        Ok(coderun_name) => {
-                            // Re-acquire lock to update
-                            let mut active = self.active.write().await;
-                            if let Some(tracked) = active.get_mut(&workflow_run_id) {
-                                tracked.active_coderun = Some(coderun_name.clone());
-                            }
-
-                            Ok(CompletionAction::Retry {
-                                agent: next_agent,
-                                coderun: coderun_name,
-                            })
-                        }
-                        Err(e) => {
-                            warn!("Failed to spawn retry CodeRun: {e}");
-                            Ok(CompletionAction::SpawnFailed(e.to_string()))
-                        }
-                    }
-                } else {
-                    // Max attempts reached, escalate
-                    tracked.state.status = RemediationStatus::Escalated;
-
-                    warn!(
-                        "Max attempts reached for workflow {}, escalating",
-                        workflow_run_id
-                    );
-
-                    // Store escalation in memory
-                    if let Some(memory) = &self.memory {
-                        let _ = memory
-                            .store_escalation(
-                                &tracked.failure,
-                                Some(&tracked.failure_type),
-                                tracked.state.attempts.len() as u32,
-                                &completion.error_message.unwrap_or_default(),
-                            )
-                            .await;
-                    }
-
-                    let failure = tracked.failure.clone();
-                    let attempts = tracked.state.attempts.clone();
-                    let pr_number = tracked.pr_number;
-
-                    Ok(CompletionAction::Escalate {
-                        failure,
-                        attempts,
-                        pr_number,
-                    })
-                }
+                Ok(CompletionAction::Escalate {
+                    failure,
+                    attempts,
+                    pr_number,
+                })
             }
         }
     }
 
     /// Select the next agent for retry.
-    async fn select_next_agent(&self, tracked: &TrackedRemediation, failed_agent: Agent) -> Agent {
+    fn select_next_agent(&self, tracked: &TrackedRemediation, failed_agent: Agent) -> Agent {
         // Try a different agent
         let ctx = RemediationContext {
             failure: Some(tracked.failure.clone()),
@@ -399,7 +404,7 @@ impl RemediationTracker {
     }
 }
 
-/// Action to take after a CodeRun completes.
+/// Action to take after a `CodeRun` completes.
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum CompletionAction {

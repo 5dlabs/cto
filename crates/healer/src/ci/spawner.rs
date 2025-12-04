@@ -1,6 +1,6 @@
-//! CodeRun spawner for CI remediation.
+//! `CodeRun` spawner for CI remediation.
 //!
-//! Creates Kubernetes CodeRun resources with:
+//! Creates Kubernetes `CodeRun` resources with:
 //! - Deduplication to prevent duplicate remediation attempts
 //! - Enriched prompts from templates
 //! - Proper labels for tracking
@@ -15,7 +15,7 @@ use tracing::{debug, info, warn};
 
 use super::types::{Agent, CiFailureType, RemediationConfig, RemediationContext};
 
-/// CodeRun spawner for CI remediation.
+/// `CodeRun` spawner for CI remediation.
 pub struct CodeRunSpawner {
     /// Configuration
     config: RemediationConfig,
@@ -29,6 +29,10 @@ pub struct CodeRunSpawner {
 
 impl CodeRunSpawner {
     /// Create a new spawner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template engine cannot be initialized.
     pub fn new(config: RemediationConfig, namespace: &str, repository: &str) -> Result<Self> {
         let mut templates = Handlebars::new();
         templates.set_strict_mode(true);
@@ -46,6 +50,10 @@ impl CodeRunSpawner {
     }
 
     /// Load templates from a directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be read or templates are invalid.
     pub fn load_templates(&mut self, dir: &str) -> Result<()> {
         use std::fs;
 
@@ -68,13 +76,21 @@ impl CodeRunSpawner {
     }
 
     /// Register a template from string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is invalid.
     pub fn register_template(&mut self, name: &str, content: &str) -> Result<()> {
         self.templates
             .register_template_string(name, content)
             .context("Failed to register template")
     }
 
-    /// Check for existing remediation CodeRun.
+    /// Check for existing remediation `CodeRun`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl command fails.
     pub fn has_existing_remediation(&self, workflow_run_id: u64) -> Result<bool> {
         let label_selector = format!(
             "app.kubernetes.io/name=healer,healer/workflow-run-id={}",
@@ -112,6 +128,10 @@ impl CodeRunSpawner {
     }
 
     /// Check for recent remediation within time window.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl command fails.
     pub fn has_recent_remediation(&self, branch: &str) -> Result<bool> {
         let time_window_secs = i64::from(self.config.time_window_mins) * 60;
         let cutoff = Utc::now() - chrono::Duration::seconds(time_window_secs);
@@ -162,7 +182,15 @@ impl CodeRunSpawner {
         Ok(false)
     }
 
-    /// Spawn a CodeRun for CI remediation.
+    /// Spawn a `CodeRun` for CI remediation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - A remediation already exists for this workflow run
+    /// - A recent remediation exists for this branch
+    /// - Prompt rendering fails
+    /// - kubectl apply fails
     pub fn spawn(&self, agent: Agent, ctx: &RemediationContext) -> Result<String> {
         // Check for existing remediation
         if let Some(failure) = &ctx.failure {
@@ -374,12 +402,15 @@ impl CodeRunSpawner {
         }
 
         prompt.push_str("\n## Failure Logs\n```\n");
-        // Truncate logs if too long
-        if ctx.workflow_logs.len() > 10000 {
+        // Truncate logs if too long (UTF-8 safe)
+        let max_log_bytes = 10000;
+        if ctx.workflow_logs.len() > max_log_bytes {
+            // Find a safe UTF-8 boundary to truncate at
+            let truncated = truncate_utf8_safe(&ctx.workflow_logs, max_log_bytes);
             let _ = writeln!(
                 prompt,
                 "{}...\n(truncated, {} total bytes)",
-                &ctx.workflow_logs[..10000],
+                truncated,
                 ctx.workflow_logs.len()
             );
         } else {
@@ -398,7 +429,7 @@ impl CodeRunSpawner {
         prompt
     }
 
-    /// Build the CodeRun YAML manifest.
+    /// Build the `CodeRun` YAML manifest.
     fn build_coderun_yaml(&self, agent: Agent, ctx: &RemediationContext, prompt: &str) -> String {
         let failure = ctx.failure.as_ref();
 
@@ -471,7 +502,7 @@ spec:
         yaml
     }
 
-    /// Apply the CodeRun YAML and return the created name.
+    /// Apply the `CodeRun` YAML and return the created name.
     fn apply_coderun(yaml: &str) -> Result<String> {
         use std::io::Write;
         use std::process::Stdio;
@@ -502,6 +533,23 @@ spec:
         let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(name)
     }
+}
+
+/// Truncate a UTF-8 string at a safe byte boundary.
+///
+/// This avoids panicking when slicing in the middle of a multi-byte character.
+fn truncate_utf8_safe(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+
+    // Find the last valid UTF-8 character boundary at or before max_bytes
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    &s[..end]
 }
 
 /// Sanitize a string for use as a Kubernetes label value.
@@ -548,4 +596,3 @@ mod tests {
         assert!(spawner.is_ok());
     }
 }
-

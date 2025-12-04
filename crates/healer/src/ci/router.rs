@@ -144,13 +144,11 @@ impl CiRouter {
             | CiFailureType::SecurityCodeScan
             | CiFailureType::SecuritySecret => Agent::Cipher,
 
-            // Git/GitHub -> Atlas
+            // Git/GitHub + General -> Atlas (fallback)
             CiFailureType::GitMergeConflict
             | CiFailureType::GithubWorkflow
-            | CiFailureType::GitPermission => Agent::Atlas,
-
-            // General -> Atlas (fallback)
-            CiFailureType::General => Agent::Atlas,
+            | CiFailureType::GitPermission
+            | CiFailureType::General => Agent::Atlas,
         }
     }
 
@@ -473,7 +471,7 @@ impl CiRouter {
             }
             Agent::Blaze => {
                 // If Blaze is failing, check if there's infra involvement
-                if ctx.changed_files.iter().any(|f| f.is_infra()) {
+                if ctx.changed_files.iter().any(ChangedFile::is_infra) {
                     return Agent::Bolt;
                 }
                 Agent::Atlas
@@ -484,10 +482,10 @@ impl CiRouter {
             }
             Agent::Cipher => {
                 // Security issues might need code changes from Rex/Blaze
-                if ctx.changed_files.iter().any(|f| f.is_rust()) {
+                if ctx.changed_files.iter().any(ChangedFile::is_rust) {
                     return Agent::Rex;
                 }
-                if ctx.changed_files.iter().any(|f| f.is_frontend()) {
+                if ctx.changed_files.iter().any(ChangedFile::is_frontend) {
                     return Agent::Blaze;
                 }
                 Agent::Atlas
@@ -502,12 +500,9 @@ impl CiRouter {
 
 /// Route a security alert to the appropriate agent.
 #[must_use]
-pub fn route_security_alert(alert: &SecurityAlert) -> Agent {
+pub fn route_security_alert(_alert: &SecurityAlert) -> Agent {
     // All security alerts go to Cipher
-    match alert.alert_type.as_str() {
-        "dependabot_alert" | "code_scanning_alert" | "secret_scanning_alert" => Agent::Cipher,
-        _ => Agent::Cipher, // Default to Cipher for any security-related event
-    }
+    Agent::Cipher
 }
 
 #[cfg(test)]
@@ -629,4 +624,3 @@ mod tests {
         assert_eq!(ft, CiFailureType::FrontendTypeScript);
     }
 }
-

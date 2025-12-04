@@ -1,6 +1,6 @@
-//! OpenMemory client for historical context.
+//! `OpenMemory` client for historical context.
 //!
-//! Provides integration with the OpenMemory service for:
+//! Provides integration with the `OpenMemory` service for:
 //! - Querying past CI failures and their solutions
 //! - Tracking agent performance statistics
 //! - Learning from routing decisions
@@ -13,10 +13,10 @@ use tracing::{debug, info, warn};
 
 use super::types::{Agent, CiFailure, CiFailureType, HistoricalContext, MemoryEntry};
 
-/// OpenMemory client configuration.
+/// `OpenMemory` client configuration.
 #[derive(Debug, Clone)]
 pub struct MemoryConfig {
-    /// OpenMemory service URL
+    /// `OpenMemory` service URL
     pub url: String,
     /// Agent namespace for memories
     pub namespace: String,
@@ -37,7 +37,7 @@ impl Default for MemoryConfig {
     }
 }
 
-/// OpenMemory client for querying and storing memories.
+/// `OpenMemory` client for querying and storing memories.
 pub struct MemoryClient {
     client: Client,
     config: MemoryConfig,
@@ -142,6 +142,10 @@ pub struct AgentStats {
 
 impl MemoryClient {
     /// Create a new memory client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client cannot be created.
     pub fn new(config: MemoryConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(std::time::Duration::from_millis(config.timeout_ms))
@@ -152,6 +156,10 @@ impl MemoryClient {
     }
 
     /// Query for similar past failures.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails.
     pub async fn query_similar_failures(
         &self,
         failure: &CiFailure,
@@ -211,6 +219,10 @@ impl MemoryClient {
     }
 
     /// Query agent success rates for a given failure type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails.
     pub async fn query_agent_success_rates(
         &self,
         failure_type: Option<&CiFailureType>,
@@ -268,6 +280,10 @@ impl MemoryClient {
     }
 
     /// Store a remediation outcome.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails.
     pub async fn store_remediation_outcome(
         &self,
         failure: &CiFailure,
@@ -327,6 +343,10 @@ impl MemoryClient {
     }
 
     /// Store a routing decision for learning.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails.
     pub async fn store_routing_decision(
         &self,
         failure_type: Option<&CiFailureType>,
@@ -382,6 +402,10 @@ impl MemoryClient {
     }
 
     /// Store an escalation event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails.
     pub async fn store_escalation(
         &self,
         failure: &CiFailure,
@@ -500,4 +524,3 @@ mod tests {
         assert_eq!(config.query_limit, 20);
     }
 }
-

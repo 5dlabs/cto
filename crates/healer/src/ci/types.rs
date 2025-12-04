@@ -19,7 +19,7 @@ pub enum Agent {
     Rex,
     /// Frontend specialist (JS, TS, npm, React)
     Blaze,
-    /// Infrastructure specialist (Docker, Helm, K8s, ArgoCD, GitOps)
+    /// Infrastructure specialist (Docker, Helm, K8s, `ArgoCD`, `GitOps`)
     Bolt,
     /// Security specialist (Dependabot, code scanning, secrets)
     Cipher,
@@ -91,7 +91,7 @@ pub enum CiFailureType {
     FrontendDeps,
     /// TypeScript compilation errors
     FrontendTypeScript,
-    /// ESLint errors
+    /// `ESLint` errors
     FrontendLint,
     /// Frontend test failures
     FrontendTest,
@@ -105,7 +105,7 @@ pub enum CiFailureType {
     HelmTemplate,
     /// Kubernetes manifest issues
     K8sManifest,
-    /// ArgoCD sync failures
+    /// `ArgoCD` sync failures
     ArgoCdSync,
     /// YAML syntax errors
     YamlSyntax,
@@ -395,7 +395,7 @@ impl CiFailure {
 /// Security alert event from GitHub.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityAlert {
-    /// Alert type (dependabot, code_scanning, secret_scanning)
+    /// Alert type (dependabot, `code_scanning`, `secret_scanning`)
     pub alert_type: String,
     /// Alert severity
     pub severity: String,
@@ -430,7 +430,7 @@ pub struct RemediationContext {
     pub pr: Option<PullRequest>,
     /// Changed files in the failing commit
     pub changed_files: Vec<ChangedFile>,
-    /// ArgoCD application status (if relevant)
+    /// `ArgoCD` application status (if relevant)
     pub argocd_status: Option<ArgoCdStatus>,
     /// Recent error logs from Loki
     pub recent_logs: String,
@@ -438,7 +438,7 @@ pub struct RemediationContext {
     pub pod_state: Option<PodState>,
     /// Error rate metrics from Prometheus
     pub error_rate: Option<f64>,
-    /// Historical context from OpenMemory
+    /// Historical context from `OpenMemory`
     pub historical: Option<HistoricalContext>,
     /// Previous remediation attempts (for retries)
     pub previous_attempts: Vec<RemediationAttempt>,
@@ -567,12 +567,12 @@ impl ChangedFile {
     }
 }
 
-/// ArgoCD application status.
+/// `ArgoCD` application status.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArgoCdStatus {
     /// Health status (Healthy, Progressing, Degraded, etc.)
     pub health: String,
-    /// Sync status (Synced, OutOfSync)
+    /// Sync status (Synced, `OutOfSync`)
     pub sync: String,
     /// List of unhealthy resources
     pub unhealthy_resources: Vec<String>,
@@ -612,7 +612,7 @@ pub struct CommitInfo {
     pub author: String,
 }
 
-/// Historical context from OpenMemory.
+/// Historical context from `OpenMemory`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HistoricalContext {
     /// Similar failures found in memory
@@ -623,7 +623,7 @@ pub struct HistoricalContext {
     pub known_solutions: Vec<MemoryEntry>,
 }
 
-/// A memory entry from OpenMemory.
+/// A memory entry from `OpenMemory`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
     /// Memory ID
@@ -676,9 +676,10 @@ impl RemediationState {
     }
 
     /// Record a new attempt.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn record_attempt(&mut self, outcome: AttemptOutcome, coderun_name: &str, agent: Agent) {
         let attempt = RemediationAttempt {
-            attempt_number: self.attempts.len() as u32 + 1,
+            attempt_number: u32::try_from(self.attempts.len()).unwrap_or_default() + 1,
             agent,
             coderun_name: coderun_name.to_string(),
             started_at: Utc::now(),
@@ -766,7 +767,7 @@ pub struct RemediationAttempt {
     pub attempt_number: u32,
     /// Agent that made this attempt
     pub agent: Agent,
-    /// Name of the CodeRun resource
+    /// Name of the `CodeRun` resource
     pub coderun_name: String,
     /// When the attempt started
     pub started_at: DateTime<Utc>,
@@ -815,7 +816,7 @@ pub struct RemediationConfig {
     pub max_attempts: u32,
     /// Time window (minutes) for deduplication
     pub time_window_mins: u32,
-    /// OpenMemory URL
+    /// `OpenMemory` URL
     pub memory_url: Option<String>,
     /// Whether to enable memory queries
     pub memory_enabled: bool,

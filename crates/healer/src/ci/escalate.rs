@@ -49,7 +49,11 @@ impl Escalator {
     }
 
     /// Escalate a failed remediation to humans.
-    pub async fn escalate(
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if all escalation methods fail.
+    pub fn escalate(
         &self,
         failure: &CiFailure,
         attempts: &[RemediationAttempt],
@@ -124,13 +128,11 @@ impl Escalator {
         for attempt in attempts {
             let duration = attempt
                 .duration()
-                .map(|d| format!("{}s", d.as_secs()))
-                .unwrap_or_else(|| "N/A".to_string());
+                .map_or_else(|| "N/A".to_string(), |d| format!("{}s", d.as_secs()));
 
             let outcome = attempt
                 .outcome
-                .map(|o| format!("{o:?}"))
-                .unwrap_or_else(|| "Unknown".to_string());
+                .map_or_else(|| "Unknown".to_string(), |o| format!("{o:?}"));
 
             let _ = writeln!(
                 msg,

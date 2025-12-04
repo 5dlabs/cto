@@ -32,7 +32,7 @@ pub struct ServerState {
     pub router: CiRouter,
     /// Context gatherer
     pub gatherer: ContextGatherer,
-    /// CodeRun spawner
+    /// `CodeRun` spawner
     pub spawner: RwLock<CodeRunSpawner>,
     /// Configuration
     pub config: RemediationConfig,
@@ -44,10 +44,33 @@ pub struct ServerState {
 
 impl ServerState {
     /// Create a new server state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `CodeRunSpawner` cannot be created or templates cannot be loaded.
     pub fn new(config: RemediationConfig, repository: &str, namespace: &str) -> Result<Self> {
         let router = CiRouter::new();
         let gatherer = ContextGatherer::new(repository, namespace);
-        let spawner = CodeRunSpawner::new(config.clone(), namespace, repository)?;
+        let mut spawner = CodeRunSpawner::new(config.clone(), namespace, repository)?;
+
+        // Load CI prompt templates from standard locations
+        // Try /app/prompts/ci first (production), then crates/healer/prompts/ci (dev)
+        let template_dirs = ["/app/prompts/ci", "crates/healer/prompts/ci", "prompts/ci"];
+        let mut loaded = false;
+        for dir in &template_dirs {
+            if std::path::Path::new(dir).exists() {
+                if let Err(e) = spawner.load_templates(dir) {
+                    warn!("Failed to load templates from {dir}: {e}");
+                } else {
+                    info!("Loaded CI templates from {dir}");
+                    loaded = true;
+                    break;
+                }
+            }
+        }
+        if !loaded {
+            warn!("No CI templates found, using generic prompts");
+        }
 
         Ok(Self {
             router,
@@ -73,6 +96,10 @@ pub fn build_router(state: Arc<ServerState>) -> Router {
 }
 
 /// Start the HTTP server.
+///
+/// # Errors
+///
+/// Returns an error if the server fails to start or bind to the address.
 pub async fn run_server(state: Arc<ServerState>, addr: &str) -> Result<()> {
     let app = build_router(state);
 
@@ -98,7 +125,7 @@ struct HealthResponse {
 /// CI failure event from webhook/sensor.
 #[derive(Debug, Deserialize)]
 pub struct CiFailureRequest {
-    /// GitHub workflow_job or check_run event
+    /// GitHub `workflow_job` or `check_run` event
     #[serde(flatten)]
     pub event: serde_json::Value,
 }
@@ -108,7 +135,7 @@ pub struct CiFailureRequest {
 pub struct CiFailureResponse {
     /// Request status
     pub status: ResponseStatus,
-    /// CodeRun name (if created)
+    /// `CodeRun` name (if created)
     pub coderun_name: Option<String>,
     /// Agent selected
     pub agent: Option<String>,
@@ -179,21 +206,18 @@ async fn ci_failure_handler(
     info!("Received CI failure event");
 
     // Parse the event
-    let failure = match parse_ci_failure(&request.event) {
-        Some(f) => f,
-        None => {
-            warn!("Could not parse CI failure event");
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(CiFailureResponse {
-                    status: ResponseStatus::Failed,
-                    coderun_name: None,
-                    agent: None,
-                    failure_type: None,
-                    reason: Some("Could not parse event".to_string()),
-                }),
-            );
-        }
+    let Some(failure) = parse_ci_failure(&request.event) else {
+        warn!("Could not parse CI failure event");
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(CiFailureResponse {
+                status: ResponseStatus::Failed,
+                coderun_name: None,
+                agent: None,
+                failure_type: None,
+                reason: Some("Could not parse event".to_string()),
+            }),
+        );
     };
 
     // Validate the event
@@ -583,4 +607,3 @@ mod tests {
         assert!(!should_process(&success, &config));
     }
 }
-

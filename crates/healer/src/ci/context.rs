@@ -2,7 +2,7 @@
 //!
 //! Collects diagnostic information from multiple sources:
 //! - GitHub: workflow logs, PR state, changed files
-//! - ArgoCD: application status, sync state
+//! - `ArgoCD`: application status, sync state
 //! - Loki: recent error logs
 //! - Kubernetes: pod state, events
 
@@ -20,7 +20,7 @@ pub struct ContextGatherer {
     repository: String,
     /// Namespace for Kubernetes operations
     namespace: String,
-    /// ArgoCD server URL (optional)
+    /// `ArgoCD` server URL (optional)
     argocd_url: Option<String>,
     /// Loki URL (optional)
     loki_url: Option<String>,
@@ -38,7 +38,7 @@ impl ContextGatherer {
         }
     }
 
-    /// Set ArgoCD URL.
+    /// Set `ArgoCD` URL.
     #[must_use]
     pub fn with_argocd(mut self, url: &str) -> Self {
         self.argocd_url = Some(url.to_string());
@@ -53,6 +53,11 @@ impl ContextGatherer {
     }
 
     /// Gather full context for a CI failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if critical context gathering fails. Most individual
+    /// context sources are fault-tolerant and will log warnings on failure.
     pub fn gather(&self, failure: &CiFailure) -> Result<RemediationContext> {
         let mut ctx = RemediationContext {
             failure: Some(failure.clone()),
@@ -102,6 +107,10 @@ impl ContextGatherer {
     }
 
     /// Fetch workflow logs using gh CLI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `gh` CLI command fails.
     pub fn fetch_workflow_logs(&self, run_id: u64) -> Result<String> {
         let output = Command::new("gh")
             .args([
@@ -141,6 +150,11 @@ impl ContextGatherer {
     }
 
     /// Fetch PR for a branch using gh CLI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `gh` CLI command fails to execute.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn fetch_pr_for_branch(&self, branch: &str) -> Result<Option<PullRequest>> {
         let output = Command::new("gh")
             .args([
@@ -180,23 +194,29 @@ impl ContextGatherer {
             mergeable: pr["mergeable"].as_str().map(|s| s == "MERGEABLE"),
             checks_status: pr["statusCheckRollup"]
                 .as_array()
-                .map(|checks| {
-                    let failed = checks
-                        .iter()
-                        .filter(|c| c["conclusion"].as_str() == Some("FAILURE"))
-                        .count();
-                    if failed > 0 {
-                        format!("{failed} checks failing")
-                    } else {
-                        "all passing".to_string()
-                    }
-                })
-                .unwrap_or_else(|| "unknown".to_string()),
+                .map_or_else(
+                    || "unknown".to_string(),
+                    |checks| {
+                        let failed = checks
+                            .iter()
+                            .filter(|c| c["conclusion"].as_str() == Some("FAILURE"))
+                            .count();
+                        if failed > 0 {
+                            format!("{failed} checks failing")
+                        } else {
+                            "all passing".to_string()
+                        }
+                    },
+                ),
             html_url: pr["url"].as_str().unwrap_or("").to_string(),
         }))
     }
 
     /// Fetch changed files for a commit using gh CLI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `gh` CLI command fails.
     pub fn fetch_changed_files(&self, sha: &str) -> Result<Vec<ChangedFile>> {
         let output = Command::new("gh")
             .args([
@@ -229,7 +249,11 @@ impl ContextGatherer {
         Ok(files)
     }
 
-    /// Fetch ArgoCD application status using argocd CLI or API.
+    /// Fetch `ArgoCD` application status using argocd CLI or API.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the kubectl command fails.
     pub fn fetch_argocd_status(&self, app_name: &str) -> Result<ArgoCdStatus> {
         // Try using kubectl to get ArgoCD app status
         let output = Command::new("kubectl")
@@ -260,6 +284,10 @@ impl ContextGatherer {
     }
 
     /// Fetch recent error logs from Loki.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if log fetching fails completely.
     pub fn fetch_loki_errors(&self, branch: &str) -> Result<String> {
         // This would typically use HTTP to query Loki
         // For now, use kubectl logs as a fallback
@@ -284,6 +312,10 @@ impl ContextGatherer {
     }
 
     /// Fetch pod state from Kubernetes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl commands fail.
     pub fn fetch_pod_state(&self, workflow_name: &str) -> Result<PodState> {
         // Get pod names
         let output = Command::new("kubectl")
@@ -330,6 +362,10 @@ impl ContextGatherer {
     }
 
     /// Fetch commits since a given SHA (for retry context).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `gh` CLI command fails.
     pub fn fetch_commits_since(&self, original_sha: &str, branch: &str) -> Result<Vec<serde_json::Value>> {
         let output = Command::new("gh")
             .args([
@@ -360,7 +396,11 @@ impl ContextGatherer {
         Ok(commits)
     }
 
-    /// Fetch CodeRun logs for retry context.
+    /// Fetch `CodeRun` logs for retry context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl logs command fails.
     pub fn fetch_coderun_logs(&self, coderun_name: &str) -> Result<String> {
         let output = Command::new("kubectl")
             .args([
@@ -383,6 +423,10 @@ impl ContextGatherer {
     }
 
     /// Post a comment on a PR.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `gh` CLI command fails.
     pub fn post_pr_comment(&self, pr_number: u32, comment: &str) -> Result<()> {
         let output = Command::new("gh")
             .args([
@@ -487,4 +531,3 @@ mod tests {
         assert!(!empty.mostly_frontend());
     }
 }
-
