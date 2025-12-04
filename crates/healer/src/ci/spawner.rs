@@ -21,8 +21,27 @@ use super::types::{Agent, CiFailureType, RemediationConfig, RemediationContext};
 // Handlebars Helpers
 // =============================================================================
 
+/// Extract an i64 from a helper parameter.
+///
+/// Handles both JSON numbers and numeric strings (needed for subexpression chaining,
+/// since subexpressions output strings that are passed to parent helpers).
+fn get_i64_param(h: &Helper, idx: usize) -> i64 {
+    h.param(idx)
+        .and_then(|v| {
+            let val = v.value();
+            // Try as JSON number first
+            val.as_i64().or_else(|| {
+                // Try parsing string (for subexpression outputs like "(subtract 3 1)" → "2")
+                val.as_str().and_then(|s| s.parse().ok())
+            })
+        })
+        .unwrap_or(0)
+}
+
 /// Greater-than-or-equal helper for Handlebars templates.
 /// Usage: `{{#if (gte attempt_number max_attempts)}}...{{/if}}`
+///
+/// Supports both direct number values and string outputs from subexpressions.
 fn gte_helper(
     h: &Helper,
     _: &Handlebars,
@@ -30,14 +49,8 @@ fn gte_helper(
     _: &mut RenderContext,
     out: &mut dyn Output,
 ) -> HelperResult {
-    let left = h
-        .param(0)
-        .and_then(|v| v.value().as_i64())
-        .unwrap_or(0);
-    let right = h
-        .param(1)
-        .and_then(|v| v.value().as_i64())
-        .unwrap_or(0);
+    let left = get_i64_param(h, 0);
+    let right = get_i64_param(h, 1);
 
     out.write(if left >= right { "true" } else { "" })?;
     Ok(())
@@ -45,6 +58,8 @@ fn gte_helper(
 
 /// Subtract helper for Handlebars templates.
 /// Usage: `{{subtract max_attempts 1}}`
+///
+/// Supports both direct number values and string outputs from subexpressions.
 fn subtract_helper(
     h: &Helper,
     _: &Handlebars,
@@ -52,14 +67,8 @@ fn subtract_helper(
     _: &mut RenderContext,
     out: &mut dyn Output,
 ) -> HelperResult {
-    let left = h
-        .param(0)
-        .and_then(|v| v.value().as_i64())
-        .unwrap_or(0);
-    let right = h
-        .param(1)
-        .and_then(|v| v.value().as_i64())
-        .unwrap_or(0);
+    let left = get_i64_param(h, 0);
+    let right = get_i64_param(h, 1);
 
     out.write(&(left - right).to_string())?;
     Ok(())
@@ -193,8 +202,13 @@ impl CodeRunSpawner {
         let time_window_secs = i64::from(self.config.time_window_mins) * 60;
         let cutoff = Utc::now() - chrono::Duration::seconds(time_window_secs);
 
+        // Sanitize branch name to match how it's stored in CodeRun labels
+        // (e.g., "feat/new-feature" → "feat-new-feature")
+        let sanitized_branch = sanitize_label(branch);
+
         // Get CodeRuns created after cutoff
-        let label_selector = format!("app.kubernetes.io/name=healer,healer/branch={branch}");
+        let label_selector =
+            format!("app.kubernetes.io/name=healer,healer/branch={sanitized_branch}");
 
         // Use tab delimiter to avoid conflicts with RFC 3339 timestamps (which contain colons)
         let output = Command::new("kubectl")
