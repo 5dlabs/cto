@@ -15,7 +15,7 @@ pub struct TaskState {
     pub status: TaskStatus,
     /// PR number once created
     pub pr_number: Option<u32>,
-    /// Active CodeRun name
+    /// Active `CodeRun` name
     pub active_coderun: Option<String>,
     /// Detected issues
     pub issues: Vec<Issue>,

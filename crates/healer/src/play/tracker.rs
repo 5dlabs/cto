@@ -32,6 +32,10 @@ impl PlayTracker {
     }
 
     /// Load tracker from K8s state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading from Kubernetes fails.
     pub fn load(namespace: &str) -> Result<Self> {
         let batch = PlayBatch::load_from_k8s(namespace)?;
         Ok(Self::new(batch))
@@ -70,15 +74,21 @@ impl PlayTracker {
     }
 
     /// Spawn a code-fixing remediation for an issue.
-    pub async fn remediate(&self, issue: &Issue) -> Result<RemediationState> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context gathering, diagnosis, or spawning fails.
+    pub fn remediate(&self, issue: &Issue) -> Result<RemediationState> {
         // 1. Gather context (logs, code, agent output)
-        let context = self.remediation.gather_context(issue, &self.batch).await?;
+        let context = self.remediation.gather_context(issue, &self.batch)?;
 
         // 2. Diagnose root cause
-        let diagnosis = self.remediation.diagnose(&context).await?;
+        let diagnosis = self.remediation.diagnose(&context)?;
 
-        // 3. Spawn Healer CodeRun to fix the code
-        let coderun_name = self.remediation.spawn_fix_coderun(&diagnosis).await?;
+        // 3. Spawn Healer CodeRun to fix the code (passing task_id for cancellation)
+        let coderun_name = self
+            .remediation
+            .spawn_fix_coderun(issue.task_id(), &diagnosis)?;
 
         Ok(RemediationState {
             coderun_name,
@@ -124,7 +134,7 @@ impl PlayTracker {
 
     /// Get tasks grouped by health status.
     #[must_use]
-    pub fn tasks_by_health(&self) -> TasksByHealth {
+    pub fn tasks_by_health(&self) -> TasksByHealth<'_> {
         let mut healthy = vec![];
         let mut stuck = vec![];
         let mut failed = vec![];

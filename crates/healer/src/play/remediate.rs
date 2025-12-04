@@ -6,9 +6,9 @@ use std::process::Command;
 use super::batch::PlayBatch;
 use super::types::{Diagnosis, DiagnosisCategory, DiagnosisContext, Issue, PrContext};
 
-/// Engine for gathering context and spawning fix CodeRuns.
+/// Engine for gathering context and spawning fix `CodeRuns`.
 pub struct RemediationEngine {
-    /// Namespace for CodeRuns
+    /// Namespace for `CodeRuns`
     namespace: String,
 }
 
@@ -30,7 +30,11 @@ impl RemediationEngine {
     }
 
     /// Gather context for diagnosing an issue.
-    pub async fn gather_context(&self, issue: &Issue, batch: &PlayBatch) -> Result<DiagnosisContext> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if gathering context fails.
+    pub fn gather_context(&self, issue: &Issue, batch: &PlayBatch) -> Result<DiagnosisContext> {
         let mut context = DiagnosisContext::default();
 
         let task_id = issue.task_id();
@@ -39,11 +43,11 @@ impl RemediationEngine {
         // Get logs from Loki if we have a workflow/coderun name
         if let Some(task) = task {
             if let Some(ref coderun) = task.active_coderun {
-                context.logs = self.fetch_pod_logs(coderun).await.unwrap_or_default();
+                context.logs = self.fetch_pod_logs(coderun).unwrap_or_default();
             }
             if let Some(ref workflow) = task.workflow_name {
                 if context.logs.is_empty() {
-                    context.logs = self.fetch_workflow_logs(workflow).await.unwrap_or_default();
+                    context.logs = self.fetch_workflow_logs(workflow).unwrap_or_default();
                 }
             }
         }
@@ -51,7 +55,7 @@ impl RemediationEngine {
         // Get PR context if we have a PR number
         if let Some(task) = task {
             if let Some(pr_number) = task.pr_number {
-                context.pr_state = self.fetch_pr_context(&batch.repository, pr_number).await.ok();
+                context.pr_state = self.fetch_pr_context(&batch.repository, pr_number).ok();
             }
         }
 
@@ -62,7 +66,7 @@ impl RemediationEngine {
     }
 
     /// Fetch pod logs from Loki.
-    async fn fetch_pod_logs(&self, pod_name: &str) -> Result<String> {
+    fn fetch_pod_logs(&self, pod_name: &str) -> Result<String> {
         // Use kubectl logs as fallback (Loki query would be better)
         let output = Command::new("kubectl")
             .args([
@@ -96,7 +100,7 @@ impl RemediationEngine {
     }
 
     /// Fetch workflow logs.
-    async fn fetch_workflow_logs(&self, workflow_name: &str) -> Result<String> {
+    fn fetch_workflow_logs(&self, workflow_name: &str) -> Result<String> {
         let output = Command::new("kubectl")
             .args([
                 "logs",
@@ -114,7 +118,8 @@ impl RemediationEngine {
     }
 
     /// Fetch PR context from GitHub.
-    async fn fetch_pr_context(&self, repository: &str, pr_number: u32) -> Result<PrContext> {
+    #[allow(clippy::unused_self)]
+    fn fetch_pr_context(&self, repository: &str, pr_number: u32) -> Result<PrContext> {
         let output = Command::new("gh")
             .args([
                 "pr",
@@ -141,17 +146,20 @@ impl RemediationEngine {
             mergeable: json["mergeable"].as_str() == Some("MERGEABLE"),
             checks_status: json["statusCheckRollup"]
                 .as_array()
-                .map(|arr| {
+                .map_or_else(|| "unknown".to_string(), |arr| {
                     let passed = arr.iter().filter(|c| c["conclusion"] == "SUCCESS").count();
                     let total = arr.len();
                     format!("{passed}/{total} passed")
-                })
-                .unwrap_or_else(|| "unknown".to_string()),
+                }),
         })
     }
 
     /// Diagnose the root cause of an issue.
-    pub async fn diagnose(&self, context: &DiagnosisContext) -> Result<Diagnosis> {
+    ///
+    /// # Errors
+    ///
+    /// This function currently always succeeds but may fail in the future.
+    pub fn diagnose(&self, context: &DiagnosisContext) -> Result<Diagnosis> {
         // Simple pattern-based diagnosis
         let logs = &context.logs;
         let agent_output = &context.agent_output;
@@ -215,8 +223,14 @@ impl RemediationEngine {
         })
     }
 
-    /// Spawn a Healer CodeRun to fix the diagnosed issue.
-    pub async fn spawn_fix_coderun(&self, diagnosis: &Diagnosis) -> Result<String> {
+    /// Spawn a Healer `CodeRun` to fix the diagnosed issue.
+    ///
+    /// The `task_id` is used to label the `CodeRun` for later cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl fails to apply the `CodeRun` resource.
+    pub fn spawn_fix_coderun(&self, task_id: &str, diagnosis: &Diagnosis) -> Result<String> {
         let coderun_name = format!(
             "healer-fix-{}",
             uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown")
@@ -243,6 +257,7 @@ Do NOT just restart or retry - fix the underlying issue in code.
         );
 
         // Create the CodeRun YAML
+        // Labels include task-id for cancellation via CancelRemediation command
         let coderun_yaml = format!(
             r"apiVersion: cto.5dlabs.io/v1alpha1
 kind: CodeRun
@@ -252,6 +267,7 @@ metadata:
   labels:
     app.kubernetes.io/name: healer
     app.kubernetes.io/component: remediation
+    task-id: '{}'
 spec:
   cli: claude
   model: sonnet
@@ -263,6 +279,7 @@ spec:
 ",
             coderun_name,
             self.namespace,
+            task_id,
             prompt.lines().map(|l| format!("    {l}")).collect::<Vec<_>>().join("\n")
         );
 
@@ -295,4 +312,3 @@ impl Default for RemediationEngine {
         Self::new()
     }
 }
-

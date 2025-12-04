@@ -31,6 +31,10 @@ impl PlayCleanup {
     }
 
     /// Check if cleanup is safe (no running tasks).
+    ///
+    /// # Errors
+    ///
+    /// This function currently does not return errors but may in the future.
     pub fn can_cleanup(&self, batch: &PlayBatch) -> Result<bool> {
         if self.force {
             return Ok(true);
@@ -45,6 +49,10 @@ impl PlayCleanup {
     }
 
     /// Perform cleanup of all play state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tasks are still running (without force) or kubectl fails.
     pub fn cleanup(&self, batch: &PlayBatch) -> Result<CleanupReport> {
         let mut report = CleanupReport::default();
 
@@ -55,10 +63,10 @@ impl PlayCleanup {
             );
         }
 
-        // Delete play-task-* ConfigMaps
+        // Delete play-task-* `ConfigMaps`
         report.configmaps_deleted = self.delete_task_configmaps()?;
 
-        // Delete any remediation CodeRuns
+        // Delete any remediation `CodeRuns`
         report.coderuns_deleted = self.delete_remediation_coderuns();
 
         // Delete any play-related workflows
@@ -67,7 +75,7 @@ impl PlayCleanup {
         Ok(report)
     }
 
-    /// Delete play-task-* ConfigMaps.
+    /// Delete play-task-* `ConfigMaps`.
     fn delete_task_configmaps(&self) -> Result<usize> {
         // First, list the ConfigMaps
         let output = Command::new("kubectl")
@@ -109,7 +117,7 @@ impl PlayCleanup {
         Ok(deleted)
     }
 
-    /// Delete healer remediation CodeRuns.
+    /// Delete healer remediation `CodeRuns`.
     fn delete_remediation_coderuns(&self) -> usize {
         // List healer-fix-* CodeRuns
         let output = Command::new("kubectl")
@@ -200,6 +208,10 @@ impl PlayCleanup {
     }
 
     /// Cleanup a specific task's state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl fails.
     pub fn cleanup_task(&self, task_id: &str) -> Result<()> {
         let configmap_name = format!("play-task-{task_id}");
 
@@ -226,9 +238,9 @@ impl PlayCleanup {
 /// Report of what was cleaned up.
 #[derive(Debug, Default)]
 pub struct CleanupReport {
-    /// Number of ConfigMaps deleted
+    /// Number of `ConfigMaps` deleted
     pub configmaps_deleted: usize,
-    /// Number of CodeRuns deleted
+    /// Number of `CodeRuns` deleted
     pub coderuns_deleted: usize,
     /// Number of Workflows deleted
     pub workflows_deleted: usize,
@@ -257,4 +269,3 @@ impl std::fmt::Display for CleanupReport {
         )
     }
 }
-

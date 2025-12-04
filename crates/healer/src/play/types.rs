@@ -75,8 +75,7 @@ impl TaskStatus {
     #[must_use]
     pub fn current_stage(&self) -> Option<Stage> {
         match self {
-            Self::InProgress { stage, .. } => Some(*stage),
-            Self::Failed { stage, .. } => Some(*stage),
+            Self::InProgress { stage, .. } | Self::Failed { stage, .. } => Some(*stage),
             _ => None,
         }
     }
@@ -94,7 +93,7 @@ impl TaskStatus {
 /// State of an active remediation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemediationState {
-    /// Name of the Healer CodeRun
+    /// Name of the Healer `CodeRun`
     pub coderun_name: String,
     /// Summary of the diagnosis
     pub diagnosis: String,

@@ -47,10 +47,14 @@ impl PlayBatch {
         }
     }
 
-    /// Load batch state from Kubernetes ConfigMaps.
+    /// Load batch state from Kubernetes `ConfigMaps`.
     ///
-    /// Queries for all `play-task-*` ConfigMaps in the specified namespace
+    /// Queries for all `play-task-*` `ConfigMaps` in the specified namespace
     /// and reconstructs the batch state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kubectl fails or JSON parsing fails.
     pub fn load_from_k8s(namespace: &str) -> Result<Self> {
         // Get all play-task-* ConfigMaps
         let output = Command::new("kubectl")
@@ -92,7 +96,7 @@ impl PlayBatch {
         Self::parse_configmaps(&output.stdout, namespace)
     }
 
-    /// Parse ConfigMap JSON output into a batch.
+    /// Parse `ConfigMap` JSON output into a batch.
     fn parse_configmaps(json_output: &[u8], namespace: &str) -> Result<Self> {
         let json_str = String::from_utf8_lossy(json_output);
         let value: serde_json::Value =
@@ -156,8 +160,7 @@ impl PlayBatch {
                     let started = data["last-updated"]
                         .as_str()
                         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(Utc::now);
+                        .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
                     task.status = TaskStatus::InProgress {
                         stage,

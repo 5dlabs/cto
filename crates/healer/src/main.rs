@@ -6461,9 +6461,8 @@ fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
             if let Some(issue) = task_issue {
                 println!("{}", format!("Spawning remediation for task {task_id}...").cyan());
 
-                // Run async remediation
-                let rt = tokio::runtime::Runtime::new()?;
-                let result = rt.block_on(tracker.remediate(issue))?;
+                // Run remediation
+                let result = tracker.remediate(issue)?;
 
                 println!("{}", "Remediation spawned:".green().bold());
                 println!("  CodeRun: {}", result.coderun_name.cyan());
@@ -6550,6 +6549,7 @@ fn print_batch_status(tracker: &play::PlayTracker) {
     println!();
 
     // Progress bar
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let progress_filled = (summary.progress / 100.0 * 30.0) as usize;
     let progress_empty = 30 - progress_filled;
     println!(
@@ -6606,9 +6606,9 @@ fn print_batch_status(tracker: &play::PlayTracker) {
 
 /// Print a single task row.
 fn print_task_row(task: &play::TaskState) {
-    let stage = task.current_stage()
-        .map(|s| s.display_name().to_string())
-        .unwrap_or_else(|| "-".to_string());
+    let stage = task
+        .current_stage()
+        .map_or_else(|| "-".to_string(), |s| s.display_name().to_string());
 
     let status = match &task.status {
         play::types::TaskStatus::Pending => "Pending".dimmed(),
@@ -6617,13 +6617,13 @@ fn print_task_row(task: &play::TaskState) {
         play::types::TaskStatus::Failed { .. } => "Failed".red(),
     };
 
-    let duration = task.stage_duration()
-        .map(|d| format!("{}m", d.num_minutes()))
-        .unwrap_or_else(|| "-".to_string());
+    let duration = task
+        .stage_duration()
+        .map_or_else(|| "-".to_string(), |d| format!("{}m", d.num_minutes()));
 
-    let pr = task.pr_number
-        .map(|n| format!("#{n}"))
-        .unwrap_or_else(|| "-".to_string());
+    let pr = task
+        .pr_number
+        .map_or_else(|| "-".to_string(), |n| format!("#{n}"));
 
     let health = match task.health_indicator() {
         "healthy" => "OK".green(),
@@ -6647,9 +6647,9 @@ fn print_task_detail(task: &play::TaskState) {
     println!();
 
     // Stage info
-    let stage = task.current_stage()
-        .map(|s| s.display_name().to_string())
-        .unwrap_or_else(|| "-".to_string());
+    let stage = task
+        .current_stage()
+        .map_or_else(|| "-".to_string(), |s| s.display_name().to_string());
     let agent = task.current_stage()
         .and_then(|s| s.agent())
         .unwrap_or("-");

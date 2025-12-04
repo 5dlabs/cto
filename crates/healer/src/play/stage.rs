@@ -92,7 +92,7 @@ impl Stage {
         }
     }
 
-    /// Parse a stage from a ConfigMap stage string.
+    /// Parse a stage from a `ConfigMap` stage string.
     #[must_use]
     pub fn from_configmap_value(value: &str) -> Option<Self> {
         match value.to_lowercase().as_str() {
