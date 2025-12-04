@@ -31,6 +31,8 @@ pub struct BootstrapConfig {
     pub output_dir: PathBuf,
     /// Talos version string (e.g., "v1.9.0").
     pub talos_version: String,
+    /// Optional config patches (YAML) to apply.
+    pub config_patches: Vec<String>,
 }
 
 impl BootstrapConfig {
@@ -43,6 +45,7 @@ impl BootstrapConfig {
             install_disk: "/dev/sda".to_string(),
             output_dir: PathBuf::from("/tmp/talos-bootstrap"),
             talos_version: "v1.9.0".to_string(),
+            config_patches: Vec::new(),
         }
     }
 
@@ -65,6 +68,25 @@ impl BootstrapConfig {
     pub fn with_talos_version(mut self, version: impl Into<String>) -> Self {
         self.talos_version = version.into();
         self
+    }
+
+    /// Add a config patch (inline YAML).
+    #[must_use]
+    pub fn with_config_patch(mut self, patch: impl Into<String>) -> Self {
+        self.config_patches.push(patch.into());
+        self
+    }
+
+    /// Configure kube-proxy mode (iptables or ipvs).
+    /// Use "disabled" to disable kube-proxy entirely (for Cilium replacement).
+    #[must_use]
+    pub fn with_kube_proxy_mode(self, mode: &str) -> Self {
+        let patch = match mode {
+            "disabled" => "cluster:\n  proxy:\n    disabled: true\n".to_string(),
+            "ipvs" => "cluster:\n  proxy:\n    mode: ipvs\n".to_string(),
+            _ => "cluster:\n  proxy:\n    mode: iptables\n".to_string(),
+        };
+        self.with_config_patch(patch)
     }
 }
 
@@ -173,20 +195,26 @@ pub fn generate_config(config: &BootstrapConfig) -> Result<GeneratedConfigs> {
         "Generating Talos config for cluster '{}'...",
         config.cluster_name
     );
-    let output = Command::new("talosctl")
-        .args([
-            "gen",
-            "config",
-            &config.cluster_name,
-            &endpoint,
-            "--with-secrets",
-        ])
-        .arg(&secrets_path)
-        .args(["--output-dir"])
-        .arg(&config.output_dir)
-        .args(["--install-disk", &config.install_disk])
-        .output()
-        .context("Failed to run talosctl gen config")?;
+
+    let mut cmd = Command::new("talosctl");
+    cmd.args([
+        "gen",
+        "config",
+        &config.cluster_name,
+        &endpoint,
+        "--with-secrets",
+    ])
+    .arg(&secrets_path)
+    .args(["--output-dir"])
+    .arg(&config.output_dir)
+    .args(["--install-disk", &config.install_disk]);
+
+    // Add any config patches
+    for patch in &config.config_patches {
+        cmd.args(["--config-patch", patch]);
+    }
+
+    let output = cmd.output().context("Failed to run talosctl gen config")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

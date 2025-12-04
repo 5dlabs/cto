@@ -10,6 +10,8 @@ use tracing_subscriber::EnvFilter;
 
 use cto_metal::providers::latitude::Latitude;
 use cto_metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
+use cto_metal::stack;
+use cto_metal::state::{ClusterState, ProvisionStep, RetryConfig, with_retry_async};
 use cto_metal::talos::{self, BootstrapConfig, TalosConfig};
 use tokio::task::JoinSet;
 
@@ -234,6 +236,19 @@ enum Commands {
         /// Timeout in seconds to wait for each step.
         #[arg(long, default_value = "1200")]
         timeout: u64,
+
+        /// Resume from saved state if interrupted.
+        #[arg(long, default_value = "false")]
+        resume: bool,
+
+        /// Deploy the platform stack after cluster bootstrap.
+        /// Installs: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows.
+        #[arg(long, default_value = "false")]
+        deploy_stack: bool,
+
+        /// Initialize and unseal Vault after deployment (requires --deploy-stack).
+        #[arg(long, default_value = "false")]
+        init_vault: bool,
     },
 
     /// Join a worker node to an existing Talos cluster.
@@ -280,6 +295,59 @@ enum Commands {
         /// Timeout in seconds to wait for each step.
         #[arg(long, default_value = "900")]
         timeout: u64,
+    },
+
+    /// Deploy the CTO platform stack to an existing cluster.
+    ///
+    /// Deploys Argo CD, Cert-Manager, Vault, and Ingress to the cluster.
+    Stack {
+        /// Path to kubeconfig for the cluster.
+        #[arg(long)]
+        kubeconfig: PathBuf,
+
+        /// Deploy only Argo CD.
+        #[arg(long, default_value = "false")]
+        argocd_only: bool,
+
+        /// Deploy only Cert-Manager.
+        #[arg(long, default_value = "false")]
+        cert_manager_only: bool,
+
+        /// Deploy only Vault.
+        #[arg(long, default_value = "false")]
+        vault_only: bool,
+
+        /// Deploy only Ingress.
+        #[arg(long, default_value = "false")]
+        ingress_only: bool,
+
+        /// Initialize and unseal Vault after deployment.
+        #[arg(long, default_value = "false")]
+        init_vault: bool,
+    },
+
+    /// Initialize and unseal Vault.
+    ///
+    /// Run this after deploying Vault for the first time.
+    VaultInit {
+        /// Path to kubeconfig for the cluster.
+        #[arg(long)]
+        kubeconfig: PathBuf,
+
+        /// Output file for Vault credentials (JSON).
+        #[arg(long, default_value = "vault-init.json")]
+        output: PathBuf,
+    },
+
+    /// Unseal an existing Vault instance.
+    VaultUnseal {
+        /// Path to kubeconfig for the cluster.
+        #[arg(long)]
+        kubeconfig: PathBuf,
+
+        /// Unseal key (base64 encoded).
+        #[arg(long)]
+        unseal_key: String,
     },
 }
 
@@ -630,156 +698,260 @@ async fn main() -> Result<()> {
             install_disk,
             output_dir,
             timeout,
+            resume,
+            deploy_stack,
+            init_vault,
         } => {
             info!("Provisioning 2-node cluster: {name}");
 
+            let retry_config = RetryConfig::default();
             let cp_hostname = format!("{name}-cp1");
             let worker_hostname = format!("{name}-worker1");
+
+            // Check for existing state to resume
+            let mut state = if resume {
+                if let Some(existing) = ClusterState::load(&output_dir)? {
+                    if existing.can_resume() {
+                        println!("📂 Found saved state at step {:?}", existing.step);
+                        println!("   Resuming from last checkpoint...");
+                        existing
+                    } else {
+                        println!("📂 Found completed/failed state, starting fresh");
+                        ClusterState::new(&name, &output_dir)
+                    }
+                } else {
+                    ClusterState::new(&name, &output_dir)
+                }
+            } else {
+                ClusterState::new(&name, &output_dir)
+            };
 
             // Create second provider instance for parallel ops
             let provider2 = Latitude::new(&cli.api_key, &cli.project_id)
                 .context("Failed to create second Latitude provider")?;
 
-            // Step 1: Create BOTH servers in parallel
-            println!("\n🖥️  Step 1/9: Creating both servers in parallel...");
+            // Variables to track server state (may be restored from saved state)
+            let (cp_id, worker_id, cp_addr, worker_addr) = if state.step >= ProvisionStep::WaitingServersReady {
+                // Restore from saved state
+                let cp = state.control_plane.as_ref()
+                    .context("No control plane in saved state")?;
+                let wk = state.worker.as_ref()
+                    .context("No worker in saved state")?;
+                println!("📂 Restored server info from state:");
+                println!("   Control Plane: {} ({})", cp.id, cp.ip);
+                println!("   Worker:        {} ({})", wk.id, wk.ip);
+                (cp.id.clone(), wk.id.clone(), cp.ip.clone(), wk.ip.clone())
+            } else {
+                // Step 1: Create BOTH servers in parallel
+                state.set_step(ProvisionStep::CreatingServers)?;
+                println!("\n🖥️  Step 1/9: Creating both servers in parallel...");
 
-            let cp_req = CreateServerRequest {
-                hostname: cp_hostname.clone(),
-                plan: cp_plan,
-                region: region.clone(),
-                os: "ubuntu_24_04_x64_lts".to_string(),
-                ssh_keys: ssh_keys.clone(),
+                let cp_req = CreateServerRequest {
+                    hostname: cp_hostname.clone(),
+                    plan: cp_plan,
+                    region: region.clone(),
+                    os: "ubuntu_24_04_x64_lts".to_string(),
+                    ssh_keys: ssh_keys.clone(),
+                };
+                let worker_req = CreateServerRequest {
+                    hostname: worker_hostname.clone(),
+                    plan: worker_plan,
+                    region,
+                    os: "ubuntu_24_04_x64_lts".to_string(),
+                    ssh_keys,
+                };
+
+                // Use retry for API calls
+                let (cp_server, worker_server) = with_retry_async(&retry_config, "Create servers", || {
+                    let p1 = &provider;
+                    let p2 = &provider2;
+                    let cp = cp_req.clone();
+                    let wk = worker_req.clone();
+                    async move {
+                        tokio::try_join!(p1.create_server(cp), p2.create_server(wk))
+                            .map_err(|e| anyhow::anyhow!("{e}"))
+                    }
+                }).await?;
+
+                let cp_id = cp_server.id.clone();
+                let worker_id = worker_server.id.clone();
+                let cp_ip = cp_server.ipv4.clone().unwrap_or_default();
+                let wk_ip = worker_server.ipv4.clone().unwrap_or_default();
+
+                println!("   Control Plane: {cp_id} ({cp_ip})");
+                println!("   Worker:        {worker_id} ({wk_ip})");
+
+                // Save server info to state
+                state.set_control_plane(cp_id.clone(), cp_ip.clone(), cp_hostname.clone())?;
+                state.set_worker(worker_id.clone(), wk_ip.clone(), worker_hostname.clone())?;
+
+                // Step 2: Wait for BOTH servers to be ready in parallel
+                state.set_step(ProvisionStep::WaitingServersReady)?;
+                println!("\n⏳ Step 2/9: Waiting for both servers to be ready...");
+
+                let (cp_ready, worker_ready) = with_retry_async(&retry_config, "Wait for servers", || {
+                    let p1 = &provider;
+                    let p2 = &provider2;
+                    let cid = cp_id.clone();
+                    let wid = worker_id.clone();
+                    async move {
+                        tokio::try_join!(p1.wait_ready(&cid, timeout), p2.wait_ready(&wid, timeout))
+                            .map_err(|e| anyhow::anyhow!("{e}"))
+                    }
+                }).await?;
+
+                let cp_addr = cp_ready.ipv4.clone().unwrap_or_default();
+                let worker_addr = worker_ready.ipv4.clone().unwrap_or_default();
+                println!("   ✅ Control plane ready: {cp_addr}");
+                println!("   ✅ Worker ready: {worker_addr}");
+
+                // Update state with actual IPs
+                state.set_control_plane(cp_id.clone(), cp_addr.clone(), cp_hostname.clone())?;
+                state.set_worker(worker_id.clone(), worker_addr.clone(), worker_hostname.clone())?;
+
+                (cp_id, worker_id, cp_addr, worker_addr)
             };
-            let worker_req = CreateServerRequest {
-                hostname: worker_hostname.clone(),
-                plan: worker_plan,
-                region,
-                os: "ubuntu_24_04_x64_lts".to_string(),
-                ssh_keys,
-            };
 
-            let (cp_server, worker_server) = tokio::try_join!(
-                provider.create_server(cp_req),
-                provider2.create_server(worker_req),
-            )?;
+            // Step 3: Trigger Talos iPXE on BOTH (skip if already past this step)
+            if state.step < ProvisionStep::WaitingTalos {
+                state.set_step(ProvisionStep::WaitingTalos)?;
+                println!("\n🔄 Step 3/9: Triggering Talos iPXE boot on both...");
 
-            let cp_id = cp_server.id.clone();
-            let worker_id = worker_server.id.clone();
-            println!(
-                "   Control Plane: {} ({})",
-                cp_id,
-                cp_server.ipv4.clone().unwrap_or_default()
-            );
-            println!(
-                "   Worker:        {} ({})",
-                worker_id,
-                worker_server.ipv4.clone().unwrap_or_default()
-            );
-
-            // Step 2: Wait for BOTH servers to be ready in parallel
-            println!("\n⏳ Step 2/9: Waiting for both servers to be ready...");
-            let (cp_ready, worker_ready) = tokio::try_join!(
-                provider.wait_ready(&cp_id, timeout),
-                provider2.wait_ready(&worker_id, timeout),
-            )?;
-
-            let cp_addr = cp_ready.ipv4.clone().unwrap_or_default();
-            let worker_addr = worker_ready.ipv4.clone().unwrap_or_default();
-            println!("   ✅ Control plane ready: {cp_addr}");
-            println!("   ✅ Worker ready: {worker_addr}");
-
-            // Step 3: Trigger Talos iPXE on BOTH in parallel
-            println!("\n🔄 Step 3/9: Triggering Talos iPXE boot on both...");
-            let talos_cfg =
-                TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
+                let talos_cfg = TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
                     &talos_version,
                     cto_metal::talos::DEFAULT_SCHEMATIC_ID,
                 ));
-            let ipxe_url = talos_cfg.ipxe_url();
+                let ipxe_url = talos_cfg.ipxe_url();
 
-            let cp_ipxe = ReinstallIpxeRequest {
-                hostname: cp_hostname.clone(),
-                ipxe_url: ipxe_url.clone(),
-            };
-            let worker_ipxe = ReinstallIpxeRequest {
-                hostname: worker_hostname.clone(),
-                ipxe_url,
-            };
+                let cp_ipxe = ReinstallIpxeRequest {
+                    hostname: cp_hostname.clone(),
+                    ipxe_url: ipxe_url.clone(),
+                };
+                let worker_ipxe = ReinstallIpxeRequest {
+                    hostname: worker_hostname.clone(),
+                    ipxe_url,
+                };
 
-            tokio::try_join!(
-                provider.reinstall_ipxe(&cp_id, cp_ipxe),
-                provider2.reinstall_ipxe(&worker_id, worker_ipxe),
-            )?;
-            println!("   ✅ iPXE triggered on both servers!");
+                with_retry_async(&retry_config, "Trigger iPXE", || {
+                    let p1 = &provider;
+                    let p2 = &provider2;
+                    let cid = cp_id.clone();
+                    let wid = worker_id.clone();
+                    let cipxe = cp_ipxe.clone();
+                    let wipxe = worker_ipxe.clone();
+                    async move {
+                        tokio::try_join!(p1.reinstall_ipxe(&cid, cipxe), p2.reinstall_ipxe(&wid, wipxe))
+                            .map_err(|e| anyhow::anyhow!("{e}"))
+                    }
+                }).await?;
+                println!("   ✅ iPXE triggered on both servers!");
+            } else {
+                println!("\n⏭️  Step 3/9: Skipping iPXE (already triggered)");
+            }
 
-            // Step 4: Wait for BOTH to enter Talos maintenance mode in parallel
-            println!("\n📡 Step 4/9: Waiting for Talos maintenance mode on both...");
-            println!("   (This typically takes 10-15 minutes for iPXE boot)");
+            // Step 4: Wait for BOTH to enter Talos maintenance mode
+            if state.step <= ProvisionStep::WaitingTalos {
+                println!("\n📡 Step 4/9: Waiting for Talos maintenance mode on both...");
+                println!("   (This typically takes 10-15 minutes for iPXE boot)");
 
-            // Use a JoinSet to poll both in parallel
-            let cp_poll = cp_addr.clone();
-            let worker_poll = worker_addr.clone();
-            let timeout_duration = Duration::from_secs(timeout);
+                let cp_poll = cp_addr.clone();
+                let worker_poll = worker_addr.clone();
+                let timeout_duration = Duration::from_secs(timeout);
 
-            let mut set = JoinSet::new();
-            set.spawn(async move {
-                talos::wait_for_talos(&cp_poll, timeout_duration)?;
-                Ok::<_, anyhow::Error>(("cp", cp_poll))
-            });
-            set.spawn(async move {
-                talos::wait_for_talos(&worker_poll, timeout_duration)?;
-                Ok::<_, anyhow::Error>(("worker", worker_poll))
-            });
+                let mut set = JoinSet::new();
+                set.spawn(async move {
+                    talos::wait_for_talos(&cp_poll, timeout_duration)?;
+                    Ok::<_, anyhow::Error>(("cp", cp_poll))
+                });
+                set.spawn(async move {
+                    talos::wait_for_talos(&worker_poll, timeout_duration)?;
+                    Ok::<_, anyhow::Error>(("worker", worker_poll))
+                });
 
-            while let Some(result) = set.join_next().await {
-                match result {
-                    Ok(Ok((node, addr))) => println!("   ✅ {node} Talos ready: {addr}"),
-                    Ok(Err(e)) => anyhow::bail!("Failed waiting for Talos: {e}"),
-                    Err(e) => anyhow::bail!("Task panicked: {e}"),
+                while let Some(result) = set.join_next().await {
+                    match result {
+                        Ok(Ok((node, addr))) => {
+                            println!("   ✅ {node} Talos ready: {addr}");
+                            if node == "cp" {
+                                state.set_cp_talos_ready()?;
+                            } else {
+                                state.set_worker_talos_ready()?;
+                            }
+                        }
+                        Ok(Err(e)) => anyhow::bail!("Failed waiting for Talos: {e}"),
+                        Err(e) => anyhow::bail!("Task panicked: {e}"),
+                    }
                 }
+            } else {
+                println!("\n⏭️  Step 4/9: Skipping Talos wait (already ready)");
             }
 
             // Step 5: Generate secrets and config
-            println!("\n🔐 Step 5/9: Generating secrets and configs...");
-            talos::generate_secrets(&output_dir)?;
+            if state.step < ProvisionStep::GeneratingConfigs {
+                state.set_step(ProvisionStep::GeneratingConfigs)?;
+                println!("\n🔐 Step 5/9: Generating secrets and configs...");
+                talos::generate_secrets(&output_dir)?;
+            } else {
+                println!("\n⏭️  Step 5/9: Skipping config generation (already done)");
+            }
 
             let config = BootstrapConfig::new(&name, &cp_addr)
                 .with_install_disk(&install_disk)
                 .with_output_dir(&output_dir)
                 .with_talos_version(&talos_version);
             let configs = talos::generate_config(&config)?;
+            let kubeconfig_path = output_dir.join("kubeconfig");
 
             // Step 6: Apply config to control plane
-            println!("\n🚀 Step 6/9: Applying config to control plane...");
-            talos::apply_config(&cp_addr, &configs.controlplane)?;
+            if state.step < ProvisionStep::ApplyingCpConfig {
+                state.set_step(ProvisionStep::ApplyingCpConfig)?;
+                println!("\n🚀 Step 6/9: Applying config to control plane...");
+                talos::apply_config(&cp_addr, &configs.controlplane)?;
+            } else {
+                println!("\n⏭️  Step 6/9: Skipping CP config (already applied)");
+            }
 
             // Step 7: Wait for control plane install and bootstrap
-            println!("\n⏳ Step 7/9: Waiting for control plane installation...");
-            talos::wait_for_install(&cp_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+            if state.step < ProvisionStep::Bootstrapping {
+                state.set_step(ProvisionStep::WaitingCpInstall)?;
+                println!("\n⏳ Step 7/9: Waiting for control plane installation...");
+                talos::wait_for_install(&cp_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
 
-            println!("\n🎯 Bootstrapping control plane...");
-            talos::bootstrap_cluster(&cp_addr, &configs.talosconfig)?;
+                state.set_step(ProvisionStep::Bootstrapping)?;
+                println!("\n🎯 Bootstrapping control plane...");
+                talos::bootstrap_cluster(&cp_addr, &configs.talosconfig)?;
 
-            println!("\n☸️  Waiting for Kubernetes API...");
-            talos::wait_for_kubernetes(&cp_addr, &configs.talosconfig, Duration::from_secs(300))?;
+                state.set_step(ProvisionStep::WaitingKubernetes)?;
+                println!("\n☸️  Waiting for Kubernetes API...");
+                talos::wait_for_kubernetes(&cp_addr, &configs.talosconfig, Duration::from_secs(300))?;
 
-            // Get kubeconfig
-            let kubeconfig_path = output_dir.join("kubeconfig");
-            talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
-            println!("   ✅ Control plane bootstrapped!");
+                // Get kubeconfig
+                talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
+                println!("   ✅ Control plane bootstrapped!");
+            } else {
+                println!("\n⏭️  Step 7/9: Skipping bootstrap (already done)");
+            }
 
             // Step 8: Apply config to worker and join
-            println!("\n🔄 Step 8/9: Applying config to worker node...");
-            talos::apply_config(&worker_addr, &configs.worker)?;
+            if state.step < ProvisionStep::ApplyingWorkerConfig {
+                state.set_step(ProvisionStep::ApplyingWorkerConfig)?;
+                println!("\n🔄 Step 8/9: Applying config to worker node...");
+                talos::apply_config(&worker_addr, &configs.worker)?;
+            } else {
+                println!("\n⏭️  Step 8/9: Skipping worker config (already applied)");
+            }
 
             // Step 9: Wait for worker to join
-            println!("\n⏳ Step 9/9: Waiting for worker to join cluster...");
-            talos::wait_for_install(
-                &worker_addr,
-                &configs.talosconfig,
-                Duration::from_secs(timeout),
-            )?;
-            talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(300))?;
+            let total_steps = if deploy_stack { 10 } else { 9 };
+            if state.step < ProvisionStep::Complete {
+                state.set_step(ProvisionStep::WaitingWorkerJoin)?;
+                println!("\n⏳ Step 9/{total_steps}: Waiting for worker to join cluster...");
+                talos::wait_for_install(&worker_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+                talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(300))?;
+                state.set_step(ProvisionStep::Complete)?;
+            } else {
+                println!("\n⏭️  Step 9/{total_steps}: Skipping worker join (already complete)");
+            }
 
             println!("\n🎉 2-node cluster provisioned successfully!");
             println!("\n📊 Summary:");
@@ -791,9 +963,80 @@ async fn main() -> Result<()> {
             println!("   - {}", configs.worker.display());
             println!("   - {}", configs.talosconfig.display());
             println!("   - {}", kubeconfig_path.display());
+
+            // Step 10: Deploy platform stack (optional)
+            if deploy_stack {
+                println!("\n📦 Step 10/{total_steps}: Deploying platform stack...");
+                println!("   This installs: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows");
+
+                // Install local-path-provisioner for bare metal PVCs
+                println!("\n   Installing local-path-provisioner (for bare metal storage)...");
+                stack::deploy_local_path_provisioner(&kubeconfig_path)?;
+
+                // Deploy core components
+                println!("\n   Deploying Cert-Manager...");
+                stack::deploy_cert_manager(&kubeconfig_path)?;
+
+                println!("\n   Deploying ArgoCD...");
+                stack::deploy_argocd(&kubeconfig_path)?;
+
+                println!("\n   Deploying Vault...");
+                stack::deploy_vault(&kubeconfig_path)?;
+
+                println!("\n   Deploying Ingress-NGINX...");
+                if let Err(e) = stack::deploy_ingress_nginx(&kubeconfig_path) {
+                    // Ingress may timeout on bare metal (no LoadBalancer), but pods still deploy
+                    println!("   ⚠️  Ingress deployment warning: {e}");
+                    println!("   (This is expected on bare metal - pods are still deploying)");
+                }
+
+                println!("\n   Deploying Argo Workflows...");
+                stack::deploy_argo_workflows(&kubeconfig_path)?;
+
+                println!("\n   ✅ Platform stack deployed!");
+
+                // Initialize and unseal Vault if requested
+                if init_vault {
+                    println!("\n🔐 Initializing and unsealing Vault...");
+                    let vault_init = stack::init_vault(&kubeconfig_path)?;
+
+                    // Save keys to file
+                    let vault_keys_path = output_dir.join("vault-keys.json");
+                    let keys_json = serde_json::json!({
+                        "unseal_keys": vault_init.unseal_keys,
+                        "root_token": vault_init.root_token,
+                    });
+                    std::fs::write(&vault_keys_path, serde_json::to_string_pretty(&keys_json)?)?;
+
+                    // Unseal with first key
+                    if let Some(key) = vault_init.unseal_keys.first() {
+                        stack::unseal_vault(&kubeconfig_path, key)?;
+                    }
+
+                    println!("   ✅ Vault initialized and unsealed!");
+                    println!("   Root token: {}", vault_init.root_token);
+                    println!("   Keys saved to: {}", vault_keys_path.display());
+                }
+
+                // Get ArgoCD password
+                if let Ok(password) = stack::get_argocd_password(&kubeconfig_path) {
+                    println!("\n🔑 ArgoCD Credentials:");
+                    println!("   Username: admin");
+                    println!("   Password: {password}");
+                }
+            }
+
+            println!("\n📁 State file (for resume):");
+            println!("   - {}", ClusterState::state_file(&output_dir).display());
             println!("\n📋 Next steps:");
             println!("   export KUBECONFIG={}", kubeconfig_path.display());
             println!("   kubectl get nodes");
+            if !deploy_stack {
+                println!("\n💡 To deploy stack:");
+                println!("   metal stack --kubeconfig {}", kubeconfig_path.display());
+            }
+            println!("\n💡 To resume if interrupted:");
+            println!("   metal cluster --name {name} --resume --output-dir {}", output_dir.display());
         }
 
         Commands::Join {
@@ -882,6 +1125,135 @@ async fn main() -> Result<()> {
             println!("   Hostname:     {hostname}");
             println!("\n📋 Verify with:");
             println!("   kubectl get nodes");
+        }
+
+        Commands::Stack {
+            kubeconfig,
+            argocd_only,
+            cert_manager_only,
+            vault_only,
+            ingress_only,
+            init_vault,
+        } => {
+            info!("Deploying CTO platform stack...");
+
+            // Check if kubeconfig exists
+            if !kubeconfig.exists() {
+                anyhow::bail!("Kubeconfig not found: {}", kubeconfig.display());
+            }
+
+            // Deploy specific component or full stack
+            if argocd_only {
+                println!("\n🚀 Deploying ArgoCD...");
+                stack::deploy_argocd(&kubeconfig)?;
+            } else if cert_manager_only {
+                println!("\n🔐 Deploying Cert-Manager...");
+                stack::deploy_cert_manager(&kubeconfig)?;
+            } else if vault_only {
+                println!("\n🔒 Deploying Vault...");
+                stack::deploy_vault(&kubeconfig)?;
+            } else if ingress_only {
+                println!("\n🌐 Deploying Ingress-NGINX...");
+                stack::deploy_ingress_nginx(&kubeconfig)?;
+            } else {
+                // Deploy full stack
+                println!("\n📦 Deploying full CTO platform stack...");
+                println!("   Components: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows");
+
+                println!("\n🔐 Step 1/5: Deploying Cert-Manager...");
+                stack::deploy_cert_manager(&kubeconfig)?;
+
+                println!("\n🚀 Step 2/5: Deploying ArgoCD...");
+                stack::deploy_argocd(&kubeconfig)?;
+
+                println!("\n🔒 Step 3/5: Deploying Vault...");
+                stack::deploy_vault(&kubeconfig)?;
+
+                println!("\n🌐 Step 4/5: Deploying Ingress-NGINX...");
+                stack::deploy_ingress_nginx(&kubeconfig)?;
+
+                println!("\n⚙️  Step 5/5: Deploying Argo Workflows...");
+                stack::deploy_argo_workflows(&kubeconfig)?;
+            }
+
+            // Get ArgoCD password if ArgoCD was deployed
+            if !cert_manager_only && !vault_only && !ingress_only {
+                println!("\n📊 Stack deployment complete!");
+
+                if let Ok(password) = stack::get_argocd_password(&kubeconfig) {
+                    println!("\n🔑 ArgoCD Credentials:");
+                    println!("   Username: admin");
+                    println!("   Password: {password}");
+                }
+
+                // Initialize Vault if requested
+                if init_vault {
+                    println!("\n🔐 Initializing Vault...");
+                    match stack::init_vault(&kubeconfig) {
+                        Ok(vault_creds) => {
+                            println!("   ✅ Vault initialized and unsealed!");
+                            println!("\n🔑 Vault Credentials (SAVE THESE!):");
+                            println!("   Unseal Key: {}", vault_creds.unseal_keys.first().unwrap_or(&String::new()));
+                            println!("   Root Token: {}", vault_creds.root_token);
+                        }
+                        Err(e) => {
+                            println!("   ⚠️  Vault init: {e}");
+                        }
+                    }
+                } else {
+                    println!("\n⚠️  Vault needs initialization. Run:");
+                    println!("   metal vault-init --kubeconfig {}", kubeconfig.display());
+                }
+
+                println!("\n📋 Access services:");
+                println!("   ArgoCD:  kubectl port-forward svc/argocd-server -n argocd 8080:443");
+                println!("   Vault:   kubectl port-forward svc/vault -n vault 8200:8200");
+            }
+
+            println!("\n🎉 Stack deployment successful!");
+        }
+
+        Commands::VaultInit { kubeconfig, output } => {
+            info!("Initializing Vault...");
+
+            if !kubeconfig.exists() {
+                anyhow::bail!("Kubeconfig not found: {}", kubeconfig.display());
+            }
+
+            match stack::init_vault(&kubeconfig) {
+                Ok(vault_creds) => {
+                    println!("\n🔐 Vault initialized and unsealed!");
+                    println!("\n🔑 Vault Credentials:");
+                    println!("   Unseal Key: {}", vault_creds.unseal_keys.first().unwrap_or(&String::new()));
+                    println!("   Root Token: {}", vault_creds.root_token);
+
+                    // Save to file
+                    let json = serde_json::json!({
+                        "unseal_keys_b64": vault_creds.unseal_keys,
+                        "root_token": vault_creds.root_token,
+                    });
+                    std::fs::write(&output, serde_json::to_string_pretty(&json)?)?;
+                    println!("\n💾 Credentials saved to: {}", output.display());
+                }
+                Err(e) => {
+                    println!("❌ Vault initialization failed: {e}");
+                    return Err(e);
+                }
+            }
+        }
+
+        Commands::VaultUnseal {
+            kubeconfig,
+            unseal_key,
+        } => {
+            info!("Unsealing Vault...");
+
+            if !kubeconfig.exists() {
+                anyhow::bail!("Kubeconfig not found: {}", kubeconfig.display());
+            }
+
+            stack::unseal_vault(&kubeconfig, &unseal_key)?;
+            println!("\n🔓 Vault unsealed successfully!");
         }
     }
 
