@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.33](https://github.com/5dlabs/cto/compare/v0.12.32...v0.12.33) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* rename heal to healer ([#2678](https://github.com/5dlabs/cto/issues/2678)) ([8f8d257](https://github.com/5dlabs/cto/commit/8f8d2570d3d460a310173349553576599521c059))
+
+
+### 📚 Documentation
+
+* **healer:** add documentation for current and desired functionality ([#2680](https://github.com/5dlabs/cto/issues/2680)) ([e2f9c9a](https://github.com/5dlabs/cto/commit/e2f9c9a76347e4235a01d2991655f26dcfacb963))
+
 ## [0.12.32](https://github.com/5dlabs/cto/compare/v0.12.31...v0.12.32) (2025-12-04)
 
 
