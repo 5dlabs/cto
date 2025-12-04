@@ -698,7 +698,7 @@ struct HealerConfig {
     /// Server config for the healer server's inline Factory usage (alert analysis/triage)
     #[serde(default)]
     server: ServerConfig,
-    /// CodeRun config for spawning remediation agents
+    /// `CodeRun` config for spawning remediation agents
     coderun: CodeRunConfig,
 }
 
@@ -753,7 +753,7 @@ fn default_output_format() -> String {
     "text".to_string()
 }
 
-/// Memory configuration for OpenMemory integration.
+/// Memory configuration for `OpenMemory` integration.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct MemoryConfig {
@@ -878,7 +878,7 @@ struct CodeRunConfig {
     #[serde(default)]
     local_tools: Vec<String>,
     cli_config: CliConfig,
-    /// Memory configuration for remediation agent - passed to CodeRun cliConfig.settings
+    /// Memory configuration for remediation agent - passed to `CodeRun` cliConfig.settings
     #[serde(default)]
     memory: MemoryConfig,
 }
@@ -6234,6 +6234,7 @@ fn load_healer_config(config_path: &str) -> HealerConfig {
 
 /// Build the `CodeRun` YAML manifest using values from config.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
