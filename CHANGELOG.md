@@ -1,5 +1,58 @@
 # Changelog
 
+## [0.12.30](https://github.com/5dlabs/cto/compare/v0.12.29...v0.12.30) (2025-12-04)
+
+
+### ✨ Features
+
+* **telemetry:** migrate from Victoria Metrics/Logs to Grafana stack ([#2571](https://github.com/5dlabs/cto/issues/2571)) ([db6710a](https://github.com/5dlabs/cto/commit/db6710a08d3604eb6b0eef46148ab21358e578b4))
+
+
+### 🐛 Bug Fixes
+
+* add GitHub App authentication to heal templates ([#2670](https://github.com/5dlabs/cto/issues/2670)) ([9156508](https://github.com/5dlabs/cto/commit/91565081d4711f8cbe82eab0a095982128d38faa))
+* **alertmanager:** add ignoreDifferences for StatefulSet API defaults ([#2657](https://github.com/5dlabs/cto/issues/2657)) ([aec47bd](https://github.com/5dlabs/cto/commit/aec47bd5520235b5e823355f65e4955b61726827))
+* **atlas:** increase TTL and add pod deletion delay for atlas-guardian workflows ([#2620](https://github.com/5dlabs/cto/issues/2620)) ([557f0dd](https://github.com/5dlabs/cto/commit/557f0dda642672d9ab8f9d4774367b9336579fe8)), closes [#2599](https://github.com/5dlabs/cto/issues/2599)
+* **ci:** allow SARIF upload failures when Advanced Security is disabled ([#2664](https://github.com/5dlabs/cto/issues/2664)) ([e9c9e34](https://github.com/5dlabs/cto/commit/e9c9e346adb20093d4ecf2d8edd7b3dd35be484a))
+* **ci:** allow SARIF upload to fail without GHAS ([#2662](https://github.com/5dlabs/cto/issues/2662)) ([5de1f59](https://github.com/5dlabs/cto/commit/5de1f590306577f0ba74f3f6964b790354ad22f2))
+* **grafana:** remove orphaned Victoria datasources and fix Prometheus port ([#2608](https://github.com/5dlabs/cto/issues/2608)) ([96b5ce7](https://github.com/5dlabs/cto/commit/96b5ce77f869da451bdbad4e1017d28dee34e21e))
+* **grafana:** use correct Prometheus service port (80) ([#2595](https://github.com/5dlabs/cto/issues/2595)) ([ad3b18e](https://github.com/5dlabs/cto/commit/ad3b18e9f214db1278fcabef4008a9d2753be272))
+* **heal:** add atlas-guardian and atlas-batch-integration to A2 excluded pods ([#2640](https://github.com/5dlabs/cto/issues/2640)) ([acaab87](https://github.com/5dlabs/cto/commit/acaab871234044f17634c9f1a82b0921ab7b3a65)), closes [#2633](https://github.com/5dlabs/cto/issues/2633)
+* **heal:** add retry logic with exponential backoff for git operations ([#2609](https://github.com/5dlabs/cto/issues/2609)) ([1d9994e](https://github.com/5dlabs/cto/commit/1d9994e45b09b8497c06aa2b4e537f45508c52fc))
+* **heal:** add startup grace period to A2 silent failure detection ([#2639](https://github.com/5dlabs/cto/issues/2639)) ([047d24f](https://github.com/5dlabs/cto/commit/047d24fd33a83a4f31612e23311e9c06ffb5d3f4)), closes [#2630](https://github.com/5dlabs/cto/issues/2630)
+* **heal:** add tweakcn to excluded pod prefixes for A8 alerts ([#2634](https://github.com/5dlabs/cto/issues/2634)) ([7e7778b](https://github.com/5dlabs/cto/commit/7e7778b5af483c6e1b4c13608649accfa7b39bbe)), closes [#2627](https://github.com/5dlabs/cto/issues/2627)
+* **heal:** exclude infrastructure pods from A8 step timeout alerts ([#2631](https://github.com/5dlabs/cto/issues/2631)) ([2476283](https://github.com/5dlabs/cto/commit/2476283363906bcc0c8e6d6c83fb150f1d0b5e94)), closes [#2625](https://github.com/5dlabs/cto/issues/2625)
+* **heal:** extend TTL for atlas-conflict-monitor workflow pods ([f48829c](https://github.com/5dlabs/cto/commit/f48829c4f1b1d00e4930801d61a1575a7514ba31)), closes [#2599](https://github.com/5dlabs/cto/issues/2599)
+* **heal:** persist agent logs to PVC before pod termination ([#2622](https://github.com/5dlabs/cto/issues/2622)) ([48783f4](https://github.com/5dlabs/cto/commit/48783f48a8e792f61835e70b92e249188074792e))
+* **heal:** remediate stale ConfigMap detection, GC timing, and dedup logic ([#2560](https://github.com/5dlabs/cto/issues/2560)) ([f81074a](https://github.com/5dlabs/cto/commit/f81074a6a220c6e42530972821b70d40055350d2))
+* **heal:** skip A2 alerts for containers with exit code 0 ([#2642](https://github.com/5dlabs/cto/issues/2642)) ([a19290b](https://github.com/5dlabs/cto/commit/a19290bc76849d5dfe1801b65f48869071b065cb)), closes [#2636](https://github.com/5dlabs/cto/issues/2636)
+* **loki:** increase ingestion rate limits for high-volume logging ([#2645](https://github.com/5dlabs/cto/issues/2645)) ([75f5898](https://github.com/5dlabs/cto/commit/75f58984eb266969126e3c540d4a16e39b434319))
+* **openmemory:** add missing OM_TIER environment variable ([#2613](https://github.com/5dlabs/cto/issues/2613)) ([195eb10](https://github.com/5dlabs/cto/commit/195eb105e722fae6d498a4ddfc25d684205bf265)), closes [#2557](https://github.com/5dlabs/cto/issues/2557)
+* **openmemory:** add missing OM_TIER environment variable ([#2617](https://github.com/5dlabs/cto/issues/2617)) ([12b56cc](https://github.com/5dlabs/cto/commit/12b56ccdf57d4f713fe2dbda24e29dde308f3469)), closes [#2586](https://github.com/5dlabs/cto/issues/2586)
+* **play-workflow:** correct variable name CM_NAME to CONFIGMAP_NAME ([#2601](https://github.com/5dlabs/cto/issues/2601)) ([c53e99f](https://github.com/5dlabs/cto/commit/c53e99fca544e56bc26887938f7053d32b0f7d89)), closes [#2569](https://github.com/5dlabs/cto/issues/2569)
+* **sensors:** use proper Argo Events parameter mapping for atlas-conflict-monitor ([#2652](https://github.com/5dlabs/cto/issues/2652)) ([6ba9d0c](https://github.com/5dlabs/cto/commit/6ba9d0cb336e46a56b551f5eff27c2573f5595a8)), closes [#2651](https://github.com/5dlabs/cto/issues/2651)
+* **sensors:** use proper Argo Events parameter mapping for workflow templates ([#2650](https://github.com/5dlabs/cto/issues/2650)) ([7c04519](https://github.com/5dlabs/cto/commit/7c04519d51a0a22df86548cfcc8944071c90c423)), closes [#2643](https://github.com/5dlabs/cto/issues/2643)
+* **telemetry:** fix alertmanager security context, loki caching, and otel-collector exporters ([#2588](https://github.com/5dlabs/cto/issues/2588)) ([74dde75](https://github.com/5dlabs/cto/commit/74dde7507349481de486aff1c0d847afc0ff1a92))
+* **workflow:** add error handling and output defaults to play workflow templates ([#2612](https://github.com/5dlabs/cto/issues/2612)) ([77efff0](https://github.com/5dlabs/cto/commit/77efff09594b579fddef888e5719a287e75d9c7c)), closes [#2563](https://github.com/5dlabs/cto/issues/2563)
+* **workflow:** correct variable name in determine-resume-point stale ConfigMap cleanup ([#2600](https://github.com/5dlabs/cto/issues/2600)) ([e2a27ec](https://github.com/5dlabs/cto/commit/e2a27ec44d9727f9e61b0cea06f2c57628d83305)), closes [#2566](https://github.com/5dlabs/cto/issues/2566)
+* **workflow:** correct variable name in determine-resume-point stale ConfigMap cleanup ([#2600](https://github.com/5dlabs/cto/issues/2600)) ([a804d4f](https://github.com/5dlabs/cto/commit/a804d4f8a0776e3154720d2ec469a520ddab376b)), closes [#2566](https://github.com/5dlabs/cto/issues/2566)
+* **workflow:** correct variable name in determine-resume-point template ([64c402b](https://github.com/5dlabs/cto/commit/64c402b1ccad289d4d2e69484562ed612f72d8bb)), closes [#2573](https://github.com/5dlabs/cto/issues/2573)
+* **workflow:** improve parallel-task-processor error handling and TTL ([#2575](https://github.com/5dlabs/cto/issues/2575)) ([#2605](https://github.com/5dlabs/cto/issues/2605)) ([6cb98ba](https://github.com/5dlabs/cto/commit/6cb98baac37733f0e236dbf0da0801896de330e0))
+* **workflow:** increase pod GC delete delay to 300s for heal log capture ([#2607](https://github.com/5dlabs/cto/issues/2607)) ([9e46c27](https://github.com/5dlabs/cto/commit/9e46c2780799d853927ba16a88ff43eaf7c64458)), closes [#2576](https://github.com/5dlabs/cto/issues/2576)
+* **workflow:** use authenticated GitHub API for script download ([#2648](https://github.com/5dlabs/cto/issues/2648)) ([3bac8d0](https://github.com/5dlabs/cto/commit/3bac8d07f5b06c9a5e2e4ba457ccf557c3b8565e)), closes [#2647](https://github.com/5dlabs/cto/issues/2647)
+
+
+### 📚 Documentation
+
+* add comprehensive MCP tools documentation for observability stack ([#2655](https://github.com/5dlabs/cto/issues/2655)) ([0b1592e](https://github.com/5dlabs/cto/commit/0b1592e4497b906e62d4e253e769060adffba9b7))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([74853d5](https://github.com/5dlabs/cto/commit/74853d5855ab93860e83215be53dd255b21aa9c9))
+* **chart:** regenerate agent templates ConfigMaps ([#2610](https://github.com/5dlabs/cto/issues/2610)) ([63c2ec1](https://github.com/5dlabs/cto/commit/63c2ec1325f344b54ef7f8b98c9c99cd71993580))
+* remove atlas-conflict-monitor-sensor ([#2663](https://github.com/5dlabs/cto/issues/2663)) ([ebbeedc](https://github.com/5dlabs/cto/commit/ebbeedcd05fa4a5bdca5f486098cac10960c16b6))
+
 ## [0.12.29](https://github.com/5dlabs/cto/compare/v0.12.28...v0.12.29) (2025-12-03)
 
 
