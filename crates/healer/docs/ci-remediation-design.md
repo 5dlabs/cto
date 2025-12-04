@@ -1557,32 +1557,338 @@ Please investigate: https://github.com/5dlabs/cto/pull/1234
 - [ ] Route to specialist agents (Rex/Blaze/Bolt/Cipher/Atlas)
 - [ ] Default to Factory CLI + Opus 4.5
 
-### Phase 2: Enhanced Detection
+### Phase 2: Enhanced Detection & Context
 - [ ] Fetch and analyze workflow logs via `gh` CLI
 - [ ] Pattern matching on log content
 - [ ] Changed files analysis
+- [ ] Context enrichment from ArgoCD, Loki, K8s
 
-### Phase 3: Recursive Loop & Tracking
+### Phase 3: OpenMemory Integration
+- [ ] Add Healer agent to OpenMemory configuration
+- [ ] Implement `query_historical_context()` for routing decisions
+- [ ] Query past remediations for similar failures
+- [ ] Query agent success rates by failure type
+- [ ] Enrich agent prompts with historical solutions
+
+### Phase 4: Recursive Loop & Tracking
 - [ ] Watch CodeRun completions
 - [ ] Implement retry-with-more-context logic
 - [ ] Track attempts per task
 - [ ] Max 3 attempts default
 
-### Phase 4: Escalation & Notifications
+### Phase 5: Memory Storage & Learning
+- [ ] Record remediation outcomes to OpenMemory
+- [ ] Store success patterns (agent, approach, time-to-fix)
+- [ ] Store escalation events for learning
+- [ ] Detect routing mismatches and improve
+- [ ] Feed insights back to prompts
+
+### Phase 6: Escalation & Notifications
 - [ ] Human escalation after max attempts
 - [ ] Discord notifications via notify module
 - [ ] PR comments explaining what was tried
 
-### Phase 5: Learning & Insights
-- [ ] Record success/failure by agent
-- [ ] Identify routing improvements
-- [ ] Track time-to-fix metrics
-- [ ] Feed insights back to prompts
-
-### Phase 6: Sensor Migration
+### Phase 7: Sensor Migration & Cleanup
 - [ ] Update sensor to call Healer HTTP endpoint
 - [ ] Remove direct CodeRun creation from sensor
+- [ ] Remove `templates/remediate/` directory
 - [ ] Deploy and validate end-to-end
+
+### Phase 8: Advanced Coordination (Future)
+- [ ] Evaluate Beads for multi-failure dependency tracking
+- [ ] Evaluate Agent Mail for bi-directional agent communication
+- [ ] Implement if justified by complexity needs
+
+---
+
+---
+
+## OpenMemory Integration (Server-Side)
+
+Healer uses OpenMemory for **server-side historical context**, enabling intelligent routing decisions based on past remediation patterns.
+
+### Why Server-Side Memory?
+
+| Component | Memory Use | Purpose |
+|-----------|------------|---------|
+| **Healer Server** | Long-term (3-4 days) | Historical patterns, routing improvements, failure correlations |
+| **Agent CodeRuns** | Task-scoped | Immediate context for current fix attempt |
+
+The server maintains a "big picture" view while agents focus on the immediate task.
+
+### Memory Integration Points
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     HEALER + OPENMEMORY INTEGRATION                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│   ┌─────────────────┐          ┌─────────────────────────────────────────┐   │
+│   │   CI Failure    │          │           OpenMemory Server              │   │
+│   │     Event       │          │           (cto-system:3000)              │   │
+│   └────────┬────────┘          └─────────────────────────────────────────┘   │
+│            │                              ▲                                   │
+│            ▼                              │                                   │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                           HEALER SERVER                              │   │
+│   │                                                                      │   │
+│   │  1. QUERY: "What do I know about this type of failure?"             │   │
+│   │     └── Past remediations for similar errors                        │   │
+│   │     └── Success rates by agent for this failure type               │   │
+│   │     └── Common root causes and fixes                                │   │
+│   │                                                                      │   │
+│   │  2. ROUTE: Use historical success rates to pick best agent          │   │
+│   │                                                                      │   │
+│   │  3. ENRICH: Include relevant memories in agent prompt               │   │
+│   │                                                                      │   │
+│   │  4. STORE: Record outcome (success/failure/escalation)              │   │
+│   │     └── Agent used, time to fix, what worked                        │   │
+│   │     └── For failures: what was tried, why it didn't work           │   │
+│   │                                                                      │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Memory Queries
+
+```rust
+impl Healer {
+    /// Query OpenMemory before routing a CI failure
+    async fn query_historical_context(&self, ctx: &RemediationContext) -> HistoricalContext {
+        let memory_client = OpenMemoryClient::new(&self.config.memory_url);
+        
+        // Query for similar failures
+        let similar_failures = memory_client.query(&format!(
+            "CI failure {} in workflow {} with error: {}",
+            ctx.failure_type.name(),
+            ctx.event.workflow_name,
+            ctx.error_summary(),
+        ), 10).await?;
+        
+        // Query for agent success rates on this failure type
+        let agent_patterns = memory_client.query(&format!(
+            "remediation success {} agent",
+            ctx.failure_type.name(),
+        ), 5).await?;
+        
+        // Query for known solutions
+        let solutions = memory_client.query(&format!(
+            "fix solution {} {}",
+            ctx.failure_type.name(),
+            ctx.workflow_logs.error_signature(),
+        ), 5).await?;
+        
+        HistoricalContext {
+            similar_failures,
+            agent_success_patterns: agent_patterns,
+            known_solutions: solutions,
+        }
+    }
+}
+```
+
+### Memory Storage Events
+
+```rust
+/// Events that trigger memory storage
+enum MemoryEvent {
+    /// Remediation succeeded on first attempt
+    FirstAttemptSuccess {
+        failure_type: CiFailureType,
+        agent: Agent,
+        fix_approach: String,
+        time_to_fix: Duration,
+    },
+    
+    /// Remediation succeeded after retry
+    RetrySuccess {
+        failure_type: CiFailureType,
+        attempts: Vec<AttemptSummary>,
+        winning_approach: String,
+    },
+    
+    /// Escalated to human - valuable learning signal
+    Escalation {
+        failure_type: CiFailureType,
+        attempts: Vec<AttemptSummary>,
+        why_agents_failed: String,
+    },
+    
+    /// Agent routing was suboptimal
+    RoutingMismatch {
+        initial_agent: Agent,
+        successful_agent: Agent,
+        failure_type: CiFailureType,
+    },
+}
+
+impl Healer {
+    /// Store remediation outcome in OpenMemory
+    async fn record_to_memory(&self, event: MemoryEvent) -> Result<()> {
+        let memory_client = OpenMemoryClient::new(&self.config.memory_url);
+        
+        match event {
+            MemoryEvent::FirstAttemptSuccess { failure_type, agent, fix_approach, time_to_fix } => {
+                memory_client.add_memory(
+                    &format!(
+                        "Successful {} remediation by {} in {:?}: {}",
+                        failure_type.name(), agent.name(), time_to_fix, fix_approach
+                    ),
+                    json!({
+                        "type": "remediation_success",
+                        "failure_type": failure_type.name(),
+                        "agent": agent.name(),
+                        "time_to_fix_secs": time_to_fix.as_secs(),
+                        "first_attempt": true,
+                    }),
+                ).await?;
+            }
+            
+            MemoryEvent::Escalation { failure_type, attempts, why_agents_failed } => {
+                memory_client.add_memory(
+                    &format!(
+                        "ESCALATION: {} required human help after {} attempts. Reason: {}",
+                        failure_type.name(), attempts.len(), why_agents_failed
+                    ),
+                    json!({
+                        "type": "escalation",
+                        "failure_type": failure_type.name(),
+                        "attempts": attempts.len(),
+                        "agents_tried": attempts.iter().map(|a| a.agent.name()).collect::<Vec<_>>(),
+                    }),
+                ).await?;
+            }
+            
+            // ... other events
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Configuration
+
+Add Healer as an agent in OpenMemory:
+
+```yaml
+# In infra/charts/openmemory/values.yaml
+agents:
+  - name: healer
+    namespace: cto
+    queryLimit: 15          # More queries for routing decisions
+    reinforcementMultiplier: 1.5  # Learn faster from outcomes
+```
+
+### Prompt Enrichment
+
+When spawning a CodeRun, include relevant memories:
+
+```handlebars
+# CI Rust Fix - Rex
+
+{{#if historical_context.known_solutions}}
+## 📚 Historical Context
+
+Similar issues have been fixed before:
+
+{{#each historical_context.known_solutions}}
+- **{{this.pattern}}**: {{this.solution}}
+{{/each}}
+
+Consider these approaches when analyzing the current failure.
+{{/if}}
+
+## Failure Details
+...
+```
+
+---
+
+## Agent Communication: Beads & Agent Mail Evaluation
+
+Two emerging tools have been evaluated for potential integration:
+
+### Beads (Graph-Based Task Planner)
+
+**Repository**: https://github.com/steveyegge/beads
+
+| Feature | Description | Healer Use Case |
+|---------|-------------|-----------------|
+| **Issue Graph** | Tracks tasks with dependencies | Track remediation attempts as a dependency graph |
+| **Ready Work Detection** | Identifies unblocked tasks | Find which failures can be worked on in parallel |
+| **Agent-Friendly JSON** | `bd export --json` | Easy integration with Healer's Rust code |
+| **Git-Versioned** | JSONL records in repo | Audit trail of all remediation decisions |
+| **Memory Decay** | Agent-driven compaction | Auto-clean old remediation records |
+
+**Potential Integration**:
+```rust
+// Track remediation as Beads issues
+struct RemediationIssue {
+    id: String,                    // "healer/ci-123"
+    failure_type: CiFailureType,
+    status: BeadStatus,            // pending, in_progress, done, blocked
+    depends_on: Vec<String>,       // Other issues this needs resolved first
+    agent_assigned: Option<Agent>,
+}
+
+// Use Beads to find what can be worked on
+let ready_issues = beads.find_ready();  // Issues with no blockers
+```
+
+**Verdict**: 🟡 **Useful for complex multi-failure scenarios** where remediations have dependencies (e.g., "fix Cargo.lock before fixing Clippy"). Not essential for MVP but valuable for Phase 2.
+
+### Agent Mail (MCP Coordination Layer)
+
+**Repository**: https://github.com/Dicklesworthstone/mcp_agent_mail
+
+| Feature | Description | Healer Use Case |
+|---------|-------------|-----------------|
+| **Inbox/Outbox** | Structured messaging | Healer sends instructions, agents report status |
+| **File Leases** | Avoid edit conflicts | Prevent multiple agents from editing same file |
+| **Message History** | Searchable archive | Review past agent communications |
+| **Web UI** | Human oversight | Monitor Healer-agent conversations |
+
+**Potential Integration**:
+```rust
+// Healer sends a remediation request
+agent_mail.send(AgentMessage {
+    from: "healer",
+    to: "rex",
+    subject: "CI Failure: clippy lint",
+    body: json!({
+        "workflow_run_id": 12345,
+        "failure_type": "rust_clippy",
+        "priority": "high",
+        "prompt": rendered_prompt,
+    }),
+    claims: vec!["/crates/healer/src/main.rs"],  // Reserve files
+});
+
+// Agent responds when done
+let response = agent_mail.receive("healer").await;
+match response.status {
+    "fixed" => self.mark_resolved(response.task_id),
+    "blocked" => self.escalate_or_retry(response),
+}
+```
+
+**Verdict**: 🟢 **Good for bi-directional communication** if we want agents to report back mid-execution or request clarification. However, the current CodeRun + watch approach is simpler and works well. Consider for Phase 3 when we need richer agent coordination.
+
+### Recommendation
+
+| Phase | Communication Approach | Rationale |
+|-------|------------------------|-----------|
+| **Phase 1 (MVP)** | CodeRun CRD + K8s watch | Simple, proven, already implemented |
+| **Phase 2** | Add Beads for task graph | Track multi-failure dependencies |
+| **Phase 3** | Evaluate Agent Mail | If agents need mid-run communication |
+
+For now, we continue with the CodeRun-based approach since:
+1. It's already working in the play module
+2. CodeRun labels provide good tracking
+3. K8s events give completion notifications
+4. Adding complexity should be justified by need
 
 ---
 
@@ -1592,4 +1898,6 @@ Please investigate: https://github.com/5dlabs/cto/pull/1234
 - `/crates/healer/src/play/remediate.rs` - Existing remediation engine
 - `/crates/healer/src/notify.rs` - Notification module
 - `/infra/charts/controller/agent-templates/` - Agent prompt templates
+- `/infra/charts/openmemory/values.yaml` - OpenMemory configuration
+- `/docs/openmemory-integration-guide.md` - Memory function reference
 

@@ -16,7 +16,7 @@ use std::path::Path;
 ///
 /// Null/undefined values are skipped silently to avoid producing "null" strings
 /// in output when context variables are missing.
-fn concat_helper(
+pub fn concat_helper(
     h: &Helper,
     _: &Handlebars,
     _: &HbsContext,
@@ -43,7 +43,7 @@ fn concat_helper(
 
 /// Helper function to convert strings to lowercase.
 /// Usage: `{{lowercase alert_id}}` -> "a7" (from "A7")
-fn lowercase_helper(
+pub fn lowercase_helper(
     h: &Helper,
     _: &Handlebars,
     _: &HbsContext,

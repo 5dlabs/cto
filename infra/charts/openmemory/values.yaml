@@ -132,6 +132,20 @@ agents:
     namespace: "agent/cipher"
     queryLimit: 20
     reinforcementMultiplier: 1.8
+  
+  healer:
+    enabled: true
+    namespace: "agent/healer"
+    # Higher query limit for historical analysis
+    queryLimit: 50
+    # Higher reinforcement to learn from successes/failures
+    reinforcementMultiplier: 2.0
+    # Custom healer configuration
+    categories:
+      - ci-failures
+      - agent-performance
+      - routing-decisions
+      - escalations
 
 # API configuration
 api:

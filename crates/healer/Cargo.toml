@@ -31,6 +31,11 @@ tokio = { workspace = true }
 # HTTP Client for Victoria Logs API
 reqwest = { workspace = true }
 
+# HTTP Server
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
 # Time handling
 chrono = { workspace = true }
 
