@@ -35,6 +35,8 @@
 #![allow(clippy::module_name_repetitions)]
 
 pub mod providers;
+pub mod stack;
+pub mod state;
 pub mod talos;
 
 pub use providers::latitude::Latitude;

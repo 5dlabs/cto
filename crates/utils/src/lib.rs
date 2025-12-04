@@ -83,12 +83,14 @@
 //! ## Modules
 //!
 //! - [`alerts`] - Fetch PR check run annotations (alerts) from GitHub
+//! - [`checks`] - Check PR CI status and wait for completion
 //! - [`clippy`] - Fetch and parse Clippy errors from CI for automated remediation
 //! - [`comment`] - Post comments to GitHub PRs
 //! - [`resolve`] - Resolve PR review thread conversations
 //! - [`reviews`] - Fetch PR review comments from Bugbot and Stitch
 
 pub mod alerts;
+pub mod checks;
 pub mod clippy;
 pub mod comment;
 pub mod resolve;
@@ -96,6 +98,7 @@ pub mod reviews;
 
 // Re-export key types for convenience
 pub use alerts::{Annotation, AnnotationLevel, CheckRun, PrAlerts};
+pub use checks::{CheckConclusion, CheckStatus, CiCheck, PrCheckStatus, PrChecks};
 pub use clippy::{ClippyError, ClippyErrors};
 pub use comment::{format_alerts_comment, format_alerts_comment_with_context, PrComment};
 pub use resolve::{PrConversations, ReviewThread};

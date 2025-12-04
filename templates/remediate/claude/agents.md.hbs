@@ -74,6 +74,27 @@ Fixes issues identified by Stitch review."
 git push origin HEAD
 ```
 
+### Step 6: Verify All Checks Pass
+After pushing, you MUST verify that all CI checks pass before completing the task.
+
+```bash
+# Wait for checks to complete and verify all pass (timeout: 10 minutes)
+utils checks --repo "$REPO_SLUG" --pr "$PR_NUMBER" --wait 600 --strict
+
+# If checks fail, examine the failures and iterate
+if [ $? -ne 0 ]; then
+    echo "❌ CI checks failed. Examining failures..."
+    utils checks --repo "$REPO_SLUG" --pr "$PR_NUMBER" --failed
+    # Go back to Step 3 to fix the new issues
+fi
+```
+
+**IMPORTANT**: Do NOT complete this task until all CI checks pass:
+- Use `utils checks` to monitor check status
+- The `--strict` flag exits with code 1 if any checks fail
+- If checks fail, examine the failures and apply fixes
+- Iterate until all checks pass
+
 ## MCP Tools Available
 {{#if remote_tools}}
 Remote tools configured:
@@ -85,5 +106,6 @@ No remote tools configured.
 {{/if}}
 
 ## Exit Behavior
-- Exit 0 when fixes are pushed successfully
-- Exit 1 if fixes fail to apply or push
+- Exit 0 ONLY when fixes are pushed AND all CI checks pass
+- Exit 1 if fixes fail to apply, push, or CI checks fail after all retry attempts
+- Do NOT exit successfully until verified that checks have passed
