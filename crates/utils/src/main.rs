@@ -8,7 +8,10 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use utils::{AnnotationLevel, ClippyErrors, PrAlerts, PrComment, PrConversations, PrReviews};
+use utils::{
+    AnnotationLevel, CiCheck, ClippyErrors, PrAlerts, PrCheckStatus, PrChecks, PrComment,
+    PrConversations, PrReviews,
+};
 
 #[derive(Parser)]
 #[command(name = "utils")]
@@ -138,6 +141,36 @@ enum Commands {
         #[arg(long)]
         list: bool,
     },
+    /// Check PR CI status (pass/fail/pending)
+    Checks {
+        /// Repository in owner/repo format
+        #[arg(short, long)]
+        repo: String,
+
+        /// Pull request number
+        #[arg(short, long)]
+        pr: u32,
+
+        /// Only show failed checks
+        #[arg(long)]
+        failed: bool,
+
+        /// Only show pending checks
+        #[arg(long)]
+        pending: bool,
+
+        /// Wait for checks to complete (timeout in seconds)
+        #[arg(long)]
+        wait: Option<u64>,
+
+        /// Poll interval in seconds when waiting (default: 30)
+        #[arg(long)]
+        interval: Option<u64>,
+
+        /// Exit with error code if any checks fail
+        #[arg(long)]
+        strict: bool,
+    },
 }
 
 #[tokio::main]
@@ -198,6 +231,21 @@ async fn main() -> Result<()> {
             list,
         } => {
             run_resolve(&repo, pr, all, author, thread_id, list, cli.format).await?;
+        }
+        Commands::Checks {
+            repo,
+            pr,
+            failed,
+            pending,
+            wait,
+            interval,
+            strict,
+        } => {
+            let exit_code =
+                run_checks(&repo, pr, failed, pending, wait, interval, strict, cli.format).await?;
+            if exit_code != 0 {
+                std::process::exit(exit_code);
+            }
         }
     }
 
@@ -544,4 +592,137 @@ async fn run_resolve(
     );
 
     Ok(())
+}
+
+/// Run the checks command to fetch and display PR check status
+#[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
+async fn run_checks(
+    repo: &str,
+    pr: u32,
+    show_failed: bool,
+    show_pending: bool,
+    wait: Option<u64>,
+    interval: Option<u64>,
+    strict: bool,
+    format: OutputFormat,
+) -> Result<i32> {
+    let (owner, repo_name) = utils::alerts::parse_repo(repo)?;
+    let client = PrChecks::new(owner, repo_name);
+
+    // If waiting, poll until complete
+    let status = if let Some(timeout) = wait {
+        client.wait_for_completion(pr, timeout, interval).await?
+    } else {
+        client.fetch(pr).await?
+    };
+
+    // Filter based on flags
+    let checks_to_show: Vec<_> = if show_failed {
+        status.failed_checks().into_iter().cloned().collect()
+    } else if show_pending {
+        status.pending_checks().into_iter().cloned().collect()
+    } else {
+        status.checks.clone()
+    };
+
+    // Output
+    match format {
+        OutputFormat::Json => {
+            if show_failed || show_pending {
+                println!("{}", serde_json::to_string_pretty(&checks_to_show)?);
+            } else {
+                println!("{}", serde_json::to_string_pretty(&status)?);
+            }
+        }
+        OutputFormat::Text => {
+            print_checks_text(pr, &status, &checks_to_show, show_failed, show_pending);
+        }
+    }
+
+    // Determine exit code
+    let exit_code = if strict && status.has_failures() {
+        1
+    } else if strict && status.has_pending() {
+        2
+    } else {
+        0
+    };
+
+    Ok(exit_code)
+}
+
+/// Print check status in human-readable format
+fn print_checks_text(
+    pr: u32,
+    status: &PrCheckStatus,
+    checks: &[CiCheck],
+    filtered_failed: bool,
+    filtered_pending: bool,
+) {
+    // Header
+    let filter_desc = if filtered_failed {
+        " (failed only)"
+    } else if filtered_pending {
+        " (pending only)"
+    } else {
+        ""
+    };
+
+    println!("PR #{pr} Check Status{filter_desc}\n");
+
+    // Summary line
+    let status_emoji = if status.all_passed() {
+        "✅"
+    } else if status.has_failures() {
+        "❌"
+    } else if status.has_pending() {
+        "⏳"
+    } else {
+        "ℹ️"
+    };
+
+    println!(
+        "{status_emoji} {}/{} checks passed ({} failed, {} pending, {} skipped)",
+        status.passed, status.total, status.failed, status.pending, status.skipped
+    );
+    println!("   Merge state: {}\n", status.merge_state);
+
+    if checks.is_empty() {
+        if filtered_failed {
+            println!("No failed checks found.");
+        } else if filtered_pending {
+            println!("No pending checks found.");
+        }
+        return;
+    }
+
+    // List checks
+    for check in checks {
+        let icon = if check.passed() {
+            "✅"
+        } else if check.failed() {
+            "❌"
+        } else if check.pending() {
+            "⏳"
+        } else {
+            "⚪"
+        };
+
+        let conclusion_str = check
+            .conclusion
+            .map_or_else(|| "pending".to_string(), |c| c.to_string());
+
+        let workflow = if check.workflow.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", check.workflow)
+        };
+
+        println!("{icon} {}{workflow}: {conclusion_str}", check.name);
+    }
+
+    // Instructions for failed checks
+    if status.has_failures() && !filtered_pending {
+        println!("\n💡 To see check run logs, use: gh run view <run-id>");
+    }
 }

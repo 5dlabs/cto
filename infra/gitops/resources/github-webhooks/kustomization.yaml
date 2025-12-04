@@ -11,8 +11,8 @@ resources:
   - stage-aware-tess-approval-sensor.yaml
   - tess-label-fallback-sensor.yaml
   - stage-aware-pr-merged-sensor.yaml
-  - atlas-pr-monitor-sensor.yaml
-  - atlas-conflict-monitor-sensor.yaml
+  # atlas-pr-monitor-sensor.yaml - REMOVED: Atlas only runs at end of play cycle
+  # atlas-conflict-monitor-sensor.yaml - REMOVED: HEAL now handles conflict detection
   - atlas-batch-integration-sensor.yaml
   - merge-to-main-sensor.yaml
   - remediation-feedback-sensor.yaml
