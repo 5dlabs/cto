@@ -73,9 +73,9 @@ HEADER_EOF
       # Intake ConfigMap: all intake/* templates for unified project intake
       files_list=$(find -L "agent-templates/intake" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     else
-      # CLI-specific: collect files under code/, docs/, heal/ directories for this CLI
+      # CLI-specific: collect files under code/, docs/, healer/ directories for this CLI
       # Note: review/ and remediate/ are handled by the separate "review" ConfigMap
-      files_list=$(find -L "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/heal/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
+      files_list=$(find -L "agent-templates/code/${filter}" "agent-templates/docs/${filter}" "agent-templates/healer/${filter}" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.py" \) 2>/dev/null | LC_ALL=C sort || true)
     fi
     
     # Also include shared agent partials so templates can resolve {{> agents/...}} references

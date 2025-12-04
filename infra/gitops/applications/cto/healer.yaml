@@ -1,19 +1,19 @@
 ---
-# ArgoCD Application for Heal (Self-Healing Platform Monitor)
+# ArgoCD Application for Healer (Self-Healing Platform Monitor)
 # Deployed as a continuous Kubernetes deployment in the CTO namespace
 # Watches for pod failures and spawns Rex remediation agents via CodeRun CRDs
 #
 # Image updates are managed by ArgoCD Image Updater:
-# - Watches ghcr.io/5dlabs/heal for new semver tags
+# - Watches ghcr.io/5dlabs/healer for new semver tags
 # - Automatically updates image.tag parameter
 # - ArgoCD syncs and rolls out new version
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cto-heal
+  name: cto-healer
   namespace: argocd
   labels:
-    app.kubernetes.io/name: heal
+    app.kubernetes.io/name: healer
     app.kubernetes.io/part-of: cto
     app.kubernetes.io/managed-by: cto-app-of-apps
   annotations:
@@ -21,11 +21,11 @@ metadata:
     # ArgoCD Image Updater Configuration
     # Enables automatic image updates on new releases
     # ═══════════════════════════════════════════════════════════════════
-    argocd-image-updater.argoproj.io/image-list: heal=ghcr.io/5dlabs/heal
-    argocd-image-updater.argoproj.io/heal.update-strategy: semver
-    argocd-image-updater.argoproj.io/heal.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/image-list: healer=ghcr.io/5dlabs/healer
+    argocd-image-updater.argoproj.io/healer.update-strategy: semver
+    argocd-image-updater.argoproj.io/healer.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
     argocd-image-updater.argoproj.io/write-back-method: argocd
-    argocd-image-updater.argoproj.io/heal.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/healer.helm.image-tag: image.tag
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -42,23 +42,23 @@ spec:
         revisionHistoryLimit: 5
 
         image:
-          repository: ghcr.io/5dlabs/heal
+          repository: ghcr.io/5dlabs/healer
           pullPolicy: Always
           tag: latest
 
         imagePullSecrets:
           - name: ghcr-secret
 
-        fullnameOverride: heal
+        fullnameOverride: healer
 
         serviceAccount:
           create: false
           automount: true
-          name: heal
+          name: healer
 
         podAnnotations:
           logs.platform.5dlabs.io/collect: "true"
-          logs.platform.5dlabs.io/service: heal
+          logs.platform.5dlabs.io/service: healer
 
         podLabels:
           app.kubernetes.io/component: monitor
@@ -94,16 +94,16 @@ spec:
             cpu: 100m
             memory: 256Mi
 
-        # Heal is a watch loop, not an HTTP server - use exec probes
+        # Healer is a watch loop, not an HTTP server - use exec probes
         livenessProbe:
           exec:
-            command: ["pgrep", "-f", "heal"]
+            command: ["pgrep", "-f", "healer"]
           initialDelaySeconds: 10
           periodSeconds: 30
           failureThreshold: 3
         readinessProbe:
           exec:
-            command: ["pgrep", "-f", "heal"]
+            command: ["pgrep", "-f", "healer"]
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 3
@@ -112,19 +112,19 @@ spec:
           enabled: false
 
         volumes:
-          - name: heal-workspace
+          - name: healer-workspace
             persistentVolumeClaim:
-              claimName: heal-workspace
-          - name: heal-config
+              claimName: healer-workspace
+          - name: healer-config
             configMap:
-              name: heal-config
+              name: healer-config
 
         volumeMounts:
-          - name: heal-workspace
+          - name: healer-workspace
             mountPath: /workspace/watch
-          - name: heal-config
-            mountPath: /app/heal-config.json
-            subPath: heal-config.json
+          - name: healer-config
+            mountPath: /app/healer-config.json
+            subPath: healer-config.json
 
         nodeSelector: {}
         tolerations: []
@@ -141,7 +141,7 @@ spec:
           - name: LOG_LEVEL
             value: info
           - name: RUST_LOG
-            value: heal=debug,info
+            value: healer=debug,info
           - name: ANTHROPIC_API_KEY
             valueFrom:
               secretKeyRef:
@@ -170,7 +170,7 @@ spec:
           enabled: false
 
         command:
-          - /usr/local/bin/heal
+          - /usr/local/bin/healer
 
         args:
           - alert-watch
@@ -179,12 +179,12 @@ spec:
           - --prompts-dir
           - /app/prompts
 
-        # Skip default claude-config init (not needed for heal)
+        # Skip default claude-config init (not needed for healer)
         skipDefaultInitContainers: true
 
         # Fix PVC permissions on startup
-        # The heal-workspace PVC may be created/owned by different users (filebrowser runs as 'user')
-        # but heal container runs as root. This ensures all containers can write to the shared PVC.
+        # The healer-workspace PVC may be created/owned by different users (filebrowser runs as 'user')
+        # but healer container runs as root. This ensures all containers can write to the shared PVC.
         extraInitContainers:
           - name: fix-pvc-permissions
             image: busybox:latest
@@ -197,7 +197,7 @@ spec:
                 chmod -R 777 /workspace/watch
                 echo "Permissions fixed."
             volumeMounts:
-              - name: heal-workspace
+              - name: healer-workspace
                 mountPath: /workspace/watch
 
         extraContainers:
@@ -220,7 +220,7 @@ spec:
                 cpu: 50m
                 memory: 64Mi
             volumeMounts:
-              - name: heal-workspace
+              - name: healer-workspace
                 mountPath: /srv
           - name: log-tailer
             image: busybox:latest
@@ -239,7 +239,7 @@ spec:
                   fi
                 done
             volumeMounts:
-              - name: heal-workspace
+              - name: healer-workspace
                 mountPath: /workspace/watch
 
   destination:
@@ -272,4 +272,3 @@ spec:
         - /spec/replicas
 
   revisionHistoryLimit: 10
-
