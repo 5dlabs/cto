@@ -209,7 +209,13 @@ impl BookmarkPoller {
         // Check if we got redirected to login
         let url = page.url().await?.unwrap_or_default();
         if url.contains("login") || url.contains("flow") {
-            tracing::warn!(url, "Redirected to login - cookies may be invalid");
+            tracing::error!(
+                url,
+                "Redirected to login - auth cookies are invalid or expired"
+            );
+            browser.close().await?;
+            handle.await?;
+            anyhow::bail!("Authentication failed: redirected to login page. Twitter session cookies are invalid or expired.");
         }
 
         let html = page.content().await?;
