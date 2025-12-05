@@ -224,12 +224,15 @@ impl Pipeline {
     }
 }
 
-/// Truncate text for preview.
+/// Truncate text for preview, respecting UTF-8 character boundaries.
 fn truncate_preview(text: &str) -> String {
-    const MAX_LEN: usize = 100;
-    if text.len() <= MAX_LEN {
+    const MAX_CHARS: usize = 100;
+
+    let char_count = text.chars().count();
+    if char_count <= MAX_CHARS {
         text.to_string()
     } else {
-        format!("{}...", &text[..MAX_LEN])
+        let truncated: String = text.chars().take(MAX_CHARS).collect();
+        format!("{truncated}...")
     }
 }
