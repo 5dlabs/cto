@@ -35,9 +35,11 @@ pub struct FileStorage {
 
 impl FileStorage {
     /// Create a new file storage instance
+    ///
+    /// Uses `.taskmaster/` directory for TaskMaster compatibility.
     pub fn new(project_path: impl AsRef<Path>) -> Self {
         let project_path = project_path.as_ref().to_path_buf();
-        let tasks_dir = project_path.join(".tasks");
+        let tasks_dir = project_path.join(".taskmaster");
         let tasks_subdir = tasks_dir.join("tasks");
         let tasks_file = tasks_subdir.join("tasks.json");
         let config_file = tasks_dir.join("config.json");
@@ -646,8 +648,11 @@ mod tests {
         storage.initialize().await.unwrap();
 
         assert!(storage.is_initialized().await.unwrap());
-        assert!(temp_dir.path().join(".tasks/tasks/tasks.json").exists());
-        assert!(temp_dir.path().join(".tasks/state.json").exists());
+        assert!(temp_dir
+            .path()
+            .join(".taskmaster/tasks/tasks.json")
+            .exists());
+        assert!(temp_dir.path().join(".taskmaster/state.json").exists());
     }
 
     #[tokio::test]

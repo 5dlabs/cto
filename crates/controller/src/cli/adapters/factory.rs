@@ -434,6 +434,7 @@ mod tests {
     use super::*;
     use crate::cli::test_utils::templates_root;
     use serde_json::json;
+    use serial_test::serial;
 
     fn sample_agent_config() -> AgentConfig {
         AgentConfig {
@@ -465,9 +466,13 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_generate_config_renders_factory_template() {
-        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        std::env::set_var("TOOLS_SERVER_URL", "http://localhost:3000/mcp");
+        // SAFETY: This test runs serially via #[serial] to avoid env var races
+        unsafe {
+            std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+            std::env::set_var("TOOLS_SERVER_URL", "http://localhost:3000/mcp");
+        }
 
         let adapter = FactoryAdapter::new().unwrap();
         let config = adapter
@@ -535,8 +540,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_health_check_reports_details() {
-        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+        // SAFETY: This test runs serially via #[serial] to avoid env var races
+        unsafe {
+            std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+        }
         let adapter = FactoryAdapter::new().unwrap();
         let health = adapter.health_check().await.unwrap();
 

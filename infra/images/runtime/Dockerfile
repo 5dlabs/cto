@@ -296,6 +296,13 @@ RUN --mount=type=cache,target=/root/.cache \
         shadcn@latest \
         wrangler || true
 
+# Install Expo / React Native tooling (Tap mobile agent)
+# EAS CLI is essential for cloud builds, submissions, and OTA updates
+RUN --mount=type=cache,target=/root/.cache \
+    npm install -g --no-fund \
+        eas-cli@latest \
+        expo-cli@latest || true
+
 # Install Morph MCP server for fast code editing (10,500 tok/s) and intelligent search
 # Provides edit_file and warp_grep tools for all CLI agents
 # Note: ripgrep is already installed above (required for warp_grep)
@@ -370,8 +377,28 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
 
-# Install TaskMaster globally (version controlled via ARG for easy updates)
+# Install tasks CLI from CTO monorepo unified release (skip if version is "skip" or empty)
+# This is the Rust replacement for TaskMaster-AI, providing faster task management
+ARG TASKS_VERSION=skip
+RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing tasks CLI v${TASKS_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tasks \
+          "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/tasks-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/tasks && \
+        echo "✅ tasks CLI installed"; \
+      else \
+        echo "⏭️ Skipping tasks CLI installation (unsupported architecture: ${ARCH})"; \
+      fi; \
+    else \
+      echo "⏭️ Skipping tasks CLI installation (no release available)"; \
+    fi
+
+# Install TaskMaster globally as fallback (version controlled via ARG for easy updates)
 # This layer is intentionally placed late so version bumps don't invalidate earlier layers
+# NOTE: This is being replaced by the Rust `tasks` CLI above
 RUN npm install -g task-master-ai@${TASKMASTER_VERSION}
 
 # Install git-delta

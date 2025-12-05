@@ -8,6 +8,7 @@
 #![allow(clippy::disallowed_macros)]
 #![allow(clippy::uninlined_format_args)]
 
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -402,6 +403,17 @@ enum Commands {
         #[arg(long)]
         tag: Option<String>,
     },
+
+    /// Generate individual task files
+    Generate {
+        /// Output directory (default: same as tasks file)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Tag context
+        #[arg(long)]
+        tag: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -556,7 +568,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             ui::print_success("Project initialized successfully!");
             ui::print_info(&format!(
                 "Tasks directory created at: {}",
-                project_path.join(".tasks").display()
+                project_path.join(".taskmaster").display()
             ));
         }
 
@@ -1373,6 +1385,93 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             ui::print_info(&format!(
                 "Tokens used: {} in, {} out",
                 usage.input_tokens, usage.output_tokens
+            ));
+        }
+
+        Commands::Generate { output, tag } => {
+            check_initialized(&tasks_domain).await?;
+
+            let tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
+
+            if tasks.is_empty() {
+                ui::print_info("No tasks to generate files for");
+                return Ok(());
+            }
+
+            // Determine output directory
+            let output_dir =
+                output.unwrap_or_else(|| project_path.join(".taskmaster").join("tasks"));
+            tokio::fs::create_dir_all(&output_dir).await?;
+
+            let mut generated = 0;
+            for task in &tasks {
+                // Zero-pad task ID to 3 digits for proper sorting
+                let padded_id = format!("{:0>3}", task.id);
+                let task_file = output_dir.join(format!("task-{padded_id}.md"));
+
+                // Generate markdown content
+                let mut content = String::new();
+                writeln!(content, "# Task {}: {}\n", task.id, task.title).ok();
+                writeln!(content, "**Status:** {}", task.status).ok();
+                writeln!(content, "**Priority:** {}", task.priority).ok();
+
+                if !task.dependencies.is_empty() {
+                    writeln!(
+                        content,
+                        "**Dependencies:** {}",
+                        task.dependencies.join(", ")
+                    )
+                    .ok();
+                }
+                content.push('\n');
+
+                content.push_str("## Description\n\n");
+                content.push_str(&task.description);
+                content.push_str("\n\n");
+
+                if !task.details.is_empty() {
+                    content.push_str("## Implementation Details\n\n");
+                    content.push_str(&task.details);
+                    content.push_str("\n\n");
+                }
+
+                if !task.test_strategy.is_empty() {
+                    content.push_str("## Test Strategy\n\n");
+                    content.push_str(&task.test_strategy);
+                    content.push_str("\n\n");
+                }
+
+                // Include subtasks if any
+                if !task.subtasks.is_empty() {
+                    content.push_str("## Subtasks\n\n");
+                    for subtask in &task.subtasks {
+                        writeln!(
+                            content,
+                            "- [ ] **{}.{}** {} ({})",
+                            task.id, subtask.id, subtask.title, subtask.status
+                        )
+                        .ok();
+                        if !subtask.description.is_empty() {
+                            writeln!(content, "  - {}", subtask.description).ok();
+                        }
+                    }
+                    content.push('\n');
+                }
+
+                tokio::fs::write(&task_file, &content).await.map_err(|e| {
+                    TasksError::FileWriteError {
+                        path: task_file.display().to_string(),
+                        reason: e.to_string(),
+                    }
+                })?;
+
+                generated += 1;
+            }
+
+            ui::print_success(&format!(
+                "Generated {} task file(s) in {}",
+                generated,
+                output_dir.display()
             ));
         }
     }

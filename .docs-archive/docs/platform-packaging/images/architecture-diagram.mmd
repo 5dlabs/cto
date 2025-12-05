@@ -1,0 +1,23 @@
+graph TD
+    A[User Input] --> B[CLI Installer]
+    B --> C[Configuration Manager]
+    C --> D[Template Engine]
+    
+    D --> E[Cluster Provisioner]
+    E --> F[k3s/Kind/Minikube]
+    
+    D --> G[Component Installer]
+    G --> H[ArgoCD]
+    G --> I[Argo Workflows]
+    G --> J[Controller]
+    
+    C --> K[GitHub Manager]
+    K --> L[App Creation]
+    K --> M[Webhook Setup]
+    
+    N[Validation Engine] --> O[Health Checks]
+    O --> P[Access Info]
+    
+    Q[Distribution] --> R[Homebrew]
+    Q --> S[Direct Downloads]
+    Q --> T[Docker Images]
