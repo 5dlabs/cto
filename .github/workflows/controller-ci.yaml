@@ -74,7 +74,8 @@ jobs:
         working-directory: ./crates/controller
         run: |
           echo "🔍 Enforcing AWS-spec lint gates (clippy::pedantic + -D warnings)"
-          cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+          # Exclude research crate - it has its own CI with different lint config
+          cargo clippy --workspace --exclude research --all-targets --all-features -- -D warnings -W clippy::pedantic
 
   # Commit formatting changes (runs on push events when formatting was needed)
   commit-format-changes:
