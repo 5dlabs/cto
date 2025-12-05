@@ -243,8 +243,14 @@ async fn run_poll(
     if create_pr && result.saved > 0 {
         println!("\n📤 Creating pull request...");
 
-        match create_research_pr(&output, &result.saved_ids, &repo, &base_branch, &research_dir)
-            .await
+        match create_research_pr(
+            &output,
+            &result.saved_ids,
+            &repo,
+            &base_branch,
+            &research_dir,
+        )
+        .await
         {
             Ok(pr_url) => {
                 println!("✅ Pull request created: {pr_url}");

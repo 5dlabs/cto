@@ -100,7 +100,12 @@ impl GitPublisher {
 
         // Create and checkout new branch
         let output = Command::new("git")
-            .args(["checkout", "-b", branch_name, &format!("origin/{base_branch}")])
+            .args([
+                "checkout",
+                "-b",
+                branch_name,
+                &format!("origin/{base_branch}"),
+            ])
             .current_dir(repo_dir)
             .output()
             .await
@@ -187,4 +192,3 @@ impl Default for GitPublisher {
         Self::new()
     }
 }
-
