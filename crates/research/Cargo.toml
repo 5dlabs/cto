@@ -49,6 +49,13 @@ handlebars = { workspace = true }
 # Browser automation (pure Rust)
 chromiumoxide = { version = "0.8", features = ["tokio-runtime"], default-features = false }
 
+# GitHub API for PR creation
+octocrab = "0.38"
+
+# File system utilities
+walkdir = "2"
+tempfile = "3"
+
 # Local crates
 tasks = { path = "../tasks" }
 scraper = "0.24.0"

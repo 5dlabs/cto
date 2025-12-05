@@ -2,12 +2,13 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use research::analysis::Category;
 use research::auth::{BrowserAuth, Session};
 use research::pipeline::{Pipeline, PipelineConfig};
+use research::publish::{PublishConfig, Publisher};
 use research::storage::ResearchIndex;
 use research::twitter::BookmarkParser;
 use tasks::ai::ProviderRegistry;
@@ -49,6 +50,22 @@ pub enum Commands {
         /// AI model to use
         #[arg(long, default_value = "claude-sonnet-4-20250514")]
         model: String,
+
+        /// Create a PR with new research entries
+        #[arg(long)]
+        create_pr: bool,
+
+        /// GitHub repository for PR (owner/repo format)
+        #[arg(long, default_value = "5dlabs/cto")]
+        repo: String,
+
+        /// Base branch for PR
+        #[arg(long, default_value = "main")]
+        base_branch: String,
+
+        /// Directory in repo for research files
+        #[arg(long, default_value = "docs/research")]
+        research_dir: String,
     },
 
     /// Interactive auth setup (run locally, not in container)
@@ -125,6 +142,10 @@ async fn main() -> Result<()> {
             min_relevance,
             batch_size,
             model,
+            create_pr,
+            repo,
+            base_branch,
+            research_dir,
         } => {
             tracing::info!(
                 output = %output.display(),
@@ -132,9 +153,22 @@ async fn main() -> Result<()> {
                 min_relevance,
                 batch_size,
                 model,
+                create_pr,
+                repo,
                 "Starting poll cycle"
             );
-            run_poll(output, state, min_relevance, batch_size, model).await
+            run_poll(
+                output,
+                state,
+                min_relevance,
+                batch_size,
+                model,
+                create_pr,
+                repo,
+                base_branch,
+                research_dir,
+            )
+            .await
         }
         Commands::Auth {
             export_to_vault,
@@ -162,6 +196,10 @@ async fn run_poll(
     min_relevance: f32,
     batch_size: usize,
     model: String,
+    create_pr: bool,
+    repo: String,
+    base_branch: String,
+    research_dir: String,
 ) -> Result<()> {
     // Load session from environment
     let session = Session::from_env()?;
@@ -201,7 +239,48 @@ async fn run_poll(
         }
     }
 
+    // Create PR if requested and there are saved entries
+    if create_pr && result.saved > 0 {
+        println!("\n📤 Creating pull request...");
+
+        match create_research_pr(&output, &result.saved_ids, &repo, &base_branch, &research_dir)
+            .await
+        {
+            Ok(pr_url) => {
+                println!("✅ Pull request created: {pr_url}");
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to create PR: {e}");
+                // Don't fail the whole run if PR creation fails
+            }
+        }
+    } else if create_pr && result.saved == 0 {
+        println!("\n📭 No new entries to publish");
+    }
+
     Ok(())
+}
+
+async fn create_research_pr(
+    source_dir: &Path,
+    entry_ids: &[String],
+    repo: &str,
+    base_branch: &str,
+    research_dir: &str,
+) -> Result<String> {
+    let github_token = std::env::var("GITHUB_TOKEN")
+        .or_else(|_| std::env::var("GH_TOKEN"))
+        .map_err(|_| anyhow::anyhow!("GITHUB_TOKEN or GH_TOKEN not set for PR creation"))?;
+
+    let config = PublishConfig {
+        repo: repo.to_string(),
+        base_branch: base_branch.to_string(),
+        research_dir: research_dir.to_string(),
+        github_token,
+    };
+
+    let publisher = Publisher::new(config)?;
+    publisher.publish(source_dir, entry_ids).await
 }
 
 async fn run_auth(export_to_vault: bool, output: Option<PathBuf>) -> Result<()> {

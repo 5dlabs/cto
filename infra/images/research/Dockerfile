@@ -31,12 +31,13 @@ RUN cargo build --release --package research
 # =============================================================================
 FROM debian:bookworm-slim
 
-# Install runtime dependencies including Chromium
+# Install runtime dependencies including Chromium and git
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
     fonts-liberation \
+    git \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
