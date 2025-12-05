@@ -91,3 +91,4 @@ tokio-test = "0.4"
 mockall = { workspace = true }
 wiremock = { workspace = true }
 uuid = { workspace = true }
+serial_test = { workspace = true }

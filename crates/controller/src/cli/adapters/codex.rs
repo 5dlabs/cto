@@ -20,7 +20,7 @@ use std::sync::Arc;
 use tracing::{debug, info, instrument};
 
 const CODEX_CONFIG_TEMPLATE: &str = "code/codex/config.toml.hbs";
-const CODEX_MEMORY_TEMPLATE: &str = "code/codex/agents.md.hbs";
+const CODEX_MEMORY_TEMPLATE: &str = "code/codex/agents-default.md.hbs";
 
 fn first_string<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
     keys.iter()
@@ -429,6 +429,7 @@ mod tests {
     use crate::cli::adapter::{AgentConfig, ToolConfiguration};
     use crate::cli::test_utils::templates_root;
     use serde_json::json;
+    use serial_test::serial;
 
     fn sample_agent_config() -> AgentConfig {
         AgentConfig {
@@ -459,9 +460,13 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_generate_config_applies_overrides() {
-        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        std::env::set_var("TOOLS_SERVER_URL", "http://localhost:9000/mcp");
+        // SAFETY: This test runs serially via #[serial] to avoid env var races
+        unsafe {
+            std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+            std::env::set_var("TOOLS_SERVER_URL", "http://localhost:9000/mcp");
+        }
 
         let adapter = CodexAdapter::new().unwrap();
         let agent_config = sample_agent_config();
@@ -487,8 +492,12 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_memory_template_includes_tools_and_instructions() {
-        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+        // SAFETY: This test runs serially via #[serial] to avoid env var races
+        unsafe {
+            std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+        }
         let adapter = CodexAdapter::new().unwrap();
         let agent_config = sample_agent_config();
 
