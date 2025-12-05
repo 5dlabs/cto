@@ -152,6 +152,8 @@ impl BookmarkPoller {
         use futures::StreamExt;
 
         let config = BrowserConfig::builder()
+            .arg("--no-sandbox") // Required for containerized environments
+            .arg("--disable-dev-shm-usage") // Avoid /dev/shm size issues in containers
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to build browser config: {e}"))?;
         let (mut browser, mut handler) = Browser::launch(config).await?;

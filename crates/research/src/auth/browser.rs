@@ -29,11 +29,15 @@ impl BrowserAuth {
 
         let config = if self.headless {
             BrowserConfig::builder()
+                .arg("--no-sandbox") // Required for containerized environments
+                .arg("--disable-dev-shm-usage") // Avoid /dev/shm size issues in containers
                 .build()
                 .map_err(|e| anyhow::anyhow!("Failed to build browser config: {e}"))?
         } else {
             BrowserConfig::builder()
                 .with_head()
+                .arg("--no-sandbox")
+                .arg("--disable-dev-shm-usage")
                 .build()
                 .map_err(|e| anyhow::anyhow!("Failed to build browser config: {e}"))?
         };
