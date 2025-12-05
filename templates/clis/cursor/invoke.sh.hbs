@@ -1,0 +1,75 @@
+# =========================================================================
+# Cursor CLI Invocation Partial
+# 
+# This partial handles the Cursor CLI command building and execution.
+# Include this in workflow containers using: {{> clis/cursor/invoke}}
+#
+# Note: Cursor CLI documentation is less extensive than other CLIs.
+# This template is based on observed behavior and community usage.
+#
+# Required context variables:
+#   - WORK_DIR: Working directory for execution (defaults to /workspace)
+#   - PROMPT_CONTENT: The prompt to send (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               CURSOR CLI INVOCATION                          ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Set working directory
+WORK_DIR="${WORK_DIR:-/workspace}"
+
+# Build Cursor command
+CURSOR_CMD=("cursor" "chat")
+
+# Working directory context
+CURSOR_CMD+=("--directory" "$WORK_DIR")
+
+# =========================================================================
+# Model Configuration
+# =========================================================================
+{{#if model}}
+CURSOR_CMD+=("--model" "{{model}}")
+echo "✓ Model: {{model}}"
+{{/if}}
+
+# =========================================================================
+# Output Format
+# =========================================================================
+CURSOR_CMD+=("--json")
+
+# =========================================================================
+# Determine Prompt Source
+# =========================================================================
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Add prompt as the final argument
+CURSOR_CMD+=("$PROMPT_TEXT")
+
+echo ""
+echo "🚀 Cursor Command:"
+echo "   cursor chat --directory $WORK_DIR [options] \"<prompt>\""
+echo ""
+
+# =========================================================================
+# Execute Cursor
+# Note: Cursor reads AGENTS.md from project root for context
+# =========================================================================
+echo "Starting Cursor execution..."
+"${CURSOR_CMD[@]}"
+CURSOR_EXIT_CODE=$?
+
+echo ""
+echo "✓ Cursor execution completed (exit code: $CURSOR_EXIT_CODE)"
+

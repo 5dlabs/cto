@@ -1,0 +1,49 @@
+{
+  "mode": "exec",
+  "exec": {
+    "command": "opencode",
+    "args": [
+      "--task-repo-dir", "/workspace",
+      "--model", "{{model}}"{{#if debug}},
+      "--debug"{{/if}}
+    ],
+    "env": {
+      {{#if api_key}}
+      "OPENCODE_API_KEY": "{{api_key}}",
+      {{/if}}
+      {{#if base_url}}
+      "OPENCODE_BASE_URL": "{{base_url}}"{{/if}}{{#if temperature}},
+      "OPENCODE_TEMPERATURE": "{{temperature}}"{{/if}}{{#if max_tokens}},
+      "OPENCODE_MAX_TOKENS": "{{max_tokens}}"{{/if}}{{#if debug}},
+      "OPENCODE_DEBUG": "true"{{/if}}{{#if continue_task}},
+      "OPENCODE_CONTINUE": "true"{{/if}}
+    }
+  },
+  "instructions": ["AGENTS.md"],
+  "tools": {
+    "filesystem": {
+      "enabled": true,
+      "sandbox": {
+        "root": "/workspace",
+        "allow_symlinks": false
+      }
+    },
+    "shell": {
+      "enabled": true,
+      "sandbox": {
+        "working_dir": "/workspace",
+        "allowed_commands": ["git", "npm", "pnpm", "yarn", "cargo", "docker", "kubectl", "make"]
+      }
+    }{{#if tools.url}},
+    "remote": {
+      "enabled": true,
+      "env": {
+        "TOOLS_SERVER_URL": "{{tools.url}}"
+      }{{#if tools.tools}},
+      "availableTools": [{{#each tools.tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+      {{/if}}
+    }
+    {{/if}}
+  }
+}
+

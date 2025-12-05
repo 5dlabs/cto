@@ -1,0 +1,61 @@
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      {{#if agent_tools_override}}
+      {{#each permissions.allow}}
+      "{{this}}"{{#unless @last}},{{/unless}}
+      {{/each}}
+      {{else}}
+      "Bash",
+      "Create",
+      "Edit",
+      "Read",
+      "Write",
+      "MultiEdit",
+      "Glob",
+      "Grep",
+      "LS",
+      "Task",
+      "ExitPlanMode",
+      "ExitSpecMode",
+      "NotebookRead",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "TodoRead",
+      "TodoWrite",
+      "GenerateDroid"
+      {{/if}}
+    ],
+    "deny": [
+      {{#if agent_tools_override}}
+      {{#each permissions.deny}}
+      "{{this}}"{{#unless @last}},{{/unless}}
+      {{/each}}
+      {{else}}
+      {{/if}}
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "DISABLE_AUTOUPDATER": "1",
+    "DISABLE_COST_WARNINGS": "0",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "0",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "{{#if telemetry.enabled}}1{{else}}0{{/if}}"{{#if telemetry.enabled}},
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317",
+    "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL": "grpc",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317",
+    "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "grpc"{{/if}}{{#if retry.is_retry}},
+    "BASH_DEFAULT_TIMEOUT_MS": "30000",
+    "BASH_MAX_TIMEOUT_MS": "300000"{{/if}}
+  },
+  "model": "{{model}}",
+  "cleanupPeriodDays": 7,
+  "includeCoAuthoredBy": false
+}
+
