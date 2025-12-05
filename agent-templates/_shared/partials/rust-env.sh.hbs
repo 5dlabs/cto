@@ -1,0 +1,19 @@
+# =========================================================================
+# Rust Environment Bootstrap
+# =========================================================================
+
+# Source Rust environment if available
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+# Ensure stable toolchain
+if command -v rustup >/dev/null 2>&1; then
+  rustup default stable 2>/dev/null || true
+fi
+
+echo "PATH: $PATH"
+

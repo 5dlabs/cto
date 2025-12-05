@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task>
+  <id>INTEGRATION_TASK_ID</id>
+  <title>Integration - Level LEVEL_INDEX</title>
+  <type>integration</type>
+  <level>LEVEL_INDEX</level>
+  
+  <description>
+    Validate that all tasks from execution level LEVEL_INDEX integrate correctly as a cohesive system before proceeding to the next level.
+  </description>
+  
+  <scope>
+    <integrated_tasks>TASK_LIST_PLACEHOLDER</integrated_tasks>
+    <validation_type>inter-task-integration</validation_type>
+    <execution_level>LEVEL_INDEX</execution_level>
+  </scope>
+  
+  <dependencies>
+    <task_ids>ALL_DEPENDENCY_TASK_IDS</task_ids>
+    <rationale>Must wait for all level LEVEL_INDEX tasks to complete before integration validation</rationale>
+  </dependencies>
+  
+  <priority>high</priority>
+  <estimated_effort>30-60 minutes</estimated_effort>
+  
+  <agent_assignment>
+    <primary>tess</primary>
+    <alternate>morgan</alternate>
+    <rationale>Integration validation requires QA expertise and comprehensive testing</rationale>
+  </agent_assignment>
+  
+  <integration_checks>
+    <check type="pr_status">All level LEVEL_INDEX PRs merged to main</check>
+    <check type="test_suite">Full test suite passes on main</check>
+    <check type="build">Production build succeeds</check>
+    <check type="conflicts">No merge conflicts or integration errors</check>
+    <check type="compatibility">All components interact correctly</check>
+  </integration_checks>
+  
+  <deliverables>
+    <deliverable>Integration validation report</deliverable>
+    <deliverable>Issue resolutions (if problems found)</deliverable>
+    <deliverable>Updated documentation (if needed)</deliverable>
+  </deliverables>
+  
+  <success_criteria>
+    <criterion>All level LEVEL_INDEX PRs merged</criterion>
+    <criterion>Full test suite passes</criterion>
+    <criterion>Build succeeds</criterion>
+    <criterion>No integration conflicts</criterion>
+    <criterion>Ready for next execution level</criterion>
+  </success_criteria>
+  
+  <metadata>
+    <is_integration_task>true</is_integration_task>
+    <blocks_next_level>true</blocks_next_level>
+    <auto_generated>true</auto_generated>
+  </metadata>
+</task>

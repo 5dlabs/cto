@@ -1,0 +1,48 @@
+# Codex Project Memory
+
+## Execution Context
+- **GitHub App**: {{github_app}}
+- **Model**: {{model}}
+- **Task ID**: {{task_id}}
+- **Service**: {{service}}
+- **Repository**: {{repository_url}}
+- **Docs Repository**: {{docs_repository_url}}
+- **Docs Branch**: {{docs_branch}}
+- **Working Directory**: {{working_directory}}
+
+## Universal Rules (All Agents)
+1. **Task Isolation** – work exclusively on Task {{task_id}}; document, but do not implement, anything outside scope.
+2. **Real Systems Only** – integrations must hit real APIs/databases; parameterize everything (env vars/config/CLI flags).
+3. **Quality Gates** – `cargo fmt`, `cargo clippy -- -D warnings -W clippy::pedantic`, full test suite, and coverage ≥95% (language equivalents acceptable).
+4. **Documentation** – keep task docs (`task/*.md`) and project READMEs accurate as you go; leave breadcrumbs for the next agent.
+5. **Feature Branch Only** – the controller has already checked out `feature/task-{{task_id}}-implementation`. Do not run `git push origin main` or any command that targets the default branch. Always inspect `git status` before committing, and when you publish changes use `git push origin HEAD` (or `git push origin $CURRENT_BRANCH`).
+6. **Stay Autonomous** – this workflow is unattended. Never pause to ask for confirmation, approval, or guidance. When in doubt, proceed with the task, document assumptions in the PR, and surface blockers via logs.
+7. **Pull Request Discipline** – ensure a PR exists, carries labels `task-{{task_id}}`, `service-{{service}}`, and `run-{{workflow_name}}`, and includes a summary of tests/coverage before you consider the task complete.
+8. **Preserve Workspace** – never run cleanup commands that wipe the workspace or PVC (e.g. `rm -rf /workspace`, deleting the repo, mass-removing cache directories). Leave artifacts in place for downstream agents; rely on `git` to stage only relevant changes.
+9. **Verify MCP Tools** – during initialization, enumerate every remote MCP tool exposed by Tools and probe each one (e.g. lightweight health call or a no-op request). Log the outcome so we can detect missing or misconfigured tools early.
+
+{{#if cli_config.instructions}}
+## Custom Instructions
+{{{cli_config.instructions}}}
+{{else if cli_config.memory}}
+## Memory Notes
+{{{cli_config.memory}}}
+{{else}}
+## Memory Notes
+_No additional Codex memory instructions were provided for this run._
+{{/if}}
+
+{{#if tools.tools}}
+## Tools Tools
+{{#each tools.tools}}
+- {{this}}
+{{/each}}
+{{else}}
+## Tools Tools
+- No remote tools configured. Tools will still provide discovery commands.
+{{/if}}
+
+{{#if cli_config.additionalNotes}}
+## Additional Notes
+{{{cli_config.additionalNotes}}}
+{{/if}}

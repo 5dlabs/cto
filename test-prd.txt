@@ -1,0 +1,29 @@
+# Simple Task Manager CLI
+
+## Overview
+Build a simple command-line task manager application that allows users to create, list, update, and delete tasks.
+
+## Requirements
+
+### Core Features
+1. **Task Creation**: Users can create new tasks with a title and optional description
+2. **Task Listing**: Display all tasks in a formatted table
+3. **Task Status**: Mark tasks as pending, in-progress, or done
+4. **Task Deletion**: Remove tasks by ID
+
+### Technical Requirements
+- Language: Rust
+- Storage: JSON file (~/.tasks/tasks.json)
+- CLI framework: clap
+
+### Commands
+- `task add "title" --description "desc"` - Create a new task
+- `task list` - Show all tasks
+- `task status <id> <status>` - Update task status
+- `task remove <id>` - Delete a task
+
+### Non-functional Requirements
+- Tasks should persist between sessions
+- IDs should be auto-incrementing integers
+- Output should be colored for readability
+

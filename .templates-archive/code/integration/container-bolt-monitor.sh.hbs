@@ -1,0 +1,265 @@
+#!/bin/sh
+# Bolt-Monitor - Continuous Deployment Health Monitoring
+# Queries ALL ArgoCD applications and posts status updates to relevant PRs
+
+echo "Bolt-Monitor: Checking deployment health across all applications"
+
+# Source common setup
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
+
+# Setup authentication
+setup_github_auth
+
+# Configuration
+NAMESPACE="${NAMESPACE:-cto}"
+UPDATE_ON_CHANGE_ONLY="${UPDATE_ON_CHANGE_ONLY:-true}"
+STATE_FILE="/tmp/bolt-monitor-state.json"
+
+echo "Update on change only: $UPDATE_ON_CHANGE_ONLY"
+
+# Initialize state if it doesn't exist
+if [ ! -f "$STATE_FILE" ]; then
+    echo "{}" > "$STATE_FILE"
+fi
+
+# Get all ArgoCD applications
+get_all_argocd_apps() {
+    kubectl get applications -n argocd \
+        -l managed-by=bolt \
+        -o json | jq -r '.items[] | @base64'
+}
+
+# Extract app details
+get_app_details() {
+    local app_b64="$1"
+    local app_json=$(echo "$app_b64" | base64 -d)
+    
+    local name=$(echo "$app_json" | jq -r '.metadata.name')
+    local task_id=$(echo "$app_json" | jq -r '.metadata.labels."task-id" // empty')
+    local env=$(echo "$app_json" | jq -r '.metadata.labels.environment // "unknown"')
+    local sync_status=$(echo "$app_json" | jq -r '.status.sync.status // "Unknown"')
+    local health_status=$(echo "$app_json" | jq -r '.status.health.status // "Unknown"')
+    local namespace=$(echo "$app_json" | jq -r '.spec.destination.namespace')
+    
+    echo "$name|$task_id|$env|$sync_status|$health_status|$namespace"
+}
+
+# Get pod status for an application
+get_pod_status() {
+    local namespace="$1"
+    local app_name="$2"
+    
+    local total=$(kubectl get pods -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    local running=$(kubectl get pods -n "$namespace" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    
+    echo "$running/$total"
+}
+
+# Get ngrok URL for an application
+get_ngrok_url() {
+    local namespace="$1"
+    local app_name="$2"
+    
+    # Try to find ngrok tunnel
+    local tunnel_name=$(kubectl get tunnel -n "$namespace" -o name 2>/dev/null | head -n 1 | cut -d'/' -f2)
+    if [ -n "$tunnel_name" ]; then
+        kubectl get tunnel "$tunnel_name" -n "$namespace" -o jsonpath='{.status.url}' 2>/dev/null || echo ""
+    else
+        echo ""
+    fi
+}
+
+# Check if status changed since last run
+status_changed() {
+    local app_name="$1"
+    local new_status="$2"
+    
+    if [ "$UPDATE_ON_CHANGE_ONLY" != "true" ]; then
+        return 0  # Always report if not in change-only mode
+    fi
+    
+    local old_status=$(jq -r ".[\"$app_name\"] // \"\"" "$STATE_FILE")
+    
+    if [ "$old_status" != "$new_status" ]; then
+        # Update state
+        local temp_file=$(mktemp)
+        jq ". + {\"$app_name\": \"$new_status\"}" "$STATE_FILE" > "$temp_file"
+        mv "$temp_file" "$STATE_FILE"
+        return 0  # Status changed
+    fi
+    
+    return 1  # No change
+}
+
+# Generate status emoji
+get_status_emoji() {
+    local health="$1"
+    local sync="$2"
+    
+    if [ "$health" = "Healthy" ] && [ "$sync" = "Synced" ]; then
+        echo "✅"
+    elif [ "$health" = "Progressing" ]; then
+        echo "🔄"
+    elif [ "$health" = "Degraded" ]; then
+        echo "⚠️"
+    elif [ "$health" = "Missing" ]; then
+        echo "❌"
+    else
+        echo "❔"
+    fi
+}
+
+# Find PR number for a task ID
+find_pr_for_task() {
+    local task_id="$1"
+    local repo_owner=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
+    local repo_name=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+    
+    # Search for PRs with task-{id} label
+    gh pr list \
+        --repo "$repo_owner/$repo_name" \
+        --label "task-$task_id" \
+        --json number \
+        --jq '.[0].number' 2>/dev/null || echo ""
+}
+
+# Post or update monitoring comment on PR
+post_monitoring_update() {
+    local pr_number="$1"
+    local comment_body="$2"
+    
+    if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+        echo "No PR number provided, skipping comment"
+        return
+    fi
+    
+    local repo_owner=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
+    local repo_name=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+    
+    # Try to find existing monitoring comment
+    local comment_id=$(gh api \
+        "/repos/$repo_owner/$repo_name/issues/$pr_number/comments" \
+        --jq '.[] | select(.body | contains("📊 Bolt Monitor: Deployment Health")) | .id' \
+        2>/dev/null | head -n 1)
+    
+    if [ -n "$comment_id" ]; then
+        # Update existing comment
+        echo "Updating existing comment $comment_id on PR #$pr_number"
+        gh api \
+            --method PATCH \
+            "/repos/$repo_owner/$repo_name/issues/comments/$comment_id" \
+            -f body="$comment_body" \
+            >/dev/null 2>&1
+    else
+        # Create new comment
+        echo "Creating new monitoring comment on PR #$pr_number"
+        gh pr comment "$pr_number" \
+            --repo "$repo_owner/$repo_name" \
+            --body "$comment_body" \
+            >/dev/null 2>&1
+    fi
+}
+
+# Main monitoring logic
+echo "===== Scanning ArgoCD Applications ====="
+
+# Group applications by task ID
+declare -A task_apps_preview
+declare -A task_apps_production
+declare -A task_prs
+
+# Collect all applications
+for app_b64 in $(get_all_argocd_apps); do
+    app_details=$(get_app_details "$app_b64")
+    
+    IFS='|' read -r name task_id env sync_status health_status namespace <<< "$app_details"
+    
+    if [ -z "$task_id" ] || [ "$task_id" = "null" ]; then
+        echo "Skipping $name (no task ID)"
+        continue
+    fi
+    
+    # Get additional details
+    pods=$(get_pod_status "$namespace" "$name")
+    url=$(get_ngrok_url "$namespace" "$name")
+    emoji=$(get_status_emoji "$health_status" "$sync_status")
+    
+    # Build status line
+    status_line="- **$name** $emoji $health_status | $sync_status"
+    
+    if [ -n "$pods" ] && [ "$pods" != "0/0" ]; then
+        status_line="$status_line\n  - Pods: $pods Running"
+    fi
+    
+    if [ -n "$url" ]; then
+        status_line="$status_line\n  - URL: $url"
+    fi
+    
+    # Store by environment
+    if [ "$env" = "preview" ]; then
+        if [ -z "${task_apps_preview[$task_id]}" ]; then
+            task_apps_preview[$task_id]="$status_line"
+        else
+            task_apps_preview[$task_id]="${task_apps_preview[$task_id]}\n$status_line"
+        fi
+    elif [ "$env" = "production" ]; then
+        if [ -z "${task_apps_production[$task_id]}" ]; then
+            task_apps_production[$task_id]="$status_line"
+        else
+            task_apps_production[$task_id]="${task_apps_production[$task_id]}\n$status_line"
+        fi
+    fi
+    
+    # Find PR if we haven't already
+    if [ -z "${task_prs[$task_id]}" ]; then
+        pr_number=$(find_pr_for_task "$task_id")
+        if [ -n "$pr_number" ]; then
+            task_prs[$task_id]="$pr_number"
+        fi
+    fi
+    
+    # Check if we should update (status changed or not in change-only mode)
+    combined_status="$health_status|$sync_status|$pods"
+    if status_changed "$name" "$combined_status"; then
+        echo "✓ Status change detected for $name"
+    fi
+done
+
+# Generate and post updates for each task
+for task_id in "${!task_prs[@]}"; do
+    pr_number="${task_prs[$task_id]}"
+    
+    if [ -z "$pr_number" ]; then
+        echo "No PR found for task $task_id, skipping"
+        continue
+    fi
+    
+    echo "Generating update for Task $task_id (PR #$pr_number)"
+    
+    # Build comment body
+    comment_body="## 📊 Bolt Monitor: Deployment Health\n\n"
+    
+    # Add preview deployments
+    if [ -n "${task_apps_preview[$task_id]}" ]; then
+        comment_body="$comment_body### Preview Deployments\n${task_apps_preview[$task_id]}\n\n"
+    fi
+    
+    # Add production deployments
+    if [ -n "${task_apps_production[$task_id]}" ]; then
+        comment_body="$comment_body### Production Deployments\n${task_apps_production[$task_id]}\n\n"
+    fi
+    
+    # Add timestamp
+    timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+    comment_body="$comment_body**Last Check:** $timestamp\n\n"
+    comment_body="$comment_body---\n*Monitored by Bolt*"
+    
+    # Post/update comment
+    post_monitoring_update "$pr_number" "$(echo -e "$comment_body")"
+done
+
+echo "===== Monitoring Complete ====="
+echo "Scanned $(echo "${!task_prs[@]}" | wc -w | tr -d ' ') task(s) with active deployments"
+echo "Next check in $CHECK_INTERVAL seconds"
+
+

@@ -1,0 +1,48 @@
+# =========================================================================
+# Docker Sidecar Management
+# 
+# Shared function to stop Docker sidecar containers gracefully.
+# This is used by CLIs that need Docker support (e.g., Cursor).
+# =========================================================================
+
+stop_docker_sidecar() {
+  if [ ! -S /var/run/docker.sock ]; then
+    return
+  fi
+
+  echo "🛑 Stopping Docker sidecar"
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill dockerd >/dev/null 2>&1 || true
+    sleep 1
+    if pidof dockerd >/dev/null 2>&1; then
+      pkill -9 dockerd >/dev/null 2>&1 || true
+    fi
+    if pidof docker-init >/dev/null 2>&1; then
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+  else
+    PID=$(pidof dockerd 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+      kill "$PID" >/dev/null 2>&1 || true
+    fi
+    PID_INIT=$(pidof docker-init 2>/dev/null || true)
+    if [ -n "$PID_INIT" ]; then
+      kill "$PID_INIT" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  for _ in 1 2 3 4 5; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped"
+      return
+    fi
+    sleep 1
+  done
+
+  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
+  echo "⚠️ Docker sidecar still running (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+}

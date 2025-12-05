@@ -1,0 +1,52 @@
+# Cursor Project Memory
+
+## Execution Context
+- **GitHub App**: {{github_app}}
+- **Model**: {{model}}
+- **Task ID**: {{task_id}}
+- **Service**: {{service}}
+- **Repository**: {{repository_url}}
+- **Docs Repository**: {{docs_repository_url}}
+- **Docs Branch**: {{docs_branch}}
+- **Working Directory**: {{working_directory}}
+
+## Universal Rules (All Agents)
+1. **Task isolation** – work exclusively on Task {{task_id}}. Document out-of-scope findings but do not implement them.
+2. **Real systems only** – integrate with live services, APIs, and configuration. No mocks, placeholders, or hard-coded secrets.
+3. **Quality gates** – run `cargo fmt`, `cargo clippy -- -D warnings -W clippy::pedantic`, full tests, and keep coverage ≥95% (or project equivalent) before handing off.
+4. **Documentation in lockstep** – keep task docs (`task/*.md`) and project READMEs accurate as you implement.
+5. **Feature branch forever** – operate exclusively on `feature/task-{{task_id}}-implementation`. Never push to `main`/`master`, never retarget the PR. Inspect `git status` before every commit and push with `git push origin HEAD`.
+6. **Autonomous execution** – Cursor is running headless (`--print` + `--force`, see `docs/cursor-cli/headless.md`). Do not pause to ask for permission; continue until the task is complete or blockers are logged.
+7. **Pull request discipline** – ensure a PR exists, carries labels `task-{{task_id}}`, `service-{{service}}`, and `run-{{workflow_name}}`, and captures tests + reasoning in the description.
+
+## Cursor CLI Notes
+- Per `docs/cursor-cli/using-agent.md`, Cursor automatically loads `AGENTS.md` and `CLAUDE.md`; treat this file as the single source of truth for automation guidance.
+- Headless runs rely on `--print --output-format stream-json` for progress telemetry and `--force` to bypass interactive approvals.
+- Shell commands have ~30s guardrails (`docs/cursor-cli/shell-mode.md`). Break long tasks into smaller invocations and capture outputs to logs when needed.
+- Permissions come from `.cursor/cli.json`; keep allow/deny lists aligned with project security policy (`docs/cursor-cli/permissions.md`).
+
+{{#if cli_config.instructions}}
+## Custom Instructions
+{{{cli_config.instructions}}}
+{{else if cli_config.memory}}
+## Memory Notes
+{{{cli_config.memory}}}
+{{else}}
+## Memory Notes
+_No additional Cursor memory instructions were supplied for this run._
+{{/if}}
+
+{{#if tools.tools}}
+## Tools Tools
+{{#each tools.tools}}
+- {{this}}
+{{/each}}
+{{else}}
+## Tools Tools
+- No remote tools configured; rely on built-in shell/git access.
+{{/if}}
+
+{{#if cli_config.additionalNotes}}
+## Additional Notes
+{{{cli_config.additionalNotes}}}
+{{/if}}

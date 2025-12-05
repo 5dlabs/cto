@@ -1,0 +1,244 @@
+# Gemini Code Project Memory
+
+## Project Information
+- **Repository**: {{repository_url}}
+- **Source Branch**: {{docs_branch}}
+- **GitHub App**: {{github_app}}
+- **Working Directory**: {{working_directory}}
+- **Implementation Target**: task {{task_id}}
+
+## Allowed Environment Variables
+
+These are the environment variable NAMES available to the agent. Values are never shown here.
+
+- Workflow-provided:
+{{#if workflow_env_vars}}
+{{#each workflow_env_vars}}
+  - {{this}}
+{{/each}}
+{{else}}
+  - (none)
+{{/if}}
+
+- From requirements.yaml:
+{{#if requirements_env_vars}}
+{{#each requirements_env_vars}}
+  - {{this}}
+{{/each}}
+{{else}}
+  - (none)
+{{/if}}
+
+- Secret sources (envFrom):
+{{#if requirements_secret_sources}}
+{{#each requirements_secret_sources}}
+  - {{this}}
+{{/each}}
+{{else}}
+  - (none)
+{{/if}}
+
+## Tool Capabilities
+
+See @mcp-tools.md for your available tools and usage guidelines
+
+## 🚨 CRITICAL: NO MOCKS - LIVE DATA ONLY 🚨
+
+**MANDATORY IMPLEMENTATION REQUIREMENT**: You MUST implement fully functional systems with live data - NO mock data, placeholders, or hard-coded values.
+
+### Live Data Requirements
+- **Database Operations**: Use real database connections, queries, and transactions
+- **API Integrations**: Connect to actual external APIs, not mock responses
+- **Configuration**: ALL configurable values (trading pairs, endpoints, thresholds) must be parameterized via:
+  - Environment variables
+  - Configuration files (config.json, .env, etc.)
+  - Command-line arguments
+  - Database-driven configuration
+
+### Examples of What NOT to Do:
+```rust
+// ❌ NEVER: Hard-coded trading pairs
+let pairs = vec!["BTC/USD", "ETH/USD"];
+
+// ❌ NEVER: Mock API responses
+fn get_price() -> f64 { 100.0 } // Mock price
+
+// ❌ NEVER: Placeholder implementations
+fn process_payment() { println!("Payment processed"); }
+```
+
+### Examples of Correct Implementation:
+```rust
+// ✅ DO: Parameterized configuration
+#[derive(Deserialize)]
+struct Config {
+    trading_pairs: Vec<String>,
+    api_endpoint: String,
+    api_key: String,
+}
+
+// ✅ DO: Real API calls with error handling
+async fn get_live_price(pair: &str, client: &ApiClient) -> Result<f64, ApiError> {
+    let response = client.get_price(pair).await?;
+    Ok(response.price)
+}
+
+// ✅ DO: Actual business logic implementation
+async fn process_real_payment(payment: PaymentRequest) -> Result<PaymentResponse, PaymentError> {
+    // Real payment processing logic
+}
+```
+
+### Configuration Strategy:
+1. **Environment Variables**: For sensitive data (API keys, database URLs)
+2. **Config Files**: For business logic parameters (pairs, thresholds, timeouts)
+3. **CLI Arguments**: For runtime behavior (log levels, debug modes)
+4. **Database Config**: For dynamic, user-configurable settings
+
+**VERIFICATION**: Before claiming completion, demonstrate that your implementation works with real data sources and can be reconfigured without code changes.
+
+## Project Guidelines & Standards
+
+See @coding-guidelines.md for project coding standards and best practices
+See @github-guidelines.md for git workflow and commit message standards
+
+### Pre-PR Quality Gates (MUST PASS BEFORE PR)
+
+You may NOT create a PR until ALL of the following succeed locally:
+- Formatting check: `cargo fmt --all -- --check`
+- Clippy with pedantic lints and zero warnings: `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+- Tests passing and high coverage (target ≥95%, strive for ~100% on critical paths):
+  - Recommended: `cargo llvm-cov --workspace --all-features --fail-under-lines 95`
+  - Alternative: `cargo tarpaulin --all --fail-under 95`
+
+## Current Task Documentation
+
+{{#if task_id}}
+**Your current task ({{task_id}}) documentation:**
+- See @task/task.md for requirements and description
+- See @task/acceptance-criteria.md for success criteria
+- See @task/architecture.md for technical approach and guidance
+{{else}}
+**General project documentation:**
+- See @README.md for project overview and setup instructions
+- See @.taskmaster/docs/architecture.md for system design patterns
+- See @.taskmaster/docs/prd.txt for product requirements
+{{/if}}
+
+## System Architecture & Context
+
+See @.taskmaster/docs/architecture.md for system design patterns and architectural decisions
+{{#if docs_repository_url}}See @.taskmaster/docs/prd.txt for complete product requirements{{/if}}
+
+## Implementation Workflow
+
+{{#if task_id}}
+### Current Task Process
+1. **Understand**: Read @task/task.md for requirements
+2. **Plan**: Review @task/architecture.md for technical approach
+3. **Validate**: Check @task/acceptance-criteria.md for success criteria
+4. **Code**: Follow patterns in @coding-guidelines.md
+5. **Commit**: Use standards from @github-guidelines.md
+6. **Test**: Verify all acceptance criteria are met
+
+### Task Context
+- **Task ID**: {{task_id}}
+- **Repository**: {{repository_url}}
+- **Branch**: {{docs_branch}}
+- **Working Directory**: {{working_directory}}
+{{else}}
+### General Development Process
+1. **Explore**: Understand existing codebase structure
+2. **Plan**: Follow established patterns and conventions
+3. **Implement**: Adhere to @coding-guidelines.md standards
+4. **Test**: Ensure changes meet project quality standards
+5. **Commit**: Follow @github-guidelines.md workflow
+{{/if}}
+
+## Quick Command Reference
+
+### Testing & Quality
+```bash
+# Rust: run tests
+cargo test --workspace --all-features
+
+# Rust: formatting (must pass before PR)
+cargo fmt --all -- --check
+
+# Rust: clippy with pedantic and deny warnings (must pass before PR)
+cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+
+# Optional: coverage targets (recommended ≥95%)
+cargo llvm-cov --workspace --all-features --fail-under-lines 95 || \
+  cargo tarpaulin --all --fail-under 95
+
+# Build verification
+cargo build --workspace --all-features
+```
+
+### Git Workflow
+```bash
+{{#if task_id}}
+# Commit with task-specific message (see @github-guidelines.md for details)
+git commit -m "feat(task-{{task_id}}): implement [brief description]
+
+- [specific changes made]
+- [tests added/updated]
+- [meets acceptance criteria: X, Y, Z]"
+{{else}}
+# Standard commit message (see @github-guidelines.md for format)
+git commit -m "feat: implement [brief description]"
+{{/if}}
+```
+
+## Pull Request Requirements
+
+**CRITICAL**: After completing implementation, you MUST create a pull request using GitHub CLI:
+
+```bash
+gh pr create --title "feat(task-{{task_id}}): [brief description]" \
+             --body "[detailed PR description with changes, testing, and notes]"
+```
+
+**DO NOT** rely on PR_DESCRIPTION.md or any automated mechanism. You must explicitly run `gh pr create`.
+
+**IMPORTANT PR HANDLING**:
+- Always check if a PR already exists for this task before creating a new one
+- Use `gh pr list --state all --label "task-{{task_id}}"` to find existing PRs for your task
+- If a PR exists and is OPEN: continue working on the existing PR (push more commits)
+- If a PR exists and is MERGED: the task is complete - do NOT create a new PR
+- If a PR exists and is CLOSED (not merged): create a new PR with `gh pr create`
+- Only create a new PR when there's no open PR or when reopening after a closed (unmerged) PR
+
+Additional PR gating rules:
+- Do NOT open a PR unless: `cargo fmt --all -- --check` passes, `cargo clippy ... -D warnings -W clippy::pedantic` passes, and all tests pass
+- Aim for ≥95% coverage; target ~100% on critical code paths before PR
+
+## Development Tools & Patterns
+
+### Gemini Code Integration
+- Use `LS` and `Glob` to explore codebase structure
+- Use `Read` to examine existing code patterns
+- Use `Grep` to find similar implementations
+- Use `Edit` for targeted changes, `MultiEdit` for related changes
+- Validate with `Bash` commands after each change
+
+### Implementation Guidelines
+{{#if task_id}}
+- Focus on current task requirements in `task/` directory
+- Follow architectural guidance provided in @task/architecture.md
+- Ensure all acceptance criteria are met before completion
+- Use established patterns from @coding-guidelines.md
+{{else}}
+- Explore existing codebase structure before making changes
+- Follow established patterns and conventions
+- Ensure changes align with project architecture
+- Maintain backward compatibility unless explicitly changing interfaces
+{{/if}}
+
+---
+
+**🚨 FINAL REMINDER: You MUST create a pull request with `gh pr create` before completing your work. The container will FAIL if you don't. This is not optional. 🚨**
+
+*All referenced files (@filename) are automatically imported into Gemini's context. For detailed information on any topic, refer to the specific imported files above.*
+

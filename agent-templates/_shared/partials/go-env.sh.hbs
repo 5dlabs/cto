@@ -1,0 +1,21 @@
+# =========================================================================
+# Go Environment Bootstrap
+# =========================================================================
+
+# Set up Go paths
+export GOPATH="${GOPATH:-$HOME/go}"
+export GOROOT="${GOROOT:-/usr/local/go}"
+export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+
+# Source Go environment if available
+if [ -f "$HOME/.gvm/scripts/gvm" ]; then
+  . "$HOME/.gvm/scripts/gvm"
+fi
+
+# Verify Go is available
+if command -v go >/dev/null 2>&1; then
+  echo "Go version: $(go version)"
+else
+  echo "⚠️ Go not found in PATH"
+fi
+
