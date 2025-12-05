@@ -27,12 +27,11 @@ pub struct PublishConfig {
 impl PublishConfig {
     /// Create config from environment variables.
     pub fn from_env() -> Result<Self> {
-        let repo = std::env::var("RESEARCH_REPO")
-            .unwrap_or_else(|_| "5dlabs/cto".to_string());
-        let base_branch = std::env::var("RESEARCH_BASE_BRANCH")
-            .unwrap_or_else(|_| "main".to_string());
-        let research_dir = std::env::var("RESEARCH_DIR")
-            .unwrap_or_else(|_| "docs/research".to_string());
+        let repo = std::env::var("RESEARCH_REPO").unwrap_or_else(|_| "5dlabs/cto".to_string());
+        let base_branch =
+            std::env::var("RESEARCH_BASE_BRANCH").unwrap_or_else(|_| "main".to_string());
+        let research_dir =
+            std::env::var("RESEARCH_DIR").unwrap_or_else(|_| "docs/research".to_string());
         let github_token = std::env::var("GITHUB_TOKEN")
             .or_else(|_| std::env::var("GH_TOKEN"))
             .map_err(|_| anyhow::anyhow!("GITHUB_TOKEN or GH_TOKEN not set"))?;
@@ -59,7 +58,11 @@ impl Publisher {
         let github = PrCreator::new(&config.github_token)?;
         let git = GitPublisher::new();
 
-        Ok(Self { config, git, github })
+        Ok(Self {
+            config,
+            git,
+            github,
+        })
     }
 
     /// Publish research entries to GitHub as a PR.
@@ -205,4 +208,3 @@ impl Publisher {
         body
     }
 }
-
