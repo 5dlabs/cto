@@ -72,7 +72,8 @@ jobs:
       - name: Run Clippy (pedantic)
         run: |
           echo "🔍 Running clippy with pedantic warnings..."
-          cargo clippy -p research --all-targets -- -D warnings -W clippy::pedantic
+          # Use crate's Cargo.toml lint configuration (pedantic deny + specific allows)
+          cargo clippy -p research --all-targets
 
   # Run tests
   test-rust:
