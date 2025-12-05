@@ -1399,7 +1399,8 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             }
 
             // Determine output directory
-            let output_dir = output.unwrap_or_else(|| project_path.join(".taskmaster").join("tasks"));
+            let output_dir =
+                output.unwrap_or_else(|| project_path.join(".taskmaster").join("tasks"));
             tokio::fs::create_dir_all(&output_dir).await?;
 
             let mut generated = 0;
@@ -1415,7 +1416,12 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 writeln!(content, "**Priority:** {}", task.priority).ok();
 
                 if !task.dependencies.is_empty() {
-                    writeln!(content, "**Dependencies:** {}", task.dependencies.join(", ")).ok();
+                    writeln!(
+                        content,
+                        "**Dependencies:** {}",
+                        task.dependencies.join(", ")
+                    )
+                    .ok();
                 }
                 content.push('\n');
 
@@ -1443,7 +1449,8 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                             content,
                             "- [ ] **{}.{}** {} ({})",
                             task.id, subtask.id, subtask.title, subtask.status
-                        ).ok();
+                        )
+                        .ok();
                         if !subtask.description.is_empty() {
                             writeln!(content, "  - {}", subtask.description).ok();
                         }
@@ -1451,12 +1458,12 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                     content.push('\n');
                 }
 
-                tokio::fs::write(&task_file, &content)
-                    .await
-                    .map_err(|e| TasksError::FileWriteError {
+                tokio::fs::write(&task_file, &content).await.map_err(|e| {
+                    TasksError::FileWriteError {
                         path: task_file.display().to_string(),
                         reason: e.to_string(),
-                    })?;
+                    }
+                })?;
 
                 generated += 1;
             }

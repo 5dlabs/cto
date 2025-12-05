@@ -648,7 +648,10 @@ mod tests {
         storage.initialize().await.unwrap();
 
         assert!(storage.is_initialized().await.unwrap());
-        assert!(temp_dir.path().join(".taskmaster/tasks/tasks.json").exists());
+        assert!(temp_dir
+            .path()
+            .join(".taskmaster/tasks/tasks.json")
+            .exists());
         assert!(temp_dir.path().join(".taskmaster/state.json").exists());
     }
 
