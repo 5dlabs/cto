@@ -1,0 +1,92 @@
+# {{project_name}}
+
+{{#if project_description}}
+{{project_description}}
+{{else}}
+A software project managed by the CTO platform.
+{{/if}}
+
+## Agent: {{agent_name}}
+
+{{> agents/{{agent_name}}/identity}}
+
+## Commands
+
+{{#if build_command}}
+- **Build**: `{{build_command}}`
+{{else}}
+- **Build**: `cargo build --release`
+{{/if}}
+
+{{#if test_command}}
+- **Test**: `{{test_command}}`
+{{else}}
+- **Test**: `cargo test --workspace --all-features`
+{{/if}}
+
+{{#if lint_command}}
+- **Lint**: `{{lint_command}}`
+{{else}}
+- **Lint**: `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+{{/if}}
+
+{{#if format_command}}
+- **Format**: `{{format_command}}`
+{{else}}
+- **Format**: `cargo fmt --all -- --check`
+{{/if}}
+
+## Project Structure
+
+{{#if project_structure}}
+{{project_structure}}
+{{else}}
+```
+├── src/           # Source code
+├── tests/         # Integration tests
+├── docs/          # Documentation
+└── infra/         # Infrastructure
+```
+{{/if}}
+
+## Conventions
+
+{{#if conventions}}
+{{#each conventions}}
+- {{this}}
+{{/each}}
+{{else}}
+- Use `tracing` for logging, not `println!`
+- Run Clippy pedantic before committing
+- All public items must be documented
+- Tests alongside code in `mod tests { ... }`
+{{/if}}
+
+## Before Committing
+
+1. Run format check: `{{#if format_command}}{{format_command}}{{else}}cargo fmt --all -- --check{{/if}}`
+2. Run lints: `{{#if lint_command}}{{lint_command}}{{else}}cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic{{/if}}`
+3. Run tests: `{{#if test_command}}{{test_command}}{{else}}cargo test --workspace --all-features{{/if}}`
+4. Ensure all checks pass before creating PR
+
+## Detailed Guides
+
+When working on specific areas, read the relevant guide:
+
+- **Coding Standards**: `docs/coding-guidelines.md`
+- **GitHub Workflow**: `docs/github-guidelines.md`
+{{#if guides}}
+{{#each guides}}
+- **{{name}}**: `{{path}}`
+{{/each}}
+{{/if}}
+
+Read the relevant guide BEFORE starting work on that area.
+
+## Security
+
+- Never commit secrets or API keys
+- Use environment variables for configuration
+- Validate all external input
+- Use parameterized queries for database operations
+

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "hasChangedDefaultModel": true,
+  "model": {
+    "default": "{{model}}"{{#if model_reasoning_effort}},
+    "reasoningEffort": "{{model_reasoning_effort}}"{{/if}}{{#if temperature}},
+    "temperature": {{temperature}}{{/if}}{{#if max_output_tokens}},
+    "maxOutputTokens": {{max_output_tokens}}{{/if}}
+  },
+  "editor": {
+    "vimMode": {{#if editor_vim_mode}}true{{else}}false{{/if}}
+  },
+  "permissions": {
+    "allow": [
+      "Shell(*)",
+      "Read(**/*)",
+      "Write(**/*)"
+    ],
+    "deny": []
+  },
+  "automation": {
+    "approvalPolicy": "{{#if approval_policy}}{{approval_policy}}{{else}}on-failure{{/if}}",
+    "sandboxMode": "{{#if sandbox_mode}}{{sandbox_mode}}{{else}}workspace-write{{/if}}"{{#if project_doc_max_bytes}},
+    "projectDocMaxBytes": {{project_doc_max_bytes}}{{/if}}
+  },
+  "mcp": {
+    "servers": {
+      {{#if tools.url}}
+      "tools": {
+        "command": "tools",
+        "args": ["--url", "{{tools.url}}"],
+        "env": {
+          "TOOLS_SERVER_URL": "{{tools.url}}"
+        }{{#if tools.tools}},
+        "availableTools": [
+          {{#each tools.tools}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+        ]{{/if}}
+      }
+      {{/if}}
+    }
+  }
+}
+

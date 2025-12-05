@@ -1,0 +1,105 @@
+# =========================================================================
+# Gemini CLI Invocation Partial
+# 
+# This partial handles the Gemini CLI command building and execution.
+# Include this in workflow containers using: {{> clis/gemini/invoke}}
+#
+# Reference: https://geminicli.com/docs/cli/commands/
+#
+# Required context variables:
+#   - WORK_DIR: Working directory for execution (defaults to /workspace)
+#   - PROMPT_CONTENT: The prompt to send (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use (e.g., gemini-3-pro)
+#   - sandbox_profile: default | permissive | restrictive
+#
+# Note: Gemini CLI reads context from GEMINI.md files in hierarchical order.
+# The AGENTS.md harmonization uses symlinks: GEMINI.md -> AGENTS.md
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               GEMINI CLI INVOCATION                          ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Set working directory
+WORK_DIR="${WORK_DIR:-/workspace}"
+cd "$WORK_DIR"
+
+# =========================================================================
+# Ensure GEMINI.md symlink exists (AGENTS.md harmonization)
+# =========================================================================
+if [ -f "$WORK_DIR/AGENTS.md" ] && [ ! -f "$WORK_DIR/GEMINI.md" ]; then
+    ln -sf AGENTS.md "$WORK_DIR/GEMINI.md"
+    echo "✓ Created GEMINI.md symlink to AGENTS.md"
+fi
+
+# =========================================================================
+# Ensure .gemini/settings.json exists
+# =========================================================================
+mkdir -p "$WORK_DIR/.gemini"
+if [ ! -f "$WORK_DIR/.gemini/settings.json" ]; then
+    cat > "$WORK_DIR/.gemini/settings.json" << 'SETTINGS_EOF'
+{
+  "context": {
+    "fileName": ["AGENTS.md", "GEMINI.md"]
+  }
+}
+SETTINGS_EOF
+    echo "✓ Created .gemini/settings.json"
+fi
+
+# Build Gemini command
+# Gemini CLI uses: gemini -p "prompt" for non-interactive mode
+GEMINI_CMD=("gemini")
+
+# =========================================================================
+# Non-interactive mode with prompt
+# =========================================================================
+GEMINI_CMD+=("-p")
+
+# =========================================================================
+# Model Configuration (if specified via environment or flag)
+# =========================================================================
+{{#if model}}
+# Note: Model selection may need to be done via /model command or settings
+echo "✓ Model requested: {{model}}"
+{{/if}}
+
+# =========================================================================
+# Determine Prompt Source
+# =========================================================================
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Add prompt as the final argument
+GEMINI_CMD+=("$PROMPT_TEXT")
+
+echo ""
+echo "🚀 Gemini Command:"
+echo "   gemini -p \"<prompt>\""
+echo ""
+echo "ℹ️  Gemini CLI reads context from:"
+echo "   - GEMINI.md (symlinked to AGENTS.md)"
+echo "   - .gemini/settings.json"
+echo ""
+
+# =========================================================================
+# Execute Gemini
+# Note: Gemini CLI has built-in commands like /chat, /memory, /tools
+# For automation, we use the -p flag for direct prompt execution
+# =========================================================================
+echo "Starting Gemini execution..."
+"${GEMINI_CMD[@]}"
+GEMINI_EXIT_CODE=$?
+
+echo ""
+echo "✓ Gemini execution completed (exit code: $GEMINI_EXIT_CODE)"
+

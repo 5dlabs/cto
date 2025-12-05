@@ -1,0 +1,23 @@
+{
+  "context": {
+    "fileName": ["AGENTS.md", "GEMINI.md"],
+    "fileFiltering": "gitignore"
+  },
+  "theme": "default",
+  "advanced": {
+    {{#if bug_command}}
+    "bugCommand": "{{bug_command}}"
+    {{/if}}
+  },
+  "sandboxing": {
+    {{#if sandbox_profile}}
+    "profile": "{{sandbox_profile}}"
+    {{else}}
+    "profile": "permissive"
+    {{/if}}
+  },
+  "checkpointing": {
+    "enabled": true
+  }
+}
+

@@ -1,0 +1,97 @@
+# =========================================================================
+# OpenCode CLI Invocation Partial
+# 
+# This partial handles the OpenCode CLI command building and execution.
+# Include this in workflow containers using: {{> clis/opencode/invoke}}
+#
+# Reference: https://opencode.ai/docs/cli/
+#
+# Required context variables:
+#   - WORK_DIR: Working directory for execution (defaults to /workspace)
+#   - PROMPT_CONTENT: The prompt to send (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use
+#   - debug: If true, enables debug logging
+#
+# Note: OpenCode reads instructions from AGENTS.md (configurable via opencode.json)
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               OPENCODE CLI INVOCATION                        ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Set working directory
+WORK_DIR="${WORK_DIR:-/workspace}"
+cd "$WORK_DIR"
+
+# =========================================================================
+# Ensure opencode.json exists for AGENTS.md discovery
+# =========================================================================
+if [ ! -f "$WORK_DIR/opencode.json" ]; then
+    cat > "$WORK_DIR/opencode.json" << 'OPENCODE_EOF'
+{
+  "instructions": ["AGENTS.md"]
+}
+OPENCODE_EOF
+    echo "✓ Created opencode.json for AGENTS.md discovery"
+fi
+
+# Build OpenCode command
+OPENCODE_CMD=("opencode")
+
+# =========================================================================
+# Working Directory
+# =========================================================================
+OPENCODE_CMD+=("--task-repo-dir" "$WORK_DIR")
+
+# =========================================================================
+# Model Configuration
+# =========================================================================
+{{#if model}}
+OPENCODE_CMD+=("--model" "{{model}}")
+echo "✓ Model: {{model}}"
+{{/if}}
+
+# =========================================================================
+# Debug Mode
+# =========================================================================
+{{#if debug}}
+OPENCODE_CMD+=("--debug")
+echo "✓ Debug mode enabled"
+{{/if}}
+
+# =========================================================================
+# Determine Prompt Source
+# =========================================================================
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# OpenCode may use stdin or --prompt flag
+OPENCODE_CMD+=("--prompt" "$PROMPT_TEXT")
+
+echo ""
+echo "🚀 OpenCode Command:"
+echo "   opencode --task-repo-dir $WORK_DIR [options] --prompt \"<prompt>\""
+echo ""
+echo "ℹ️  OpenCode reads context from:"
+echo "   - AGENTS.md (via opencode.json instructions)"
+echo ""
+
+# =========================================================================
+# Execute OpenCode
+# =========================================================================
+echo "Starting OpenCode execution..."
+"${OPENCODE_CMD[@]}"
+OPENCODE_EXIT_CODE=$?
+
+echo ""
+echo "✓ OpenCode execution completed (exit code: $OPENCODE_EXIT_CODE)"
+
