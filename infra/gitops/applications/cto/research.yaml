@@ -5,7 +5,8 @@
 # Components:
 # - CronJob: Polls bookmarks every 5 minutes
 # - PVC: Stores research entries
-# - Secrets: Twitter, Anthropic, and Firecrawl credentials
+#
+# Note: Secrets (research-twitter-secrets) are managed by vault-config app
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -26,18 +27,11 @@ metadata:
 spec:
   project: platform
 
-  sources:
-    # Research CronJob and PVC
-    - repoURL: https://github.com/5dlabs/cto
-      targetRevision: main
-      path: infra/research
-
-    # Vault secrets for research
-    - repoURL: https://github.com/5dlabs/cto
-      targetRevision: main
-      path: infra/vault/secrets
-      directory:
-        include: research.yaml
+  # Note: Vault secrets (research-twitter-secrets) managed by vault-config app
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/research
 
   destination:
     server: https://kubernetes.default.svc

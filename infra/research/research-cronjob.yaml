@@ -24,7 +24,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: longhorn
+  storageClassName: local-path
 
 ---
 # ServiceAccount for research CronJob
@@ -72,6 +72,14 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           restartPolicy: OnFailure
+          # Ensure jobs run on worker nodes, not control plane
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: DoesNotExist
           volumes:
             - name: data
               persistentVolumeClaim:
