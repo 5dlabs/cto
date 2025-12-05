@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    {{#if tools.url}}
+    "tools": {
+      "command": "tools",
+      "args": [
+        "--url",
+        "{{tools.url}}",
+        "--working-dir",
+        "/workspace"
+      ],
+      "env": {
+        "TOOLS_SERVER_URL": "{{tools.url}}"
+      }{{#if tools.tools}},
+      "availableTools": [
+        {{#each tools.tools}}
+        "{{this}}"{{#unless @last}},{{/unless}}
+        {{/each}}
+      ]{{/if}}
+    }
+    {{/if}}
+  }
+}
+

@@ -1,0 +1,125 @@
+# =========================================================================
+# Aider CLI Invocation Partial
+# 
+# This partial handles the Aider CLI command building and execution.
+# Include this in workflow containers using: {{> clis/aider/invoke}}
+#
+# Reference: https://aider.chat/docs/config/options.html
+#
+# Required context variables:
+#   - WORK_DIR: Working directory for execution (defaults to /workspace)
+#   - PROMPT_CONTENT: The prompt to send (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use (e.g., gpt-4o, claude-opus-4-5-20250929)
+#   - auto_commits: If true, aider auto-commits changes
+#   - edit_format: whole | diff | udiff
+#
+# Note: Aider reads context from AGENTS.md via --read flag or .aider.conf.yml
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               AIDER CLI INVOCATION                           ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Set working directory
+WORK_DIR="${WORK_DIR:-/workspace}"
+cd "$WORK_DIR"
+
+# =========================================================================
+# Ensure .aider.conf.yml exists for AGENTS.md discovery
+# =========================================================================
+if [ ! -f "$WORK_DIR/.aider.conf.yml" ]; then
+    cat > "$WORK_DIR/.aider.conf.yml" << 'AIDER_EOF'
+# Aider configuration for automation
+read: AGENTS.md
+auto-commits: false
+yes: true
+stream: true
+AIDER_EOF
+    echo "✓ Created .aider.conf.yml for AGENTS.md discovery"
+fi
+
+# Build Aider command
+AIDER_CMD=("aider")
+
+# =========================================================================
+# Model Configuration
+# =========================================================================
+{{#if model}}
+AIDER_CMD+=("--model" "{{model}}")
+echo "✓ Model: {{model}}"
+{{/if}}
+
+# =========================================================================
+# Read AGENTS.md for context
+# =========================================================================
+if [ -f "$WORK_DIR/AGENTS.md" ]; then
+    AIDER_CMD+=("--read" "AGENTS.md")
+    echo "✓ Reading AGENTS.md for context"
+fi
+
+# =========================================================================
+# Edit Format
+# =========================================================================
+{{#if edit_format}}
+AIDER_CMD+=("--edit-format" "{{edit_format}}")
+echo "✓ Edit format: {{edit_format}}"
+{{/if}}
+
+# =========================================================================
+# Auto-commit Configuration
+# =========================================================================
+{{#if auto_commits}}
+AIDER_CMD+=("--auto-commits")
+echo "✓ Auto-commits enabled"
+{{else}}
+AIDER_CMD+=("--no-auto-commits")
+echo "✓ Auto-commits disabled"
+{{/if}}
+
+# =========================================================================
+# Automation Mode (yes to all prompts)
+# =========================================================================
+AIDER_CMD+=("--yes")
+
+# =========================================================================
+# Stream Output
+# =========================================================================
+AIDER_CMD+=("--stream")
+
+# =========================================================================
+# Determine Prompt Source
+# =========================================================================
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Add prompt via --message flag
+AIDER_CMD+=("--message" "$PROMPT_TEXT")
+
+echo ""
+echo "🚀 Aider Command:"
+echo "   aider --model {{model}} --read AGENTS.md --yes --message \"<prompt>\""
+echo ""
+echo "ℹ️  Aider reads context from:"
+echo "   - AGENTS.md (via --read flag)"
+echo "   - .aider.conf.yml configuration"
+echo ""
+
+# =========================================================================
+# Execute Aider
+# =========================================================================
+echo "Starting Aider execution..."
+"${AIDER_CMD[@]}"
+AIDER_EXIT_CODE=$?
+
+echo ""
+echo "✓ Aider execution completed (exit code: $AIDER_EXIT_CODE)"
+
