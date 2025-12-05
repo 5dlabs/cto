@@ -175,9 +175,9 @@ async fn run_poll(
 
     // Configure pipeline
     let config = PipelineConfig {
-        output_dir: output,
+        output_dir: output.clone(),
         state_path: state.clone(),
-        index_path: state.parent().unwrap_or(&state).join("research/index.json"),
+        index_path: output.join("index.json"),
         min_relevance,
         batch_size,
         model,

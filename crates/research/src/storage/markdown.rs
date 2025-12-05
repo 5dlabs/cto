@@ -141,7 +141,9 @@ impl MarkdownWriter {
         if !entry.relevance.implementation_ideas.is_empty() {
             md.push_str("implementation_ideas:\n");
             for idea in &entry.relevance.implementation_ideas {
-                let _ = writeln!(md, "  - \"{}\"", idea.replace('"', "'"));
+                // Escape quotes and newlines for valid YAML
+                let escaped = idea.replace('"', "'").replace('\n', "\\n");
+                let _ = writeln!(md, "  - \"{escaped}\"");
             }
         }
 

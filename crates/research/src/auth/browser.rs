@@ -63,21 +63,18 @@ impl BrowserAuth {
         // Wait a bit for cookies to settle
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        // Extract cookies via JavaScript
-        let cookies_json: String = page.evaluate("document.cookie").await?.into_value()?;
+        // Extract cookies via CDP (document.cookie can't access HttpOnly cookies like auth_token)
+        let cookies = page.get_cookies().await?;
 
         // Parse cookies
         let mut auth_token = None;
         let mut ct0 = None;
 
-        for cookie in cookies_json.split(';') {
-            let parts: Vec<&str> = cookie.trim().splitn(2, '=').collect();
-            if parts.len() == 2 {
-                match parts[0] {
-                    "auth_token" => auth_token = Some(parts[1].to_string()),
-                    "ct0" => ct0 = Some(parts[1].to_string()),
-                    _ => {}
-                }
+        for cookie in cookies {
+            match cookie.name.as_str() {
+                "auth_token" => auth_token = Some(cookie.value.clone()),
+                "ct0" => ct0 = Some(cookie.value.clone()),
+                _ => {}
             }
         }
 

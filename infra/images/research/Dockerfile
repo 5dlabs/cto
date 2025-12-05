@@ -58,8 +58,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROMIUM_PATH=/usr/bin/chromium
 
-# Create non-root user
-RUN useradd -ms /bin/bash research
+# Create non-root user with explicit UID to match k8s securityContext
+RUN useradd -u 1000 -ms /bin/bash research
 
 # Copy pre-built binary from builder
 COPY --from=builder /build/target/release/research /usr/local/bin/research

@@ -88,11 +88,19 @@ impl BookmarkParser {
     }
 
     /// Parse a tweet URL to extract username and tweet ID.
-    /// URLs are like: /username/status/1234567890
+    /// URLs are like: /username/status/1234567890 or /username/status/1234567890?s=20
     fn parse_tweet_url(url: &str) -> Option<(String, String)> {
         let parts: Vec<&str> = url.trim_start_matches('/').split('/').collect();
         if parts.len() >= 3 && parts[1] == "status" {
-            Some((parts[0].to_string(), parts[2].to_string()))
+            // Strip query parameters and fragments from the ID
+            let id = parts[2]
+                .split('?')
+                .next()
+                .unwrap_or(parts[2])
+                .split('#')
+                .next()
+                .unwrap_or(parts[2]);
+            Some((parts[0].to_string(), id.to_string()))
         } else {
             None
         }
