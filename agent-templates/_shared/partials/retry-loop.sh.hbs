@@ -1,5 +1,5 @@
 # =========================================================================
-# Retry Loop with Acceptance Verification
+# Retry Loop with Model Rotation and Acceptance Verification
 # =========================================================================
 
 # Retry configuration from environment or template defaults
@@ -10,9 +10,13 @@ echo ""
 echo "🔄 Retry Configuration:"
 echo "   Max Retries: $MAX_RETRIES"
 echo "   Current Attempt: $CURRENT_ATTEMPT"
+if [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
+    echo "   Model Rotation: ENABLED"
+    echo "   Models: $(echo "$MODEL_ROTATION_MODELS" | jq -r 'join(" → ")' 2>/dev/null || echo "$MODEL_ROTATION_MODELS")"
+fi
 echo ""
 
-# Run CLI with retry awareness
+# Run CLI with retry awareness and model rotation
 run_with_retry() {
     local attempt=1
     local max_attempts=$((MAX_RETRIES + 1))  # +1 for initial attempt
@@ -20,11 +24,29 @@ run_with_retry() {
     while [ "$attempt" -le "$max_attempts" ]; do
         echo ""
         echo "════════════════════════════════════════════════════════════════"
+        
+        # Get model for this attempt (handles rotation if enabled)
+        local current_model
+        if type get_model_for_attempt >/dev/null 2>&1; then
+            current_model=$(get_model_for_attempt "$attempt")
+        else
+            current_model="${CURRENT_MODEL:-{{model}}}"
+        fi
+        
         echo "║ Attempt $attempt of $max_attempts"
+        if [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
+            echo "║ Model: $current_model (rotated)"
+        else
+            echo "║ Model: $current_model"
+        fi
         echo "════════════════════════════════════════════════════════════════"
         echo ""
 
-        # Execute the CLI
+        # Export current model for CLI adapters to use
+        export ACTIVE_MODEL="$current_model"
+        export CURRENT_ATTEMPT="$attempt"
+
+        # Execute the CLI (adapter should read ACTIVE_MODEL)
         {{cli_execute}}
         CLI_EXIT_CODE=$?
 
@@ -32,7 +54,13 @@ run_with_retry() {
             echo "❌ CLI execution failed with exit code: $CLI_EXIT_CODE"
             
             if [ "$attempt" -lt "$max_attempts" ]; then
-                echo "🔄 Retrying in 5 seconds..."
+                if [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
+                    local next_model
+                    next_model=$(get_model_for_attempt "$((attempt + 1))")
+                    echo "🔄 Retrying with model: $next_model in 5 seconds..."
+                else
+                    echo "🔄 Retrying in 5 seconds..."
+                fi
                 sleep 5
                 attempt=$((attempt + 1))
                 continue
@@ -46,16 +74,25 @@ run_with_retry() {
         if type probe_acceptance_criteria >/dev/null 2>&1; then
             if probe_acceptance_criteria; then
                 echo "✅ Task complete - acceptance criteria verified"
+                echo "   Model used: $current_model"
+                echo "   Attempt: $attempt of $max_attempts"
                 return 0
             else
                 if [ "$attempt" -lt "$max_attempts" ]; then
-                    echo "🔄 Acceptance criteria not met - retrying..."
+                    if [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
+                        local next_model
+                        next_model=$(get_model_for_attempt "$((attempt + 1))")
+                        echo "🔄 Acceptance criteria not met - retrying with model: $next_model"
+                    else
+                        echo "🔄 Acceptance criteria not met - retrying..."
+                    fi
                     attempt=$((attempt + 1))
                     # Continue session flag for retry
                     export CONTINUE_SESSION="true"
                     continue
                 else
                     echo "❌ Max retries exhausted - acceptance criteria not fully met"
+                    echo "   Final model tried: $current_model"
                     # Return success if CLI completed, let controller decide on retry
                     return 0
                 fi
