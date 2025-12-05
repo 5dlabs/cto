@@ -70,6 +70,10 @@ jobs:
           fi
 
       - name: Run Clippy (pedantic)
+        env:
+          # Disable default RUSTFLAGS from setup-rust-toolchain so crate's Cargo.toml
+          # lint configuration (pedantic deny + specific allows) is respected
+          RUSTFLAGS: ""
         run: |
           echo "🔍 Running clippy with pedantic warnings..."
           # Use crate's Cargo.toml lint configuration (pedantic deny + specific allows)
