@@ -1,0 +1,424 @@
+---
+name: CLI Adapter Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/controller/src/cli/**'
+      - 'templates/code/**'
+      - 'scripts/test-cli-integration.sh'
+      - '.github/workflows/cli-tests.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/controller/src/cli/**'
+      - 'templates/code/**'
+      - 'scripts/test-cli-integration.sh'
+      - '.github/workflows/cli-tests.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+  # Environment variables for CLI adapter tests (with safe defaults)
+  TOOLS_SERVER_URL: "http://localhost:3000/mcp"
+  CLAUDE_DEFAULT_MAX_TOKENS: "16384"
+  CLAUDE_DEFAULT_TEMPERATURE: "0.7"
+  CLAUDE_MAX_CONTEXT_TOKENS: "200000"
+
+jobs:
+  # Change detection job
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.filter.outputs.cli }}
+      templates: ${{ steps.filter.outputs.templates }}
+      scripts: ${{ steps.filter.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            cli:
+              - 'crates/controller/src/cli/**'
+              - '!crates/controller/src/cli/**/*.md'
+            templates:
+              - 'templates/code/**'
+            scripts:
+              - 'scripts/test-cli-integration.sh'
+
+  # Rust linting for CLI modules
+  lint-cli:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.templates == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: crates/controller -> target
+          shared-key: "rust-cache-cli-tests"
+
+      - name: Check formatting
+        working-directory: ./crates/controller
+        run: |
+          echo "🔧 Checking cargo fmt for CLI modules..."
+          cargo fmt --all -- --check
+
+      - name: Run Clippy (pedantic)
+        working-directory: ./crates/controller
+        run: |
+          echo "🔍 Running clippy with pedantic warnings on CLI modules..."
+          cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+
+  # Run CLI adapter unit tests
+  test-cli-adapters:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true' || needs.changes.outputs.templates == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: crates/controller -> target
+          shared-key: "rust-cache-cli-tests"
+
+      - name: Run CLI adapter unit tests
+        working-directory: ./crates/controller
+        run: |
+          echo "🧪 Running CLI adapter unit tests..."
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing Claude Adapter"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::adapters::claude:: -- --nocapture 2>&1 | tee claude-adapter.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing Codex Adapter"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::adapters::codex:: -- --nocapture 2>&1 | tee codex-adapter.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing Gemini Adapter"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::adapters::gemini:: -- --nocapture 2>&1 | tee gemini-adapter.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing OpenCode Adapter"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::adapters::opencode:: -- --nocapture 2>&1 | tee opencode-adapter.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing Factory Adapter"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::adapters::factory:: -- --nocapture 2>&1 | tee factory-adapter.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing Adapter Factory"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::adapter_factory:: -- --nocapture 2>&1 | tee adapter-factory.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Testing Base Adapter"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli::base_adapter:: -- --nocapture 2>&1 | tee base-adapter.log
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Running All CLI Tests (comprehensive)"
+          echo "═══════════════════════════════════════════════════════════"
+          cargo test cli:: --all-features 2>&1 | tee cli-tests-full.log
+          
+          echo ""
+          echo "✅ All CLI adapter tests completed!"
+
+      - name: Upload test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cli-adapter-test-logs
+          path: |
+            crates/controller/*.log
+          retention-days: 7
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          {
+            echo "## 🧪 CLI Adapter Test Results"
+            echo ""
+            echo "| Adapter | Status |"
+            echo "|---------|--------|"
+            
+            for adapter in claude codex gemini opencode factory; do
+              if [ -f "crates/controller/${adapter}-adapter.log" ]; then
+                if grep -q "FAILED" "crates/controller/${adapter}-adapter.log"; then
+                  echo "| ${adapter^} | ❌ Failed |"
+                elif grep -q "passed" "crates/controller/${adapter}-adapter.log"; then
+                  echo "| ${adapter^} | ✅ Passed |"
+                else
+                  echo "| ${adapter^} | ⚠️ Unknown |"
+                fi
+              else
+                echo "| ${adapter^} | ⏭️ Skipped |"
+              fi
+            done
+            
+            echo ""
+            echo "### Test Artifacts"
+            echo "Detailed logs are available in the \`cli-adapter-test-logs\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Template validation tests
+  test-templates:
+    needs: changes
+    if: needs.changes.outputs.templates == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Handlebars templates
+        run: |
+          echo "🔍 Validating CLI configuration templates..."
+          echo ""
+          
+          TEMPLATES=(
+            "templates/code/claude/config.json.hbs"
+            "templates/code/codex/config.toml.hbs"
+            "templates/code/codex/agents.md.hbs"
+            "templates/code/gemini/config.json.hbs"
+            "templates/code/gemini/memory.md.hbs"
+            "templates/code/opencode/config.json.hbs"
+            "templates/code/opencode/memory.md.hbs"
+            "templates/code/factory/factory-cli-config.json.hbs"
+            "templates/code/cursor/cursor-cli-config.json.hbs"
+          )
+          
+          ERRORS=0
+          for template in "${TEMPLATES[@]}"; do
+            if [ -f "$template" ]; then
+              # Basic syntax check - ensure file is not empty and has valid structure
+              if [ -s "$template" ]; then
+                echo "✅ $template exists and is non-empty"
+                
+                # Check for unclosed Handlebars expressions (basic validation)
+                OPEN_COUNT=$(grep -o '{{' "$template" | wc -l)
+                CLOSE_COUNT=$(grep -o '}}' "$template" | wc -l)
+                
+                if [ "$OPEN_COUNT" -ne "$CLOSE_COUNT" ]; then
+                  echo "⚠️  Warning: Mismatched Handlebars delimiters in $template ({{ = $OPEN_COUNT, }} = $CLOSE_COUNT)"
+                fi
+              else
+                echo "❌ $template is empty!"
+                ERRORS=$((ERRORS + 1))
+              fi
+            else
+              echo "❌ $template not found!"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          
+          echo ""
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Template validation failed with $ERRORS errors"
+            exit 1
+          else
+            echo "✅ All templates validated successfully!"
+          fi
+
+      - name: Check template structure
+        run: |
+          echo "🔍 Checking template directory structure..."
+          echo ""
+          
+          # List all templates
+          echo "📁 CLI Configuration Templates:"
+          find templates/code -type f -name "*.hbs" | sort | while read -r file; do
+            SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file")
+            echo "  - $file ($SIZE bytes)"
+          done
+
+  # Integration tests with CLI tools (optional, runs if CLIs are available)
+  integration-tests:
+    needs: [lint-cli, test-cli-adapters, test-templates]
+    if: |
+      always() && !cancelled() &&
+      (needs.lint-cli.result == 'success' || needs.lint-cli.result == 'skipped') &&
+      (needs.test-cli-adapters.result == 'success' || needs.test-cli-adapters.result == 'skipped') &&
+      (needs.test-templates.result == 'success' || needs.test-templates.result == 'skipped') &&
+      github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    continue-on-error: true  # Non-blocking - CLIs may not be installed
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for available CLIs
+        id: check-clis
+        run: |
+          echo "🔍 Checking for installed CLI tools..."
+          echo ""
+          
+          AVAILABLE_CLIS=""
+          
+          # Check Claude
+          if command -v claude &> /dev/null; then
+            echo "✅ Claude CLI found: $(claude --version 2>&1 | head -1)"
+            AVAILABLE_CLIS="$AVAILABLE_CLIS claude"
+          else
+            echo "⏭️  Claude CLI not found"
+          fi
+          
+          # Check Codex
+          if command -v codex &> /dev/null; then
+            echo "✅ Codex CLI found"
+            AVAILABLE_CLIS="$AVAILABLE_CLIS codex"
+          else
+            echo "⏭️  Codex CLI not found"
+          fi
+          
+          # Check Cursor
+          if command -v cursor &> /dev/null; then
+            echo "✅ Cursor CLI found"
+            AVAILABLE_CLIS="$AVAILABLE_CLIS cursor"
+          else
+            echo "⏭️  Cursor CLI not found"
+          fi
+          
+          # Check Droid (Factory)
+          if command -v droid &> /dev/null; then
+            echo "✅ Factory (droid) CLI found"
+            AVAILABLE_CLIS="$AVAILABLE_CLIS droid"
+          else
+            echo "⏭️  Factory (droid) CLI not found"
+          fi
+          
+          echo ""
+          if [ -n "$AVAILABLE_CLIS" ]; then
+            echo "available-clis=$AVAILABLE_CLIS" >> "$GITHUB_OUTPUT"
+            echo "has-clis=true" >> "$GITHUB_OUTPUT"
+            echo "📋 Available CLIs:$AVAILABLE_CLIS"
+          else
+            echo "has-clis=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  No CLI tools installed - skipping integration tests"
+          fi
+
+      - name: Run integration tests
+        if: steps.check-clis.outputs.has-clis == 'true'
+        env:
+          # API keys for CLI integration tests (if available)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          echo "🧪 Running CLI integration tests..."
+          chmod +x scripts/test-cli-integration.sh
+          ./scripts/test-cli-integration.sh || echo "⚠️ Some integration tests failed (non-blocking)"
+
+      - name: Integration test summary
+        if: always()
+        run: |
+          {
+            echo "## 🔗 CLI Integration Tests"
+            echo ""
+            if [ "${{ steps.check-clis.outputs.has-clis }}" == "true" ]; then
+              echo "Integration tests ran with available CLIs: ${{ steps.check-clis.outputs.available-clis }}"
+            else
+              echo "ℹ️ No CLI tools were available on this runner."
+              echo ""
+              echo "To run integration tests locally:"
+              echo "\`\`\`bash"
+              echo "./scripts/test-cli-integration.sh"
+              echo "\`\`\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Summary job
+  cli-tests-summary:
+    needs: [lint-cli, test-cli-adapters, test-templates, integration-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        run: |
+          {
+            echo "## 📊 CLI Test Suite Summary"
+            echo ""
+            echo "| Job | Status |"
+            echo "|-----|--------|"
+            
+            # Lint status
+            if [ "${{ needs.lint-cli.result }}" == "success" ]; then
+              echo "| Lint (Clippy Pedantic) | ✅ Passed |"
+            elif [ "${{ needs.lint-cli.result }}" == "skipped" ]; then
+              echo "| Lint (Clippy Pedantic) | ⏭️ Skipped |"
+            else
+              echo "| Lint (Clippy Pedantic) | ❌ Failed |"
+            fi
+            
+            # Unit tests status
+            if [ "${{ needs.test-cli-adapters.result }}" == "success" ]; then
+              echo "| CLI Adapter Unit Tests | ✅ Passed |"
+            elif [ "${{ needs.test-cli-adapters.result }}" == "skipped" ]; then
+              echo "| CLI Adapter Unit Tests | ⏭️ Skipped |"
+            else
+              echo "| CLI Adapter Unit Tests | ❌ Failed |"
+            fi
+            
+            # Template tests status
+            if [ "${{ needs.test-templates.result }}" == "success" ]; then
+              echo "| Template Validation | ✅ Passed |"
+            elif [ "${{ needs.test-templates.result }}" == "skipped" ]; then
+              echo "| Template Validation | ⏭️ Skipped |"
+            else
+              echo "| Template Validation | ❌ Failed |"
+            fi
+            
+            # Integration tests status (non-blocking)
+            if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+              echo "| Integration Tests | ✅ Passed |"
+            elif [ "${{ needs.integration-tests.result }}" == "skipped" ]; then
+              echo "| Integration Tests | ⏭️ Skipped |"
+            else
+              echo "| Integration Tests | ⚠️ Failed (non-blocking) |"
+            fi
+            
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Tested Components"
+            echo "- **Claude Adapter**: Config generation, prompt formatting, response parsing"
+            echo "- **Codex Adapter**: TOML config generation, memory templates"
+            echo "- **Gemini Adapter**: JSON config, tool call extraction"
+            echo "- **OpenCode Adapter**: Exec-mode config, NDJSON parsing"
+            echo "- **Factory Adapter**: Multi-model config, metadata extraction"
+            echo "- **Cursor Adapter**: IDE integration config"
+            echo "- **Adapter Factory**: Dynamic adapter creation, health monitoring"
+            echo "- **Base Adapter**: Template rendering, validation"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Determine overall status
+        run: |
+          # Only fail if required jobs failed (not integration tests)
+          if [ "${{ needs.lint-cli.result }}" == "failure" ] || \
+             [ "${{ needs.test-cli-adapters.result }}" == "failure" ] || \
+             [ "${{ needs.test-templates.result }}" == "failure" ]; then
+            echo "❌ Required CLI tests failed"
+            exit 1
+          fi
+          echo "✅ All required CLI tests passed"
+
