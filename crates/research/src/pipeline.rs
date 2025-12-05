@@ -131,6 +131,8 @@ impl Pipeline {
                 Err(e) => {
                     tracing::warn!(id = %bookmark.id, error = %e, "Analysis failed");
                     result.errors.push(format!("{}: {e}", bookmark.id));
+                    // Mark as processed to avoid duplicate retries on next poll
+                    state.mark_processed(&bookmark.id);
                     continue;
                 }
             };

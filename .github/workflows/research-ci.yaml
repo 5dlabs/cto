@@ -153,10 +153,10 @@ jobs:
             echo "🔧 Installing/repairing Rust toolchain..."
             rustup toolchain uninstall stable 2>/dev/null || true
             for _ in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup toolchain install stable && \
-              rustup default stable && break
               rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+              if rustup toolchain install stable && rustup default stable; then
+                break
+              fi
             done
           fi
 

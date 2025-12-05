@@ -116,8 +116,15 @@ fn truncate_content(content: &str, max_length: usize) -> String {
         return content.to_string();
     }
 
+    // Find a safe character boundary at or before max_length
+    let safe_end = content
+        .char_indices()
+        .take_while(|(i, _)| *i < max_length)
+        .last()
+        .map_or(0, |(i, c)| i + c.len_utf8());
+
     // Try to find a paragraph break near the limit
-    let truncate_at = content[..max_length].rfind("\n\n").unwrap_or(max_length);
+    let truncate_at = content[..safe_end].rfind("\n\n").unwrap_or(safe_end);
 
     format!("{}...", &content[..truncate_at])
 }

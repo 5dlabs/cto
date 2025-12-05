@@ -22,8 +22,7 @@ impl BookmarkParser {
             Selector::parse("[data-testid='tweet']").expect("Invalid tweet selector");
 
         // Extract tweet links and text
-        let link_selector =
-            Selector::parse("a[href*='/status/']").expect("Invalid link selector");
+        let link_selector = Selector::parse("a[href*='/status/']").expect("Invalid link selector");
         let text_selector =
             Selector::parse("[data-testid='tweetText']").expect("Invalid text selector");
 

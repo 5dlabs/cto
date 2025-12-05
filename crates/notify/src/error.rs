@@ -25,4 +25,3 @@ pub enum ChannelError {
     #[error("{0}")]
     Other(String),
 }
-
