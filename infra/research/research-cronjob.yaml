@@ -97,12 +97,14 @@ spec:
                 - name: data
                   mountPath: /data
               envFrom:
+                # Twitter cookies (new secret)
                 - secretRef:
                     name: research-twitter-secrets
+                # Reuse existing API keys from platform
                 - secretRef:
-                    name: research-anthropic-secrets
+                    name: cto-secrets
                 - secretRef:
-                    name: research-firecrawl-secrets
+                    name: tools-firecrawl-secrets
               resources:
                 requests:
                   cpu: 100m
