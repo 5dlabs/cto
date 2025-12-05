@@ -1,0 +1,10 @@
+{{!-- Cleo (Code Quality) - Allowed tools --}}
+{{#if cli_type}}
+{{#if (eq cli_type "claude")}}
+--allowedTools Bash(git:*),Bash(gh:*),Bash(cargo:*),Bash(pnpm:*),Bash(npm:*),Bash(kubectl:*),Bash(cat:*),Bash(ls:*),Read,Write,Edit,mcp__*
+{{/if}}
+{{#if (eq cli_type "factory")}}
+--allow git,gh,cargo,pnpm,npm,kubectl,cat,ls,read,write,edit
+{{/if}}
+{{/if}}
+

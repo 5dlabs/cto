@@ -1,0 +1,202 @@
+{{!--
+  GitHub App JWT Authentication
+  
+  This partial handles GitHub App authentication including:
+  - JWT token generation
+  - Installation token retrieval
+  - Token refresh logic
+  - Git credentials setup
+  
+  Required context:
+    - repository_url: Target repository URL (https or git@)
+  
+  Required environment variables:
+    - GITHUB_APP_ID: The GitHub App ID
+    - GITHUB_APP_PRIVATE_KEY: The PEM-encoded private key
+  
+  Exports:
+    - GITHUB_TOKEN: Installation access token
+    - GH_TOKEN: Same as GITHUB_TOKEN (for gh CLI)
+    - REPO_OWNER: Parsed repository owner
+    - REPO_NAME: Parsed repository name
+    - TOKEN_GENERATED_AT: Timestamp of token generation
+  
+  Functions provided:
+    - parse_repo(): Parse owner/name from URL
+    - refresh_github_token(): Refresh the installation token
+    - refresh_token_if_needed(): Refresh if token is > 50 minutes old
+    - write_git_credentials(): Write token to git credentials file
+--}}
+
+# =========================================================================
+# GitHub App Authentication
+# =========================================================================
+
+REPO_URL="{{repository_url}}"
+
+if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+  echo "❌ Missing GitHub App credentials (GITHUB_APP_ID or GITHUB_APP_PRIVATE_KEY)"
+  exit 1
+fi
+
+echo "🔐 Authenticating with GitHub App"
+
+# Create temporary key file for JWT signing
+TEMP_KEY_FILE="/tmp/github-app-key.pem"
+printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
+chmod 600 "$TEMP_KEY_FILE"
+
+# Generate JWT token for GitHub App authentication
+JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+NOW=$(date +%s)
+EXP=$((NOW + 600))
+JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+rm -f "$TEMP_KEY_FILE"
+
+# Parse repository URL to extract owner and name
+parse_repo() {
+  local input="$1"
+  if echo "$input" | grep -qE '^https://github.com/'; then
+    echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  elif echo "$input" | grep -qE '^git@github.com:'; then
+    echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  else
+    echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
+  fi
+}
+
+read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
+REPO_HTTP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+
+echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
+
+# Get installation ID (try repo first, then org)
+INSTALLATION_ID=$(curl -s -L \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+fi
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  echo "❌ Unable to resolve installation ID for $REPO_OWNER/$REPO_NAME"
+  exit 1
+fi
+
+# Get installation access token
+GITHUB_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+  echo "❌ Unable to obtain installation token"
+  exit 1
+fi
+
+export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+export GH_HOST="github.com"
+export REPO_OWNER
+export REPO_NAME
+export REPO_HTTP_URL
+
+# Set up git credentials
+export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
+CREDENTIALS_FILE=/workspace/.git-credentials
+mkdir -p /workspace
+
+git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
+
+write_git_credentials() {
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    return
+  fi
+  printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$CREDENTIALS_FILE"
+  chmod 600 "$CREDENTIALS_FILE" 2>/dev/null || true
+}
+
+write_git_credentials
+
+TOKEN_GENERATED_AT=$(date +%s)
+
+# Token refresh function - call this for long-running tasks
+refresh_github_token() {
+  echo "🔄 Refreshing GitHub App token..."
+
+  TEMP_KEY_FILE="/tmp/github-app-key-$$"
+  printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+  chmod 600 "$TEMP_KEY_FILE"
+
+  JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  NOW=$(date +%s)
+  EXP=$((NOW + 600))
+  JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+  rm -f "$TEMP_KEY_FILE"
+
+  NEW_INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+  if [ "$NEW_INSTALLATION_ID" = "null" ] || [ -z "$NEW_INSTALLATION_ID" ]; then
+    NEW_INSTALLATION_ID=$(curl -s -L \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+  fi
+
+  TOKEN_RESPONSE=$(curl -s -X POST \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/app/installations/$NEW_INSTALLATION_ID/access_tokens")
+
+  NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+  if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+    export GITHUB_TOKEN="$NEW_TOKEN"
+    export GH_TOKEN="$NEW_TOKEN"
+    TOKEN_GENERATED_AT=$(date +%s)
+    write_git_credentials
+
+    if command -v gh >/dev/null 2>&1; then
+      printf '%s\n' "$NEW_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1 || true
+      gh auth setup-git >/dev/null 2>&1 || true
+    fi
+
+    echo "✅ Token refreshed"
+    return 0
+  fi
+
+  echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+  return 1
+}
+
+# Refresh token if older than 50 minutes (tokens expire after 1 hour)
+refresh_token_if_needed() {
+  if [ -z "$TOKEN_GENERATED_AT" ]; then
+    refresh_github_token || true
+    return
+  fi
+
+  NOW=$(date +%s)
+  TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+  if [ $TOKEN_AGE -gt 3000 ]; then
+    echo "🔄 Token age: $((TOKEN_AGE / 60)) minutes — refreshing"
+    refresh_github_token || true
+  fi
+}
+
+echo "✅ GitHub authentication successful (installation: $INSTALLATION_ID)"
+

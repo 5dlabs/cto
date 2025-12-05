@@ -1,0 +1,44 @@
+# =========================================================================
+# Completion and Status Signaling
+# =========================================================================
+
+# Read acceptance probe result if available
+ACCEPTANCE_RESULT="unknown"
+if [ -f "/workspace/.acceptance_result" ]; then
+    ACCEPTANCE_RESULT=$(cat /workspace/.acceptance_result)
+fi
+
+# Write completion status for controller
+cat > /workspace/.agent_status.json << EOF
+{
+    "agent": "{{agent_name}}",
+    "job_type": "{{job_type}}",
+    "task_id": "{{task_id}}",
+    "cli_type": "{{cli_type}}",
+    "attempt": ${CURRENT_ATTEMPT:-1},
+    "max_retries": ${EXECUTION_MAX_RETRIES:-{{default_retries}}},
+    "acceptance_result": "$ACCEPTANCE_RESULT",
+    "completed_at": "$(date -Iseconds)"
+}
+EOF
+
+# Signal completion to sidecar
+touch /workspace/.agent_done 2>/dev/null || true
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ "$ACCEPTANCE_RESULT" = "passed" ]; then
+    echo "║ ✅ {{agent_name}} {{job_type}} complete - Acceptance criteria PASSED"
+elif [ "$ACCEPTANCE_RESULT" = "failed" ]; then
+    echo "║ ⚠️ {{agent_name}} {{job_type}} complete - Acceptance criteria NOT MET"
+else
+    echo "║ ✅ {{agent_name}} {{job_type}} complete"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
+# Exit with appropriate code
+if [ "$ACCEPTANCE_RESULT" = "failed" ] && [ "${STRICT_ACCEPTANCE:-false}" = "true" ]; then
+    exit 1
+fi
+
+exit 0

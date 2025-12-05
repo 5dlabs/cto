@@ -1,0 +1,168 @@
+#!/bin/sh
+# Factory PR Review - Stitch
+# Executes PR review tasks triggered by GitHub events
+# Spawned via CodeRun CRD (runType: review) when PRs are opened, CI fails, or review commands are issued
+
+set -e
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║           STITCH PR REVIEW (FACTORY) STARTING                ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "🔢 PR Number: {{pr_number}}"
+echo "📂 Repository: {{repository_url}}"
+echo "🔍 Review Mode: {{review_mode}}"
+echo "⚡ Trigger: {{trigger}}"
+echo "📝 Head SHA: {{head_sha}}"
+
+# Source common utilities if available
+if [ -f /workspace/scripts/lib/common.sh ]; then
+    . /workspace/scripts/lib/common.sh
+fi
+
+# Set up environment (names match agents.md documentation)
+export REPOSITORY_URL="{{repository_url}}"
+export PR_NUMBER="{{pr_number}}"
+export HEAD_SHA="{{head_sha}}"
+export REVIEW_MODE="{{review_mode}}"
+export TRIGGER="{{trigger}}"
+
+# MCP Tools configuration
+export TOOLS_URL="{{tools_url}}"
+
+# Extract owner/repo from URL
+REPO_SLUG=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+export REPO_SLUG
+
+echo "📦 Repository: $REPO_SLUG"
+echo "🔧 Tools URL: $TOOLS_URL"
+
+# Always fetch CI alerts for proactive analysis (not just when triggered by check_run)
+echo ""
+echo "📊 Pre-flight: Checking CI status..."
+if command -v utils >/dev/null 2>&1; then
+    utils alerts --repo "$REPO_SLUG" --pr "$PR_NUMBER" --format json > /tmp/ci-alerts.json 2>/dev/null || echo "[]" > /tmp/ci-alerts.json
+    
+    # Count alerts by severity
+    if command -v jq >/dev/null 2>&1 && [ -s /tmp/ci-alerts.json ]; then
+        FAILURE_COUNT=$(jq '[.[] | select(.annotation_level == "failure")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        WARNING_COUNT=$(jq '[.[] | select(.annotation_level == "warning")] | length' /tmp/ci-alerts.json 2>/dev/null || echo "0")
+        export CI_ALERTS_FILE="/tmp/ci-alerts.json"
+        export CI_FAILURE_COUNT="$FAILURE_COUNT"
+        export CI_WARNING_COUNT="$WARNING_COUNT"
+        
+        if [ "$FAILURE_COUNT" -gt 0 ]; then
+            echo "🔴 Found $FAILURE_COUNT CI error(s), $WARNING_COUNT warning(s)"
+            echo "   → CI failures will be analyzed and posted as inline comments"
+        elif [ "$WARNING_COUNT" -gt 0 ]; then
+            echo "🟡 Found $WARNING_COUNT CI warning(s)"
+        else
+            echo "✅ No CI failures detected"
+        fi
+    else
+        echo "⚠️  Could not parse CI alerts (jq not available)"
+    fi
+else
+    echo "⚠️  utils binary not available, skipping CI analysis"
+fi
+
+# Additional context if triggered by check_run
+{{#if check_run_context}}
+echo ""
+echo "🔴 CI Failure Analysis Mode (triggered by check_run)"
+echo "   Check Run: {{check_run_context.name}}"
+echo "   Check Run ID: {{check_run_context.check_run_id}}"
+echo "   Conclusion: {{check_run_context.conclusion}}"
+export CHECK_RUN_ID="{{check_run_context.check_run_id}}"
+export CHECK_RUN_NAME="{{check_run_context.name}}"
+{{/if}}
+
+# Fetch comment context if triggered by comment
+{{#if comment_context}}
+echo ""
+echo "💬 Comment-Triggered Review"
+echo "   Author: {{comment_context.author}}"
+echo "   Command: {{comment_context.body}}"
+{{#if comment_context.file_path}}
+echo "   File: {{comment_context.file_path}}:{{comment_context.line_number}}"
+{{/if}}
+{{/if}}
+
+# Fetch code scan context if triggered by security alert
+{{#if code_scan_context}}
+echo ""
+echo "🔒 Security Alert Analysis Mode"
+echo "   Alert: #{{code_scan_context.alert_number}}"
+echo "   Rule: {{code_scan_context.rule_id}}"
+echo "   Severity: {{code_scan_context.severity}}"
+{{#if code_scan_context.file_path}}
+echo "   File: {{code_scan_context.file_path}}"
+{{/if}}
+{{/if}}
+
+# Load agent prompt
+AGENT_PROMPT="/task-files/agents.md"
+if [ ! -f "${AGENT_PROMPT}" ]; then
+    echo "❌ Agent prompt not found at ${AGENT_PROMPT}"
+    exit 1
+fi
+
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Display configured remote tools
+echo ""
+echo "📋 Configured Remote Tools:"
+{{#if remote_tools}}
+{{#each remote_tools}}
+echo "  • {{this}}"
+{{/each}}
+{{else}}
+echo "  (none configured)"
+{{/if}}
+
+# Verify Factory MCP tools are available using droid --list-tools
+echo ""
+echo "🔍 Verifying Factory MCP tools..."
+if command -v droid >/dev/null 2>&1; then
+    TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+    
+    if [ "$TOOL_LIST" != "FAILED" ]; then
+        # Show tool count
+        TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
+        echo "  📊 Total tools available: $TOOL_COUNT"
+        
+        # List available tools for verification
+        echo ""
+        echo "📋 Available Tools:"
+        echo "$TOOL_LIST" | grep "status:" | sed 's/^/  /' | head -20
+        
+        if [ "$TOOL_COUNT" -gt 20 ]; then
+            echo "  ... and $((TOOL_COUNT - 20)) more"
+        fi
+    else
+        echo "  ⚠️ Could not list Factory tools (droid exec --list-tools failed)"
+    fi
+else
+    echo "  ⚠️ droid CLI not available for tool verification"
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+
+echo ""
+echo "🚀 Starting Factory CLI (droid exec)..."
+echo ""
+
+# Run Factory with the review agent prompt
+exec droid exec \
+    --auto high \
+    --model "{{model}}" \
+    --output-format stream-json \
+    "$(cat ${AGENT_PROMPT})"
+

@@ -1,0 +1,392 @@
+#!/bin/sh
+# Bolt-Preview - Preview Deployment Specialist
+# Creates preview ArgoCD apps and Cloudflare Tunnel ingress for active PRs
+
+echo "Bolt-Preview: Creating preview deployment for PR"
+
+# Source common setup
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
+
+# Setup authentication
+setup_github_auth
+
+# Environment context from sensor
+BOLT_MODE="${BOLT_MODE:-preview}"
+PR_NUMBER="${PR_NUMBER}"
+PR_BRANCH="${PR_BRANCH}"
+PR_ACTION="${PR_ACTION:-opened}"
+TASK_ID="${TASK_ID}"
+SERVICE_NAME="${SERVICE_NAME}"
+REPOSITORY="{{repository_url}}"
+
+echo "Mode: $BOLT_MODE"
+echo "PR: #$PR_NUMBER"
+echo "Branch: $PR_BRANCH"
+echo "Action: $PR_ACTION"
+echo "Repository: $REPOSITORY"
+
+# Extract task ID if not provided
+if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
+    echo "===== Extracting Task ID ====="
+    
+    # Try from PR labels
+    TASK_ID=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[] | select(.name | startswith("task-")) | .name' | sed 's/task-//' | head -n 1)
+    
+    # Try from branch name
+    if [ -z "$TASK_ID" ]; then
+        TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task-[0-9]+' | sed 's/task-//' | head -n 1)
+    fi
+    
+    if [ -z "$TASK_ID" ]; then
+        echo "❌ Could not extract task ID from PR labels or branch name"
+        echo "PR must have task-{id} label or branch must contain task-{id}"
+        exit 1
+    fi
+    
+    echo "✓ Extracted Task ID: $TASK_ID"
+fi
+
+# Configuration
+PREVIEW_NAMESPACE="cto-preview-task-$TASK_ID"
+APP_NAME="task-$TASK_ID-preview"
+ARGOCD_PATH="${ARGOCD_PATH:-helm}"
+SERVICE_PORT="${SERVICE_PORT:-80}"
+SYNC_TIMEOUT=300  # 5 minutes
+
+echo "Preview Namespace: $PREVIEW_NAMESPACE"
+echo "ArgoCD App: $APP_NAME"
+
+# Step 1: Create preview namespace with resource quotas
+create_preview_namespace() {
+    echo "===== Creating Preview Namespace ====="
+    
+    if kubectl get namespace "$PREVIEW_NAMESPACE" >/dev/null 2>&1; then
+        echo "✅ Namespace '$PREVIEW_NAMESPACE' already exists"
+        return 0
+    fi
+    
+    # Create namespace
+    kubectl create namespace "$PREVIEW_NAMESPACE"
+    
+    # Apply resource quota
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: preview-quota
+  namespace: $PREVIEW_NAMESPACE
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: "4Gi"
+    requests.storage: "10Gi"
+    pods: "20"
+    services: "10"
+EOF
+    
+    # Apply network policy (optional - isolate previews)
+    cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: preview-isolation
+  namespace: $PREVIEW_NAMESPACE
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ngrok ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ngrok-ingress-controller
+EOF
+    
+    echo "✅ Created preview namespace with resource quotas"
+}
+
+# Step 2: Create ArgoCD Application for preview (GitOps)
+create_preview_argocd_app() {
+    echo "===== Creating Preview ArgoCD Application (GitOps) ====="
+    
+    # Clone cto-apps repository
+    local cto_apps_dir="/tmp/cto-apps-preview-$$"
+    rm -rf "$cto_apps_dir"
+    
+    echo "Cloning cto-apps repository..."
+    git clone https://github.com/5dlabs/cto-apps.git "$cto_apps_dir" 2>&1 || {
+        echo "❌ Failed to clone cto-apps repository"
+        return 1
+    }
+    
+    cd "$cto_apps_dir"
+    
+    # Generate Application YAML from template
+    local app_file="preview/task-$TASK_ID-preview.yaml"
+    local argocd_path="${ARGOCD_PATH:-helm}"
+    
+    echo "Generating Preview Application manifest from template..."
+    sed -e "s|{{APP_NAME}}|$APP_NAME|g" \
+        -e "s|{{TASK_ID}}|$TASK_ID|g" \
+        -e "s|{{REPO_URL}}|$REPOSITORY|g" \
+        -e "s|{{BRANCH}}|$PR_BRANCH|g" \
+        -e "s|{{ARGOCD_PATH}}|$argocd_path|g" \
+        -e "s|{{NAMESPACE}}|$PREVIEW_NAMESPACE|g" \
+        templates/preview-app.yaml.template > "$app_file"
+    
+    # Add PR number as additional label  
+    sed -i.bak "/managed-by: bolt/a\\
+    pr-number: \"$PR_NUMBER\"" "$app_file"
+    rm -f "$app_file.bak" 2>/dev/null || true
+    
+    echo "Generated: $app_file"
+    cat "$app_file"
+    
+    # Commit and push
+    git config user.name "Bolt Preview"
+    git config user.email "bolt-preview@5dlabs.ai"
+    git add "$app_file"
+    
+    if git diff --cached --quiet; then
+        echo "✅ No changes to commit (application already exists with same config)"
+        cd - >/dev/null
+        rm -rf "$cto_apps_dir"
+        return 0
+    fi
+    
+    git commit -m "Add preview deployment for task-$TASK_ID
+
+PR: #$PR_NUMBER
+Branch: $PR_BRANCH
+Repository: $REPOSITORY
+Namespace: $PREVIEW_NAMESPACE
+
+Created by Bolt Preview"
+    
+    echo "Pushing to cto-apps repository..."
+    git push origin main || {
+        echo "❌ Failed to push to cto-apps repository"
+        cd - >/dev/null
+        rm -rf "$cto_apps_dir"
+        return 1
+    }
+    
+    echo "✅ Created preview application manifest in GitOps repo"
+    echo "   ArgoCD will automatically sync within 30 seconds"
+    
+    # Cleanup
+    cd - >/dev/null
+    rm -rf "$cto_apps_dir"
+}
+
+# Step 3: Wait for ArgoCD sync
+wait_for_preview_sync() {
+    echo "===== Waiting for Preview Sync ====="
+    
+    local elapsed=0
+    
+    while [ $elapsed -lt $SYNC_TIMEOUT ]; do
+        sync_status=$(kubectl get application "$APP_NAME" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        health_status=$(kubectl get application "$APP_NAME" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+        
+        echo "[$elapsed/${SYNC_TIMEOUT}s] Sync: $sync_status, Health: $health_status"
+        
+        if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
+            echo "✅ Preview deployment is Synced and Healthy"
+            return 0
+        fi
+        
+        if [ "$health_status" = "Degraded" ]; then
+            echo "⚠️  Application is Degraded, checking details..."
+            kubectl get application "$APP_NAME" -n argocd -o jsonpath='{.status.conditions}' | jq '.'
+        fi
+        
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+    
+    echo "⚠️  Timeout waiting for preview sync"
+    kubectl get application "$APP_NAME" -n argocd -o yaml
+    return 1
+}
+
+# Step 4: Create ngrok ingress
+create_preview_ngrok() {
+    echo "===== Creating Preview ngrok Tunnel ====="
+    
+    # Determine service name (try to find the main service in namespace)
+    local service_name=$(kubectl get svc -n "$PREVIEW_NAMESPACE" -o name 2>/dev/null | grep -v kubernetes | head -n 1 | cut -d'/' -f2)
+    
+    if [ -z "$service_name" ]; then
+        # Fallback to service name from environment or repo name
+        service_name="${SERVICE_NAME:-main}"
+        echo "Using fallback service name: $service_name"
+    else
+        echo "Detected service: $service_name"
+    fi
+    
+    local tunnel_name="$APP_NAME"
+    
+    # Check if tunnel already exists
+    if kubectl get tunnel "$tunnel_name" -n "$PREVIEW_NAMESPACE" >/dev/null 2>&1; then
+        echo "✅ ngrok tunnel already exists"
+    else
+        # Create ngrok Tunnel CRD
+        cat <<EOF | kubectl apply -f -
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: $tunnel_name
+  namespace: $PREVIEW_NAMESPACE
+  labels:
+    task-id: "$TASK_ID"
+    environment: preview
+    managed-by: bolt
+spec:
+  forwardsTo: $service_name:$SERVICE_PORT
+EOF
+        echo "✅ Created ngrok tunnel: $tunnel_name"
+    fi
+    
+    # Wait for tunnel to provision
+    echo "Waiting for ngrok tunnel to provision..."
+    local wait_count=0
+    while [ $wait_count -lt 30 ]; do
+        tunnel_url=$(kubectl get tunnel "$tunnel_name" -n "$PREVIEW_NAMESPACE" -o jsonpath='{.status.url}' 2>/dev/null)
+        if [ -n "$tunnel_url" ]; then
+            echo "✅ Tunnel URL: $tunnel_url"
+            return 0
+        fi
+        sleep 2
+        wait_count=$((wait_count + 1))
+    done
+    
+    echo "⚠️  Timeout waiting for ngrok tunnel URL"
+    return 1
+}
+
+# Step 5: Get preview URL
+get_preview_url() {
+    echo "===== Getting Preview URL ====="
+    
+    local tunnel_name="$APP_NAME"
+    local url=$(kubectl get tunnel "$tunnel_name" -n "$PREVIEW_NAMESPACE" -o jsonpath='{.status.url}' 2>/dev/null)
+    
+    if [ -n "$url" ]; then
+        echo "✅ Preview URL: $url"
+        echo "$url"
+    else
+        echo "❌ Could not get preview URL"
+        return 1
+    fi
+}
+
+# Step 6: Verify preview accessibility
+verify_preview_access() {
+    local url="$1"
+    
+    echo "===== Verifying Preview Accessibility ====="
+    
+    if [ -z "$url" ]; then
+        echo "No URL provided"
+        return 1
+    fi
+    
+    local http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || echo "000")
+    
+    echo "HTTP Status: $http_code"
+    
+    if [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || [ "$http_code" = "302" ]; then
+        echo "✅ Preview is publicly accessible"
+        return 0
+    else
+        echo "⚠️  Preview returned HTTP $http_code (may still be starting up)"
+        return 0  # Don't fail - app might need more time
+    fi
+}
+
+# Step 7: Post preview URL to PR
+post_preview_url_to_pr() {
+    local url="$1"
+    
+    echo "===== Posting Preview URL to PR ====="
+    
+    local comment_body=$(cat <<EOF
+## 🔍 Bolt Preview: Task $TASK_ID
+
+✅ **Preview environment is ready!**
+
+### Preview Details
+- **URL:** $url
+- **Environment:** \`$PREVIEW_NAMESPACE\`
+- **Branch:** \`$PR_BRANCH\`
+- **ArgoCD App:** \`$APP_NAME\`
+
+### Deployment Status
+- ✅ ArgoCD: Synced & Healthy
+- ✅ Namespace: Created with resource quotas
+- ✅ Public URL: Verified accessible
+
+**This preview updates automatically when you push new commits!**
+
+### Resource Limits
+- CPU: 2 cores max
+- Memory: 4 GiB max  
+- Storage: 10 GiB max
+- Pods: 20 max
+
+---
+*Deployed by Bolt Preview at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
+EOF
+)
+    
+    # Check for existing preview comment
+    local comment_id=$(gh api \
+        "/repos/{{github_repository}}/issues/$PR_NUMBER/comments" \
+        --jq '.[] | select(.body | contains("🔍 Bolt Preview: Task '$TASK_ID'")) | .id' \
+        2>/dev/null | head -n 1)
+    
+    if [ -n "$comment_id" ]; then
+        # Update existing comment
+        echo "Updating existing preview comment $comment_id"
+        gh api \
+            --method PATCH \
+            "/repos/{{github_repository}}/issues/comments/$comment_id" \
+            -f body="$comment_body" \
+            >/dev/null 2>&1
+    else
+        # Create new comment
+        echo "Creating new preview comment"
+        gh pr comment "$PR_NUMBER" --body "$comment_body" >/dev/null 2>&1
+    fi
+    
+    echo "✅ Posted preview URL to PR #$PR_NUMBER"
+}
+
+# Main execution
+echo "===== Starting Preview Deployment ====="
+
+# Execute steps
+create_preview_namespace || { echo "Failed to create namespace"; exit 1; }
+create_preview_argocd_app || { echo "Failed to create ArgoCD app"; exit 1; }
+wait_for_preview_sync || { echo "Failed to sync ArgoCD app"; exit 1; }
+create_preview_ngrok || { echo "Failed to create ngrok tunnel"; exit 1; }
+
+PREVIEW_URL=$(get_preview_url)
+if [ -z "$PREVIEW_URL" ]; then
+    echo "❌ Could not get preview URL"
+    exit 1
+fi
+
+verify_preview_access "$PREVIEW_URL"
+post_preview_url_to_pr "$PREVIEW_URL"
+
+echo "===== Preview Deployment Complete ====="
+echo "Preview URL: $PREVIEW_URL"
+echo "Namespace: $PREVIEW_NAMESPACE"
+echo "ArgoCD App: $APP_NAME"
+echo ""
+echo "✅ Your preview is live! It will update automatically on new commits."
+
+

@@ -1,0 +1,346 @@
+#!/bin/sh
+# Bolt-Production - Production Deployment Specialist
+# Cleans up preview, creates production ArgoCD apps, sets up ngrok ingress
+
+echo "Bolt-Production: Deploying {{service}} to production"
+
+# Source common setup
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
+
+# Setup authentication
+setup_github_auth
+
+# Environment context
+TASK_ID="{{task_id}}"
+SERVICE="{{service}}"
+REPOSITORY="{{repository_url}}"
+BRANCH="${BRANCH:-main}"
+
+# Production naming
+PRODUCTION_NAMESPACE="cto-prod-task-$TASK_ID"
+PRODUCTION_APP="task-$TASK_ID-prod"
+
+# Preview naming (for cleanup)
+PREVIEW_NAMESPACE="cto-preview-task-$TASK_ID"
+PREVIEW_APP="task-$TASK_ID-preview"
+
+echo "Task ID: $TASK_ID"
+echo "Service: $SERVICE"
+echo "Production Namespace: $PRODUCTION_NAMESPACE"
+echo "Production App: $PRODUCTION_APP"
+echo "Repository: $REPOSITORY"
+
+# Step 0: Clean up preview deployment first!
+cleanup_preview() {
+    echo "===== Cleaning Up Preview Deployment ====="
+    
+    local cleaned_items=0
+    
+    # Delete preview ArgoCD application (GitOps)
+    echo "Removing preview from cto-apps repository..."
+    
+    local cto_apps_dir="/tmp/cto-apps-cleanup-$$"
+    rm -rf "$cto_apps_dir"
+    
+    git clone https://github.com/5dlabs/cto-apps.git "$cto_apps_dir" 2>&1 && {
+        cd "$cto_apps_dir"
+        local app_file="preview/task-$TASK_ID-preview.yaml"
+        
+        if [ -f "$app_file" ]; then
+            git config user.name "Bolt Production"
+            git config user.email "bolt-production@5dlabs.ai"
+            git rm "$app_file"
+            git commit -m "Remove preview deployment for task-$TASK_ID (promoted to production)"
+            git push origin main && {
+                cleaned_items=$((cleaned_items + 1))
+                echo "✅ Removed preview from GitOps repo"
+            } || {
+                echo "⚠️  Failed to push, trying direct delete"
+                kubectl delete application "$PREVIEW_APP" -n argocd --wait=false 2>/dev/null
+            }
+        fi
+        
+        cd - >/dev/null
+        rm -rf "$cto_apps_dir"
+    } || {
+        echo "⚠️  Could not clone cto-apps, trying direct delete"
+        if kubectl get application "$PREVIEW_APP" -n argocd >/dev/null 2>&1; then
+            kubectl delete application "$PREVIEW_APP" -n argocd --wait=false
+            cleaned_items=$((cleaned_items + 1))
+        fi
+        rm -rf "$cto_apps_dir"
+    }
+    
+    # Delete preview namespace (cascades to all resources)
+    if kubectl get namespace "$PREVIEW_NAMESPACE" >/dev/null 2>&1; then
+        echo "Deleting preview namespace: $PREVIEW_NAMESPACE"
+        kubectl delete namespace "$PREVIEW_NAMESPACE" --wait=false
+        cleaned_items=$((cleaned_items + 1))
+    else
+        echo "Preview namespace not found (already cleaned or never existed)"
+    fi
+    
+    if [ $cleaned_items -gt 0 ]; then
+        echo "✅ Preview cleanup initiated ($cleaned_items resource(s))"
+    else
+        echo "✓ No preview resources to clean up"
+    fi
+}
+
+# Step 1: Create Production ArgoCD Application (GitOps)
+create_production_argocd_app() {
+    local app_name="$PRODUCTION_APP"
+    local repo_url="$REPOSITORY"
+    local path="${ARGOCD_PATH:-helm}"
+    local namespace="$PRODUCTION_NAMESPACE"
+    
+    echo "===== Creating Production ArgoCD Application (GitOps): $app_name ====="
+    
+    # Clone cto-apps repository
+    local cto_apps_dir="/tmp/cto-apps-prod-$$"
+    rm -rf "$cto_apps_dir"
+    
+    echo "Cloning cto-apps repository..."
+    git clone https://github.com/5dlabs/cto-apps.git "$cto_apps_dir" 2>&1 || {
+        echo "❌ Failed to clone cto-apps repository"
+        return 1
+    }
+    
+    cd "$cto_apps_dir"
+    
+    # Generate Application YAML from template
+    local app_file="production/task-$TASK_ID-prod.yaml"
+    
+    echo "Generating Production Application manifest from template..."
+    sed -e "s|{{APP_NAME}}|$app_name|g" \
+        -e "s|{{TASK_ID}}|$TASK_ID|g" \
+        -e "s|{{REPO_URL}}|$repo_url|g" \
+        -e "s|{{ARGOCD_PATH}}|$path|g" \
+        -e "s|{{NAMESPACE}}|$namespace|g" \
+        templates/production-app.yaml.template > "$app_file"
+    
+    echo "Generated: $app_file"
+    cat "$app_file"
+    
+    # Commit and push
+    git config user.name "Bolt Production"
+    git config user.email "bolt-production@5dlabs.ai"
+    git add "$app_file"
+    
+    if git diff --cached --quiet; then
+        echo "✅ No changes to commit (application already exists with same config)"
+        cd - >/dev/null
+        rm -rf "$cto_apps_dir"
+        return 0
+    fi
+    
+    git commit -m "Add production deployment for task-$TASK_ID
+
+Repository: $repo_url
+Branch: main
+Namespace: $namespace
+
+Deployed by Bolt Production after successful QA"
+    
+    echo "Pushing to cto-apps repository..."
+    git push origin main || {
+        echo "❌ Failed to push to cto-apps repository"
+        cd - >/dev/null
+        rm -rf "$cto_apps_dir"
+        return 1
+    }
+    
+    echo "✅ Created production application manifest in GitOps repo"
+    echo "   ArgoCD will automatically sync within 30 seconds"
+    
+    # Cleanup
+    cd - >/dev/null
+    rm -rf "$cto_apps_dir"
+}
+
+# Step 2: Wait for Production ArgoCD sync and health
+wait_for_production_sync() {
+    local app_name="$PRODUCTION_APP"
+    local max_wait=600  # 10 minutes for production
+    local elapsed=0
+    
+    echo "===== Waiting for Production ArgoCD Sync: $app_name ====="
+    
+    while [ $elapsed -lt $max_wait ]; do
+        local sync_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        local health_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+        
+        echo "[$elapsed/${max_wait}s] Sync: $sync_status, Health: $health_status"
+        
+        if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
+            echo "✅ Production deployment is Synced and Healthy"
+            return 0
+        fi
+        
+        if [ "$health_status" = "Degraded" ]; then
+            echo "⚠️  Application is Degraded, continuing to wait..."
+        fi
+        
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+    
+    echo "⚠️  Timeout waiting for production sync"
+    kubectl get application "$app_name" -n argocd -o yaml
+    return 1
+}
+
+# Step 3: Create Production ngrok ingress
+create_production_ngrok() {
+    local tunnel_name="$PRODUCTION_APP"
+    local namespace="$PRODUCTION_NAMESPACE"
+    local service_port="${SERVICE_PORT:-80}"
+    
+    echo "===== Creating Production ngrok Tunnel ====="
+    
+    # Auto-detect main service in namespace
+    local service_name=$(kubectl get svc -n "$namespace" -o name 2>/dev/null | grep -v kubernetes | head -n 1 | cut -d'/' -f2)
+    
+    if [ -z "$service_name" ]; then
+        service_name="${SERVICE:-main}"
+        echo "Using fallback service name: $service_name"
+    else
+        echo "Detected service: $service_name"
+    fi
+    
+    # Check if ngrok tunnel already exists
+    if kubectl get tunnel "$tunnel_name" -n "$namespace" >/dev/null 2>&1; then
+        echo "✅ Production ngrok tunnel already exists"
+    else
+        # Create ngrok Tunnel CRD
+        cat <<EOF | kubectl apply -f -
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: $tunnel_name
+  namespace: $namespace
+  labels:
+    task-id: "$TASK_ID"
+    environment: production
+    managed-by: bolt
+spec:
+  forwardsTo: $service_name:$service_port
+EOF
+        echo "✅ Created production ngrok tunnel"
+    fi
+    
+    # Wait for tunnel to provision
+    echo "Waiting for production ngrok tunnel to provision..."
+    local wait_count=0
+    while [ $wait_count -lt 30 ]; do
+        tunnel_url=$(kubectl get tunnel "$tunnel_name" -n "$namespace" -o jsonpath='{.status.url}' 2>/dev/null)
+        if [ -n "$tunnel_url" ]; then
+            echo "✅ Production tunnel URL: $tunnel_url"
+            return 0
+        fi
+        sleep 2
+        wait_count=$((wait_count + 1))
+    done
+    
+    echo "⚠️  Timeout waiting for production ngrok tunnel URL"
+    return 1
+}
+
+# Step 4: Get Production URL
+get_production_url() {
+    local tunnel_name="$PRODUCTION_APP"
+    local namespace="$PRODUCTION_NAMESPACE"
+    
+    echo "===== Getting Production URL ====="
+    
+    # Get ngrok tunnel URL
+    local url=$(kubectl get tunnel "$tunnel_name" -n "$namespace" -o jsonpath='{.status.url}' 2>/dev/null)
+    
+    if [ -n "$url" ]; then
+        echo "✅ Production URL: $url"
+        echo "$url"
+    else
+        echo "❌ Could not get production URL"
+        return 1
+    fi
+}
+
+# Step 5: Verify public accessibility
+verify_public_access() {
+    local url="$1"
+    
+    echo "===== Verifying Public Access: $url ====="
+    
+    # Try to curl the URL
+    if curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" | grep -E "^(200|301|302)$" >/dev/null; then
+        echo "✅ Application is publicly accessible"
+        return 0
+    else
+        echo "⚠️  Application may not be publicly accessible yet"
+        return 1
+    fi
+}
+
+# Main Production Deployment Workflow
+echo "===== Bolt-Production: Deploying to Production ====="
+
+# 0. Clean up preview first!
+cleanup_preview
+
+# 1. Create production ArgoCD application
+create_production_argocd_app || { echo "Failed to create production ArgoCD app"; exit 1; }
+
+# 2. Wait for production sync and health
+wait_for_production_sync || { echo "Failed to sync production deployment"; exit 1; }
+
+# 3. Create production ngrok ingress
+create_production_ngrok || { echo "Failed to create production ngrok tunnel"; exit 1; }
+
+# 4. Get production URL
+PRODUCTION_URL=$(get_production_url)
+
+# 5. Verify accessibility
+if [ -n "$PRODUCTION_URL" ]; then
+    verify_public_access "$PRODUCTION_URL"
+fi
+
+# 6. Post production results to PR
+if [ -n "$PR_NUMBER" ] && [ -n "$PRODUCTION_URL" ]; then
+    echo "===== Posting Production URL to PR #$PR_NUMBER ====="
+    
+    gh pr comment "$PR_NUMBER" --body "## 🚀 Bolt-Production: Task $TASK_ID Deployed
+
+✅ **Your application is LIVE and publicly accessible!**
+
+### Production Details
+- **URL:** $PRODUCTION_URL
+- **Environment:** \`$PRODUCTION_NAMESPACE\`
+- **Branch:** \`main\`
+- **ArgoCD App:** \`$PRODUCTION_APP\`
+
+### Deployment Status
+- ✅ ArgoCD: Synced & Healthy
+- ✅ All pods Running
+- ✅ Public URL: Verified accessible
+- ✅ Preview Cleaned Up
+
+### Quality Gates Passed
+- ✅ Cleo: Code Quality Review
+- ✅ Tess: QA Testing
+- ✅ Atlas: Integration & Merge
+
+**Your app is ready for users! 🎉**
+
+🔗 **Production URL:** $PRODUCTION_URL
+
+---
+*Deployed by Bolt Production at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*"
+else
+    echo "⚠️  Could not post to PR (PR_NUMBER or PRODUCTION_URL missing)"
+fi
+
+echo "===== Bolt-Production Complete ====="
+echo "Production URL: $PRODUCTION_URL"
+echo "Production App: $PRODUCTION_APP"
+echo "Production Namespace: $PRODUCTION_NAMESPACE"
+

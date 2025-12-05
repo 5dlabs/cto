@@ -1,0 +1,1908 @@
+#!/bin/sh
+
+# Ensure Rust environment is always properly set up
+echo "🔧 Setting up Rust environment..."
+
+# Source Rust environment if available (fixes cargo not found issues)
+if [ -f "$HOME/.cargo/env" ]; then
+    . "$HOME/.cargo/env"
+    echo "✓ Sourced Rust environment from $HOME/.cargo/env"
+fi
+
+# Also try root cargo env as fallback
+if [ -f "/root/.cargo/env" ]; then
+    . "/root/.cargo/env"
+    echo "✓ Sourced Rust environment from /root/.cargo/env"
+fi
+
+# Ensure rustup has a default toolchain set
+if command -v rustup >/dev/null 2>&1; then
+    rustup default stable 2>/dev/null || true
+    echo "✓ Ensured stable Rust toolchain is default"
+else
+    echo "⚠️ rustup not found in PATH"
+fi
+
+# Verify Rust is available
+if command -v cargo >/dev/null 2>&1; then
+    echo "✓ Cargo is available: $(cargo --version)"
+else
+    echo "❌ Cargo not found in PATH"
+    echo "Current PATH: $PATH"
+    echo "Attempting to find cargo..."
+    find /usr -name cargo 2>/dev/null | head -5 || echo "No cargo found in /usr"
+    find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
+fi
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║           REX/BLAZE DOCUMENTATION WORKFLOW STARTING          ║'
+echo '║                  Implementation Agent Active                  ║'
+echo '║            ⚠️  TASK {{task_id}} ONLY - NO OTHER TASKS ⚠️             ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "📚 Focus: Documentation-first implementation approach"
+echo "📋 Task ID: {{task_id}}"
+echo "⛔ CRITICAL: You must ONLY work on Task {{task_id}} - ignore ALL other tasks"
+
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f /workspace/.agent_done ]; then
+    echo "🧹 Cleaning up sentinel file from previous run"
+    rm -f /workspace/.agent_done
+fi
+
+# Disable interactive Git prompts globally
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# Repository URL
+REPO_URL="{{repository_url}}"
+
+# GitHub App authentication is configured via environment variables
+echo "Using GitHub App authentication"
+
+# Authenticate with GitHub App
+if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+    echo "Authenticating with GitHub App..."
+
+    # Create temporary private key file (support escaped newlines)
+    TEMP_KEY_FILE="/tmp/github-app-key.pem"
+    printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+
+    # Generate JWT token for GitHub App (fixed JWT generation for Linux containers)
+    # JWT header
+    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+
+    # JWT payload with current time and expiration (10 minutes)
+    NOW=$(date +%s)
+    EXP=$((NOW + 600))
+    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+
+    # Sign the JWT
+    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+    # Get installation ID for the repository (robust parsing of owner/repo)
+    INPUT_REPO="{{repository_url}}"
+    REPO_OWNER=""
+    REPO_NAME=""
+
+    if echo "$INPUT_REPO" | grep -qE '^https://github.com/'; then
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+    elif echo "$INPUT_REPO" | grep -qE '^git@github.com:'; then
+        # SSH format git@github.com:owner/repo(.git)
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:[^/]+/([^/]+)(\.git)?|\1|')
+    else
+        # Fallback: assume slug owner/repo (possibly with .git)
+        SLUG=$(echo "$INPUT_REPO" | sed -E 's|\.git$||')
+        REPO_OWNER=$(echo "$SLUG" | cut -d'/' -f1)
+        REPO_NAME=$(echo "$SLUG" | cut -d'/' -f2)
+    fi
+
+    echo "DEBUG: Parsed repository - Owner: '$REPO_OWNER', Name: '$REPO_NAME'"
+
+    echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
+
+    # Get the installation ID (retry and follow redirects). Fallback to org installation.
+    INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+        --connect-timeout 5 --max-time 12 \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
+
+    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "⚠️ Repo installation not found, trying org installation..."
+        ORG_INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+            --connect-timeout 5 --max-time 12 \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$REPO_OWNER/installation")
+        INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+    fi
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "❌ Failed to get installation ID for $REPO_OWNER/$REPO_NAME"
+        echo "Response (repo): $INSTALLATION_RESPONSE"
+        echo "Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
+        rm -f "$TEMP_KEY_FILE"
+        exit 1
+    fi
+
+    echo "Installation ID: $INSTALLATION_ID"
+
+    # Get installation access token
+    TOKEN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+    TOKEN_GENERATED_AT=$(date +%s)  # Track when token was generated for refresh logic
+
+    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+        echo "❌ Failed to get installation access token"
+        echo "Response: $TOKEN_RESPONSE"
+        rm -f "$TEMP_KEY_FILE"
+        exit 1
+    fi
+
+    # Clean up temporary key file
+    rm -f "$TEMP_KEY_FILE"
+
+    # Export the token for git to use
+    export GITHUB_TOKEN
+
+    # Configure git to use the token (use --replace-all to handle multiple existing helpers)
+    git config --global --replace-all credential.helper store
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+
+    # Also authenticate gh CLI with the token
+    echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+    echo "✓ GitHub App authenticated successfully"
+
+    # Token refresh functions for long-running jobs
+    refresh_github_token() {
+        echo "🔄 Refreshing GitHub App token..."
+
+        # Create temporary key file
+        TEMP_KEY_FILE="/tmp/github-app-key-$$"
+        echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+        chmod 600 "$TEMP_KEY_FILE"
+
+        # Generate new JWT
+        JWT_TOKEN=$(ruby -r openssl -r json -r base64 -e "
+        key = OpenSSL::PKey::RSA.new(File.read('$TEMP_KEY_FILE'))
+        payload = {
+            iat: Time.now.to_i - 60,
+            exp: Time.now.to_i + (10 * 60),
+            iss: '$GITHUB_APP_ID'
+        }
+        header = { alg: 'RS256', typ: 'JWT' }
+
+        header_enc = Base64.urlsafe_encode64(header.to_json).gsub('=', '')
+        payload_enc = Base64.urlsafe_encode64(payload.to_json).gsub('=', '')
+        signature = Base64.urlsafe_encode64(key.sign(OpenSSL::Digest::SHA256.new, \"#{header_enc}.#{payload_enc}\")).gsub('=', '')
+
+        puts \"#{header_enc}.#{payload_enc}.#{signature}\"
+        ")
+
+        # Get installation ID (reuse logic from initial auth)
+        INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+        if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+            INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+        fi
+
+        # Get new installation token
+        TOKEN_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+        NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+        if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+            export GITHUB_TOKEN="$NEW_TOKEN"
+            export TOKEN_GENERATED_AT=$(date +%s)
+
+            # Update git credentials
+            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+            echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null
+
+            echo "✅ Token refreshed successfully"
+            rm -f "$TEMP_KEY_FILE"
+            return 0
+        else
+            echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+            rm -f "$TEMP_KEY_FILE"
+            return 1
+        fi
+    }
+
+    # Check if token needs refresh (call before git operations)
+    refresh_token_if_needed() {
+        if [ -z "$TOKEN_GENERATED_AT" ]; then
+            echo "⚠️ No token timestamp found, refreshing token..."
+            refresh_github_token
+            return
+        fi
+
+        NOW=$(date +%s)
+        TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+        # Refresh if token is older than 50 minutes (tokens last 1 hour, refresh at 50 min to be safe)
+        if [ $TOKEN_AGE -gt 3000 ]; then
+            echo "🔄 Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+            refresh_github_token
+        fi
+    }
+
+else
+    echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
+    exit 1
+fi
+
+# Git configuration with proper GitHub App attribution
+git config --global --add safe.directory /workspace
+
+# Set GitHub App attribution - use generic format for all agents
+GITHUB_APP="{{github_app}}"
+# Generic attribution that works for any agent
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+# Configure git with proper GitHub App attribution
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+
+# Set environment variables for Claude Code to use
+export GIT_AUTHOR_NAME="$GIT_AUTHOR_NAME"
+export GIT_AUTHOR_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+echo "✓ Git configured"
+
+# =============================================================================
+# AUTHENTICATION VERIFICATION
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "🔐 AUTHENTICATION VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+# Repository URLs - Handle both full URLs and org/repo format
+# Check if repository_url already contains https://github.com/
+if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+    REPO_HTTP_URL="{{repository_url}}"
+    if ! echo "{{repository_url}}" | grep -q "\.git$"; then
+        REPO_HTTP_URL="${REPO_HTTP_URL}.git"
+    fi
+else
+    REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
+fi
+
+# Same for docs repository
+if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+    DOCS_HTTP_URL="{{docs_repository_url}}"
+    if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
+        DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
+    fi
+else
+    DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
+fi
+
+# DEBUG: Show what URLs are being constructed
+echo "🔍 DEBUG: URL Construction & Parameters"
+echo "  Input repository_url: '{{repository_url}}'"
+echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+echo "  Input working_directory: '{{working_directory}}'"
+echo "  Input docs_branch: '{{docs_branch}}'"
+echo "  Input github_app: '{{github_app}}'"
+echo "  Input task_id: '{{task_id}}'"
+echo "  Input service: '{{service}}'"
+echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
+echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
+echo "  Current working directory: $(pwd)"
+echo "  Available environment variables:"
+env | grep -E "(GITHUB|ANTHROPIC)" | sort
+
+# Test HTTPS access to repository
+echo "🔍 DEBUG: Testing HTTPS repository access..."
+echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
+if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
+  echo "✓ HTTPS repository access successful"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Output: $(cat /tmp/repo_test.out | head -1)"
+else
+  echo "❌ HTTPS repository access failed"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/repo_test.out)"
+  echo "  Git credential helper status:"
+  git config --list | grep credential || echo "  No credential helpers configured"
+  echo ""
+  echo "🚫 ABORTING: Cannot access repository via HTTPS"
+  exit 1
+fi
+
+# Test docs repository access
+echo "🔍 DEBUG: Testing docs repository access..."
+echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
+if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
+  echo "✓ Docs repository access successful"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Output: $(cat /tmp/docs_test.out | head -1)"
+else
+  echo "❌ Docs repository access failed"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/docs_test.out)"
+  echo ""
+  echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
+  exit 1
+fi
+
+# Dual Repository Setup - Platform repo for docs, Target repo for implementation
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║                 DUAL REPOSITORY SETUP                        ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Repository Information
+DOCS_BRANCH="{{docs_branch}}"
+GITHUB_APP="{{github_app}}"
+
+# Helper: derive safe workspace directory name from repo input (URL, SSH, or slug)
+sanitize_repo_dir() {
+    input="$1"
+    if echo "$input" | grep -qE '^https://github.com/'; then
+        owner=$(echo "$input" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        name=$(echo "$input" | sed -E 's|https://github.com/[^/]+/([^/]+)(\\.git)?|\1|')
+        printf '%s-%s' "$owner" "$name"
+    elif echo "$input" | grep -qE '^git@github.com:'; then
+        owner=$(echo "$input" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
+        name=$(echo "$input" | sed -E 's|git@github.com:[^/]+/([^/]+)(\\.git)?|\1|')
+        printf '%s-%s' "$owner" "$name"
+    else
+        # Assume owner/repo (optionally with .git)
+        slug=$(echo "$input" | sed -E 's|\\.git$||')
+        echo "$slug" | tr '/' '-'
+    fi
+}
+
+# Derive workspace directory names (owner-repo)
+DOCS_REPO_DIR=$(sanitize_repo_dir "{{docs_repository_url}}")
+TARGET_REPO_DIR=$(sanitize_repo_dir "{{repository_url}}")
+
+echo "=== REPOSITORY SETUP ==="
+echo "Docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+echo "Target repository: {{repository_url}} ($REPO_HTTP_URL)"
+echo "Docs branch: $DOCS_BRANCH"
+echo "GitHub App: $GITHUB_APP"
+
+# Always use consistent workflow approach
+# Even if docs and target are the same repo, we clone them separately
+# This avoids complex branch switching and file preservation issues
+echo "=== UNIFIED WORKFLOW APPROACH ==="
+echo "  docs_repository_url: '{{docs_repository_url}}'"
+echo "  repository_url: '{{repository_url}}'"
+echo "  └─ TaskMaster files will be copied from docs repo at: {{docs_project_directory}}"
+
+# Repository Setup - Always use consistent approach
+echo "=== REPOSITORY SETUP ==="
+
+# Step 1: Clone or update docs repository temporarily
+if [ -d "/tmp/docs-repo" ]; then
+    echo "🔄 DOCS REPOSITORY: UPDATE - temporary directory exists"
+    cd /tmp/docs-repo
+    git fetch origin
+    git checkout "$DOCS_BRANCH"
+    git reset --hard "origin/$DOCS_BRANCH"
+    cd /workspace
+    echo "✓ Docs repository updated"
+else
+    echo "📥 DOCS REPOSITORY: CLONING - extracting task files"
+    if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo; then
+        echo "❌ Failed to clone docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+        exit 1
+    fi
+    cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd /workspace
+    echo "✓ Docs repository cloned to temporary location"
+fi
+
+# Step 2: Clone or update target repository
+if [ -d "$TARGET_REPO_DIR" ]; then
+    echo "🔄 TARGET REPOSITORY: UPDATE - directory already exists"
+    echo "📁 Found existing target repository '$TARGET_REPO_DIR', updating..."
+    cd "$TARGET_REPO_DIR"
+    git fetch origin main
+    git reset --hard origin/main
+    cd /workspace
+    echo "✓ Target repository updated successfully"
+else
+    echo "📥 TARGET REPOSITORY: CLONING - first time setup"
+    if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
+        echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
+        exit 1
+    fi
+    echo "✓ Target repository cloned successfully"
+fi
+
+# Step 3: Copy task files from docs repo to target repo
+echo "📋 TASK FILES: COPYING from docs to target repository"
+mkdir -p "/workspace/$TARGET_REPO_DIR/task"
+
+# Determine docs project directory path
+{{#if docs_project_directory}}
+if [ "{{docs_project_directory}}" = "." ]; then
+    DOCS_PATH="/tmp/docs-repo/.taskmaster"
+else
+    DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
+fi
+{{else}}
+DOCS_PATH="/tmp/docs-repo/.taskmaster"
+{{/if}}
+
+# Copy specific task files
+TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
+echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
+echo "🔍 DEBUG: Contents of docs temp directory:"
+ls -la /tmp/docs-repo/.taskmaster/ || echo "No .taskmaster found"
+echo "🔍 DEBUG: Contents of docs directory:"
+ls -la /tmp/docs-repo/.taskmaster/docs/ || echo "No docs directory found"
+
+if [ -d "$TASK_DIR" ]; then
+    echo "🔍 DEBUG: Task directory found, contents:"
+    ls -la "$TASK_DIR"
+
+    echo "✅ Copying task.md..."
+    cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
+
+    echo "✅ Copying acceptance-criteria.md..."
+    cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
+
+    echo "✅ Copying prompt.md..."
+    cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
+
+    echo "✅ Copying tools-config.json..."
+
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$CLAUDE_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$CLAUDE_WORK_DIR/tools-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Cleo" -> "cleo")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate tools-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
+    if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
+        echo "📋 tools-config.json not generated, using ConfigMap fallback..."
+        if [ -f "/task-files/tools-config.json" ]; then
+            cp "/task-files/tools-config.json" "$CLAUDE_WORK_DIR/tools-config.json" && echo "✓ tools-config.json copied to Claude working directory" || echo "❌ tools-config.json copy failed"
+            cp "/task-files/tools-config.json" "/workspace/tools-config.json" && echo "✓ tools-config.json copied to workspace root" || echo "❌ tools-config.json copy to workspace failed"
+        else
+            echo "⚠️ tools-config.json not found - MCP client may not be configured"
+        fi
+    else
+        echo "✓ Using dynamically generated tools-config.json from cto-config.json"
+    fi
+
+    echo "✅ Copying tools-guide.md..."
+    if [ -f "$TASK_DIR/tools-guide.md" ]; then
+        cp "$TASK_DIR/tools-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ tools-guide.md copied" || echo "❌ tools-guide.md copy failed"
+    else
+        echo "⚠️ tools-guide.md not found - code agent won't have tool usage guidance"
+    fi
+
+    echo "✓ Task {{task_id}} files copied from $TASK_DIR"
+else
+    echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
+    echo "🔍 DEBUG: Available directories in docs:"
+    find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+fi
+
+# Copy architecture.md from docs root
+ARCH_FILE="$DOCS_PATH/docs/architecture.md"
+if [ -f "$ARCH_FILE" ]; then
+    cp "$ARCH_FILE" "/workspace/$TARGET_REPO_DIR/task/"
+    echo "✓ Architecture documentation copied"
+else
+    echo "⚠️ architecture.md not found at: $ARCH_FILE"
+fi
+
+# Copy tasks.json if it exists
+if [ -f "$DOCS_PATH/tasks.json" ]; then
+    cp "$DOCS_PATH/tasks.json" "/workspace/$TARGET_REPO_DIR/task/"
+    echo "✓ tasks.json copied"
+fi
+
+echo "✓ Task files copied to target repository"
+
+# DEBUG: Verify files were copied successfully
+echo "🔍 DEBUG: Contents of target task directory after copy:"
+ls -la "/workspace/$TARGET_REPO_DIR/task/" || echo "Task directory not found"
+echo "🔍 DEBUG: Checking if prompt.md exists:"
+[ -f "/workspace/$TARGET_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
+
+# Step 4: Clean up docs repository
+echo "🧹 CLEANUP: Removing temporary docs repository"
+rm -rf /tmp/docs-repo
+echo "✓ Docs repository cleaned up"
+
+# Set working directory to the target repository root
+# DO NOT overwrite REPO_NAME - it's already correctly parsed for GitHub API calls
+WORKSPACE_DIR="$TARGET_REPO_DIR"
+echo "✓ Working directory: /workspace/$WORKSPACE_DIR"
+
+# Set Claude working directory early (needed for tools-config.json copy)
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
+else
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
+fi
+mkdir -p "$CLAUDE_WORK_DIR"
+echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
+
+# Setup feature branch for implementation
+echo "=== BRANCH SETUP ==="
+cd "/workspace/$WORKSPACE_DIR"
+
+# Sync with latest main to prevent conflicts
+echo "🔄 Syncing with latest main to prevent conflicts..."
+git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || echo "⚠️ Could not fetch main/master branch"
+
+# Create or checkout feature branch (with conflict-safe fallback)
+FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+BRANCH_EXISTS="false"
+
+if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
+    BRANCH_EXISTS="true"
+    echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+    git checkout $FEATURE_BRANCH
+
+    echo "📥 Merging latest main into $FEATURE_BRANCH..."
+    if git merge origin/main --no-edit; then
+        echo "✓ Successfully merged latest main into feature branch"
+    else
+        echo "⚠️ MERGE CONFLICT: Cannot auto-merge main into $FEATURE_BRANCH"
+        echo "🔄 Auto-aborting merge and creating a fresh branch from origin/main"
+        # Abort merge if in progress
+        git merge --abort 2>/dev/null || true
+        # Create a unique fresh branch to avoid reuse conflicts
+        NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+        git checkout -B "$NEW_BRANCH" origin/main
+        FEATURE_BRANCH="$NEW_BRANCH"
+        echo "✓ Switched to fresh branch: $FEATURE_BRANCH"
+    fi
+else
+    # Create new feature branch from latest main
+    echo "Creating new feature branch '$FEATURE_BRANCH' from latest main..."
+    git checkout -b $FEATURE_BRANCH origin/main
+    echo "✓ Created feature branch: $FEATURE_BRANCH"
+fi
+
+# 5. Change to Claude Working Directory (already set up earlier)
+cd "$CLAUDE_WORK_DIR"
+echo "✓ Changed to Claude working directory: $CLAUDE_WORK_DIR"
+echo "🔑 CRITICAL: Claude will be launched from this directory"
+
+# Working directory setup completed above
+
+# Configure git user after successful clone
+echo "=== POST-CLONE GIT CONFIGURATION ==="
+# Fix dubious ownership issues
+git config --global --add safe.directory "/workspace/$WORKSPACE_DIR"
+echo "✓ Added repository to safe directories"
+
+# Set git config locally in the working repository (persistent on PVC)
+if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
+    cd "/workspace/$WORKSPACE_DIR"
+    git config --local user.name "$GIT_AUTHOR_NAME"
+    git config --local user.email "$GIT_AUTHOR_EMAIL"
+    # Set up automatic upstream for new branches
+    git config --local push.autoSetupRemote true
+    echo "✓ Configured git user in target repository: $GIT_AUTHOR_NAME"
+    echo "✓ Enabled automatic upstream setup for new branches"
+fi
+
+cd /workspace
+
+# Copy ConfigMap files to working directory (AFTER repository clone)
+echo "=== CONFIGMAP FILE SETUP ==="
+
+# Claude working directory already set above during repository setup
+
+echo "Setting up files in Claude working directory: $CLAUDE_WORK_DIR"
+cd "$CLAUDE_WORK_DIR"
+
+# Copy all files from ConfigMap to working directory
+if [ -d "/task-files" ]; then
+  echo "Copying ConfigMap files to working directory..."
+
+  # CLAUDE.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
+        OVERWRITE_MEMORY="{{overwrite_memory}}"
+
+  # Handle CLAUDE.md based on overwriteMemory setting
+        if [ "$OVERWRITE_MEMORY" = "true" ]; then
+          # Overwrite mode: Always replace CLAUDE.md with fresh template
+    cp "/task-files/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
+    cp "/task-files/CLAUDE.md" "/workspace/CLAUDE.md"
+          echo "✓ Overwrote CLAUDE.md memory file (fresh start requested)"
+          echo "✓ Copied CLAUDE.md to workspace root for easy access"
+        else
+          # Preserve mode (default): Only copy if doesn't exist
+          if [ ! -f "$CLAUDE_WORK_DIR/CLAUDE.md" ]; then
+      # Initial creation - copy from ConfigMap
+      cp "/task-files/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
+      cp "/task-files/CLAUDE.md" "/workspace/CLAUDE.md"
+            echo "✓ Created initial CLAUDE.md memory file"
+            echo "✓ Copied CLAUDE.md to workspace root for easy access"
+          else
+            echo "✓ Preserved existing CLAUDE.md memory file (maintaining accumulated context)"
+            # Still copy to workspace root for consistency
+            cp "$CLAUDE_WORK_DIR/CLAUDE.md" "/workspace/CLAUDE.md"
+            echo "✓ Synced CLAUDE.md to workspace root"
+          fi
+        fi
+
+  # Copy all other markdown files (excluding CLAUDE.md)
+  for md_file in /task-files/*.md; do
+    if [ -f "$md_file" ]; then
+      basename_file=$(basename "$md_file")
+      # Skip CLAUDE.md since we handled it above
+      if [ "$basename_file" != "CLAUDE.md" ]; then
+        cp "$md_file" "$CLAUDE_WORK_DIR/"
+        echo "✓ Updated $basename_file"
+      fi
+    fi
+  done
+
+  # Verify enterprise settings (mounted directly from ConfigMap)
+  if [ -f "/etc/claude-code/managed-settings.json" ]; then
+    echo "✓ Enterprise settings verified"
+    if ! jq empty /etc/claude-code/managed-settings.json 2>/dev/null; then
+      echo "❌ Invalid enterprise settings JSON"
+      exit 1
+    fi
+  else
+    echo "❌ Enterprise settings not found"
+    exit 1
+  fi
+
+  # Copy guidelines files to working directory
+  if [ -f "/task-files/coding-guidelines.md" ]; then
+    cp /task-files/coding-guidelines.md "$CLAUDE_WORK_DIR/"
+    echo "✓ Copied coding-guidelines.md to working directory"
+  fi
+
+  if [ -f "/task-files/github-guidelines.md" ]; then
+    cp /task-files/github-guidelines.md "$CLAUDE_WORK_DIR/"
+    echo "✓ Copied github-guidelines.md to working directory"
+  fi
+
+  # System prompt will be rendered inline (no file copying needed)
+  echo "✓ System prompt template will be rendered inline"
+
+  # Hook copying disabled
+  echo "! Hook scripts disabled - no hooks will be copied"
+
+  # Set up MCP configuration
+  echo "Setting up MCP configuration..."
+
+  # Copy MCP configuration from ConfigMap to project root (project scope)
+  if [ -f "/task-files/mcp.json" ]; then
+    cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+    echo "✓ Copied mcp.json to .mcp.json (project scope)"
+  else
+    echo "⚠️  mcp.json template not found"
+  fi
+
+  # Enterprise managed settings are mounted directly from ConfigMap
+  echo "=== ENTERPRISE MANAGED SETTINGS ==="
+  echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
+  echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
+
+  echo "✓ ConfigMap files copied to $CLAUDE_WORK_DIR"
+else
+  echo "⚠️  Warning: /task-files directory not found (ConfigMap not mounted?)"
+fi
+
+
+# Copy Current Task Documentation to Working Directory
+echo "=== TASK DOCUMENTATION SETUP ==="
+echo "🔍 DEBUG: REPO_NAME is: $REPO_NAME"
+echo "🔍 DEBUG: CLAUDE_WORK_DIR is: $CLAUDE_WORK_DIR"
+echo "🔍 DEBUG: Task ID is: {{task_id}}"
+
+# Task directory should already exist from multi-repo workflow or be created as needed
+mkdir -p "$CLAUDE_WORK_DIR/task"
+echo "✓ Created task directory at: $CLAUDE_WORK_DIR/task"
+
+# Task documentation was copied from docs repository during repository setup
+echo "✓ Task documentation available in task/ directory"
+
+# Move tools-config.json if it's in the task directory
+if [ -f "$CLAUDE_WORK_DIR/task/tools-config.json" ]; then
+    mv "$CLAUDE_WORK_DIR/task/tools-config.json" "$CLAUDE_WORK_DIR/tools-config.json" && echo "✓ tools-config.json moved to Claude working directory" || echo "❌ tools-config.json move failed"
+fi
+
+# DEBUG: Verify files were copied successfully
+echo "🔍 DEBUG: Contents of target task directory:"
+ls -la "$CLAUDE_WORK_DIR/task/" || echo "Task directory not found"
+echo "🔍 DEBUG: Checking if prompt.md exists:"
+[ -f "$CLAUDE_WORK_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
+
+# Verify tools-config.json is available in Claude's working directory
+echo "=== TOOLS CONFIG SETUP ==="
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
+
+# Helper to check non-empty JSON object
+is_valid_cfg() {
+  local p="$1"
+  [ -f "$p" ] || return 1
+  jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
+}
+
+# --- Remediation status label helpers ---------------------------------------
+
+STATUS_LABEL_NEEDS_FIXES="needs-fixes"
+STATUS_LABEL_FIXING="fixing-in-progress"
+STATUS_LABEL_NEEDS_CLEO="needs-cleo"
+STATUS_LABEL_NEEDS_TESS="needs-tess"
+STATUS_LABEL_APPROVED="approved"
+STATUS_LABEL_FAILED="failed-remediation"
+STATUS_LABEL_NEEDS_TESTS_LEGACY="needs tests"
+
+ensure_status_labels() {
+  local repo="$1"
+  shift
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for entry in "$@"; do
+    [ -n "$entry" ] || continue
+    local label="${entry%%:*}"
+    local rest="${entry#*:}"
+    local color="${rest%%:*}"
+    local desc="${rest#*:}"
+
+    if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
+      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+pr_add_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR #$pr_number"
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR $pr_url"
+    fi
+  done
+}
+
+pr_remove_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --remove-label "$label" >/dev/null 2>&1 || true
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --remove-label "$label" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+update_coderun_status() {
+  local remediation="$1"
+  local qa="$2"
+  local pr_url_value="${3:-$PR_URL}"
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local patch
+  patch=$(jq -n \
+    --arg ts "$timestamp" \
+    --arg pr "$pr_url_value" \
+    --arg rem "$remediation" \
+    --arg qa "$qa" \
+    '{status: ({lastUpdate: $ts}
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+        + (if $rem != "" then {remediationStatus: $rem} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end))}')
+
+  if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+    kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$patch" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to update CodeRun status with remediation context"
+  fi
+}
+
+SRC_OK=false
+WS_OK=false
+if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
+if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
+
+if $SRC_OK; then
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
+elif $WS_OK; then
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
+else
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid). Aborting."
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
+  else
+    echo "   Source missing: $SOURCE_CFG"
+  fi
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$WORKSPACE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$WORKSPACE_CFG"; echo; })
+  else
+    echo "   Workspace missing: $WORKSPACE_CFG"
+  fi
+  exit 1
+fi
+
+echo '=== WORKSPACE VALIDATION ==='
+
+# Check for required files in Claude's working directory
+MISSING_FILES=""
+REQUIRED_FILES="CLAUDE.md"
+
+echo "Checking for required files..."
+for file in $REQUIRED_FILES; do
+  if [ ! -f "$CLAUDE_WORK_DIR/$file" ]; then
+    echo "ERROR: Missing required file: $CLAUDE_WORK_DIR/$file"
+    MISSING_FILES="$MISSING_FILES $file"
+  else
+    echo "✓ Found: $CLAUDE_WORK_DIR/$file"
+    # Show file size for verification
+    size=$(wc -c < "$CLAUDE_WORK_DIR/$file" 2>/dev/null || echo "0")
+    echo "  File size: $size bytes"
+  fi
+done
+
+# Check git repository (REQUIRED for implementation tasks)
+if [ ! -d "/workspace/$WORKSPACE_DIR/.git" ]; then
+  echo "✗ CRITICAL ERROR: No target git repository found!"
+  MISSING_FILES="$MISSING_FILES git-repository"
+else
+  echo "✓ Found: target git repository"
+fi
+
+# If any files are missing, abort
+if [ -n "$MISSING_FILES" ]; then
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "║                 WORKSPACE VALIDATION FAILED                  ║"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  echo "The following required files are missing:"
+  for missing in $MISSING_FILES; do
+    case "$missing" in
+      "CLAUDE.md")
+        echo "  ❌ $missing - Main task instructions for Claude"
+        ;;
+      "git-repository")
+        echo "  ❌ $missing - Required for committing implementation changes"
+        ;;
+      *)
+        echo "  ❌ $missing"
+        ;;
+    esac
+  done
+  echo ""
+  echo "These files should have been created by the ConfigMap setup process."
+  echo "Claude will NOT be started to avoid wasting API credits."
+  echo ""
+  exit 1
+fi
+
+echo "✓ All required files present. Workspace is valid."
+
+echo '=== IMPLEMENTATION TASK DIAGNOSTICS ==='
+echo "Project directory: $CLAUDE_WORK_DIR"
+echo "Project directory contents:"
+ls -la "$CLAUDE_WORK_DIR"
+echo ""
+
+# Show git status
+echo "Git status:"
+git status 2>/dev/null || echo "Git status unavailable"
+echo ""
+
+echo '=== CLAUDE EXECUTION ==='
+
+# Export necessary variables
+export SERVICE_NAME="{{service}}"
+export TASK_ID="{{task_id}}"
+export GITHUB_APP="{{github_app}}"
+
+# Change to project directory before running Claude
+cd "$CLAUDE_WORK_DIR"
+echo "Changed to directory: $(pwd)"
+
+# Verify we're in the correct directory and have required files
+echo "=== WORKING DIRECTORY VERIFICATION ==="
+echo "Current working directory: $(pwd)"
+echo "Expected directory: $CLAUDE_WORK_DIR"
+if [ "$(pwd)" != "$CLAUDE_WORK_DIR" ]; then
+  echo "❌ ERROR: Failed to change to correct working directory!"
+  echo "Attempting to change directory again..."
+  cd "$CLAUDE_WORK_DIR" || exit 1
+  echo "✓ Successfully changed to: $(pwd)"
+fi
+
+# Verify git repository is accessible from Claude working directory
+echo "=== GIT REPOSITORY VERIFICATION ==="
+if [ ! -d ".git" ]; then
+  echo "❌ ERROR: No .git directory found in Claude working directory: $(pwd)"
+  echo "📂 Checking parent directory structure:"
+  echo "  Current: $(pwd)"
+  echo "  Contents: $(ls -la . | head -5)"
+  if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
+    echo "  Found .git at: /workspace/$REPO_NAME/"
+    echo "🔧 This indicates a working directory path mismatch"
+    echo "🔧 CLAUDE_WORK_DIR: $CLAUDE_WORK_DIR"
+    echo "🔧 Expected git repo: /workspace/$REPO_NAME"
+  fi
+  exit 1
+else
+  echo "✅ Git repository verified at: $(pwd)/.git"
+  echo "✅ Repository status: $(git status --porcelain | wc -l) modified files"
+  echo "✅ Current branch: $(git branch --show-current 2>/dev/null || echo 'detached')"
+fi
+
+# Verify setup
+echo "✓ Code implementation environment ready"
+
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
+# Calculate which model to use for this attempt (attempt number from controller)
+ATTEMPT={{#if attempts}}{{attempts}}{{else}}1{{/if}}
+CURRENT_MODEL="$DEFAULT_MODEL"
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+  CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+fi
+if [ -n "$CURRENT_MODEL" ]; then
+  echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+  
+  # Create writable copy of enterprise settings and update model
+  if [ -f "/etc/claude-code/managed-settings.json" ]; then
+    mkdir -p /etc/claude-code-writable
+    cp /etc/claude-code/managed-settings.json /etc/claude-code-writable/managed-settings.json
+    chmod 644 /etc/claude-code-writable/managed-settings.json
+    
+    if command -v jq >/dev/null 2>&1; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "/etc/claude-code-writable/managed-settings.json" > /tmp/settings-rotated.json && \
+      mv /tmp/settings-rotated.json "/etc/claude-code-writable/managed-settings.json"
+      echo "✓ Updated model in settings: $CURRENT_MODEL"
+      
+      # Point Claude to the writable settings
+      export CLAUDE_CODE_SETTINGS_DIR="/etc/claude-code-writable"
+    else
+      echo "⚠️ jq not available, using default model from settings"
+    fi
+  fi
+fi
+
+# Build Claude command
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+
+# Add MCP configuration if available
+if [ -f "/workspace/.mcp.json" ]; then
+    echo "✓ Adding MCP configuration from /workspace/.mcp.json to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/.mcp.json"
+else
+    echo "⚠️ No MCP configuration file found at /workspace/.mcp.json, MCP servers will not be available"
+fi
+
+# Look for Rex-specific system prompt file, then combine with inline SYSTEM_PROMPT so it is always utilized
+SELECTED_SYS_PROMPT=""
+if [ -f "/task-files/rex-system-prompt.md" ]; then
+    echo "✓ Found Rex system prompt file"
+    SELECTED_SYS_PROMPT="/task-files/rex-system-prompt.md"
+    if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
+        echo "[DEBUG] System prompt path: $SELECTED_SYS_PROMPT"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "$SELECTED_SYS_PROMPT" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] ----"
+    fi
+elif [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+    echo "✓ Found system prompt file for {{github_app}}"
+    SELECTED_SYS_PROMPT="/config/agents/{{github_app}}_system-prompt.md"
+    if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
+        echo "[DEBUG] System prompt path: $SELECTED_SYS_PROMPT"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "$SELECTED_SYS_PROMPT" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] ----"
+    fi
+else
+    echo "ℹ️ No system prompt file found for agent {{github_app}}"
+fi
+
+# Defer combining with inline SYSTEM_PROMPT until after it is defined
+
+# Model is set via managed-settings.json (updated by model rotation above if enabled)
+
+# Add continue flag if this is a retry attempt or user requested continuation
+{{#if continue_session}}
+CLAUDE_CMD="$CLAUDE_CMD --continue"
+echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
+{{/if}}
+
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    STARTING CLAUDE EXECUTION                  ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "Command: $CLAUDE_CMD"
+echo "Note: Claude will automatically read CLAUDE.md from the working directory"
+
+# Inline system prompt (static content)
+SYSTEM_PROMPT='## 🚨 CRITICAL SYSTEM REQUIREMENTS 🚨
+
+**⛔ OVERCONFIDENCE MITIGATION - MANDATORY VERIFICATION ⛔**
+
+You have a DANGEROUS tendency to declare task completion before actually verifying everything works. This is ABSOLUTELY UNACCEPTABLE.
+
+**MANDATORY VERIFICATION REQUIREMENTS:**
+- ✅ **MUST** actually run and test your code - never assume it works
+- ✅ **MUST** verify ALL acceptance criteria through actual testing
+- ✅ **MUST** confirm your changes don'\''t break existing functionality
+- ✅ **MUST** test end-to-end workflows and edge cases
+- ✅ **MUST** run all linters and build checks successfully
+- ✅ **CANNOT** claim completion based on code appearance alone
+
+**YOU ARE PROHIBITED FROM CLAIMING SUCCESS UNTIL:**
+1. You have executed and verified every piece of functionality
+2. You have tested integration with existing systems
+3. You have confirmed all acceptance criteria pass through testing
+4. All automated tests pass (linting, builds, unit tests)
+5. You have verified the solution works end-to-end in practice
+
+**IF YOU DECLARE SUCCESS WITHOUT VERIFICATION, YOU HAVE FAILED.**
+
+## 🔧 ORCHESTRATOR EXECUTION CONTEXT
+
+- **Service**: {{service}}
+- **Task ID**: {{task_id}}
+- **Repository**: {{repository_url}}
+- **Docs Repository**: {{docs_repository_url}}
+- **Working Directory**: {{working_directory}}
+- **GitHub App**: {{github_app}}
+
+{{#if continue_session}}
+## 🔄 CONTINUE SESSION - PR COMMENT RESOLUTION PRIORITY
+
+**⚠️ MANDATORY FIRST STEP: Before proceeding with any other work, you MUST:**
+
+1. **Check for unresolved PR comments**: Use `gh pr view --json reviews` or check the PR directly
+2. **Resolve ALL pending comments first**: Address reviewer feedback, fix issues, respond to questions
+3. **Push comment resolutions**: Commit and push any fixes for reviewer concerns
+4. **Only then proceed**: After ALL PR comments are resolved, continue with the main task
+
+**This ensures reviewer feedback takes priority and maintains collaborative workflow quality.**
+
+{{/if}}
+## ⚠️ EXECUTION REQUIREMENTS
+
+- **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
+- **NO MOCKS ALLOWED**: Implement ONLY with real data sources and live APIs - no hard-coded values, no mock data
+- **Parameterized Configuration**: ALL business logic parameters (trading pairs, endpoints, thresholds) must be configurable via env vars, config files, or CLI args
+- **Pre-PR quality gates (MANDATORY)**: Do NOT open a PR unless all of these pass locally:
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+  - `cargo test --workspace --all-features` and high coverage (aim ≥95%, target ~100% on critical paths)
+- **GitHub workflow**: Read @github-guidelines.md for commit standards
+- **Verify continuously**: Run tests and checks after each significant change
+- **Commit incrementally**: Don'\''t save all changes for the end
+- **Test thoroughly**: Validate against acceptance criteria before completion
+
+## 🚨 NON-NEGOTIABLE PULL REQUEST REQUIREMENT 🚨
+
+**⛔ CRITICAL: YOU MUST CREATE A PULL REQUEST - NO EXCEPTIONS ⛔**
+
+**MANDATORY FINAL STEP:**
+- **MUST** create a pull request using `gh pr create` command
+- **MUST** include proper labels (task-{{task_id}}, run-{{workflow.name}}, service-{{service}})
+- **MUST** verify PR creation succeeded before claiming task completion
+- **THE TASK IS INCOMPLETE AND FAILED IF NO PR IS CREATED**
+
+**YOU CANNOT COMPLETE THIS TASK WITHOUT CREATING A PULL REQUEST.**
+**IF YOU DO NOT CREATE A PR, YOU HAVE FAILED THE TASK COMPLETELY.**
+
+**Remember**: Focus on thorough implementation and verification.'
+
+# Now that SYSTEM_PROMPT is defined, combine with selected file and add to CLI
+COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
+{
+  if [ -n "$SELECTED_SYS_PROMPT" ]; then
+    cat "$SELECTED_SYS_PROMPT" || true
+    echo "\n---\n(Appended inline system requirements)\n"
+  else
+    echo "---"
+    echo "name: InlineSystem"
+    echo "description: Appended inline system requirements"
+    echo "---"
+  fi
+  printf '%s' "$SYSTEM_PROMPT"
+} > "$COMBINED_SYS_PROMPT"
+
+# Ensure we pass the combined system prompt
+CLAUDE_CMD="$CLAUDE_CMD --system-prompt $COMBINED_SYS_PROMPT"
+
+echo "Starting Claude execution (stream-json via FIFO)..."
+echo "=========================="
+
+# Safe mode toggle for debugging (prevents token consumption)
+SAFE_MODE="false"  # Set to "false" for full task execution
+
+if [ "$SAFE_MODE" = "true" ]; then
+    echo "🛡️ SAFE MODE ENABLED - Running simple test instead of full task"
+    FIFO_PATH="/workspace/agent-input.jsonl"
+    rm -f "$FIFO_PATH" 2>/dev/null || true
+    mkfifo "$FIFO_PATH"
+    chmod 666 "$FIFO_PATH" || true
+    # Keep a persistent writer open and start Claude in background to avoid EOF race
+    exec 9>"$FIFO_PATH"
+    $CLAUDE_CMD < "$FIFO_PATH" &
+    CLAUDE_PID=$!
+    printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
+    # Close writer so reader can exit cleanly
+    exec 9>&-
+    wait $CLAUDE_PID
+else
+    # Debug: Show what's actually in the task directory before checking for prompt.md
+    echo "🔍 DEBUG: About to check for prompt.md at: $CLAUDE_WORK_DIR/task/prompt.md"
+    echo "🔍 DEBUG: Contents of task directory:"
+    ls -la "$CLAUDE_WORK_DIR/task/" || echo "Task directory not found or empty"
+    echo "🔍 DEBUG: Current working directory contents:"
+    ls -la "$CLAUDE_WORK_DIR/" || echo "Working directory not accessible"
+
+    # Check if prompt.md exists and use it as main prompt
+    if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
+        echo "✓ Using task-specific prompt from docs service: task/prompt.md"
+
+        echo "startingTask:{{task_id}}"
+        echo ""
+
+        # DEBUG: Print MCP_TOOLS_CONFIG for troubleshooting client config issues
+        echo "🔍 DEBUG: MCP_TOOLS_CONFIG is set to: '$MCP_TOOLS_CONFIG'"
+        if [ -f "$MCP_TOOLS_CONFIG" ]; then
+            echo "🔍 DEBUG: MCP_TOOLS_CONFIG file exists and is readable"
+            echo "🔍 DEBUG: First few lines of client config:"
+            head -10 "$MCP_TOOLS_CONFIG" 2>/dev/null || echo "Could not read client config file"
+        else
+            echo "🔍 DEBUG: MCP_TOOLS_CONFIG file does NOT exist or is not readable"
+        fi
+        echo ""
+
+        # Prepare prompt prefix with CRITICAL task isolation instruction
+        PROMPT_PREFIX="⛔ **CRITICAL TASK ISOLATION REQUIREMENT** ⛔
+
+You are assigned to work on **TASK {{task_id}} ONLY**.
+
+**STRICT RULES:**
+1. You MUST ONLY implement Task {{task_id}} - ignore ALL other tasks
+2. DO NOT skip ahead to other tasks, even if you see evidence of previous work
+3. DO NOT implement task-2, task-3, task-4, etc. - ONLY Task {{task_id}}
+4. If you see existing code from other tasks, IGNORE IT
+5. If your memory (CLAUDE.md) mentions other tasks, IGNORE those parts
+6. Focus SOLELY on the requirements in task/prompt.md for Task {{task_id}}
+7. NEVER use mocks or hard-coded values - implement with real APIs, databases, and configurable parameters
+        
+        **TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
+        
+        ---
+        
+        🚨 NON-NEGOTIABLE PR REQUIREMENT 🚨
+        
+        After you finish implementation and validations:
+        - Stage and commit changes with a clear message
+        - Push the feature branch to origin
+        - Create a pull request targeting main using 'gh pr create' with an informative title/body
+        - Do NOT claim completion until 'gh pr list --head <current-branch>' returns a PR number
+        - If PR creation fails (auth/network), diagnose and retry until successful
+        
+        ---
+        
+        "
+
+        # Add tools guidance if available
+        if [ -f "$CLAUDE_WORK_DIR/task/tools-guide.md" ]; then
+            PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **Tool Usage Reference**
+
+Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/tools-guide.md\`. This file contains:
+- Selected tools for this specific task
+- When and how to use each tool
+- Tool arguments, parameters, and configuration options
+- Implementation workflow and best practices
+- Tool relationships and sequencing
+
+**The tools-guide.md is your authoritative reference for tool usage in this task.**
+
+---
+
+"
+            echo "✓ Including task isolation instructions and tools guidance"
+        else
+            echo "✓ Including task isolation instructions (no tools guide found)"
+        fi
+
+        # Seed initial user turn via a FIFO (system prompts are set via CLI flags, not streamed)
+        FIFO_PATH="/workspace/agent-input.jsonl"
+        rm -f "$FIFO_PATH" 2>/dev/null || true
+        mkfifo "$FIFO_PATH"
+        chmod 666 "$FIFO_PATH" || true
+
+        # Start Claude (reader) first in background to avoid writer-open blocking
+        $CLAUDE_CMD < "$FIFO_PATH" &
+        CLAUDE_PID=$!
+
+        # Start background token refresh for long-running jobs
+        (
+            while kill -0 $CLAUDE_PID 2>/dev/null; do
+                sleep 2700  # Check every 45 minutes
+
+                if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
+                    NOW=$(date +%s)
+                    TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+                    if [ $TOKEN_AGE -gt 2700 ]; then
+                        echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+                        refresh_github_token
+                    fi
+                fi
+            done
+        ) &
+        TOKEN_REFRESH_PID=$!
+        echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
+
+        # Compose initial user turn
+        USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
+
+        # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
+        FIFO_OPENED=false
+        if printf '{"text":%s}\n' "$USER_COMBINED" | \
+             curl -fsS -X POST http://127.0.0.1:8080/input \
+               -H 'Content-Type: application/json' \
+               --data-binary @- >/dev/null 2>&1; then
+          echo "✓ Initial prompt sent via sidecar /input"
+        else
+          echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+          # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
+          exec 9>"$FIFO_PATH"
+          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+          exec 9>&-  # Close immediately to send EOF to Claude
+          FIFO_OPENED=false  # Mark as already closed
+        fi
+
+        # Optional debug: dump FIFO holders if requested
+        if [ "${DEBUG_FIFO:-false}" = "true" ]; then
+          echo "[DEBUG] Dumping FIFO holders for $FIFO_PATH"
+          for p in /proc/[0-9]*; do
+            pid=${p##*/}
+            [ -d "$p/fd" ] || continue
+            for fd in "$p"/fd/*; do
+              tgt=$(readlink "$fd" 2>/dev/null || true)
+              case "$tgt" in *agent-input.jsonl*)
+                fdnum=${fd##*/}
+                comm=$(cat "$p/comm" 2>/dev/null || echo "?")
+                echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt"
+              ;;
+              esac
+            done
+          done
+        fi
+
+        # Optional hang diagnostics without enforcing a timeout
+        if [ -n "${HANG_DIAG_SECONDS:-}" ] && [ "$HANG_DIAG_SECONDS" -gt 0 ] 2>/dev/null; then
+          (
+            sleep "$HANG_DIAG_SECONDS"
+            if kill -0 "$CLAUDE_PID" 2>/dev/null; then
+              echo "[DEBUG] Hang diag after ${HANG_DIAG_SECONDS}s: dumping FIFO holders and ps"
+              for p in /proc/[0-9]*; do
+                pid=${p##*/}; [ -d "$p/fd" ] || continue
+                for fd in "$p"/fd/*; do tgt=$(readlink "$fd" 2>/dev/null || true); case "$tgt" in *agent-input.jsonl*) fdnum=${fd##*/}; comm=$(cat "$p/comm" 2>/dev/null || echo "?"); echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt";; esac; done
+              done
+              ps -eo pid,ppid,comm,args | head -200 || true
+            fi
+          ) & HANG_DIAG_PID=$!
+        fi
+
+        # Wait for Claude process to complete naturally
+        echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
+
+        # Simple wait - Claude should exit naturally when done
+        wait "$CLAUDE_PID"
+        CLAUDE_EXIT_CODE=$?
+
+        # Stop token refresh background process
+        if [ -n "$TOKEN_REFRESH_PID" ]; then
+            kill $TOKEN_REFRESH_PID 2>/dev/null || true
+            echo "✓ Stopped token refresh process"
+        fi
+
+        if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+          echo "✅ Claude process completed successfully"
+        else
+          echo "❌ Claude process FAILED with exit code: $CLAUDE_EXIT_CODE"
+          echo "🔍 Critical error - Claude did not complete successfully"
+          echo "📋 This typically indicates:"
+          echo "   - API rate limiting or authentication issues"
+          echo "   - MCP client configuration problems"
+          echo "   - Invalid prompt or system message formatting"
+          echo "   - Tool execution failures"
+          echo ""
+          echo "⚠️ ABORTING: Cannot continue without successful Claude execution"
+          echo "🔚 Force terminating container with error status..."
+          
+          # Clean up background processes
+          if [ -n "$TOKEN_REFRESH_PID" ]; then
+              kill $TOKEN_REFRESH_PID 2>/dev/null || true
+          fi
+          if [ -n "${HANG_DIAG_PID:-}" ]; then 
+              kill "$HANG_DIAG_PID" 2>/dev/null || true
+          fi
+          
+          # Write failure marker for debugging
+          echo "rex-implementation-failed:$(date -u +%Y-%m-%dT%H:%M:%SZ):exit-code-$CLAUDE_EXIT_CODE" > /workspace/.rex-failed
+          
+          # Exit with error to signal pod failure
+          exit $CLAUDE_EXIT_CODE
+        fi
+
+        # Stop diagnostics if running
+        if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
+
+        # Ensure FIFO cleanup happens regardless of how Claude exited
+        echo "🔧 Performing FIFO cleanup..."
+
+        # Close FIFO writer if it was opened (in fallback)
+        if [ "$FIFO_OPENED" = "true" ]; then
+          echo "🔧 Closing FIFO file descriptor..."
+          # Try multiple methods to ensure fd 9 gets closed
+          exec 9>&- 2>/dev/null || {
+            echo "⚠️ exec 9>&- failed, trying alternative close method"
+            eval "exec 9>&-" 2>/dev/null || {
+              echo "⚠️ Alternative close failed, FIFO fd may remain open"
+            }
+          }
+        else
+          echo "ℹ️ FIFO was not opened via fallback, checking sidecar"
+        fi
+
+        # Clean up FIFO file to ensure no processes are blocked
+        if [ -p "$FIFO_PATH" ]; then
+          echo "🔧 Removing FIFO to ensure clean shutdown"
+          rm -f "$FIFO_PATH" 2>/dev/null || echo "⚠️ Could not remove FIFO"
+        fi
+
+        # Gracefully stop sidecar to allow Job to complete (all containers must exit)
+        if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
+          echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
+        else
+          echo "🔧 Attempting sidecar shutdown..."
+          shutdown_attempts=0
+          max_shutdown_attempts=3
+
+        while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+          if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+            echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+            break
+          else
+            shutdown_attempts=$((shutdown_attempts + 1))
+            echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+            if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+              echo "Retrying in 2 seconds..."
+              sleep 2
+            fi
+          fi
+        done
+
+          if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+            echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+            echo "🔧 Force terminating sidecar processes..."
+            pkill -f "sidecar" || echo "No sidecar processes found to kill"
+          fi
+
+        # Wait for sidecar to actually terminate
+          echo "⏳ Waiting for sidecar termination..."
+          timeout=10
+          while [ $timeout -gt 0 ]; do
+            if ! pgrep -f "sidecar" > /dev/null 2>&1; then
+              echo "✅ Sidecar terminated successfully"
+              break
+            fi
+            sleep 1
+            timeout=$((timeout - 1))
+          done
+
+          if [ $timeout -eq 0 ]; then
+            echo "⚠️ Sidecar still running after wait period"
+          fi
+        fi
+    else
+        echo "❌ ERROR: No prompt.md found from docs service"
+        echo "The docs service should always provide task/prompt.md"
+        echo "Check docs repository and task configuration"
+        exit 1
+    fi
+fi
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║                 IMPLEMENTATION TASK COMPLETE                 ║'
+echo '════════════════════════════════════════════════════════════════'
+
+# Claude execution completed — run post-completion hook if present to ensure PR creation
+echo "🔗 Checking for post-completion PR hook..."
+if [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
+  echo "🔗 Found stop hook: /task-files/hooks-stop-code-pr-creation.sh"
+  
+  # Copy script to writable location to fix permission issues
+  HOOK_SCRIPT="/tmp/hooks-stop-code-pr-creation.sh"
+  cp "/task-files/hooks-stop-code-pr-creation.sh" "$HOOK_SCRIPT"
+  chmod +x "$HOOK_SCRIPT"
+  echo "✓ Copied hook script to writable location with execute permissions"
+  
+  echo "🚀 Running stop hook to commit, push, and create PR (as fallback)..."
+  (
+    cd "$CLAUDE_WORK_DIR" && "$HOOK_SCRIPT"
+  ) || echo "⚠️ Stop hook failed (continuing to PR verification)"
+else
+  echo "ℹ️ No stop hook found; relying on agent-driven PR creation"
+fi
+
+echo "Claude has completed successfully."
+
+# =============================================================================
+# CRITICAL PR VERIFICATION - MUST HAVE CREATED A PR
+# =============================================================================
+echo ""
+echo "🔍 VERIFYING PULL REQUEST CREATION (MANDATORY)..."
+echo ""
+
+# Give GitHub API a moment to register the PR if just created
+sleep 3
+
+# Check if a PR was created for this branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+PR_CHECK_FAILED=false
+
+if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+    echo "📋 Checking for PR on branch: $CURRENT_BRANCH"
+    
+    # Try to find PR by branch (need to specify repo)
+    PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    
+    if [ -z "$PR_EXISTS" ]; then
+        # Also check by task label as backup
+        TASK_LABEL="task-${TASK_ID}"
+        PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+
+    # If still not found, run the stop hook one more time (idempotent) then re-check
+    if [ -z "$PR_EXISTS" ] && [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
+        echo "🔁 No PR detected yet; retrying stop hook once more..."
+        
+        # Use the same writable copy approach for retry
+        HOOK_SCRIPT="/tmp/hooks-stop-code-pr-creation.sh"
+        if [ ! -f "$HOOK_SCRIPT" ]; then
+            cp "/task-files/hooks-stop-code-pr-creation.sh" "$HOOK_SCRIPT"
+            chmod +x "$HOOK_SCRIPT"
+        fi
+        
+        (
+          cd "$CLAUDE_WORK_DIR" && "$HOOK_SCRIPT"
+        ) || echo "⚠️ Stop hook retry failed"
+        echo "⏳ Waiting briefly before re-checking PR..."
+        sleep 3
+        PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+    
+    if [ -z "$PR_EXISTS" ]; then
+        echo "❌ CRITICAL ERROR: No pull request found!"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "║                    PR CREATION FAILED                        ║"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "Rex was required to create a pull request but failed to do so."
+        echo "This is a MANDATORY requirement that was not met."
+        echo ""
+        echo "Possible reasons:"
+        echo "  1. No code changes were made"
+        echo "  2. Changes were not committed"
+        echo "  3. Branch was not pushed to remote"
+        echo "  4. PR creation command failed"
+        echo "  5. GitHub authentication issues"
+        echo ""
+        echo "Diagnostic information:"
+        echo "  Branch: $CURRENT_BRANCH"
+        echo "  Task ID: ${TASK_ID}"
+        
+        # Check if there are uncommitted changes
+        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+            echo "  ⚠️ There are uncommitted changes in the repository"
+        fi
+        
+        # Check if branch exists on remote
+        if ! git ls-remote --heads origin "$CURRENT_BRANCH" | grep -q "$CURRENT_BRANCH"; then
+            echo "  ⚠️ Branch not found on remote repository"
+        fi
+        
+        echo ""
+        echo "🔚 FAILING CONTAINER: Rex did not create required pull request"
+        
+        # Write failure marker
+        echo "rex-no-pr-created:$(date -u +%Y-%m-%dT%H:%M:%SZ):branch-$CURRENT_BRANCH" > /workspace/.rex-pr-failed
+        
+        # Exit with error
+        exit 1
+    else
+        echo "✅ Pull request #${PR_EXISTS} found successfully"
+        echo "Rex has completed the task and created the required PR."
+    fi
+else
+    echo "⚠️ WARNING: Unable to verify PR (branch detection failed)"
+    echo "Branch: $CURRENT_BRANCH"
+    # Don't fail here as this might be a git configuration issue
+fi
+
+# =============================================================================
+# PR DETECTION AND LABELING
+# =============================================================================
+# After Claude completes, check if a PR was created and apply correlation labels
+if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
+  echo "🔍 Checking for PRs created by this task..."
+
+  # Debug: Show current directory and work directory
+  echo "📍 Current directory: $(pwd)"
+  echo "📍 Claude work directory: $CLAUDE_WORK_DIR"
+
+  # Determine implementation repository slug for gh -R
+  REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+  if [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
+    ORIGIN_URL=$(git -C "$CLAUDE_WORK_DIR" remote get-url origin 2>/dev/null || echo "")
+    if echo "$ORIGIN_URL" | grep -qE '^https://github.com/'; then
+      REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)(\.git)?|\1|')
+    elif echo "$ORIGIN_URL" | grep -qE '^git@github.com:'; then
+      REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\.git)?|\1|')
+    fi
+  fi
+
+  echo "📍 Repository: $REPO_SLUG"
+
+  # Retry loop for PR detection (sometimes GitHub API takes a moment)
+  MAX_RETRIES=5
+  RETRY_COUNT=0
+  PR_NUMBER=""
+
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$PR_NUMBER" ]; do
+    if [ $RETRY_COUNT -gt 0 ]; then
+      echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES: Waiting for PR to appear in GitHub API..."
+      sleep 3
+    fi
+
+    # First, try to find PR by task label (Claude may have added task-N label)
+    TASK_LABEL="task-${TASK_ID}"
+    PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+
+    # If not found by label, try by branch name (current branch)
+    if [ -z "$PR_NUMBER" ]; then
+      CURRENT_BRANCH=$(cd "$CLAUDE_WORK_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+      if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
+        echo "🔍 Checking for PR on branch: $CURRENT_BRANCH"
+        PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+      fi
+    fi
+
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+  done
+
+  if [ -n "$PR_NUMBER" ]; then
+    echo "✅ Found PR #${PR_NUMBER}"
+
+    # Get the PR URL
+    PR_URL="https://github.com/${REPO_SLUG}/pull/${PR_NUMBER}"
+    echo "📝 PR URL: $PR_URL"
+
+    ensure_status_labels "$REPO_SLUG" \
+      "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
+      "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
+      "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cleo quality review" \
+      "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
+      "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
+      "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
+
+    pr_remove_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" \
+      "$STATUS_LABEL_NEEDS_FIXES" \
+      "$STATUS_LABEL_FIXING" \
+      "$STATUS_LABEL_NEEDS_TESS" \
+      "$STATUS_LABEL_APPROVED" \
+      "$STATUS_LABEL_FAILED" \
+      "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
+
+    pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_CLEO"
+
+    echo "🔄 Recording remediation status (needs-cleo) for CodeRun"
+    update_coderun_status "$STATUS_LABEL_NEEDS_CLEO" "pending" "$PR_URL"
+
+    # Apply correlation labels with comprehensive debugging
+    echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
+
+    # Debug: Check environment variables
+    echo "🔍 DEBUG: Environment check for label creation:"
+    echo "   TASK_ID: '${TASK_ID}'"
+    echo "   WORKFLOW_NAME: '${WORKFLOW_NAME}'"
+    echo "   SERVICE_NAME: '${SERVICE_NAME}'"
+    echo "   CODERUN_NAME: '${CODERUN_NAME}'"
+    echo "   GitHub Token: $([ -n "$GITHUB_TOKEN" ] && echo 'Present' || echo 'Missing')"
+
+    # Validate required variables
+    if [ -z "$WORKFLOW_NAME" ]; then
+      echo "❌ ERROR: WORKFLOW_NAME is not set!"
+      echo "🔍 DEBUG: Attempting to extract from CODERUN_NAME..."
+      # Try to extract workflow name from CodeRun name pattern
+      if [ -n "$CODERUN_NAME" ]; then
+        # Pattern: service-t{task}-stage-{hash} created by workflow
+        echo "   CODERUN_NAME format: $CODERUN_NAME"
+      fi
+
+      # Check if we can get it from Kubernetes labels
+      if command -v kubectl >/dev/null 2>&1 && [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+        echo "🔍 DEBUG: Trying to get workflow name from CodeRun labels..."
+        WORKFLOW_FROM_LABELS=$(kubectl get coderun "$CODERUN_NAME" -n "$NAMESPACE" -o jsonpath='{.metadata.labels.workflow-name}' 2>/dev/null || echo "")
+        if [ -n "$WORKFLOW_FROM_LABELS" ]; then
+          echo "✅ Found workflow name from CodeRun labels: $WORKFLOW_FROM_LABELS"
+          WORKFLOW_NAME="$WORKFLOW_FROM_LABELS"
+        else
+          echo "❌ Could not retrieve workflow name from CodeRun labels"
+        fi
+      fi
+
+      # Final check - if still no workflow name, fail loudly
+      if [ -z "$WORKFLOW_NAME" ]; then
+        echo "❌ CRITICAL: Cannot determine WORKFLOW_NAME - this will cause correlation issues!"
+        echo "🔍 DEBUG: Available environment variables:"
+        env | grep -E "WORKFLOW|CODERUN|TASK|SERVICE" | sort
+        # DO NOT use 'unknown' - exit with error instead
+        echo "❌ Refusing to use 'unknown' label - failing task"
+        exit 1
+      fi
+    fi
+
+    TASK_LABEL="task-${TASK_ID}"
+    RUN_LABEL="run-${WORKFLOW_NAME}"
+    SERVICE_LABEL="service-${SERVICE_NAME}"
+
+    echo "📋 Labels to apply:"
+    echo "   Task: $TASK_LABEL"
+    echo "   Run: $RUN_LABEL"
+    echo "   Service: $SERVICE_LABEL"
+
+    # Pre-create labels if they don't exist (do this BEFORE trying to add them)
+    echo "🔍 Ensuring labels exist in repository..."
+    for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+      if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
+        echo "   📝 Creating label '$label'..."
+        case "$label" in
+          task-*) COLOR="f29513"; DESC="Task correlation" ;;
+          run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
+          service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+          *) COLOR="ededed"; DESC="Correlation label" ;;
+        esac
+        gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+      else
+        echo "   ✓ Label '$label' already exists"
+      fi
+    done
+
+    # Try to add labels with detailed error capture
+    echo "🔍 Attempting to add labels to PR #${PR_NUMBER}..."
+    LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
+    LABEL_EXIT_CODE=$?
+
+    if [ $LABEL_EXIT_CODE -eq 0 ]; then
+      echo "✅ Added correlation labels successfully"
+    else
+      echo "⚠️ Failed to add labels (exit code: $LABEL_EXIT_CODE)"
+      echo "🔍 DEBUG: Error output: $LABEL_ERROR"
+
+      # Check if labels exist
+      echo "🔍 DEBUG: Checking which labels exist..."
+      for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+        if gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
+          echo "   ✓ Label '$label' exists"
+        else
+          echo "   ✗ Label '$label' does not exist"
+          # Create the missing label
+          echo "   📝 Creating label '$label'..."
+          case "$label" in
+            task-*) COLOR="f29513"; DESC="Task correlation" ;;
+            run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
+            service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+            *) COLOR="ededed"; DESC="Unknown label type" ;;
+          esac
+
+          CREATE_ERROR=$(gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>&1)
+          CREATE_EXIT=$?
+          if [ $CREATE_EXIT -eq 0 ]; then
+            echo "   ✅ Created label '$label'"
+          else
+            echo "   ❌ Failed to create label '$label': $CREATE_ERROR"
+          fi
+        fi
+      done
+
+      # Retry adding labels with individual attempts
+      echo "🔍 DEBUG: Retrying label addition individually..."
+      LABELS_ADDED=0
+      for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+        RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "$label" 2>&1)
+        RETRY_EXIT=$?
+        if [ $RETRY_EXIT -eq 0 ]; then
+          echo "   ✅ Added label '$label'"
+          LABELS_ADDED=$((LABELS_ADDED + 1))
+        else
+          echo "   ❌ Failed to add label '$label': $RETRY_ERROR"
+        fi
+      done
+
+      if [ $LABELS_ADDED -eq 3 ]; then
+        echo "✅ All labels added successfully after retry"
+      elif [ $LABELS_ADDED -gt 0 ]; then
+        echo "⚠️ Partial success: $LABELS_ADDED/3 labels added"
+      else
+        echo "❌ CRITICAL: Could not add any labels to PR"
+        echo "🔍 DEBUG: Checking PR state..."
+        PR_STATE=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+        echo "   PR State: $PR_STATE"
+        if [ "$PR_STATE" = "CLOSED" ] || [ "$PR_STATE" = "MERGED" ]; then
+          echo "❌ PR is $PR_STATE - cannot add labels to closed/merged PRs"
+        fi
+      fi
+    fi
+
+    # Final verification that labels were applied
+    echo "🔍 Final verification of PR labels..."
+    PR_LABELS=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+    if echo "$PR_LABELS" | grep -q "^task-${TASK_ID}$" && \
+       echo "$PR_LABELS" | grep -q "^run-${WORKFLOW_NAME}$" && \
+       echo "$PR_LABELS" | grep -q "^service-${SERVICE_NAME}$"; then
+      echo "✅ VERIFIED: All correlation labels are present on PR #${PR_NUMBER}"
+    else
+      echo "⚠️ WARNING: Some labels may be missing. Current labels:"
+      echo "$PR_LABELS" | sed 's/^/   - /'
+      echo ""
+      echo "Expected labels:"
+      echo "   - task-${TASK_ID}"
+      echo "   - run-${WORKFLOW_NAME}"
+      echo "   - service-${SERVICE_NAME}"
+    fi
+  else
+    echo "ℹ️ No PR found for this task (Claude may not have created one)"
+  fi
+else
+  echo "ℹ️ Skipping PR labeling: missing GITHUB_TOKEN or gh CLI"
+fi
+
+# Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
+touch /workspace/.agent_done 2>/dev/null || true
+
+# Final termination sequence
+echo '════════════════════════════════════════════════════════════════'
+echo '║                 REX CONTAINER TERMINATION                    ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "Container PID: $$"
+echo "Final Process Check:"
+ps aux | head -5
+
+# Write completion marker for workflow tracking
+echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
+
+# Force exit to terminate the pod
+echo "🔚 Force terminating container..."
+exit 0

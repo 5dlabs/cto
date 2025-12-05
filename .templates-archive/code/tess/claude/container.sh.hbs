@@ -1,0 +1,2226 @@
+#!/bin/sh
+
+# CRITICAL: Clean up sentinel file IMMEDIATELY to prevent sidecar from shutting down
+# This MUST happen before anything else, as the sidecar starts before our script
+if [ -f /workspace/.agent_done ]; then
+    echo "🧹 URGENT: Removing leftover sentinel file from previous run"
+    rm -f /workspace/.agent_done
+fi
+
+# Also clean up Tess completion marker if present
+if [ -f /workspace/.tess-complete ]; then
+    echo "🧹 Removing Tess completion marker from previous run"
+    rm -f /workspace/.tess-complete
+fi
+
+# Ensure Rust environment is always properly set up
+echo "🔧 Setting up Rust environment..."
+
+# Source Rust environment if available (fixes cargo not found issues)
+# Try multiple possible locations for Rust environment
+RUST_ENV_SOURCES=(
+    "$HOME/.cargo/env"
+    "/root/.cargo/env"
+    "/usr/local/cargo/env"
+    "/home/ubuntu/.cargo/env"
+    "/home/user/.cargo/env"
+)
+
+for env_file in "${RUST_ENV_SOURCES[@]}"; do
+    if [ -f "$env_file" ]; then
+        echo "✓ Sourcing Rust environment from $env_file"
+        . "$env_file"
+        # Export PATH explicitly after sourcing
+        export PATH="$HOME/.cargo/bin:/usr/local/cargo/bin:$PATH"
+        break
+    fi
+done
+
+# Ensure rustup has a default toolchain set
+if command -v rustup >/dev/null 2>&1; then
+    echo "✓ Rustup found, ensuring stable toolchain is default..."
+    rustup default stable 2>/dev/null || true
+    # Re-source environment after setting default
+    if [ -f "$HOME/.cargo/env" ]; then
+        . "$HOME/.cargo/env"
+    elif [ -f "/root/.cargo/env" ]; then
+        . "/root/.cargo/env"
+    fi
+    export PATH="$HOME/.cargo/bin:/usr/local/cargo/bin:$PATH"
+    echo "✓ Ensured stable Rust toolchain is default"
+else
+    echo "⚠️ rustup not found in PATH"
+fi
+
+# Verify Rust is available with multiple fallback attempts
+if command -v cargo >/dev/null 2>&1; then
+    echo "✓ Cargo is available: $(cargo --version)"
+elif [ -f "/usr/local/cargo/bin/cargo" ]; then
+    echo "✓ Found cargo at /usr/local/cargo/bin/cargo"
+    export PATH="/usr/local/cargo/bin:$PATH"
+    echo "✓ Cargo is available: $(cargo --version)"
+elif [ -f "$HOME/.cargo/bin/cargo" ]; then
+    echo "✓ Found cargo at $HOME/.cargo/bin/cargo"
+    export PATH="$HOME/.cargo/bin:$PATH"
+    echo "✓ Cargo is available: $(cargo --version)"
+else
+    echo "❌ Cargo not found in PATH"
+    echo "Current PATH: $PATH"
+    echo "Attempting to find cargo..."
+    find /usr -name cargo 2>/dev/null | head -5 || echo "No cargo found in /usr"
+    find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
+    find /root -name cargo 2>/dev/null | head -5 || echo "No cargo found in /root"
+    # Try to install Rust as last resort
+    echo "🔧 Attempting to install Rust via rustup..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || true
+    . "$HOME/.cargo/env" || true
+    export PATH="$HOME/.cargo/bin:$PATH"
+    if command -v cargo >/dev/null 2>&1; then
+        echo "✓ Cargo installed and available: $(cargo --version)"
+    else
+        echo "❌ Failed to install Rust, continuing without cargo..."
+    fi
+fi
+
+echo '════════════════════════════════════════════════════════════════'
+echo '║              TESS TESTING WORKFLOW STARTING                  ║'
+echo '║         Quality Assurance & Deployment Testing Agent         ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎯 Agent: {{github_app}}"
+echo "🧪 Focus: Comprehensive testing, deployment validation, test coverage"
+echo "📋 Task ID: {{task_id}}"
+echo "✅ Mission: 120% satisfaction through exhaustive testing"
+echo "🔍 Debug Session: $(date '+%Y-%m-%d %H:%M:%S') - PID: $$"
+echo "📊 Log Level: DEBUG (showing JSON construction details)"
+
+# Disable interactive Git prompts globally
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# Allow soft failure for prechecks when desired
+# Set TESS_STRICT_PRECHECKS=1 to enforce hard exits on failures
+TESS_STRICT_PRECHECKS="${TESS_STRICT_PRECHECKS:-0}"
+
+soft_abort() {
+  # Usage: soft_abort "message" [exit_code]
+  msg="$1"; code="${2:-1}"
+  echo "❌ $msg"
+  if [ "$TESS_STRICT_PRECHECKS" = "1" ]; then
+    echo "🚫 Aborting (TESS_STRICT_PRECHECKS=1)"
+    exit "$code"
+  else
+    echo "⚠️ Non-fatal precheck failure (continuing with limited capabilities)"
+  fi
+}
+
+# Repository URL
+REPO_URL="{{repository_url}}"
+
+# GitHub App authentication is configured via environment variables
+echo "Using GitHub App authentication for testing workflow"
+
+# Function to ensure MCP server shutdown
+shutdown_sidecar() {
+  # Allow tests or callers to skip shutdown entirely
+  if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
+    echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
+    return 0
+  fi
+
+  echo "🔧 Signaling MCP sidecar to shutdown..."
+  touch /workspace/.agent_done 2>/dev/null || true
+
+  echo "🔧 Attempting MCP sidecar shutdown (127.0.0.1:8080)..."
+  local shutdown_attempts=0
+  local max_shutdown_attempts=3
+
+  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+      echo "✓ MCP sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+      break
+    else
+      shutdown_attempts=$((shutdown_attempts + 1))
+      echo "⚠️ MCP sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+        echo "Retrying in 2 seconds..."
+        sleep 2
+      fi
+    fi
+  done
+
+  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+    echo "❌ Failed to shutdown MCP sidecar after $max_shutdown_attempts attempts"
+    echo "⚠️ Sidecar may not be running; continuing"
+  fi
+}
+
+# Authenticate with GitHub App
+if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+    echo "Authenticating with GitHub App..."
+
+    # Create temporary private key file (support escaped newlines)
+    TEMP_KEY_FILE="/tmp/github-app-key.pem"
+    printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+
+    # Generate JWT token for GitHub App (fixed JWT generation for Linux containers)
+    # JWT header
+    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+
+    # JWT payload with current time and expiration (10 minutes)
+    NOW=$(date +%s)
+    EXP=$((NOW + 600))
+    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+
+    # Sign the JWT
+    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+    # Get installation ID for the repository (robust parsing of owner/repo)
+    INPUT_REPO="{{repository_url}}"
+    REPO_OWNER=""
+    REPO_NAME=""
+
+    if echo "$INPUT_REPO" | grep -qE '^https://github.com/'; then
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+    elif echo "$INPUT_REPO" | grep -qE '^git@github.com:'; then
+        # SSH format git@github.com:owner/repo(.git)
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:[^/]+/([^/]+)(\.git)?|\1|')
+    else
+        # Fallback: assume slug owner/repo (possibly with .git)
+        SLUG=$(echo "$INPUT_REPO" | sed -E 's|\.git$||')
+        REPO_OWNER=$(echo "$SLUG" | cut -d'/' -f1)
+        REPO_NAME=$(echo "$SLUG" | cut -d'/' -f2)
+    fi
+
+    echo "DEBUG: Parsed repository - Owner: '$REPO_OWNER', Name: '$REPO_NAME'"
+
+    echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
+
+    # Get the installation ID (retry and follow redirects). Fallback to org installation.
+    INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+        --connect-timeout 5 --max-time 12 \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
+
+    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "⚠️ Repo installation not found, trying org installation..."
+        ORG_INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+            --connect-timeout 5 --max-time 12 \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$REPO_OWNER/installation")
+        INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+    fi
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        soft_abort "Failed to get installation ID for $REPO_OWNER/$REPO_NAME" 1
+        echo "Response (repo): $INSTALLATION_RESPONSE"
+        echo "Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
+        rm -f "$TEMP_KEY_FILE"
+        INSTALLATION_ID=""
+    fi
+
+    echo "Installation ID: $INSTALLATION_ID"
+
+    # Get installation access token
+    TOKEN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+    TOKEN_GENERATED_AT=$(date +%s)  # Track when token was generated for refresh logic
+
+    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+        soft_abort "Failed to get installation access token" 1
+        echo "Response: $TOKEN_RESPONSE"
+        rm -f "$TEMP_KEY_FILE"
+        GITHUB_TOKEN=""
+    fi
+
+    echo "✅ Successfully authenticated with GitHub App"
+
+    # Clean up temporary key file
+    rm -f "$TEMP_KEY_FILE"
+
+    # Export the token for git to use
+    export GITHUB_TOKEN
+
+    # Configure git to use the token (use --replace-all to handle multiple existing helpers)
+    git config --global --replace-all credential.helper store
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+
+    # Also authenticate gh CLI with the token
+    echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+    # Token refresh functions for long-running jobs
+    refresh_github_token() {
+        echo "🔄 Refreshing GitHub App token..."
+
+        # Create temporary key file
+        TEMP_KEY_FILE="/tmp/github-app-key-$$"
+        echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+        chmod 600 "$TEMP_KEY_FILE"
+
+        # Generate new JWT
+        JWT_TOKEN=$(ruby -r openssl -r json -r base64 -e "
+        key = OpenSSL::PKey::RSA.new(File.read('$TEMP_KEY_FILE'))
+        payload = {
+            iat: Time.now.to_i - 60,
+            exp: Time.now.to_i + (10 * 60),
+            iss: '$GITHUB_APP_ID'
+        }
+        header = { alg: 'RS256', typ: 'JWT' }
+
+        header_enc = Base64.urlsafe_encode64(header.to_json).gsub('=', '')
+        payload_enc = Base64.urlsafe_encode64(payload.to_json).gsub('=', '')
+        signature = Base64.urlsafe_encode64(key.sign(OpenSSL::Digest::SHA256.new, \"#{header_enc}.#{payload_enc}\")).gsub('=', '')
+
+        puts \"#{header_enc}.#{payload_enc}.#{signature}\"
+        ")
+
+        # Get installation ID (reuse logic from initial auth)
+        INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+        if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+            INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+        fi
+
+        # Get new installation token
+        TOKEN_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+        NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+        if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+            export GITHUB_TOKEN="$NEW_TOKEN"
+            export TOKEN_GENERATED_AT=$(date +%s)
+
+            # Update git credentials
+            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+            echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null
+
+            echo "✅ Token refreshed successfully"
+            rm -f "$TEMP_KEY_FILE"
+            return 0
+        else
+            echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+            rm -f "$TEMP_KEY_FILE"
+            return 1
+        fi
+    }
+
+    # Check if token needs refresh (call before git operations)
+    refresh_token_if_needed() {
+        if [ -z "$TOKEN_GENERATED_AT" ]; then
+            echo "⚠️ No token timestamp found, refreshing token..."
+            refresh_github_token
+            return
+        fi
+
+        NOW=$(date +%s)
+        TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+        # Refresh if token is older than 50 minutes (tokens last 1 hour, refresh at 50 min to be safe)
+        if [ $TOKEN_AGE -gt 3000 ]; then
+            echo "🔄 Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+            refresh_github_token
+        fi
+    }
+
+else
+    echo "❌ GitHub App credentials not found"
+    exit 1
+fi
+
+# Set working directory for the agent
+# Set Working Directory (Critical for Claude Execution) - Match Rex pattern
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
+else
+  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
+fi
+mkdir -p "$CLAUDE_WORK_DIR"
+cd "$CLAUDE_WORK_DIR"
+
+# Prepare environment for testing
+echo "════════════════════════════════════════════════════════════════"
+echo "🧪 PREPARING TESTING ENVIRONMENT"
+echo "════════════════════════════════════════════════════════════════"
+
+# Git configuration with proper GitHub App attribution
+git config --global --add safe.directory /workspace
+
+# Set GitHub App attribution - use generic format for all agents
+GITHUB_APP="{{github_app}}"
+# Generic attribution that works for any agent
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+# Configure git with proper GitHub App attribution
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+
+# Set environment variables for Claude Code to use
+export GIT_AUTHOR_NAME="$GIT_AUTHOR_NAME"
+export GIT_AUTHOR_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+echo "✓ Git configured"
+
+# =============================================================================
+# AUTHENTICATION VERIFICATION
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "🔐 AUTHENTICATION VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+# Repository URLs - Handle both full URLs and org/repo format
+# Check if repository_url already contains https://github.com/
+if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+    REPO_HTTP_URL="{{repository_url}}"
+    if ! echo "{{repository_url}}" | grep -q "\.git$"; then
+        REPO_HTTP_URL="${REPO_HTTP_URL}.git"
+    fi
+else
+    REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
+fi
+
+# Same for docs repository
+if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+    DOCS_HTTP_URL="{{docs_repository_url}}"
+    if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
+        DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
+    fi
+else
+    DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
+fi
+
+# DEBUG: Show what URLs are being constructed
+echo "🔍 DEBUG: URL Construction & Parameters"
+echo "  Input repository_url: '{{repository_url}}'"
+echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+echo "  Input working_directory: '{{working_directory}}'"
+echo "  Input docs_branch: '{{docs_branch}}'"
+echo "  Input github_app: '{{github_app}}'"
+echo "  Input task_id: '{{task_id}}'"
+echo "  Input service: '{{service}}'"
+echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
+echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
+echo "  Current working directory: $(pwd)"
+echo "  Available environment variables:"
+env | grep -E "(GITHUB|ANTHROPIC)" | sort
+
+# Test HTTPS access to repository
+echo "🔍 DEBUG: Testing HTTPS repository access..."
+echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
+GIT_REPO_OK=0
+if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
+  echo "✓ HTTPS repository access successful"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Output: $(cat /tmp/repo_test.out | head -1)"
+else
+  echo "❌ HTTPS repository access failed"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/repo_test.out)"
+  echo "  Git credential helper status:"
+  git config --list | grep credential || echo "  No credential helpers configured"
+  echo ""
+  soft_abort "Cannot access repository via HTTPS" 1
+  GIT_REPO_OK=1
+fi
+
+# Test docs repository access
+echo "🔍 DEBUG: Testing docs repository access..."
+echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
+DOCS_REPO_OK=0
+if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
+  echo "✓ Docs repository access successful"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Output: $(cat /tmp/docs_test.out | head -1)"
+else
+  echo "❌ Docs repository access failed"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/docs_test.out)"
+  echo ""
+  soft_abort "Cannot access docs repository via HTTPS" 1
+  DOCS_REPO_OK=1
+fi
+
+# Clone or update repository (directly to Claude working directory)
+if [ -d "$CLAUDE_WORK_DIR/.git" ]; then
+    echo "📁 Found existing repository at working directory, updating..."
+    cd "$CLAUDE_WORK_DIR"
+    git fetch origin --prune
+else
+    # Ensure parent directories exist
+    mkdir -p "$(dirname "$CLAUDE_WORK_DIR")"
+
+    # If directory exists but isn't a git repo, remove it first
+    if [ -d "$CLAUDE_WORK_DIR" ] && [ ! -d "$CLAUDE_WORK_DIR/.git" ]; then
+        echo "🧹 Removing non-git directory to prepare for clone..."
+        rm -rf "$CLAUDE_WORK_DIR"
+    fi
+
+    echo "📥 Cloning repository to working directory..."
+    # Make sure parent directory exists and we're in a valid location
+    PARENT_DIR="$(dirname "$CLAUDE_WORK_DIR")"
+    mkdir -p "$PARENT_DIR"
+    cd "$PARENT_DIR"
+
+    # Use the REPO_HTTP_URL constructed in authentication verification section
+    if [ "$GIT_REPO_OK" -eq 0 ]; then
+      if ! git clone "$REPO_HTTP_URL" "$(basename "$CLAUDE_WORK_DIR")"; then
+          soft_abort "Failed to clone repository" 1
+          echo "Debug: CLAUDE_WORK_DIR=$CLAUDE_WORK_DIR"
+          echo "Debug: Parent directory exists: $(ls -la "$PARENT_DIR" 2>/dev/null || echo 'No')"
+          mkdir -p "$(basename "$CLAUDE_WORK_DIR")" || true
+      fi
+    else
+      echo "⚠️ Skipping clone due to previous repo access failure; creating empty working directory"
+      mkdir -p "$(basename "$CLAUDE_WORK_DIR")" || true
+    fi
+    cd "$(basename "$CLAUDE_WORK_DIR")"
+fi
+
+# Utility function for safe Git operations
+safe_git_pull() {
+    local remote="$1"
+    local branch="$2"
+
+    echo "📥 Attempting to pull from $remote/$branch..."
+
+    # Try rebase first (cleaner history)
+    if git pull --rebase "$remote" "$branch" 2>/dev/null; then
+        echo "✓ Successfully pulled with rebase"
+        return 0
+    fi
+
+    # Try merge if rebase fails
+    if git pull --no-rebase "$remote" "$branch" 2>/dev/null; then
+        echo "✓ Successfully pulled with merge"
+        return 0
+    fi
+
+    # If both fail, show current status and continue
+    echo "⚠️ Could not pull due to divergent branches or conflicts"
+    echo "📍 Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+    echo "📍 Local changes: $(git status --porcelain | wc -l) files modified"
+    echo "📍 Continuing with current branch state"
+    return 1
+}
+
+# Derive repository slug for gh CLI operations
+REPO_SLUG=""
+if git -C "$CLAUDE_WORK_DIR" remote get-url origin >/dev/null 2>&1; then
+  ORIGIN_URL=$(git -C "$CLAUDE_WORK_DIR" remote get-url origin 2>/dev/null || echo "")
+  if echo "$ORIGIN_URL" | grep -qE '^https://github.com/'; then
+    REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)(\\.git)?|\\1|')
+  elif echo "$ORIGIN_URL" | grep -qE '^git@github.com:'; then
+    REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\\.git)?|\\1|')
+  fi
+fi
+
+# If PR context is missing, try to discover by task label
+if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
+  TASK_LABEL="task-${TASK_ID}"
+  if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ]; then
+      PR_NUMBER="$CAND_NUM"
+      PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
+      echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
+    fi
+  fi
+fi
+
+# Checkout PR branch for testing review
+if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+    echo "🔄 Checking out PR #$PR_NUMBER for QA testing..."
+    cd "$CLAUDE_WORK_DIR"
+    git fetch origin --prune
+    PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    if [ -n "$PR_BRANCH" ]; then
+        # Try to checkout/create the branch
+        if git checkout "$PR_BRANCH" 2>/dev/null; then
+            echo "✓ Checked out existing branch: $PR_BRANCH"
+        else
+            echo "📝 Creating new local branch from remote: $PR_BRANCH"
+            if git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null; then
+                echo "✓ Created new branch: $PR_BRANCH"
+            else
+                echo "⚠️ Could not create branch $PR_BRANCH, staying on current branch"
+                # Skip to the next part without the continue
+            fi
+        fi
+
+        # Only attempt pull if we successfully checked out/created the branch
+        if [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" = "$PR_BRANCH" ]; then
+            # Handle divergent branches gracefully using utility function
+            if ! safe_git_pull origin "$PR_BRANCH"; then
+                echo "📍 Continuing with current branch state for testing"
+            fi
+        fi
+        echo "✓ Checked out PR branch: $PR_BRANCH"
+    else
+        echo "⚠️ Could not determine PR branch name, staying on default branch"
+    fi
+
+    # Add PR context to CLAUDE.md for reference
+    echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "# PR Context for Testing" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **PR Number**: $PR_NUMBER" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **PR URL**: $PR_URL" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **Branch**: $PR_BRANCH" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+else
+    echo "ℹ️ No PR context provided - working on default branch"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo "🔧 TESTING INFRASTRUCTURE SETUP"
+echo "════════════════════════════════════════════════════════════════"
+
+# Setup Kubernetes admin access if available
+if [ -f "/etc/kube/config" ]; then
+    export KUBECONFIG=/etc/kube/config
+    echo "✅ Kubernetes admin access configured"
+    kubectl version --client 2>/dev/null || echo "⚠️ kubectl not available"
+fi
+
+# Setup database admin credentials if available
+if [ -n "$POSTGRES_ADMIN_PASSWORD" ]; then
+    export PGPASSWORD="$POSTGRES_ADMIN_PASSWORD"
+    echo "✅ PostgreSQL admin credentials configured"
+fi
+
+if [ -n "$REDIS_ADMIN_PASSWORD" ]; then
+    export REDIS_PASSWORD="$REDIS_ADMIN_PASSWORD"
+    echo "✅ Redis admin credentials configured"
+fi
+
+# Setup Argo CD admin access if available
+if [ -n "$ARGOCD_ADMIN_TOKEN" ]; then
+    export ARGOCD_AUTH_TOKEN="$ARGOCD_ADMIN_TOKEN"
+    echo "✅ Argo CD admin access configured"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo "📋 TESTING WORKFLOW REQUIREMENTS"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "PHASE 0: CI/CD Setup (IMMEDIATE PRIORITY)"
+echo "- Set up GitHub Actions CI pipeline if not exists"
+echo "- Add test running and coverage reporting to CI"
+echo "- Configure branch protection rules with test gates"
+echo "- Ensure tests must pass before merge"
+echo "- Do this AS SOON as there's enough code to test"
+echo ""
+echo "PHASE 1: Acceptance Criteria Validation"
+echo "- Review implementation against acceptance criteria (NOT architecture)"
+echo "- Verify ALL acceptance criteria are fully met"
+echo "- Focus on task/acceptance-criteria.md requirements"
+echo "- Add PR comments for any missing acceptance criteria"
+echo ""
+echo "PHASE 2: Test Writing (PRIMARY RESPONSIBILITY)"
+echo "- Write comprehensive unit tests for all code"
+echo "- Write integration tests for all features"
+echo "- AIM FOR 100% TEST COVERAGE - this is critical!"
+echo "- Ensure all tests pass before approval"
+echo "- Push test files to the PR branch"
+echo "- ONLY write test files (*_test.*, *.test.*, etc.)"
+echo "- NEVER modify implementation/business logic code"
+echo ""
+echo "PHASE 3: Manual Testing & Validation"
+echo "- Run the test suite and verify coverage"
+echo "- Test application functionality manually"
+echo "- Verify no regressions introduced"
+echo "- Document findings in PR comments"
+echo ""
+echo "CRITICAL: Set up CI gates early & achieve 100% coverage!"
+echo "════════════════════════════════════════════════════════════════"
+
+# Copy task files if docs repository is specified
+{{#if docs_repository_url}}
+echo "📋 Copying task files from documentation repository..."
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{#if docs_branch}}{{docs_branch}}{{else}}main{{/if}}"
+DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:${GITHUB_TOKEN}@github.com/|")
+
+if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo 2>/dev/null; then
+    echo "❌ Failed to clone docs repository from $DOCS_REPO_URL"
+    echo "📍 This may be due to authentication or network issues"
+    echo "📍 Continuing without task files from docs repository"
+else
+    cd /tmp/docs-repo || {
+        echo "⚠️ Could not change to docs repository directory"
+        cd "$CLAUDE_WORK_DIR"
+    }
+
+    # Try to checkout the docs branch with error handling
+    if git checkout "$DOCS_BRANCH" 2>/dev/null; then
+        echo "✓ Checked out docs branch: $DOCS_BRANCH"
+        cd "$CLAUDE_WORK_DIR"
+    else
+        echo "⚠️ Could not checkout docs branch $DOCS_BRANCH"
+        echo "📍 Available branches: $(git branch -r 2>/dev/null | head -5 || echo 'unknown')"
+        cd "$CLAUDE_WORK_DIR"
+    fi
+fi
+
+# Copy task files
+mkdir -p "$CLAUDE_WORK_DIR/task"
+{{#if docs_project_directory}}
+if [ "{{docs_project_directory}}" = "." ]; then
+    DOCS_PATH="/tmp/docs-repo/.taskmaster"
+else
+    DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
+fi
+{{else}}
+DOCS_PATH="/tmp/docs-repo/.taskmaster"
+{{/if}}
+
+TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+if [ -d "$TASK_DIR" ]; then
+    cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/tools-guide.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    echo "✓ Task {{task_id}} files copied"
+fi
+
+# Copy architecture.md
+if [ -f "$DOCS_PATH/docs/architecture.md" ]; then
+    cp "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/"
+fi
+
+# Clean up docs repo
+rm -rf /tmp/docs-repo
+{{/if}}
+
+# Repository is now cloned directly to Claude working directory - no copy needed
+echo "✓ Repository cloned directly to working directory"
+
+# Check if we should continue previous session
+{{#if continue_session}}
+echo "📂 Continuing from previous session..."
+# Preserve existing CLAUDE.md if it exists
+if [ -f "/workspace/CLAUDE.md" ]; then
+    echo "✓ Found existing CLAUDE.md, preserving session memory"
+fi
+{{else}}
+{{#if overwrite_memory}}
+echo "🔄 Overwriting session memory as requested..."
+rm -f /workspace/CLAUDE.md
+{{/if}}
+{{/if}}
+
+# Generate configuration files from templates
+echo "🔧 Generating Tess-specific configuration files..."
+
+# Enterprise managed settings are mounted directly from ConfigMap
+echo "=== ENTERPRISE MANAGED SETTINGS ==="
+echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
+echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
+
+# Verify tools-config.json is available and valid
+echo "=== TOOLS CONFIG SETUP ==="
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
+
+# Helper to check non-empty JSON object
+is_valid_cfg() {
+  local p="$1"
+  [ -f "$p" ] || return 1
+  jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
+}
+
+STATUS_LABEL_NEEDS_FIXES="needs-fixes"
+STATUS_LABEL_FIXING="fixing-in-progress"
+STATUS_LABEL_NEEDS_CLEO="needs-cleo"
+STATUS_LABEL_NEEDS_TESS="needs-tess"
+STATUS_LABEL_APPROVED="approved"
+STATUS_LABEL_FAILED="failed-remediation"
+STATUS_LABEL_NEEDS_TESTS_LEGACY="needs tests"
+
+ensure_status_labels() {
+  local repo="$1"
+  shift
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for entry in "$@"; do
+    [ -n "$entry" ] || continue
+    local label="${entry%%:*}"
+    local rest="${entry#*:}"
+    local color="${rest%%:*}"
+    local desc="${rest#*:}"
+
+    if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
+      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+pr_add_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR #$pr_number"
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR $pr_url"
+    fi
+  done
+}
+
+pr_remove_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --remove-label "$label" >/dev/null 2>&1 || true
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --remove-label "$label" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+update_coderun_status() {
+  local remediation="$1"
+  local qa="$2"
+  local pr_url_value="${3:-$PR_URL}"
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local patch
+  patch=$(jq -n \
+    --arg ts "$timestamp" \
+    --arg pr "$pr_url_value" \
+    --arg rem "$remediation" \
+    --arg qa "$qa" \
+    '{status: ({lastUpdate: $ts}
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+        + (if $rem != "" then {remediationStatus: $rem} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end))}')
+
+  if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+    kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$patch" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to update CodeRun status with remediation context"
+  fi
+}
+
+# Copy tools-config.json from task files first
+
+# Generate tools-config.json from cto-config.json in the cloned repository
+echo "🔧 Generating tools-config.json from cto-config.json..."
+CTO_CONFIG_PATH="$CLAUDE_WORK_DIR/cto-config.json"
+CLIENT_CONFIG_PATH="$CLAUDE_WORK_DIR/tools-config.json"
+
+if [ -f "$CTO_CONFIG_PATH" ]; then
+  echo "✓ Found cto-config.json at $CTO_CONFIG_PATH"
+  
+  # Extract agent name from github_app (e.g., "5DLabs-Cleo" -> "cleo")
+  GITHUB_APP="{{github_app}}"
+  AGENT_NAME=$(echo "$GITHUB_APP" | sed 's/^.*-//' | tr '[:upper:]' '[:lower:]')
+  echo "📝 Extracting tools configuration for agent: $AGENT_NAME (from $GITHUB_APP)"
+  
+  # Debug: Show what we're reading
+  echo "🔍 DEBUG: Checking agents.$AGENT_NAME in cto-config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".agents.${AGENT_NAME} // empty | if . then \"✓ Found agent config\" else empty end" "$CTO_CONFIG_PATH" || echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json"
+  fi
+  
+  # Extract tools configuration and generate tools-config.json
+  if command -v jq >/dev/null 2>&1; then
+    # First check if agent exists in cto-config.json
+    if jq -e --arg agent "$AGENT_NAME" '.agents[$agent] != null' "$CTO_CONFIG_PATH" >/dev/null 2>&1; then
+      jq -n \
+        --arg agent "$AGENT_NAME" \
+        --slurpfile cto "$CTO_CONFIG_PATH" \
+        '{
+          remoteTools: ($cto[0].agents[$agent].tools.remote // []),
+          localServers: ($cto[0].agents[$agent].tools.localServers // {})
+        }' > "$CLIENT_CONFIG_PATH"
+      
+      # Validate generated config has at least one tool or server
+      TOOL_COUNT=$(jq -r '(.remoteTools // [] | length) + (.localServers // {} | keys | length)' "$CLIENT_CONFIG_PATH" 2>/dev/null || echo "0")
+      
+      if [ -f "$CLIENT_CONFIG_PATH" ] && [ -s "$CLIENT_CONFIG_PATH" ] && [ "$TOOL_COUNT" -gt 0 ]; then
+        echo "✅ Generated tools-config.json from cto-config.json"
+        echo "🔍 DEBUG: Generated tools-config.json contents:"
+        jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLIENT_CONFIG_PATH" 2>/dev/null || cat "$CLIENT_CONFIG_PATH"
+      else
+        echo "❌ Generated config is empty (no tools found) - will use ConfigMap fallback"
+        rm -f "$CLIENT_CONFIG_PATH"
+      fi
+    else
+      echo "⚠️ Agent '$AGENT_NAME' not found in cto-config.json - will use ConfigMap fallback"
+    fi
+  else
+    echo "⚠️ jq not available; cannot generate tools-config.json from cto-config.json"
+  fi
+else
+  echo "⚠️ cto-config.json not found at $CTO_CONFIG_PATH"
+fi
+
+# Fallback: copy from task-files ONLY if generation failed or cto-config.json not found
+if [ ! -f "$CLIENT_CONFIG_PATH" ] || [ ! -s "$CLIENT_CONFIG_PATH" ]; then
+  echo "📋 tools-config.json not generated, using ConfigMap fallback..."
+  if [ -f "/task-files/tools-config.json" ]; then
+    cp /task-files/tools-config.json "$CLAUDE_WORK_DIR/tools-config.json"
+    cp /task-files/tools-config.json "/workspace/tools-config.json"
+    echo "✓ tools-config.json copied from ConfigMap to both working directory and workspace root"
+  else
+    echo "⚠️ tools-config.json not found in task-files"
+  fi
+else
+  echo "✓ Using dynamically generated tools-config.json from cto-config.json"
+fi
+
+SRC_OK=false
+WS_OK=false
+if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
+if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
+
+if $SRC_OK; then
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
+elif $WS_OK; then
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
+else
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid)."
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
+  else
+    echo "   Source missing: $SOURCE_CFG"
+  fi
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$WORKSPACE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$WORKSPACE_CFG"; echo; })
+  else
+    echo "   Workspace missing: $WORKSPACE_CFG"
+  fi
+  soft_abort "No valid tools-config.json available" 1
+  # Minimal fallback client-config to allow execution to proceed
+  printf '{"remoteTools":[],"localServers":{}}' > "$CLAUDE_WORK_DIR/tools-config.json" 2>/dev/null || true
+  export MCP_TOOLS_CONFIG="$CLAUDE_WORK_DIR/tools-config.json"
+  echo "✓ Created minimal fallback tools-config.json at $MCP_TOOLS_CONFIG"
+fi
+
+# Create initial CLAUDE.md if needed
+if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
+    # Use PR_NUMBER from environment if available, otherwise use template value
+    PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+    # Extract template variables for use in heredoc
+    TASK_ID="{{task_id}}"
+    cat > /workspace/CLAUDE.md << EOF
+# TESS - ULTRA-STRICT Quality Assurance Agent
+
+## Agent Role & Philosophy
+- **Primary**: Find EVERY defect, no matter how minor - be EXTREMELY CRITICAL
+- **Mindset**: "This code is guilty until proven innocent"
+- **Philosophy**: "If it CAN fail, it WILL fail in production"
+- **Standards**: NOTHING less than perfection is acceptable
+- **Approach**: Be pedantic, nitpicky, and relentless - better to reject good code than approve bad code
+- **CRITICAL**: REJECT any implementation that uses mocks, hard-coded values, or fake data - demand real APIs, databases, and configurable parameters
+
+## Testing Workflow Phases
+
+### Phase 0: CI/CD Setup (MOVED TO CLIO)
+- ⚠️ **CI/CD setup is now handled by Clio agent**
+- Clio will create and manage `.github/workflows/` files
+- Focus on testing the code that exists
+- If CI is missing, request it from Clio rather than creating it yourself
+- Validate existing CI/CD if present, but don't create new workflows
+
+### Phase 1: Task-Specific Acceptance Criteria Verification
+- Review implementation against **THIS SPECIFIC TASK'S** acceptance criteria ONLY
+- IMPORTANT: You are testing Task $TASK_ID ONLY, not the entire project
+- The project may be incomplete (e.g., task-1 won't have a working app yet)
+- Verify ALL acceptance criteria for **Task $TASK_ID** are fully met
+- Focus ONLY on what's defined for THIS SPECIFIC TASK
+- IGNORE missing features that belong to other tasks
+- **CRITICAL**: REJECT any hard-coded values, mocks, or fake data - verify real database/API connections and configurable parameters
+- Post PR comments for any missing items FROM THIS TASK ONLY
+
+### Phase 2: Test Writing FOR THIS TASK (YOUR MAIN JOB!)
+- Write tests for the code implemented in **Task $TASK_ID** ONLY
+- Don't write tests for features from other tasks (they don't exist yet)
+- Write unit tests for ALL code FROM THIS TASK
+- Write integration tests for features IMPLEMENTED IN THIS TASK
+- **TARGET: 100% coverage of THIS TASK'S code** - not the whole project!
+- Use appropriate testing frameworks for the language:
+  - Python: pytest with coverage
+  - JavaScript/TypeScript: jest with coverage
+  - Go: go test with coverage
+  - Rust: cargo test with tarpaulin
+- Commit and push test files to the PR branch
+- Run coverage reports for THIS TASK'S code in PR comments
+
+### Phase 3: Test Execution & Validation
+- Run the complete test suite with coverage reporting
+- Verify coverage meets or exceeds 95% (target 100%)
+- Ensure all tests pass successfully
+- Test application functionality manually if needed
+- Document coverage percentages in PR comments
+
+## CRITICAL RULES
+- **CAN** write and push test files (*_test.*, *.test.*, spec.*, etc.)
+- **CANNOT** create CI/CD workflows - that's Clio's job
+- **CAN** modify test configuration files (jest.config.js, pytest.ini, etc.)
+- **CANNOT** modify implementation/business logic code
+- **CANNOT** modify non-test files (except test configs and CI/CD)
+- **MUST** write comprehensive tests for ALL functionality
+- **MUST** set up CI gates as early as possible
+- **MUST** achieve highest possible test coverage (target 100%)
+- **MUST** validate against THIS TASK'S acceptance criteria ONLY
+- **MUST** remember you're testing Task $TASK_ID, not the entire project
+- **MUST** verify Kubernetes cluster access and report if unavailable
+
+## Admin Access Capabilities
+- Kubernetes cluster admin
+- PostgreSQL admin access
+- Redis admin access
+- Argo CD admin access
+- GitHub Actions access
+
+## Success Criteria (BE EXTREMELY STRICT!)
+- **Coverage**: MINIMUM 95%, target 100% (reject if under 95%)
+- **Edge Cases**: EVERY conceivable edge case must have a test
+- **Error Handling**: ALL error paths must be tested thoroughly
+- **Performance**: Must be OPTIMAL (not just "acceptable")
+- **Security**: Look for ANY potential vulnerability
+- **Code Quality**: Even minor issues are grounds for rejection
+- **Documentation**: Missing or unclear docs = automatic rejection
+- **Acceptance Criteria**: 100% met (not 99%)
+- **Your Confidence**: Must be 200% certain (not just "pretty sure")
+
+## CRITICAL REMINDERS
+- **BE HARSH**: Your job is to find problems, not be nice
+- **NO COMPROMISE**: Don't approve "good enough" code
+- **ASSUME THE WORST**: If something seems off, it probably is
+- **TEST EVERYTHING**: Including the tests themselves
+- **REJECT FIRST**: When in doubt, request changes
+
+## Important Notes
+- Only start work when PR has "ready-for-qa" label
+- Do NOT merge PR - only approve
+- Human (CTO) performs final merge
+
+EOF
+
+    # Copy base CLAUDE.md from ConfigMap if it exists (match Rex pattern)
+    if [ -f "/task-files/CLAUDE.md" ]; then
+        cat /task-files/CLAUDE.md >> "/workspace/CLAUDE.md"
+        echo "✓ Appended base CLAUDE.md content from ConfigMap"
+    fi
+
+    # Copy to working directory for consistency with Rex pattern
+    cp "/workspace/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
+    echo "✓ Created Tess-specific CLAUDE.md memory"
+fi  # End of CLAUDE.md creation if block
+
+# Copy guidelines files to working directory (match Rex pattern)
+if [ -f "/task-files/coding-guidelines.md" ]; then
+  cp /task-files/coding-guidelines.md "$CLAUDE_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
+
+if [ -f "/task-files/github-guidelines.md" ]; then
+  cp /task-files/github-guidelines.md "$CLAUDE_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+# Copy MCP configuration from ConfigMap to project root (project scope)
+if [ -f "/task-files/mcp.json" ]; then
+  cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+  echo "✓ Copied mcp.json to .mcp.json (project scope)"
+else
+  echo "⚠️ mcp.json template not found"
+fi
+
+# Setup hook scripts
+echo "🔧 Setting up Tess-specific hook scripts..."
+mkdir -p "$CLAUDE_WORK_DIR/hooks"
+
+{{#each hook_scripts}}
+cat > "$CLAUDE_WORK_DIR/hooks/{{@key}}" << 'EOF'
+{{{this}}}
+EOF
+chmod +x "$CLAUDE_WORK_DIR/hooks/{{@key}}"
+{{/each}}
+
+# Export environment for Claude
+export CLAUDE_WORK_DIR
+export GITHUB_TOKEN
+export REPO_OWNER
+export REPO_NAME
+# TARGET_REPO_DIR no longer needed - repository cloned directly to CLAUDE_WORK_DIR
+
+echo "════════════════════════════════════════════════════════════════"
+echo "✅ TESS TESTING AGENT READY"
+echo "════════════════════════════════════════════════════════════════"
+echo "📁 Working Directory: $CLAUDE_WORK_DIR"
+echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
+echo "📋 Task: {{task_id}}"
+echo "🧪 Focus: Comprehensive testing & deployment validation"
+echo "⚠️  CRITICAL: Must be 120% satisfied before approval"
+echo "════════════════════════════════════════════════════════════════"
+
+# Start Claude with Tess-specific configuration
+cd "$CLAUDE_WORK_DIR"
+
+# Build Claude command (continue flag disabled due to cache_control API bug)
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+
+# Look for Tess-specific system prompt file
+if [ -f "/task-files/tess-system-prompt.md" ]; then
+    echo "✓ Found Tess system prompt file, adding to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/tess-system-prompt.md"
+elif [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+    # Fallback to GitHub App specific prompt
+    echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
+else
+    echo "ℹ️ No system prompt file found, using defaults"
+fi
+
+# Continue flag disabled due to cache_control API bug - removed conditional logic
+
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    STARTING CLAUDE EXECUTION                  ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "Command: $CLAUDE_CMD"
+echo "Note: Claude will automatically read CLAUDE.md from the working directory"
+
+# Tess uses her own system prompt and focuses on acceptance criteria
+echo "✓ Starting Tess with specialized QA system prompt"
+echo "✓ Tess will focus on acceptance criteria and comprehensive testing"
+
+if [ -f "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" ]; then
+    echo "✓ Found acceptance-criteria.md - this is Tess's primary focus"
+else
+    echo "⚠️ No acceptance-criteria.md found - Tess may need to work with available task files"
+fi
+
+# Prepare initial guidance for Tess
+INITIAL_GUIDANCE=$(cat <<TESS_EOF
+🧪 **TESS ULTRA-STRICT QA TESTING WORKFLOW**
+
+You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to validate THIS SPECIFIC TASK, not the entire project.
+
+**YOUR MINDSET - BE EXTREMELY HARSH BUT PERSISTENT**:
+- This code is GUILTY until proven innocent
+- If something CAN go wrong, it WILL in production
+- \"Good enough\" is NEVER good enough
+- Every minor issue is a potential disaster
+- Be pedantic, nitpicky, and relentless
+- It's better to reject good code than approve bad code
+- BUT: You MUST fix all issues yourself - don't just complain
+- Your job is NOT DONE until you achieve APPROVED status
+
+**CRITICAL INSTRUCTIONS**:
+- DO write and push comprehensive test files
+- DO NOT modify implementation/business logic code
+- Create proper PR reviews with your testing results
+- BE BRUTALLY HONEST - don't spare feelings
+
+**YOUR WORKFLOW LOOP (MUST COMPLETE)**:
+1. Check CI Status
+2. If CI fails: Write/Fix Tests and retry
+3. Write comprehensive tests
+4. Check test coverage (must be >= 95%)
+5. Deploy to Kubernetes (if access available)
+6. Verify all acceptance criteria met
+7. If issues found: Fix them and retry
+8. Post APPROVE review (only when everything passes)
+
+**Your STRICT testing requirements:**
+
+1. **CRITICAL: Verify CI Status FIRST (ABSOLUTE BLOCKER)**:
+   - **If repository has workflows**: Run \`gh pr checks $PR_NUM\` to see CI status
+   - **If no workflows**: Skip CI validation and proceed to testing requirements
+   - If ANY CI check is failing: DO NOT EXIT
+   - Instead: Write tests to fix the failures
+   - Format Rust code: \`cargo fmt --all\` (if Rust project)
+   - Push your changes: \`git add . && git commit -m "test: fix failing tests" && git push\`
+   - Wait for CI (when workflows exist): \`sleep 60\` then check again
+   - KEEP ITERATING until CI is GREEN (when workflows exist)
+   - You CANNOT proceed OR exit until requirements are met
+
+2. **Write Comprehensive Tests (After CI passes)**:
+   - Write unit tests for ALL new functionality
+   - Write integration tests for API endpoints and workflows
+   - Write edge case tests for boundary conditions
+   - Ensure test coverage reaches 95% minimum
+   - Push all test files to the repository
+
+3. **Deploy to Kubernetes (MANDATORY FOR END-TO-END VALIDATION)**:
+   - Tess must execute a full integration smoke test in the live Kubernetes environment.
+   - Use Tools MCP Kubernetes commands (preferred) for all cluster operations. Fall back to local `kubectl` only if required.
+   - Quick capability test:
+     * `tools kubernetes_listResources --kind namespaces`
+     * `tools kubernetes_getPodsLogs --namespace test-$TASK_ID --pod <pod>`
+   - End-to-end expectations when cluster access exists:
+     a) **Create namespace** for the test (via Tools `kubernetes_createResource` or `kubectl create ns test-$TASK_ID`).
+     b) **Deploy** the universal chart and wait for pods to become ready.
+     c) **Verify pod health** (Tools list pods / `kubectl get pods`).
+     d) **Exercise the service** (port-forward and hit health/test endpoints).
+     e) **Teardown** namespace to avoid orphaned resources.
+   - If both Tools and local `kubectl` are unavailable, record that in the PR review; otherwise a deployment check is required before approval.
+   - Always include the exact commands/tool invocations in the review summary so operators can audit the run.
+
+4. **Task $TASK_ID Acceptance Criteria (100% or REJECT)**:
+   - EVERY requirement FOR THIS TASK must be PERFECTLY met
+   - Remember: Task 1 won't have a complete app, that's EXPECTED
+   - Only check criteria listed for Task $TASK_ID
+   - 99% compliance = FAILURE
+   - Any ambiguity = request clarification before approval
+
+5. **Test Coverage (95% MINIMUM or REJECT)**:
+   - Check actual coverage numbers with tools
+   - EVERY edge case must have a test
+   - EVERY error path must be tested
+   - Missing tests = automatic rejection
+
+6. **Manual Testing (EXHAUSTIVE)**:
+   - Test EVERY possible input combination
+   - Test invalid inputs, edge cases, boundary conditions
+   - Test performance under load
+   - Test memory usage and leaks
+   - Test security vulnerabilities
+   - If it crashes under ANY condition = REJECT
+
+7. **Code Quality (PRISTINE or REJECT)**:
+   - ANY clippy warning = REJECT
+   - ANY TODO or FIXME = REJECT
+   - ANY commented out code = REJECT
+   - ANY unclear variable names = REJECT
+   - Missing documentation = REJECT
+
+8. **PR Review (BE HARSH)**:
+   - List EVERY issue, no matter how minor
+   - Demand fixes for EVERYTHING
+   - Only approve when code is PERFECT
+   - When in doubt, REQUEST CHANGES
+
+9. **ITERATE UNTIL APPROVED**:
+   - After posting REQUEST CHANGES, DO NOT STOP
+   - Fix the issues yourself by writing tests
+   - Format Rust code if needed: \`cargo fmt --all\` (for Rust projects)
+   - Push your fixes and wait for CI
+   - **If workflows exist**: Check \`gh pr checks $PR_NUM\` again
+   - If still failing, keep fixing and pushing
+   - REPEAT until you can post APPROVE
+   - You are NOT ALLOWED to finish without APPROVE status
+
+10. **MANDATORY PRE-APPROVAL CHECKLIST**:
+    Before you can APPROVE, ALL of these MUST be true:
+    □ CI Status: **If workflows exist** - Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
+    □ Test Coverage: Must be >= 95% (verify with coverage tools)
+    □ All Tests Pass: 100% of tests must pass, no skipped tests
+    □ Acceptance Criteria: 100% of Task $TASK_ID criteria met
+    □ No TODO/FIXME: Zero TODOs or FIXMEs in code
+    □ No Warnings: Zero clippy warnings, zero compiler warnings
+    □ K8s Deployment: If you have access, deployment must succeed
+
+    **VERIFICATION COMMANDS TO RUN BEFORE APPROVING**:
+    \`\`\`bash
+    # 1. Verify CI is completely green - NO FAILURES ALLOWED
+    # Check CI status (only if workflows exist)
+   if [ -d ".github/workflows" ] && [ -n "$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | head -1)" ]; then
+       gh pr checks $PR_NUM
+   else
+       echo "ℹ️  No GitHub Actions workflows found - skipping CI validation"
+   fi
+    # EVERY check must show "pass" or ✓
+    # If you see ANY "fail", "pending", or "skipping" - CANNOT APPROVE
+
+    # 2. Verify all checks are passing using tab-separated status field
+    # gh pr checks output format: NAME<TAB>STATUS<TAB>CONCLUSION<TAB>URL
+    CI_OUTPUT=\$(gh pr checks $PR_NUM)
+    if [ -z "\$CI_OUTPUT" ]; then
+        echo "⚠️ No CI checks found - continuing without CI verification"
+        # Don't exit, just continue with testing
+    fi
+
+    # Count checks by looking at the status field (2nd column)
+    TOTAL_CHECKS=\$(echo "\$CI_OUTPUT" | wc -l)
+    # Look for pass/✓ only in the status column (tab-delimited field 2)
+    PASSING_CHECKS=\$(echo "\$CI_OUTPUT" | awk -F'\t' '\$2 ~ /pass|✓/' | wc -l)
+
+    if [ "\$TOTAL_CHECKS" != "\$PASSING_CHECKS" ]; then
+        echo "⚠️ NOT ALL CHECKS PASSING - continuing with testing"
+        echo "Total: \$TOTAL_CHECKS, Passing: \$PASSING_CHECKS"
+        echo "Failed/pending checks:"
+        echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/ {print \$1 " - " \$2}'
+        echo "📝 Note: Will continue testing despite CI issues"
+        # Don't exit, just continue with testing
+    fi
+
+    # 3. Only if ALL checks show "pass" can you approve
+    \`\`\`
+
+    IF ANY ITEM IS UNCHECKED, YOU CANNOT APPROVE!
+
+**KUBERNETES DEPLOYMENT INSTRUCTIONS**:
+If you have kubectl access, deploy the application to verify it works:
+\`\`\`bash
+# 1. Check if we can actually deploy (skip Docker build/push - image should exist)
+if ! kubectl version --short 2>/dev/null; then
+  echo "ℹ️ Local kubectl not configured. Use Tools MCP Kubernetes commands instead (e.g. 'tools kubernetes_createResource', 'tools kubernetes_listResources')."
+  echo "⚠️ If Tools commands also fail, document the lack of cluster access in your PR review."
+  # Don't exit - continue with other tests (Tools commands can still be used manually)
+fi
+
+# 2. Create or use test namespace (idempotent)
+kubectl create namespace test-$TASK_ID --dry-run=client -o yaml | kubectl apply -f -
+
+# 3. Check if universal-app chart exists locally
+CHART_PATH="/workspace/infra/charts/universal-app"
+if [ ! -d "$CHART_PATH" ]; then
+  # Try alternate locations
+  CHART_PATH="./infra/charts/universal-app"
+  if [ ! -d "$CHART_PATH" ]; then
+    echo "⚠️ Universal app chart not found - skipping deployment"
+    # Don't exit - continue with other tests
+    SKIP_K8S_DEPLOY=true
+  fi
+fi
+
+# 4. Deploy using universal-app chart (assuming image already exists)
+if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
+  RELEASE_NAME="task-$TASK_ID"
+  helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
+  --namespace test-$TASK_ID \
+  --set fullnameOverride="$RELEASE_NAME" \
+  --set image.repository=ghcr.io/5dlabs/task-$TASK_ID \
+  --set image.tag=latest \
+  --set ingress.enabled=false \
+  --set service.port=8080 \
+  --set resources.limits.cpu=500m \
+  --set resources.limits.memory=512Mi \
+  --timeout 5m \
+  --wait || {
+    echo "⚠️ Helm install failed - checking status"
+    kubectl get all -n test-$TASK_ID
+    helm uninstall "$RELEASE_NAME" -n test-$TASK_ID 2>/dev/null || true
+    # Don't exit - continue with other tests
+  }
+
+  # 5. Get actual deployment and service names (helm may add suffixes)
+  DEPLOYMENT_NAME=$(kubectl get deployment -n test-$TASK_ID -o name | head -1)
+  SVC_NAME=$(kubectl get svc -n test-$TASK_ID -o name | head -1)
+
+  # 6. Check pod status
+  kubectl get pods -n test-$TASK_ID
+
+  # 7. Port-forward with retry logic and better timing
+  if [ -n "$SVC_NAME" ]; then
+    PF_SUCCESS=false
+    for i in 1 2 3; do
+      # Kill any existing port-forward process before retry
+      if [ -n "$PF_PID" ]; then
+        kill $PF_PID 2>/dev/null || true
+        wait $PF_PID 2>/dev/null || true
+      fi
+
+      kubectl port-forward -n test-$TASK_ID "$SVC_NAME" 8080:8080 &
+      PF_PID=$!
+      sleep 5  # Give port-forward time to establish
+
+      # Test if port-forward is actually working, not just if process exists
+      if curl -f -s --connect-timeout 2 http://localhost:8080/ >/dev/null 2>&1; then
+        echo "✓ Port-forward established and responding"
+        PF_SUCCESS=true
+        break
+      elif kill -0 $PF_PID 2>/dev/null; then
+        echo "Port-forward process running but not responding yet"
+      else
+        echo "Retry $i: Port-forward failed, retrying..."
+      fi
+    done
+
+    # Test endpoints if port-forward succeeded
+    if [ "$PF_SUCCESS" = "true" ] && [ -n "$PF_PID" ]; then
+      curl -f http://localhost:8080/health || echo "⚠️ Health check failed or not implemented"
+      curl -f http://localhost:8080/ready || echo "⚠️ Ready check failed or not implemented"
+      kill $PF_PID 2>/dev/null || true
+      wait $PF_PID 2>/dev/null || true
+    else
+      echo "⚠️ Port-forward could not be established after 3 attempts"
+      # Clean up any remaining process
+      [ -n "$PF_PID" ] && kill $PF_PID 2>/dev/null || true
+    fi
+  fi
+
+  # 8. Check logs for errors
+  kubectl logs -n test-$TASK_ID -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
+
+  # 9. Cleanup
+  helm uninstall "$RELEASE_NAME" -n test-$TASK_ID --wait || true
+  kubectl delete namespace test-$TASK_ID --wait=false || true
+else
+  echo "ℹ️ Kubernetes deployment skipped - no access or chart missing"
+  echo "   ➤ Double-check Tools MCP commands before skipping entirely."
+fi
+\`\`\`
+
+**HOW TO POST PR REVIEW (CRITICAL: Use proper review, NOT regular comments!)**:
+Use GitHub CLI to create a PROPER REVIEW with formal review status:
+\`\`\`bash
+# WRONG - Don't do this (creates regular comments, not a review):
+# gh pr review {{pr_number}} --comment --body \"Some feedback\"
+
+# CORRECT - Submit a proper REQUEST CHANGES review:
+gh pr review $PR_NUM --request-changes --body \"### 🔴 Required Changes
+
+## CI Status
+✅ **GitHub Actions CI**: All checks passing
+
+## Task $TASK_ID Acceptance Criteria Status
+❌ **Criterion 1**: Not fully implemented (missing X)
+✅ **Criterion 2**: Properly implemented
+❌ **Criterion 3**: Partially complete (Y not working)
+
+## Task $TASK_ID Test Coverage
+❌ **Test Coverage**: 78% for task code (minimum: 95%)
+❌ **Missing Tests**: Error handling in task-specific functions
+✅ **Unit Tests**: 42/42 passing for this task's code
+
+## Kubernetes Deployment
+✅ **Deployment**: Successfully deployed to test-{{task_id}} namespace
+✅ **Pods**: All pods running (1/1 ready)
+❌ **Health Check**: /health endpoint returning 404
+
+## Issues Found IN TASK {{task_id}}
+1. **Critical**: Health endpoint not implemented
+2. **Critical**: Task acceptance criterion #1 not met
+3. **Major**: Test coverage below 95% requirement
+
+## Required Actions FOR TASK {{task_id}}
+- [ ] Implement /health and /ready endpoints
+- [ ] Complete acceptance criterion #1
+- [ ] Add tests to reach 95% coverage
+- [ ] Fix health check endpoints for K8s deployment
+
+Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
+
+# CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
+# FIRST: Verify you can approve
+CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-$PR_NUM})
+if [ -z "\$CI_OUTPUT" ]; then
+  echo "⚠️ No CI checks found - will continue working on testing requirements"
+  # Don't exit, continue with testing
+fi
+
+# Check for non-passing statuses in the status column (2nd field)
+CI_FAILED=\$(echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/' | wc -l)
+if [ "\$CI_FAILED" -gt 0 ]; then
+  echo "⚠️ CI HAS FAILURES OR IS INCOMPLETE - will continue working on fixes"
+  echo "Failed/pending checks:"
+  echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/ {print \$1 " - " \$2}'
+  echo "📝 Note: Will continue testing and working on CI fixes"
+  # Don't exit, continue working
+fi
+
+# APPROVE REVIEW FORMAT:
+gh pr review $PR_NUM --approve --body \"### ✅ QA Review for Task $TASK_ID - APPROVED
+
+## Pre-Approval Verification
+✅ **ALL CI checks verified**: Ran 'gh pr checks' - all showing success
+✅ **No failures found**: Zero failing checks confirmed
+
+## CI Status
+✅ **GitHub Actions CI**: All checks passing (verified with gh CLI)
+✅ **All workflows**: Green across the board
+
+## Task $TASK_ID Acceptance Criteria
+✅ **All criteria for Task $TASK_ID are fully met**
+✅ **Criterion 1**: Implemented correctly
+✅ **Criterion 2**: Working as specified
+✅ **Criterion 3**: Validated and tested
+
+## Task $TASK_ID Test Results
+✅ **Test Coverage**: 98.5% for task-specific code
+✅ **Unit Tests**: All passing for this task
+✅ **Integration Tests**: Task features tested
+✅ **CI/CD Pipeline**: All checks green
+
+## Kubernetes Deployment
+✅ **Deployment**: Successfully deployed to test-$TASK_ID namespace
+✅ **Pods**: All pods running and healthy (1/1 ready)
+✅ **Health Checks**: /health and /ready endpoints responding correctly
+✅ **Service**: Verified functionality via port-forward testing
+✅ **Cleanup**: Test namespace removed successfully
+
+## Task $TASK_ID Quality Assessment
+- All acceptance criteria met for this specific task
+- Tests comprehensively cover task implementation
+- Successfully deployed and tested in Kubernetes
+- Code quality meets all standards
+
+## Conclusion
+Task {{task_id}} implementation meets all requirements and is ready for the next task in the sequence.\"
+\`\`\`
+
+**IMPORTANT RULES**:
+1. NEVER use \`--comment\` flag - it creates regular comments, not reviews
+2. ALWAYS use \`--request-changes\` when issues are found
+3. ONLY use \`--approve\` when ALL tests pass and quality is perfect
+4. Include detailed feedback in the review body
+5. Format your review with clear sections and checkboxes
+
+Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBACK via PR review comments. You handle all testing code while Rex handles implementation changes.
+
+**CRITICAL ITERATION REQUIREMENT**:
+- DO NOT EXIT until ALL of the following are true:
+  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks ${PR_NUMBER:-$PR_NUM}
+  2. Test coverage is >= 95%
+  3. All acceptance criteria for Task $TASK_ID are met
+  4. Kubernetes deployment succeeds (if you have access)
+  5. You have posted an APPROVE review
+
+- If ANY of these are not met:
+  1. Write/fix tests as needed
+  2. Format Rust code: \`cargo fmt --all\` (if Rust project)
+  3. Push your changes
+  4. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-$PR_NUM})
+  5. Check status again
+  6. KEEP ITERATING until everything passes
+
+- **APPROVAL GATES** (You CANNOT approve if ANY of these are true):
+  * Any CI check is failing or pending
+  * Test coverage < 95%
+  * Any acceptance criteria unmet
+  * Any TODOs or FIXMEs in code
+  * Any compiler/linter warnings
+
+- You are NOT DONE until you can post an APPROVE review
+- NEVER exit with a REQUEST CHANGES review - keep working until it's fixed
+- Your success is measured by getting to APPROVED status
+- **IF YOU APPROVE WITH FAILING CI, YOU HAVE FAILED YOUR MISSION**
+TESS_EOF
+)
+
+# Set trap to ensure sidecar shutdown on exit (set here after all functions are defined)
+# Using explicit function call for compatibility with /bin/sh
+trap 'echo "🚨 EXIT TRAP TRIGGERED - Shutting down sidecar..."; shutdown_sidecar' EXIT INT TERM
+echo "✅ EXIT trap set for sidecar shutdown"
+
+# Start Claude with initial guidance
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    STARTING TESS QA EXECUTION                 ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Sentinel and completion marker cleanup already done at script start
+
+# Seed initial user turn via a FIFO with timeout protection
+FIFO_PATH="/workspace/agent-input.jsonl"
+rm -f "$FIFO_PATH" 2>/dev/null || true
+
+# Create FIFO with error handling
+if ! mkfifo "$FIFO_PATH" 2>/dev/null; then
+    echo "❌ Failed to create FIFO at $FIFO_PATH"
+    exit 1
+fi
+chmod 666 "$FIFO_PATH" || true
+
+# Start Claude (simple approach like Cleo)
+$CLAUDE_CMD < "$FIFO_PATH" &
+CLAUDE_PID=$!
+
+# Start background token refresh for long-running jobs
+(
+    while kill -0 $CLAUDE_PID 2>/dev/null; do
+        sleep 2700  # Check every 45 minutes
+
+        if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
+            NOW=$(date +%s)
+            TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+            if [ $TOKEN_AGE -gt 2700 ]; then
+                echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+                refresh_github_token
+            fi
+        fi
+    done
+) &
+TOKEN_REFRESH_PID=$!
+echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
+
+# Add timeout protection - if Claude doesn't start within 30 seconds, fail gracefully
+TIMEOUT=30
+COUNT=0
+while [ $COUNT -lt $TIMEOUT ]; do
+    if kill -0 "$CLAUDE_PID" 2>/dev/null; then
+        break
+    fi
+    sleep 1
+    COUNT=$((COUNT + 1))
+done
+
+if [ $COUNT -ge $TIMEOUT ]; then
+    echo "❌ Claude process failed to start within $TIMEOUT seconds"
+    kill "$CLAUDE_PID" 2>/dev/null || true
+    exit 1
+fi
+
+# =============================================================================
+# DEBUG LOGGING: JSON CONSTRUCTION PROCESS
+# =============================================================================
+echo "🔍 DEBUG: Starting JSON construction process..."
+echo "📝 Original INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE} characters"
+echo "📝 Original INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE:0:100}..."
+
+# Clean up initial guidance and send via sidecar - simplified approach
+echo "🧹 Cleaning INITIAL_GUIDANCE (removing empty lines and trailing spaces)..."
+INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
+echo "✅ Cleaned INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE_CLEAN} characters"
+echo "✅ Cleaned INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE_CLEAN:0:100}..."
+
+# Wait for MCP sidecar to be ready (local Pod network)
+echo "⏳ Waiting for MCP server to be ready..."
+MAX_RETRIES=10
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+        echo "✓ MCP server is ready"
+        break
+    fi
+    sleep 1
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "⚠️ MCP server not ready after ${MAX_RETRIES}s, proceeding with fallback"
+fi
+
+# =============================================================================
+# DEBUG LOGGING: SIDECAR JSON CONSTRUCTION
+# =============================================================================
+echo "🔧 Constructing JSON for sidecar transmission..."
+
+# Create the JSON payload for sidecar
+SIDECAR_JSON=$(printf '{"text":%s}' "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
+echo "📤 Sidecar JSON payload length: ${#SIDECAR_JSON} characters"
+echo "📤 Sidecar JSON payload preview: ${SIDECAR_JSON:0:200}..."
+echo "🔍 Full sidecar JSON structure:"
+echo "$SIDECAR_JSON" | jq . 2>/dev/null || echo "❌ Sidecar JSON parsing failed: $SIDECAR_JSON"
+
+# Send via MCP sidecar HTTP endpoint - use raw text to avoid JSON formatting issues
+echo "📡 Sending to MCP server /input endpoint..."
+if printf '%s\n' "$SIDECAR_JSON" | \
+     curl -fsS -X POST http://127.0.0.1:8080/input \
+       -H 'Content-Type: application/json' \
+       --data-binary @- >/dev/null 2>&1; then
+  echo "✅ Initial QA guidance sent via MCP server /input"
+else
+  echo "⚠️ MCP server /input failed, falling back to direct FIFO write"
+  # Fallback: construct JSON properly to avoid cache_control errors
+  echo "🔧 Constructing FIFO JSON payload..."
+  FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
+              "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
+  echo "📤 FIFO JSON payload length: ${#FIFO_JSON} characters"
+  echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
+  echo "🔍 Full FIFO JSON structure:"
+  echo "$FIFO_JSON" | jq . 2>/dev/null || echo "❌ FIFO JSON parsing failed: $FIFO_JSON"
+
+  exec 9>"$FIFO_PATH"
+  printf '%s\n' "$FIFO_JSON" >&9
+  exec 9>&-  # Close immediately to send EOF to Claude
+  echo "✅ Initial QA guidance sent via FIFO fallback"
+fi
+
+# Simple wait like Cleo - no complex monitoring
+
+# =============================================================================
+# DEBUG LOGGING: CLAUDE EXECUTION MONITORING
+# =============================================================================
+echo "🤖 Monitoring Claude execution..."
+echo "🔍 Claude PID: $CLAUDE_PID"
+
+# Wait for Claude process to complete
+echo "⏳ Waiting for Claude process to complete..."
+wait "$CLAUDE_PID" 2>/dev/null || true
+CLAUDE_EXIT_CODE=$?
+
+# Stop token refresh background process
+if [ -n "$TOKEN_REFRESH_PID" ]; then
+    kill $TOKEN_REFRESH_PID 2>/dev/null || true
+    echo "✓ Stopped token refresh process"
+fi
+
+echo "🔚 Claude process completed with exit code: $CLAUDE_EXIT_CODE"
+
+# Safety check: Ensure we don't have any syntax errors that could cause command interpretation issues
+echo "🔍 DEBUG: Performing safety checks..."
+if [ -n "$(echo "$INITIAL_GUIDANCE" | grep '^fix:')" ]; then
+  echo "⚠️ WARNING: Found lines starting with 'fix:' in INITIAL_GUIDANCE - this could cause command interpretation errors"
+fi
+
+# Close FIFO writer if it was opened
+exec 9>&- 2>/dev/null || true
+
+# =============================================================================
+# PR REVIEW POSTING - Check if Claude already handled it
+# =============================================================================
+echo "🔍 Checking if PR review was already posted by Claude..."
+
+# Use PR_NUMBER from environment if available, otherwise use template value
+PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+TASK_ID="{{task_id}}"
+
+# Debug: Show what we got for PR_NUM
+echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}', pr_number template='{{pr_number}}'"
+echo "🔍 DEBUG: Resolved PR_NUM='$PR_NUM'"
+
+# Handle case where PR_NUM is empty - skip PR review entirely
+if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
+  echo "ℹ️ No PR number available - skipping PR review posting"
+  echo "🔍 This is normal for non-PR workflows or when PR context is not provided"
+  echo "✅ Tess QA workflow completed successfully"
+  exit 0
+fi
+
+# Check if Claude already posted a review (to avoid duplicate reviews)
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  EXISTING_REVIEW=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews[] | select(.author.login == "tess-5dlabs" or .author.login == "5dlabs-tess") | .state' 2>/dev/null | head -1)
+  if [ -n "$EXISTING_REVIEW" ]; then
+    echo "✅ Claude already posted a $EXISTING_REVIEW review - skipping duplicate"
+    echo "🔍 Tess QA workflow completed successfully"
+    exit 0
+  fi
+fi
+
+# Check CI status to determine review type
+echo "📊 Checking CI status for PR #$PR_NUM..."
+
+# Pre-flight check: Verify GitHub CLI is available and working
+echo "🔍 Pre-flight check: GitHub CLI availability..."
+
+# Check if GitHub CLI is available (should be pre-installed in base image)
+GH_AVAILABLE=true
+if ! command -v gh >/dev/null 2>&1; then
+  echo "❌ GitHub CLI not found in PATH"
+  echo "⚠️ GitHub CLI should be pre-installed in the base image"
+  echo "📝 Will skip PR review posting (GitHub CLI unavailable)"
+  GH_AVAILABLE=false
+else
+  echo "✅ GitHub CLI available"
+
+  # Check authentication
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "❌ GitHub CLI not authenticated"
+    echo "⚠️ Cannot perform CI checks or PR reviews without authentication"
+    echo "📝 Will skip PR review posting (GitHub authentication unavailable)"
+    GH_AVAILABLE=false
+  else
+    echo "✅ GitHub CLI is available and authenticated"
+  fi
+fi
+
+# Function to safely execute gh command with error handling
+check_ci_status() {
+  local pr_num="$1"
+  local temp_file
+  temp_file=$(mktemp)
+
+  # Check if gh is available and authenticated
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "❌ Error: gh CLI is not installed"
+    echo "ℹ️ Cannot perform CI checks or PR reviews without GitHub CLI"
+    rm -f "$temp_file"
+    return 1
+  fi
+
+  # Test gh authentication
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "❌ Error: gh CLI is not authenticated"
+    echo "ℹ️ Cannot perform CI checks or PR reviews without authentication"
+    rm -f "$temp_file"
+    return 1
+  fi
+
+  # Get CI checks in JSON format with proper error handling (with timeout)
+  if ! timeout 30 gh pr checks "$pr_num" --json name,status,conclusion,url 2>"$temp_file"; then
+    local error_output
+    error_output=$(cat "$temp_file" 2>/dev/null || echo "Unknown error")
+    rm -f "$temp_file"
+
+    # Log the full error for debugging
+    echo "🔍 DEBUG: gh pr checks failed with error: $error_output" >&2
+
+    # Check for specific error conditions with more comprehensive patterns
+    if echo "$error_output" | grep -q "pull request not found\|could not resolve to a PullRequest\|PR not found"; then
+      echo "❌ Error: PR #$pr_num not found"
+      return 2
+    elif echo "$error_output" | grep -q "network\|timeout\|connection\|HTTP\|API rate limit"; then
+      echo "❌ Error: Network or API issue accessing GitHub ($error_output)"
+      return 3
+    elif echo "$error_output" | grep -q "authentication\|token\|unauthorized\|forbidden"; then
+      echo "❌ Error: Authentication failed - check GitHub token permissions"
+      return 4
+    elif echo "$error_output" | grep -q "repository not found\|not accessible"; then
+      echo "❌ Error: Repository not accessible or not found"
+      return 5
+    else
+      echo "❌ Error: Failed to get PR checks: $error_output"
+      return 1
+    fi
+  fi
+
+  rm -f "$temp_file"
+  return 0
+}
+
+# Only perform PR review if GitHub CLI is available
+if [ "$GH_AVAILABLE" = "true" ]; then
+  # Get CI status using robust JSON parsing
+  CI_JSON=$(check_ci_status "$PR_NUM")
+  CI_STATUS=$?
+
+  # Validate CI_JSON is valid JSON before proceeding
+  if [ $CI_STATUS -eq 0 ] && [ -n "$CI_JSON" ]; then
+    # Basic JSON validation - check if it starts and ends with brackets
+    if ! (echo "$CI_JSON" | grep -q '^\[' && echo "$CI_JSON" | grep -q '\]$'); then
+      echo "⚠️ Invalid JSON format received from gh pr checks - falling back to text parsing"
+      CI_STATUS=1
+    fi
+  fi
+
+  case $CI_STATUS in
+  1)
+    echo "⚠️ GitHub CLI unavailable - cannot perform PR reviews"
+    echo "📝 Tess QA completed but unable to post PR review due to GitHub CLI issues"
+    echo "✅ QA workflow finished successfully despite GitHub CLI problems"
+    echo "🔍 Recommendation: Install and authenticate GitHub CLI for full functionality"
+    # Don't exit here - continue to sidecar shutdown
+    ;;
+  2)
+    echo "⚠️ PR not found - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **PR Not Found**: Pull request #$PR_NUM does not exist
+❌ **Cannot verify**: Invalid PR reference
+
+## Required Actions
+- [ ] Verify correct PR number
+- [ ] Check if PR was closed or merged
+- [ ] Update PR reference if needed
+
+**Note**: Cannot proceed with QA until valid PR is specified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+    ;;
+  3)
+    echo "⚠️ Network error - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **Network Error**: Unable to connect to GitHub API
+❌ **Cannot verify**: CI status check failed due to connectivity issues
+
+## Required Actions
+- [ ] Check network connectivity
+- [ ] Verify GitHub API access
+- [ ] Retry after network issues are resolved
+
+**Note**: Cannot proceed with QA until CI status can be verified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+    ;;
+  4)
+    echo "⚠️ Authentication error - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **Authentication Error**: GitHub token permissions insufficient
+❌ **Cannot verify**: CI status check failed due to auth issues
+
+## Required Actions
+- [ ] Verify GitHub token has correct permissions
+- [ ] Check repository access permissions
+- [ ] Ensure token hasn't expired
+- [ ] Contact administrator for token refresh
+
+**Note**: Cannot proceed with QA until authentication is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+    ;;
+  5)
+    echo "⚠️ Repository access error - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **Repository Access Error**: Repository not found or not accessible
+❌ **Cannot verify**: CI status check failed due to repo access issues
+
+## Required Actions
+- [ ] Verify repository exists and is accessible
+- [ ] Check repository permissions for the token
+- [ ] Ensure repository URL is correct
+- [ ] Contact administrator for access issues
+
+**Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+    ;;
+  esac
+
+  # Parse CI status from JSON output
+  if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
+    echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
+    # Post REQUEST CHANGES review for missing CI
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **Missing CI Setup**: No GitHub Actions workflows detected
+❌ **Cannot verify**: Test execution and deployment status unknown
+
+## Required Actions
+- [ ] Set up GitHub Actions CI pipeline
+- [ ] Add automated testing workflow
+- [ ] Configure deployment verification
+- [ ] Add branch protection rules
+
+**Note**: Cannot proceed with QA until CI is properly configured." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+else
+  # Function to parse JSON without jq dependency
+  parse_ci_json() {
+    local json="$1"
+    local field="$2"
+    local value="$3"
+
+    # Count total checks
+    if [ "$field" = "total" ]; then
+      echo "$json" | grep -o '"name"' | wc -l
+      return
+    fi
+
+    # Count by status and conclusion
+    case "$field" in
+      "completed")
+        echo "$json" | grep -o '"status":"completed"' | wc -l
+        ;;
+      "success")
+        # Count objects that have both completed status and success conclusion
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | wc -l
+        ;;
+      "failed")
+        # Count objects that have completed status and failure/cancelled/timed_out conclusion
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | wc -l
+        ;;
+      "pending")
+        local total completed
+        total=$(echo "$json" | grep -o '"name"' | wc -l)
+        completed=$(echo "$json" | grep -o '"status":"completed"' | wc -l)
+        echo $((total - completed))
+        ;;
+    esac
+  }
+
+  # Function to extract check details
+  extract_check_details() {
+    local json="$1"
+    local type="$2"
+
+    case "$type" in
+      "failed")
+        # Extract failed check names and conclusions
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | sed -E 's/.*"name":"([^"]+)".*"conclusion":"([^"]+)".*/- \1 (\2)/'
+        ;;
+      "pending")
+        # Extract pending check names and statuses
+        echo "$json" | sed 's/},{/\n/g' | grep -v '"status":"completed"' | sed -E 's/.*"name":"([^"]+)".*"status":"([^"]+)".*/- \1 (\2)/'
+        ;;
+      "success")
+        # Extract successful check names
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | sed -E 's/.*"name":"([^"]+)".*/- \1 ✅/'
+        ;;
+    esac
+  }
+
+  # Use jq if available, otherwise use fallback parsing
+  if command -v jq >/dev/null 2>&1; then
+    echo "📋 Using jq for JSON parsing"
+    TOTAL_CHECKS=$(echo "$CI_JSON" | jq -r '. | length')
+    COMPLETED_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed")] | length')
+    SUCCESS_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and .conclusion == "success")] | length')
+    FAILED_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | length')
+    PENDING_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status != "completed")] | length')
+  else
+    echo "📋 Using fallback JSON parsing (jq not available)"
+    TOTAL_CHECKS=$(parse_ci_json "$CI_JSON" "total")
+    COMPLETED_CHECKS=$(parse_ci_json "$CI_JSON" "completed")
+    SUCCESS_CHECKS=$(parse_ci_json "$CI_JSON" "success")
+    FAILED_CHECKS=$(parse_ci_json "$CI_JSON" "failed")
+    PENDING_CHECKS=$(parse_ci_json "$CI_JSON" "pending")
+  fi
+
+  echo "📊 CI Status Summary:"
+  echo "  - Total checks: $TOTAL_CHECKS"
+  echo "  - Completed: $COMPLETED_CHECKS"
+  echo "  - Successful: $SUCCESS_CHECKS"
+  echo "  - Failed: $FAILED_CHECKS"
+  echo "  - Pending: $PENDING_CHECKS"
+
+  HAVE_PR_REF=false
+  if [ -n "$REPO_SLUG" ] && { [ -n "$PR_NUM" ] || [ -n "$PR_URL" ]; }; then
+    HAVE_PR_REF=true
+    ensure_status_labels "$REPO_SLUG" \
+      "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
+      "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
+      "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cleo quality review" \
+      "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
+      "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
+      "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
+  fi
+
+  if [ "$FAILED_CHECKS" -gt 0 ]; then
+    echo "❌ CI failures detected - posting REQUEST CHANGES review"
+    # Get details of failed checks
+    if command -v jq >/dev/null 2>&1; then
+      FAILED_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | map("- " + .name + " (" + .conclusion + ")") | join("\n")')
+    else
+      FAILED_DETAILS=$(extract_check_details "$CI_JSON" "failed")
+    fi
+
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **CI Failures Detected**: $FAILED_CHECKS out of $TOTAL_CHECKS check(s) failing
+❌ **Cannot approve**: All CI checks must pass
+
+## Failed Checks
+$FAILED_DETAILS
+
+## Required Actions
+- [ ] Fix all failing CI checks
+- [ ] Address test failures
+- [ ] Resolve build errors
+- [ ] Verify all workflows pass
+
+**Note**: Will re-evaluate once CI issues are resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_TESS" \
+        "$STATUS_LABEL_NEEDS_CLEO" \
+        "$STATUS_LABEL_APPROVED" \
+        "$STATUS_LABEL_FAILED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
+    fi
+    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
+  elif [ "$PENDING_CHECKS" -gt 0 ]; then
+    echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
+    # Get details of pending checks
+    if command -v jq >/dev/null 2>&1; then
+      PENDING_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status != "completed")] | map("- " + .name + " (" + .status + ")") | join("\n")')
+    else
+      PENDING_DETAILS=$(extract_check_details "$CI_JSON" "pending")
+    fi
+
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+⏳ **CI Checks Pending**: $PENDING_CHECKS out of $TOTAL_CHECKS check(s) still running
+❌ **Cannot approve**: All CI checks must complete successfully
+
+## Pending Checks
+$PENDING_DETAILS
+
+## Required Actions
+- [ ] Wait for all CI checks to complete
+- [ ] Verify all checks pass successfully
+- [ ] Address any failures that may occur
+
+**Note**: Will re-evaluate once all CI checks are complete." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_FIXES" \
+        "$STATUS_LABEL_APPROVED" \
+        "$STATUS_LABEL_FAILED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
+    fi
+    update_coderun_status "$STATUS_LABEL_NEEDS_TESS" "pending" "$PR_URL"
+  elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
+    echo "✅ All CI checks passing - posting APPROVE review"
+    # Get details of successful checks
+    if command -v jq >/dev/null 2>&1; then
+      SUCCESS_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and .conclusion == "success")] | map("- " + .name + " ✅") | join("\n")')
+    else
+      SUCCESS_DETAILS=$(extract_check_details "$CI_JSON" "success")
+    fi
+
+    timeout 30 gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
+
+## Pre-Approval Verification
+✅ **ALL CI checks verified**: $SUCCESS_CHECKS out of $TOTAL_CHECKS checks passing
+✅ **No failures found**: Zero failing checks confirmed
+
+## CI Status
+✅ **GitHub Actions CI**: All checks passing
+$SUCCESS_DETAILS
+
+## Task $TASK_ID Acceptance Criteria
+✅ **All criteria met**: Implementation complete and verified
+✅ **Code quality**: Passes all standards
+✅ **Testing**: Comprehensive test coverage achieved
+
+## Final Assessment
+- **Quality Score**: Excellent implementation
+- **Ready for merge**: All requirements satisfied
+- **No outstanding issues**: Clean, production-ready code
+
+**APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_FIXES" \
+        "$STATUS_LABEL_NEEDS_TESS" \
+        "$STATUS_LABEL_NEEDS_CLEO" \
+        "$STATUS_LABEL_FIXING" \
+        "$STATUS_LABEL_FAILED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_APPROVED"
+    fi
+    update_coderun_status "$STATUS_LABEL_APPROVED" "approved" "$PR_URL"
+  else
+    echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+⚠️ **Unexpected CI State**: Unable to determine final CI status
+❌ **Cannot approve**: CI status unclear
+
+## Current Status
+- Total checks: $TOTAL_CHECKS
+- Completed: $COMPLETED_CHECKS
+- Successful: $SUCCESS_CHECKS
+- Failed: $FAILED_CHECKS
+- Pending: $PENDING_CHECKS
+
+## Required Actions
+- [ ] Review CI check configuration
+- [ ] Ensure all checks are properly defined
+- [ ] Verify workflow completion
+- [ ] Contact administrator if issues persist
+
+**Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_TESS" \
+        "$STATUS_LABEL_NEEDS_CLEO" \
+        "$STATUS_LABEL_APPROVED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
+    fi
+    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
+  fi
+
+else
+  # GitHub CLI not available - skip PR review
+  echo "📝 Skipping PR review posting due to GitHub CLI unavailability"
+  echo "✅ Tess QA workflow completed but could not post PR review"
+fi
+
+
+
+# =============================================================================
+# DEBUG LOGGING: FINAL STATUS
+# =============================================================================
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  echo "✅ Tess QA testing completed successfully"
+  echo "📊 Final status: SUCCESS (exit code 0)"
+else
+  echo "⚠️ Tess QA testing exited with code: $CLAUDE_EXIT_CODE"
+  echo "📊 Final status: FAILURE (exit code $CLAUDE_EXIT_CODE)"
+  echo "🔍 This usually indicates a cache_control or API error occurred"
+  echo "📝 Note: Container will still exit successfully to allow workflow continuation"
+fi
+
+echo "🔍 Process information:"
+echo "  - PID: $CLAUDE_PID"
+echo "  - Exit code: $CLAUDE_EXIT_CODE"
+echo "  - Working directory: $(pwd)"
+echo "  - Repository: $REPO_NAME"
+echo "  - PR Review: Posted to #$PR_NUM"
+
+# Sidecar shutdown is handled by the EXIT trap defined earlier
+# The shutdown_sidecar function will be called automatically when the script exits
+
+# Perform final cleanup of our own processes
+echo "🔧 Performing final process cleanup..."
+
+# Clean up any child processes we may have spawned
+cleanup_child_processes() {
+  if [ $$ -gt 1 ] && [ -d "/proc" ]; then
+    # Get all child processes
+    local child_pids=""
+    child_pids=$(ps -o pid,ppid | awk -v ppid=$$ '$2 == ppid {print $1}' 2>/dev/null || echo "")
+
+    if [ -n "$child_pids" ]; then
+      echo "🔍 Found child processes to clean up: $child_pids"
+      echo "$child_pids" | xargs kill -TERM 2>/dev/null || true
+      sleep 2
+      echo "$child_pids" | xargs kill -KILL 2>/dev/null || true
+    fi
+  fi
+}
+
+cleanup_child_processes
+
+# Write completion marker for workflow tracking
+echo "tess-qa-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
+
+# Final termination sequence
+echo '════════════════════════════════════════════════════════════════'
+echo '║                 TESS CONTAINER TERMINATION                    ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "Container PID: $$"
+echo "Final Process Check:"
+ps aux | head -5
+
+# Cleanup FIFO
+rm -f "$FIFO_PATH" 2>/dev/null || true
+
+# Force exit to terminate the pod
+echo "🔚 Force terminating container..."
+exit 0

@@ -1,0 +1,11 @@
+{
+  "remoteTools": [
+    {{#if remote_tools}}
+    {{#each remote_tools}}
+    "{{this}}"{{#unless @last}},{{/unless}}
+    {{/each}}
+    {{else}}
+    "brave_search_brave_web_search"
+    {{/if}}
+  ]
+}
