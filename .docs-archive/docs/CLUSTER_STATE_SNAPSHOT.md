@@ -277,18 +277,11 @@ vault kv put secret/tools-kubernetes KUBECONFIG="<base64-kubeconfig>"
 If critical issues persist, revert to pre-refactor state:
 
 ```bash
-# Revert all 5 PRs from the namespace consolidation refactor (in reverse order)
-git revert <commit-for-PR-1743>  # PR #1743 - Remove trader namespace and duplicate entries
-git revert <commit-for-PR-1742>  # PR #1742 - Remove maxAge config from eventbus
-git revert ec3b2050              # PR #1740 - eventbus maxAge quoting + platform-runners
-git revert 6d406abf              # PR #1739 - arc-controller OCI format fix
-git revert 4a5259cc              # PR #1738 - Comprehensive namespace consolidation
+git revert 4a5259cc  # PR #1738
+git revert 6d406abf  # PR #1739  
+git revert ec3b2050  # PR #1740
 git push origin main
 ```
-
-**Important:** All 5 PRs (#1738, #1739, #1740, #1742, #1743) must be reverted together
-to avoid leaving the system in an inconsistent state. Reverting only some PRs will
-cause namespace mismatches between resources.
 
 Then manually restore old namespaces and redeploy.
 
