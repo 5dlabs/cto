@@ -15,7 +15,7 @@
 # Builder stage - compile the Rust binary
 # =============================================================================
 # hadolint ignore=DL3007
-FROM rust:1.83-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 WORKDIR /build
 
