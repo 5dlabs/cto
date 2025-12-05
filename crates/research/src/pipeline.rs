@@ -181,6 +181,8 @@ impl Pipeline {
                     result
                         .errors
                         .push(format!("{}: write failed: {e}", bookmark.id));
+                    // Mark as processed to avoid duplicate retries on next poll
+                    state.mark_processed(&bookmark.id);
                     continue;
                 }
             };
