@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "model": {
+    "default": "{{model}}"{{#if reasoning_effort}},
+    "reasoningEffort": "{{reasoning_effort}}"{{/if}}{{#if temperature}},
+    "temperature": {{temperature}}{{/if}}{{#if max_output_tokens}},
+    "maxOutputTokens": {{max_output_tokens}}{{/if}}
+  },
+  "autoRun": {
+    "enabled": true,
+    "level": "{{#if auto_level}}{{auto_level}}{{else if reasoning_effort}}{{reasoning_effort}}{{else}}high{{/if}}"
+  },
+  "specificationMode": {
+    "default": true
+  },
+  "execution": {
+    "approvalPolicy": "{{approval_policy}}",
+    "sandboxMode": "{{sandbox_mode}}"{{#if project_doc_max_bytes}},
+    "projectDocMaxBytes": {{project_doc_max_bytes}}{{/if}}
+  },
+  "permissions": {
+    "allow": [
+      "Shell(*)",
+      "Read(**/*)",
+      "Write(**/*)"
+    ],
+    "deny": []
+  },
+  "tools": {
+    "endpoint": "{{tools.url}}"{{#if tools.tools}},
+    "tools": [
+      {{#each tools.tools}}
+      "{{this}}"{{#unless @last}},{{/unless}}
+      {{/each}}
+    ]{{/if}}
+  },
+  "mcp": {
+    "servers": {
+      "tools": {
+        "command": "tools",
+        "args": ["--url", "{{tools.url}}"],
+        "env": {
+          "TOOLS_SERVER_URL": "{{tools.url}}"
+        }{{#if tools.tools}},
+        "availableTools": [
+          {{#each tools.tools}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+        ]{{/if}}
+      }
+    }
+  }{{#if raw_additional_json}},
+  {{{raw_additional_json}}}
+  {{/if}}
+}

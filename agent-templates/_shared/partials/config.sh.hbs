@@ -1,0 +1,24 @@
+# =========================================================================
+# Configuration
+# =========================================================================
+
+# Retry/iteration settings
+MAX_RETRIES="${EXECUTION_MAX_RETRIES:-{{default_retries}}}"
+CURRENT_ATTEMPT="${CURRENT_ATTEMPT:-1}"
+ACCEPTANCE_THRESHOLD="${ACCEPTANCE_THRESHOLD:-90}"
+
+# Export for use in scripts
+export MAX_RETRIES
+export CURRENT_ATTEMPT
+export ACCEPTANCE_THRESHOLD
+
+echo ""
+echo "📋 Configuration:"
+echo "  🤖 CLI: {{cli_type}}"
+echo "  🎯 Model: {{model}}"
+echo "  🔄 Attempt: $CURRENT_ATTEMPT of $MAX_RETRIES"
+echo "  ✓ Acceptance threshold: ${ACCEPTANCE_THRESHOLD}%"
+{{#if continue_session}}
+echo "  🔁 Continue session: enabled (retry mode)"
+{{/if}}
+echo ""

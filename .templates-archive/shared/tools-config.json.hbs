@@ -1,0 +1,58 @@
+{
+  {{#if remote_tools}}
+  "remoteTools": [
+    {{#each remote_tools}}
+    "{{this}}"{{#unless @last}},{{/unless}}
+    {{/each}}
+  ]{{#if (eq tool_config "advanced")}},{{/if}}
+  {{else}}
+  {{#if (eq tool_config "minimal")}}
+  "remoteTools": []{{#if (eq tool_config "advanced")}},{{/if}}
+  {{else if (eq tool_config "default")}}
+  "remoteTools": [
+    "brave_search_brave_web_search",
+    "openmemory_query",
+    "openmemory_store"
+  ]{{#if (eq tool_config "advanced")}},{{/if}}
+  {{else if (eq tool_config "advanced")}}
+  "remoteTools": [
+    "brave_search_brave_web_search",
+    "openmemory_query",
+    "openmemory_store",
+    "openmemory_list",
+    "openmemory_get",
+    "openmemory_reinforce",
+    "github_create_issue",
+    "kubernetes_listResources",
+    "terraform_list_providers"
+  ],
+  {{else}}
+  "remoteTools": [
+    "brave_search_brave_web_search",
+    "openmemory_query",
+    "openmemory_store"
+  ]{{#if (eq tool_config "advanced")}},{{/if}}
+  {{/if}}
+  {{/if}}
+  {{#if (eq tool_config "advanced")}}
+  "localServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+      "tools": [
+        {{#if local_tools}}
+        {{#each local_tools}}
+        "{{this}}"{{#unless @last}},{{/unless}}
+        {{/each}}
+        {{else}}
+        "read_file",
+        "write_file",
+        "list_directory",
+        "create_directory"
+        {{/if}}
+      ],
+      "workingDirectory": "project_root"
+    }
+  }
+  {{/if}}
+}

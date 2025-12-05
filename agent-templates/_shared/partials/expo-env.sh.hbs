@@ -1,0 +1,137 @@
+# =========================================================================
+# Expo / React Native Environment Bootstrap
+# =========================================================================
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║ Setting up Expo environment"
+echo "════════════════════════════════════════════════════════════════"
+
+# -------------------------------------------------------------------------
+# EAS CLI - Required for cloud builds, submissions, and updates
+# -------------------------------------------------------------------------
+if ! command -v eas >/dev/null 2>&1; then
+  echo "Installing EAS CLI globally..."
+  npm install -g eas-cli@latest 2>/dev/null || {
+    echo "⚠️ Failed to install EAS CLI globally, will use npx"
+  }
+fi
+
+if command -v eas >/dev/null 2>&1; then
+  echo "EAS CLI version: $(eas --version)"
+else
+  echo "EAS CLI: available via npx eas-cli"
+fi
+
+# -------------------------------------------------------------------------
+# Expo CLI - For local development (npx expo is preferred)
+# -------------------------------------------------------------------------
+# Note: Expo CLI is typically run via npx to ensure correct version
+# matching the project's expo package. Global install is optional.
+echo "Expo CLI: available via npx expo"
+
+# -------------------------------------------------------------------------
+# expo-doctor - Project health checks
+# -------------------------------------------------------------------------
+echo "expo-doctor: available via npx expo-doctor"
+
+# -------------------------------------------------------------------------
+# Watchman - File watcher (improves Metro bundler performance)
+# -------------------------------------------------------------------------
+if command -v watchman >/dev/null 2>&1; then
+  echo "Watchman version: $(watchman --version 2>/dev/null || echo 'installed')"
+else
+  echo "Watchman: not installed (optional, Metro will use polling)"
+fi
+
+# -------------------------------------------------------------------------
+# Android SDK (for local Android builds)
+# -------------------------------------------------------------------------
+if [ -n "$ANDROID_HOME" ] || [ -n "$ANDROID_SDK_ROOT" ]; then
+  export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+  export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+  export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+  echo "Android SDK: $ANDROID_HOME"
+  
+  # Check for adb
+  if command -v adb >/dev/null 2>&1; then
+    echo "adb version: $(adb --version 2>/dev/null | head -1 || echo 'available')"
+  fi
+else
+  echo "Android SDK: not configured (use EAS Build for cloud builds)"
+fi
+
+# -------------------------------------------------------------------------
+# Java (required for Android builds)
+# -------------------------------------------------------------------------
+if [ -n "$JAVA_HOME" ]; then
+  export PATH="$JAVA_HOME/bin:$PATH"
+  echo "Java: $JAVA_HOME"
+elif command -v java >/dev/null 2>&1; then
+  echo "Java version: $(java -version 2>&1 | head -1)"
+else
+  echo "Java: not installed (use EAS Build for cloud builds)"
+fi
+
+# -------------------------------------------------------------------------
+# Xcode (macOS only, for local iOS builds)
+# -------------------------------------------------------------------------
+if [ "$(uname)" = "Darwin" ]; then
+  if command -v xcrun >/dev/null 2>&1; then
+    XCODE_VERSION=$(xcodebuild -version 2>/dev/null | head -1 || echo "unknown")
+    echo "Xcode: $XCODE_VERSION"
+    
+    # iOS Simulator
+    if command -v xcrun >/dev/null 2>&1; then
+      echo "iOS Simulator: available via xcrun simctl"
+    fi
+  else
+    echo "Xcode: not installed (use EAS Build for cloud builds)"
+  fi
+fi
+
+# -------------------------------------------------------------------------
+# Expo Environment Variables
+# -------------------------------------------------------------------------
+
+# Disable telemetry in CI environments
+export EXPO_NO_TELEMETRY=1
+
+# Enable non-interactive mode for CI
+export CI=1
+export EXPO_NO_DOTENV=0
+
+# EAS credentials (if provided via secrets)
+if [ -n "$EXPO_TOKEN" ]; then
+  echo "EXPO_TOKEN: configured (authenticated)"
+else
+  echo "EXPO_TOKEN: not set (will need to run 'eas login' or 'npx expo login')"
+fi
+
+# -------------------------------------------------------------------------
+# Useful Expo Commands Reference
+# -------------------------------------------------------------------------
+cat << 'EXPO_COMMANDS'
+
+Expo Quick Reference:
+  npx expo start              # Start dev server
+  npx expo start --clear      # Start with cleared cache
+  npx expo-doctor             # Check project health
+  npx expo install [pkg]      # Install with version compatibility
+  npx expo prebuild           # Generate native directories
+  npx expo run:ios            # Build and run iOS locally
+  npx expo run:android        # Build and run Android locally
+  
+EAS Commands:
+  eas login                   # Authenticate with Expo
+  eas build:configure         # Initialize eas.json
+  eas build -p ios            # Build iOS in cloud
+  eas build -p android        # Build Android in cloud
+  eas submit -p ios           # Submit to App Store
+  eas submit -p android       # Submit to Play Store
+  eas update                  # Publish OTA update
+
+EXPO_COMMANDS
+
+echo ""
+

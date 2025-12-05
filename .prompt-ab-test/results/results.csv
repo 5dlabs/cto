@@ -1,0 +1,5 @@
+cli,format,success,retries,time_seconds,files_created,tests_passed,clippy_passed,acceptance_pct
+claude,markdown,1,1,76,1,1,1,100
+claude,xml,1,1,56,1,1,1,100
+codex,markdown,1,1,33,1,1,1,100
+codex,xml,1,1,39,1,1,1,100

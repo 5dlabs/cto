@@ -1,0 +1,74 @@
+# =========================================================================
+# Retry Loop with Acceptance Verification
+# =========================================================================
+
+# Retry configuration from environment or template defaults
+MAX_RETRIES="${EXECUTION_MAX_RETRIES:-{{default_retries}}}"
+CURRENT_ATTEMPT="${CURRENT_ATTEMPT:-1}"
+
+echo ""
+echo "🔄 Retry Configuration:"
+echo "   Max Retries: $MAX_RETRIES"
+echo "   Current Attempt: $CURRENT_ATTEMPT"
+echo ""
+
+# Run CLI with retry awareness
+run_with_retry() {
+    local attempt=1
+    local max_attempts=$((MAX_RETRIES + 1))  # +1 for initial attempt
+    
+    while [ "$attempt" -le "$max_attempts" ]; do
+        echo ""
+        echo "════════════════════════════════════════════════════════════════"
+        echo "║ Attempt $attempt of $max_attempts"
+        echo "════════════════════════════════════════════════════════════════"
+        echo ""
+
+        # Execute the CLI
+        {{cli_execute}}
+        CLI_EXIT_CODE=$?
+
+        if [ $CLI_EXIT_CODE -ne 0 ]; then
+            echo "❌ CLI execution failed with exit code: $CLI_EXIT_CODE"
+            
+            if [ "$attempt" -lt "$max_attempts" ]; then
+                echo "🔄 Retrying in 5 seconds..."
+                sleep 5
+                attempt=$((attempt + 1))
+                continue
+            else
+                echo "❌ Max retries exhausted"
+                return 1
+            fi
+        fi
+
+        # CLI succeeded - now verify acceptance criteria
+        if type probe_acceptance_criteria >/dev/null 2>&1; then
+            if probe_acceptance_criteria; then
+                echo "✅ Task complete - acceptance criteria verified"
+                return 0
+            else
+                if [ "$attempt" -lt "$max_attempts" ]; then
+                    echo "🔄 Acceptance criteria not met - retrying..."
+                    attempt=$((attempt + 1))
+                    # Continue session flag for retry
+                    export CONTINUE_SESSION="true"
+                    continue
+                else
+                    echo "❌ Max retries exhausted - acceptance criteria not fully met"
+                    # Return success if CLI completed, let controller decide on retry
+                    return 0
+                fi
+            fi
+        else
+            echo "⚠️ No acceptance probe available - treating CLI success as completion"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Export for use
+export -f run_with_retry 2>/dev/null || true
+

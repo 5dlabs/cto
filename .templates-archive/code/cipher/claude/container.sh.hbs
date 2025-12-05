@@ -1,0 +1,2855 @@
+#!/bin/sh
+
+# Ensure Rust environment is always properly set up
+echo "🔧 Setting up Rust environment..."
+
+# Source Rust environment if available (fixes cargo not found issues)
+if [ -f "$HOME/.cargo/env" ]; then
+    . "$HOME/.cargo/env"
+    echo "✓ Sourced Rust environment from $HOME/.cargo/env"
+fi
+
+# Also try root cargo env as fallback
+if [ -f "/root/.cargo/env" ]; then
+    . "/root/.cargo/env"
+    echo "✓ Sourced Rust environment from /root/.cargo/env"
+fi
+
+# Ensure rustup has a default toolchain set
+if command -v rustup >/dev/null 2>&1; then
+    rustup default stable 2>/dev/null || true
+    echo "✓ Ensured stable Rust toolchain is default"
+else
+    echo "⚠️ rustup not found in PATH"
+fi
+
+# Verify Rust is available
+if command -v cargo >/dev/null 2>&1; then
+    echo "✓ Cargo is available: $(cargo --version)"
+else
+    echo "❌ Cargo not found in PATH"
+    echo "Current PATH: $PATH"
+    echo "Attempting to find cargo..."
+    find /usr -name cargo 2>/dev/null | head -5 || echo "No cargo found in /usr"
+    find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
+fi
+
+echo '════════════════════════════════════════════════════════════════'
+printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
+echo '║  CIPHER SECURITY SCANNING WORKFLOW STARTING                  ║'
+echo '║  Vulnerability Analysis & Security Validation Agent          ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🔒 Focus: Security vulnerability scanning, dependency analysis, compliance"
+echo "📋 Task ID: {{task_id}}"
+echo "✅ Mission: Zero tolerance for CRITICAL/HIGH security vulnerabilities"
+
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
+# Docker sidecar cleanup function
+stop_docker_sidecar() {
+  echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."
+  
+  # CRITICAL: Write sentinel file to signal sidecar to stop (file watch mechanism)
+  # This must happen BEFORE any returns so sidecar stops even on early exit
+  touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
+  echo "✅ Sentinel file created to signal sidecar shutdown"
+  
+  # Check if Docker processes are running (more reliable than socket check)
+  DOCKER_PID=$(pidof dockerd 2>/dev/null || true)
+  INIT_PID=$(pidof docker-init 2>/dev/null || true)
+  
+  # If no processes are running, we're done
+  if [ -z "$DOCKER_PID" ] && [ -z "$INIT_PID" ]; then
+    # Also check socket for informational purposes
+    if [ ! -S /var/run/docker.sock ]; then
+      echo "✅ Docker sidecar not running (no processes found, socket also missing)"
+    else
+      echo "⚠️ Docker processes not found but socket exists - sidecar may be in transition"
+    fi
+    return
+  fi
+
+  # Socket check for informational purposes only (don't block on it)
+  if [ ! -S /var/run/docker.sock ]; then
+    echo "⚠️ Docker socket not found at /var/run/docker.sock but processes are running"
+    echo "   Attempting to stop processes directly..."
+  else
+    echo "🛑 Stopping Docker sidecar"
+  fi
+
+  # Attempt to stop processes regardless of socket status
+  if command -v pkill >/dev/null 2>&1; then
+    if [ -n "$DOCKER_PID" ]; then
+      pkill dockerd >/dev/null 2>&1 || true
+    fi
+    if [ -n "$INIT_PID" ]; then
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
+    sleep 1
+    # Force kill if still running
+    if pidof dockerd >/dev/null 2>&1; then
+      pkill -9 dockerd >/dev/null 2>&1 || true
+    fi
+    if pidof docker-init >/dev/null 2>&1; then
+      pkill -9 docker-init >/dev/null 2>&1 || true
+    fi
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+    killall docker-init >/dev/null 2>&1 || true
+  else
+    if [ -n "$DOCKER_PID" ]; then
+      kill "$DOCKER_PID" >/dev/null 2>&1 || true
+      sleep 1
+      if pidof dockerd >/dev/null 2>&1; then
+        kill -9 "$DOCKER_PID" >/dev/null 2>&1 || true
+      fi
+    fi
+    if [ -n "$INIT_PID" ]; then
+      kill "$INIT_PID" >/dev/null 2>&1 || true
+      sleep 1
+      if pidof docker-init >/dev/null 2>&1; then
+        kill -9 "$INIT_PID" >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  # Wait for processes to actually stop
+  for _ in 1 2 3 4 5; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped successfully"
+      return
+    fi
+    sleep 1
+  done
+
+  # Final check - report if still running
+  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
+  if [ -n "$REMAINING_DOCKER" ] || [ -n "$REMAINING_INIT" ]; then
+    echo "⚠️ Docker sidecar still running after cleanup attempts (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+    echo "   Sidecar will stop via sentinel file watch mechanism"
+  else
+    echo "✅ Docker sidecar stopped"
+  fi
+}
+
+# Set up EXIT trap to ensure Docker sidecar cleanup
+trap 'stop_docker_sidecar || true' EXIT
+
+# =========================================================================
+# RETRY CONFIGURATION
+# =========================================================================
+MAX_RETRIES_CONFIG=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🤖 CLI: {{cli_type}}"
+echo "🎯 Model: {{model}}"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${CLAUDE_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: CLAUDE_MAX_RETRIES environment variable"
+elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# Clean up any leftover completion marker from previous runs
+# This prevents issues with sequential task executions on the same PVC
+if [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
+# =========================================================================
+# SECURITY TOOLS SETUP
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              CIPHER SECURITY TOOLS VERIFICATION               ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Verify all security tools are available
+echo "🔍 Verifying security scanning tools..."
+
+# Multi-language SAST
+if command -v semgrep >/dev/null 2>&1; then
+    echo "✅ Semgrep: $(semgrep --version | head -1)"
+else
+    echo "⚠️ Semgrep not found - installing..."
+    pip3 install --break-system-packages semgrep || echo "❌ Failed to install Semgrep"
+fi
+
+# Rust security tools
+if command -v cargo >/dev/null 2>&1; then
+    if cargo audit --version >/dev/null 2>&1; then
+        echo "✅ cargo-audit: $(cargo audit --version)"
+    else
+        echo "⚠️ cargo-audit not found - will install if Rust project detected"
+    fi
+    
+    if cargo geiger --version >/dev/null 2>&1; then
+        echo "✅ cargo-geiger: $(cargo geiger --version 2>&1 | head -1)"
+    else
+        echo "⚠️ cargo-geiger not found - will install if Rust project detected"
+    fi
+    
+    if cargo deny --version >/dev/null 2>&1; then
+        echo "✅ cargo-deny: $(cargo deny --version)"
+    else
+        echo "⚠️ cargo-deny not found - will install if Rust project detected"
+    fi
+fi
+
+# Secret scanning
+if command -v gitleaks >/dev/null 2>&1; then
+    echo "✅ gitleaks: $(gitleaks version)"
+else
+    echo "❌ gitleaks not found"
+fi
+
+# Vulnerability scanning
+if command -v trivy >/dev/null 2>&1; then
+    echo "✅ trivy: $(trivy --version | head -1)"
+else
+    echo "❌ trivy not found"
+fi
+
+# Dockerfile linting
+if command -v hadolint >/dev/null 2>&1; then
+    echo "✅ hadolint: $(hadolint --version)"
+else
+    echo "⚠️ hadolint not found"
+fi
+
+echo ""
+echo "📚 Security Guidelines Available:"
+if [ -f "/workspace/CIPHER_SECURITY_GUIDELINES.md" ]; then
+    echo "✅ Complete security guidelines: /workspace/CIPHER_SECURITY_GUIDELINES.md"
+else
+    echo "⚠️ Security guidelines not found at /workspace/CIPHER_SECURITY_GUIDELINES.md"
+fi
+
+if [ -f "/workspace/CIPHER_QUICK_REFERENCE.md" ]; then
+    echo "✅ Quick reference: /workspace/CIPHER_QUICK_REFERENCE.md"
+else
+    echo "⚠️ Quick reference not found at /workspace/CIPHER_QUICK_REFERENCE.md"
+fi
+
+if [ -f "/workspace/.semgrep.yaml" ]; then
+    echo "✅ Semgrep custom rules: /workspace/.semgrep.yaml"
+else
+    echo "⚠️ Semgrep rules not found at /workspace/.semgrep.yaml"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# Disable interactive Git prompts globally
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# Repository URL
+REPO_URL="{{repository_url}}"
+
+# GitHub App authentication is configured via environment variables
+echo "Using GitHub App authentication for security scanning"
+
+# Authenticate with GitHub App
+if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+    echo "Authenticating with GitHub App..."
+
+    # Create temporary private key file (support escaped newlines)
+    TEMP_KEY_FILE="/tmp/github-app-key.pem"
+    printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+
+    # Generate JWT token for GitHub App (fixed JWT generation for Linux containers)
+    # JWT header
+    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+
+    # JWT payload with current time and expiration (10 minutes)
+    NOW=$(date +%s)
+    EXP=$((NOW + 600))
+    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+
+    # Sign the JWT
+    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+    # Get installation ID for the repository (robust parsing of owner/repo)
+    INPUT_REPO="{{repository_url}}"
+    REPO_OWNER=""
+    REPO_NAME=""
+
+    if echo "$INPUT_REPO" | grep -qE '^https://github.com/'; then
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+    elif echo "$INPUT_REPO" | grep -qE '^git@github.com:'; then
+        # SSH format git@github.com:owner/repo(.git)
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:[^/]+/([^/]+)(\.git)?|\1|')
+    else
+        # Fallback: assume slug owner/repo (possibly with .git)
+        SLUG=$(echo "$INPUT_REPO" | sed -E 's|\.git$||')
+        REPO_OWNER=$(echo "$SLUG" | cut -d'/' -f1)
+        REPO_NAME=$(echo "$SLUG" | cut -d'/' -f2)
+    fi
+
+    echo "DEBUG: Parsed repository - Owner: '$REPO_OWNER', Name: '$REPO_NAME'"
+
+    echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
+
+    # Get the installation ID (retry and follow redirects). Fallback to org installation.
+    INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+        --connect-timeout 5 --max-time 12 \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
+
+    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "⚠️ Repo installation not found, trying org installation..."
+        ORG_INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+            --connect-timeout 5 --max-time 12 \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$REPO_OWNER/installation")
+        INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+    fi
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "❌ Failed to get installation ID for $REPO_OWNER/$REPO_NAME"
+        echo "Response (repo): $INSTALLATION_RESPONSE"
+        echo "Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
+        rm -f "$TEMP_KEY_FILE"
+        exit 1
+    fi
+
+    echo "Installation ID: $INSTALLATION_ID"
+
+    # Get installation access token
+    TOKEN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+    TOKEN_GENERATED_AT=$(date +%s)  # Track when token was generated for refresh logic
+
+    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+        echo "❌ Failed to get installation access token"
+        echo "Response: $TOKEN_RESPONSE"
+        rm -f "$TEMP_KEY_FILE"
+        exit 1
+    fi
+
+    echo "✅ Successfully authenticated with GitHub App"
+
+    # Clean up temporary key file
+    rm -f "$TEMP_KEY_FILE"
+
+    # Export the token for git to use
+    export GITHUB_TOKEN
+
+    # Configure git to use the token (use --replace-all to handle multiple existing helpers)
+    git config --global --replace-all credential.helper store
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+
+    # Also authenticate gh CLI with the token
+    echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+    # Token refresh functions for long-running jobs
+    refresh_github_token() {
+        echo "🔄 Refreshing GitHub App token..."
+
+        # Create temporary key file
+        TEMP_KEY_FILE="/tmp/github-app-key-$$"
+        echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+        chmod 600 "$TEMP_KEY_FILE"
+
+        # Generate new JWT
+        JWT_TOKEN=$(ruby -r openssl -r json -r base64 -e "
+        key = OpenSSL::PKey::RSA.new(File.read('$TEMP_KEY_FILE'))
+        payload = {
+            iat: Time.now.to_i - 60,
+            exp: Time.now.to_i + (10 * 60),
+            iss: '$GITHUB_APP_ID'
+        }
+        header = { alg: 'RS256', typ: 'JWT' }
+
+        header_enc = Base64.urlsafe_encode64(header.to_json).gsub('=', '')
+        payload_enc = Base64.urlsafe_encode64(payload.to_json).gsub('=', '')
+        signature = Base64.urlsafe_encode64(key.sign(OpenSSL::Digest::SHA256.new, \"#{header_enc}.#{payload_enc}\")).gsub('=', '')
+
+        puts \"#{header_enc}.#{payload_enc}.#{signature}\"
+        ")
+
+        # Get installation ID (reuse logic from initial auth)
+        INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+        if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+            INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+        fi
+
+        # Get new installation token
+        TOKEN_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+        NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+        if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+            export GITHUB_TOKEN="$NEW_TOKEN"
+            export TOKEN_GENERATED_AT=$(date +%s)
+
+            # Update git credentials
+            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+            echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null
+
+            echo "✅ Token refreshed successfully"
+            rm -f "$TEMP_KEY_FILE"
+            return 0
+        else
+            echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+            rm -f "$TEMP_KEY_FILE"
+            return 1
+        fi
+    }
+
+    # Check if token needs refresh (call before git operations)
+    refresh_token_if_needed() {
+        if [ -z "$TOKEN_GENERATED_AT" ]; then
+            echo "⚠️ No token timestamp found, refreshing token..."
+            refresh_github_token
+            return
+        fi
+
+        NOW=$(date +%s)
+        TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+        # Refresh if token is older than 50 minutes (tokens last 1 hour, refresh at 50 min to be safe)
+        if [ $TOKEN_AGE -gt 3000 ]; then
+            echo "🔄 Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+            refresh_github_token
+        fi
+    }
+
+else
+    echo "❌ GitHub App credentials not found"
+    exit 1
+fi
+
+# Extract repository name from URL (e.g., "5dlabs/rust-basic-api-2" -> "rust-basic-api-2")
+REPO_NAME=$(echo "{{repository_url}}" | sed -E 's|.*/([^/]+)$|\1|' | sed 's|\.git$||')
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
+
+# Determine working directory - use repo root if working_directory is "." or empty
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  CLAUDE_WORK_DIR="$REPO_ROOT"
+else
+  CLAUDE_WORK_DIR="$REPO_ROOT/$WORK_DIR"
+fi
+
+echo "🔧 Repository: $REPO_NAME"
+echo "🔧 Working directory will be set to: $CLAUDE_WORK_DIR"
+
+# Prepare environment for security checks
+echo "════════════════════════════════════════════════════════════════"
+echo "📊 PREPARING SECURITY SCANNING ENVIRONMENT"
+echo "════════════════════════════════════════════════════════════════"
+
+# Set GitHub App attribution - use generic format for all agents
+derive_bot_identity() {
+    local app_name="$1"
+
+    if [ -z "$app_name" ] || [ "$app_name" = "null" ]; then
+        GIT_AUTHOR_NAME="automation[bot]"
+        GIT_AUTHOR_EMAIL="automation[bot]@users.noreply.github.com"
+        return
+    fi
+
+    local slug
+    slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+    if [ -z "$slug" ]; then
+        slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]')
+    fi
+
+    local bot_login="${slug}[bot]"
+    local bot_email="${bot_login}@users.noreply.github.com"
+
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        local encoded_login
+        encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/%5B/g; s/\]/%5D/g')
+        local bot_response
+        bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
+        local bot_id
+        bot_id=$(printf '%s' "$bot_response" | jq -r '.id // empty' 2>/dev/null || echo '')
+        if [ -n "$bot_id" ]; then
+            bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
+        fi
+    fi
+
+    GIT_AUTHOR_NAME="$bot_login"
+    GIT_AUTHOR_EMAIL="$bot_email"
+}
+
+GITHUB_APP="{{github_app}}"
+derive_bot_identity "$GITHUB_APP"
+
+# Configure git with proper GitHub App attribution
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+git config --global init.defaultBranch main
+
+# Fix git dubious ownership issues
+git config --global --add safe.directory "$TASK_WORKSPACE"
+
+# Set environment variables for Claude Code to use
+export GIT_AUTHOR_NAME="$GIT_AUTHOR_NAME"
+export GIT_AUTHOR_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+
+# =============================================================================
+# CIPHER SECURITY SCAN HELPER FUNCTIONS
+# =============================================================================
+
+# Comprehensive security scan function
+run_cipher_security_scan() {
+    local scan_dir="${1:-.}"
+    local report_dir="${2:-/workspace/security-reports}"
+    
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║           CIPHER COMPREHENSIVE SECURITY SCAN                  ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    
+    mkdir -p "$report_dir"
+    local has_critical=0
+    local has_high=0
+    
+    # 1. Semgrep Static Analysis (Multi-language)
+    echo "🔍 [1/6] Running Semgrep static analysis..."
+    if command -v semgrep >/dev/null 2>&1; then
+        if [ -f "/workspace/.semgrep.yaml" ]; then
+            semgrep scan --config /workspace/.semgrep.yaml --severity ERROR \
+                --json --output "$report_dir/semgrep-results.json" "$scan_dir" 2>&1 | tee "$report_dir/semgrep.log"
+        else
+            semgrep scan --config auto --severity ERROR \
+                --json --output "$report_dir/semgrep-results.json" "$scan_dir" 2>&1 | tee "$report_dir/semgrep.log"
+        fi
+        
+        # Check for critical/high findings
+        if [ -f "$report_dir/semgrep-results.json" ]; then
+            local semgrep_errors=$(jq -r '.results | length' "$report_dir/semgrep-results.json" 2>/dev/null || echo "0")
+            if [ "$semgrep_errors" -gt 0 ]; then
+                echo "⚠️ Semgrep found $semgrep_errors ERROR-level issues"
+                has_high=1
+            else
+                echo "✅ Semgrep: No ERROR-level issues found"
+            fi
+        fi
+    else
+        echo "⚠️ Semgrep not available - skipping"
+    fi
+    
+    # 2. Rust Security (if Cargo.toml exists)
+    if [ -f "$scan_dir/Cargo.toml" ]; then
+        echo ""
+        echo "🦀 [2/6] Running Rust security scans..."
+        
+        # cargo audit
+        if command -v cargo >/dev/null 2>&1 && cargo audit --version >/dev/null 2>&1; then
+            echo "  📦 Running cargo audit..."
+            cd "$scan_dir" && cargo audit --json > "$report_dir/cargo-audit.json" 2>&1 || true
+            
+            if [ -f "$report_dir/cargo-audit.json" ]; then
+                local critical_vulns=$(jq -r '[.vulnerabilities.list[] | select(.advisory.severity == "critical")] | length' "$report_dir/cargo-audit.json" 2>/dev/null || echo "0")
+                local high_vulns=$(jq -r '[.vulnerabilities.list[] | select(.advisory.severity == "high")] | length' "$report_dir/cargo-audit.json" 2>/dev/null || echo "0")
+                
+                if [ "$critical_vulns" -gt 0 ]; then
+                    echo "  ❌ Found $critical_vulns CRITICAL vulnerabilities"
+                    has_critical=1
+                fi
+                if [ "$high_vulns" -gt 0 ]; then
+                    echo "  ⚠️ Found $high_vulns HIGH vulnerabilities"
+                    has_high=1
+                fi
+                if [ "$critical_vulns" -eq 0 ] && [ "$high_vulns" -eq 0 ]; then
+                    echo "  ✅ cargo audit: No CRITICAL/HIGH vulnerabilities"
+                fi
+            fi
+        else
+            echo "  ⚠️ cargo-audit not available - installing..."
+            cargo install cargo-audit 2>&1 | tail -5
+        fi
+        
+        # cargo geiger
+        if cargo geiger --version >/dev/null 2>&1; then
+            echo "  ☢️ Running cargo geiger (unsafe code detection)..."
+            cd "$scan_dir" && cargo geiger --output-format Json > "$report_dir/cargo-geiger.json" 2>&1 || true
+            echo "  ✅ cargo geiger scan complete"
+        fi
+        
+        # cargo deny
+        if cargo deny --version >/dev/null 2>&1; then
+            echo "  🚫 Running cargo deny..."
+            cd "$scan_dir" && cargo deny check advisories > "$report_dir/cargo-deny.log" 2>&1 || true
+            echo "  ✅ cargo deny scan complete"
+        fi
+    else
+        echo ""
+        echo "ℹ️ [2/6] No Cargo.toml found - skipping Rust security scans"
+    fi
+    
+    # 3. TypeScript/JavaScript Security (if package.json exists)
+    if [ -f "$scan_dir/package.json" ]; then
+        echo ""
+        echo "📦 [3/6] Running npm security audit..."
+        cd "$scan_dir" && npm audit --json > "$report_dir/npm-audit.json" 2>&1 || true
+        
+        if [ -f "$report_dir/npm-audit.json" ]; then
+            local npm_critical=$(jq -r '.metadata.vulnerabilities.critical // 0' "$report_dir/npm-audit.json" 2>/dev/null || echo "0")
+            local npm_high=$(jq -r '.metadata.vulnerabilities.high // 0' "$report_dir/npm-audit.json" 2>/dev/null || echo "0")
+            
+            if [ "$npm_critical" -gt 0 ]; then
+                echo "  ❌ Found $npm_critical CRITICAL npm vulnerabilities"
+                has_critical=1
+            fi
+            if [ "$npm_high" -gt 0 ]; then
+                echo "  ⚠️ Found $npm_high HIGH npm vulnerabilities"
+                has_high=1
+            fi
+            if [ "$npm_critical" -eq 0 ] && [ "$npm_high" -eq 0 ]; then
+                echo "  ✅ npm audit: No CRITICAL/HIGH vulnerabilities"
+            fi
+        fi
+    else
+        echo ""
+        echo "ℹ️ [3/6] No package.json found - skipping npm security audit"
+    fi
+    
+    # 4. Secret Scanning with gitleaks
+    echo ""
+    echo "🔐 [4/6] Running secret scanning with gitleaks..."
+    if command -v gitleaks >/dev/null 2>&1; then
+        gitleaks detect --source "$scan_dir" --report-path "$report_dir/gitleaks-report.json" \
+            --verbose --no-git 2>&1 | tee "$report_dir/gitleaks.log" || true
+        
+        if [ -f "$report_dir/gitleaks-report.json" ]; then
+            local secrets_found=$(jq -r '. | length' "$report_dir/gitleaks-report.json" 2>/dev/null || echo "0")
+            if [ "$secrets_found" -gt 0 ]; then
+                echo "  ⚠️ Found $secrets_found potential secrets - verify they are in .gitignore"
+                echo "  ⚠️ CRITICAL: Check with 'git check-ignore <file>' before flagging"
+            else
+                echo "  ✅ gitleaks: No secrets detected"
+            fi
+        fi
+    else
+        echo "  ⚠️ gitleaks not available"
+    fi
+    
+    # 5. Trivy Vulnerability Scanning
+    echo ""
+    echo "🛡️ [5/6] Running trivy vulnerability scan..."
+    if command -v trivy >/dev/null 2>&1; then
+        trivy fs --severity HIGH,CRITICAL --format json \
+            --output "$report_dir/trivy-report.json" "$scan_dir" 2>&1 | tee "$report_dir/trivy.log" || true
+        
+        if [ -f "$report_dir/trivy-report.json" ]; then
+            local trivy_critical=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' "$report_dir/trivy-report.json" 2>/dev/null || echo "0")
+            local trivy_high=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "$report_dir/trivy-report.json" 2>/dev/null || echo "0")
+            
+            if [ "$trivy_critical" -gt 0 ]; then
+                echo "  ❌ Found $trivy_critical CRITICAL vulnerabilities"
+                has_critical=1
+            fi
+            if [ "$trivy_high" -gt 0 ]; then
+                echo "  ⚠️ Found $trivy_high HIGH vulnerabilities"
+                has_high=1
+            fi
+            if [ "$trivy_critical" -eq 0 ] && [ "$trivy_high" -eq 0 ]; then
+                echo "  ✅ trivy: No CRITICAL/HIGH vulnerabilities"
+            fi
+        fi
+    else
+        echo "  ⚠️ trivy not available"
+    fi
+    
+    # 6. GitHub Code Scanning Alerts
+    echo ""
+    echo "🔍 [6/6] Checking GitHub Code Scanning alerts..."
+    if [ -n "${PR_NUMBER:-}" ]; then
+        gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUMBER" \
+            > "$report_dir/github-code-scanning.json" 2>&1 || true
+        
+        if [ -f "$report_dir/github-code-scanning.json" ]; then
+            local gh_critical=$(jq -r '[.[] | select(.rule.severity == "error")] | length' "$report_dir/github-code-scanning.json" 2>/dev/null || echo "0")
+            local gh_high=$(jq -r '[.[] | select(.rule.severity == "warning")] | length' "$report_dir/github-code-scanning.json" 2>/dev/null || echo "0")
+            
+            if [ "$gh_critical" -gt 0 ]; then
+                echo "  ❌ Found $gh_critical CRITICAL GitHub Code Scanning alerts"
+                has_critical=1
+            fi
+            if [ "$gh_high" -gt 0 ]; then
+                echo "  ⚠️ Found $gh_high HIGH GitHub Code Scanning alerts"
+                has_high=1
+            fi
+            if [ "$gh_critical" -eq 0 ] && [ "$gh_high" -eq 0 ]; then
+                echo "  ✅ GitHub Code Scanning: No CRITICAL/HIGH alerts"
+            fi
+        fi
+    else
+        echo "  ℹ️ No PR number - skipping GitHub Code Scanning check"
+    fi
+    
+    # Summary
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║                    SCAN SUMMARY                               ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "📊 Security scan reports saved to: $report_dir"
+    echo ""
+    
+    if [ "$has_critical" -eq 1 ]; then
+        echo "❌ CRITICAL vulnerabilities found - PR MUST be blocked"
+        echo "   Review reports and fix all CRITICAL issues before proceeding"
+        return 2
+    elif [ "$has_high" -eq 1 ]; then
+        echo "⚠️ HIGH severity vulnerabilities found - must fix before merge"
+        echo "   Review reports and address all HIGH severity issues"
+        return 1
+    else
+        echo "✅ No CRITICAL or HIGH severity vulnerabilities detected"
+        echo "   Security scan passed - proceed with code quality checks"
+        return 0
+    fi
+}
+
+# Export the function so Claude can reference it
+export -f run_cipher_security_scan
+
+# =============================================================================
+# AUTHENTICATION VERIFICATION
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "🔐 AUTHENTICATION VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+# Repository URLs - Handle both full URLs and org/repo format
+# Check if repository_url already contains https://github.com/
+if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+    REPO_HTTP_URL="{{repository_url}}"
+    if ! echo "{{repository_url}}" | grep -q "\.git$"; then
+        REPO_HTTP_URL="${REPO_HTTP_URL}.git"
+    fi
+else
+    REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
+fi
+
+# Same for docs repository
+if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+    DOCS_HTTP_URL="{{docs_repository_url}}"
+    if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
+        DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
+    fi
+else
+    DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
+fi
+
+# DEBUG: Show what URLs are being constructed
+echo "🔍 DEBUG: URL Construction & Parameters"
+echo "  Input repository_url: '{{repository_url}}'"
+echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+echo "  Input working_directory: '{{working_directory}}'"
+echo "  Input docs_branch: '{{docs_branch}}'"
+echo "  Input github_app: '{{github_app}}'"
+echo "  Input task_id: '{{task_id}}'"
+echo "  Input service: '{{service}}'"
+echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
+echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
+echo "  Current working directory: $(pwd)"
+echo "  Available environment variables:"
+env | grep -E "(GITHUB|ANTHROPIC)" | sed -E 's/(=).*/=\[REDACTED\]/' | sort
+
+# Test HTTPS access to repository
+echo "🔍 DEBUG: Testing HTTPS repository access..."
+echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
+if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
+  echo "✓ HTTPS repository access successful"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Output: $(cat /tmp/repo_test.out | head -1)"
+else
+  echo "❌ HTTPS repository access failed"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/repo_test.out)"
+  echo "  Git credential helper status:"
+  git config --list | grep credential || echo "  No credential helpers configured"
+  echo ""
+  echo "🚫 ABORTING: Cannot access repository via HTTPS"
+  exit 1
+fi
+
+# Test docs repository access
+echo "🔍 DEBUG: Testing docs repository access..."
+echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
+if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
+  echo "✓ Docs repository access successful"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Output: $(cat /tmp/docs_test.out | head -1)"
+else
+  echo "❌ Docs repository access failed"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/docs_test.out)"
+  echo ""
+  echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
+  exit 1
+fi
+
+# Clone or update repository
+cd "$TASK_WORKSPACE"
+if [ -d "$REPO_NAME/.git" ]; then
+    echo "📁 Found existing repository at '$REPO_ROOT', updating..."
+    cd "$REPO_NAME"
+    git fetch origin --prune
+else
+    echo "📥 Cloning repository to '$REPO_ROOT'..."
+    if ! git clone "$REPO_HTTP_URL" "$REPO_NAME"; then
+        echo "❌ Failed to clone repository"
+        exit 1
+    fi
+    cd "$REPO_NAME"
+fi
+
+# Create working directory if it's a subdirectory
+if [ "$CLAUDE_WORK_DIR" != "$REPO_ROOT" ]; then
+    mkdir -p "$CLAUDE_WORK_DIR"
+fi
+
+cd "$CLAUDE_WORK_DIR"
+echo "✓ Working directory: $CLAUDE_WORK_DIR"
+
+# Derive repository slug for gh CLI operations
+REPO_SLUG=""
+if git -C "$CLAUDE_WORK_DIR" remote get-url origin >/dev/null 2>&1; then
+  ORIGIN_URL=$(git -C "$CLAUDE_WORK_DIR" remote get-url origin 2>/dev/null || echo "")
+  if echo "$ORIGIN_URL" | grep -qE '^https://github.com/'; then
+    REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)(\\.git)?|\\1|')
+  elif echo "$ORIGIN_URL" | grep -qE '^git@github.com:'; then
+    REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\\.git)?|\\1|')
+  fi
+fi
+
+# If PR context is missing, try to discover by task label
+if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
+  TASK_LABEL="task-${TASK_ID}"
+  if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
+    # Only search OPEN PRs, sorted by creation date (newest first)
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --state open --json number,createdAt --jq 'sort_by(.createdAt) | reverse | .[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ] && [ "$CAND_NUM" != "null" ]; then
+      PR_NUMBER="$CAND_NUM"
+      PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
+      echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
+    fi
+  fi
+fi
+
+# Checkout PR branch for security scan
+if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+    echo "🔄 Checking out PR #$PR_NUMBER for security scan..."
+    cd "$CLAUDE_WORK_DIR"
+
+    # Fix git dubious ownership before any git operations
+    git config --global --add safe.directory "$CLAUDE_WORK_DIR"
+    echo "✓ Added repository to git safe directories"
+
+    # Fetch all latest changes including PR branches
+    git fetch origin --prune
+
+    # Get PR branch information and checkout
+    PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    
+    # If we couldn't get the branch name from pr view, try getting it from the PR list
+    if [ -z "$PR_BRANCH" ]; then
+        echo "⚠️  Initial branch name lookup failed, trying alternate method..."
+        PR_BRANCH=$(gh pr list --json number,headRefName --jq ".[] | select(.number == $PR_NUMBER) | .headRefName" 2>/dev/null || echo "")
+    fi
+    
+    if [ -n "$PR_BRANCH" ]; then
+        echo "📦 Checking out PR branch: $PR_BRANCH"
+        if git checkout "$PR_BRANCH" 2>/dev/null; then
+            echo "📥 Pulling latest changes from $PR_BRANCH..."
+            git pull origin "$PR_BRANCH" || echo "⚠️  Could not pull latest changes"
+        elif git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null; then
+            echo "✅ Created and checked out tracking branch for $PR_BRANCH"
+        else
+            echo "⚠️  Branch checkout failed, trying to fetch and checkout..."
+            git fetch origin "$PR_BRANCH:$PR_BRANCH" 2>/dev/null && git checkout "$PR_BRANCH" || {
+                echo "❌ All checkout methods failed"
+                exit 1
+            }
+        fi
+    else
+        echo "❌ CRITICAL: Could not determine PR branch name from PR #$PR_NUMBER"
+        echo "   This would create a wrong branch name (pr-$PR_NUMBER)"
+        echo "   Refusing to continue to avoid creating duplicate branches"
+        exit 1
+    fi
+
+    # Verify we're on the right commit
+    CURRENT_SHA=$(git rev-parse HEAD)
+    echo "📍 Current commit: $CURRENT_SHA"
+
+    # Don't change directory yet - we'll cd to CLAUDE_WORK_DIR at the end
+    echo "✅ Repository positioned at PR #$PR_NUMBER with latest changes"
+else
+    echo "⚠️  No PR context found (PR_NUMBER=$PR_NUMBER, PR_URL=$PR_URL)"
+    echo "📋 Will perform security scan on current repository state"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo "🔍 SECURITY ANALYSIS PREPARATION"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "MISSION: Enforce rigorous security standards:"
+echo "1. Check GitHub code scanning for open security vulnerabilities"
+echo "2. Fix all CRITICAL/HIGH/MEDIUM severity security issues"
+echo "3. Verify security best practices are followed"
+echo "4. Run quality checks (Clippy, fmt, tests) after security fixes"
+echo "5. Add 'ready-for-qa' label only when all security checks pass"
+echo ""
+echo "Security Standards:"
+echo "- Zero CRITICAL/HIGH/MEDIUM security vulnerabilities"
+echo "- No hardcoded secrets or credentials"
+echo "- Proper input validation and sanitization"
+echo "- Secure cryptography practices"
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+
+# Copy task files from docs repository if configured
+echo "📋 Preparing task documentation for security scan..."
+echo "════════════════════════════════════════════════════════════════"
+
+{{#if docs_repository_url}}
+# Initialize comprehensive tracking with explicit stage flags
+COPIED_FILES=""
+FAILED_FILES=""
+EXISTING_FILES=""
+DOCS_SETUP_SUCCESS=false
+DOCS_AUTH_VERIFIED=false
+DOCS_CLONE_SUCCESS=false
+DOCS_PATH_VALID=false
+
+# Prepare target directory (ensure it exists)
+if ! mkdir -p "$CLAUDE_WORK_DIR/task" 2>/tmp/mkdir_error.log; then
+    echo "❌ CRITICAL: Cannot create task directory"
+    echo "   Error: $(cat /tmp/mkdir_error.log 2>/dev/null || echo 'unknown')"
+    echo "   Aborting docs setup"
+else
+    echo "✓ Task directory prepared: $CLAUDE_WORK_DIR/task"
+fi
+
+# Validate GitHub token exists before proceeding
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "❌ CRITICAL: No GITHUB_TOKEN available"
+    echo "   Cannot authenticate to docs repository"
+    echo "   Aborting docs setup - agent will have limited context"
+    DOCS_AUTH_VERIFIED=false
+else
+    echo "✓ GitHub token available (${#GITHUB_TOKEN} chars)"
+    DOCS_AUTH_VERIFIED=true
+fi
+
+# Only proceed if we have authentication
+if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+    # Build authenticated docs URL
+    DOCS_REPO_URL="{{docs_repository_url}}"
+    DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
+    
+    echo "📥 Docs Repository: $DOCS_REPO_URL"
+
+    # Step 1: Verify repository access (fail fast if inaccessible)
+    echo ""
+    echo "🔍 Step 1/4: Verifying repository access..."
+    if ! git ls-remote "$DOCS_HTTP_URL" HEAD >/tmp/docs_access_test.out 2>&1; then
+        echo "❌ Repository access FAILED"
+        echo "   URL: $DOCS_REPO_URL"
+        echo "   Error: $(cat /tmp/docs_access_test.out 2>/dev/null | head -3)"
+        echo "   This is a blocking error - cannot proceed with docs setup"
+        DOCS_AUTH_VERIFIED=false
+    else
+        echo "✅ Repository access verified"
+        DOCS_AUTH_VERIFIED=true
+    fi
+fi
+
+# Step 2: Clone repository with explicit error handling
+if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+    echo ""
+    echo "📥 Step 2/4: Cloning docs repository..."
+
+    # Clean up any existing docs clone
+    rm -rf /tmp/docs-repo /tmp/docs_clone_error.log 2>/dev/null || true
+
+    MAX_ATTEMPTS=3
+    CLONE_SUCCEEDED=false
+
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+        echo "   Clone attempt $attempt/$MAX_ATTEMPTS..."
+
+        # Attempt clone with explicit error capture
+        if git clone --quiet --depth 1 "$DOCS_HTTP_URL" /tmp/docs-repo 2>/tmp/docs_clone_error.log; then
+            # Verify clone actually succeeded
+            if [ -d "/tmp/docs-repo/.git" ]; then
+                # Additional validation - check for at least some content
+                FILE_COUNT=$(find /tmp/docs-repo -type f 2>/dev/null | wc -l)
+                if [ "$FILE_COUNT" -gt 0 ]; then
+                    CLONE_SUCCEEDED=true
+                    DOCS_CLONE_SUCCESS=true
+                    echo "✅ Clone successful ($FILE_COUNT files)"
+                    break
+                else
+                    echo "❌ Clone succeeded but repository appears empty"
+                fi
+            else
+                echo "❌ Clone command succeeded but .git directory missing"
+            fi
+        else
+            CLONE_ERROR=$(cat /tmp/docs_clone_error.log 2>/dev/null | head -3)
+            echo "❌ Clone failed: ${CLONE_ERROR:-Unknown error}"
+        fi
+
+        # Retry logic
+        if [ $attempt -lt $MAX_ATTEMPTS ]; then
+            echo "   Waiting 5 seconds before retry..."
+            sleep 5
+        fi
+    done
+
+    if [ "$CLONE_SUCCEEDED" != "true" ]; then
+        echo "❌ FAILED to clone after $MAX_ATTEMPTS attempts"
+        echo "   Last error: $(cat /tmp/docs_clone_error.log 2>/dev/null || echo 'No error log available')"
+        DOCS_CLONE_SUCCESS=false
+    fi
+else
+    echo ""
+    echo "⏭️  Step 2/4: SKIPPED (authentication failed or not available)"
+fi
+
+# Step 3: Determine and validate paths with simplified logic
+if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
+    echo ""
+    echo "📂 Step 3/4: Validating documentation paths..."
+
+    # Simplified path determination - single clear logic path
+    {{#if docs_project_directory}}
+    # docs_project_directory is specified
+    if [ "{{docs_project_directory}}" = "." ] || [ "{{docs_project_directory}}" = "" ]; then
+        # Root of repository
+        DOCS_BASE_PATH="/tmp/docs-repo"
+        echo "   Using repository root (docs_project_directory='{{docs_project_directory}}')"
+    else
+        # Subdirectory specified
+        DOCS_BASE_PATH="/tmp/docs-repo/{{docs_project_directory}}"
+        echo "   Using subdirectory: {{docs_project_directory}}"
+    fi
+    {{else}}
+    # No docs_project_directory specified - default to root
+    DOCS_BASE_PATH="/tmp/docs-repo"
+    echo "   Using repository root (no docs_project_directory specified)"
+    {{/if}}
+
+    # Validate base path exists
+    if [ ! -d "$DOCS_BASE_PATH" ]; then
+        echo "❌ Base path does not exist: $DOCS_BASE_PATH"
+        echo "   Repository structure:"
+        ls -la /tmp/docs-repo 2>/dev/null | head -10 || echo "   Cannot list repository"
+        DOCS_PATH_VALID=false
+        DOCS_CLONE_SUCCESS=false
+    else
+        # Build and validate remaining paths
+        DOCS_PATH="$DOCS_BASE_PATH/.taskmaster"
+        TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+
+        echo "✅ Base path exists: $DOCS_BASE_PATH"
+        echo "   Taskmaster directory: $DOCS_PATH"
+        echo "   Task directory: $TASK_DIR"
+
+        # Validate .taskmaster directory - create if missing for resilient setup
+        if [ ! -d "$DOCS_PATH" ]; then
+            echo "⚠️  .taskmaster directory not found at: $DOCS_PATH"
+            echo "   Initializing .taskmaster structure..."
+            mkdir -p "$DOCS_PATH/tasks"
+            mkdir -p "$DOCS_PATH/docs"
+            if [ -d "$DOCS_PATH" ]; then
+                echo "✅ Created .taskmaster structure"
+                DOCS_PATH_VALID=true
+            else
+                echo "❌ Failed to create .taskmaster structure"
+                DOCS_PATH_VALID=false
+            fi
+        else
+            echo "✅ .taskmaster directory found"
+            DOCS_PATH_VALID=true
+        fi
+
+        # Check task directory (informational only, not blocking)
+        if [ ! -d "$TASK_DIR" ]; then
+            echo "⚠️  Task-specific directory not found: $TASK_DIR"
+            if [ -d "$DOCS_PATH/docs" ]; then
+                echo "   Available task directories:"
+                ls -d "$DOCS_PATH/docs/task-"* 2>/dev/null | head -5 || echo "   None found"
+            fi
+        else
+            echo "✅ Task directory found"
+        fi
+    fi
+else
+    echo ""
+    echo "⏭️  Step 3/4: SKIPPED (clone was not successful)"
+fi
+
+# Step 4: Copy documentation files with enhanced error tracking
+if [ "$DOCS_PATH_VALID" = "true" ]; then
+    echo ""
+    echo "📋 Step 4/4: Copying documentation files..."
+
+    # Enhanced file copy helper with better error handling
+    safe_copy_file() {
+        local src="$1"
+        local dest="$2"
+        local filename="$3"
+
+        # Validate source exists
+        if [ ! -f "$src" ]; then
+            echo "  ⊘ $filename - source not found"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+
+        # Check if source is readable and has content
+        if [ ! -r "$src" ]; then
+            echo "  ❌ $filename - source not readable"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+
+        local src_size=$(wc -c < "$src" 2>/dev/null || echo "0")
+        if [ "$src_size" = "0" ]; then
+            echo "  ⚠️  $filename - source is empty (0 bytes)"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+
+        # Check if destination already exists with content
+        if [ -f "$dest" ] && [ -s "$dest" ]; then
+            local dest_size=$(wc -c < "$dest")
+            echo "  ↻ $filename - already exists (${dest_size}B), preserving"
+            EXISTING_FILES="$EXISTING_FILES $filename"
+            return 0
+        fi
+
+        # Attempt copy with explicit error handling
+        if cp "$src" "$dest" 2>/tmp/copy_error_${filename}.log; then
+            # Verify copy succeeded and has content
+            if [ -f "$dest" ] && [ -s "$dest" ]; then
+                local copied_size=$(wc -c < "$dest")
+                # Verify size matches source
+                if [ "$copied_size" = "$src_size" ]; then
+                    echo "  ✅ $filename - copied successfully (${copied_size}B)"
+                    COPIED_FILES="$COPIED_FILES $filename"
+                    return 0
+                else
+                    echo "  ❌ $filename - size mismatch (src:${src_size}B dest:${copied_size}B)"
+                    rm -f "$dest"
+                    FAILED_FILES="$FAILED_FILES $filename"
+                    return 1
+                fi
+            else
+                echo "  ❌ $filename - copy succeeded but destination is empty"
+                rm -f "$dest"
+                FAILED_FILES="$FAILED_FILES $filename"
+                return 1
+            fi
+        else
+            local error=$(cat /tmp/copy_error_${filename}.log 2>/dev/null || echo "unknown error")
+            echo "  ❌ $filename - copy failed: $error"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+    }
+
+    # Copy task-specific files (task.md is critical, others are optional)
+    CRITICAL_FILES_COPIED=0
+    if [ -d "$TASK_DIR" ]; then
+        echo "  📁 Processing task-specific files from: $TASK_DIR"
+
+        # Critical file: task.md
+        if safe_copy_file "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/task.md" "task.md"; then
+            CRITICAL_FILES_COPIED=$((CRITICAL_FILES_COPIED + 1))
+        fi
+
+        # Optional files
+        safe_copy_file "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" "acceptance-criteria.md" || true
+        safe_copy_file "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/prompt.md" "prompt.md" || true
+    else
+        echo "  ⚠️  Task directory not found: $TASK_DIR"
+        echo "  Skipping task-specific files (task.md, acceptance-criteria.md, prompt.md)"
+        FAILED_FILES="$FAILED_FILES task.md acceptance-criteria.md prompt.md"
+    fi
+
+    # Copy architecture documentation (optional)
+    safe_copy_file "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/architecture.md" "architecture.md" || true
+
+    # Determine overall success
+    # Success if at least one critical file was copied/exists OR any files were copied/exist
+    AVAILABLE_FILE_COUNT=$(ls -1 "$CLAUDE_WORK_DIR/task/" 2>/dev/null | wc -l)
+    if [ "$AVAILABLE_FILE_COUNT" -gt 0 ]; then
+        DOCS_SETUP_SUCCESS=true
+        echo "  ✅ Setup successful - $AVAILABLE_FILE_COUNT file(s) available"
+    else
+        echo "  ❌ Setup failed - no files available for agent"
+        DOCS_SETUP_SUCCESS=false
+    fi
+else
+    echo ""
+    echo "⏭️  Step 4/4: SKIPPED (path validation failed)"
+fi
+
+# Comprehensive final summary with clear status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "📊 TASK DOCUMENTATION SETUP SUMMARY"
+echo "════════════════════════════════════════════════════════════════"
+
+# Overall status with clear pass/fail
+if [ "$DOCS_SETUP_SUCCESS" = "true" ]; then
+    echo "✅ STATUS: SUCCESS"
+    echo "   Documentation is available for the agent"
+else
+    echo "❌ STATUS: FAILED"
+    echo "   Agent will proceed with limited context"
+fi
+
+# Detailed stage breakdown
+echo ""
+echo "Pipeline Stages:"
+printf "  1. Authentication:   %s\n" "$([ "$DOCS_AUTH_VERIFIED" = "true" ] && echo "✅ Verified" || echo "❌ Failed")"
+printf "  2. Clone:            %s\n" "$([ "$DOCS_CLONE_SUCCESS" = "true" ] && echo "✅ Success" || echo "❌ Failed")"
+printf "  3. Path Validation:  %s\n" "$([ "$DOCS_PATH_VALID" = "true" ] && echo "✅ Valid" || echo "❌ Invalid")"
+printf "  4. File Operations:  %s\n" "$([ "$DOCS_SETUP_SUCCESS" = "true" ] && echo "✅ Complete" || echo "❌ Incomplete")"
+
+# File status tracking
+if [ -n "$COPIED_FILES" ]; then
+    echo ""
+    echo "📄 Newly copied:$COPIED_FILES"
+fi
+
+if [ -n "$EXISTING_FILES" ]; then
+    echo "📄 Preserved existing:$EXISTING_FILES"
+fi
+
+if [ -n "$FAILED_FILES" ]; then
+    echo "❌ Failed/missing:$FAILED_FILES"
+fi
+
+# List actual available files in task directory
+echo ""
+echo "📁 Task documentation available:"
+if [ -d "$CLAUDE_WORK_DIR/task" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/task" 2>/dev/null | wc -l)" -gt 0 ]; then
+    ls -lh "$CLAUDE_WORK_DIR/task/" 2>/dev/null | tail -n +2 | while read -r line; do
+        filename=$(echo "$line" | awk '{print $9}')
+        size=$(echo "$line" | awk '{print $5}')
+        printf "   ✓ %s (%s)\n" "$filename" "$size"
+    done
+else
+    echo "   (none available)"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+
+# Smart cleanup strategy - preserve debugging info on failure
+if [ "$DOCS_SETUP_SUCCESS" = "true" ] && [ -z "$FAILED_FILES" ]; then
+    # Full success - clean up everything
+    rm -rf /tmp/docs-repo /tmp/docs_access_test.out /tmp/docs_clone_error.log /tmp/copy_error_*.log 2>/dev/null || true
+    echo "✓ Temporary files cleaned (setup successful)"
+else
+    # Partial or complete failure - keep debugging info
+    echo "⚠️  Preserving temporary files for debugging"
+    echo ""
+    echo "Debug Information Available:"
+    [ -d "/tmp/docs-repo" ] && echo "   ✓ /tmp/docs-repo (cloned repository)"
+    [ -f "/tmp/docs_access_test.out" ] && echo "   ✓ /tmp/docs_access_test.out (access test output)"
+    [ -f "/tmp/docs_clone_error.log" ] && echo "   ✓ /tmp/docs_clone_error.log (clone errors)"
+    ls /tmp/copy_error_*.log 2>/dev/null | while read -r log; do
+        echo "   ✓ $log"
+    done || true
+
+    # Provide specific troubleshooting guidance
+    echo ""
+    echo "Troubleshooting Steps:"
+    if [ "$DOCS_AUTH_VERIFIED" != "true" ]; then
+        echo "   1. Verify GITHUB_TOKEN is valid and has repository access"
+        echo "   2. Check repository URL: {{docs_repository_url}}"
+    fi
+    if [ "$DOCS_CLONE_SUCCESS" != "true" ] && [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+        echo "   1. Review clone error log: /tmp/docs_clone_error.log"
+        echo "   2. Verify repository exists and is accessible"
+    fi
+    if [ "$DOCS_PATH_VALID" != "true" ] && [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
+        echo "   1. Check docs_project_directory configuration: '{{docs_project_directory}}'"
+        echo "   2. Verify .taskmaster directory exists in configured path"
+        echo "   3. List repository structure: ls -la /tmp/docs-repo"
+    fi
+fi
+
+{{else}}
+# No docs repository configured - check for local task files
+echo "ℹ️  No docs repository configured"
+echo "Checking for local task files in repository..."
+
+if [ -d "$CLAUDE_WORK_DIR/task" ]; then
+    FILE_COUNT=$(ls -A "$CLAUDE_WORK_DIR/task" 2>/dev/null | wc -l)
+    if [ "$FILE_COUNT" -gt 0 ]; then
+        echo "✓ Found task directory with $FILE_COUNT file(s)"
+        echo ""
+        echo "📁 Available files:"
+        ls -lh "$CLAUDE_WORK_DIR/task/" 2>/dev/null | tail -n +2 | while read -r line; do
+            filename=$(echo "$line" | awk '{print $9}')
+            size=$(echo "$line" | awk '{print $5}')
+            printf "   ✓ %s (%s)\n" "$filename" "$size"
+        done
+    else
+        echo "⚠️  Task directory exists but is empty"
+        echo "   Agent will proceed with limited context"
+    fi
+else
+    echo "⚠️  No task documentation available"
+    echo "   - No docs repository configured (docs_repository_url not set)"
+    echo "   - No local task/ directory found in repository"
+    echo "   Agent will proceed with minimal context"
+fi
+echo "════════════════════════════════════════════════════════════════"
+{{/if}}
+
+# Ensure we're in the git repository working directory
+echo "✓ Working directly in git repository at: $CLAUDE_WORK_DIR"
+
+# Check if we should continue previous session
+{{#if continue_session}}
+echo "📂 Continuing from previous session..."
+# Preserve existing CLAUDE.md if it exists
+if [ -f "/workspace/CLAUDE.md" ]; then
+    echo "✓ Found existing CLAUDE.md, preserving session memory"
+fi
+{{else}}
+{{#if overwrite_memory}}
+echo "🔄 Overwriting session memory as requested..."
+rm -f /workspace/CLAUDE.md
+{{/if}}
+{{/if}}
+
+# Generate configuration files from templates
+echo "🔧 Generating Cipher-specific configuration files..."
+
+# Enterprise managed settings - copy to writable location for model rotation
+echo "=== ENTERPRISE MANAGED SETTINGS ==="
+echo "✓ Settings source: /etc/claude-code/managed-settings.json (ConfigMap mount)"
+
+# Copy enterprise settings to writable location
+# ConfigMap mounts use symlinks that can't be modified, so we copy to a writable path
+# Claude will use this writable copy, allowing model rotation to work
+mkdir -p "/etc/claude-code-writable"
+if [ -f "/etc/claude-code/managed-settings.json" ]; then
+  cp "/etc/claude-code/managed-settings.json" "/etc/claude-code-writable/managed-settings.json"
+  echo "✓ Copied enterprise settings to /etc/claude-code-writable/managed-settings.json (writable)"
+  echo "✓ Model rotation will modify this writable copy"
+else
+  echo "⚠️ Enterprise settings not found, Claude will use defaults"
+fi
+
+# Verify tools-config.json is available and valid
+echo "=== TOOLS CONFIG SETUP ==="
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/tools-config.json"
+SOURCE_CFG="/task-files/tools-config.json"
+
+# Helper to check non-empty JSON object
+is_valid_cfg() {
+  local p="$1"
+  [ -f "$p" ] || return 1
+  jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
+}
+
+STATUS_LABEL_NEEDS_FIXES="needs-fixes"
+STATUS_LABEL_FIXING="fixing-in-progress"
+STATUS_LABEL_NEEDS_CLEO="needs-cipher"
+STATUS_LABEL_NEEDS_TESS="needs-tess"
+STATUS_LABEL_APPROVED="approved"
+STATUS_LABEL_FAILED="failed-remediation"
+STATUS_LABEL_NEEDS_TESTS_LEGACY="needs tests"
+
+ensure_status_labels() {
+  local repo="$1"
+  shift
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for entry in "$@"; do
+    [ -n "$entry" ] || continue
+    local label="${entry%%:*}"
+    local rest="${entry#*:}"
+    local color="${rest%%:*}"
+    local desc="${rest#*:}"
+
+    if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
+      gh label create "$label" --force -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+pr_add_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR #$pr_number"
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR $pr_url"
+    fi
+  done
+}
+
+pr_remove_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --remove-label "$label" >/dev/null 2>&1 || true
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --remove-label "$label" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+update_coderun_status() {
+  local remediation="$1"
+  local qa="$2"
+  local pr_url_value="${3:-$PR_URL}"
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local patch
+  patch=$(jq -n \
+    --arg ts "$timestamp" \
+    --arg pr "$pr_url_value" \
+    --arg rem "$remediation" \
+    --arg qa "$qa" \
+    '{status: ({lastUpdate: $ts}
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+        + (if $rem != "" then {remediationStatus: $rem} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end))}')
+
+  if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+    kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$patch" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to update CodeRun status with remediation context"
+  fi
+}
+
+# Copy tools-config.json from task files first
+if [ -f "/task-files/tools-config.json" ]; then
+  cp /task-files/tools-config.json "$CLAUDE_WORK_DIR/tools-config.json"
+  cp \$CLAUDE_WORK_DIR/tools-config.json "$TASK_WORKSPACE/tools-config.json" 2>/dev/null || true
+  echo "✓ tools-config.json copied from ConfigMap to both working directory and workspace root"
+else
+  echo "⚠️ tools-config.json not found in task-files"
+fi
+
+SRC_OK=false
+WS_OK=false
+if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
+if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
+
+if $SRC_OK; then
+  export MCP_TOOLS_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from source ConfigMap: $MCP_TOOLS_CONFIG"
+elif $WS_OK; then
+  export MCP_TOOLS_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_TOOLS_CONFIG from workspace copy: $MCP_TOOLS_CONFIG"
+else
+  echo "❌ No valid tools-config.json found (both source and workspace empty/invalid). Aborting."
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
+  else
+    echo "   Source missing: $SOURCE_CFG"
+  fi
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$WORKSPACE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$WORKSPACE_CFG"; echo; })
+  else
+    echo "   Workspace missing: $WORKSPACE_CFG"
+  fi
+  exit 1
+fi
+
+# Check if CLAUDE.md already exists (created by controller)
+if [ -f "$CLAUDE_WORK_DIR/CLAUDE.md" ]; then
+    echo "✓ CLAUDE.md already exists (from controller), using existing file"
+elif [ -f "/workspace/CLAUDE.md" ]; then
+    echo "✓ Found CLAUDE.md in workspace, copying to working directory"
+    cp "/workspace/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
+else
+    echo "📝 Creating Cipher-specific CLAUDE.md memory file"
+    cat > "$CLAUDE_WORK_DIR/CLAUDE.md" << 'EOF'
+# CIPHER - Security Scanning Agent
+
+## Agent Role
+- **Primary**: Security vulnerability scanning and remediation
+- **Focus**: Identify and fix security vulnerabilities before production
+- **Zero tolerance for MEDIUM/HIGH/CRITICAL severity vulnerabilities**
+- **Critical**: Ensure all security best practices are followed
+
+## PRIORITY TASKS
+
+### 1. GitHub Code Scanning (DO FIRST!)
+Check for security vulnerabilities on the current PR:
+\\\`\\\`\\\`bash
+# Get all open security alerts for this PR
+gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM"
+
+# Check if there are any CRITICAL/HIGH/MEDIUM severity alerts
+CRITICAL_COUNT=\\\$(gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM" | jq '[.[] | select(.rule.severity == "critical")] | length')
+HIGH_COUNT=\\\$(gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM" | jq '[.[] | select(.rule.severity == "high")] | length')
+MEDIUM_COUNT=\\\$(gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM" | jq '[.[] | select(.rule.severity == "medium")] | length')
+
+echo "🔒 Security Scan Results:"
+echo "   CRITICAL: \\\$CRITICAL_COUNT"
+echo "   HIGH: \\\$HIGH_COUNT"
+echo "   MEDIUM: \\\$MEDIUM_COUNT"
+\\\`\\\`\\\`
+
+### 2. Security Vulnerability Remediation (HIGH PRIORITY)
+Address all vulnerabilities found:
+
+**Common Vulnerabilities to Fix:**
+- **SQL Injection**: Always use parameterized queries/prepared statements
+- **Command Injection**: Validate and sanitize all command inputs
+- **Path Traversal**: Use path normalization and validation
+- **Insecure Crypto**: Use modern, approved cryptographic libraries
+- **Hardcoded Secrets**: Move to environment variables or secret management
+- **Unsafe Deserialization**: Validate data before deserialization
+- **XSS**: Properly escape all user input in HTML contexts
+- **Auth/Authorization Bypass**: Verify permissions at every access point
+
+### 3. Merge Conflict Resolution
+Check for merge conflicts and resolve them:
+\\\`\\\`\\\`bash
+# Check if PR has conflicts
+gh pr view $PR_NUM --json mergeable,mergeStateStatus
+
+# If conflicts exist:
+git fetch origin main
+git merge origin/main
+# Resolve conflicts intelligently, preserving functionality
+git add -A
+git commit -m "fix: resolve merge conflicts with main"
+git push
+\\\`\\\`\\\`
+
+## Security Best Practices
+
+### Input Validation
+- Validate all user input against expected formats
+- Use allowlists, not denylists
+- Sanitize input before use in sensitive contexts
+
+### Secure Database Access
+\\\`\\\`\\\`rust
+// ❌ NEVER do this (SQL injection risk):
+let query = format!("SELECT * FROM users WHERE id = {}", user_id);
+
+// ✅ Always use parameterized queries:
+let user = sqlx::query!("SELECT * FROM users WHERE id = $1", user_id)
+    .fetch_one(&pool)
+    .await?;
+\\\`\\\`\\\`
+
+### Safe Path Handling
+\\\`\\\`\\\`rust
+// ❌ NEVER do this (path traversal risk):
+let path = format!("/data/{}", user_input);
+
+// ✅ Always normalize and validate paths:
+use std::path::Path;
+let base = Path::new("/data");
+let requested = base.join(user_input);
+if !requested.starts_with(base) {
+    return Err("Invalid path");
+}
+\\\`\\\`\\\`
+
+### Secure Cryptography
+- Use modern algorithms (AES-256-GCM, ChaCha20-Poly1305)
+- Never implement your own crypto
+- Use secure random number generators
+- Properly handle keys and initialization vectors
+
+### Secret Management
+\\\`\\\`\\\`rust
+// ❌ NEVER do this:
+const API_KEY: &str = "sk_live_abc123...";
+
+// ✅ Always use environment variables:
+let api_key = std::env::var("API_KEY")
+    .expect("API_KEY must be set");
+\\\`\\\`\\\`
+
+## Code Quality Integration
+
+### Security-Aware Quality Checks
+\\\`\\\`\\\`bash
+# Run standard quality checks
+RUST_CHANGES=\\\$(git diff --name-only origin/main...HEAD | grep -E '\\\.(rs|toml)\\\$' || true)
+if [ -n "\\\$RUST_CHANGES" ]; then
+  cargo clippy -- -D warnings -D clippy::pedantic
+  cargo fmt --check
+  cargo test
+fi
+\\\`\\\`\\\`
+
+### Important Rules
+- **NEVER suppress security warnings** - fix the underlying vulnerability
+- Document all security-sensitive code decisions
+- Review dependencies for known vulnerabilities
+- Ensure CI/CD includes security scanning
+
+## GitHub Integration
+- Check code scanning alerts before any other work
+- Fix all CRITICAL/HIGH/MEDIUM vulnerabilities
+- Post PR comments documenting security fixes
+- Push fixes and verify alerts are resolved
+- Only approve when all security checks pass
+
+## Success Criteria
+- ✅ Zero CRITICAL/HIGH/MEDIUM security vulnerabilities
+- ✅ All security best practices followed
+- ✅ No hardcoded secrets or credentials
+- ✅ Input validation implemented properly
+- ✅ Secure cryptography used correctly
+- ✅ All quality checks passing
+- ✅ Changes documented and pushed
+
+## Remember
+Security is not optional. Every vulnerability you fix protects users, data, and the company.
+Never suppress security warnings - fix the root cause. When in doubt, fail securely.
+EOF
+
+    # Append base CLAUDE.md from ConfigMap if it exists
+    if [ -f "/task-files/CLAUDE.md" ]; then
+        echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md"
+        cat "/task-files/CLAUDE.md" >> "$CLAUDE_WORK_DIR/CLAUDE.md"
+        echo "✓ Appended base CLAUDE.md content from ConfigMap"
+    fi
+fi
+
+# Copy guidelines files to working directory (match Rex pattern)
+if [ -f "/task-files/coding-guidelines.md" ]; then
+  cp /task-files/coding-guidelines.md "$CLAUDE_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
+
+if [ -f "/task-files/github-guidelines.md" ]; then
+  cp /task-files/github-guidelines.md "$CLAUDE_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+# Copy MCP configuration from ConfigMap to project root (project scope)
+if [ -f "/task-files/mcp.json" ]; then
+  cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+  echo "✓ Copied mcp.json to .mcp.json (project scope)"
+else
+  echo "⚠️ mcp.json template not found"
+fi
+
+# Setup hook scripts
+echo "🔧 Setting up Cipher-specific hook scripts..."
+mkdir -p "$CLAUDE_WORK_DIR/hooks"
+
+{{#each hook_scripts}}
+cat > "$CLAUDE_WORK_DIR/hooks/{{@key}}" << 'EOF'
+{{{this}}}
+EOF
+chmod +x "$CLAUDE_WORK_DIR/hooks/{{@key}}"
+{{/each}}
+
+# Export environment for Claude
+export CLAUDE_WORK_DIR
+export GITHUB_TOKEN
+export REPO_OWNER
+export REPO_NAME
+export REPO_ROOT
+
+echo "════════════════════════════════════════════════════════════════"
+echo "✅ CIPHER SECURITY AGENT READY"
+echo "════════════════════════════════════════════════════════════════"
+echo "📁 Working Directory: $CLAUDE_WORK_DIR"
+echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
+echo "📋 Task: {{task_id}}"
+echo "🎯 Focus: Security vulnerability scanning and remediation"
+echo "⚠️  CRITICAL: Must fix all CRITICAL/HIGH/MEDIUM security vulnerabilities"
+echo "════════════════════════════════════════════════════════════════"
+
+# Export necessary variables for Claude execution
+export SERVICE_NAME="{{service}}"
+export TASK_ID="{{task_id}}"
+export GITHUB_APP="{{github_app}}"
+
+# Initialize retry loop variables
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+ATTEMPT=1
+SUCCESS=0
+CLAUDE_EXIT_CODE=1
+
+echo "🔄 Cipher will retry up to $MAX_RETRIES times until security standards are met"
+echo ""
+
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
+# Retry loop - Cipher will continue until security checks pass or max retries reached
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "════════════════════════════════════════════════════════════════"
+  echo "🚀 Cipher Security Scan Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "════════════════════════════════════════════════════════════════"
+
+  # =========================================================================
+  # INCREMENTAL CONTEXT: Load previous iteration findings
+  # =========================================================================
+  AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
+  mkdir -p "$AGENT_STATE_DIR"
+
+  PREVIOUS_CONTEXT=""
+  if [ $ATTEMPT -gt 1 ]; then
+    PREV_ATTEMPT=$((ATTEMPT - 1))
+    PREV_STATE_FILE="$AGENT_STATE_DIR/security-iteration-${PREV_ATTEMPT}.json"
+
+    if [ -f "$PREV_STATE_FILE" ]; then
+      echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
+
+      if command -v jq >/dev/null 2>&1; then
+        PREV_FINDINGS=$(jq -r '.findings // "No findings recorded"' "$PREV_STATE_FILE" 2>/dev/null || echo "")
+        PREV_STATUS=$(jq -r '.status // "unknown"' "$PREV_STATE_FILE" 2>/dev/null || echo "unknown")
+
+        if [ -n "$PREV_FINDINGS" ] && [ "$PREV_FINDINGS" != "No findings recorded" ]; then
+          PREVIOUS_CONTEXT="
+
+## 🔄 Context from Previous Iteration (#$PREV_ATTEMPT)
+
+**Status**: $PREV_STATUS
+
+**Previous Findings**:
+$PREV_FINDINGS
+
+**Focus for This Iteration**:
+- Address the issues identified above
+- Don't repeat the same analysis
+- Build on previous progress incrementally
+
+"
+          echo "✅ Loaded context: $PREV_STATUS with findings"
+        fi
+      fi
+    else
+      echo "ℹ️ No previous iteration state found (first attempt or state cleared)"
+    fi
+  fi
+
+  if [ -n "$PREVIOUS_CONTEXT" ]; then
+    PROMPT_CONTENT="${PROMPT_CONTENT}${PREVIOUS_CONTEXT}"
+    echo "📝 Enhanced prompt with previous iteration context"
+  fi
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+    
+    # Update writable copy of enterprise settings with current model
+    if [ -f "/etc/claude-code-writable/managed-settings.json" ]; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "/etc/claude-code-writable/managed-settings.json" > /tmp/settings-rotated.json && \
+      mv /tmp/settings-rotated.json "/etc/claude-code-writable/managed-settings.json"
+      echo "✓ Updated model rotation settings"
+    fi
+  fi
+
+# Start Claude with Cipher-specific configuration
+cd "$CLAUDE_WORK_DIR"
+
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "📖 How MCP Tool Validation Works:"
+echo "  1. Check if claude CLI is available"
+echo "  2. List all configured MCP servers (claude mcp list)"
+echo "  3. Verify required servers are connected (tools for Cipher)"
+echo "  4. Attempt to list available tools from each server"
+echo "  5. Ensure critical tools are accessible"
+echo ""
+echo "🔍 Verifying Claude MCP tools..."
+
+TOOL_VERIFICATION_FAILED=false
+
+if command -v claude >/dev/null 2>&1; then
+  # Check MCP servers first
+  echo "📋 Checking MCP servers..."
+  MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+  
+  if echo "$MCP_LIST" | grep -q "Connected"; then
+    echo "  ✓ MCP servers connected"
+    echo "$MCP_LIST" | grep "Connected" | sed 's/^/  /'
+  else
+    echo "  ⚠️ No MCP servers connected"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Cipher needs: Context7, GitHub
+  REQUIRED_SERVERS=("tools")
+  
+  echo ""
+  echo "🔍 Verifying required MCP servers..."
+  for server in "${REQUIRED_SERVERS[@]}"; do
+    if echo "$MCP_LIST" | grep -q "$server.*Connected"; then
+      echo "  ✓ $server server available"
+    else
+      echo "  ❌ $server server NOT available"
+      TOOL_VERIFICATION_FAILED=true
+    fi
+  done
+  
+  echo ""
+  echo "📦 Listing available MCP tools from connected servers..."
+  
+  # Try to list tools from the tools server
+  if echo "$MCP_LIST" | grep -q "tools.*Connected"; then
+    # Extract tools URL from MCP list
+    TOOLS_URL=$(echo "$MCP_LIST" | grep "tools" | sed -n 's/.*--url \([^ ]*\).*/\1/p' | head -1)
+    if [ -z "$TOOLS_URL" ]; then
+      # Fallback to known URL if extraction fails
+      TOOLS_URL="http://tools.cto.svc.cluster.local:3000/mcp"
+    fi
+    
+    echo "  🔧 Tools server tools (from $TOOLS_URL):"
+    
+    # Try to get tool list via direct MCP query
+    # Note: This assumes tools MCP server supports a tools/list endpoint
+    TOOLS_RESPONSE=$(curl -s -X POST "$TOOLS_URL" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1}' 2>/dev/null || echo "")
+    
+    if [ -n "$TOOLS_RESPONSE" ] && echo "$TOOLS_RESPONSE" | grep -q "result"; then
+      # Parse and display tools if we got a valid response
+      echo "$TOOLS_RESPONSE" | jq -r '.result.tools[]?.name // empty' 2>/dev/null | sed 's/^/    - /' || echo "    ⚠️ Unable to parse tool list"
+      
+      # Count tools
+      TOOL_COUNT=$(echo "$TOOLS_RESPONSE" | jq -r '.result.tools | length' 2>/dev/null || echo "0")
+      echo "    📊 Total: $TOOL_COUNT tools available"
+    else
+      echo "    ℹ️ Unable to fetch tool list (server may not support listing)"
+      echo "    ℹ️ Tools will be discovered at runtime by Claude"
+    fi
+  fi
+  
+  echo ""
+else
+  echo "  ⚠️ claude CLI not available for tool verification"
+  TOOL_VERIFICATION_FAILED=true
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "Critical MCP servers are not available. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - Tools server not reachable"
+  echo "  - MCP servers not initialized properly"
+  echo "  - .mcp.json misconfigured"
+  echo ""
+  echo "Full MCP server list:"
+  claude mcp list 2>&1 || echo "Failed to list MCP servers"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical MCP tools verified successfully"
+echo ""
+# =========================================================================
+
+# Build Claude command
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+
+# Add writable enterprise settings for model rotation
+if [ -f "/etc/claude-code-writable/managed-settings.json" ]; then
+    echo "✓ Using writable enterprise settings for model rotation"
+    CLAUDE_CMD="$CLAUDE_CMD --settings /etc/claude-code-writable/managed-settings.json"
+fi
+
+# Look for Cipher-specific system prompt file
+if [ -f "/task-files/cipher-system-prompt.md" ]; then
+    echo "✓ Found Cipher system prompt file, adding to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/cipher-system-prompt.md"
+else
+    echo "ℹ️ No Cipher system prompt file found, using inline prompt"
+fi
+
+# Create Cipher's static prompt (fallback if no system prompt file)
+echo "✓ Creating Cipher's security scanning prompt"
+
+# Build static prompt with task context
+# Determine language-specific security checks
+TASK_LANG="${TASK_LANGUAGE:-rust}"
+TASK_FW="${TASK_FRAMEWORK:-}"
+
+# Build language-specific security guidance
+LANGUAGE_SECURITY=""
+case "$TASK_LANG" in
+  typescript|javascript|ts|js)
+    LANGUAGE_SECURITY="
+## TypeScript/JavaScript Security Standards
+
+### Comprehensive Security Scan Commands:
+\`\`\`bash
+# 1. Semgrep static analysis (CRITICAL - run first)
+semgrep scan --config auto --severity ERROR --json > semgrep-results.json
+
+# 2. Dependency vulnerabilities (CRITICAL)
+npm audit --json > npm-audit.json
+
+# 3. Secret scanning (CRITICAL - check .gitignore first)
+gitleaks detect --source . --report-path gitleaks-report.json --verbose
+
+# 4. Vulnerability scanning (HIGH)
+trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+
+# 5. ESLint with security plugins (if configured)
+eslint --ext .ts,.tsx . --config .eslintrc.json
+\`\`\`
+
+### Security Requirements:
+- **Semgrep**: No CRITICAL/HIGH issues (XSS, eval, innerHTML, SQL injection)
+- **Dependency Audit**: Run \`npm audit\` - zero CRITICAL/HIGH CVEs
+- **Package Security**: Check for known vulnerable packages in package.json
+- **Secret Detection**: Scan for exposed API keys, tokens, credentials
+- **XSS Protection**: Verify input sanitization and output encoding
+- **Secrets**: Use \`gitleaks\` but verify files are NOT in .gitignore first
+
+### Helper Function Available:
+Run comprehensive security scan with a single command:
+\`\`\`bash
+run_cipher_security_scan . /workspace/security-reports
+\`\`\`
+
+This runs ALL security tools and generates reports. Returns: 0 (pass), 1 (HIGH issues), 2 (CRITICAL issues)
+
+### Guidelines:
+- **Complete guide**: /workspace/CIPHER_SECURITY_GUIDELINES.md
+- **Quick reference**: /workspace/CIPHER_QUICK_REFERENCE.md
+- **Custom rules**: /workspace/.semgrep.yaml"
+    if echo "$TASK_FW" | grep -q "react\|next"; then
+      LANGUAGE_SECURITY="$LANGUAGE_SECURITY
+- **React Security**: Check for dangerouslySetInnerHTML usage, validate prop types
+- **Next.js Security**: Verify API routes have proper authentication, check env var exposure"
+    fi
+    ;;
+  rust)
+    LANGUAGE_SECURITY="
+## Rust Security Standards
+
+### Comprehensive Security Scan Commands:
+\`\`\`bash
+# 1. Semgrep static analysis (CRITICAL - run first)
+semgrep scan --config auto --severity ERROR --json > semgrep-results.json
+
+# 2. Dependency vulnerabilities (CRITICAL)
+cargo audit --json > cargo-audit.json
+
+# 3. Unsafe code detection (HIGH)
+cargo geiger --output-format Json > cargo-geiger.json
+
+# 4. Policy enforcement (HIGH)
+cargo deny check advisories
+cargo deny check licenses
+
+# 5. Secret scanning (CRITICAL - check .gitignore first)
+gitleaks detect --source . --report-path gitleaks-report.json --verbose
+
+# 6. Vulnerability scanning (HIGH)
+trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+\`\`\`
+
+### Security Requirements:
+- **Semgrep**: No CRITICAL/HIGH issues in custom rules
+- **Dependency Audit**: Run \`cargo audit\` - zero CRITICAL/HIGH CVEs
+- **Unsafe Code**: Review all \`unsafe\` blocks with \`cargo geiger\`
+- **Input Validation**: Verify bounds checking and input sanitization
+- **Cryptography**: Ensure proper use of cryptographic libraries
+- **Secrets**: Use \`gitleaks\` but verify files are NOT in .gitignore first
+
+### Helper Function Available:
+Run comprehensive security scan with a single command:
+\`\`\`bash
+run_cipher_security_scan . /workspace/security-reports
+\`\`\`
+
+This runs ALL security tools and generates reports. Returns: 0 (pass), 1 (HIGH issues), 2 (CRITICAL issues)
+
+### Guidelines:
+- **Complete guide**: /workspace/CIPHER_SECURITY_GUIDELINES.md
+- **Quick reference**: /workspace/CIPHER_QUICK_REFERENCE.md
+- **Custom rules**: /workspace/.semgrep.yaml"
+    ;;
+  python)
+    LANGUAGE_SECURITY="
+## Python Security Standards
+- **Dependency Audit**: Run \`pip-audit\` or \`safety check\`
+- **Input Validation**: Check for SQL injection, command injection risks
+- **Secret Management**: Verify credentials not hardcoded
+- **Dependency Pinning**: Ensure requirements.txt has pinned versions"
+    ;;
+  *)
+    LANGUAGE_SECURITY="
+## General Security Standards
+- **Dependency Audit**: Check for known vulnerabilities in dependencies
+- **Secret Detection**: Scan for exposed credentials
+- **Input Validation**: Verify all user input is properly validated"
+    ;;
+esac
+
+CIPHER_PROMPT="# Security Scanning Assignment
+
+You are Cipher, a rigorous security scanning agent. Your mission is to identify and fix security vulnerabilities before they reach production.
+
+## Your Role
+- **Primary Focus**: Security vulnerability scanning and remediation
+- **Language Context**: This is a **${TASK_LANG}** project${TASK_FW:+ using $TASK_FW}
+$LANGUAGE_SECURITY
+- **Security Tools**: GitHub Code Scanning, dependency audits, secret detection
+- **Code Quality**: Clippy (pedantic), cargo fmt, cargo test after security fixes
+- **CI/CD**: Verify GitHub Actions workflows include security scanning
+- **Decision Authority**: Add 'ready-for-qa' label only when ALL security checks pass
+- **Standards**: Zero CRITICAL/HIGH/MEDIUM vulnerabilities, secure coding practices, no hardcoded secrets
+
+## Current Context
+
+### Pull Request Information
+- **PR Number**: ${PR_NUMBER:-"Not specified"}
+- **PR URL**: ${PR_URL:-"Not specified"}
+- **Repository**: $REPO_OWNER/$REPO_NAME
+- **Working Directory**: $CLAUDE_WORK_DIR"
+
+# Add task context if available
+if [ -f "$CLAUDE_WORK_DIR/task/task.md" ]; then
+    CIPHER_PROMPT="$CIPHER_PROMPT
+
+### Task Information (for context)
+$(cat "$CLAUDE_WORK_DIR/task/task.md")
+
+### Task Requirements (Rex was asked to implement)
+$(cat "$CLAUDE_WORK_DIR/task/prompt.md" 2>/dev/null || echo "No prompt.md found")
+
+### Acceptance Criteria (what Rex needed to achieve)
+$(cat "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" 2>/dev/null || echo "No acceptance-criteria.md found")
+
+### Architecture Reference (if available)
+$(cat "$CLAUDE_WORK_DIR/task/architecture.md" 2>/dev/null || echo "No architecture.md found")"
+else
+    CIPHER_PROMPT="$CIPHER_PROMPT
+
+### Task Information
+No task files found in /task directory - proceeding with general security scan."
+fi
+
+# Complete the prompt
+CIPHER_PROMPT="$CIPHER_PROMPT
+
+## Your Instructions
+
+**🚨 CRITICAL: PR WORKFLOW - READ THIS FIRST 🚨**
+
+You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
+- **DO NOT create a new PR** - Rex already created one
+- **DO NOT create a new branch** - you're already on Rex's PR branch
+- **DO NOT post PR reviews** - the container script handles all reviews after you finish
+- **DO push your fixes** to the EXISTING PR branch
+- All your commits will automatically appear on PR #${PR_NUMBER:-UNKNOWN}
+- The repository is already checked out to the correct PR branch
+
+**Your job**: Fix security vulnerabilities on Rex's PR, NOT create your own PR or post reviews.
+
+**CRITICAL RESTRICTION**: Never run \`gh pr review\` commands. You can:
+- ✅ Post comments: \`gh pr comment\`
+- ✅ Add labels: \`gh pr edit --add-label\`
+- ✅ Push commits: \`git push\`
+- ❌ NEVER: \`gh pr review --approve\`
+- ❌ NEVER: \`gh pr review --request-changes\`
+- ❌ NEVER: \`gh pr review --comment\`
+
+The container will post the final review based on your exit code.
+
+1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
+2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
+3. **Check GitHub Code Scanning (CRITICAL - MUST FIX ALL MEDIUM/HIGH ISSUES)**:
+   - Check for security vulnerabilities: gh api "/repos/{{repo_owner}}/{{repo_name}}/code-scanning/alerts?state=open&pr={{pr_number}}"
+   - **ZERO TOLERANCE** for HIGH and CRITICAL severity issues
+   - **MUST FIX** all MEDIUM severity issues
+   - Common issues to address:
+     * SQL injection vulnerabilities
+     * Command injection risks
+     * Path traversal vulnerabilities
+     * Insecure cryptographic practices
+     * Hardcoded credentials
+     * Unsafe deserialization
+   - If code scanning alerts exist, you MUST fix them before proceeding
+   - Use secure coding practices: parameterized queries, input validation, safe path handling
+   - Do NOT suppress security warnings - fix the underlying vulnerability
+4. **Verify Live Data Implementation**: Ensure NO mocks exist - all implementations must use real databases, APIs, and configurable parameters (no hard-coded trading pairs, endpoints, etc.)
+5. **Run quality checks (CRITICAL - NO BYPASSES)**:
+   - For Rust: cargo clippy -- -D warnings -W clippy::pedantic
+   - **ABSOLUTELY CRITICAL**: DO NOT add #[allow(clippy::...)] to bypass warnings!
+   - Instead, FIX the underlying code issues that Clippy identifies
+   - Review existing code and REMOVE any #[allow(clippy::...)] attributes by fixing the code
+   - Run cargo fmt to fix any formatting issues
+   - For YAML: YAML linting and validation
+   - IMPORTANT: Commit and push ALL fixes immediately (don't wait until the end)
+   - NOTE: Do NOT write tests - Tess handles all testing
+6. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
+   - Check if .github/workflows/ci.yml exists (or similar CI workflow)
+   - If not, create using these PROVEN TEMPLATES from our production platform:
+
+   **a) Dockerfile (Runtime-only, expects pre-built binary):**
+   \\\`\\\`\\\`dockerfile
+   FROM debian:bookworm-slim
+   RUN apt-get update && apt-get install -y \\\\
+       ca-certificates libssl3 wget --no-install-recommends \\\\
+       && rm -rf /var/lib/apt/lists/* && apt-get clean
+   RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
+   WORKDIR /app
+   COPY binary-name /app/binary-name
+   RUN chmod +x /app/binary-name && chown -R app:app /app
+   USER app
+   EXPOSE 8080
+   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\\
+       CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+   CMD ["./binary-name"]
+   \\\`\\\`\\\`
+
+   **b) CI Workflow (.github/workflows/ci.yml) - Fast Builds with Caching:**
+   \\\`\\\`\\\`yaml
+   name: Continuous Integration
+   on:
+     push:
+       branches: [main]
+     pull_request:
+       branches: [main]
+
+   jobs:
+     lint-rust:
+       runs-on: ubuntu-22.04
+       steps:
+         - uses: actions/checkout@v4
+         - uses: actions-rust-lang/setup-rust-toolchain@v1
+           with:
+             toolchain: stable
+             components: rustfmt, clippy
+         # 🚀 CRITICAL: Use Swatinem/rust-cache for intelligent dependency caching
+         - uses: Swatinem/rust-cache@v2
+           with:
+             workspaces: . -> target
+             shared-key: "rust-cache-ci"
+         - name: Format check
+           run: cargo fmt --all -- --check
+         - name: Clippy
+           run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic
+
+     test-rust:
+       runs-on: ubuntu-22.04
+       steps:
+         - uses: actions/checkout@v4
+         - uses: actions-rust-lang/setup-rust-toolchain@v1
+           with:
+             toolchain: stable
+         - uses: Swatinem/rust-cache@v2
+           with:
+             workspaces: . -> target
+             shared-key: "rust-cache-ci"
+         - name: Run tests
+           run: cargo test --all-features --all-targets
+   \\\`\\\`\\\`
+
+   **c) Deploy Workflow (.github/workflows/deploy.yml) - Arc Runner with Ultra-Fast Builds:**
+   \\\`\\\`\\\`yaml
+   name: Deploy
+   on:
+     push:
+       branches: [main, develop, feature/*, feat/*, fix/*]
+
+   env:
+     REGISTRY: ghcr.io
+     IMAGE_BASE: ${{ github.repository_owner }}
+
+   jobs:
+     build:
+       # 🚀 CRITICAL: Use Arc runner (k8s-runner) for 5-10x faster builds
+       # Arc runners have pre-installed: sccache, mold linker, pre-warmed dependencies
+       runs-on: [k8s-runner]
+       permissions:
+         contents: read
+         packages: write
+       steps:
+         - uses: actions/checkout@v4
+
+         # 🚀 Build with ULTRA-FAST caching mechanisms
+         - name: Build binary
+           env:
+             # Use sccache for compiler-level caching (pre-installed on k8s-runner)
+             RUSTC_WRAPPER: "sccache"
+             # Build to persistent cache directory for multi-run speed
+             CARGO_TARGET_DIR: "\$HOME/cache/target"
+             # Optimize for speed
+             CARGO_INCREMENTAL: "0"
+             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+             CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+           run: |
+             # Pre-warm sccache (already installed on k8s-runner)
+             sccache --start-server || true
+             echo "📊 Initial sccache stats:"
+             sccache --show-stats
+
+             # Build with persistent cache directory
+             mkdir -p \$HOME/cache/target
+             cargo build --release --bin <binary-name>
+
+             # Show cache hit rates
+             echo "📊 Final sccache stats:"
+             sccache --show-stats
+
+             # Copy from cache dir to workspace
+             cp \$HOME/cache/target/release/<binary-name> ./<binary-name>
+
+         - uses: docker/setup-buildx-action@v3
+           with:
+             driver: docker
+             install: true
+
+         - uses: docker/login-action@v3
+           with:
+             registry: ghcr.io
+             username: ${{ github.actor }}
+             password: ${{ secrets.GITHUB_TOKEN }}
+
+         - uses: docker/build-push-action@v5
+           with:
+             context: .
+             file: ./Dockerfile
+             platforms: linux/amd64  # Can add arm64 with docker-container driver
+             push: true
+             tags: |
+               ghcr.io/${{ github.repository }}:latest
+               ghcr.io/${{ github.repository }}:${{ github.sha }}
+             # Use GitHub Actions cache for Docker layers
+             cache-from: type=gha
+             cache-to: type=gha,mode=max
+   \\\`\\\`\\\`
+
+   **KEY PERFORMANCE OPTIMIZATIONS:**
+   - ✅ **Arc Runners (k8s-runner)**: 5-10x faster than ubuntu-latest, pre-warmed dependencies
+   - ✅ **sccache**: Compiler-level caching, massive speedup on incremental builds
+   - ✅ **CARGO_TARGET_DIR**: Persistent cache across builds in \$HOME/cache/target
+   - ✅ **Swatinem/rust-cache**: Intelligent Cargo dependency caching for CI jobs
+   - ✅ **mold linker**: Ultra-fast linking (pre-installed on k8s-runner)
+   - ✅ **GitHub Actions Cache**: Docker layer caching with cache-from/cache-to
+
+   - Commit and push the CI configuration
+   - Push any code fixes you made locally
+   - Use 'gh workflow run' to trigger the build if needed
+   - Use 'gh run list' and 'gh run view' to monitor status
+   - **WATCH FOR STUCK JOBS**: If jobs show "Waiting" > 2 min:
+     * Check runner availability and labels
+     * Verify workflow syntax is correct
+     * Fix any workflow configuration issues
+   - KEEP ITERATING: Fix issues, push, check CI, repeat until ALL JOBS RUN AND PASS
+7. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
+   - **If repository has workflows**: Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
+   - **If no workflows**: Skip CI validation and proceed to code quality checks
+   - **CRITICAL: Check for stuck/pending jobs** (only if workflows exist):
+     * Look for jobs showing "Waiting" or "Pending" for > 2 minutes
+     * Check 'gh run list --branch=$(gh pr view {{pr_number}} --json headRefName -q .headRefName)' for workflow status
+     * If jobs aren't starting, investigate:
+       - Missing runner labels? Check 'runs-on:' in workflow
+       - Workflow syntax errors? Validate with 'actionlint' or GitHub UI
+       - Missing workflow triggers? Check 'on:' section
+       - Concurrency limits? Check workflow 'concurrency:' settings
+   - **Common fixes for stuck jobs** (only if workflows exist):
+     * Add/fix 'runs-on: ubuntu-latest' (or appropriate runner)
+     * Remove invalid actions or fix version tags
+     * Ensure workflow file is in .github/workflows/
+     * Check if workflow needs to be enabled in Actions settings
+   - **CRITICAL: Fix CI/CD Permissions Issues** (YOU MUST FIX THESE, DON'T SKIP!):
+     * If Docker push to GHCR fails with "write_package" error:
+       - Add 'permissions:' block to the job: 'contents: read' and 'packages: write'
+       - Example: See deploy workflow template above (lines with 'permissions:')
+       - This is REQUIRED for pushing to ghcr.io (GitHub Container Registry)
+     * If workflow can't create PRs/comments:
+       - Add 'pull-requests: write' permission
+     * If workflow can't push commits:
+       - Add 'contents: write' permission
+     * **ALWAYS** include proper permissions block - it's part of CI setup!
+     * Use 'gh run view <run-id>' to see permission errors
+   - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI (when workflows exist)
+   - **VERIFY NO #[allow(clippy::...)] BYPASSES**: Check that no warnings are suppressed
+   - **VERIFY DOCKER PUSH SUCCESS**: If workflow includes Docker build, ensure images push to registry successfully
+   - SUCCESS = Code quality checks pass + CI passes (if workflows exist) OR code quality checks pass (if no workflows)
+   - Do NOT proceed until quality standards are met AND Docker images can be pushed (if applicable)
+8. **Review against task requirements**: Verify implementation matches acceptance criteria
+9. **Report results**: Provide detailed summary of checks performed, security scanning results, CI setup, and any fixes applied
+10. **Success criteria**: Security vulnerabilities fixed + Quality checks pass + CI/CD validation (when workflows exist)
+
+## Quality Standards (MUST PASS IN GITHUB ACTIONS WHEN WORKFLOWS EXIST, OTHERWISE LOCALLY!)
+- **Zero tolerance for security vulnerabilities** - All MEDIUM, HIGH, and CRITICAL severity issues from GitHub code scanning MUST be fixed
+- **No security warning suppression** - Fix the vulnerability, don't silence the alert
+- **Secure coding practices required** - Use parameterized queries, input validation, safe APIs
+- **Zero tolerance** for clippy warnings at pedantic level (in CI if workflows exist, locally otherwise)
+- **NO CLIPPY BYPASSES** - Absolutely no #[allow(clippy::...)] attributes unless critically necessary with documented justification
+- **FIX THE CODE, NOT THE WARNING** - Address the underlying issues Clippy identifies
+- **Perfect formatting** required (cargo fmt --check must pass in CI if workflows exist, locally otherwise)
+- **All tests pass** (cargo test must succeed in CI if workflows exist, locally otherwise)
+- **Clean YAML** syntax and structure
+- **CI/CD Pipeline** MUST be working with successful Docker image build AND push (when workflows exist)
+- **Permissions** MUST be configured correctly (packages:write for GHCR, contents:write for commits, etc.)
+- **Docker Registry** MUST accept image pushes (no "write_package" errors or permission failures)
+- **GitHub Actions** MUST show green checks for ALL quality gates (when workflows exist)
+- **Task compliance** (implementation should meet acceptance criteria)
+- **NO MOCKS ALLOWED** (all implementations must use live data and real APIs - no hard-coded or mock values)
+- **Parameterized Configuration** (trading pairs, endpoints, and business logic must be configurable, not hard-coded)
+
+## CRITICAL REMINDER
+Your success is measured by:
+- **If workflows exist**: GitHub Actions CI status, NOT local checks
+  - You MUST push your changes to see them tested in CI
+  - You MUST iterate: fix locally → push → check CI → repeat until green
+  - Clippy pedantic MUST pass in GitHub Actions before you can add 'ready-for-qa' label
+  - **ALL CI JOBS MUST ACTUALLY RUN** - stuck/pending jobs = FAILURE
+- **If no workflows**: Local quality checks and task compliance
+  - Run quality checks locally: cargo clippy, cargo fmt, cargo test
+  - Ensure code meets quality standards before approval
+
+## TROUBLESHOOTING STUCK CI JOBS
+If CI jobs won't start (showing \"Waiting\" or \"Pending\" indefinitely):
+1. **Check runner labels**: Ensure 'runs-on:' uses valid runners
+   - Common: ubuntu-latest, ubuntu-22.04, ubuntu-20.04
+   - Self-hosted: [self-hosted], [k8s-runner]
+2. **Validate workflow syntax**: Run locally or check GitHub UI for errors
+3. **Check workflow triggers**: Ensure 'on:' section includes your event
+4. **Fix common issues**:
+   - Missing or misspelled action names
+   - Invalid YAML syntax (use yamllint)
+   - Workflow file not in .github/workflows/
+   - Workflow disabled in repo settings
+- The PR checks page on GitHub is your source of truth
+
+Begin your security scan now."
+
+# Debug: Print the actual prompt and CLAUDE.md content
+echo "════════════════════════════════════════════════════════════════"
+echo "🔍 DEBUG: CIPHER PROMPT CONTENT"
+echo "════════════════════════════════════════════════════════════════"
+echo "$CIPHER_PROMPT"
+echo "════════════════════════════════════════════════════════════════"
+
+echo "════════════════════════════════════════════════════════════════"
+echo "🔍 DEBUG: CLI MEMORY FILE CONTENT"
+echo "════════════════════════════════════════════════════════════════"
+# Check for the appropriate memory file based on CLI type
+CLI_TYPE="{{cli_type}}"
+case "$CLI_TYPE" in
+    "claude")
+        MEMORY_FILE="CLAUDE.md"
+        ;;
+    "factory")
+        MEMORY_FILE="AGENTS.md"
+        ;;
+    "codex")
+        MEMORY_FILE="AGENTS.md"
+        ;;
+    *)
+        MEMORY_FILE="CLAUDE.md"  # Default fallback
+        ;;
+esac
+
+if [ -f "$CLAUDE_WORK_DIR/$MEMORY_FILE" ]; then
+    cat "$CLAUDE_WORK_DIR/$MEMORY_FILE"
+else
+    echo "ℹ️ No $MEMORY_FILE found at $CLAUDE_WORK_DIR/$MEMORY_FILE (using $CLI_TYPE CLI)"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
+# Compose initial user turn with the static prompt
+USER_COMBINED=$(printf "%s" "$CIPHER_PROMPT" | jq -Rs .)
+
+# Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
+# Use a subshell to ensure stdin closes after the prompt is sent
+(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED"; exec 0<&-) | $CLAUDE_CMD &
+CLAUDE_PID=$!
+echo "✓ Started Claude with Cipher prompt (PID: $CLAUDE_PID), stdin will close after prompt"
+
+# Start background token refresh for long-running jobs
+(
+    while kill -0 $CLAUDE_PID 2>/dev/null; do
+        sleep 2700  # Check every 45 minutes
+
+        if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
+            NOW=$(date +%s)
+            TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+            if [ $TOKEN_AGE -gt 2700 ]; then
+                echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+                refresh_github_token
+            fi
+        fi
+    done
+) &
+TOKEN_REFRESH_PID=$!
+echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
+
+# Wait for Claude process to complete
+wait "$CLAUDE_PID"
+CLAUDE_EXIT_CODE=$?
+
+# Stop token refresh background process
+if [ -n "$TOKEN_REFRESH_PID" ]; then
+    kill $TOKEN_REFRESH_PID 2>/dev/null || true
+    echo "✓ Stopped token refresh process"
+fi
+
+# Always attempt to complete security scan - don't exit on Claude failures
+echo "🔄 Processing security scan results..."
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  echo "✅ Claude security scan completed successfully"
+fi
+
+# Always attempt to post PR comment and add label regardless of Claude exit status
+# Update remediation status labels for Cipher's outcome
+# Ensure OWNER/REPO slug for gh -R
+if [ -z "${REPO_SLUG:-}" ]; then
+  REPO_INPUT="{{repository_url}}"
+  if echo "$REPO_INPUT" | grep -q "^https://github.com/"; then
+    REPO_SLUG=$(echo "$REPO_INPUT" | sed -E 's|https://github.com/([^/]+/[^/.]+)(\.git)?$|\1|')
+  else
+    REPO_SLUG="$REPO_INPUT"
+  fi
+fi
+
+SECURITY_PASSED=0
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  SECURITY_PASSED=1
+fi
+
+if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
+  ensure_status_labels "$REPO_SLUG" \
+    "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
+    "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
+    "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cipher security scan" \
+    "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
+    "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
+    "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
+
+  # =========================================================================
+  # COMPLETION PROBE: Ask Claude if security checks are complete
+  # =========================================================================
+  echo "🧭 Running security completion probe..."
+  
+  COMPLETION_PROMPT="Security scan completion check.
+
+Review security findings. Answer 'yes' ONLY if:
+1. Zero CRITICAL/HIGH/MEDIUM vulnerabilities in git-tracked files
+2. Files in .gitignore (like .config/, .env) are NOT issues
+3. Quality checks pass (or fail only due to missing external services)
+
+IMPORTANT: Respond with ONLY the word 'yes' or 'no' on a single line.
+Do not add explanations or additional text.
+
+Your response:"
+
+  COMPLETION_LOG="/tmp/cipher-completion-${ATTEMPT}.log"
+  
+  set +e
+  COMPLETION_OUTPUT=$(claude --stream-json false "$COMPLETION_PROMPT" 2>&1 | tee "$COMPLETION_LOG")
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set -e
+
+  echo "🧭 Completion response:"
+  printf '%s\n' "$COMPLETION_OUTPUT"
+
+  # Extract yes/no from response - matches several safe patterns:
+  # 1. **yes** or **no** (markdown bold at line start)
+  # 2. Standalone yes/no on their own line  
+  # 3. "Answer: yes", ": yes", "Response: no" (after colon/dash)
+  # Avoids false matches from "no warnings", "no errors", "yes, there are issues"
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$|[:] *(yes|no)$|^[-:] *(yes|no)$' | sed 's/[*:-]//g' | sed 's/^ *//;s/ *$//' | tail -n1 | tr '[:upper:]' '[:lower:]')
+
+  # Determine if security checks passed based on completion probe
+  SECURITY_PASSED=0
+  if [ "$COMPLETION_RESPONSE" = "yes" ]; then
+    echo "✅ Cipher confirmed security checks complete"
+    SECURITY_PASSED=1
+  elif [ "$COMPLETION_RESPONSE" = "no" ]; then
+    echo "🔴 Cipher reports security issues remain"
+    SECURITY_PASSED=0
+  elif [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "⚠️ Completion probe unclear, using exit code"
+    SECURITY_PASSED=1
+  else
+    SECURITY_PASSED=0
+  fi
+
+  if [ $SECURITY_PASSED -eq 1 ]; then
+    # Security passed - will post approval AFTER loop completes to avoid duplicates
+    # Add security-approved label (create if missing)
+    LABEL_NAME="security-approved"
+    LABEL_API_PATH=$(printf '%s' "$LABEL_NAME" | sed 's/ /%20/g')
+    echo "🏷️  Ensuring '$LABEL_NAME' label exists"
+    if ! gh api -H "Accept: application/vnd.github+json" "repos/$REPO_OWNER/$REPO_NAME/labels/$LABEL_API_PATH" >/dev/null 2>&1; then
+      gh api -X POST \
+        -H "Accept: application/vnd.github+json" \
+        "repos/$REPO_OWNER/$REPO_NAME/labels" \
+        -f name="$LABEL_NAME" \
+        -f color="0E8A16" \
+        -f description="Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
+    fi
+    echo "🏷️  Adding '$LABEL_NAME' label"
+    if ! gh api -X POST \
+      -H "Accept: application/vnd.github+json" \
+      "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels" \
+      -F labels[]="$LABEL_NAME" >/dev/null 2>&1; then
+      echo "⚠️ Failed to add $LABEL_NAME label"
+    fi
+
+    LABEL_READY_FOR_SECURITY="ready-for-security"
+    LABEL_READY_FOR_QA="ready-for-qa"
+    echo "🧹 Removing '$LABEL_READY_FOR_SECURITY' label after security approval"
+    gh api -X DELETE \
+      -H "Accept: application/vnd.github+json" \
+      "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels/$LABEL_READY_FOR_SECURITY" >/dev/null 2>&1 || echo "ℹ️ '$LABEL_READY_FOR_SECURITY' label already absent"
+
+    echo "♻️ Refreshing '$LABEL_READY_FOR_QA' label to trigger Tess"
+    gh api -X DELETE \
+      -H "Accept: application/vnd.github+json" \
+      "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels/$LABEL_READY_FOR_QA" >/dev/null 2>&1 || true
+    if gh api -X POST \
+      -H "Accept: application/vnd.github+json" \
+      "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUMBER/labels" \
+      -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
+      echo "🏷️  Added '$LABEL_READY_FOR_QA' label to signal Tess"
+    else
+      echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
+    fi
+
+    update_coderun_status "ready-for-qa" "security-passed" "$PR_URL"
+  else
+    # Security issues detected - will post REQUEST_CHANGES after loop completes
+    # Add needs-fixes label so evaluate-remediation can detect it
+    echo "🏷️  Adding 'needs-fixes' label to trigger remediation"
+    timeout 30 gh pr edit "$PR_NUMBER" --add-label "needs-fixes" || echo "⚠️ Failed to add needs-fixes label"
+
+    # DO NOT add ready-for-qa label - block Tess until issues are fixed
+    echo "🛑 Blocking Tess handoff - security issues must be resolved first"
+
+    update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
+  fi
+else
+  echo "⚠️ No PR reference available, skipping remediation label update"
+  update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" ""
+fi
+
+# No sidecar shutdown needed - container will exit naturally when main process completes
+
+  # =========================================================================
+  # SAVE ITERATION STATE: Persist findings for next iteration
+  # =========================================================================
+  STATE_FILE="$AGENT_STATE_DIR/security-iteration-${ATTEMPT}.json"
+  
+  # Check if security scan was successful using SECURITY_PASSED variable (set earlier based on log analysis)
+  if [ ${SECURITY_PASSED:-0} -eq 1 ]; then
+    # Save successful completion state
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "completed",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": "Security checks passed on iteration $ATTEMPT",
+  "exit_code": 0,
+  "issues": []
+}
+EOF
+    echo "💾 Saved successful completion state to $STATE_FILE"
+
+    echo "✅ Attempt $ATTEMPT: Security checks passed"
+    SUCCESS=1
+    break
+  else
+    # Save incomplete state
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "incomplete",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": "Security issues detected - remediation required",
+  "exit_code": $CLAUDE_EXIT_CODE,
+  "issues": ["Security vulnerabilities or policy violations found"]
+}
+EOF
+    echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
+
+    echo "⚠️ Attempt $ATTEMPT: Security issues detected - blocking Tess handoff"
+
+    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
+      ATTEMPT=$((ATTEMPT + 1))
+      echo ""
+      # Brief pause before retry
+      sleep 2
+    else
+      echo "❌ Maximum retry attempts reached - Rex remediation required"
+      break
+    fi
+  fi
+done
+
+# Post a single security summary comment per CodeRun
+if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
+  echo "💬 Posting final security scan summary to PR..."
+
+  if [ $SUCCESS -eq 1 ]; then
+    COMMENT_BODY="## 🔒 Security Review by Cipher
+
+✅ **Security checks completed successfully**
+
+### Security Gates Passed
+- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified
+
+**Status:** Ready for QA testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher*"
+  else
+    COMMENT_BODY="## 🔒 Security Review by Cipher
+
+⚠️ **Security review encountered issues**
+
+### Current Status
+- Security checks are being processed
+- Some issues must be resolved before QA
+
+### Next Steps
+- Fix the security vulnerabilities called out in the logs
+- Update insecure dependencies or configurations
+- Remove any exposed secrets
+- Address security best practice violations
+
+---
+*Security review by Cipher*"
+  fi
+
+  if [ -n "$PR_NUMBER" ]; then
+    if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
+      echo "✅ Successfully posted security scan summary"
+    else
+      echo "⚠️ Failed to post security comment using PR number"
+    fi
+  elif [ -n "$PR_URL" ]; then
+    if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
+      echo "✅ Successfully posted security scan summary"
+    else
+      echo "⚠️ Failed to post security comment using PR URL"
+    fi
+  fi
+else
+  echo "ℹ️ No PR reference available, skipping security summary comment"
+fi
+
+# Post PR review ONCE after loop completes (not inside loop to avoid duplicates)
+if [ -n "$PR_NUMBER" ]; then
+  if [ $SUCCESS -eq 1 ]; then
+    echo "✅ Cipher security checks passed - posting status comment (no approval)"
+    
+    # Post status comment - Tess retains sole approval authority
+    timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED (Status Only)
+
+All security checks have passed:
+- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified
+
+**Status:** Ready for QA testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher — Tess grants the approval*" || echo "⚠️ PR comment command failed"
+  else
+    echo "❌ Security issues detected - posting REQUEST CHANGES review (once)"
+    
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Security Changes
+
+Security issues detected. Please address the following:
+- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations
+
+Rex will address these issues and resubmit for review.
+
+---
+*Security review by Cipher*" || echo "⚠️ PR review command failed"
+  fi
+fi
+
+# Report final status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ CIPHER SECURITY SCAN SUCCESSFUL"
+  echo "   Completed after $ATTEMPT attempt(s)"
+  echo "   All security checks passed - ready for Tess"
+else
+  echo "🛑 CIPHER SECURITY GATE: BLOCKING WORKFLOW"
+  echo "   Attempted $ATTEMPT time(s)"
+  echo "   Security issues detected - Rex remediation required"
+  echo "   Tess handoff BLOCKED until issues resolved"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
+# Cleanup and exit
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 CIPHER SECURITY SCAN COMPLETE                ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "📋 Task: {{task_id}}"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ Security checks passed"
+else
+  echo "❌ Security issues found - workflow blocked"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
+# Final termination sequence
+echo "════════════════════════════════════════════════════════════════"
+echo "🔚 TERMINATING CIPHER CONTAINER"
+echo "════════════════════════════════════════════════════════════════"
+echo "Claude Exit Code: $CLAUDE_EXIT_CODE"
+echo "Security Gate Result: $([ $SUCCESS -eq 1 ] && echo 'PASSED' || echo 'BLOCKED')"
+echo "Container PID: $$"
+echo "Final Process Check:"
+ps aux | head -5
+
+# Write completion marker for workflow tracking (only if passed)
+if [ $SUCCESS -eq 1 ]; then
+  echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+fi
+
+# Explicitly stop Docker sidecar before exiting
+echo "🛑 Explicitly stopping Docker sidecar..."
+stop_docker_sidecar || true
+
+# Exit with appropriate code based on success
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔚 Terminating container with success status..."
+  exit 0
+else
+  echo "🔚 Terminating container with failure status..."
+  echo "📝 Security issues detected - blocking workflow progression"
+  exit 1
+fi
