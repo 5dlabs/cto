@@ -72,6 +72,8 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           restartPolicy: OnFailure
+          imagePullSecrets:
+            - name: ghcr-secret
           # Ensure jobs run on worker nodes, not control plane
           affinity:
             nodeAffinity:
