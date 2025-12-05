@@ -1,0 +1,22 @@
+---
+# Requirements configuration for CTO project
+# This file applies to ALL tasks in the project automatically
+# Located at: docs/requirements.yaml (project-level configuration)
+
+# Static environment variables (non-secret configuration)
+environment:
+  # Logging
+  RUST_LOG: "info"
+
+# Note: No secrets are defined here. If you need secrets for your project:
+# 1. Create the secret in your cluster (e.g., via External Secrets)
+# 2. Add the secret reference below:
+#
+# secrets:
+#   - name: your-secret-name
+#
+# 3. Or add environment variables that reference secret keys:
+#
+# environment:
+#   YOUR_SECRET_VAR: "value-from-secret"
+
