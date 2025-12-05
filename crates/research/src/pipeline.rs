@@ -55,6 +55,8 @@ pub struct PollCycleResult {
     pub skipped: usize,
     /// Errors encountered.
     pub errors: Vec<String>,
+    /// IDs of saved entries (for PR creation).
+    pub saved_ids: Vec<String>,
 }
 
 /// Research pipeline orchestrator.
@@ -200,6 +202,7 @@ impl Pipeline {
 
             state.mark_processed(&bookmark.id);
             result.saved += 1;
+            result.saved_ids.push(bookmark.id.clone());
 
             tracing::info!(
                 id = %bookmark.id,

@@ -103,9 +103,20 @@ spec:
                 - --min-relevance=0.5
                 - --batch-size=10
                 - --model=claude-sonnet-4-20250514
+                - --create-pr
+                - --repo=5dlabs/cto
+                - --base-branch=main
+                - --research-dir=docs/research
               volumeMounts:
                 - name: data
                   mountPath: /data
+              env:
+                # Map GitHub PAT to GITHUB_TOKEN
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: tools-github-secrets
+                      key: GITHUB_PERSONAL_ACCESS_TOKEN
               envFrom:
                 # Twitter cookies (new secret)
                 - secretRef:
