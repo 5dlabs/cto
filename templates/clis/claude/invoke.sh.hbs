@@ -1,0 +1,138 @@
+# =========================================================================
+# Claude Code CLI Invocation Partial
+# 
+# This partial handles ONLY the Claude CLI command building and execution.
+# Include this in workflow containers using: {{> clis/claude/invoke}}
+#
+# Required context variables:
+#   - CLAUDE_WORK_DIR: Working directory for Claude
+#   - PROMPT_CONTENT: The prompt to send to Claude (or read from task/prompt.md)
+#   - github_app: GitHub App name for system prompt lookup
+#
+# Optional context variables:
+#   - model: Model to use (defaults to settings)
+#   - continue_session: If true, adds --continue flag
+#   - mcp_config_path: Path to MCP config (defaults to /workspace/.mcp.json)
+#   - system_prompt_path: Path to system prompt file
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               CLAUDE CODE CLI INVOCATION                     ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Build Claude command with latest CLI flags (as of Dec 2024)
+# Reference: https://code.claude.com/docs/en/cli-reference
+CLAUDE_CMD="claude -p"
+
+# Output format: stream-json for programmatic parsing
+CLAUDE_CMD="$CLAUDE_CMD --output-format stream-json"
+CLAUDE_CMD="$CLAUDE_CMD --input-format stream-json"
+
+# Verbose mode for debugging
+CLAUDE_CMD="$CLAUDE_CMD --verbose"
+
+# MCP configuration
+MCP_CONFIG="${mcp_config_path:-/workspace/.mcp.json}"
+if [ -f "$MCP_CONFIG" ]; then
+    echo "✓ Adding MCP configuration: $MCP_CONFIG"
+    CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG"
+else
+    echo "⚠️ No MCP configuration found at $MCP_CONFIG"
+fi
+
+# System prompt handling
+# Priority: 1) Explicit path, 2) agents ConfigMap, 3) task-files
+{{#if system_prompt_path}}
+if [ -f "{{system_prompt_path}}" ]; then
+    echo "✓ Using explicit system prompt: {{system_prompt_path}}"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt-file {{system_prompt_path}}"
+fi
+{{else}}
+if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+    echo "✓ Using system prompt from agents ConfigMap for {{github_app}}"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt-file /config/agents/{{github_app}}_system-prompt.md"
+elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
+    echo "✓ Using system prompt from task-files for {{github_app}}"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt-file /task-files/{{github_app}}_system-prompt.md"
+else
+    echo "ℹ️ No system prompt file found, using defaults"
+fi
+{{/if}}
+
+# Continue session (for retries)
+{{#if continue_session}}
+CLAUDE_CMD="$CLAUDE_CMD --continue"
+echo "✓ Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})"
+{{/if}}
+
+# Model override (if specified - otherwise uses managed-settings.json)
+{{#if model}}
+# Note: Model can also be set via managed-settings.json or --model flag
+# Using model alias: {{model}}
+echo "✓ Model specified: {{model}}"
+{{/if}}
+
+# Permission mode for automation
+CLAUDE_CMD="$CLAUDE_CMD --dangerously-skip-permissions"
+
+echo ""
+echo "🚀 Claude Command: $CLAUDE_CMD"
+echo ""
+
+# Execute Claude with FIFO for streaming input
+FIFO_PATH="/workspace/agent-input.jsonl"
+rm -f "$FIFO_PATH" 2>/dev/null || true
+mkfifo "$FIFO_PATH"
+chmod 666 "$FIFO_PATH" || true
+
+# Start Claude (reader) in background
+$CLAUDE_CMD < "$FIFO_PATH" &
+CLAUDE_PID=$!
+
+# Determine prompt source
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    USER_PROMPT="$PROMPT_CONTENT"
+elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
+    USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    kill "$CLAUDE_PID" 2>/dev/null || true
+    exit 1
+fi
+
+# JSON-escape the prompt
+USER_COMBINED=$(printf "%s" "$USER_PROMPT" | jq -Rs .)
+
+# Send prompt via sidecar HTTP endpoint (preferred) or direct FIFO
+if printf '{"text":%s}\n' "$USER_COMBINED" | \
+     curl -fsS -X POST http://127.0.0.1:8080/input \
+       -H 'Content-Type: application/json' \
+       --data-binary @- >/dev/null 2>&1; then
+    echo "✓ Prompt sent via sidecar /input"
+else
+    echo "⚠️ Sidecar /input failed, using direct FIFO write"
+    exec 9>"$FIFO_PATH"
+    printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+fi
+
+# Wait for Claude to complete
+wait "$CLAUDE_PID"
+CLAUDE_EXIT_CODE=$?
+
+# Close FIFO writer if opened
+exec 9>&- 2>/dev/null || true
+
+# Request sidecar shutdown
+if [ "${SKIP_MCP_SHUTDOWN:-0}" != "1" ]; then
+    curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1 || true
+fi
+
+echo ""
+echo "✓ Claude execution completed (exit code: $CLAUDE_EXIT_CODE)"
+
+
+
+
+
+

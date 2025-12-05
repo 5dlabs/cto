@@ -1,0 +1,107 @@
+# =========================================================================
+# OpenAI Codex CLI Invocation Partial
+# 
+# This partial handles ONLY the Codex CLI command building and execution.
+# Include this in workflow containers using: {{> clis/codex/invoke}}
+#
+# Required context variables:
+#   - CLAUDE_WORK_DIR: Working directory for execution (uses CODEX_WORK_DIR internally)
+#   - PROMPT_CONTENT: The prompt to send (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use (e.g., gpt-5-codex)
+#   - sandbox_mode: read-only, workspace-write, danger-full-access (default: workspace-write)
+#   - approval_mode: untrusted, on-failure, on-request, never (default: on-failure)
+#   - full_auto: If true, sets workspace-write sandbox + on-failure approvals
+#   - enable_search: If true, enables web search capability
+#   - add_dirs: Additional directories to grant write access
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               OPENAI CODEX CLI INVOCATION                    ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Build Codex command with latest CLI flags (as of Dec 2024)
+# Reference: https://developers.openai.com/codex/cli/reference/
+CODEX_CMD=("codex" "exec")
+
+# Working directory
+CODEX_WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
+CODEX_CMD+=("--cd" "$CODEX_WORK_DIR")
+
+# Full auto mode (shortcut for unattended work)
+{{#if full_auto}}
+CODEX_CMD+=("--full-auto")
+echo "✓ Full auto mode enabled (workspace-write sandbox, approvals on-failure)"
+{{else}}
+# Manual sandbox and approval configuration
+SANDBOX_MODE="{{#if sandbox_mode}}{{sandbox_mode}}{{else}}workspace-write{{/if}}"
+CODEX_CMD+=("--sandbox" "$SANDBOX_MODE")
+echo "✓ Sandbox mode: $SANDBOX_MODE"
+
+APPROVAL_MODE="{{#if approval_mode}}{{approval_mode}}{{else}}on-failure{{/if}}"
+CODEX_CMD+=("--ask-for-approval" "$APPROVAL_MODE")
+echo "✓ Approval mode: $APPROVAL_MODE"
+{{/if}}
+
+# Model override
+{{#if model}}
+CODEX_CMD+=("--model" "{{model}}")
+echo "✓ Model: {{model}}"
+{{/if}}
+
+# JSON output for streaming
+CODEX_CMD+=("--json")
+
+# Web search capability
+{{#if enable_search}}
+CODEX_CMD+=("--search")
+echo "✓ Web search enabled"
+{{/if}}
+
+# Additional directories with write access
+{{#if add_dirs}}
+{{#each add_dirs}}
+CODEX_CMD+=("--add-dir" "{{this}}")
+{{/each}}
+echo "✓ Additional directories: {{add_dirs}}"
+{{/if}}
+
+# Dangerous mode for fully isolated environments only
+{{#if dangerous_bypass}}
+CODEX_CMD+=("--dangerously-bypass-approvals-and-sandbox")
+echo "⚠️ DANGEROUS: Bypassing all approvals and sandbox"
+{{/if}}
+
+# Determine prompt source
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$CODEX_WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$CODEX_WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Add prompt as the final argument
+CODEX_CMD+=("$PROMPT_TEXT")
+
+echo ""
+echo "🚀 Codex Command:"
+echo "   codex exec --cd $CODEX_WORK_DIR [options] \"<prompt>\""
+echo ""
+
+# Execute Codex
+echo "Starting Codex execution..."
+"${CODEX_CMD[@]}"
+CODEX_EXIT_CODE=$?
+
+echo ""
+echo "✓ Codex execution completed (exit code: $CODEX_EXIT_CODE)"
+
+
+
+
+
+
