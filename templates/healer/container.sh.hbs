@@ -1,0 +1,215 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# Healer CI Remediation Container
+# 
+# This workflow container handles CI failure remediation tasks.
+# It uses shared partials for common functionality and CLI invoke partials.
+#
+# Key differences from Code/Play workflow:
+# - Prompts come from Healer server (static), not docs repo
+# - Uses git worktrees for isolated remediation attempts
+# - Focused on fixing CI failures with minimal changes
+# =========================================================================
+
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else}}
+echo '════════════════════════════════════════════════════════════════'
+echo '║             HEALER CI REMEDIATION STARTING                    ║'
+echo '════════════════════════════════════════════════════════════════'
+{{/if}}
+
+echo "🔧 Agent: {{agent_name}}"
+echo "📦 Repository: {{repository}}"
+echo "🌿 Branch: {{branch}}"
+echo "🔨 Failure Type: {{failure_type}}"
+echo "📋 Task ID: {{task_id}}"
+
+# =============================================================================
+# ENVIRONMENT SETUP
+# =============================================================================
+
+# Bootstrap Rust environment (shared partial)
+{{> shared/bootstrap/rust-env}}
+
+echo "PATH: $PATH"
+
+# Disable interactive Git prompts globally
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# GitHub App authentication (shared partial)
+{{> shared/functions/github-auth}}
+
+# Git configuration with proper GitHub App attribution
+git config --global --add safe.directory /workspace
+git config --global --add safe.directory '*'
+
+# Set GitHub App attribution
+GITHUB_APP="{{github_app}}"
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Healer)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+echo "✓ Git configured: $GIT_AUTHOR_NAME"
+
+# =============================================================================
+# REPOSITORY SETUP (WORKTREE ISOLATION)
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               REPOSITORY WORKTREE SETUP                      ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+REPO_URL="https://github.com/{{repository}}.git"
+REPO_DIR="/workspace/repo"
+WORKTREE_DIR="/workspace/worktree-{{task_id}}"
+TARGET_BRANCH="{{branch}}"
+
+# Clone or update main repository
+if [ -d "$REPO_DIR/.git" ]; then
+    echo "📁 Repository exists, fetching updates..."
+    cd "$REPO_DIR"
+    git fetch origin --prune
+else
+    echo "📥 Cloning repository: {{repository}}"
+    git clone "$REPO_URL" "$REPO_DIR"
+    cd "$REPO_DIR"
+fi
+
+# Create worktree for isolated remediation
+if [ -d "$WORKTREE_DIR" ]; then
+    echo "🔄 Removing existing worktree..."
+    git worktree remove "$WORKTREE_DIR" --force 2>/dev/null || rm -rf "$WORKTREE_DIR"
+fi
+
+echo "🌿 Creating worktree for branch: $TARGET_BRANCH"
+if git show-ref --verify --quiet "refs/remotes/origin/$TARGET_BRANCH"; then
+    git worktree add "$WORKTREE_DIR" "origin/$TARGET_BRANCH"
+else
+    echo "⚠️ Remote branch not found, creating from HEAD"
+    git worktree add -b "$TARGET_BRANCH" "$WORKTREE_DIR" HEAD
+fi
+
+cd "$WORKTREE_DIR"
+echo "✓ Working in worktree: $WORKTREE_DIR"
+echo "✓ Current branch: $(git branch --show-current)"
+
+# Set working directory for CLI execution
+CLAUDE_WORK_DIR="$WORKTREE_DIR"
+export CLAUDE_WORK_DIR
+
+# =============================================================================
+# PROMPT SETUP (FROM HEALER SERVER)
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║                     PROMPT SETUP                              ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Healer prompts are provided via ConfigMap or directly in the CodeRun spec
+# They should be mounted at /healer-prompts or provided via environment
+
+PROMPT_PATH="/healer-prompts/prompt.md"
+if [ -f "$PROMPT_PATH" ]; then
+    echo "✓ Found prompt at: $PROMPT_PATH"
+    PROMPT_CONTENT=$(cat "$PROMPT_PATH")
+elif [ -n "${HEALER_PROMPT:-}" ]; then
+    echo "✓ Using prompt from HEALER_PROMPT environment variable"
+    PROMPT_CONTENT="$HEALER_PROMPT"
+elif [ -f "/task-files/prompt.md" ]; then
+    echo "✓ Using prompt from task-files ConfigMap"
+    PROMPT_CONTENT=$(cat "/task-files/prompt.md")
+else
+    echo "❌ ERROR: No prompt found for remediation"
+    exit 1
+fi
+
+export PROMPT_CONTENT
+
+# =============================================================================
+# MCP CONFIGURATION
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║                   MCP CONFIGURATION                          ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Copy MCP configuration if available
+if [ -f "/task-files/mcp.json" ]; then
+    cp /task-files/mcp.json "$WORKTREE_DIR/.mcp.json"
+    cp /task-files/mcp.json /workspace/.mcp.json
+    echo "✓ MCP configuration copied"
+elif [ -f "/healer-prompts/mcp.json" ]; then
+    cp /healer-prompts/mcp.json "$WORKTREE_DIR/.mcp.json"
+    cp /healer-prompts/mcp.json /workspace/.mcp.json
+    echo "✓ MCP configuration copied from healer-prompts"
+else
+    echo "⚠️ No MCP configuration found"
+fi
+
+# =============================================================================
+# CLI EXECUTION
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║                    CLI EXECUTION                              ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+cd "$CLAUDE_WORK_DIR"
+
+# Select and invoke CLI based on configuration
+CLI_TYPE="{{#if cli}}{{cli}}{{else}}claude{{/if}}"
+echo "🔧 CLI: $CLI_TYPE"
+
+case "$CLI_TYPE" in
+    "claude")
+        {{> clis/claude/invoke}}
+        ;;
+    "factory"|"droid")
+        {{> clis/factory/invoke}}
+        ;;
+    "codex")
+        {{> clis/codex/invoke}}
+        ;;
+    *)
+        echo "❌ Unknown CLI type: $CLI_TYPE"
+        exit 1
+        ;;
+esac
+
+# =============================================================================
+# CLEANUP AND STATUS
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "║                     CLEANUP                                   ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Write completion marker
+touch /workspace/.agent_done 2>/dev/null || true
+
+# Optionally clean up worktree (keep for debugging if needed)
+{{#if cleanup_worktree}}
+echo "🧹 Cleaning up worktree..."
+cd /workspace
+git -C "$REPO_DIR" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
+echo "✓ Worktree cleaned up"
+{{else}}
+echo "📁 Worktree preserved for debugging: $WORKTREE_DIR"
+{{/if}}
+
+echo ""
+echo '════════════════════════════════════════════════════════════════'
+echo '║           HEALER CI REMEDIATION COMPLETE                      ║'
+echo '════════════════════════════════════════════════════════════════'
+
+exit 0
+
