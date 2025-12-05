@@ -132,7 +132,7 @@ jobs:
 
   # Build and push Docker image (only on push to main, not PRs)
   build-docker:
-    needs: [lint-rust, test-rust, build-check]
+    needs: [lint-rust, test-rust, build-check, docker-lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [k8s-runner]
     permissions:
