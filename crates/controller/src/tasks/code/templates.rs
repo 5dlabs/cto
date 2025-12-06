@@ -611,12 +611,22 @@ impl CodeTemplateGenerator {
     }
 
     fn generate_cursor_project_permissions(
-        code_run: &CodeRun,
-        cli_config: &Value,
-        remote_tools: &[String],
+        _code_run: &CodeRun,
+        _cli_config: &Value,
+        _remote_tools: &[String],
     ) -> Result<String> {
-        // Generate MCP config directly (no template needed)
-        Self::generate_cursor_mcp_config(code_run, cli_config, remote_tools)
+        // Generate Cursor project permissions config (not MCP config)
+        let config = json!({
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)" ],
+                "deny": []
+            }
+        });
+        serde_json::to_string_pretty(&config).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Cursor project permissions: {e}"
+            ))
+        })
     }
 
     fn generate_cursor_mcp_config(
