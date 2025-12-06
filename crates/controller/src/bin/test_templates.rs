@@ -11,9 +11,8 @@ use controller::tasks::template_paths::{
     CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_CURSOR_CONTAINER_TEMPLATE,
     CODE_FACTORY_AGENTS_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
     CODE_FACTORY_CONTAINER_TEMPLATE, SHARED_BOOTSTRAP_RUST_ENV, SHARED_CONTAINER_CORE,
-    SHARED_FUNCTIONS_COMPLETION_MARKER, SHARED_FUNCTIONS_DOCKER_SIDECAR, SHARED_FUNCTIONS_GH_CLI,
-    SHARED_FUNCTIONS_GITHUB_AUTH, SHARED_FUNCTIONS_GIT_OPERATIONS, SHARED_FUNCTIONS_QUALITY_GATES,
-    SHARED_PROMPTS_CONTEXT7, SHARED_PROMPTS_DESIGN_SYSTEM,
+    SHARED_FUNCTIONS_COMPLETION_MARKER, SHARED_FUNCTIONS_GITHUB_AUTH, SHARED_FUNCTIONS_GIT_OPERATIONS,
+    SHARED_FUNCTIONS_QUALITY_GATES, SHARED_PROMPTS_CONTEXT7, SHARED_PROMPTS_DESIGN_SYSTEM,
 };
 use handlebars::Handlebars;
 use serde_json::json;
@@ -48,13 +47,10 @@ fn register_shared_partials(
     println!("📦 Registering shared partials:");
 
     // Map partial name (used in templates) -> template path
+    // Note: docker-sidecar and gh-cli removed - no longer exist as separate partials
     let shared_partials = vec![
         ("shared/bootstrap/rust-env", SHARED_BOOTSTRAP_RUST_ENV),
         ("shared/functions/github-auth", SHARED_FUNCTIONS_GITHUB_AUTH),
-        (
-            "shared/functions/docker-sidecar",
-            SHARED_FUNCTIONS_DOCKER_SIDECAR,
-        ),
         (
             "shared/functions/completion-marker",
             SHARED_FUNCTIONS_COMPLETION_MARKER,
@@ -63,7 +59,6 @@ fn register_shared_partials(
             "shared/functions/git-operations",
             SHARED_FUNCTIONS_GIT_OPERATIONS,
         ),
-        ("shared/functions/gh-cli", SHARED_FUNCTIONS_GH_CLI),
         (
             "shared/functions/quality-gates",
             SHARED_FUNCTIONS_QUALITY_GATES,
