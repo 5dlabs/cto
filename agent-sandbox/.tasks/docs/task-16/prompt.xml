@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="16" priority="high" agent="rex">
+    <meta>
+        <title>Initialize Rust/Axum project with PostgreSQL and Redis integration</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 16 with production-quality code.</role>
+
+    <context>
+        <overview>Set up the foundational Rust project structure with Axum 0.7, configure sqlx for PostgreSQL 15, and establish Redis 7 connections for caching and pub/sub</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Initialize Cargo project with workspace structure
+2. Add dependencies: axum = &quot;0.7&quot;, tokio = { version = &quot;1&quot;, features = [&quot;full&quot;] }, sqlx = { version = &quot;0.7&quot;, features = [&quot;postgres&quot;, &quot;runtime-tokio-rustls&quot;, &quot;migrate&quot;] }, redis = { version = &quot;0.24&quot;, features = [&quot;tokio-comp&quot;, &quot;connection-manager&quot;] }
+3. Create directory structure: src/{api, domain, infra}, frontend/, infra/
+4. Configure .env with DATABASE_URL, REDIS_URL
+5. Setup sqlx migrations directory
+6. Create main.rs with basic Axum server scaffold
+7. Implement Redis connection pool in infra/redis.rs
+8. Implement PostgreSQL connection pool in infra/database.rs</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-16): Initialize Rust/Axum project with PostgreSQL and Redis integration</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify cargo build succeeds, server starts on configured port, PostgreSQL connection pool initializes, Redis ping succeeds</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

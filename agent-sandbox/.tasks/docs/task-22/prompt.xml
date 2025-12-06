@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="22" priority="high" agent="rex">
+    <meta>
+        <title>Implement Task Board CRUD API with filtering</title>
+        <priority>high</priority>
+        <dependencies>21</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 22 with production-quality code.</role>
+
+    <context>
+        <overview>Create comprehensive task management endpoints with status transitions, assignment, filtering, and soft delete functionality</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create domain/task.rs with:
+   - enum TaskStatus { Todo, InProgress, Done }
+   - struct Task { id, team_id, title, description, assignee_id, status, due_date, created_at, updated_at, deleted_at }
+   - struct TaskRepository trait
+2. Implement infra/repositories/task_repo.rs with sqlx
+3. Create api/tasks.rs handlers:
+   - POST /api/teams/:team_id/tasks { title, description, assignee_id?, due_date? } -&gt; verify user is team member
+   - GET /api/teams/:team_id/tasks?status=&amp;assignee_id=&amp;due_date_from=&amp;due_date_to= -&gt; filter with WHERE clauses, exclude deleted_at IS NOT NULL
+   - GET /api/tasks/:id -&gt; verify user has team access
+   - PATCH /api/tasks/:id { title?, description?, assignee_id?, status?, due_date? } -&gt; verify team membership
+   - DELETE /api/tasks/:id -&gt; soft delete by setting deleted_at = NOW()
+4. Add validation: title 1-200 chars, assignee must be team member
+5. Publish task events to Redis pub/sub on create/update/delete</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-22): Implement Task Board CRUD API with filtering</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests for CRUD operations, verify filtering combinations, test soft delete and 30-day retention, verify authorization checks, test assignee validation</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

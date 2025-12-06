@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="30" priority="high" agent="rex">
+    <meta>
+        <title>Implement Prometheus metrics and structured logging</title>
+        <priority>high</priority>
+        <dependencies>16</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 30 with production-quality code.</role>
+
+    <context>
+        <overview>Add observability with Prometheus metrics endpoint, structured JSON logging, and distributed tracing with trace IDs</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add dependencies: prometheus = &quot;0.13&quot;, tracing = &quot;0.1&quot;, tracing-subscriber = { version = &quot;0.3&quot;, features = [&quot;json&quot;] }, uuid = &quot;1.6&quot;
+2. Create infra/metrics.rs:
+   - Register metrics: http_requests_total (counter), http_request_duration_seconds (histogram), websocket_connections (gauge), rate_limit_rejections_total (counter)
+   - GET /metrics endpoint returning Prometheus format
+3. Create api/middleware/metrics.rs:
+   - Record http_requests_total with labels: method, path, status
+   - Record http_request_duration_seconds histogram
+4. Setup structured logging in main.rs:
+   - tracing_subscriber::fmt().json().with_target(false).init()
+   - Log format: {&quot;timestamp&quot;, &quot;level&quot;, &quot;message&quot;, &quot;trace_id&quot;, &quot;span&quot;}
+5. Create api/middleware/tracing.rs:
+   - Generate trace_id (UUID) for each request
+   - Add to response header: X-Trace-Id
+   - Include in all log entries via tracing span
+6. Instrument key functions with #[tracing::instrument]
+7. Log important events: auth attempts, rate limit hits, errors</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-30): Implement Prometheus metrics and structured logging</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify /metrics endpoint returns valid Prometheus format, test metrics increment on requests, verify trace_id in logs and headers, load test to validate histogram buckets</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

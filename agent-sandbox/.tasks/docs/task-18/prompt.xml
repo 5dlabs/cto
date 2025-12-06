@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="18" priority="high" agent="cipher">
+    <meta>
+        <title>Implement JWT authentication with refresh token mechanism</title>
+        <priority>high</priority>
+        <dependencies>16, 17</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 18 with production-quality code.</role>
+
+    <context>
+        <overview>Build JWT-based authentication system with access and refresh tokens, including token generation, validation, and rotation</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add dependencies: jsonwebtoken = &quot;9&quot;, argon2 = &quot;0.5&quot;
+2. Create domain/auth.rs with:
+   - struct Claims { sub: Uuid, exp: i64, role: String }
+   - fn generate_access_token(user_id: Uuid, role: String) -&gt; Result&lt;String&gt; (15 min expiry)
+   - fn generate_refresh_token(user_id: Uuid) -&gt; Result&lt;String&gt; (7 day expiry)
+   - fn validate_token(token: &amp;str) -&gt; Result&lt;Claims&gt;
+3. Store refresh tokens in Redis with SET refresh:{user_id} {token} EX 604800
+4. Create api/auth.rs handlers:
+   - POST /api/auth/register (email, password)
+   - POST /api/auth/login (email, password) -&gt; returns {access_token, refresh_token}
+   - POST /api/auth/refresh (refresh_token) -&gt; returns new access_token
+5. Implement Axum middleware for JWT validation in api/middleware/auth.rs
+6. Hash passwords with argon2 before storage</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-18): Implement JWT authentication with refresh token mechanism</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for token generation/validation, integration tests for register/login flow, verify expired tokens rejected, test refresh token rotation</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

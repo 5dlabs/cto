@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="31" priority="high" agent="bolt">
+    <meta>
+        <title>Create Docker multi-stage build and Kubernetes manifests</title>
+        <priority>high</priority>
+        <dependencies>30</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 31 with production-quality code.</role>
+
+    <context>
+        <overview>Build production-ready Docker image with multi-stage build and create Kubernetes deployment with HPA and health checks</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create Dockerfile:
+   - Stage 1 (builder): FROM rust:1.75-alpine, cargo build --release
+   - Stage 2 (runtime): FROM alpine:3.19, copy binary, add ca-certificates
+   - EXPOSE 8080
+2. Create .dockerignore: target/, node_modules/, .git/
+3. Create infra/k8s/deployment.yaml:
+   - Deployment with 2 replicas
+   - Resources: requests (cpu: 100m, memory: 128Mi), limits (cpu: 500m, memory: 512Mi)
+   - livenessProbe: GET /health/live, initialDelaySeconds: 10
+   - readinessProbe: GET /health/ready, initialDelaySeconds: 5
+   - Env vars from ConfigMap and Secret
+4. Create infra/k8s/service.yaml: ClusterIP service on port 80 -&gt; 8080
+5. Create infra/k8s/hpa.yaml:
+   - HorizontalPodAutoscaler: min 2, max 10 replicas
+   - Target: 70% CPU utilization
+6. Create infra/k8s/configmap.yaml: non-sensitive config
+7. Create infra/k8s/secret.yaml: DATABASE_URL, REDIS_URL, JWT_SECRET
+8. Implement health endpoints in api/health.rs:
+   - GET /health/live -&gt; 200 OK
+   - GET /health/ready -&gt; check DB and Redis connections, return 200 or 503</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-31): Create Docker multi-stage build and Kubernetes manifests</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Build Docker image and verify size &lt;50MB, test container startup, deploy to local k8s (minikube), verify HPA scales on load, test health endpoints, verify rolling updates work</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

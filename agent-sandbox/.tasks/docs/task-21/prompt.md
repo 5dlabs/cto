@@ -1,0 +1,35 @@
+# Task 21: Implement Team Management API endpoints
+
+## Role
+
+You are a Senior Rust Engineer with expertise in systems programming and APIs implementing Task 21.
+
+## Goal
+
+Create CRUD endpoints for team operations including creation, retrieval, updates, and invite link generation
+
+## Requirements
+
+1. Create domain/team.rs with:
+   - struct Team { id, name, description, owner_id, member_count, created_at }
+   - struct TeamRepository trait with CRUD methods
+2. Implement infra/repositories/team_repo.rs with sqlx queries
+3. Create api/teams.rs handlers:
+   - POST /api/teams { name, description } -> create team, add creator as owner
+   - GET /api/teams/:id -> join with team_members to get member_count
+   - PATCH /api/teams/:id { name?, description? } -> verify requester is owner/admin
+   - POST /api/teams/:id/invite -> generate uuid token, store in invites table with 7-day expiry, return invite URL
+   - POST /api/teams/join/:token -> verify token not expired, add user to team_members as member
+4. Implement role-based authorization: only owner/admin can update team
+5. Add validation: name length 3-100 chars, description max 500 chars
+
+## Acceptance Criteria
+
+Integration tests for all endpoints, verify authorization checks, test expired invite rejection, verify member count accuracy, test concurrent team creation
+
+## Constraints
+
+- Match codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-21): Implement Team Management API endpoints`

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="25" priority="medium" agent="rex">
+    <meta>
+        <title>Implement email notification system with user preferences</title>
+        <priority>medium</priority>
+        <dependencies>22</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 25 with production-quality code.</role>
+
+    <context>
+        <overview>Build email notification service for mentions and due date reminders with user-configurable preferences</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add dependencies: lettre = { version = &quot;0.11&quot;, features = [&quot;tokio1-native-tls&quot;] }, tera = &quot;1.19&quot;
+2. Create domain/notification.rs with:
+   - enum NotificationType { Mention, DueDateReminder, TaskAssigned }
+   - struct NotificationPreferences { user_id, email_mentions, email_due_dates, email_assignments }
+3. Add notification_preferences table to schema
+4. Create infra/email.rs with:
+   - struct EmailService { smtp_transport: SmtpTransport, templates: Tera }
+   - async fn send_email(to: &amp;str, subject: &amp;str, template: &amp;str, context: Context)
+5. Create templates in templates/emails/: mention.html, due_date_reminder.html
+6. Create infra/jobs/notification_job.rs:
+   - Check tasks with due_date within 24 hours, send reminders
+   - Run daily via tokio cron
+7. On task assignment/mention, check user preferences and send email asynchronously
+8. Configure SMTP via env vars: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-25): Implement email notification system with user preferences</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests with mock SMTP, integration tests for preference checks, verify emails sent on task assignment, test due date reminder job, verify unsubscribe respects preferences</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

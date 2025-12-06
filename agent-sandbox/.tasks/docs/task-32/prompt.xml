@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="32" priority="medium" agent="tap">
+    <meta>
+        <title>Implement GDPR compliance features</title>
+        <priority>medium</priority>
+        <dependencies>21, 22</dependencies>
+        <agent_hint>tap</agent_hint>
+    </meta>
+
+    <role>You are a Senior Mobile Engineer with expertise in React Native and cross-platform development. Implement Task 32 with production-quality code.</role>
+
+    <context>
+        <overview>Add data export and deletion endpoints to comply with GDPR requirements for user data portability and right to be forgotten</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create api/gdpr.rs:
+   - GET /api/users/me/export -&gt; generate JSON export of all user data
+   - POST /api/users/me/delete -&gt; initiate account deletion
+2. Data export includes:
+   - User profile (email, created_at)
+   - Teams owned/member of
+   - All tasks created or assigned
+   - Activity history
+   - Format: { &quot;user&quot;: {...}, &quot;teams&quot;: [...], &quot;tasks&quot;: [...], &quot;activity&quot;: [...] }
+3. Account deletion process:
+   - Soft delete user (set deleted_at)
+   - Anonymize user data in tasks (set assignee_id to NULL, created_by to &apos;deleted_user&apos;)
+   - Remove from all teams
+   - Delete OAuth tokens
+   - Delete device tokens
+   - Schedule permanent deletion after 30 days
+4. Add deletion confirmation: require password re-entry
+5. Send email confirmation of deletion request
+6. Create infra/jobs/gdpr_cleanup.rs: permanently delete users after 30 days</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-32): Implement GDPR compliance features</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test data export completeness, verify account deletion anonymizes data correctly, test 30-day deletion delay, verify email confirmation sent, test deletion cancellation</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

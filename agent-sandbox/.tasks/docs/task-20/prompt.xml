@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="20" priority="high" agent="cipher">
+    <meta>
+        <title>Implement Redis-based rate limiting middleware</title>
+        <priority>high</priority>
+        <dependencies>18</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 20 with production-quality code.</role>
+
+    <context>
+        <overview>Create token bucket rate limiter using Redis to enforce 100 req/min for authenticated users and 20 req/min for anonymous</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create infra/rate_limiter.rs with:
+   - struct RateLimiter { redis: ConnectionManager }
+   - async fn check_rate_limit(key: &amp;str, max_requests: u32, window_secs: u64) -&gt; Result&lt;bool&gt;
+2. Use Redis commands: INCR rate:{key}:{window}, EXPIRE if first request
+3. Create api/middleware/rate_limit.rs:
+   - Extract user_id from JWT or use IP address for anonymous
+   - Apply limits: authenticated users 100/60s, anonymous 20/60s
+   - Return 429 Too Many Requests if exceeded with Retry-After header
+4. Integrate middleware into Axum router before auth middleware
+5. Add rate limit headers to all responses: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-20): Implement Redis-based rate limiting middleware</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Load test with &gt;100 requests in 60s, verify 429 responses, test both authenticated and anonymous limits, verify Redis keys expire correctly</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
