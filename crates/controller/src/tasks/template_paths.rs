@@ -124,14 +124,15 @@ pub const REVIEW_FACTORY_POST_REVIEW_TEMPLATE: &str = "agents/stitch/review/syst
 
 // ============================================================================
 // Shared partials (legacy names mapped to new locations)
+// Note: These are kept for backwards compatibility with older templates.
+// The docker-sidecar and gh-cli functions no longer exist as separate partials;
+// their functionality is integrated into the shared container template.
 // ============================================================================
 
 pub const SHARED_BOOTSTRAP_RUST_ENV: &str = "_shared/partials/rust-env.sh.hbs";
 pub const SHARED_FUNCTIONS_GITHUB_AUTH: &str = "_shared/partials/github-auth.sh.hbs";
-pub const SHARED_FUNCTIONS_DOCKER_SIDECAR: &str = "_shared/partials/header.sh.hbs";
 pub const SHARED_FUNCTIONS_COMPLETION_MARKER: &str = "_shared/partials/completion.sh.hbs";
 pub const SHARED_FUNCTIONS_GIT_OPERATIONS: &str = "_shared/partials/git-setup.sh.hbs";
-pub const SHARED_FUNCTIONS_GH_CLI: &str = "_shared/partials/github-auth.sh.hbs";
 pub const SHARED_FUNCTIONS_QUALITY_GATES: &str = "_shared/partials/acceptance-probe.sh.hbs";
 pub const SHARED_PROMPTS_CONTEXT7: &str = "agents/rex/coder/system-prompt.md.hbs";
 pub const SHARED_PROMPTS_DESIGN_SYSTEM: &str = "agents/blaze/coder/system-prompt.md.hbs";

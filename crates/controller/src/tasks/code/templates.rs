@@ -3615,8 +3615,6 @@ impl CodeTemplateGenerator {
             SHARED_BOOTSTRAP_RUST_ENV,
             SHARED_CONTAINER_CORE,
             SHARED_FUNCTIONS_COMPLETION_MARKER,
-            SHARED_FUNCTIONS_DOCKER_SIDECAR,
-            SHARED_FUNCTIONS_GH_CLI,
             SHARED_FUNCTIONS_GITHUB_AUTH,
             SHARED_FUNCTIONS_GIT_OPERATIONS,
             SHARED_FUNCTIONS_QUALITY_GATES,
@@ -3643,13 +3641,10 @@ impl CodeTemplateGenerator {
         ];
 
         // Legacy partials (for backwards compatibility)
+        // Note: docker-sidecar and gh-cli removed - no longer exist as separate partials
         let legacy_partials = vec![
             ("shared/bootstrap/rust-env", SHARED_BOOTSTRAP_RUST_ENV),
             ("shared/functions/github-auth", SHARED_FUNCTIONS_GITHUB_AUTH),
-            (
-                "shared/functions/docker-sidecar",
-                SHARED_FUNCTIONS_DOCKER_SIDECAR,
-            ),
             (
                 "shared/functions/completion-marker",
                 SHARED_FUNCTIONS_COMPLETION_MARKER,
@@ -3658,7 +3653,6 @@ impl CodeTemplateGenerator {
                 "shared/functions/git-operations",
                 SHARED_FUNCTIONS_GIT_OPERATIONS,
             ),
-            ("shared/functions/gh-cli", SHARED_FUNCTIONS_GH_CLI),
             (
                 "shared/functions/quality-gates",
                 SHARED_FUNCTIONS_QUALITY_GATES,
