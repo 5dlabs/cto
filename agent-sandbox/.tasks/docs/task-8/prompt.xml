@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="8" priority="high" agent="cipher">
+    <meta>
+        <title>Create role-based authorization middleware and permission checks</title>
+        <priority>high</priority>
+        <dependencies>3, 5</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 8 with production-quality code.</role>
+
+    <context>
+        <overview>Implement granular permission system for owner, admin, member, and viewer roles with route-level authorization guards</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Define Role enum in src/domain/auth.rs: Owner, Admin, Member, Viewer
+2. Create src/api/middleware/authorize.rs:
+   - fn require_role(min_role: Role) -&gt; Middleware
+   - Extract user_id and team_id from request
+   - Query team_members for user&apos;s role
+   - Compare with required role hierarchy: Owner &gt; Admin &gt; Member &gt; Viewer
+   - Return 403 Forbidden if insufficient permissions
+3. Define permission matrix:
+   - Owner: all operations including team deletion
+   - Admin: manage members, tasks, settings
+   - Member: create/edit own tasks, view all
+   - Viewer: read-only access
+4. Apply middleware to route groups in router configuration
+5. Create helper function: async fn check_team_access(user_id, team_id, min_role) -&gt; Result&lt;()&gt;</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-8): Create role-based authorization middleware and permission checks</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit test role hierarchy comparison. Integration tests: create team as owner, add member with viewer role, verify viewer cannot create tasks but can read. Test admin can manage members but not delete team</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
