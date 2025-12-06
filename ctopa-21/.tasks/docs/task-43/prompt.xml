@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="43" priority="medium" agent="tess">
+    <meta>
+        <title>Add load testing framework</title>
+        <priority>medium</priority>
+        <dependencies>27, 42</dependencies>
+        <agent_hint>tess</agent_hint>
+    </meta>
+
+    <role>You are a Senior QA Engineer with expertise in test automation and quality assurance. Implement Task 43 with production-quality code.</role>
+
+    <context>
+        <overview>Implement load testing to verify system performance under stress</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create test/load/ directory
+2. Implement load testing scenarios
+3. Add performance benchmarking
+4. Create stress testing for webhook endpoints
+5. Add database load testing
+6. Implement performance regression testing</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-43): Add load testing framework</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Run load tests and verify system meets performance requirements</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

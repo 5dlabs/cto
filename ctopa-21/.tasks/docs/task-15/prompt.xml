@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="15" priority="medium" agent="rex">
+    <meta>
+        <title>Create database schema and models</title>
+        <priority>medium</priority>
+        <dependencies>2</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 15 with production-quality code.</role>
+
+    <context>
+        <overview>Design and implement database schema for storing workflow and activity data</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Choose database solution (PostgreSQL recommended)
+2. Create migration files for schema
+3. Define models for workflows, activities, and tasks
+4. Set up database connection and ORM (Prisma/TypeORM)
+5. Create database indexes for performance
+6. Add database seeding scripts</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-15): Create database schema and models</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify database schema creation and model operations work correctly</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

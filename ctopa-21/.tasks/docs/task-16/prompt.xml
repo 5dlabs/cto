@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="16" priority="medium" agent="rex">
+    <meta>
+        <title>Implement workflow state persistence</title>
+        <priority>medium</priority>
+        <dependencies>15, 8</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 16 with production-quality code.</role>
+
+    <context>
+        <overview>Add database layer to persist and retrieve workflow execution state</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create src/repositories/workflowRepository.ts
+2. Implement CRUD operations for workflow records
+3. Add workflow state transitions tracking
+4. Create workflow history logging
+5. Add workflow querying and filtering
+6. Implement workflow cleanup policies</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-16): Implement workflow state persistence</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test workflow persistence and retrieval with various state transitions</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

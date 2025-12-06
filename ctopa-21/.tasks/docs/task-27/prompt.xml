@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="27" priority="high" agent="tess">
+    <meta>
+        <title>Create integration test suite</title>
+        <priority>high</priority>
+        <dependencies>18, 24</dependencies>
+        <agent_hint>tess</agent_hint>
+    </meta>
+
+    <role>You are a Senior QA Engineer with expertise in test automation and quality assurance. Implement Task 27 with production-quality code.</role>
+
+    <context>
+        <overview>Build comprehensive integration tests for the entire workflow</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create test/integration/ directory structure
+2. Implement end-to-end workflow tests
+3. Add Linear API integration tests
+4. Create webhook processing integration tests
+5. Add database integration tests
+6. Implement test data setup and cleanup</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-27): Create integration test suite</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Run integration tests against test environment and verify all components work together</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

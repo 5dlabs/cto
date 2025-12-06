@@ -1,0 +1,410 @@
+{
+  "meta": {
+    "generatedAt": "2025-12-06T19:17:22.245646670+00:00",
+    "tasksFile": ".tasks/tasks.json",
+    "model": "claude-sonnet-4-20250514",
+    "threshold": 5
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Initialize project structure and dependencies",
+      "complexityScore": 3,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard project initialization with well-defined steps. Low complexity as it involves straightforward setup tasks with minimal technical challenges."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Configure environment variables and secrets management",
+      "complexityScore": 3,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Basic configuration management with standard patterns. Low complexity with clear implementation path and minimal dependencies."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Set up Express.js server foundation",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard Express.js setup with middleware configuration. Moderate-low complexity with well-established patterns and frameworks."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Implement webhook signature verification",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) HMAC signature computation implementation, 2) Timing-safe comparison utilities, 3) Middleware integration and error handling",
+      "reasoning": "Security-critical component requiring cryptographic knowledge and careful implementation to prevent timing attacks. Higher complexity due to security implications."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Create Linear API client wrapper",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) GraphQL query builder and executor, 2) Authentication and headers management, 3) Error handling and retry logic, 4) API method implementations",
+      "reasoning": "Requires GraphQL knowledge, error handling, and retry mechanisms. Moderate complexity due to external API integration challenges."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Define webhook payload interfaces",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "TypeScript interface definition with validation schemas. Moderate complexity requiring understanding of webhook payload structures."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Implement webhook endpoint handler",
+      "complexityScore": 5,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Route definition and middleware application, 2) Payload parsing and validation, 3) Event routing and response handling",
+      "reasoning": "Central integration point requiring coordination of multiple components. Moderate complexity with multiple dependencies."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Create intake workflow trigger mechanism",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Workflow condition evaluation engine, 2) State management implementation, 3) Execution orchestration, 4) Logging and monitoring integration",
+      "reasoning": "Core business logic with complex state management and workflow orchestration. Higher complexity due to business rule implementation."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement Linear task creation service",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Data mapping and transformation, 2) Linear API integration for task creation, 3) Error handling and retry mechanisms",
+      "reasoning": "Requires data transformation and external API integration with error handling. Moderate-high complexity."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Design activity emission system",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Event schema design and validation, 2) Emission mechanism implementation, 3) Persistence layer integration, 4) Query and filtering capabilities",
+      "reasoning": "Event-driven architecture component requiring careful design for scalability and performance. Moderate-high complexity."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Set up logging infrastructure",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard logging setup with winston. Moderate complexity with established patterns and libraries."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Create webhook event processor",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into: 1) Event type routing implementation, 2) Validation and sanitization, 3) Individual event processors, 4) Error handling and fallbacks, 5) Deduplication mechanism",
+      "reasoning": "Complex orchestration component handling multiple event types with sophisticated routing and error handling. High complexity."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Implement health check endpoints",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard health check implementation with dependency verification. Moderate complexity."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Set up request validation middleware",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Schema-based validation with comprehensive error handling. Moderate complexity requiring validation library expertise."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "Create database schema and models",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Database selection and setup, 2) Schema design and migrations, 3) ORM configuration and models, 4) Indexing and performance optimization",
+      "reasoning": "Database design requiring careful consideration of relationships and performance. Moderate-high complexity."
+    },
+    {
+      "taskId": 16,
+      "taskTitle": "Implement workflow state persistence",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Repository pattern implementation, 2) State transition tracking, 3) Query optimization and cleanup policies",
+      "reasoning": "Data persistence with state management and performance considerations. Moderate-high complexity."
+    },
+    {
+      "taskId": 17,
+      "taskTitle": "Add activity persistence layer",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Similar to workflow persistence but simpler data model. Moderate complexity."
+    },
+    {
+      "taskId": 18,
+      "taskTitle": "Create webhook delivery testing utilities",
+      "complexityScore": 5,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Payload generators and signature creation, 2) Mock server implementation, 3) Delivery and retry testing framework",
+      "reasoning": "Testing infrastructure requiring mock services and test data generation. Moderate complexity."
+    },
+    {
+      "taskId": 19,
+      "taskTitle": "Implement error handling and recovery",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Global error middleware implementation, 2) Error classification and logging, 3) Circuit breaker implementation, 4) Recovery strategy implementation",
+      "reasoning": "Critical system resilience component requiring sophisticated error handling patterns. High complexity."
+    },
+    {
+      "taskId": 20,
+      "taskTitle": "Add rate limiting and throttling",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard rate limiting with middleware configuration. Moderate complexity with established libraries."
+    },
+    {
+      "taskId": 21,
+      "taskTitle": "Create Linear team and project mapping",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Mapping rule engine implementation, 2) Team and project resolution logic, 3) Fallback and error handling",
+      "reasoning": "Business logic requiring rule engine and mapping strategies. Moderate-high complexity."
+    },
+    {
+      "taskId": 22,
+      "taskTitle": "Implement webhook retry mechanism",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Exponential backoff implementation, 2) Queue management system, 3) Dead letter queue and monitoring",
+      "reasoning": "Resilience mechanism requiring queue management and backoff strategies. Moderate-high complexity."
+    },
+    {
+      "taskId": 23,
+      "taskTitle": "Add webhook payload validation",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Validation layer with schema enforcement and sanitization. Moderate complexity."
+    },
+    {
+      "taskId": 24,
+      "taskTitle": "Create workflow execution engine",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into: 1) Step execution orchestrator, 2) Branching and conditional logic, 3) Parallel execution manager, 4) Rollback mechanism, 5) Timeout handling, 6) State persistence integration",
+      "reasoning": "Core engine requiring complex orchestration, state management, and execution control. Very high complexity."
+    },
+    {
+      "taskId": 25,
+      "taskTitle": "Implement activity event streaming",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) WebSocket/SSE server implementation, 2) Event filtering and subscription management, 3) Connection management, 4) Event replay capabilities",
+      "reasoning": "Real-time streaming requiring connection management and event handling. High complexity."
+    },
+    {
+      "taskId": 26,
+      "taskTitle": "Add metrics and monitoring",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Metrics collection with Prometheus integration. Moderate complexity with established patterns."
+    },
+    {
+      "taskId": 27,
+      "taskTitle": "Create integration test suite",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into: 1) Test environment setup, 2) End-to-end workflow tests, 3) API integration tests, 4) Database integration tests, 5) Test data management",
+      "reasoning": "Comprehensive testing requiring multiple system integration and test environment management. High complexity."
+    },
+    {
+      "taskId": 28,
+      "taskTitle": "Implement Linear webhook subscriptions",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Subscription management API, 2) Bidirectional sync logic, 3) Conflict resolution mechanisms",
+      "reasoning": "Bidirectional integration with conflict resolution. Moderate-high complexity."
+    },
+    {
+      "taskId": 29,
+      "taskTitle": "Add configuration management API",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Configuration API with validation and versioning. Moderate complexity."
+    },
+    {
+      "taskId": 30,
+      "taskTitle": "Implement workflow templates",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Template schema and validation, 2) Template loading and customization, 3) Versioning and sharing system",
+      "reasoning": "Template system requiring schema design and versioning. Moderate-high complexity."
+    },
+    {
+      "taskId": 31,
+      "taskTitle": "Add webhook event filtering",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Rule-based filtering with configuration management. Moderate complexity."
+    },
+    {
+      "taskId": 32,
+      "taskTitle": "Create audit logging system",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Audit event capture and formatting, 2) Secure persistence and querying, 3) Retention and compliance features",
+      "reasoning": "Security and compliance feature requiring careful implementation. Moderate-high complexity."
+    },
+    {
+      "taskId": 33,
+      "taskTitle": "Implement task priority and scheduling",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Priority calculation algorithms, 2) Team capacity management, 3) Dependency tracking, 4) Workload balancing",
+      "reasoning": "Intelligent scheduling requiring algorithms and capacity management. High complexity."
+    },
+    {
+      "taskId": 34,
+      "taskTitle": "Add bulk operations support",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Batch processing engine, 2) Progress tracking and rollback, 3) Performance optimization",
+      "reasoning": "Bulk processing with performance and reliability considerations. Moderate-high complexity."
+    },
+    {
+      "taskId": 35,
+      "taskTitle": "Create webhook security scanning",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Malicious payload detection, 2) Content filtering and sanitization, 3) Threat intelligence integration, 4) Automated blocking mechanisms",
+      "reasoning": "Security feature requiring threat detection and automated response. High complexity."
+    },
+    {
+      "taskId": 36,
+      "taskTitle": "Implement workflow analytics",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Metrics calculation and aggregation, 2) Performance analysis algorithms, 3) Reporting and visualization",
+      "reasoning": "Analytics requiring data processing and statistical analysis. Moderate-high complexity."
+    },
+    {
+      "taskId": 37,
+      "taskTitle": "Add API documentation generation",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard OpenAPI documentation with established tools. Moderate complexity."
+    },
+    {
+      "taskId": 38,
+      "taskTitle": "Create performance optimization layer",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Caching layer implementation, 2) Cache invalidation strategies, 3) Performance monitoring and optimization",
+      "reasoning": "Performance optimization requiring caching strategies and monitoring. Moderate-high complexity."
+    },
+    {
+      "taskId": 39,
+      "taskTitle": "Implement data export capabilities",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Data export with multiple formats and filtering. Moderate complexity."
+    },
+    {
+      "taskId": 40,
+      "taskTitle": "Add webhook replay functionality",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Event storage and indexing, 2) Replay trigger and filtering, 3) Result comparison and analysis",
+      "reasoning": "Replay system requiring event storage and comparison logic. Moderate-high complexity."
+    },
+    {
+      "taskId": 41,
+      "taskTitle": "Create unit test suite",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Test framework setup and utilities, 2) Service layer unit tests, 3) Utility and helper tests, 4) Coverage reporting and automation",
+      "reasoning": "Comprehensive testing requiring extensive test coverage and mocking. Moderate-high complexity."
+    },
+    {
+      "taskId": 42,
+      "taskTitle": "Implement deployment configuration",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Containerization and Docker setup, 2) Kubernetes manifests, 3) CI/CD pipeline configuration, 4) Environment-specific configurations",
+      "reasoning": "DevOps configuration requiring containerization and orchestration knowledge. Moderate-high complexity."
+    },
+    {
+      "taskId": 43,
+      "taskTitle": "Add load testing framework",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Load testing with performance benchmarking. Moderate complexity with established tools."
+    },
+    {
+      "taskId": 44,
+      "taskTitle": "Create monitoring dashboards",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Dashboard configuration with Grafana. Moderate complexity with established tools."
+    },
+    {
+      "taskId": 45,
+      "taskTitle": "Implement backup and recovery",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Automated backup implementation, 2) Point-in-time recovery system, 3) Disaster recovery procedures",
+      "reasoning": "Critical data protection requiring backup strategies and recovery testing. Moderate-high complexity."
+    },
+    {
+      "taskId": 46,
+      "taskTitle": "Add security hardening",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Input sanitization and validation, 2) Security headers and CORS configuration, 3) API key rotation and security scanning",
+      "reasoning": "Security hardening requiring comprehensive security measures. Moderate-high complexity."
+    },
+    {
+      "taskId": 47,
+      "taskTitle": "Create user documentation",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Documentation creation with structured content. Moderate complexity requiring technical writing skills."
+    },
+    {
+      "taskId": 48,
+      "taskTitle": "Implement graceful shutdown",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Graceful shutdown with connection draining and cleanup. Moderate complexity."
+    },
+    {
+      "taskId": 49,
+      "taskTitle": "Add final integration validation",
+      "complexityScore": 5,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "End-to-end validation requiring comprehensive testing. Moderate complexity as validation task."
+    },
+    {
+      "taskId": 50,
+      "taskTitle": "Production readiness checklist",
+      "complexityScore": 4,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Review and validation task with defined checklist. Moderate complexity as coordination task."
+    }
+  ]
+}

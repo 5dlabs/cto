@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="35" priority="medium" agent="cipher">
+    <meta>
+        <title>Create webhook security scanning</title>
+        <priority>medium</priority>
+        <dependencies>4, 23</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 35 with production-quality code.</role>
+
+    <context>
+        <overview>Implement security scanning for incoming webhook payloads</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create src/security/payloadScanner.ts
+2. Implement malicious payload detection
+3. Add content filtering and sanitization
+4. Create threat intelligence integration
+5. Add security event logging
+6. Implement automatic blocking mechanisms</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-35): Create webhook security scanning</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test security scanning with various payload types including malicious content</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
