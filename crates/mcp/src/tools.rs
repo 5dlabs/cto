@@ -39,30 +39,50 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
 fn get_intake_schema() -> Value {
     json!({
         "name": "intake",
-        "description": "Process a PRD to generate TaskMaster tasks and comprehensive documentation in a single operation. Parses PRD, generates task breakdowns, enriches context via Firecrawl, creates agent prompts, and submits a single PR with the complete project structure.",
+        "description": "Process a PRD to generate tasks and documentation. Parses PRD, generates task breakdowns with complexity analysis, creates agent prompts (XML + Markdown), and optionally submits a PR. Use local=true for immediate local execution without Argo.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "project_name": {
                     "type": "string",
-                    "description": "Name of the project subdirectory (required). Will contain .taskmaster folder with tasks and documentation."
+                    "description": "Name of the project subdirectory (required). Will contain .tasks folder with tasks and documentation."
                 },
                 "prd_content": {
                     "type": "string",
-                    "description": "PRD content as a string (optional). If not provided, reads from {project_name}/intake/prd.txt"
+                    "description": "PRD content as a string (optional). If not provided, reads from {project_name}/prd.md or {project_name}/prd.txt"
                 },
                 "architecture_content": {
                     "type": "string",
-                    "description": "Architecture document content (optional). If not provided, reads from {project_name}/intake/architecture.md if it exists"
+                    "description": "Architecture document content (optional). If not provided, reads from {project_name}/architecture.md if it exists"
+                },
+                "local": {
+                    "type": "boolean",
+                    "description": "Run intake locally using tasks CLI instead of submitting Argo workflow (optional, defaults to false)",
+                    "default": false
+                },
+                "num_tasks": {
+                    "type": "integer",
+                    "description": "Target number of tasks to generate (optional, defaults to 15)",
+                    "default": 15
+                },
+                "expand": {
+                    "type": "boolean",
+                    "description": "Expand tasks into subtasks (optional, defaults to true)",
+                    "default": true
+                },
+                "analyze": {
+                    "type": "boolean",
+                    "description": "Analyze task complexity (optional, defaults to true)",
+                    "default": true
+                },
+                "model": {
+                    "type": "string",
+                    "description": "AI model to use (optional, defaults to claude-sonnet-4-20250514)"
                 },
                 "enrich_context": {
                     "type": "boolean",
                     "description": "Auto-scrape URLs found in PRD via Firecrawl to enrich task context (optional, defaults to true)",
                     "default": true
-                },
-                "model": {
-                    "type": "string",
-                    "description": "Claude model to use (optional, defaults to claude-opus-4-5-20250929)"
                 },
                 "include_codebase": {
                     "type": "boolean",
@@ -89,7 +109,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
             "properties": {
                 "task_id": {
                     "type": "integer",
-                    "description": "Task ID to implement from task files. Optional - if not provided, will auto-detect next available task from TaskMaster based on dependencies and priority.",
+                    "description": "Task ID to implement from task files. Optional - if not provided, will auto-detect next available task based on dependencies and priority.",
                     "minimum": 1
                 },
                 "repository": {
@@ -151,7 +171,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                 },
                 "parallel_execution": {
                     "type": "boolean",
-                    "description": "Enable parallel execution of independent tasks. When true, analyzes TaskMaster dependencies and runs tasks in parallel execution levels. When false (default), runs tasks sequentially one at a time. Requires TaskMaster tasks.json with proper dependencies.",
+                    "description": "Enable parallel execution of independent tasks. When true, analyzes task dependencies and runs tasks in parallel execution levels. When false (default), runs tasks sequentially one at a time. Requires tasks.json with proper dependencies.",
                     "default": false
                 },
                 "model": {

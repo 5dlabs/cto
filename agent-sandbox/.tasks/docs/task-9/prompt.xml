@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="9" priority="medium" agent="rex">
+    <meta>
+        <title>Build WebSocket endpoint for real-time task updates</title>
+        <priority>medium</priority>
+        <dependencies>1, 4, 6</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 9 with production-quality code.</role>
+
+    <context>
+        <overview>Implement WebSocket connection handling with Redis pub/sub for broadcasting task changes to connected team members</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add dependencies: tokio-tungstenite = &quot;0.21&quot;, futures-util = &quot;0.3&quot;
+2. Create src/api/websocket.rs:
+   - GET /api/ws: upgrade_to_websocket(Query&lt;{token: String}&gt;) -&gt; WebSocketUpgrade
+   - Validate JWT from query param
+   - Store connection in HashMap&lt;UserId, Vec&lt;WebSocket&gt;&gt;
+3. Implement Redis pub/sub listener in src/infra/notifications.rs:
+   - Subscribe to channel: task_updates:{team_id}
+   - On message, broadcast to all connected team members
+4. Modify task update handlers to publish events:
+   - redis.publish(&quot;task_updates:{team_id}&quot;, json!({&quot;type&quot;: &quot;task_updated&quot;, &quot;task&quot;: task}))
+5. Message format: {&quot;type&quot;: &quot;task_created|task_updated|task_deleted&quot;, &quot;task&quot;: TaskDto, &quot;timestamp&quot;: ISO8601}
+6. Handle connection cleanup on disconnect</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-9): Build WebSocket endpoint for real-time task updates</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration test: connect 2 clients to same team, update task via REST API, verify both receive WebSocket message. Test 1000 concurrent connections. Test reconnection handling. Verify messages only sent to team members</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

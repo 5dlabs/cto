@@ -1,7 +1,7 @@
 ---
 # Morgan Issue Comment Sensor
 # Triggers Morgan to process human feedback from GitHub issue comments
-# Enables bidirectional sync between GitHub Issues and TaskMaster docs
+# Enables bidirectional sync between GitHub Issues and tasks docs
 
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -25,11 +25,11 @@ spec:
             type: string
             value:
               - "created"
-          # Only process comments on TaskMaster-managed issues
+          # Only process comments on tasks-managed issues
           - path: body.issue.labels[].name
             type: string
             value:
-              - "taskmaster-task"
+              - "cto-task"
           # Ignore bot comments (prevent loops)
           - path: body.comment.user.type
             type: string
@@ -209,7 +209,7 @@ spec:
                         - name: REPOSITORY_URL
                           value: "{{`{{workflow.parameters.repository-url}}`}}"
                       volumeMounts:
-                        - name: agent-templates
+                        - name: templates
                           mountPath: /workspace
                           readOnly: true
                       resources:
@@ -221,8 +221,8 @@ spec:
                           memory: 1Gi
 
                 volumes:
-                  - name: agent-templates
+                  - name: templates
                     configMap:
-                      name: controller-agent-templates-pm
+                      name: controller-templates-pm
                       defaultMode: 0755
 

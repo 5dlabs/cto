@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="15" priority="high" agent="bolt">
+    <meta>
+        <title>Build Docker multi-stage image and Kubernetes deployment manifests</title>
+        <priority>high</priority>
+        <dependencies>14</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 15 with production-quality code.</role>
+
+    <context>
+        <overview>Create optimized Docker build with multi-stage compilation, Kubernetes deployment with HPA, and production-ready configuration</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create Dockerfile:
+   - Stage 1: rust:1.75 as builder, copy source, cargo build --release
+   - Stage 2: debian:bookworm-slim, copy binary and templates, install ca-certificates
+   - EXPOSE 3000, CMD [&quot;./teamsync-api&quot;]
+2. Create infra/k8s/:
+   - deployment.yaml: 3 replicas, resource limits (500m CPU, 512Mi memory), liveness/readiness probes
+   - service.yaml: ClusterIP service on port 80 -&gt; 3000
+   - hpa.yaml: HorizontalPodAutoscaler targeting 70% CPU, min 3, max 10 replicas
+   - configmap.yaml: non-sensitive config (LOG_LEVEL, CORS_ORIGINS)
+   - secret.yaml: template for DATABASE_URL, JWT_SECRET, etc.
+   - ingress.yaml: TLS termination, path routing
+3. Add .dockerignore: target/, node_modules/, .git/
+4. Create docker-compose.yml for local dev: API, PostgreSQL, Redis
+5. Build script: docker build --target production -t teamsync-api:latest .</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-15): Build Docker multi-stage image and Kubernetes deployment manifests</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Build Docker image, verify size &lt; 100MB. Run container, test health endpoints. Deploy to local k8s (minikube), verify pods start. Test HPA scales under load (use hey or k6). Verify logs appear in JSON format</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

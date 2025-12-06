@@ -565,6 +565,7 @@ impl AIDomain {
             tags: Vec::new(),
             assignee: None,
             complexity: None,
+            agent_hint: None,
         }
     }
 

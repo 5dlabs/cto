@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-/// Get the agent-templates directory path
+/// Get the templates directory path
 fn templates_dir() -> PathBuf {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     PathBuf::from(manifest_dir)
@@ -18,7 +18,12 @@ fn templates_dir() -> PathBuf {
         .unwrap()
         .parent()
         .unwrap()
-        .join("agent-templates")
+        .join("templates")
+}
+
+/// Get the agents directory path (templates/agents/)
+fn agents_dir() -> PathBuf {
+    templates_dir().join("agents")
 }
 
 /// Agent and their supported job types
@@ -51,7 +56,7 @@ fn test_templates_dir_exists() {
     let dir = templates_dir();
     assert!(
         dir.exists(),
-        "agent-templates directory should exist at {}",
+        "templates directory should exist at {}",
         dir.display()
     );
 }
@@ -77,6 +82,7 @@ fn test_all_partials_exist() {
         "github-auth.sh.hbs",
         "git-setup.sh.hbs",
         "task-files.sh.hbs",
+        "tools-config.sh.hbs",
         "acceptance-probe.sh.hbs",
         "completion.sh.hbs",
     ];
@@ -97,7 +103,7 @@ fn test_all_partials_exist() {
 
 #[test]
 fn test_all_agent_directories_exist() {
-    let base = templates_dir();
+    let base = agents_dir();
 
     for (agent, _) in agent_job_matrix() {
         let agent_dir = base.join(agent);
@@ -112,7 +118,7 @@ fn test_all_agent_directories_exist() {
 
 #[test]
 fn test_all_system_prompts_exist() {
-    let base = templates_dir();
+    let base = agents_dir();
 
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
@@ -143,7 +149,7 @@ fn test_all_system_prompts_exist() {
 
 #[test]
 fn test_all_container_templates_exist() {
-    let base = templates_dir();
+    let base = agents_dir();
 
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
@@ -196,8 +202,8 @@ fn test_shared_container_renders() {
         "Container should include git-setup partial"
     );
     assert!(
-        content.contains("{{cli_execute}}"),
-        "Container should have cli_execute placeholder"
+        content.contains("{{> cli_execute}}"),
+        "Container should have cli_execute partial"
     );
 }
 
@@ -228,7 +234,7 @@ fn test_partials_are_valid_handlebars() {
 
 #[test]
 fn test_system_prompts_contain_role_context() {
-    let base = templates_dir();
+    let base = agents_dir();
 
     let role_keywords: HashMap<&str, Vec<&str>> = [
         ("coder", vec!["code", "implement", "develop", "feature"]),
@@ -274,7 +280,7 @@ fn test_agent_specialization_in_prompts() {
     let base = templates_dir();
 
     // Rex should mention Rust
-    let rex_prompt = fs::read_to_string(base.join("rex/coder/system-prompt.md.hbs"))
+    let rex_prompt = fs::read_to_string(base.join("agents/rex/coder/system-prompt.md.hbs"))
         .expect("Should read rex prompt")
         .to_lowercase();
     assert!(
@@ -283,7 +289,7 @@ fn test_agent_specialization_in_prompts() {
     );
 
     // Blaze should mention frontend/react
-    let blaze_prompt = fs::read_to_string(base.join("blaze/coder/system-prompt.md.hbs"))
+    let blaze_prompt = fs::read_to_string(base.join("agents/blaze/coder/system-prompt.md.hbs"))
         .expect("Should read blaze prompt")
         .to_lowercase();
     assert!(
@@ -294,7 +300,7 @@ fn test_agent_specialization_in_prompts() {
     );
 
     // Grizz should mention Go
-    let grizz_prompt = fs::read_to_string(base.join("grizz/coder/system-prompt.md.hbs"))
+    let grizz_prompt = fs::read_to_string(base.join("agents/grizz/coder/system-prompt.md.hbs"))
         .expect("Should read grizz prompt")
         .to_lowercase();
     assert!(
@@ -303,7 +309,7 @@ fn test_agent_specialization_in_prompts() {
     );
 
     // Nova should mention Node/TypeScript
-    let nova_prompt = fs::read_to_string(base.join("nova/coder/system-prompt.md.hbs"))
+    let nova_prompt = fs::read_to_string(base.join("agents/nova/coder/system-prompt.md.hbs"))
         .expect("Should read nova prompt")
         .to_lowercase();
     assert!(
@@ -367,7 +373,7 @@ fn test_github_auth_partial_security() {
 
 #[test]
 fn test_template_count_matches_expected() {
-    let base = templates_dir();
+    let base = agents_dir();
     let mut total_prompts = 0;
     let mut total_containers = 0;
 
@@ -394,4 +400,253 @@ fn test_template_count_matches_expected() {
         total_containers >= 20,
         "Should have at least 20 container templates, found {total_containers}"
     );
+}
+
+// ============================================================================
+// Full Template Rendering Tests
+// These tests verify that templates render correctly through CodeTemplateGenerator
+// ============================================================================
+
+#[allow(clippy::disallowed_macros)] // println! is fine in tests for output
+mod rendering_tests {
+    use controller::cli::types::CLIType;
+    use controller::crds::coderun::CLIConfig;
+    use controller::crds::{CodeRun, CodeRunSpec};
+    use controller::tasks::code::templates::CodeTemplateGenerator;
+    use controller::tasks::config::ControllerConfig;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use std::collections::HashMap;
+
+    /// Create a test CodeRun with specific agent and CLI type
+    fn create_code_run(github_app: &str, cli_type: CLIType) -> CodeRun {
+        let mut settings = HashMap::new();
+        settings.insert("approvalPolicy".to_string(), serde_json::json!("never"));
+        settings.insert(
+            "sandboxMode".to_string(),
+            serde_json::json!("workspace-write"),
+        );
+
+        CodeRun {
+            metadata: ObjectMeta {
+                name: Some("test-run".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
+                cli_config: Some(CLIConfig {
+                    cli_type,
+                    model: "test-model".to_string(),
+                    settings,
+                    max_tokens: Some(16000),
+                    temperature: Some(0.7),
+                    model_rotation: None,
+                }),
+                task_id: Some(1),
+                service: "test-service".to_string(),
+                repository_url: "https://github.com/test/repo".to_string(),
+                docs_repository_url: "https://github.com/test/docs".to_string(),
+                docs_project_directory: Some("docs".to_string()),
+                working_directory: Some("src".to_string()),
+                model: "test-model".to_string(),
+                github_user: Some("test-user".to_string()),
+                github_app: Some(github_app.to_string()),
+                context_version: 1,
+                continue_session: false,
+                overwrite_memory: false,
+                docs_branch: "main".to_string(),
+                env: HashMap::new(),
+                env_from_secrets: Vec::new(),
+                enable_docker: false,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        }
+    }
+
+    /// Agent/CLI combinations to test
+    fn agent_cli_matrix() -> Vec<(&'static str, CLIType, &'static str)> {
+        vec![
+            // Rex (Rust) with all CLIs
+            ("5DLabs-Rex", CLIType::Claude, "claude"),
+            ("5DLabs-Rex", CLIType::Codex, "codex"),
+            ("5DLabs-Rex", CLIType::Cursor, "cursor"),
+            ("5DLabs-Rex", CLIType::Factory, "factory"),
+            ("5DLabs-Rex", CLIType::Gemini, "gemini"),
+            ("5DLabs-Rex", CLIType::OpenCode, "opencode"),
+            // Blaze (Frontend) with Claude
+            ("5DLabs-Blaze", CLIType::Claude, "claude"),
+            // Cleo (Quality) with Claude
+            ("5DLabs-Cleo", CLIType::Claude, "claude"),
+            // Tess (Test) with Claude
+            ("5DLabs-Tess", CLIType::Claude, "claude"),
+            // Atlas (Integration) with Claude
+            ("5DLabs-Atlas", CLIType::Claude, "claude"),
+            // Bolt (Deploy) with Claude
+            ("5DLabs-Bolt", CLIType::Claude, "claude"),
+        ]
+    }
+
+    /// CLI-specific invocation markers to verify in rendered output
+    fn cli_markers(cli_type: CLIType) -> Vec<&'static str> {
+        match cli_type {
+            CLIType::Claude => vec!["claude", "CLAUDE"],
+            CLIType::Codex => vec!["codex", "CODEX"],
+            CLIType::Cursor => vec!["cursor", "CURSOR"],
+            CLIType::Factory => vec!["factory", "FACTORY"],
+            CLIType::Gemini => vec!["gemini", "GEMINI"],
+            CLIType::OpenCode => vec!["opencode", "OPENCODE"],
+            _ => vec![],
+        }
+    }
+
+    #[test]
+    fn test_container_script_renders_for_all_agent_cli_combos() {
+        let config = ControllerConfig::default();
+
+        for (agent, cli_type, cli_name) in agent_cli_matrix() {
+            let code_run = create_code_run(agent, cli_type);
+
+            // Generate all templates
+            let result = CodeTemplateGenerator::generate_all_templates(&code_run, &config);
+
+            assert!(
+                result.is_ok(),
+                "Template generation failed for {agent} + {cli_name}: {:?}",
+                result.err()
+            );
+
+            let templates = result.unwrap();
+
+            // Verify container.sh was generated
+            assert!(
+                templates.contains_key("container.sh"),
+                "container.sh should be generated for {agent} + {cli_name}"
+            );
+
+            let container_script = &templates["container.sh"];
+
+            // Verify it's not empty
+            assert!(
+                !container_script.is_empty(),
+                "container.sh should not be empty for {agent} + {cli_name}"
+            );
+
+            // Verify it contains shell script markers
+            assert!(
+                container_script.contains("#!/bin/bash") || container_script.contains("set -"),
+                "container.sh should be a bash script for {agent} + {cli_name}"
+            );
+
+            // Verify it contains CLI-specific invocation
+            let markers = cli_markers(cli_type);
+            let found_cli_marker = markers.iter().any(|m| container_script.contains(m));
+            assert!(
+                found_cli_marker,
+                "container.sh for {agent} + {cli_name} should contain CLI marker from {markers:?}"
+            );
+
+            // Verify common sections exist
+            assert!(
+                container_script.contains("GIT_") || container_script.contains("git"),
+                "container.sh should have git setup for {agent} + {cli_name}"
+            );
+
+            println!("✓ {agent} + {cli_name}: {} bytes", container_script.len());
+        }
+    }
+
+    #[test]
+    fn test_system_prompt_renders_for_agents() {
+        let config = ControllerConfig::default();
+
+        let agents = vec![
+            "5DLabs-Rex",
+            "5DLabs-Blaze",
+            "5DLabs-Cleo",
+            "5DLabs-Tess",
+            "5DLabs-Atlas",
+            "5DLabs-Bolt",
+        ];
+
+        for agent in agents {
+            let code_run = create_code_run(agent, CLIType::Claude);
+            let result = CodeTemplateGenerator::generate_all_templates(&code_run, &config);
+
+            assert!(
+                result.is_ok(),
+                "Template generation failed for {agent}: {:?}",
+                result.err()
+            );
+
+            let templates = result.unwrap();
+
+            // Check for memory file (CLAUDE.md for Claude CLI)
+            let memory_key = "CLAUDE.md";
+            assert!(
+                templates.contains_key(memory_key),
+                "{memory_key} should be generated for {agent}"
+            );
+
+            let memory = &templates[memory_key];
+            assert!(
+                !memory.is_empty(),
+                "{memory_key} should not be empty for {agent}"
+            );
+
+            println!("✓ {agent} memory: {} bytes", memory.len());
+        }
+    }
+
+    #[test]
+    fn test_config_generates_for_all_cli_types() {
+        let config = ControllerConfig::default();
+
+        // Each CLI generates a different config file
+        // Claude: settings.json, mcp.json
+        // Codex: codex-config.toml
+        // Cursor: cursor-cli-config.json, cursor-cli.json, cursor-mcp.json
+        // Factory: factory-cli-config.json, factory-cli.json
+        // Gemini: settings.json
+        // OpenCode: opencode-config.json
+        let cli_configs: Vec<(CLIType, &str)> = vec![
+            (CLIType::Claude, "settings.json"),
+            (CLIType::Codex, "codex-config.toml"),
+            (CLIType::Cursor, "cursor-cli-config.json"),
+            (CLIType::Factory, "factory-cli-config.json"),
+            (CLIType::Gemini, "settings.json"),
+            (CLIType::OpenCode, "opencode-config.json"),
+        ];
+
+        for (cli_type, config_file) in cli_configs {
+            let code_run = create_code_run("5DLabs-Rex", cli_type);
+            let result = CodeTemplateGenerator::generate_all_templates(&code_run, &config);
+
+            assert!(
+                result.is_ok(),
+                "Template generation failed for CLI {cli_type:?}: {:?}",
+                result.err()
+            );
+
+            let templates = result.unwrap();
+
+            // Verify config file exists
+            assert!(
+                templates.contains_key(config_file),
+                "{config_file} should be generated for CLI {cli_type:?}"
+            );
+
+            let config_content = &templates[config_file];
+            assert!(
+                !config_content.is_empty(),
+                "{config_file} should not be empty for CLI {cli_type:?}"
+            );
+
+            println!(
+                "✓ {cli_type:?} config ({config_file}): {} bytes",
+                config_content.len()
+            );
+        }
+    }
 }

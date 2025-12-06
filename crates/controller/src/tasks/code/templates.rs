@@ -3,14 +3,11 @@ use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
-    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
-    CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
+    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
-    CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
-    CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
-    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
-    CODE_GEMINI_MEMORY_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
-    CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
+    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -23,10 +20,19 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, warn};
 
-// Template base path (mounted from ConfigMap)
-const AGENT_TEMPLATES_PATH: &str = "/agent-templates";
+// Template base path (mounted from ConfigMap in production)
+// Can be overridden with AGENT_TEMPLATES_PATH env var for testing
+const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/templates";
+
+/// Get the agent templates directory path.
+/// Uses `AGENT_TEMPLATES_PATH` env var if set, otherwise defaults to `/templates`.
+fn get_templates_path() -> String {
+    std::env::var("AGENT_TEMPLATES_PATH")
+        .unwrap_or_else(|_| DEFAULT_AGENT_TEMPLATES_PATH.to_string())
+}
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Some fields are set but not currently used after template migration
 struct CliRenderSettings {
     model: String,
     temperature: Option<f64>,
@@ -181,7 +187,11 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "cursor-cli.json".to_string(),
-            Self::generate_cursor_project_permissions()?,
+            Self::generate_cursor_project_permissions(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+            )?,
         );
 
         templates.insert(
@@ -331,7 +341,52 @@ impl CodeTemplateGenerator {
             Self::generate_mcp_config(code_run, config)?,
         );
 
+        templates.insert(
+            "settings.json".to_string(),
+            Self::generate_gemini_settings(code_run, &enriched_cli_config)?,
+        );
+
         Ok(templates)
+    }
+
+    fn generate_gemini_settings(_code_run: &CodeRun, cli_config: &Value) -> Result<String> {
+        // Build context config
+        let context = json!({
+            "fileName": ["AGENTS.md", "GEMINI.md"],
+            "fileFiltering": "gitignore"
+        });
+
+        // Build advanced config with optional bug command
+        let mut advanced = json!({});
+        if let Some(bug_cmd) = cli_config.get("bug_command").and_then(Value::as_str) {
+            advanced["bugCommand"] = json!(bug_cmd);
+        }
+
+        // Build sandboxing config
+        let sandbox_profile = cli_config
+            .get("sandbox_profile")
+            .and_then(Value::as_str)
+            .unwrap_or("permissive");
+        let sandboxing = json!({
+            "profile": sandbox_profile
+        });
+
+        // Build complete settings config (no template needed - serialize directly)
+        let settings = json!({
+            "context": context,
+            "theme": "default",
+            "advanced": advanced,
+            "sandboxing": sandboxing,
+            "checkpointing": {
+                "enabled": true
+            }
+        });
+
+        serde_json::to_string_pretty(&settings).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Gemini settings.json: {e}"
+            ))
+        })
     }
 
     fn generate_cursor_container_script(
@@ -344,6 +399,9 @@ impl CodeTemplateGenerator {
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
+
+        // Register CLI-specific invoke template as the cli_execute partial
+        Self::register_cli_invoke_partial(&mut handlebars, CLIType::Cursor)?;
 
         let base_template = Self::load_template(CODE_CURSOR_CONTAINER_BASE_TEMPLATE)?;
         handlebars
@@ -491,58 +549,84 @@ impl CodeTemplateGenerator {
         _client_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        let template = Self::load_template(CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE)?;
-
-        handlebars
-            .register_template_string("cursor_cli_config", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Cursor CLI config template: {e}"
-                ))
-            })?;
-
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
-        let mut context = json!({
-            "model": render_settings.model,
-            "temperature": render_settings.temperature,
-            "max_output_tokens": render_settings.max_output_tokens,
-            "approval_policy": render_settings.approval_policy,
-            "sandbox_mode": render_settings.sandbox_mode,
-            "project_doc_max_bytes": render_settings.project_doc_max_bytes,
-            "editor_vim_mode": render_settings.editor_vim_mode,
-            "tools": {
-                "url": render_settings.tools_url,
-                "tools": remote_tools,
-            },
+        // Build model config
+        let mut model_config = json!({
+            "default": render_settings.model
         });
-
-        if let Some(raw_json) = &render_settings.raw_additional_json {
-            context
-                .as_object_mut()
-                .expect("context is an object")
-                .insert(
-                    "raw_additional_json".to_string(),
-                    Value::String(raw_json.clone()),
-                );
+        if let Some(temp) = render_settings.temperature {
+            model_config["temperature"] = json!(temp);
+        }
+        if let Some(max_tokens) = render_settings.max_output_tokens {
+            model_config["maxOutputTokens"] = json!(max_tokens);
         }
 
-        // Cursor CLI does not currently expose reasoning-effort toggles; ignore any value supplied.
+        // Build MCP servers config
+        let mut mcp_servers = json!({});
+        if !render_settings.tools_url.is_empty() {
+            let mut tools_server = json!({
+                "command": "tools",
+                "args": ["--url", render_settings.tools_url],
+                "env": {
+                    "TOOLS_SERVER_URL": render_settings.tools_url
+                }
+            });
+            if !remote_tools.is_empty() {
+                tools_server["availableTools"] = json!(remote_tools);
+            }
+            mcp_servers["tools"] = tools_server;
+        }
 
-        handlebars
-            .render("cursor_cli_config", &context)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render Cursor CLI config template: {e}"
-                ))
-            })
+        // Build automation config
+        let automation = json!({
+            "approvalPolicy": render_settings.approval_policy,
+            "sandboxMode": render_settings.sandbox_mode,
+            "projectDocMaxBytes": render_settings.project_doc_max_bytes
+        });
+
+        // Build complete config (no template needed - serialize directly)
+        let config = json!({
+            "version": 1,
+            "hasChangedDefaultModel": true,
+            "model": model_config,
+            "editor": {
+                "vimMode": render_settings.editor_vim_mode
+            },
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)" ],
+                "deny": []
+            },
+            "automation": automation,
+            "mcp": {
+                "servers": mcp_servers
+            }
+        });
+
+        serde_json::to_string_pretty(&config).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Cursor CLI config: {e}"
+            ))
+        })
     }
 
-    fn generate_cursor_project_permissions() -> Result<String> {
-        Self::load_template(CODE_CURSOR_PROJECT_CONFIG_TEMPLATE)
+    fn generate_cursor_project_permissions(
+        _code_run: &CodeRun,
+        _cli_config: &Value,
+        _remote_tools: &[String],
+    ) -> Result<String> {
+        // Generate Cursor project permissions config (not MCP config)
+        let config = json!({
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)" ],
+                "deny": []
+            }
+        });
+        serde_json::to_string_pretty(&config).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Cursor project permissions: {e}"
+            ))
+        })
     }
 
     fn generate_cursor_mcp_config(
@@ -550,31 +634,32 @@ impl CodeTemplateGenerator {
         cli_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        let template = Self::load_template("code/cursor/cursor-mcp.json")?;
-
-        handlebars
-            .register_template_string("cursor_mcp", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Cursor MCP config template: {e}"
-                ))
-            })?;
-
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
-        let context = json!({
-            "tools": {
-                "url": render_settings.tools_url,
-                "tools": remote_tools,
-            },
+        // Build MCP servers config (no template needed - serialize directly)
+        let mut mcp_servers = json!({});
+
+        if !render_settings.tools_url.is_empty() {
+            let mut tools_server = json!({
+                "command": "tools",
+                "args": ["--url", render_settings.tools_url, "--working-dir", "/workspace"],
+                "env": {
+                    "TOOLS_SERVER_URL": render_settings.tools_url
+                }
+            });
+            if !remote_tools.is_empty() {
+                tools_server["availableTools"] = json!(remote_tools);
+            }
+            mcp_servers["tools"] = tools_server;
+        }
+
+        let config = json!({
+            "mcpServers": mcp_servers
         });
 
-        handlebars.render("cursor_mcp", &context).map_err(|e| {
+        serde_json::to_string_pretty(&config).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to render Cursor MCP config template: {e}"
+                "Failed to serialize Cursor MCP config: {e}"
             ))
         })
     }
@@ -659,6 +744,9 @@ impl CodeTemplateGenerator {
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
+
+        // Register CLI-specific invoke template as the cli_execute partial
+        Self::register_cli_invoke_partial(&mut handlebars, CLIType::Factory)?;
 
         let base_template = Self::load_template(CODE_FACTORY_CONTAINER_BASE_TEMPLATE)?;
         handlebars
@@ -835,62 +923,106 @@ impl CodeTemplateGenerator {
     fn generate_factory_global_config(
         code_run: &CodeRun,
         cli_config: &Value,
-        client_config: &Value,
+        _client_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        let template = Self::load_template(CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE)?;
-        handlebars
-            .register_template_string("factory_cli_config", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Factory CLI config template: {e}"
-                ))
-            })?;
-
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
-        let mut context = json!({
-            "model": render_settings.model,
-            "temperature": render_settings.temperature,
-            "max_output_tokens": render_settings.max_output_tokens,
-            "approval_policy": render_settings.approval_policy,
-            "sandbox_mode": render_settings.sandbox_mode,
-            "project_doc_max_bytes": render_settings.project_doc_max_bytes,
-            "editor_vim_mode": render_settings.editor_vim_mode,
-            "reasoning_effort": render_settings.reasoning_effort,
-            "auto_level": render_settings.auto_level,
-            "tools": {
-                "url": render_settings.tools_url,
-                "tools": remote_tools,
-            },
-            "cli_config": cli_config,
-            "client_config": client_config,
+        // Build model config
+        let mut model_config = json!({
+            "default": render_settings.model
         });
-
-        if let Some(raw_json) = &render_settings.raw_additional_json {
-            context
-                .as_object_mut()
-                .expect("context is an object")
-                .insert(
-                    "raw_additional_json".to_string(),
-                    Value::String(raw_json.clone()),
-                );
+        if let Some(ref effort) = render_settings.reasoning_effort {
+            model_config["reasoningEffort"] = json!(effort);
+        }
+        if let Some(temp) = render_settings.temperature {
+            model_config["temperature"] = json!(temp);
+        }
+        if let Some(max_tokens) = render_settings.max_output_tokens {
+            model_config["maxOutputTokens"] = json!(max_tokens);
         }
 
-        handlebars
-            .render("factory_cli_config", &context)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render Factory CLI config template: {e}"
-                ))
-            })
+        // Determine auto run level
+        let auto_level = render_settings
+            .auto_level
+            .as_ref()
+            .or(render_settings.reasoning_effort.as_ref())
+            .map_or("high", String::as_str);
+
+        // Build execution config
+        let execution = json!({
+            "approvalPolicy": render_settings.approval_policy,
+            "sandboxMode": render_settings.sandbox_mode,
+            "projectDocMaxBytes": render_settings.project_doc_max_bytes
+        });
+
+        // Build base config (no template needed - serialize directly)
+        let mut config = json!({
+            "version": 1,
+            "model": model_config,
+            "autoRun": {
+                "enabled": true,
+                "level": auto_level
+            },
+            "specificationMode": {
+                "default": true
+            },
+            "execution": execution,
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)" ],
+                "deny": []
+            }
+        });
+
+        // Add tools config if URL is provided
+        if !render_settings.tools_url.is_empty() {
+            let mut tools_config = json!({
+                "endpoint": render_settings.tools_url
+            });
+            if !remote_tools.is_empty() {
+                tools_config["tools"] = json!(remote_tools);
+            }
+            config["tools"] = tools_config;
+
+            // Also add MCP servers
+            let mut mcp_tools_server = json!({
+                "command": "tools",
+                "args": ["--url", render_settings.tools_url],
+                "env": {
+                    "TOOLS_SERVER_URL": render_settings.tools_url
+                }
+            });
+            if !remote_tools.is_empty() {
+                mcp_tools_server["availableTools"] = json!(remote_tools);
+            }
+            config["mcp"] = json!({
+                "servers": {
+                    "tools": mcp_tools_server
+                }
+            });
+        }
+
+        serde_json::to_string_pretty(&config).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Factory CLI config: {e}"
+            ))
+        })
     }
 
     fn generate_factory_project_permissions() -> Result<String> {
-        Self::load_template(CODE_FACTORY_PROJECT_CONFIG_TEMPLATE)
+        // Generate a minimal permissions config (no template needed)
+        let config = json!({
+            "version": 1,
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)" ],
+                "deny": []
+            }
+        });
+        serde_json::to_string_pretty(&config).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Factory project permissions: {e}"
+            ))
+        })
     }
 
     fn generate_container_script(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
@@ -899,6 +1031,10 @@ impl CodeTemplateGenerator {
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
+
+        // Register CLI-specific invoke template as the `cli_execute` partial
+        let cli_type = Self::determine_cli_type(code_run);
+        Self::register_cli_invoke_partial(&mut handlebars, cli_type)?;
 
         // Select agent-specific template based on github_app field
         let template_path = Self::get_agent_container_template(code_run);
@@ -1093,33 +1229,89 @@ impl CodeTemplateGenerator {
 
     fn generate_claude_settings(
         code_run: &CodeRun,
-        config: &ControllerConfig,
+        _config: &ControllerConfig,
         cli_config: &Value,
     ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
+        // Check for agent-specific tool overrides
+        let agent_tools_override = cli_config
+            .get("permissions")
+            .and_then(|p| p.get("allow"))
+            .is_some();
 
-        let template = Self::load_template(CODE_CLAUDE_SETTINGS_TEMPLATE)?;
+        // Build permissions based on configuration
+        let permissions = if agent_tools_override {
+            json!({
+                "allow": cli_config.get("permissions").and_then(|p| p.get("allow")).cloned().unwrap_or(json!([])),
+                "deny": cli_config.get("permissions").and_then(|p| p.get("deny")).cloned().unwrap_or(json!([])),
+                "defaultMode": "acceptEdits"
+            })
+        } else {
+            // Default allowed tools for Claude Code CLI
+            json!({
+                "allow": [
+                    "Bash", "Create", "Edit", "Read", "Write", "MultiEdit",
+                    "Glob", "Grep", "LS", "Task", "ExitPlanMode", "ExitSpecMode",
+                    "NotebookRead", "NotebookEdit", "WebFetch", "WebSearch",
+                    "TodoRead", "TodoWrite", "GenerateDroid"
+                ],
+                "deny": [],
+                "defaultMode": "acceptEdits"
+            })
+        };
 
-        handlebars
-            .register_template_string("claude_settings", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register settings.json template: {e}"
-                ))
-            })?;
+        // Build environment variables
+        let is_retry = cli_config
+            .get("retry")
+            .and_then(|r| r.get("is_retry"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let telemetry_enabled = cli_config
+            .get("telemetry")
+            .and_then(|t| t.get("enabled"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
 
-        let context = json!({
-            "model": code_run.spec.model,
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "api_key_secret_name": config.secrets.api_key_secret_name,
-            "api_key_secret_key": config.secrets.api_key_secret_key,
-            "working_directory": code_run.spec.working_directory.as_deref().unwrap_or("."),
-            "cli_config": cli_config,
+        let mut env = json!({
+            "NODE_ENV": "production",
+            "DISABLE_AUTOUPDATER": "1",
+            "DISABLE_COST_WARNINGS": "0",
+            "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "0",
+            "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true",
+            "CLAUDE_CODE_ENABLE_TELEMETRY": if telemetry_enabled { "1" } else { "0" }
         });
 
-        handlebars.render("claude_settings", &context).map_err(|e| {
-            crate::tasks::types::Error::ConfigError(format!("Failed to render settings.json: {e}"))
+        if telemetry_enabled {
+            env["OTEL_METRICS_EXPORTER"] = json!("otlp");
+            env["OTEL_LOGS_EXPORTER"] = json!("otlp");
+            env["OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"] = json!(
+                "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+            );
+            env["OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"] = json!("grpc");
+            env["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = json!(
+                "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+            );
+            env["OTEL_EXPORTER_OTLP_LOGS_PROTOCOL"] = json!("grpc");
+        }
+
+        if is_retry {
+            env["BASH_DEFAULT_TIMEOUT_MS"] = json!("30000");
+            env["BASH_MAX_TIMEOUT_MS"] = json!("300000");
+        }
+
+        // Build complete settings config (no template needed - serialize directly)
+        let settings = json!({
+            "enableAllProjectMcpServers": true,
+            "permissions": permissions,
+            "env": env,
+            "model": code_run.spec.model,
+            "cleanupPeriodDays": 7,
+            "includeCoAuthoredBy": false
+        });
+
+        serde_json::to_string_pretty(&settings).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize Claude settings.json: {e}"
+            ))
         })
     }
 
@@ -1175,6 +1367,9 @@ impl CodeTemplateGenerator {
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
+
+        // Register CLI-specific invoke template as the cli_execute partial
+        Self::register_cli_invoke_partial(&mut handlebars, CLIType::Codex)?;
 
         let base_template = Self::load_template(CODE_CODEX_CONTAINER_BASE_TEMPLATE)?;
         handlebars
@@ -1574,46 +1769,116 @@ impl CodeTemplateGenerator {
     fn generate_codex_config(
         code_run: &CodeRun,
         cli_config: &Value,
-        client_config: &Value,
+        _client_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        let template = Self::load_template(CODE_CODEX_CONFIG_TEMPLATE)?;
-
-        handlebars
-            .register_template_string("codex_config", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Codex config template: {e}"
-                ))
-            })?;
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
-        let context = json!({
-            "model": render_settings.model,
-            "temperature": render_settings.temperature,
-            "max_output_tokens": render_settings.max_output_tokens,
-            "model_reasoning_effort": render_settings.reasoning_effort,
-            "approval_policy": render_settings.approval_policy,
-            "sandbox_mode": render_settings.sandbox_mode,
-            "project_doc_max_bytes": render_settings.project_doc_max_bytes,
-            "tools": {
-                "url": render_settings.tools_url,
-                "tools": remote_tools,
-            },
-            "model_provider": render_settings.model_provider,
-            "cli_config": cli_config,
-            "client_config": client_config,
-            "raw_additional_toml": render_settings.raw_additional_toml,
-        });
+        // Generate TOML directly (no template needed)
+        let mut toml = String::from(
+            "# Codex CLI Configuration\n\
+             # Reference: https://developers.openai.com/codex/local-config#cli\n\
+             # Generated by CTO controller\n\n\
+             # Model configuration\n",
+        );
 
-        handlebars.render("codex_config", &context).map_err(|e| {
-            crate::tasks::types::Error::ConfigError(format!(
-                "Failed to render Codex config template: {e}"
-            ))
-        })
+        toml.push_str(&format!("model = \"{}\"\n", render_settings.model));
+
+        if let Some(temp) = render_settings.temperature {
+            toml.push_str(&format!("temperature = {temp}\n"));
+        }
+        if let Some(max_tokens) = render_settings.max_output_tokens {
+            toml.push_str(&format!("model_max_output_tokens = {max_tokens}\n"));
+        }
+        if let Some(ref effort) = render_settings.reasoning_effort {
+            toml.push_str(&format!("model_reasoning_effort = \"{effort}\"\n"));
+        }
+
+        // Automation settings
+        toml.push_str("\n# Automation settings\n");
+        toml.push_str(&format!(
+            "# approval_policy: untrusted | on-failure | on-request | never\n\
+             approval_policy = \"{}\"\n",
+            render_settings.approval_policy
+        ));
+        toml.push_str(&format!(
+            "\n# sandbox_mode: read-only | workspace-write | danger-full-access\n\
+             sandbox_mode = \"{}\"\n",
+            render_settings.sandbox_mode
+        ));
+        toml.push_str(&format!(
+            "\n# Project documentation limits\n\
+             project_doc_max_bytes = {}\n",
+            render_settings.project_doc_max_bytes
+        ));
+
+        // Tools MCP server
+        if !remote_tools.is_empty() && !render_settings.tools_url.is_empty() {
+            let tools_list: Vec<String> =
+                remote_tools.iter().map(|t| format!("  \"{t}\"")).collect();
+            toml.push_str(&format!(
+                "\n# Tools MCP server for remote tools\n\
+                 [mcp_servers.tools]\n\
+                 command = \"tools\"\n\
+                 args = [\n  \"--url\",\n  \"{}\",\n  \"--working-dir\",\n  \"/workspace\"\n]\n\
+                 env = {{ \"TOOLS_SERVER_URL\" = \"{}\" }}\n\
+                 startup_timeout_sec = 30\n\
+                 tool_timeout_sec = 120\n\
+                 # Tool filtering: only expose the tools configured for this agent\n\
+                 available_tools = [\n{}\n]\n",
+                render_settings.tools_url,
+                render_settings.tools_url,
+                tools_list.join(",\n")
+            ));
+        }
+
+        // Model provider (only add if it's a non-empty object)
+        if let Some(provider) = render_settings.model_provider.as_object() {
+            if !provider.is_empty() {
+                let name = provider
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("OpenAI");
+                let base_url = provider
+                    .get("base_url")
+                    .and_then(Value::as_str)
+                    .unwrap_or("https://api.openai.com/v1");
+                let env_key = provider
+                    .get("env_key")
+                    .and_then(Value::as_str)
+                    .unwrap_or("OPENAI_API_KEY");
+                let wire_api = provider
+                    .get("wire_api")
+                    .and_then(Value::as_str)
+                    .unwrap_or("chat");
+
+                toml.push_str(&format!(
+                    "\n[model_providers.openai]\n\
+                     name = \"{name}\"\n\
+                     base_url = \"{base_url}\"\n\
+                     env_key = \"{env_key}\"\n\
+                     wire_api = \"{wire_api}\"\n"
+                ));
+
+                if let Some(max_retries) =
+                    provider.get("request_max_retries").and_then(Value::as_u64)
+                {
+                    toml.push_str(&format!("request_max_retries = {max_retries}\n"));
+                }
+                if let Some(max_retries) =
+                    provider.get("stream_max_retries").and_then(Value::as_u64)
+                {
+                    toml.push_str(&format!("stream_max_retries = {max_retries}\n"));
+                }
+            }
+        }
+
+        // Raw additional TOML
+        if let Some(ref raw_toml) = render_settings.raw_additional_toml {
+            toml.push_str(&format!("\n{raw_toml}\n"));
+        }
+
+        Ok(toml)
     }
 
     fn generate_codex_templates(
@@ -2368,6 +2633,9 @@ impl CodeTemplateGenerator {
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
 
+        // Register CLI-specific invoke template as the cli_execute partial
+        Self::register_cli_invoke_partial(&mut handlebars, CLIType::OpenCode)?;
+
         let base_template = Self::load_template(CODE_OPENCODE_CONTAINER_BASE_TEMPLATE)?;
         handlebars
             .register_partial("opencode_container_base", base_template)
@@ -2505,22 +2773,9 @@ impl CodeTemplateGenerator {
     fn generate_opencode_config(
         code_run: &CodeRun,
         cli_config: &Value,
-        client_config: &Value,
+        _client_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        let template = Self::load_template(CODE_OPENCODE_CONFIG_TEMPLATE)?;
-
-        handlebars
-            .register_template_string("opencode_config", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register OpenCode config template: {e}"
-                ))
-            })?;
-
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let provider_obj = render_settings
@@ -2528,78 +2783,105 @@ impl CodeTemplateGenerator {
             .as_object()
             .cloned()
             .unwrap_or_default();
-        let provider_name = provider_obj
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or("openai")
-            .to_string();
         let provider_env_key = provider_obj
             .get("env_key")
             .or_else(|| provider_obj.get("envKey"))
             .and_then(Value::as_str)
-            .unwrap_or("OPENAI_API_KEY")
-            .to_string();
+            .unwrap_or("OPENAI_API_KEY");
         let provider_base_url = provider_obj
             .get("base_url")
             .or_else(|| provider_obj.get("baseUrl"))
-            .and_then(Value::as_str)
-            .map(std::string::ToString::to_string);
+            .and_then(Value::as_str);
 
-        let instructions_plain = cli_config
-            .get("instructions")
-            .and_then(Value::as_str)
-            .map(std::string::ToString::to_string)
-            .or_else(|| {
-                cli_config
-                    .get("memory")
-                    .and_then(Value::as_str)
-                    .map(std::string::ToString::to_string)
-            });
+        // Build exec args
+        let mut args = vec![
+            "--task-repo-dir".to_string(),
+            "/workspace".to_string(),
+            "--model".to_string(),
+            render_settings.model.clone(),
+        ];
+        let debug = cli_config
+            .get("debug")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if debug {
+            args.push("--debug".to_string());
+        }
 
-        let local_servers_value = client_config
-            .get("localServers")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
-        let local_servers_serialized = if local_servers_value
-            .as_object()
-            .is_none_or(serde_json::Map::is_empty)
-        {
-            None
-        } else {
-            Some(
-                serde_json::to_string_pretty(&local_servers_value)
-                    .unwrap_or_else(|_| "{}".to_string()),
-            )
-        };
+        // Build exec env
+        let mut env = serde_json::Map::new();
+        env.insert(provider_env_key.to_string(), json!(""));
+        if let Some(base_url) = provider_base_url {
+            env.insert("OPENCODE_BASE_URL".to_string(), json!(base_url));
+        }
+        if let Some(temp) = render_settings.temperature {
+            env.insert("OPENCODE_TEMPERATURE".to_string(), json!(temp.to_string()));
+        }
+        if let Some(max_tokens) = render_settings.max_output_tokens {
+            env.insert(
+                "OPENCODE_MAX_TOKENS".to_string(),
+                json!(max_tokens.to_string()),
+            );
+        }
+        if debug {
+            env.insert("OPENCODE_DEBUG".to_string(), json!("true"));
+        }
+        let continue_task = cli_config
+            .get("continueTask")
+            .or_else(|| cli_config.get("continue"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if continue_task {
+            env.insert("OPENCODE_CONTINUE".to_string(), json!("true"));
+        }
 
-        let correlation_id = format!("task-{}", code_run.spec.task_id.unwrap_or(0));
-
-        let context = json!({
-            "metadata": {
-                "timestamp": chrono::Utc::now().to_rfc3339(),
-                "correlation_id": correlation_id,
-                "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-                "cli": Self::determine_cli_type(code_run).to_string(),
+        // Build tools config
+        let mut tools = json!({
+            "filesystem": {
+                "enabled": true,
+                "sandbox": {
+                    "root": "/workspace",
+                    "allow_symlinks": false
+                }
             },
-            "agent": {
-                "model": render_settings.model,
-                "temperature": render_settings.temperature,
-                "max_output_tokens": render_settings.max_output_tokens,
-                "instructions": instructions_plain,
-                "remote_tools": remote_tools,
-                "local_servers": local_servers_serialized,
-                "tools_url": render_settings.tools_url,
-                "provider": {
-                    "name": provider_name,
-                    "envKey": provider_env_key,
-                    "base_url": provider_base_url,
-                },
-            },
+            "shell": {
+                "enabled": true,
+                "sandbox": {
+                    "working_dir": "/workspace",
+                    "allowed_commands": ["git", "npm", "pnpm", "yarn", "cargo", "docker", "kubectl", "make"]
+                }
+            }
         });
 
-        handlebars.render("opencode_config", &context).map_err(|e| {
+        // Add remote tools if available
+        if !render_settings.tools_url.is_empty() {
+            let mut remote_config = json!({
+                "enabled": true,
+                "env": {
+                    "TOOLS_SERVER_URL": render_settings.tools_url
+                }
+            });
+            if !remote_tools.is_empty() {
+                remote_config["availableTools"] = json!(remote_tools);
+            }
+            tools["remote"] = remote_config;
+        }
+
+        // Build complete config (no template needed - serialize directly)
+        let config = json!({
+            "mode": "exec",
+            "exec": {
+                "command": "opencode",
+                "args": args,
+                "env": Value::Object(env)
+            },
+            "instructions": ["AGENTS.md"],
+            "tools": tools
+        });
+
+        serde_json::to_string_pretty(&config).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to render OpenCode config template: {e}"
+                "Failed to serialize OpenCode config: {e}"
             ))
         })
     }
@@ -2614,6 +2896,9 @@ impl CodeTemplateGenerator {
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
+
+        // Register CLI-specific invoke template as the cli_execute partial
+        Self::register_cli_invoke_partial(&mut handlebars, CLIType::Gemini)?;
 
         let base_template = Self::load_template(CODE_GEMINI_CONTAINER_BASE_TEMPLATE)?;
         handlebars
@@ -2900,7 +3185,8 @@ impl CodeTemplateGenerator {
         );
 
         // Read the ConfigMap directory and find files with the hook prefix
-        match std::fs::read_dir(AGENT_TEMPLATES_PATH) {
+        let templates_path = get_templates_path();
+        match std::fs::read_dir(&templates_path) {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
@@ -3004,418 +3290,204 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
-    /// Select the appropriate container template based on `run_type` and `github_app`
+    /// Determine the job type from a CodeRun based on run_type, service, and template settings.
+    /// Maps to the job subdirectory in agents/{agent}/{job}/
+    fn determine_job_type(code_run: &CodeRun) -> &'static str {
+        let run_type = code_run.spec.run_type.as_str();
+        let service = code_run.spec.service.to_lowercase();
+
+        // Check template setting for explicit job type
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        // Priority: explicit template setting > service name > run_type
+        if template_setting.contains("heal") || service.contains("heal") {
+            return "healer";
+        }
+        if template_setting.contains("watch") || service.contains("watch") {
+            return "healer"; // Watch workflows use healer role
+        }
+
+        match run_type {
+            "documentation" | "intake" => "intake",
+            "quality" => "quality",
+            "test" => "test",
+            "deploy" => "deploy",
+            "security" => "security",
+            "review" => "review",
+            "integration" => "integration",
+            _ => "coder", // Default to coder for implementation runs
+        }
+    }
+
+    /// Get the system prompt template path for an agent based on github_app and job type.
+    /// Returns path in format: agents/{agent}/{job}/system-prompt.md.hbs
+    fn get_agent_system_prompt_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let job_type = Self::determine_job_type(code_run);
+
+        // Map GitHub app to agent name
+        let agent = match github_app {
+            "5DLabs-Rex" | "5DLabs-Rex-Remediation" => "rex",
+            "5DLabs-Morgan" => "morgan",
+            "5DLabs-Blaze" => "blaze",
+            "5DLabs-Cipher" => "cipher",
+            "5DLabs-Cleo" => "cleo",
+            "5DLabs-Tess" => "tess",
+            "5DLabs-Atlas" => "atlas",
+            "5DLabs-Bolt" => "bolt",
+            "5DLabs-Grizz" => "grizz",
+            "5DLabs-Nova" => "nova",
+            "5DLabs-Tap" => "tap",
+            "5DLabs-Spark" => "spark",
+            "5DLabs-Stitch" => "stitch",
+            _ => "rex", // Default to rex for unknown agents
+        };
+
+        // Agent-specific job type defaults
+        // Some agents only support specific job types
+        let job = match (agent, job_type) {
+            // Morgan: docs for coder, otherwise use the requested type
+            ("morgan", "coder") => "docs",
+            ("morgan", _) => job_type,
+
+            // Cleo: always quality (quality assurance specialist)
+            ("cleo", _) => "quality",
+
+            // Tess: always test (testing specialist)
+            ("tess", _) => "test",
+
+            // Atlas: always integration (integration specialist)
+            ("atlas", _) => "integration",
+
+            // Bolt: deploy by default (deployment specialist)
+            ("bolt", "coder") => "deploy",
+            ("bolt", _) => job_type,
+
+            // Cipher: security by default (security specialist)
+            ("cipher", "coder") => "security",
+            ("cipher", _) => job_type,
+
+            // Stitch: review by default (code review specialist)
+            ("stitch", _) => "review",
+
+            // Default: use the determined job type
+            (_, _) => job_type,
+        };
+
+        format!("agents/{agent}/{job}/system-prompt.md.hbs")
+    }
+
+    /// Select the container template for Claude CLI.
+    /// All CLIs use the shared container template - CLI-specific behavior is
+    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
     fn get_agent_container_template(code_run: &CodeRun) -> String {
         let run_type = code_run.spec.run_type.as_str();
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let service = &code_run.spec.service;
 
-        // Check if this is a documentation or intake run type
+        // Intake runs have a specialized container
         if run_type == "documentation" || run_type == "intake" {
-            // For docs/intake runs, use the docs-specific template based on CLI
-            // The intake templates are in intake/{cli}/ directory
-            debug!("Using {} template for run_type: {}", run_type, run_type);
-            return "intake/claude/container.sh.hbs".to_string();
+            debug!("Using intake container template for run_type: {}", run_type);
+            return "agents/morgan/intake/container.sh.hbs".to_string();
         }
 
-        // Check if this is a Heal workflow:
-        // 1. Service name contains "heal", OR
-        // 2. cli_config.settings.template starts with "heal/"
-        let template_setting = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .and_then(|c| c.settings.get("template"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let is_heal = service.to_lowercase() == "heal"
-            || template_setting.to_lowercase().starts_with("heal/");
-
-        // Heal-specific container template for remediation agents
-        if is_heal {
-            debug!("Using heal container template for service: {}", service);
-            return "heal/claude/container.sh.hbs".to_string();
-        }
-
-        // Check if this is a remediation cycle (retry > 0)
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let is_remediation = retry_count > 0;
-
-        // Map GitHub App to agent-specific container template
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => {
-                if is_remediation {
-                    "claude/container-rex-remediation.sh.hbs"
-                } else {
-                    "claude/container-rex.sh.hbs"
-                }
-            }
-            "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
-            "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
-            "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "claude/container.sh.hbs", // Use default container for Tess
-            "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
-            _ => {
-                // Default to the generic container template for unknown agents
-                debug!(
-                    "No agent-specific template for '{}', using default container.sh.hbs",
-                    github_app
-                );
-                "claude/container.sh.hbs"
-            }
-        };
-
-        format!("code/{template_name}")
+        // All other runs use the shared container template
+        "_shared/container.sh.hbs".to_string()
     }
 
+    /// Select the container template for Codex CLI.
+    /// All CLIs use the shared container template - CLI-specific behavior is
+    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
     fn get_codex_container_template(code_run: &CodeRun) -> String {
         let run_type = code_run.spec.run_type.as_str();
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
 
-        // For docs/intake runs, use the intake-specific template
+        // Intake runs have a specialized container
         if run_type == "documentation" || run_type == "intake" {
-            return "intake/codex/container.sh.hbs".to_string();
+            return "agents/morgan/intake/container.sh.hbs".to_string();
         }
 
-        // Check if this is a remediation cycle
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let is_remediation = retry_count > 0;
-
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => {
-                if is_remediation {
-                    "code/codex/container-rex-remediation.sh.hbs"
-                } else {
-                    "code/codex/container-rex.sh.hbs"
-                }
-            }
-            "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
-            "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
-            "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
-            _ => "code/codex/container.sh.hbs",
-        };
-
-        template_name.to_string()
+        // All other runs use the shared container template
+        "_shared/container.sh.hbs".to_string()
     }
 
+    /// Get the memory/system-prompt template for Codex CLI.
+    /// Uses the unified agent system prompt path.
     fn get_codex_memory_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/agents-rex.md.hbs",
-            "5DLabs-Blaze" => "code/codex/agents-blaze.md.hbs",
-            "5DLabs-Cipher" => "code/codex/agents-cipher.md.hbs",
-            "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
-            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
-            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
-            _ => "code/codex/agents.md.hbs",
-        };
-
-        template_name.to_string()
+        Self::get_agent_system_prompt_template(code_run)
     }
 
-    fn get_opencode_container_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-
-        // Check if this is a remediation cycle
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let is_remediation = retry_count > 0;
-
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
-                if is_remediation {
-                    "code/opencode/container-rex-remediation.sh.hbs"
-                } else {
-                    "code/opencode/container-rex.sh.hbs"
-                }
-            }
-            "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
-            "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
-            "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
-            _ => "code/opencode/container.sh.hbs",
-        };
-
-        template_name.to_string()
+    /// Select the container template for OpenCode CLI.
+    /// All CLIs use the shared container template - CLI-specific behavior is
+    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
+    fn get_opencode_container_template(_code_run: &CodeRun) -> String {
+        // All runs use the shared container template
+        "_shared/container.sh.hbs".to_string()
     }
 
+    /// Get the memory/system-prompt template for OpenCode CLI.
+    /// Uses the unified agent system prompt path.
     fn get_opencode_memory_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
-                "code/opencode/agents-rex.md.hbs"
-            }
-            "5DLabs-Blaze" => "code/opencode/agents-blaze.md.hbs",
-            "5DLabs-Cipher" => "code/opencode/agents-cipher.md.hbs",
-            "5DLabs-Cleo" => "code/opencode/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
-            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
-            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
-            _ => "code/opencode/agents.md.hbs",
-        };
-
-        template_name.to_string()
+        Self::get_agent_system_prompt_template(code_run)
     }
 
-    fn get_gemini_container_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-
-        // Check if this is a remediation cycle
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let is_remediation = retry_count > 0;
-
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => {
-                if is_remediation {
-                    "code/gemini/container-rex-remediation.sh.hbs"
-                } else {
-                    "code/gemini/container-rex.sh.hbs"
-                }
-            }
-            "5DLabs-Blaze" => "code/gemini/container-blaze.sh.hbs",
-            "5DLabs-Cipher" => "code/gemini/container-cipher.sh.hbs",
-            "5DLabs-Cleo" => "code/gemini/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/gemini/container-tess.sh.hbs",
-            _ => "code/gemini/container.sh.hbs",
-        };
-
-        template_name.to_string()
+    /// Select the container template for Gemini CLI.
+    /// All CLIs use the shared container template - CLI-specific behavior is
+    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
+    fn get_gemini_container_template(_code_run: &CodeRun) -> String {
+        // All runs use the shared container template
+        "_shared/container.sh.hbs".to_string()
     }
 
+    /// Select the container template for Cursor CLI.
+    /// All CLIs use the shared container template - CLI-specific behavior is
+    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
     fn get_cursor_container_template(code_run: &CodeRun) -> String {
         let run_type = code_run.spec.run_type.as_str();
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
 
-        // For docs/intake runs, use the intake-specific template
+        // Intake runs have a specialized container
         if run_type == "documentation" || run_type == "intake" {
-            return "intake/cursor/container.sh.hbs".to_string();
+            return "agents/morgan/intake/container.sh.hbs".to_string();
         }
 
-        // Check if this is a remediation cycle
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let is_remediation = retry_count > 0;
-
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => {
-                if is_remediation {
-                    "code/cursor/container-rex-remediation.sh.hbs"
-                } else {
-                    "code/cursor/container-rex.sh.hbs"
-                }
-            }
-            "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
-            "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
-            "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
-            _ => "code/cursor/container.sh.hbs",
-        };
-
-        template_name.to_string()
+        // All other runs use the shared container template
+        "_shared/container.sh.hbs".to_string()
     }
 
+    /// Get the memory/system-prompt template for Cursor CLI.
+    /// Uses the unified agent system prompt path.
     fn get_cursor_memory_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/agents-rex.md.hbs",
-            "5DLabs-Blaze" => "code/cursor/agents-blaze.md.hbs",
-            "5DLabs-Cipher" => "code/cursor/agents-cipher.md.hbs",
-            "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
-            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
-            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
-            _ => "code/cursor/agents.md.hbs",
-        };
-
-        template_name.to_string()
+        Self::get_agent_system_prompt_template(code_run)
     }
 
-    fn get_gemini_memory_template(_code_run: &CodeRun) -> String {
-        // Currently using single shared memory template for all Gemini agents
-        // Can be extended in the future for agent-specific templates similar to other CLIs
-        CODE_GEMINI_MEMORY_TEMPLATE.to_string()
+    /// Get the memory/system-prompt template for Gemini CLI.
+    /// Uses the unified agent system prompt path.
+    fn get_gemini_memory_template(code_run: &CodeRun) -> String {
+        Self::get_agent_system_prompt_template(code_run)
     }
 
+    /// Get the memory/system-prompt template for Claude CLI.
+    /// Uses the unified agent system prompt path.
     fn get_claude_memory_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let service = &code_run.spec.service;
-
-        // Check if this is a Heal workflow:
-        // 1. Service name contains "heal", OR
-        // 2. cli_config.settings.template starts with "heal/"
-        let template_setting = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .and_then(|c| c.settings.get("template"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let is_heal = service.to_lowercase() == "heal"
-            || template_setting.to_lowercase().starts_with("heal/");
-
-        // Heal-specific templates for remediation agents
-        if is_heal {
-            return "heal/claude/agents.md.hbs".to_string();
-        }
-
-        // Agent-specific templates
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/claude/agents-rex.md.hbs",
-            "5DLabs-Blaze" => "code/claude/agents-blaze.md.hbs",
-            "5DLabs-Cipher" => "code/claude/agents-cipher.md.hbs",
-            "5DLabs-Cleo" => "code/claude/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
-            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
-            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
-            _ => CODE_CLAUDE_MEMORY_TEMPLATE,
-        };
-
-        template_name.to_string()
+        Self::get_agent_system_prompt_template(code_run)
     }
 
-    fn get_factory_container_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let service = &code_run.spec.service;
-
-        // Check if this is a Watch workflow:
-        // 1. Service name contains "watch", OR
-        // 2. cli_config.settings.template starts with "watch/"
-        let template_setting = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .and_then(|c| c.settings.get("template"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let is_watch = service.to_lowercase().contains("watch")
-            || template_setting.to_lowercase().starts_with("watch/");
-
-        // Check if this is a remediation cycle
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-
-        let is_remediation = retry_count > 0;
-
-        // Watch-specific templates take precedence
-        // Use watchRole from cli_config.settings to determine monitor vs remediation
-        if is_watch {
-            let watch_role = code_run
-                .spec
-                .cli_config
-                .as_ref()
-                .and_then(|c| c.settings.get("watchRole"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("monitor");
-
-            return match watch_role {
-                "remediation" => "watch/factory/container-watch-remediation.sh.hbs".to_string(),
-                // Default to monitor template
-                _ => "watch/factory/container-watch-monitor.sh.hbs".to_string(),
-            };
-        }
-
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
-                if is_remediation {
-                    "code/factory/container-rex-remediation.sh.hbs"
-                } else {
-                    "code/factory/container-rex.sh.hbs"
-                }
-            }
-            "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
-            "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
-            "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
-            _ => "code/factory/container.sh.hbs",
-        };
-
-        template_name.to_string()
+    /// Select the container template for Factory CLI.
+    /// All CLIs use the shared container template - CLI-specific behavior is
+    /// injected via the `{{> cli_execute}}` partial from `clis/{cli}/invoke.sh.hbs`.
+    fn get_factory_container_template(_code_run: &CodeRun) -> String {
+        // All runs use the shared container template
+        "_shared/container.sh.hbs".to_string()
     }
 
+    /// Get the memory/system-prompt template for Factory CLI.
+    /// Uses the unified agent system prompt path.
     fn get_factory_memory_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let service = &code_run.spec.service;
-
-        // Check if this is a Watch workflow:
-        // 1. Service name contains "watch", OR
-        // 2. cli_config.settings.template starts with "watch/"
-        let template_setting = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .and_then(|c| c.settings.get("template"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let is_watch = service.to_lowercase().contains("watch")
-            || template_setting.to_lowercase().starts_with("watch/");
-
-        // Watch-specific templates take precedence
-        // Use watchRole from cli_config.settings to determine monitor vs remediation
-        if is_watch {
-            let watch_role = code_run
-                .spec
-                .cli_config
-                .as_ref()
-                .and_then(|c| c.settings.get("watchRole"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("monitor");
-
-            return match watch_role {
-                "remediation" => "watch/factory/agents-watch-remediation.md.hbs".to_string(),
-                // Default to monitor template
-                _ => "watch/factory/agents-watch-monitor.md.hbs".to_string(),
-            };
-        }
-
-        let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
-            "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
-            "5DLabs-Cipher" => "code/factory/agents-cipher.md.hbs",
-            "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
-            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
-            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
-            _ => "code/factory/agents.md.hbs",
-        };
-
-        template_name.to_string()
+        Self::get_agent_system_prompt_template(code_run)
     }
 
     /// Extract agent name from GitHub app identifier
@@ -3476,20 +3548,42 @@ impl CodeTemplateGenerator {
         }
     }
 
-    /// Load a template file from the mounted `ConfigMap`
+    /// Load a template file from the templates directory.
+    ///
+    /// Supports two modes:
+    /// - **ConfigMap mode** (production): Files are flattened with `_` separators (e.g., `_shared_container.sh.hbs`)
+    /// - **Directory mode** (testing): Files use original path structure (e.g., `_shared/container.sh.hbs`)
     fn load_template(relative_path: &str) -> Result<String> {
-        // Convert path separators to underscores for ConfigMap key lookup
+        let templates_path = get_templates_path();
+
+        // First, try the original path structure (for local development/testing)
+        let direct_path = Path::new(&templates_path).join(relative_path);
+        if direct_path.exists() {
+            debug!(
+                "Loading code template from: {} (direct path)",
+                direct_path.display()
+            );
+            return fs::read_to_string(&direct_path).map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to load code template {relative_path}: {e}"
+                ))
+            });
+        }
+
+        // Fall back to ConfigMap key format (path separators converted to underscores)
         let configmap_key = relative_path.replace('/', "_");
-        let full_path = Path::new(AGENT_TEMPLATES_PATH).join(&configmap_key);
+        let configmap_path = Path::new(&templates_path).join(&configmap_key);
         debug!(
-            "Loading code template from: {} (key: {})",
-            full_path.display(),
+            "Loading code template from: {} (configmap key: {})",
+            configmap_path.display(),
             configmap_key
         );
 
-        fs::read_to_string(&full_path).map_err(|e| {
+        fs::read_to_string(&configmap_path).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to load code template {relative_path} (key: {configmap_key}): {e}"
+                "Failed to load code template {relative_path} (tried: {}, {}): {e}",
+                direct_path.display(),
+                configmap_path.display()
             ))
         })
     }
@@ -3513,20 +3607,54 @@ impl CodeTemplateGenerator {
     /// These partials provide CLI-agnostic building blocks for container scripts
     fn register_shared_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
-            SHARED_BOOTSTRAP_RUST_ENV, SHARED_CONTAINER_CORE, SHARED_FUNCTIONS_COMPLETION_MARKER,
-            SHARED_FUNCTIONS_DOCKER_SIDECAR, SHARED_FUNCTIONS_GH_CLI, SHARED_FUNCTIONS_GITHUB_AUTH,
-            SHARED_FUNCTIONS_GIT_OPERATIONS, SHARED_FUNCTIONS_QUALITY_GATES,
-            SHARED_PROMPTS_CONTEXT7, SHARED_PROMPTS_DESIGN_SYSTEM,
+            // New templates partials
+            PARTIAL_ACCEPTANCE_PROBE,
+            PARTIAL_COMPLETION,
+            PARTIAL_CONFIG,
+            PARTIAL_EXPO_ENV,
+            PARTIAL_GITHUB_AUTH,
+            PARTIAL_GIT_SETUP,
+            PARTIAL_GO_ENV,
+            PARTIAL_HEADER,
+            PARTIAL_NODE_ENV,
+            PARTIAL_RETRY_LOOP,
+            PARTIAL_RUST_ENV,
+            PARTIAL_TASK_FILES,
+            PARTIAL_TOOLS_CONFIG,
+            // Legacy partials
+            SHARED_BOOTSTRAP_RUST_ENV,
+            SHARED_CONTAINER_CORE,
+            SHARED_FUNCTIONS_COMPLETION_MARKER,
+            SHARED_FUNCTIONS_GITHUB_AUTH,
+            SHARED_FUNCTIONS_GIT_OPERATIONS,
+            SHARED_FUNCTIONS_QUALITY_GATES,
+            SHARED_PROMPTS_CONTEXT7,
+            SHARED_PROMPTS_DESIGN_SYSTEM,
         };
 
         // Map partial name (used in templates) -> template path
-        let shared_partials = vec![
+        // New templates partials (used by _shared/container.sh.hbs)
+        let new_partials = vec![
+            ("header", PARTIAL_HEADER),
+            ("rust-env", PARTIAL_RUST_ENV),
+            ("go-env", PARTIAL_GO_ENV),
+            ("node-env", PARTIAL_NODE_ENV),
+            ("expo-env", PARTIAL_EXPO_ENV),
+            ("config", PARTIAL_CONFIG),
+            ("github-auth", PARTIAL_GITHUB_AUTH),
+            ("git-setup", PARTIAL_GIT_SETUP),
+            ("task-files", PARTIAL_TASK_FILES),
+            ("tools-config", PARTIAL_TOOLS_CONFIG),
+            ("acceptance-probe", PARTIAL_ACCEPTANCE_PROBE),
+            ("retry-loop", PARTIAL_RETRY_LOOP),
+            ("completion", PARTIAL_COMPLETION),
+        ];
+
+        // Legacy partials (for backwards compatibility)
+        // Note: docker-sidecar and gh-cli removed - no longer exist as separate partials
+        let legacy_partials = vec![
             ("shared/bootstrap/rust-env", SHARED_BOOTSTRAP_RUST_ENV),
             ("shared/functions/github-auth", SHARED_FUNCTIONS_GITHUB_AUTH),
-            (
-                "shared/functions/docker-sidecar",
-                SHARED_FUNCTIONS_DOCKER_SIDECAR,
-            ),
             (
                 "shared/functions/completion-marker",
                 SHARED_FUNCTIONS_COMPLETION_MARKER,
@@ -3535,7 +3663,6 @@ impl CodeTemplateGenerator {
                 "shared/functions/git-operations",
                 SHARED_FUNCTIONS_GIT_OPERATIONS,
             ),
-            ("shared/functions/gh-cli", SHARED_FUNCTIONS_GH_CLI),
             (
                 "shared/functions/quality-gates",
                 SHARED_FUNCTIONS_QUALITY_GATES,
@@ -3544,6 +3671,10 @@ impl CodeTemplateGenerator {
             ("shared/design-system", SHARED_PROMPTS_DESIGN_SYSTEM),
             ("shared/container-core", SHARED_CONTAINER_CORE),
         ];
+
+        // Combine both sets
+        let shared_partials: Vec<(&str, &str)> =
+            new_partials.into_iter().chain(legacy_partials).collect();
 
         let mut failed_partials = Vec::new();
 
@@ -3573,10 +3704,10 @@ impl CodeTemplateGenerator {
         if !failed_partials.is_empty() {
             warn!(
                 "Shared partial registration incomplete. {} partials failed to load: {:?}. \
-                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                Ensure the templates ConfigMaps are properly mounted at {}",
                 failed_partials.len(),
                 failed_partials,
-                AGENT_TEMPLATES_PATH
+                get_templates_path()
             );
         }
 
@@ -3627,14 +3758,71 @@ impl CodeTemplateGenerator {
         if !failed_partials.is_empty() {
             warn!(
                 "Agent partial registration incomplete. {} partials failed to load: {:?}. \
-                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                Ensure the templates ConfigMaps are properly mounted at {}",
                 failed_partials.len(),
                 failed_partials,
-                AGENT_TEMPLATES_PATH
+                get_templates_path()
             );
         }
 
         Ok(())
+    }
+
+    /// Register CLI-specific invoke template as the `cli_execute` partial.
+    /// This allows the container.sh.hbs template to use {{> cli_execute}} to include
+    /// the CLI-specific invocation logic.
+    fn register_cli_invoke_partial(handlebars: &mut Handlebars, cli_type: CLIType) -> Result<()> {
+        let cli_name = match cli_type {
+            CLIType::Claude => "claude",
+            CLIType::Codex => "codex",
+            CLIType::Cursor => "cursor",
+            CLIType::Factory => "factory",
+            CLIType::Gemini => "gemini",
+            CLIType::OpenCode => "opencode",
+            // These CLI types don't have dedicated invoke templates yet; fall back to claude
+            CLIType::OpenHands | CLIType::Grok | CLIType::Qwen => "claude",
+        };
+
+        let invoke_template_path = format!("clis/{cli_name}/invoke.sh.hbs");
+
+        match Self::load_template(&invoke_template_path) {
+            Ok(content) => {
+                handlebars
+                    .register_partial("cli_execute", content)
+                    .map_err(|e| {
+                        crate::tasks::types::Error::ConfigError(format!(
+                            "Failed to register CLI invoke partial for {cli_name}: {e}"
+                        ))
+                    })?;
+                debug!(
+                    "Successfully registered CLI invoke partial for {}",
+                    cli_name
+                );
+                Ok(())
+            }
+            Err(e) => {
+                // If the CLI-specific invoke template is not found, fall back to a simple echo
+                warn!(
+                    "CLI invoke template not found for {cli_name} (path: {invoke_template_path}): {e}. \
+                    Registering a fallback placeholder."
+                );
+
+                // Register a fallback that just echoes the CLI type
+                let fallback = format!(
+                    r#"echo "⚠️ No invoke template found for {cli_name} CLI"
+echo "CLI invocation should be handled by the adapter."
+"#
+                );
+                handlebars
+                    .register_partial("cli_execute", fallback)
+                    .map_err(|e| {
+                        crate::tasks::types::Error::ConfigError(format!(
+                            "Failed to register fallback CLI invoke partial: {e}"
+                        ))
+                    })?;
+                Ok(())
+            }
+        }
     }
 }
 
@@ -3678,71 +3866,86 @@ mod tests {
         }
     }
 
+    // ========================================================================
+    // Container template selection tests
+    // All agents now use the shared container template (_shared/container.sh.hbs)
+    // CLI-specific behavior is injected via the cli_execute partial
+    // ========================================================================
+
     #[test]
-    fn test_rex_agent_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container-rex.sh.hbs");
+    fn test_container_template_uses_shared_for_all_agents() {
+        // All agents should use the shared container template
+        for github_app in [
+            "5DLabs-Rex",
+            "5DLabs-Cleo",
+            "5DLabs-Tess",
+            "5DLabs-Cipher",
+            "5DLabs-Atlas",
+            "5DLabs-Bolt",
+            "5DLabs-Blaze",
+        ] {
+            let code_run = create_test_code_run(Some(github_app.to_string()));
+            let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+            assert_eq!(
+                template_path, "_shared/container.sh.hbs",
+                "Agent {github_app} should use shared container template"
+            );
+        }
     }
 
     #[test]
-    fn test_cleo_agent_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container-cleo.sh.hbs");
-    }
-
-    #[test]
-    fn test_tess_agent_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        // For CLIType::Claude (default), path is prefixed with "code/" in template loading
-        assert_eq!(template_path, "code/claude/container.sh.hbs");
-    }
-
-    #[test]
-    fn test_cipher_agent_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
-    }
-
-    #[test]
-    fn test_atlas_agent_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/integration/container-atlas.sh.hbs");
-    }
-
-    #[test]
-    fn test_bolt_agent_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Bolt".to_string()));
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/integration/container-bolt.sh.hbs");
-    }
-
-    #[test]
-    fn test_default_template_selection() {
+    fn test_container_template_default_uses_shared() {
         let code_run = create_test_code_run(None);
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container.sh.hbs");
+        assert_eq!(template_path, "_shared/container.sh.hbs");
     }
 
     #[test]
-    fn test_heal_container_template_selection_by_service() {
-        // When service contains "heal", should use heal container template
+    fn test_container_template_intake_uses_morgan() {
+        // Intake runs should use Morgan's intake container
         let mut code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
-        code_run.spec.service = "heal".to_string();
+        code_run.spec.run_type = "intake".to_string();
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(
-            template_path, "heal/claude/container.sh.hbs",
-            "Service 'heal' should trigger heal container template"
+            template_path, "agents/morgan/intake/container.sh.hbs",
+            "Intake run should use Morgan intake container"
         );
     }
 
     #[test]
-    fn test_heal_container_template_selection_by_template_setting() {
-        // When cli_config.settings.template starts with "heal/", should use heal container template
+    fn test_container_template_documentation_uses_morgan() {
+        // Documentation runs should also use Morgan's intake container
+        let mut code_run = create_test_code_run(Some("5DLabs-Morgan".to_string()));
+        code_run.spec.run_type = "documentation".to_string();
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(
+            template_path, "agents/morgan/intake/container.sh.hbs",
+            "Documentation run should use Morgan intake container"
+        );
+    }
+
+    // ========================================================================
+    // System prompt template selection tests
+    // All agents use agents/{agent}/{job}/system-prompt.md.hbs
+    // ========================================================================
+
+    #[test]
+    fn test_system_prompt_template_rex_coder() {
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(template_path, "agents/rex/coder/system-prompt.md.hbs");
+    }
+
+    #[test]
+    fn test_system_prompt_template_cleo_quality() {
+        // Cleo always uses quality job type (quality assurance specialist)
+        let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(template_path, "agents/cleo/quality/system-prompt.md.hbs");
+    }
+
+    #[test]
+    fn test_system_prompt_template_healer_service() {
         use crate::cli::types::CLIType;
         use crate::crds::coderun::CLIConfig;
         use serde_json::json;
@@ -3758,10 +3961,32 @@ mod tests {
             temperature: None,
             model_rotation: None,
         });
-        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(
-            template_path, "heal/claude/container.sh.hbs",
-            "Template setting 'heal/claude' should trigger heal container template"
+            template_path, "agents/rex/healer/system-prompt.md.hbs",
+            "Heal template setting should map to healer job"
+        );
+    }
+
+    #[test]
+    fn test_system_prompt_template_morgan_intake() {
+        let mut code_run = create_test_code_run(Some("5DLabs-Morgan".to_string()));
+        code_run.spec.run_type = "intake".to_string();
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(
+            template_path, "agents/morgan/intake/system-prompt.md.hbs",
+            "Morgan intake run should use intake prompt"
+        );
+    }
+
+    #[test]
+    fn test_system_prompt_template_atlas_integration() {
+        let mut code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
+        code_run.spec.run_type = "integration".to_string();
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(
+            template_path,
+            "agents/atlas/integration/system-prompt.md.hbs"
         );
     }
 
@@ -3907,17 +4132,18 @@ mod tests {
     }
 
     #[test]
-    fn test_cursor_container_template_selection() {
+    fn test_cursor_container_template_uses_shared() {
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let template_path = CodeTemplateGenerator::get_cursor_container_template(&code_run);
-        assert_eq!(template_path, "code/cursor/container-rex.sh.hbs");
+        assert_eq!(template_path, "_shared/container.sh.hbs");
     }
 
     #[test]
     fn test_cursor_memory_template_selection() {
-        let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
+        // Rex doing default (coder) work
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let template_path = CodeTemplateGenerator::get_cursor_memory_template(&code_run);
-        assert_eq!(template_path, "code/cursor/agents-cleo.md.hbs");
+        assert_eq!(template_path, "agents/rex/coder/system-prompt.md.hbs");
     }
 
     #[test]

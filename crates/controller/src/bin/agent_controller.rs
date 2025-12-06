@@ -78,35 +78,35 @@ async fn verify_required_configmaps(
 
     let required_configmaps = vec![
         (
-            format!("{cm_prefix}-agent-templates-claude-code"),
+            format!("{cm_prefix}-templates-claude-code"),
             "Claude code templates",
         ),
         (
-            format!("{cm_prefix}-agent-templates-claude-docs"),
+            format!("{cm_prefix}-templates-claude-docs"),
             "Claude docs templates",
         ),
         (
-            format!("{cm_prefix}-agent-templates-codex"),
+            format!("{cm_prefix}-templates-codex"),
             "Codex agent templates",
         ),
         (
-            format!("{cm_prefix}-agent-templates-cursor"),
+            format!("{cm_prefix}-templates-cursor"),
             "Cursor agent templates",
         ),
         (
-            format!("{cm_prefix}-agent-templates-factory"),
+            format!("{cm_prefix}-templates-factory"),
             "Factory agent templates",
         ),
         (
-            format!("{cm_prefix}-agent-templates-integration"),
+            format!("{cm_prefix}-templates-integration"),
             "Integration agent templates",
         ),
         (
-            format!("{cm_prefix}-agent-templates-shared"),
+            format!("{cm_prefix}-templates-shared"),
             "Shared agent utilities",
         ),
         (
-            format!("{cm_prefix}-agent-templates-watch"),
+            format!("{cm_prefix}-templates-watch"),
             "E2E Watch agent templates",
         ),
     ];

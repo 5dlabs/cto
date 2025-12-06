@@ -5,7 +5,7 @@ set -euo pipefail
 THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$THIS_DIR/.." && pwd)"
 
-TARGET_SCRIPT="$ROOT_DIR/infra/charts/controller/scripts/generate-agent-templates-configmap.sh"
+TARGET_SCRIPT="$ROOT_DIR/infra/charts/controller/scripts/generate-templates-configmap.sh"
 
 if [ ! -f "$TARGET_SCRIPT" ]; then
   echo "❌ Unable to locate generator at $TARGET_SCRIPT" >&2

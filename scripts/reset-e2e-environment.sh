@@ -273,7 +273,7 @@ recreate_github_repo() {
         
         # Add minimal structure
         cd "$TEST_REPO_PATH"
-        mkdir -p docs/.taskmaster/docs
+        mkdir -p docs/.tasks/docs
         
         # Create minimal cto-config.json
         cat > cto-config.json <<'EOF'
@@ -285,7 +285,7 @@ recreate_github_repo() {
 EOF
         
         # Create a simple PRD for testing
-        cat > docs/.taskmaster/docs/simple-prd.txt <<'EOF'
+        cat > docs/.tasks/docs/simple-prd.txt <<'EOF'
 # Simple Test PRD
 
 Build a minimal test application with the following requirements:

@@ -12,7 +12,7 @@ ENV TZ="$TZ"
 # Frequently-updated tool versions (defined early, used late for better caching)
 # Changing these ARGs only invalidates layers AFTER they are used
 # =============================================================================
-ARG TASKMASTER_VERSION=0.36.0
+# TaskMaster removed - using Rust tasks CLI instead
 
 # Core tools and CLIs (cache apt metadata)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -396,10 +396,7 @@ RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
       echo "⏭️ Skipping tasks CLI installation (no release available)"; \
     fi
 
-# Install TaskMaster globally as fallback (version controlled via ARG for easy updates)
-# This layer is intentionally placed late so version bumps don't invalidate earlier layers
-# NOTE: This is being replaced by the Rust `tasks` CLI above
-RUN npm install -g task-master-ai@${TASKMASTER_VERSION}
+# TaskMaster removed - using Rust tasks CLI instead (see TASKS_VERSION above)
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -543,10 +540,9 @@ USER root
 RUN chown -R 1000:1000 /home/node/.cache /home/node/.cargo || true
 USER node
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-  set -eux; \
-  . $HOME/.cargo/env; \
-  mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
-  cargo --version; \
+  . $HOME/.cargo/env && \
+  mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin" 2>/dev/null || true && \
+  cargo --version && \
   cargo install \
     sccache \
     cargo-edit \

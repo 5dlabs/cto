@@ -8,9 +8,9 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 .PHONY: generate-templates
-generate-templates: ## Generate split ConfigMaps from agent-templates directory
+generate-templates: ## Generate split ConfigMaps from templates directory
 	@echo "Generating agent templates ConfigMaps..."
-	@./scripts/generate-agent-templates-configmaps-split.sh
+	@./scripts/generate-templates-configmaps-split.sh
 
 .PHONY: lint
 lint: ## Run helm lint on the chart
@@ -30,7 +30,7 @@ package: ## Package the Helm chart
 .PHONY: update-templates
 update-templates: generate-templates ## Update templates and prepare for commit
 	@echo "Templates updated. Don't forget to commit the changes!"
-	@git status templates/agent-templates-*.yaml
+	@git status templates/templates-*.yaml
 
 .PHONY: validate
 validate: lint template ## Validate the chart (lint + template generation)

@@ -1,0 +1,10 @@
+# Ignore E2E test outputs (code + logs are large and auto-generated)
+# Each agent-cli/ directory contains:
+#   - run-info.json (metadata)
+#   - code/ (generated source code)
+#   - code.patch (git diff)
+#   - logs/stdout.log (container output)
+*
+!.gitignore
+!README.md
+

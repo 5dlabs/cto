@@ -8,7 +8,7 @@ set -euo pipefail
 #   NAMESPACE     - Kubernetes namespace (default: cto)
 #   VALUES_FILE   - Helm values file to include (default: infra/charts/controller/values.yaml)
 # Additional Helm args can be passed after a double dash, e.g.:
-#   ./scripts/apply-agent-templates-configmap.sh -- -f custom-values.yaml
+#   ./scripts/apply-templates-configmap.sh -- -f custom-values.yaml
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -21,14 +21,14 @@ VALUES_FILE=${VALUES_FILE:-$VALUES_FILE_DEFAULT}
 
 # Split ConfigMap template names
 CONFIGMAP_TEMPLATES=(
-  "agent-templates-shared.yaml"
-  "agent-templates-claude-code.yaml"
-  "agent-templates-claude-docs.yaml"
-  "agent-templates-codex.yaml"
-  "agent-templates-cursor.yaml"
-  "agent-templates-factory.yaml"
-  "agent-templates-opencode.yaml"
-  "agent-templates-integration.yaml"
+  "templates-shared.yaml"
+  "templates-claude-code.yaml"
+  "templates-claude-docs.yaml"
+  "templates-codex.yaml"
+  "templates-cursor.yaml"
+  "templates-factory.yaml"
+  "templates-opencode.yaml"
+  "templates-integration.yaml"
 )
 
 # Split optional extra Helm args after "--"

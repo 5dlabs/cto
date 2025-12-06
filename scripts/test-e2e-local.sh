@@ -8,7 +8,7 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATES_DIR="$REPO_ROOT/agent-templates"
+TEMPLATES_DIR="$REPO_ROOT/templates"
 TEST_DIR="$REPO_ROOT/.test-e2e"
 
 # Colors
@@ -163,9 +163,9 @@ test_docker() {
     
     # Test 2: Templates mount correctly
     if docker run --rm --platform linux/amd64 \
-        -v "$TEMPLATES_DIR:/agent-templates:ro" \
+        -v "$TEMPLATES_DIR:/templates:ro" \
         "$image" \
-        test -f /agent-templates/_shared/container.sh.hbs &>/dev/null 2>&1; then
+        test -f /templates/_shared/container.sh.hbs &>/dev/null 2>&1; then
         echo -e "    ${GREEN}✓${NC} Templates mount"
         ((PASSED++))
     else
@@ -176,9 +176,9 @@ test_docker() {
     # Test 3: Partials accessible
     local partial_count
     partial_count=$(docker run --rm --platform linux/amd64 \
-        -v "$TEMPLATES_DIR:/agent-templates:ro" \
+        -v "$TEMPLATES_DIR:/templates:ro" \
         "$image" \
-        bash -c "ls /agent-templates/_shared/partials/*.hbs 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+        bash -c "ls /templates/_shared/partials/*.hbs 2>/dev/null | wc -l" 2>/dev/null || echo "0")
     
     if [ "$partial_count" -ge 7 ]; then
         echo -e "    ${GREEN}✓${NC} Partials accessible ($partial_count found)"
