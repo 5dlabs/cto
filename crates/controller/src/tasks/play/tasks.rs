@@ -40,10 +40,7 @@ struct TasksFile {
 /// Looks in common locations: .tasks/tasks/tasks.json, tasks.json
 fn find_tasks_file(repo_path: &Path) -> Option<PathBuf> {
     let candidates = vec![
-        repo_path
-            .join(".tasks")
-            .join("tasks")
-            .join("tasks.json"),
+        repo_path.join(".tasks").join("tasks").join("tasks.json"),
         repo_path.join(".tasks").join("tasks.json"),
         repo_path.join("tasks.json"),
     ];

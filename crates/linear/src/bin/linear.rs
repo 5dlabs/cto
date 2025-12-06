@@ -70,10 +70,7 @@ async fn main() -> Result<()> {
 
     info!(port = config.port, "Linear service listening");
 
-    axum::serve(listener, app)
-        .await
-        .context("Server error")?;
+    axum::serve(listener, app).await.context("Server error")?;
 
     Ok(())
 }
-

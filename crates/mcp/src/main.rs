@@ -1265,10 +1265,7 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
     };
 
     let mut candidates = vec![
-        base_dir
-            .join(".tasks")
-            .join("tasks")
-            .join("tasks.json"),
+        base_dir.join(".tasks").join("tasks").join("tasks.json"),
         base_dir.join(".tasks").join("tasks.json"),
         base_dir.join("tasks.json"),
     ];
@@ -2872,7 +2869,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Check for both .md and .txt extensions
     let project_path = workspace_dir.join(project_name);
     let intake_path = project_path.join("intake");
-    
+
     let prd_paths = [
         project_path.join("prd.md"),
         project_path.join("prd.txt"),
@@ -3131,7 +3128,11 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     {
         "provided".to_string()
     } else if let Some(prd_path) = prd_paths.iter().find(|p| p.exists()) {
-        prd_path.file_name().unwrap_or_default().to_string_lossy().to_string()
+        prd_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string()
     } else {
         // Should be unreachable due to earlier validation
         "provided".to_string()

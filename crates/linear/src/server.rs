@@ -17,9 +17,7 @@ use crate::handlers::callbacks::{
     handle_intake_complete, handle_tasks_json_callback, CallbackState,
 };
 use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
-use crate::handlers::play::{
-    cancel_play_workflow, extract_play_request, submit_play_workflow,
-};
+use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
 use crate::webhooks::{
     validate_webhook_timestamp, verify_webhook_signature, WebhookAction, WebhookPayload,
     WebhookType,
@@ -326,12 +324,7 @@ async fn handle_session_created(
         };
 
         // Submit play workflow
-        match submit_play_workflow(
-            &state.config.namespace,
-            &play_request,
-            &state.config.play,
-        )
-        .await
+        match submit_play_workflow(&state.config.namespace, &play_request, &state.config.play).await
         {
             Ok(result) => {
                 info!(
@@ -343,11 +336,7 @@ async fn handle_session_created(
                 // Emit action activity
                 if let Some(client) = &state.linear_client {
                     let _ = client
-                        .emit_action(
-                            session_id,
-                            "Started play workflow",
-                            &result.workflow_name,
-                        )
+                        .emit_action(session_id, "Started play workflow", &result.workflow_name)
                         .await;
                 }
 
@@ -491,4 +480,3 @@ async fn handle_session_prompted(
         "message": "Prompt received (handling not yet implemented)"
     })))
 }
-

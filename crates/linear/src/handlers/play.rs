@@ -264,10 +264,7 @@ mod tests {
     fn test_extract_task_id_from_title() {
         assert_eq!(extract_task_id_from_title("Task 1: Setup project"), Some(1));
         assert_eq!(extract_task_id_from_title("Task-42: Add feature"), Some(42));
-        assert_eq!(
-            extract_task_id_from_title("Task #123: Fix bug"),
-            Some(123)
-        );
+        assert_eq!(extract_task_id_from_title("Task #123: Fix bug"), Some(123));
         assert_eq!(
             extract_task_id_from_title("[Task 5] Implement API"),
             Some(5)
@@ -276,4 +273,3 @@ mod tests {
         assert_eq!(extract_task_id_from_title("Task: No number"), None);
     }
 }
-

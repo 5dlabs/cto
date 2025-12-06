@@ -208,4 +208,3 @@ mod tests {
         env::remove_var("LINEAR_PORT");
     }
 }
-

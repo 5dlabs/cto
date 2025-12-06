@@ -273,4 +273,3 @@ mod tests {
         assert_eq!(callback.error, Some("Workflow timeout".to_string()));
     }
 }
-

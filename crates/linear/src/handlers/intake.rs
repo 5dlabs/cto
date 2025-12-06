@@ -168,7 +168,10 @@ pub async fn submit_intake_workflow(
             name: Some(configmap_name.clone()),
             namespace: Some(namespace.to_string()),
             labels: Some(BTreeMap::from([
-                ("app.kubernetes.io/name".to_string(), "cto-intake".to_string()),
+                (
+                    "app.kubernetes.io/name".to_string(),
+                    "cto-intake".to_string(),
+                ),
                 (
                     "app.kubernetes.io/component".to_string(),
                     "intake".to_string(),
@@ -394,7 +397,11 @@ fn format_task_description(task: &IntakeTask) -> String {
     }
 
     if !task.test_strategy.is_empty() {
-        let _ = write!(description, "## Test Strategy\n\n{}\n\n", task.test_strategy);
+        let _ = write!(
+            description,
+            "## Test Strategy\n\n{}\n\n",
+            task.test_strategy
+        );
     }
 
     if !task.dependencies.is_empty() {
@@ -547,4 +554,3 @@ mod tests {
         assert_eq!(sanitize_project_name("test_name"), "test-name");
     }
 }
-
