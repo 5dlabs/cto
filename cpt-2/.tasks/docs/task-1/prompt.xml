@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" priority="high" agent="cipher">
+    <meta>
+        <title>Setup project foundation and dependencies</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 1 with production-quality code.</role>
+
+    <context>
+        <overview>Initialize the authentication service with required dependencies and basic configuration</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Initialize Node.js/Express project
+2. Install dependencies: express, passport, passport-google-oauth20, passport-github2, jsonwebtoken, redis, express-rate-limit, bcrypt, nodemailer
+3. Setup TypeScript configuration
+4. Configure ESLint and Prettier
+5. Setup basic folder structure: /src, /controllers, /middleware, /routes, /services, /utils, /config</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-1): Setup project foundation and dependencies</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify project builds successfully and all dependencies are properly installed</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

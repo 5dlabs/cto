@@ -1,0 +1,410 @@
+{
+  "meta": {
+    "generatedAt": "2025-12-06T18:26:47.159328043+00:00",
+    "tasksFile": ".tasks/tasks.json",
+    "model": "claude-sonnet-4-20250514",
+    "threshold": 5
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Setup project foundation and dependencies",
+      "complexityScore": 3,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the project initialization into specific setup tasks: Node.js/Express initialization, dependency installation, TypeScript configuration, linting setup, and folder structure creation. Each subtask should be independently verifiable.",
+      "reasoning": "Standard project setup with well-defined steps. Low complexity due to established patterns and tooling."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Configure environment variables and secrets",
+      "complexityScore": 4,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Split into: environment file creation, validation schema setup, secret configuration for OAuth providers, and config loader implementation. Focus on security best practices for each provider.",
+      "reasoning": "Moderate complexity due to security considerations and multiple provider configurations requiring careful validation."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Setup Redis connection and configuration",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: Redis client setup with pooling, retry logic implementation, session store configuration, health check endpoint, and TTL/cleanup configuration. Each requires different Redis features.",
+      "reasoning": "Medium complexity due to connection pooling, retry logic, and session management requirements."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Create database schema for users",
+      "complexityScore": 4,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break into: user model definition, constraint setup, migration creation, and index optimization. Each subtask addresses different database concerns.",
+      "reasoning": "Moderate complexity involving database design, constraints, and performance considerations."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement JWT token utilities",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: access token generation, refresh token generation, token verification with error handling, blacklist functionality, and refresh token flow. Each has different security requirements.",
+      "reasoning": "Higher complexity due to security-critical token management, blacklisting, and refresh token rotation."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Setup rate limiting middleware",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: Redis store configuration, endpoint-specific limits, IP-based limiting, user-based limiting, and custom error handling. Each requires different limiting strategies.",
+      "reasoning": "Medium complexity due to multiple rate limiting strategies and Redis integration."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Create authentication middleware",
+      "complexityScore": 4,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break into: token extraction, token verification, user attachment to request, and optional authentication handling. Each addresses different middleware concerns.",
+      "reasoning": "Moderate complexity with standard middleware patterns but critical security implications."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Implement Google OAuth2 strategy",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: Passport strategy configuration, callback handling, profile mapping, user registration/login logic, and Google ID storage. Each requires OAuth-specific handling.",
+      "reasoning": "Higher complexity due to OAuth flow intricacies and user profile mapping requirements."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement GitHub OAuth2 strategy",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: GitHub strategy configuration, callback handling, profile mapping, user registration/login logic, and GitHub ID storage. Similar to Google but with provider-specific differences.",
+      "reasoning": "Higher complexity due to OAuth flow intricacies and provider-specific profile handling."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Create OAuth2 routes and controllers",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break into: Google OAuth routes, GitHub OAuth routes, callback handling logic, and redirect management with error handling. Each provider needs separate route handling.",
+      "reasoning": "Medium complexity due to multiple provider routes and error handling requirements."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Implement user registration with email",
+      "complexityScore": 5,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Split into: endpoint creation, input validation, password hashing, duplicate checking, user creation, and email sending. Each step has specific validation and security requirements.",
+      "reasoning": "Medium complexity due to validation, security (password hashing), and email integration."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Implement email verification flow",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: token generation, email template creation, verification endpoint, user status update, and token expiration handling. Each requires different verification logic.",
+      "reasoning": "Medium complexity due to token management and email template integration."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Implement user login with email/password",
+      "complexityScore": 5,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break into: endpoint creation, input validation, password verification, token generation, refresh token storage, and rate limiting integration. Each step has security implications.",
+      "reasoning": "Medium complexity due to authentication logic, token generation, and rate limiting integration."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Implement session management",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: Redis session storage, session data structure, cleanup logic, expiration handling, and validation middleware. Each addresses different session lifecycle aspects.",
+      "reasoning": "Medium complexity due to Redis integration and session lifecycle management."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "Implement token refresh endpoint",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: endpoint creation, refresh token validation, Redis token checking, new token generation, and optional token rotation. Each step requires careful security handling.",
+      "reasoning": "Moderate complexity with well-defined token refresh patterns but security-critical implementation."
+    },
+    {
+      "taskId": 16,
+      "taskTitle": "Implement user logout functionality",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: endpoint creation, token blacklisting, refresh token removal, session cleanup, and multi-device logout. Each addresses different logout scenarios.",
+      "reasoning": "Moderate complexity due to multiple token/session cleanup requirements."
+    },
+    {
+      "taskId": 17,
+      "taskTitle": "Implement password reset request",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: endpoint creation, token generation, database storage, email sending, and rate limiting. Each step has specific security and user experience requirements.",
+      "reasoning": "Moderate complexity due to token generation, email integration, and security considerations."
+    },
+    {
+      "taskId": 18,
+      "taskTitle": "Implement password reset confirmation",
+      "complexityScore": 5,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide into: endpoint creation, token validation, password validation, password hashing, token cleanup, and session invalidation. Each step requires careful security handling.",
+      "reasoning": "Medium complexity due to token validation, password security, and session management."
+    },
+    {
+      "taskId": 19,
+      "taskTitle": "Create user profile endpoint",
+      "complexityScore": 3,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break into: endpoint creation, authentication middleware integration, data filtering, and OAuth provider information inclusion. Each addresses different profile data aspects.",
+      "reasoning": "Low-medium complexity with standard CRUD operations but requires proper data filtering."
+    },
+    {
+      "taskId": 20,
+      "taskTitle": "Implement account linking functionality",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: linking endpoint creation, authentication verification, OAuth flow initiation, account merging logic, and conflict resolution. Each requires complex user account management.",
+      "reasoning": "Higher complexity due to account merging logic and conflict resolution between providers."
+    },
+    {
+      "taskId": 21,
+      "taskTitle": "Setup email service configuration",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: SMTP configuration, template creation, email queue setup, error handling, and rate limiting. Each addresses different email service aspects.",
+      "reasoning": "Moderate complexity due to email service integration and reliability requirements."
+    },
+    {
+      "taskId": 22,
+      "taskTitle": "Implement input validation middleware",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: validation library setup, schema creation, email validation, password requirements, and input sanitization. Each addresses different validation concerns.",
+      "reasoning": "Moderate complexity due to comprehensive validation requirements and security considerations."
+    },
+    {
+      "taskId": 23,
+      "taskTitle": "Add security headers middleware",
+      "complexityScore": 3,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: helmet.js setup, CSP configuration, CORS setup, security headers configuration, and HSTS implementation. Each header type has specific requirements.",
+      "reasoning": "Low-medium complexity with established security header patterns."
+    },
+    {
+      "taskId": 24,
+      "taskTitle": "Implement audit logging",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: logging library setup, event logging, structured logging format, log rotation, and retention policies. Each addresses different logging aspects.",
+      "reasoning": "Moderate complexity due to structured logging requirements and log management."
+    },
+    {
+      "taskId": 25,
+      "taskTitle": "Create health check endpoints",
+      "complexityScore": 3,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break into: basic health endpoint, detailed health checks, Redis connectivity check, and database performance check. Each monitors different service components.",
+      "reasoning": "Low-medium complexity with standard health check patterns."
+    },
+    {
+      "taskId": 26,
+      "taskTitle": "Implement API documentation",
+      "complexityScore": 4,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Split into: Swagger setup, endpoint documentation, schema definition, authentication examples, error documentation, and interactive explorer. Each addresses different documentation needs.",
+      "reasoning": "Moderate complexity due to comprehensive documentation requirements across multiple endpoints."
+    },
+    {
+      "taskId": 27,
+      "taskTitle": "Setup unit tests for utilities",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: Jest setup, JWT testing, password utility testing, validation testing, and coverage reporting. Each utility function needs comprehensive testing.",
+      "reasoning": "Moderate complexity due to comprehensive test coverage requirements for security-critical utilities."
+    },
+    {
+      "taskId": 28,
+      "taskTitle": "Setup integration tests for auth flows",
+      "complexityScore": 6,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break into: test environment setup, registration flow testing, login flow testing, password reset testing, token refresh testing, and error scenario testing. Each flow requires end-to-end validation.",
+      "reasoning": "Higher complexity due to comprehensive flow testing and test environment management."
+    },
+    {
+      "taskId": 29,
+      "taskTitle": "Implement error handling middleware",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: global error middleware, error response format, authentication error handling, validation error handling, and error logging. Each error type needs specific handling.",
+      "reasoning": "Moderate complexity due to comprehensive error handling across different error types."
+    },
+    {
+      "taskId": 30,
+      "taskTitle": "Setup database connection pooling",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: pool configuration, connection limits, health checks, timeout handling, and monitoring setup. Each addresses different connection management aspects.",
+      "reasoning": "Moderate complexity due to database performance optimization and connection management."
+    },
+    {
+      "taskId": 31,
+      "taskTitle": "Implement CSRF protection",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: CSRF middleware setup, token generation, token validation, error handling, and OAuth route exclusion. Each requires specific CSRF handling.",
+      "reasoning": "Medium complexity due to CSRF token management and OAuth integration considerations."
+    },
+    {
+      "taskId": 32,
+      "taskTitle": "Setup performance monitoring",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: response time monitoring, success rate tracking, database performance monitoring, alerting setup, and dashboard creation. Each monitors different performance aspects.",
+      "reasoning": "Medium complexity due to comprehensive performance metrics and alerting requirements."
+    },
+    {
+      "taskId": 33,
+      "taskTitle": "Implement account lockout protection",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: attempt tracking, lockout logic, exponential backoff, email notifications, and unlock mechanism. Each requires careful security implementation.",
+      "reasoning": "Higher complexity due to security-critical lockout logic and user experience considerations."
+    },
+    {
+      "taskId": 34,
+      "taskTitle": "Create user management endpoints",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: admin role system, user listing endpoint, deactivation endpoints, search functionality, and activity logging. Each requires administrative privilege handling.",
+      "reasoning": "Higher complexity due to role-based access control and comprehensive user management features."
+    },
+    {
+      "taskId": 35,
+      "taskTitle": "Setup OAuth2 scope management",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: scope definition, OAuth flow integration, scope storage, endpoint validation, and access control implementation. Each requires OAuth2 specification compliance.",
+      "reasoning": "Higher complexity due to OAuth2 specification requirements and fine-grained access control."
+    },
+    {
+      "taskId": 36,
+      "taskTitle": "Implement remember me functionality",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: remember token generation, secure storage, automatic login, token cleanup, and security considerations. Each requires careful token management.",
+      "reasoning": "Medium complexity due to long-lived token security and automatic authentication logic."
+    },
+    {
+      "taskId": 37,
+      "taskTitle": "Setup Docker containerization",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: Dockerfile creation, docker-compose setup, service configuration, environment handling, and health check integration. Each addresses different containerization aspects.",
+      "reasoning": "Moderate complexity with established Docker patterns but requires service orchestration."
+    },
+    {
+      "taskId": 38,
+      "taskTitle": "Implement API versioning",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: versioning strategy implementation, routing middleware, deprecation warnings, backward compatibility, and documentation updates. Each addresses different versioning concerns.",
+      "reasoning": "Medium complexity due to backward compatibility requirements and routing considerations."
+    },
+    {
+      "taskId": 39,
+      "taskTitle": "Setup load testing framework",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: testing tool setup, scenario creation, rate limiting testing, performance measurement, and CI integration. Each addresses different load testing aspects.",
+      "reasoning": "Moderate complexity due to load testing tool configuration and performance analysis."
+    },
+    {
+      "taskId": 40,
+      "taskTitle": "Implement data encryption at rest",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: encryption setup, field-level encryption, key rotation, decryption middleware, and key management documentation. Each requires cryptographic expertise.",
+      "reasoning": "Higher complexity due to cryptographic implementation and key management requirements."
+    },
+    {
+      "taskId": 41,
+      "taskTitle": "Setup compliance logging",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: immutable log setup, data access logging, privacy event logging, integrity verification, and retention policies. Each addresses compliance requirements.",
+      "reasoning": "Higher complexity due to compliance requirements and immutable logging implementation."
+    },
+    {
+      "taskId": 42,
+      "taskTitle": "Implement social login error handling",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: provider outage handling, user cancellation handling, error response management, fallback mechanisms, and user-friendly messaging. Each addresses different error scenarios.",
+      "reasoning": "Medium complexity due to multiple error scenarios and user experience considerations."
+    },
+    {
+      "taskId": 43,
+      "taskTitle": "Setup automated security scanning",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: npm audit integration, SAST scanning setup, dependency checking, penetration testing, and reporting workflow. Each addresses different security aspects.",
+      "reasoning": "Medium complexity due to multiple security scanning tools and CI integration."
+    },
+    {
+      "taskId": 44,
+      "taskTitle": "Implement graceful shutdown",
+      "complexityScore": 4,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: signal handling, database connection closure, Redis connection closure, request completion, and timeout handling. Each addresses different shutdown aspects.",
+      "reasoning": "Moderate complexity due to proper resource cleanup and request handling during shutdown."
+    },
+    {
+      "taskId": 45,
+      "taskTitle": "Create deployment configuration",
+      "complexityScore": 6,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide into: Kubernetes manifests, CI/CD pipeline, environment configuration, deployment strategy, rollback procedures, and monitoring integration. Each addresses different deployment concerns.",
+      "reasoning": "Higher complexity due to comprehensive deployment pipeline and infrastructure requirements."
+    },
+    {
+      "taskId": 46,
+      "taskTitle": "Implement feature flags",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break into: feature flag system setup, toggle implementation, user targeting, dashboard creation, and A/B testing. Each addresses different feature management aspects.",
+      "reasoning": "Medium complexity due to feature flag system integration and targeting logic."
+    },
+    {
+      "taskId": 47,
+      "taskTitle": "Setup monitoring and alerting",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: Prometheus setup, Grafana dashboards, alert configuration, uptime monitoring, and notification system. Each addresses different monitoring aspects.",
+      "reasoning": "Higher complexity due to comprehensive monitoring stack and alerting configuration."
+    },
+    {
+      "taskId": 48,
+      "taskTitle": "Implement data backup and recovery",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide into: database backup automation, Redis backup setup, verification procedures, disaster recovery documentation, and restoration testing. Each addresses different backup aspects.",
+      "reasoning": "Medium complexity due to automated backup systems and recovery procedure validation."
+    },
+    {
+      "taskId": 49,
+      "taskTitle": "Create end-to-end test suite",
+      "complexityScore": 6,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break into: E2E framework setup, registration flow testing, OAuth flow testing, password reset testing, email verification testing, and CI integration. Each flow requires comprehensive testing.",
+      "reasoning": "Higher complexity due to comprehensive E2E testing across multiple authentication flows."
+    },
+    {
+      "taskId": 50,
+      "taskTitle": "Finalize production deployment",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Split into: security review completion, production environment finalization, deployment execution, performance monitoring, and operational documentation. Each requires careful production readiness validation.",
+      "reasoning": "High complexity due to production deployment coordination, security validation, and operational readiness requirements."
+    }
+  ]
+}

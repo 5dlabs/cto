@@ -1,0 +1,22 @@
+## Overview
+
+Implement user authentication for the platform.
+
+## Goals
+
+- Secure user authentication
+- Support multiple providers
+
+## Requirements
+
+- OAuth2 login with Google and GitHub
+- JWT token management with refresh tokens
+- Session storage in Redis
+- Rate limiting on auth endpoints
+- Password reset flow
+
+## Success Criteria
+
+- Users can sign up and log in
+- Sessions persist across browser restarts
+- Invalid tokens are rejected

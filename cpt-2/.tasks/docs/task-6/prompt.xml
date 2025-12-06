@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="6" priority="high" agent="cipher">
+    <meta>
+        <title>Setup rate limiting middleware</title>
+        <priority>high</priority>
+        <dependencies>3</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 6 with production-quality code.</role>
+
+    <context>
+        <overview>Implement rate limiting for authentication endpoints to prevent abuse</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Configure express-rate-limit with Redis store
+2. Create different limits: login (5 attempts/15min), signup (3 attempts/hour), password reset (3 attempts/hour)
+3. Implement IP-based and user-based rate limiting
+4. Add custom error messages for rate limit exceeded
+5. Setup rate limit headers in responses</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-6): Setup rate limiting middleware</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test rate limiting triggers correctly and resets after time window</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
