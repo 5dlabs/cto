@@ -2853,7 +2853,7 @@ impl BridgeState {
                                             self.current_working_dir.read().await.as_ref()
                                         {
                                             if let Some(args_obj) = arguments.as_object_mut() {
-                                                // 🎯 Universal projectRoot injection (for TaskMaster, etc.)
+                                                // 🎯 Universal projectRoot injection (for tasks CLI, etc.)
                                                 args_obj.insert(
                                                     "projectRoot".to_string(),
                                                     json!(working_dir.to_string_lossy()),

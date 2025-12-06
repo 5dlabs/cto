@@ -22,7 +22,7 @@ trap "rm -rf $TEMP_DIR" EXIT
 echo "📁 Using temp directory: $TEMP_DIR"
 
 # Copy template
-TEMPLATE_FILE="infra/charts/controller/agent-templates/code/claude/container-tess.sh.hbs"
+TEMPLATE_FILE="infra/charts/controller/templates/code/claude/container-tess.sh.hbs"
 if [ ! -f "$TEMPLATE_FILE" ]; then
     echo -e "${RED}❌ Template file not found: $TEMPLATE_FILE${NC}"
     exit 1

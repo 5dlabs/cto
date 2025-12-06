@@ -1218,10 +1218,10 @@ fn find_active_play_workflow(repo: &str) -> Result<Option<(String, u32, String)>
     Ok(None)
 }
 
-// ========== TaskMaster Integration Helpers ==========
+// ========== Tasks Integration Helpers ==========
 
 #[derive(Debug, Clone, Deserialize)]
-struct TaskMasterTask {
+struct PlayTask {
     id: u32,
     title: String,
     status: String,
@@ -1233,7 +1233,7 @@ struct TaskMasterTask {
 
 #[derive(Debug, Deserialize)]
 struct TaskTag {
-    tasks: Vec<TaskMasterTask>,
+    tasks: Vec<PlayTask>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1242,7 +1242,7 @@ enum TasksFile {
     /// New tagged format: { "master": { "tasks": [...] }, "other-tag": { "tasks": [...] } }
     Tagged(HashMap<String, TaskTag>),
     /// Legacy flat format: { "tasks": [...] }
-    Flat { tasks: Vec<TaskMasterTask> },
+    Flat { tasks: Vec<PlayTask> },
 }
 
 /// Find tasks.json in repository, optionally starting from a working directory
@@ -1266,18 +1266,18 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
 
     let mut candidates = vec![
         base_dir
-            .join(".taskmaster")
+            .join(".tasks")
             .join("tasks")
             .join("tasks.json"),
-        base_dir.join(".taskmaster").join("tasks.json"),
+        base_dir.join(".tasks").join("tasks.json"),
         base_dir.join("tasks.json"),
     ];
 
     // If working_dir was provided and we have a workspace, also try workspace root as fallback
     if working_dir.is_some() {
         if let Some(ws_dir) = workspace_dir {
-            candidates.push(ws_dir.join(".taskmaster").join("tasks").join("tasks.json"));
-            candidates.push(ws_dir.join(".taskmaster").join("tasks.json"));
+            candidates.push(ws_dir.join(".tasks").join("tasks").join("tasks.json"));
+            candidates.push(ws_dir.join(".tasks").join("tasks.json"));
             candidates.push(ws_dir.join("tasks.json"));
         }
     }
@@ -1285,8 +1285,8 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
     candidates.into_iter().find(|p| p.exists())
 }
 
-/// Get next available task from `TaskMaster`
-fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMasterTask>> {
+/// Get next available task from tasks.json
+fn get_next_play_task(working_dir: Option<&str>) -> Result<Option<PlayTask>> {
     let tasks_file =
         find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
@@ -1309,10 +1309,10 @@ fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMast
     };
 
     // Build task map for dependency checking
-    let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
+    let task_map: HashMap<u32, &PlayTask> = tasks.iter().map(|t| (t.id, t)).collect();
 
     // Filter available tasks (not done, all deps satisfied)
-    let mut available_tasks: Vec<&TaskMasterTask> = tasks
+    let mut available_tasks: Vec<&PlayTask> = tasks
         .iter()
         .filter(|task| {
             // Skip done tasks
@@ -1362,7 +1362,7 @@ fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMast
 }
 
 /// Find blocked tasks (tasks with all pending dependencies)
-fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMasterTask>> {
+fn find_blocked_play_tasks(working_dir: Option<&str>) -> Result<Vec<PlayTask>> {
     let tasks_file =
         find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
@@ -1383,7 +1383,7 @@ fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMa
         }
         TasksFile::Flat { tasks } => tasks,
     };
-    let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
+    let task_map: HashMap<u32, &PlayTask> = tasks.iter().map(|t| (t.id, t)).collect();
 
     let mut blocked = Vec::new();
 
@@ -1444,7 +1444,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let active_workflow = find_active_play_workflow(&repository)?;
 
     // Check for blocked tasks
-    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
+    let blocked_tasks = find_blocked_play_tasks(docs_dir).unwrap_or_default();
 
     // Build comprehensive status response
     match (progress, active_workflow) {
@@ -1491,10 +1491,10 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
             // No active workflow
 
             // Try to get next task (only works if repository is in local workspace)
-            let (next_task, tasks_found) = match get_next_taskmaster_task(docs_dir) {
+            let (next_task, tasks_found) = match get_next_play_task(docs_dir) {
                 Ok(task) => (task, true),
                 Err(err) => {
-                    eprintln!("ℹ️  Unable to read TaskMaster tasks locally: {err}");
+                    eprintln!("ℹ️  Unable to read tasks locally: {err}");
                     (None, false)
                 }
             };
@@ -1641,8 +1641,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
         // 3. If repository_path is provided, skip workspace detection and use it directly
         if repository_path.is_some() {
-            eprintln!("🔍 Using explicit repository path - querying TaskMaster...");
-            match get_next_taskmaster_task(docs_dir.as_deref()) {
+            eprintln!("🔍 Using explicit repository path - querying tasks...");
+            match get_next_play_task(docs_dir.as_deref()) {
                 Ok(Some(task)) => {
                     eprintln!("✅ Found next task: {} - {}", task.id, task.title);
                     Some(task.id)
@@ -1650,7 +1650,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 Ok(None) => {
                     // Check for blocked tasks to provide helpful feedback
                     let blocked_tasks =
-                        find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+                        find_blocked_play_tasks(docs_dir.as_deref()).unwrap_or_default();
 
                     let message = if blocked_tasks.is_empty() {
                         "No tasks available - all tasks are completed".to_string()
@@ -1682,7 +1682,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     // Missing tasks.json is a serious error when repository_path is explicitly provided
                     eprintln!("❌ Could not find tasks.json at repository_path: {e}");
                     return Err(anyhow!(
-                        "tasks.json not found at specified repository_path: {}. Please ensure .taskmaster/tasks/tasks.json exists.",
+                        "tasks.json not found at specified repository_path: {}. Please ensure .tasks/tasks/tasks.json exists.",
                         repository_path.as_ref().unwrap()
                     ));
                 }
@@ -1723,8 +1723,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
             if is_local_repo {
                 // Repository is local - try to auto-detect next task
-                eprintln!("🔍 Querying TaskMaster for next available task...");
-                match get_next_taskmaster_task(docs_dir.as_deref()) {
+                eprintln!("🔍 Querying tasks for next available task...");
+                match get_next_play_task(docs_dir.as_deref()) {
                     Ok(Some(task)) => {
                         eprintln!("✅ Found next task: {} - {}", task.id, task.title);
                         Some(task.id)
@@ -1732,7 +1732,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     Ok(None) => {
                         // Check for blocked tasks to provide helpful feedback
                         let blocked_tasks =
-                            find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+                            find_blocked_play_tasks(docs_dir.as_deref()).unwrap_or_default();
 
                         let message = if blocked_tasks.is_empty() {
                             "No tasks available - all tasks are completed".to_string()
@@ -2649,11 +2649,212 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 }
 
+/// Local intake mode - runs tasks CLI directly without Argo
+/// This is useful for testing and development
+#[allow(clippy::disallowed_macros)]
+fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
+    eprintln!("🏠 Running intake in LOCAL mode (no Argo workflow)");
+
+    // Get workspace directory from Cursor environment
+    let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    eprintln!("🔍 Using workspace directory: {}", workspace_dir.display());
+
+    // Get project name (required)
+    let project_name = arguments
+        .get("project_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("project_name is required"))?;
+
+    let project_path = workspace_dir.join(project_name);
+
+    // Find PRD file - check multiple locations
+    let prd_paths = [
+        project_path.join("prd.md"),
+        project_path.join("prd.txt"),
+        project_path.join("intake/prd.md"),
+        project_path.join("intake/prd.txt"),
+    ];
+
+    let prd_path = if let Some(content) = arguments.get("prd_content").and_then(|v| v.as_str()) {
+        // Write provided content to temp file
+        let temp_prd = project_path.join(".tasks/docs/prd.md");
+        std::fs::create_dir_all(temp_prd.parent().unwrap())?;
+        std::fs::write(&temp_prd, content)?;
+        eprintln!("📋 Using provided PRD content");
+        temp_prd
+    } else {
+        prd_paths
+            .iter()
+            .find(|p| p.exists())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow!(
+                    "No PRD found. Please create one of: {:?}",
+                    prd_paths
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                )
+            })?
+    };
+
+    eprintln!("📋 Using PRD: {}", prd_path.display());
+
+    // Get parameters with defaults
+    let num_tasks = arguments
+        .get("num_tasks")
+        .and_then(Value::as_i64)
+        .unwrap_or(15) as i32;
+
+    let expand = arguments
+        .get("expand")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+
+    let analyze = arguments
+        .get("analyze")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+
+    let model = arguments
+        .get("model")
+        .and_then(|v| v.as_str())
+        .unwrap_or("claude-sonnet-4-20250514");
+
+    // Build tasks intake command
+    // Check for local development binary first, then fall back to PATH
+    let tasks_bin = {
+        let dev_binary = workspace_dir.join("target/debug/tasks");
+        let release_binary = workspace_dir.join("target/release/tasks");
+        if dev_binary.exists() {
+            dev_binary.display().to_string()
+        } else if release_binary.exists() {
+            release_binary.display().to_string()
+        } else {
+            find_command("tasks")
+        }
+    };
+
+    let mut cmd = std::process::Command::new(&tasks_bin);
+    cmd.arg("intake")
+        .arg("--prd")
+        .arg(&prd_path)
+        .arg("--num-tasks")
+        .arg(num_tasks.to_string())
+        .arg("--model")
+        .arg(model)
+        .arg("--project")
+        .arg(&project_path);
+
+    if !expand {
+        cmd.arg("--no-expand");
+    }
+
+    if !analyze {
+        cmd.arg("--no-analyze");
+    }
+
+    // Check for architecture file
+    let arch_paths = [
+        project_path.join("architecture.md"),
+        project_path.join("intake/architecture.md"),
+    ];
+    if let Some(arch_path) = arch_paths.iter().find(|p| p.exists()) {
+        cmd.arg("--architecture").arg(arch_path);
+        eprintln!("🏗️ Using architecture: {}", arch_path.display());
+    }
+
+    eprintln!(
+        "🔧 Running: tasks intake --prd {} --num-tasks {} --model {}",
+        prd_path.display(),
+        num_tasks,
+        model
+    );
+
+    // Execute
+    let output = cmd.output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Log output
+    if !stdout.is_empty() {
+        eprintln!("{stdout}");
+    }
+    if !stderr.is_empty() {
+        eprintln!("{stderr}");
+    }
+
+    if output.status.success() {
+        // Read generated tasks.json for summary
+        let tasks_file = project_path.join(".tasks/tasks/tasks.json");
+        let task_count = if tasks_file.exists() {
+            let content = std::fs::read_to_string(&tasks_file)?;
+            let tasks: Value = serde_json::from_str(&content)?;
+            tasks
+                .get("tasks")
+                .and_then(|t| t.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        // Count generated docs
+        let docs_dir = project_path.join(".tasks/docs");
+        let doc_count = if docs_dir.exists() {
+            std::fs::read_dir(&docs_dir)?
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    e.path().is_dir() && e.file_name().to_string_lossy().starts_with("task-")
+                })
+                .count()
+        } else {
+            0
+        };
+
+        eprintln!(
+            "✅ Intake completed: {} tasks, {} doc directories",
+            task_count, doc_count
+        );
+
+        Ok(json!({
+            "status": "completed",
+            "mode": "local",
+            "project_name": project_name,
+            "project_path": project_path.display().to_string(),
+            "tasks_generated": task_count,
+            "docs_generated": doc_count,
+            "output_dir": project_path.join(".tasks").display().to_string(),
+            "files": {
+                "tasks": project_path.join(".tasks/tasks/tasks.json").display().to_string(),
+                "docs": project_path.join(".tasks/docs").display().to_string()
+            }
+        }))
+    } else {
+        Err(anyhow!(
+            "tasks intake failed with exit code {:?}\nstderr: {}",
+            output.status.code(),
+            stderr
+        ))
+    }
+}
+
 /// Unified intake workflow - parses PRD, generates tasks, and creates documentation
 /// This replaces the separate `intake_prd` and docs workflows
 #[allow(clippy::disallowed_macros)]
 #[allow(clippy::too_many_lines)]
 fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+    // Check for local mode first
+    let local_mode = arguments
+        .get("local")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    if local_mode {
+        return handle_intake_local(arguments);
+    }
+
     eprintln!("🚀 Processing unified intake request (PRD parsing + documentation generation)");
 
     // Get workspace directory from Cursor environment
@@ -2668,25 +2869,27 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .ok_or_else(|| anyhow!("project_name is required"))?;
 
     // Read PRD from project root or intake folder (root preferred), or use provided content
+    // Check for both .md and .txt extensions
     let project_path = workspace_dir.join(project_name);
     let intake_path = project_path.join("intake");
-    let prd_file_root = project_path.join("prd.txt");
-    let prd_file_intake = intake_path.join("prd.txt");
+    
+    let prd_paths = [
+        project_path.join("prd.md"),
+        project_path.join("prd.txt"),
+        intake_path.join("prd.md"),
+        intake_path.join("prd.txt"),
+    ];
 
     let prd_content = if let Some(content) = arguments.get("prd_content").and_then(|v| v.as_str()) {
         // Allow override via parameter for compatibility
         content.to_string()
-    } else if prd_file_root.exists() {
-        eprintln!("📋 Reading PRD from {project_name}/prd.txt");
-        std::fs::read_to_string(&prd_file_root)
-            .with_context(|| format!("Failed to read {project_name}/prd.txt"))?
-    } else if prd_file_intake.exists() {
-        eprintln!("📋 Reading PRD from {project_name}/intake/prd.txt");
-        std::fs::read_to_string(&prd_file_intake)
-            .with_context(|| format!("Failed to read {project_name}/intake/prd.txt"))?
+    } else if let Some(prd_path) = prd_paths.iter().find(|p| p.exists()) {
+        eprintln!("📋 Reading PRD from {}", prd_path.display());
+        std::fs::read_to_string(prd_path)
+            .with_context(|| format!("Failed to read {}", prd_path.display()))?
     } else {
         return Err(anyhow!(
-            "No PRD found. Please create either {project_name}/prd.txt or {project_name}/intake/prd.txt, or provide prd_content parameter"
+            "No PRD found. Please create either {project_name}/prd.md or {project_name}/prd.txt, or provide prd_content parameter"
         ));
     };
 
@@ -2774,7 +2977,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("   Please update your MCP client configuration to avoid this warning");
     }
 
-    let num_tasks = 50; // Standard task count
+    let num_tasks = 15; // Default task count (reasonable for most projects)
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
 
@@ -2926,14 +3129,12 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .is_some()
     {
-        "provided"
-    } else if prd_file_root.exists() {
-        "prd.txt"
-    } else if prd_file_intake.exists() {
-        "intake/prd.txt"
+        "provided".to_string()
+    } else if let Some(prd_path) = prd_paths.iter().find(|p| p.exists()) {
+        prd_path.file_name().unwrap_or_default().to_string_lossy().to_string()
     } else {
         // Should be unreachable due to earlier validation
-        "provided"
+        "provided".to_string()
     };
 
     let architecture_source_label = if arguments

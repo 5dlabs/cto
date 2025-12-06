@@ -304,15 +304,15 @@ spec:
                           # Try multiple possible task directory structures
                           TASK_MOVED=false
                           TASK_DIRS=(
-                            "docs/.taskmaster/docs/task-${TASK_ID}"
+                            "docs/.tasks/docs/task-${TASK_ID}"
                             "task-${TASK_ID}"
-                            ".taskmaster/docs/task-${TASK_ID}"
+                            ".tasks/docs/task-${TASK_ID}"
                             "task/task-${TASK_ID}"
                           )
 
                           COMPLETED_DIRS=(
-                            "docs/.taskmaster/docs/.completed"
-                            ".taskmaster/docs/.completed"
+                            "docs/.tasks/docs/.completed"
+                            ".tasks/docs/.completed"
                             ".completed"
                             "task/.completed"
                           )
@@ -322,10 +322,10 @@ spec:
                               echo "📁 Found task directory: $TASK_DIR"
 
                               # Determine corresponding completed directory
-                              if [[ "$TASK_DIR" == docs/.taskmaster/docs/* ]]; then
-                                COMPLETED_DIR="docs/.taskmaster/docs/.completed"
-                              elif [[ "$TASK_DIR" == .taskmaster/docs/* ]]; then
-                                COMPLETED_DIR=".taskmaster/docs/.completed"
+                              if [[ "$TASK_DIR" == docs/.tasks/docs/* ]]; then
+                                COMPLETED_DIR="docs/.tasks/docs/.completed"
+                              elif [[ "$TASK_DIR" == .tasks/docs/* ]]; then
+                                COMPLETED_DIR=".tasks/docs/.completed"
                               elif [[ "$TASK_DIR" == task/* ]]; then
                                 COMPLETED_DIR="task/.completed"
                               else
@@ -498,9 +498,9 @@ spec:
 
                           # Check if the next sequential task exists and is not completed
                           TASK_PATHS=(
-                            "docs/.taskmaster/docs/task-${NEXT_TASK_ID}"
+                            "docs/.tasks/docs/task-${NEXT_TASK_ID}"
                             "task-${NEXT_TASK_ID}"
-                            ".taskmaster/docs/task-${NEXT_TASK_ID}"
+                            ".tasks/docs/task-${NEXT_TASK_ID}"
                             "task/task-${NEXT_TASK_ID}"
                           )
 
@@ -515,8 +515,8 @@ spec:
 
                           # Check if already completed
                           COMPLETED_PATHS=(
-                            "docs/.taskmaster/docs/.completed/task-${NEXT_TASK_ID}"
-                            ".taskmaster/docs/.completed/task-${NEXT_TASK_ID}"
+                            "docs/.tasks/docs/.completed/task-${NEXT_TASK_ID}"
+                            ".tasks/docs/.completed/task-${NEXT_TASK_ID}"
                             ".completed/task-${NEXT_TASK_ID}"
                           )
 

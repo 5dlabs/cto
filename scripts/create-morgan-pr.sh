@@ -13,8 +13,8 @@ git status --short
 
 echo ""
 echo "📝 Staging Morgan PM changes..."
-git add infra/charts/controller/agent-templates/pm/github-projects-helpers.sh.hbs
-git add infra/charts/controller/agent-templates/pm/morgan-pm.sh.hbs
+git add infra/charts/controller/templates/pm/github-projects-helpers.sh.hbs
+git add infra/charts/controller/templates/pm/morgan-pm.sh.hbs
 git add docs/engineering/morgan-status-sync-fix.md
 
 echo ""
@@ -153,15 +153,15 @@ Each agent name becomes a board column that auto-creates!
 
 After merge:
 1. ArgoCD will sync new Morgan template
-2. Delete ConfigMap: \`kubectl delete configmap -n cto agent-templates-pm\`
+2. Delete ConfigMap: \`kubectl delete configmap -n cto templates-pm\`
 3. Create new test project
 4. Verify agent columns appear automatically
 5. Watch tasks move through agent columns as workflows progress
 
 ## Files Changed
 
-- \`infra/charts/controller/agent-templates/pm/github-projects-helpers.sh.hbs\`
-- \`infra/charts/controller/agent-templates/pm/morgan-pm.sh.hbs\`
+- \`infra/charts/controller/templates/pm/github-projects-helpers.sh.hbs\`
+- \`infra/charts/controller/templates/pm/morgan-pm.sh.hbs\`
 - \`docs/engineering/morgan-status-sync-fix.md\`
 
 ---

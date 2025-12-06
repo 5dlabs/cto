@@ -1,0 +1,7 @@
+# Generated test output for manual inspection
+# This directory is excluded from git
+*
+!.gitignore
+
+
+

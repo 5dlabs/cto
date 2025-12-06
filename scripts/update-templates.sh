@@ -9,11 +9,11 @@ cd "$(dirname "$0")/../infra/charts/controller"
 
 # Regenerate templates
 echo "📝 Regenerating split ConfigMaps..."
-./scripts/generate-agent-templates-configmaps-split.sh
+./scripts/generate-templates-configmaps-split.sh
 
 # Check if there are changes
 TEMPLATES_CHANGED=false
-for template in templates/agent-templates-*.yaml; do
+for template in templates/templates-*.yaml; do
     if ! git diff --quiet "$template" 2>/dev/null; then
         TEMPLATES_CHANGED=true
         break
@@ -28,12 +28,12 @@ fi
 # Show what changed
 echo ""
 echo "📄 Template changes detected:"
-git diff --stat templates/agent-templates-*.yaml
+git diff --stat templates/templates-*.yaml
 
 echo ""
 echo "🔍 Summary of changes:"
-echo "- Updated templates from agent-templates/ source files"
-for template in templates/agent-templates-*.yaml; do
+echo "- Updated templates from templates/ source files"
+for template in templates/templates-*.yaml; do
     if ! git diff --quiet "$template" 2>/dev/null; then
         checksum=$(grep 'templates-checksum:' "$template" | awk '{print $2}' | tr -d '"')
         echo "- $(basename "$template"): checksum $checksum"
@@ -43,10 +43,10 @@ done
 # Add and commit changes
 echo ""
 echo "📝 Committing updated templates..."
-git add templates/agent-templates-*.yaml
+git add templates/templates-*.yaml
 git commit -m "chore: update agent templates ConfigMaps
 
-- Regenerated from agent-templates/ source files
+- Regenerated from templates/ source files
 - Includes latest container script validation changes
 - Ensures ArgoCD deploys current templates"
 

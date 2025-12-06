@@ -502,10 +502,10 @@ impl<'a> CodeResourceManager<'a> {
         }));
 
         // Agent templates: Use projected volume to merge shared + integration ConfigMaps
-        // This allows Atlas/Bolt to access integration templates from /agent-templates
-        let shared_templates_cm_name = format!("{cm_prefix}-agent-templates-shared");
-        let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
-        let healer_templates_cm_name = format!("{cm_prefix}-agent-templates-healer");
+        // This allows Atlas/Bolt to access integration templates from /templates
+        let shared_templates_cm_name = format!("{cm_prefix}-templates-shared");
+        let integration_templates_cm_name = format!("{cm_prefix}-templates-integration");
+        let healer_templates_cm_name = format!("{cm_prefix}-templates-healer");
 
         // Check if this is a Healer workflow (service contains "healer" or template starts with "healer/")
         let is_healer_workflow = code_run.spec.service.to_lowercase().contains("healer")
@@ -541,28 +541,28 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         volumes.push(json!({
-            "name": "agent-templates-shared",
+            "name": "templates-shared",
             "projected": {
                 "sources": projected_sources
             }
         }));
         volume_mounts.push(json!({
-            "name": "agent-templates-shared",
-            "mountPath": "/agent-templates"
+            "name": "templates-shared",
+            "mountPath": "/templates"
         }));
 
         // Integration templates ConfigMap volume for Atlas/Bolt guardian scripts
         // Note: cm_prefix already defined above
-        let integration_templates_cm_name = format!("{cm_prefix}-agent-templates-integration");
+        let integration_templates_cm_name = format!("{cm_prefix}-templates-integration");
         volumes.push(json!({
-            "name": "agent-templates-integration",
+            "name": "templates-integration",
             "configMap": {
                 "name": integration_templates_cm_name
             }
         }));
         volume_mounts.push(json!({
-            "name": "agent-templates-integration",
-            "mountPath": "/agent-templates-integration"
+            "name": "templates-integration",
+            "mountPath": "/templates-integration"
         }));
 
         // Blaze agent scripts ConfigMap volume for frontend workflows

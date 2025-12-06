@@ -3,7 +3,7 @@
 # Template Validation Suite for Agent Templates
 # =============================================================================
 #
-# Validates all Handlebars templates in infra/charts/controller/agent-templates/
+# Validates all Handlebars templates in infra/charts/controller/templates/
 #
 # Validations performed:
 #   1. Handlebars syntax validation (block matching, empty refs)
@@ -27,7 +27,7 @@ set -euo pipefail
 # Script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="$PROJECT_ROOT/infra/charts/controller/agent-templates"
+TEMPLATE_DIR="$PROJECT_ROOT/infra/charts/controller/templates"
 
 # Colors
 RED='\033[0;31m'

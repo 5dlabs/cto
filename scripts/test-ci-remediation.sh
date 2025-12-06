@@ -275,7 +275,7 @@ dry_run_test() {
     
     # Check template rendering
     print_status "info" "Checking agent template..."
-    if grep -q "REMEDIATION_MODE.*ci-failure" $REPO_ROOT/infra/charts/controller/agent-templates/code/claude/container-rex.sh.hbs; then
+    if grep -q "REMEDIATION_MODE.*ci-failure" $REPO_ROOT/infra/charts/controller/templates/code/claude/container-rex.sh.hbs; then
         print_status "success" "CI remediation mode found in Rex template"
     else
         print_status "error" "CI remediation mode NOT found in Rex template"

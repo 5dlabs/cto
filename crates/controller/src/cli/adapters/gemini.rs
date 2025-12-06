@@ -11,7 +11,7 @@ use crate::cli::adapter::{
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
-use crate::tasks::template_paths::{CODE_GEMINI_CONFIG_TEMPLATE, CODE_GEMINI_MEMORY_TEMPLATE};
+use crate::tasks::template_paths::CODE_GEMINI_MEMORY_TEMPLATE;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Map as JsonMap, Value};
@@ -52,7 +52,6 @@ fn safe_f32(value: f64) -> Option<f32> {
 #[derive(Debug)]
 pub struct GeminiAdapter {
     base: Arc<BaseAdapter>,
-    config_template: &'static str,
     memory_template: &'static str,
 }
 
@@ -69,7 +68,6 @@ impl GeminiAdapter {
 
         Ok(Self {
             base,
-            config_template: CODE_GEMINI_CONFIG_TEMPLATE,
             memory_template: CODE_GEMINI_MEMORY_TEMPLATE,
         })
     }
@@ -105,13 +103,10 @@ impl GeminiAdapter {
     }
 
     fn render_config(&self, context: &Value) -> AdapterResult<String> {
-        self.base
-            .render_template_file(self.config_template, context)
-            .map_err(|err| {
-                AdapterError::TemplateError(format!(
-                    "Failed to render Gemini config template: {err}"
-                ))
-            })
+        // Serialize configuration directly (no template needed)
+        serde_json::to_string_pretty(context).map_err(|err| {
+            AdapterError::ConfigGenerationError(format!("Failed to serialize Gemini config: {err}"))
+        })
     }
 
     fn build_config_context(&self, agent_config: &AgentConfig) -> Value {
