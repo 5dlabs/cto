@@ -416,6 +416,27 @@ mod rendering_tests {
     use controller::tasks::config::ControllerConfig;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    /// Check if templates are available for testing via AGENT_TEMPLATES_PATH
+    fn templates_available() -> bool {
+        std::env::var("AGENT_TEMPLATES_PATH")
+            .map(|p| PathBuf::from(p).join("_shared/container.sh.hbs").exists())
+            .unwrap_or(false)
+    }
+
+    /// Skip test if templates aren't available
+    macro_rules! skip_if_no_templates {
+        () => {
+            if !templates_available() {
+                eprintln!(
+                    "Skipping test: AGENT_TEMPLATES_PATH not set or templates not found.\n\
+                     Run with: AGENT_TEMPLATES_PATH=\"$(pwd)/templates\" cargo test ..."
+                );
+                return;
+            }
+        };
+    }
 
     /// Create a test CodeRun with specific agent and CLI type
     fn create_code_run(github_app: &str, cli_type: CLIType) -> CodeRun {
@@ -503,6 +524,7 @@ mod rendering_tests {
 
     #[test]
     fn test_container_script_renders_for_all_agent_cli_combos() {
+        skip_if_no_templates!();
         let config = ControllerConfig::default();
 
         for (agent, cli_type, cli_name) in agent_cli_matrix() {
@@ -559,6 +581,7 @@ mod rendering_tests {
 
     #[test]
     fn test_system_prompt_renders_for_agents() {
+        skip_if_no_templates!();
         let config = ControllerConfig::default();
 
         let agents = vec![
@@ -601,6 +624,7 @@ mod rendering_tests {
 
     #[test]
     fn test_config_generates_for_all_cli_types() {
+        skip_if_no_templates!();
         let config = ControllerConfig::default();
 
         // Each CLI generates a different config file

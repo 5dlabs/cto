@@ -2810,10 +2810,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
             0
         };
 
-        eprintln!(
-            "✅ Intake completed: {} tasks, {} doc directories",
-            task_count, doc_count
-        );
+        eprintln!("✅ Intake completed: {task_count} tasks, {doc_count} doc directories");
 
         Ok(json!({
             "status": "completed",

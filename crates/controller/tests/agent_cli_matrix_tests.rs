@@ -559,7 +559,7 @@ fn create_code_run_with_scenario(agent: &AgentDef, cli_type: CLIType) -> CodeRun
             task_id: Some(42),
             service: extract_service_name(agent.scenario.repository),
             repository_url: repo_url.clone(),
-            docs_repository_url: format!("{}-docs", repo_url),
+            docs_repository_url: format!("{repo_url}-docs"),
             docs_project_directory: Some("docs".to_string()),
             working_directory: Some(agent.scenario.working_directory.to_string()),
             model: get_model_for_cli(cli_type),
@@ -642,7 +642,7 @@ fn get_model_for_cli(cli_type: CLIType) -> String {
 
 /// Extract service name from repository path
 fn extract_service_name(repo: &str) -> String {
-    repo.split('/').last().unwrap_or("unknown").to_string()
+    repo.split('/').next_back().unwrap_or("unknown").to_string()
 }
 
 fn get_cli_name(cli_type: CLIType) -> &'static str {
@@ -818,6 +818,27 @@ fn validate_config(content: &str, cli_type: CLIType) -> (bool, Vec<String>) {
 // Matrix Test Implementation
 // ============================================================================
 
+/// Check if templates are available for testing.
+/// Returns true if AGENT_TEMPLATES_PATH is set and points to valid templates.
+fn templates_available() -> bool {
+    std::env::var("AGENT_TEMPLATES_PATH")
+        .map(|p| PathBuf::from(p).join("_shared/container.sh.hbs").exists())
+        .unwrap_or(false)
+}
+
+/// Skip test if templates aren't available
+macro_rules! skip_if_no_templates {
+    () => {
+        if !templates_available() {
+            eprintln!(
+                "Skipping test: AGENT_TEMPLATES_PATH not set or templates not found.\n\
+                 Run with: AGENT_TEMPLATES_PATH=\"$(pwd)/templates\" cargo test ..."
+            );
+            return;
+        }
+    };
+}
+
 fn run_matrix_test(agent: &AgentDef, cli_type: CLIType) -> TestResult {
     let config = ControllerConfig::default();
     let code_run = create_code_run_with_scenario(agent, cli_type);
@@ -894,6 +915,7 @@ fn run_matrix_test(agent: &AgentDef, cli_type: CLIType) -> TestResult {
 
 #[test]
 fn test_full_matrix() {
+    skip_if_no_templates!();
     let agents = get_agent_matrix();
     let mut results: Vec<TestResult> = Vec::new();
     let mut failed_tests: Vec<String> = Vec::new();
@@ -951,6 +973,7 @@ fn test_full_matrix() {
 // Individual agent tests for faster iteration
 #[test]
 fn test_rex_all_clis() {
+    skip_if_no_templates!();
     let agents = get_agent_matrix();
     let rex = agents.iter().find(|a| a.name == "rex").unwrap();
 
@@ -967,6 +990,7 @@ fn test_rex_all_clis() {
 
 #[test]
 fn test_specialized_agents() {
+    skip_if_no_templates!();
     let agents = get_agent_matrix();
     let specialized = vec![
         "bolt", "cipher", "cleo", "tess", "stitch", "morgan", "atlas",
@@ -993,6 +1017,7 @@ fn test_specialized_agents() {
 
 #[test]
 fn test_all_coding_agents_with_claude() {
+    skip_if_no_templates!();
     let agents = get_agent_matrix();
     let coders = vec!["rex", "blaze", "grizz", "nova", "tap", "spark"];
 
@@ -1014,6 +1039,7 @@ fn test_all_coding_agents_with_claude() {
 
 #[test]
 fn test_container_has_required_sections() {
+    skip_if_no_templates!();
     let config = ControllerConfig::default();
     let code_run = create_test_code_run("5DLabs-Rex", CLIType::Claude);
 
@@ -1041,6 +1067,7 @@ fn test_container_has_required_sections() {
 
 #[test]
 fn test_memory_files_have_agent_context() {
+    skip_if_no_templates!();
     let agents = get_agent_matrix();
     let config = ControllerConfig::default();
 
@@ -1070,6 +1097,7 @@ fn test_memory_files_have_agent_context() {
 
 #[test]
 fn test_config_files_are_valid_format() {
+    skip_if_no_templates!();
     let config = ControllerConfig::default();
 
     let test_cases = vec![
@@ -1286,7 +1314,7 @@ fn generate_single_output() {
             }
         }
         Err(e) => {
-            println!("FAILED: {:?}", e);
+            println!("FAILED: {e:?}");
         }
     }
 
