@@ -205,6 +205,10 @@ pub struct Task {
     // Complexity analysis fields
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub complexity: Option<ComplexityInfo>,
+
+    /// Agent routing hint (blaze, rex, grizz, tap, spark, nova, tess, cipher, bolt, atlas)
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "agentHint")]
+    pub agent_hint: Option<String>,
 }
 
 impl Task {
@@ -232,6 +236,7 @@ impl Task {
             tags: Vec::new(),
             assignee: None,
             complexity: None,
+            agent_hint: None,
         }
     }
 

@@ -10,7 +10,6 @@ use crate::cli::adapter::{
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
-use crate::tasks::template_paths::CODE_CLAUDE_CONFIG_TEMPLATE;
 use anyhow::Result;
 use async_trait::async_trait;
 use regex::Regex;
@@ -18,8 +17,6 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument};
-
-const CLAUDE_CONFIG_TEMPLATE: &str = CODE_CLAUDE_CONFIG_TEMPLATE;
 
 /// Claude CLI adapter - reference implementation
 #[derive(Debug)]
@@ -142,7 +139,7 @@ impl CliAdapter for ClaudeAdapter {
             .and_then(|s| s.parse().ok())
             .unwrap_or(0.7);
 
-        // Prepare template context
+        // Build configuration object
         let context = json!({
             "model": agent_config.model,
             "max_tokens": agent_config.max_tokens.unwrap_or(default_max_tokens),
@@ -154,16 +151,15 @@ impl CliAdapter for ClaudeAdapter {
             "cli_config": agent_config.cli_config,
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "correlation_id": self.base.config.correlation_id,
+            "generated_by": "cli_adapter_claude",
+            "version": "1.0",
         });
 
-        // Render configuration template
-        let config = self
-            .base
-            .render_template_file(CLAUDE_CONFIG_TEMPLATE, &context)
-            .map_err(|e| {
-                error!(error = %e, "Failed to render Claude configuration template");
-                e
-            })?;
+        // Serialize configuration directly (no template needed)
+        let config = serde_json::to_string_pretty(&context).map_err(|e| {
+            error!(error = %e, "Failed to serialize Claude configuration");
+            AdapterError::ConfigGenerationError(format!("Failed to serialize config: {e}"))
+        })?;
 
         info!(
             config_length = config.len(),

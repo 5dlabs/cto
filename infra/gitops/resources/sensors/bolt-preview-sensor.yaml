@@ -270,7 +270,7 @@ data:
     Bolt extracts task ID using multiple methods (in order):
     1. PR label: `task-5` → Task ID: `5`
     2. Branch name: `task-5-implement-auth` → Task ID: `5`
-    3. .taskmaster-correlation file in repo
+    3. .tasks-correlation file in repo
 
     ### Resource Limits
 

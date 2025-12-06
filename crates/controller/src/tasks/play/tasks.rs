@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
-/// Task from `TaskMaster` tasks.json
+/// Task from tasks.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: u32,
@@ -20,7 +20,7 @@ pub struct Task {
     pub subtasks: Option<Vec<SubTask>>,
 }
 
-/// Subtask from `TaskMaster` tasks.json
+/// Subtask from tasks.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubTask {
     pub id: u32,
@@ -30,21 +30,21 @@ pub struct SubTask {
     pub details: Option<String>,
 }
 
-/// `TaskMaster` file structure
+/// Tasks file structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TasksFile {
     tasks: Vec<Task>,
 }
 
 /// Find the tasks.json file in a repository
-/// Looks in common locations: .taskmaster/tasks/tasks.json, tasks.json
+/// Looks in common locations: .tasks/tasks/tasks.json, tasks.json
 fn find_tasks_file(repo_path: &Path) -> Option<PathBuf> {
     let candidates = vec![
         repo_path
-            .join(".taskmaster")
+            .join(".tasks")
             .join("tasks")
             .join("tasks.json"),
-        repo_path.join(".taskmaster").join("tasks.json"),
+        repo_path.join(".tasks").join("tasks.json"),
         repo_path.join("tasks.json"),
     ];
 
@@ -220,10 +220,10 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_tasks_file(dir: &TempDir, tasks: &TasksFile) -> PathBuf {
-        let taskmaster_dir = dir.path().join(".taskmaster").join("tasks");
-        fs::create_dir_all(&taskmaster_dir).unwrap();
+        let tasks_dir = dir.path().join(".tasks").join("tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
 
-        let tasks_file = taskmaster_dir.join("tasks.json");
+        let tasks_file = tasks_dir.join("tasks.json");
         let content = serde_json::to_string_pretty(tasks).unwrap();
 
         let mut file = fs::File::create(&tasks_file).unwrap();

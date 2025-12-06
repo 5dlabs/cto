@@ -80,11 +80,32 @@ spec:
             - name: NOTIFY_DISABLED
               value: "true"
             {{- end }}
+            {{- if .Values.linear.enabled }}
+            # Linear integration configuration
+            - name: LINEAR_ENABLED
+              value: "true"
+            - name: LINEAR_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.linear.webhook.secretName }}
+                  key: {{ .Values.linear.webhook.secretKey }}
+                  optional: true
+            - name: LINEAR_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.linear.oauth.secretName }}
+                  key: {{ .Values.linear.oauth.accessTokenKey }}
+                  optional: true
+            {{- if .Values.linear.agent.teamId }}
+            - name: LINEAR_TEAM_ID
+              value: {{ .Values.linear.agent.teamId | quote }}
+            {{- end }}
+            {{- end }}
 
           volumeMounts:
             # Mount agent templates ConfigMap
-            - name: agent-templates
-              mountPath: /agent-templates
+            - name: templates
+              mountPath: /templates
               readOnly: true
             # Mount controller configuration ConfigMap
             - name: controller-config

@@ -3,12 +3,12 @@ set -euo pipefail
 
 # =============================================================================
 # Agent Image Integration Test
-# Tests that container images work with the agent-templates structure
+# Tests that container images work with the templates structure
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATES_DIR="$REPO_ROOT/agent-templates"
+TEMPLATES_DIR="$REPO_ROOT/templates"
 
 # Images to test
 IMAGES=(
@@ -71,9 +71,9 @@ for IMAGE in "${IMAGES[@]}"; do
     # Test 2: Verify templates can be mounted
     echo "  🔍 Test 2: Templates mount..."
     if docker run --rm \
-        -v "$TEMPLATES_DIR:/agent-templates:ro" \
+        -v "$TEMPLATES_DIR:/templates:ro" \
         "$IMAGE" \
-        ls /agent-templates/_shared/container.sh.hbs &>/dev/null; then
+        ls /templates/_shared/container.sh.hbs &>/dev/null; then
         echo -e "  ${GREEN}✓ Templates mounted${NC}"
     else
         echo -e "  ${RED}✗ Templates mount failed${NC}"
@@ -84,9 +84,9 @@ for IMAGE in "${IMAGES[@]}"; do
     # Test 3: Verify partials exist
     echo "  🔍 Test 3: Partials exist..."
     PARTIALS_COUNT=$(docker run --rm \
-        -v "$TEMPLATES_DIR:/agent-templates:ro" \
+        -v "$TEMPLATES_DIR:/templates:ro" \
         "$IMAGE" \
-        ls /agent-templates/_shared/partials/*.hbs 2>/dev/null | wc -l || echo "0")
+        ls /templates/_shared/partials/*.hbs 2>/dev/null | wc -l || echo "0")
     
     if [ "$PARTIALS_COUNT" -ge 7 ]; then
         echo -e "  ${GREEN}✓ Found $PARTIALS_COUNT partials${NC}"
@@ -134,5 +134,7 @@ if [ "$FAILED" -gt 0 ]; then
 fi
 
 exit 0
+
+
 
 

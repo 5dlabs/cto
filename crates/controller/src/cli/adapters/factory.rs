@@ -12,7 +12,6 @@ use crate::cli::adapter::{
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
-use crate::tasks::template_paths::CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -166,14 +165,10 @@ impl CliAdapter for FactoryAdapter {
             context.insert("raw_additional_json".to_string(), Value::String(raw));
         }
 
-        let rendered = self
-            .base
-            .render_template_file(CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE, &Value::Object(context))
-            .map_err(|e| {
-                AdapterError::TemplateError(format!(
-                    "Failed to render Factory CLI config template: {e}"
-                ))
-            })?;
+        // Serialize configuration directly (no template needed)
+        let rendered = serde_json::to_string_pretty(&Value::Object(context)).map_err(|e| {
+            AdapterError::ConfigGenerationError(format!("Failed to serialize Factory config: {e}"))
+        })?;
 
         Ok(rendered)
     }
@@ -467,7 +462,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_generate_config_renders_factory_template() {
+    async fn test_generate_config_serializes_directly() {
         // SAFETY: This test runs serially via #[serial] to avoid env var races
         unsafe {
             std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
@@ -480,36 +475,31 @@ mod tests {
             .await
             .unwrap();
 
+        // Config is now serialized directly as JSON (no template rendering)
         let parsed: Value = serde_json::from_str(&config).expect("config should be valid JSON");
+
+        // Model is at top level (not nested under model.default)
         assert_eq!(
-            parsed
-                .get("model")
-                .and_then(|model| model.get("default"))
-                .and_then(Value::as_str)
-                .unwrap(),
+            parsed.get("model").and_then(Value::as_str).unwrap(),
             "gpt-5-factory-high"
         );
+
+        // Sandbox mode is at top level (not nested under execution)
         assert_eq!(
-            parsed
-                .get("execution")
-                .and_then(|exec| exec.get("sandboxMode"))
-                .and_then(Value::as_str)
-                .unwrap(),
+            parsed.get("sandbox_mode").and_then(Value::as_str).unwrap(),
             "workspace-write"
         );
-        assert!(parsed
-            .get("autoRun")
-            .and_then(|auto| auto.get("enabled"))
-            .and_then(Value::as_bool)
-            .unwrap());
+
+        // Approval policy is at top level (from cli_config.settings.approvalPolicy)
         assert_eq!(
             parsed
-                .get("autoRun")
-                .and_then(|auto| auto.get("level"))
+                .get("approval_policy")
                 .and_then(Value::as_str)
                 .unwrap(),
-            "high"
+            "never"
         );
+
+        // Tools structure
         let tools = parsed
             .get("tools")
             .and_then(|tools| tools.get("tools"))

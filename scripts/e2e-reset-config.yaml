@@ -51,7 +51,7 @@ minimal_setup:
           "project": "cto-parallel-test",
           "description": "Test repository for CTO platform E2E testing"
         }
-    - path: docs/.taskmaster/docs/simple-prd.txt
+    - path: docs/.tasks/docs/simple-prd.txt
       content: |
         # Simple Test PRD
         

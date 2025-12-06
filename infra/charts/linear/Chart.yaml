@@ -1,0 +1,14 @@
+apiVersion: v2
+name: linear
+description: Linear webhook service for CTO platform integration
+type: application
+version: 0.1.0
+appVersion: "0.12.38"
+keywords:
+  - linear
+  - webhook
+  - cto
+maintainers:
+  - name: 5D Labs
+    url: https://5dlabs.ai
+

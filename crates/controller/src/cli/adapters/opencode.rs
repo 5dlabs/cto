@@ -12,7 +12,7 @@ use crate::cli::adapter::{
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
-use crate::tasks::template_paths::{CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_MEMORY_TEMPLATE};
+use crate::tasks::template_paths::CODE_OPENCODE_MEMORY_TEMPLATE;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Map as JsonMap, Value};
@@ -52,7 +52,6 @@ fn safe_f32(value: f64) -> Option<f32> {
 #[derive(Debug)]
 pub struct OpenCodeAdapter {
     base: Arc<BaseAdapter>,
-    config_template: &'static str,
     memory_template: &'static str,
 }
 
@@ -67,7 +66,6 @@ impl OpenCodeAdapter {
 
         Ok(Self {
             base,
-            config_template: CODE_OPENCODE_CONFIG_TEMPLATE,
             memory_template: CODE_OPENCODE_MEMORY_TEMPLATE,
         })
     }
@@ -103,13 +101,12 @@ impl OpenCodeAdapter {
     }
 
     fn render_config(&self, context: &Value) -> AdapterResult<String> {
-        self.base
-            .render_template_file(self.config_template, context)
-            .map_err(|err| {
-                AdapterError::TemplateError(format!(
-                    "Failed to render OpenCode config template: {err}"
-                ))
-            })
+        // Serialize configuration directly (no template needed)
+        serde_json::to_string_pretty(context).map_err(|err| {
+            AdapterError::ConfigGenerationError(format!(
+                "Failed to serialize OpenCode config: {err}"
+            ))
+        })
     }
 
     fn build_provider_context(cli_config: &Value) -> Value {
@@ -420,7 +417,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_generate_config_overrides_defaults() {
+    async fn test_generate_config_serializes_directly() {
         // SAFETY: This test runs serially via #[serial] to avoid env var races
         unsafe {
             std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
@@ -431,32 +428,29 @@ mod tests {
         let rendered = adapter.generate_config(&agent).await.unwrap();
         let parsed: Value = serde_json::from_str(&rendered).unwrap();
 
-        // New config format uses "mode": "exec" with command-line invocation
-        assert_eq!(parsed["mode"].as_str().unwrap(), "exec");
+        // Config is now serialized directly as JSON (no template rendering)
+        // Verify the context structure from build_config_context
+
+        // Metadata section
+        assert!(parsed.get("metadata").is_some());
+        assert_eq!(parsed["metadata"]["cli"].as_str().unwrap(), "opencode");
         assert_eq!(
-            parsed["exec"]["command"].as_str().unwrap(),
-            "/usr/local/bin/opencode"
+            parsed["metadata"]["github_app"].as_str().unwrap(),
+            "test-app"
         );
 
-        // Model is passed as an argument
-        let args = parsed["exec"]["args"].as_array().unwrap();
-        assert!(args.contains(&json!("--model")));
-        assert!(args.contains(&json!("opencode-sonnet")));
+        // Agent section with model and tools
+        assert!(parsed.get("agent").is_some());
+        assert_eq!(
+            parsed["agent"]["model"].as_str().unwrap(),
+            "opencode-sonnet"
+        );
 
-        // Settings are in env vars (rendered as empty in test, but structure is correct)
-        assert!(parsed["exec"]["env"].get("OPENCODE_API_KEY").is_some());
-        assert!(parsed["exec"]["env"].get("OPENCODE_BASE_URL").is_some());
-        // Temperature is rendered as float
-        assert!(parsed["exec"]["env"]["OPENCODE_TEMPERATURE"]
-            .as_str()
-            .is_some());
-
-        // Tools configuration
-        assert!(parsed["tools"]["remote"]["enabled"].as_bool().unwrap());
-        assert!(parsed["tools"]["remote"]["availableTools"]
+        // Remote tools
+        let remote_tools = parsed["agent"]["remote_tools"]
             .as_array()
-            .unwrap()
-            .contains(&json!("memory_create_entities")));
+            .expect("remote_tools should be an array");
+        assert!(remote_tools.contains(&json!("memory_create_entities")));
     }
 
     #[tokio::test]

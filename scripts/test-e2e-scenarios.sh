@@ -8,7 +8,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATES_DIR="$REPO_ROOT/agent-templates"
+TEMPLATES_DIR="$REPO_ROOT/templates"
 TEST_DIR="$REPO_ROOT/.test-e2e-scenarios"
 
 # Colors
@@ -295,7 +295,7 @@ EOF
     # Run container with mounted templates
     if docker run --rm \
         --platform linux/amd64 \
-        -v "$TEMPLATES_DIR:/agent-templates:ro" \
+        -v "$TEMPLATES_DIR:/templates:ro" \
         -v "$TEST_DIR/task-files-docker:/task-files:ro" \
         "$image" \
         bash -c "
@@ -304,18 +304,18 @@ EOF
             echo '════════════════════════════════════════════════════════════════'
             echo ''
             echo '📁 Template structure:'
-            ls -la /agent-templates/ || true
+            ls -la /templates/ || true
             echo ''
             echo '📁 Agent templates:'
-            ls -la /agent-templates/$agent/ 2>/dev/null || echo '  Not found'
+            ls -la /templates/$agent/ 2>/dev/null || echo '  Not found'
             echo ''
             echo '📁 Job templates:'
-            ls -la /agent-templates/$agent/$job/ 2>/dev/null || echo '  Not found'
+            ls -la /templates/$agent/$job/ 2>/dev/null || echo '  Not found'
             echo ''
             echo '📝 System prompt check:'
-            if [ -f /agent-templates/$agent/$job/system-prompt.md.hbs ]; then
+            if [ -f /templates/$agent/$job/system-prompt.md.hbs ]; then
                 echo '  ✓ System prompt exists'
-                head -3 /agent-templates/$agent/$job/system-prompt.md.hbs | sed 's/^/    /'
+                head -3 /templates/$agent/$job/system-prompt.md.hbs | sed 's/^/    /'
             else
                 echo '  ✗ System prompt missing'
             fi
