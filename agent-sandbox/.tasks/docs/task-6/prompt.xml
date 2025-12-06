@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="6" priority="high" agent="rex">
+    <meta>
+        <title>Build task board CRUD API with filtering and soft delete</title>
+        <priority>high</priority>
+        <dependencies>2, 3, 5</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 6 with production-quality code.</role>
+
+    <context>
+        <overview>Implement task management endpoints with create, read, update, delete operations, status/assignee/date filtering, and 30-day soft delete retention</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create src/api/tasks.rs with handlers:
+   - POST /api/teams/:team_id/tasks: create_task(Path&lt;Uuid&gt;, Json&lt;CreateTaskDto&gt;)
+   - GET /api/teams/:team_id/tasks: list_tasks(Path&lt;Uuid&gt;, Query&lt;TaskFilters&gt;)
+     * WHERE deleted_at IS NULL AND team_id = $1
+     * Apply filters: status IN (...), assignee_id = $2, due_date BETWEEN $3 AND $4
+   - GET /api/tasks/:id: get_task(Path&lt;Uuid&gt;)
+   - PATCH /api/tasks/:id: update_task(Path&lt;Uuid&gt;, Json&lt;UpdateTaskDto&gt;)
+   - DELETE /api/tasks/:id: soft_delete_task(Path&lt;Uuid&gt;)
+     * SET deleted_at = NOW() WHERE id = $1
+2. Define TaskFilters struct with Optional&lt;Vec&lt;Status&gt;&gt;, Optional&lt;Uuid&gt;, Optional&lt;DateRange&gt;
+3. Add background job (separate task) to hard delete tasks where deleted_at &lt; NOW() - 30 days</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-6): Build task board CRUD API with filtering and soft delete</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests: create task, verify in list. Update status, verify change. Soft delete, verify not in default list but exists in DB. Test all filter combinations. Verify only team members can access tasks</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
