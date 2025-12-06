@@ -12,7 +12,7 @@ ENV TZ="$TZ"
 # Frequently-updated tool versions (defined early, used late for better caching)
 # Changing these ARGs only invalidates layers AFTER they are used
 # =============================================================================
-ARG TASKMASTER_VERSION=0.36.0
+# TaskMaster removed - using Rust tasks CLI instead
 
 # Core tools and CLIs (cache apt metadata)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -296,6 +296,13 @@ RUN --mount=type=cache,target=/root/.cache \
         shadcn@latest \
         wrangler || true
 
+# Install Expo / React Native tooling (Tap mobile agent)
+# EAS CLI is essential for cloud builds, submissions, and OTA updates
+RUN --mount=type=cache,target=/root/.cache \
+    npm install -g --no-fund \
+        eas-cli@latest \
+        expo-cli@latest || true
+
 # Install Morph MCP server for fast code editing (10,500 tok/s) and intelligent search
 # Provides edit_file and warp_grep tools for all CLI agents
 # Note: ripgrep is already installed above (required for warp_grep)
@@ -370,9 +377,26 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
 
-# Install TaskMaster globally (version controlled via ARG for easy updates)
-# This layer is intentionally placed late so version bumps don't invalidate earlier layers
-RUN npm install -g task-master-ai@${TASKMASTER_VERSION}
+# Install tasks CLI from CTO monorepo unified release (skip if version is "skip" or empty)
+# This is the Rust replacement for TaskMaster-AI, providing faster task management
+ARG TASKS_VERSION=skip
+RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
+      ARCH=$(dpkg --print-architecture) && \
+      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
+      if [ -n "$DL_ARCH" ]; then \
+        echo "📦 Installing tasks CLI v${TASKS_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tasks \
+          "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/tasks-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/tasks && \
+        echo "✅ tasks CLI installed"; \
+      else \
+        echo "⏭️ Skipping tasks CLI installation (unsupported architecture: ${ARCH})"; \
+      fi; \
+    else \
+      echo "⏭️ Skipping tasks CLI installation (no release available)"; \
+    fi
+
+# TaskMaster removed - using Rust tasks CLI instead (see TASKS_VERSION above)
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -516,10 +540,9 @@ USER root
 RUN chown -R 1000:1000 /home/node/.cache /home/node/.cargo || true
 USER node
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-  set -eux; \
-  . $HOME/.cargo/env; \
-  mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
-  cargo --version; \
+  . $HOME/.cargo/env && \
+  mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin" 2>/dev/null || true && \
+  cargo --version && \
   cargo install \
     sccache \
     cargo-edit \

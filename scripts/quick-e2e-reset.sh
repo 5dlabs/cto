@@ -96,8 +96,8 @@ if [[ "${1:-}" == "--github" ]]; then
 }
 EOF
     
-    mkdir -p docs/.taskmaster/docs
-    cat > docs/.taskmaster/docs/test.txt <<'EOF'
+    mkdir -p docs/.tasks/docs
+    cat > docs/.tasks/docs/test.txt <<'EOF'
 # Test PRD
 
 Build a simple test application.

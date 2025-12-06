@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "completedCount": 0,
+    "lastModified": "2025-12-06T10:40:57.692652+00:00",
+    "taskCount": 6,
+    "version": "1.0.0"
+  },
+  "tasks": [
+    {
+      "agentHint": "rex",
+      "dependencies": [],
+      "description": "Initialize Rust/Axum project with PostgreSQL and Redis integration, establishing core infrastructure for the TeamSync API",
+      "details": "1. Create Cargo workspace with axum 0.7, sqlx, redis dependencies\n2. Setup PostgreSQL connection pool with sqlx migrations\n3. Configure Redis client for sessions and rate limiting\n4. Implement health check endpoints (/health/live, /health/ready)\n5. Add structured JSON logging with tracing and trace IDs\n6. Create Docker multi-stage build with Rust 1.75+\n7. Setup basic error handling and middleware stack\n\n```rust\n// Main structure\nstruct AppState {\n    db: PgPool,\n    redis: redis::Client,\n}\n\n// Health checks\nasync fn liveness() -> StatusCode { StatusCode::OK }\nasync fn readiness(State(state): State<AppState>) -> Result<StatusCode> {\n    // Check DB and Redis connectivity\n}\n```",
+      "id": "1",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Unit tests for health endpoints, integration tests for DB/Redis connectivity, verify Docker build completes successfully and container starts",
+      "title": "Setup project foundation and database infrastructure"
+    },
+    {
+      "agentHint": "cipher",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Build JWT-based auth with refresh tokens, OAuth2 integration, and role-based permissions with rate limiting",
+      "details": "1. Create user model with roles (owner, admin, member, viewer)\n2. Implement JWT token generation/validation with refresh tokens\n3. Add OAuth2 flows for Google and GitHub using oauth2 crate\n4. Create middleware for role-based authorization\n5. Implement rate limiting (100 req/min auth, 20 req/min anon) using Redis\n6. Add password hashing with argon2\n\n```rust\n#[derive(sqlx::Type, Clone)]\n#[sqlx(type_name = \"user_role\", rename_all = \"lowercase\")]\nenum UserRole { Owner, Admin, Member, Viewer }\n\nstruct AuthMiddleware;\nstruct RateLimitMiddleware { redis: redis::Client }\n\n// JWT claims structure\n#[derive(Serialize, Deserialize)]\nstruct Claims {\n    sub: Uuid,\n    role: UserRole,\n    exp: usize,\n}\n```",
+      "id": "2",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Unit tests for JWT validation, integration tests for OAuth flows, rate limiting tests with Redis, authorization middleware tests for each role level",
+      "title": "Implement authentication and authorization system"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "2"
+      ],
+      "description": "Implement CRUD operations for teams including creation, member management, and invite link generation with 7-day expiry",
+      "details": "1. Create team and team_members database tables with foreign keys\n2. Implement POST /api/teams with name, description validation\n3. Add GET /api/teams/:id with member count aggregation\n4. Build PATCH /api/teams/:id for team settings updates\n5. Create invite link system with 7-day expiry using Redis\n6. Add team membership validation middleware\n\n```rust\n#[derive(sqlx::FromRow, Serialize)]\nstruct Team {\n    id: Uuid,\n    name: String,\n    description: Option<String>,\n    created_at: DateTime<Utc>,\n    member_count: i64,\n}\n\n// POST /api/teams\nasync fn create_team(auth: AuthUser, Json(payload): Json<CreateTeamRequest>) -> Result<Json<Team>>\n\n// Invite link with Redis expiry\nasync fn generate_invite(team_id: Uuid, redis: &redis::Client) -> Result<String>\n```",
+      "id": "3",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "API integration tests for all team endpoints, test invite link expiry behavior, validate team ownership permissions, test member count accuracy",
+      "title": "Build team management API endpoints"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "3"
+      ],
+      "description": "Build comprehensive task management system with status tracking, assignments, filtering, and soft delete with 30-day retention",
+      "details": "1. Create tasks table with soft delete (deleted_at column)\n2. Implement task CRUD with validation for title, description, assignee, status, due_date\n3. Add status enum (todo, in_progress, done) with database constraints\n4. Build filtering by status, assignee, due date range using query parameters\n5. Implement soft delete with background cleanup job for 30-day retention\n6. Add task assignment validation (assignee must be team member)\n\n```rust\n#[derive(sqlx::Type, Serialize, Deserialize)]\n#[sqlx(type_name = \"task_status\", rename_all = \"snake_case\")]\nenum TaskStatus { Todo, InProgress, Done }\n\n#[derive(sqlx::FromRow, Serialize)]\nstruct Task {\n    id: Uuid,\n    team_id: Uuid,\n    title: String,\n    description: Option<String>,\n    assignee_id: Option<Uuid>,\n    status: TaskStatus,\n    due_date: Option<DateTime<Utc>>,\n    deleted_at: Option<DateTime<Utc>>,\n}\n\n// GET /api/teams/:team_id/tasks with filtering\nstruct TaskFilters {\n    status: Option<TaskStatus>,\n    assignee_id: Option<Uuid>,\n    due_after: Option<DateTime<Utc>>,\n    due_before: Option<DateTime<Utc>>,\n}\n```",
+      "id": "4",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "CRUD operation tests, filtering functionality validation, soft delete behavior verification, task assignment permission tests, 30-day cleanup job testing",
+      "title": "Implement task board with CRUD operations and filtering"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "4"
+      ],
+      "description": "Implement WebSocket connections for live updates, FCM push notifications, email notifications, and user preference controls",
+      "details": "1. Setup WebSocket endpoint with axum::extract::ws for 1000 concurrent connections\n2. Implement Redis pub/sub for broadcasting task updates across instances\n3. Create notification preferences table and user controls\n4. Integrate FCM for mobile push notifications\n5. Add email notification system for mentions and due date reminders\n6. Build connection management with user authentication\n\n```rust\nuse axum::extract::ws::{WebSocket, WebSocketUpgrade};\nuse redis::aio::PubSub;\n\nstruct NotificationService {\n    redis_pubsub: PubSub,\n    fcm_client: fcm::Client,\n    email_client: lettre::SmtpTransport,\n}\n\n#[derive(Serialize, Deserialize)]\nenum NotificationType {\n    TaskCreated,\n    TaskUpdated,\n    TaskAssigned,\n    DueDateReminder,\n    Mention,\n}\n\n// WebSocket handler\nasync fn websocket_handler(ws: WebSocketUpgrade, auth: AuthUser) -> Response {\n    ws.on_upgrade(|socket| handle_socket(socket, auth.user_id))\n}\n\n// Redis pub/sub message\nasync fn broadcast_task_update(task_id: Uuid, notification_type: NotificationType)\n```",
+      "id": "5",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "WebSocket connection tests with 1000+ concurrent connections, Redis pub/sub message delivery verification, FCM integration tests, email notification delivery tests, user preference filtering validation",
+      "title": "Build real-time notifications with WebSocket and push integration"
+    },
+    {
+      "agentHint": "bolt",
+      "dependencies": [
+        "5"
+      ],
+      "description": "Build responsive React dashboard with drag-and-drop Kanban board, team management UI, and complete Kubernetes deployment setup with observability",
+      "details": "1. Setup React 18 + TypeScript + Tailwind CSS project structure\n2. Implement Kanban board with react-beautiful-dnd for drag-and-drop\n3. Build team activity feed component with real-time WebSocket integration\n4. Create member management UI with role assignment\n5. Add dark/light theme support using Tailwind CSS\n6. Setup Kubernetes manifests with HPA for auto-scaling\n7. Configure Prometheus metrics endpoint (/metrics) with custom business metrics\n8. Ensure mobile responsiveness for all components\n\n```typescript\n// Kanban board component\ninterface Task {\n  id: string;\n  title: string;\n  status: 'todo' | 'in_progress' | 'done';\n  assignee?: User;\n  due_date?: string;\n}\n\nconst KanbanBoard: React.FC = () => {\n  const [tasks, setTasks] = useState<Task[]>([]);\n  \n  const onDragEnd = (result: DropResult) => {\n    // Update task status via API\n  };\n};\n\n// Kubernetes deployment\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: teamsync-api\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n      - name: api\n        image: teamsync:latest\n        resources:\n          requests: {cpu: 100m, memory: 128Mi}\n          limits: {cpu: 500m, memory: 512Mi}\n```",
+      "id": "6",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "React component unit tests with Jest/RTL, drag-and-drop functionality tests, WebSocket integration tests, mobile responsiveness validation, Kubernetes deployment verification, Prometheus metrics endpoint testing",
+      "title": "Create React dashboard with Kanban board and deployment configuration"
+    }
+  ]
+}

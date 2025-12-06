@@ -1,0 +1,25 @@
+# Runtime image with tasks CLI for Kind testing
+# Multi-stage build: compile tasks for Linux, then add to runtime
+
+# ===== BUILDER STAGE =====
+FROM rust:latest AS builder
+
+WORKDIR /build
+
+# Copy entire workspace for proper dependency resolution
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+
+# Build only the tasks package
+RUN cargo build --release --package tasks --bin tasks
+
+# ===== RUNTIME STAGE =====
+FROM ghcr.io/5dlabs/runtime:kind-local
+
+# Copy tasks binary from builder
+COPY --from=builder /build/target/release/tasks /usr/local/bin/tasks
+RUN chmod +x /usr/local/bin/tasks
+
+# Verify installation
+RUN tasks --version 2>&1 || tasks --help 2>&1 | head -5
+

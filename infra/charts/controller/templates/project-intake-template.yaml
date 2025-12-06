@@ -1,7 +1,7 @@
 {{- if .Values.argo.enabled }}
 ---
 # Argo Workflow Template for Unified Project Intake
-# This template processes new project PRDs, generates TaskMaster tasks,
+# This template processes new project PRDs, generates tasks,
 # enriches context via Firecrawl, and creates comprehensive documentation
 # in a single operation.
 
@@ -174,14 +174,14 @@ spec:
         image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
         imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
         command: ["/bin/bash"]
-        args: ["/agent-templates/intake_unified-intake.sh"]
+        args: ["/templates/intake_unified-intake.sh"]
         workingDir: /workspace
         volumeMounts:
           - name: intake-files
             mountPath: /intake-files
             readOnly: true
-          - name: agent-templates
-            mountPath: /agent-templates
+          - name: templates
+            mountPath: /templates
             readOnly: true
           - name: agents-config
             mountPath: /config/agents

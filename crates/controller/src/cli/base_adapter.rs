@@ -63,13 +63,13 @@ impl AdapterConfig {
 
             let repo_relative = manifest_dir
                 .map(PathBuf::from)
-                .map(|dir| dir.join("../../infra/charts/controller/agent-templates"))
+                .map(|dir| dir.join("../../infra/charts/controller/templates"))
                 .filter(|path| path.exists());
 
             if let Some(path) = repo_relative {
                 path
             } else {
-                PathBuf::from("/agent-templates")
+                PathBuf::from("/templates")
             }
         };
         Self {

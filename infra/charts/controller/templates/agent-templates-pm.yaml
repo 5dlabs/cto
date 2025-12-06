@@ -4,15 +4,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "controller.fullname" . }}-agent-templates-pm
+  name: {{ include "controller.fullname" . }}-templates-pm
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "controller.labels" . | nindent 4 }}
-    app.kubernetes.io/component: agent-templates
+    app.kubernetes.io/component: templates
     template-type: pm
 data:
 {{- $files := .Files }}
-{{- range $path, $_ := .Files.Glob "agent-templates/pm/**.hbs" }}
+{{- range $path, $_ := .Files.Glob "templates/pm/**.hbs" }}
   {{ base $path }}: |
 {{ $files.Get $path | indent 4 }}
 {{- end }}

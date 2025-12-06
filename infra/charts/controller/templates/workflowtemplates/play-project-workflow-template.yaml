@@ -485,18 +485,18 @@ spec:
 
           # Resilient task directory discovery - check both possible locations
           TASK_DIR=""
-          if [ -d ".taskmaster/docs" ] && [ -n "$(ls -A .taskmaster/docs/task-* 2>/dev/null)" ]; then
-            TASK_DIR=".taskmaster/docs"
+          if [ -d ".tasks/docs" ] && [ -n "$(ls -A .tasks/docs/task-* 2>/dev/null)" ]; then
+            TASK_DIR=".tasks/docs"
             echo "✓ Found task files in docs/ directory"
-          elif [ -d ".taskmaster/tasks" ] && [ -n "$(ls -A .taskmaster/tasks/task-* 2>/dev/null)" ]; then
-            TASK_DIR=".taskmaster/tasks"
+          elif [ -d ".tasks/tasks" ] && [ -n "$(ls -A .tasks/tasks/task-* 2>/dev/null)" ]; then
+            TASK_DIR=".tasks/tasks"
             echo "✓ Found task files in tasks/ directory"
           fi
 
           if [ -z "$TASK_DIR" ]; then
-            echo "❌ No TaskMaster task directories found. Checked:"
-            echo "   - .taskmaster/docs/task-*"
-            echo "   - .taskmaster/tasks/task-*"
+            echo "❌ No tasks task directories found. Checked:"
+            echo "   - .tasks/docs/task-*"
+            echo "   - .tasks/tasks/task-*"
             # Create empty output files so Argo can read them
             echo "" > /tmp/task-list.txt
             echo "0" > /tmp/task-count.txt
@@ -602,7 +602,7 @@ spec:
 
           set -e
 
-          echo "📊 Building dependency graph from TaskMaster data..."
+          echo "📊 Building dependency graph from tasks data..."
           echo "   Workflow: {{`{{workflow.name}}`}}"
           echo "   Docs repository: {{`{{workflow.parameters.docs-repository}}`}}"
           echo "   Docs directory: {{`{{inputs.parameters.docs-directory}}`}}"
@@ -698,10 +698,10 @@ spec:
 
           cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
 
-          # Check for .taskmaster/tasks/tasks.json
-          TASKS_JSON=".taskmaster/tasks/tasks.json"
+          # Check for .tasks/tasks/tasks.json
+          TASKS_JSON=".tasks/tasks/tasks.json"
           if [ ! -f "$TASKS_JSON" ]; then
-            echo "❌ TaskMaster tasks.json not found: $TASKS_JSON"
+            echo "❌ tasks tasks.json not found: $TASKS_JSON"
             exit 1
           fi
 
@@ -1934,7 +1934,7 @@ spec:
       volumes:
         - name: pm-templates
           configMap:
-            name: {{ include "controller.fullname" . }}-agent-templates-pm
+            name: {{ include "controller.fullname" . }}-templates-pm
             defaultMode: 0755
 
 {{- end }}

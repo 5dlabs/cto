@@ -1,0 +1,550 @@
+# Realistic Test Scenarios for Each Agent
+# These scenarios represent typical tasks each agent would handle
+
+# =============================================================================
+# CODING AGENTS (Language Specialists)
+# =============================================================================
+
+rex:
+  name: "Rex"
+  specialty: "Rust Systems Programming"
+  scenario:
+    title: "Add async retry logic to HTTP client"
+    description: |
+      Implement exponential backoff retry logic for the HTTP client in the 
+      controller crate. The retry should handle transient network failures
+      and rate limiting (429) responses.
+    repository: "5dlabs/cto"
+    working_directory: "crates/controller"
+    task_prompt: |
+      ## Task: Implement Retry Logic for HTTP Client
+      
+      Add exponential backoff retry logic to `src/http/client.rs`.
+      
+      ### Requirements
+      - Retry on connection errors and 429/503 status codes
+      - Exponential backoff: 100ms, 200ms, 400ms, 800ms, max 5 retries
+      - Use tokio for async delays
+      - Add jitter to prevent thundering herd
+      - Log retry attempts with tracing
+      
+      ### Acceptance Criteria
+      - [ ] New `RetryConfig` struct with configurable parameters
+      - [ ] `with_retry()` wrapper function for reqwest requests  
+      - [ ] Unit tests for retry logic
+      - [ ] Integration test with mock server
+    expected_tools:
+      - context7 (tokio async patterns)
+      - codebase_search (existing HTTP code)
+      - file editing
+    success_markers:
+      - "RetryConfig"
+      - "exponential_backoff"
+      - "tokio::time::sleep"
+
+blaze:
+  name: "Blaze"
+  specialty: "Frontend React/TypeScript"
+  scenario:
+    title: "Create responsive data table component"
+    description: |
+      Build a reusable DataTable component with sorting, filtering, 
+      pagination, and responsive design for the admin dashboard.
+    repository: "5dlabs/console"
+    working_directory: "src/components"
+    task_prompt: |
+      ## Task: Create DataTable Component
+      
+      Build a responsive data table for `src/components/DataTable/`.
+      
+      ### Requirements
+      - Column sorting (click headers)
+      - Text search filtering
+      - Pagination with configurable page size
+      - Responsive: stack on mobile, scroll on tablet, full on desktop
+      - Keyboard navigation support
+      - Loading and empty states
+      
+      ### Tech Stack
+      - React 18 with TypeScript
+      - TailwindCSS for styling
+      - React Table v8 for table logic
+      
+      ### Acceptance Criteria
+      - [ ] DataTable component with TypeScript generics
+      - [ ] Storybook stories for all states
+      - [ ] Unit tests with React Testing Library
+      - [ ] Responsive breakpoints working
+    expected_tools:
+      - context7 (react-table docs)
+      - codebase_search (existing components)
+      - file editing
+    success_markers:
+      - "DataTable"
+      - "useReactTable"
+      - "tailwind"
+
+grizz:
+  name: "Grizz"
+  specialty: "Go Backend Services"
+  scenario:
+    title: "Implement rate limiter middleware"
+    description: |
+      Add a token bucket rate limiter middleware for the API gateway
+      with per-client tracking and Redis backing for distributed deployments.
+    repository: "5dlabs/gateway"
+    working_directory: "internal/middleware"
+    task_prompt: |
+      ## Task: Rate Limiter Middleware
+      
+      Implement rate limiting in `internal/middleware/ratelimit.go`.
+      
+      ### Requirements
+      - Token bucket algorithm
+      - Per-client rate limiting (by API key or IP)
+      - Redis backend for distributed rate limit state
+      - Configurable limits per route
+      - Return proper 429 responses with Retry-After header
+      
+      ### Tech Stack
+      - Go 1.21+
+      - go-redis/redis for Redis client
+      - chi router middleware interface
+      
+      ### Acceptance Criteria
+      - [ ] RateLimiter struct with token bucket implementation
+      - [ ] Redis storage adapter
+      - [ ] Middleware function for chi router
+      - [ ] Unit tests with mock Redis
+      - [ ] Benchmark tests for performance
+    expected_tools:
+      - context7 (go-redis patterns)
+      - codebase_search (existing middleware)
+      - file editing
+    success_markers:
+      - "TokenBucket"
+      - "redis.Client"
+      - "Retry-After"
+
+nova:
+  name: "Nova"
+  specialty: "Node.js/TypeScript Backend"
+  scenario:
+    title: "Add WebSocket real-time notifications"
+    description: |
+      Implement WebSocket support for real-time notifications in the 
+      NestJS backend, with Redis pub/sub for horizontal scaling.
+    repository: "5dlabs/api"
+    working_directory: "src/notifications"
+    task_prompt: |
+      ## Task: WebSocket Notifications
+      
+      Add real-time notifications via WebSocket in `src/notifications/`.
+      
+      ### Requirements
+      - NestJS WebSocket gateway with Socket.io
+      - Redis adapter for multi-instance support
+      - JWT authentication for WebSocket connections
+      - Typed events with TypeScript
+      - Reconnection handling on client disconnect
+      
+      ### Tech Stack
+      - NestJS with @nestjs/websockets
+      - Socket.io with Redis adapter
+      - TypeScript strict mode
+      
+      ### Acceptance Criteria
+      - [ ] NotificationsGateway with handleConnection/handleDisconnect
+      - [ ] Redis pub/sub adapter configuration
+      - [ ] Authentication guard for WebSocket
+      - [ ] E2E tests for WebSocket connections
+      - [ ] Client SDK types exported
+    expected_tools:
+      - context7 (nestjs websockets)
+      - codebase_search (existing NestJS code)
+      - file editing
+    success_markers:
+      - "@WebSocketGateway"
+      - "RedisAdapter"
+      - "socket.io"
+
+tap:
+  name: "Tap"
+  specialty: "Expo/React Native Mobile"
+  scenario:
+    title: "Implement biometric authentication"
+    description: |
+      Add Face ID/Touch ID authentication option for the mobile app
+      using expo-local-authentication with secure token storage.
+    repository: "5dlabs/mobile"
+    working_directory: "src/features/auth"
+    task_prompt: |
+      ## Task: Biometric Authentication
+      
+      Add biometric auth in `src/features/auth/biometric/`.
+      
+      ### Requirements
+      - Face ID / Touch ID support via expo-local-authentication
+      - Secure storage of auth tokens with expo-secure-store
+      - Fallback to PIN/password if biometrics unavailable
+      - Settings screen to enable/disable biometric login
+      - Works on both iOS and Android
+      
+      ### Tech Stack
+      - Expo SDK 50
+      - expo-local-authentication
+      - expo-secure-store
+      - React Native with TypeScript
+      
+      ### Acceptance Criteria
+      - [ ] useBiometricAuth hook
+      - [ ] BiometricPrompt component
+      - [ ] Secure token storage utilities
+      - [ ] Platform-specific handling (iOS/Android)
+      - [ ] Unit tests with mocked native modules
+    expected_tools:
+      - context7 (expo-local-authentication)
+      - codebase_search (existing auth code)
+      - file editing
+    success_markers:
+      - "LocalAuthentication"
+      - "SecureStore"
+      - "biometricType"
+
+spark:
+  name: "Spark"
+  specialty: "Electron Desktop Apps"
+  scenario:
+    title: "Add system tray with quick actions"
+    description: |
+      Implement system tray icon with context menu for quick actions
+      like starting/stopping services, opening settings, and showing status.
+    repository: "5dlabs/desktop"
+    working_directory: "src/main"
+    task_prompt: |
+      ## Task: System Tray Integration
+      
+      Add system tray support in `src/main/tray.ts`.
+      
+      ### Requirements
+      - System tray icon with dynamic status indicator
+      - Context menu with: Start/Stop, Settings, About, Quit
+      - Click to show/hide main window
+      - Native notifications for status changes
+      - Platform-specific icons (macOS template, Windows ICO)
+      
+      ### Tech Stack
+      - Electron 28
+      - TypeScript
+      - electron-builder for packaging
+      
+      ### Acceptance Criteria
+      - [ ] TrayManager class with lifecycle management
+      - [ ] Dynamic icon updates based on app state
+      - [ ] Cross-platform context menu
+      - [ ] IPC handlers for renderer communication
+      - [ ] Proper cleanup on app quit
+    expected_tools:
+      - context7 (electron tray API)
+      - codebase_search (existing main process code)
+      - file editing
+    success_markers:
+      - "Tray"
+      - "nativeImage"
+      - "Menu.buildFromTemplate"
+
+# =============================================================================
+# SPECIALIZED AGENTS
+# =============================================================================
+
+bolt:
+  name: "Bolt"
+  specialty: "CI/CD & Deployment"
+  scenario:
+    title: "Add blue-green deployment to Kubernetes"
+    description: |
+      Implement blue-green deployment strategy for the production cluster
+      with automated rollback on health check failures.
+    repository: "5dlabs/infra"
+    working_directory: "k8s/deployments"
+    task_prompt: |
+      ## Task: Blue-Green Deployment
+      
+      Implement blue-green deployment in `k8s/deployments/`.
+      
+      ### Requirements
+      - Blue and green deployment manifests
+      - Service switching via label selectors
+      - Health check validation before switch
+      - Automated rollback on failure
+      - ArgoCD integration for GitOps
+      
+      ### Acceptance Criteria
+      - [ ] Blue/green deployment templates
+      - [ ] Switch script with health validation
+      - [ ] Rollback procedure documented
+      - [ ] ArgoCD Application manifest
+      - [ ] Runbook for manual intervention
+    expected_tools:
+      - codebase_search (existing k8s manifests)
+      - file editing
+    success_markers:
+      - "blue-green"
+      - "selector"
+      - "rollback"
+
+cipher:
+  name: "Cipher"
+  specialty: "Security & Vulnerability Scanning"
+  scenario:
+    title: "Fix SQL injection vulnerability"
+    description: |
+      Remediate SQL injection vulnerability in the user search endpoint
+      by implementing parameterized queries and input validation.
+    repository: "5dlabs/api"
+    working_directory: "src/users"
+    task_prompt: |
+      ## Task: Fix SQL Injection (CVE-2024-XXXX)
+      
+      Remediate SQL injection in `src/users/search.ts`.
+      
+      ### Vulnerability
+      The user search endpoint concatenates user input directly into SQL:
+      ```
+      const query = `SELECT * FROM users WHERE name LIKE '%${search}%'`;
+      ```
+      
+      ### Requirements
+      - Use parameterized queries with prepared statements
+      - Add input validation and sanitization
+      - Implement query builder pattern
+      - Add SQL injection test cases
+      - Update security documentation
+      
+      ### Acceptance Criteria
+      - [ ] Parameterized query implementation
+      - [ ] Input validation middleware
+      - [ ] Security test cases passing
+      - [ ] No raw SQL concatenation in codebase
+      - [ ] Security review checklist completed
+    expected_tools:
+      - codebase_search (SQL queries)
+      - grep (finding vulnerable patterns)
+      - file editing
+    success_markers:
+      - "parameterized"
+      - "prepared statement"
+      - "validation"
+
+cleo:
+  name: "Cleo"
+  specialty: "Code Quality & Standards"
+  scenario:
+    title: "Enforce consistent error handling"
+    description: |
+      Review and standardize error handling patterns across the codebase,
+      implementing a consistent error hierarchy and logging strategy.
+    repository: "5dlabs/cto"
+    working_directory: "crates"
+    task_prompt: |
+      ## Task: Standardize Error Handling
+      
+      Implement consistent error handling across all crates.
+      
+      ### Current Issues
+      - Mix of anyhow::Error and custom error types
+      - Inconsistent error context/messages
+      - Missing error codes for API responses
+      - Logs don't include error chain
+      
+      ### Requirements
+      - Define error hierarchy with thiserror
+      - Consistent error context pattern
+      - Error codes enum for API
+      - Structured logging with tracing
+      
+      ### Acceptance Criteria
+      - [ ] Error types defined in each crate
+      - [ ] All functions use Result with proper types
+      - [ ] Error context added at boundaries
+      - [ ] API errors have stable codes
+      - [ ] Documentation for error handling
+    expected_tools:
+      - codebase_search (error patterns)
+      - grep (anyhow usage)
+      - file editing
+    success_markers:
+      - "thiserror"
+      - "error code"
+      - "context"
+
+tess:
+  name: "Tess"
+  specialty: "Testing & QA"
+  scenario:
+    title: "Add integration test suite for API"
+    description: |
+      Create comprehensive integration tests for the REST API
+      using testcontainers for database and external service mocking.
+    repository: "5dlabs/api"
+    working_directory: "tests/integration"
+    task_prompt: |
+      ## Task: API Integration Tests
+      
+      Build integration test suite in `tests/integration/`.
+      
+      ### Requirements
+      - Testcontainers for PostgreSQL and Redis
+      - Test fixtures with factory pattern
+      - API client wrapper for typed requests
+      - Coverage for all CRUD endpoints
+      - CI pipeline integration
+      
+      ### Test Categories
+      - Authentication flows
+      - User management
+      - Resource CRUD operations
+      - Error scenarios
+      - Rate limiting behavior
+      
+      ### Acceptance Criteria
+      - [ ] Test setup with testcontainers
+      - [ ] Factory functions for test data
+      - [ ] Tests for all API endpoints
+      - [ ] CI configuration for test run
+      - [ ] Coverage report generation
+    expected_tools:
+      - codebase_search (existing tests)
+      - file editing
+    success_markers:
+      - "testcontainers"
+      - "fixture"
+      - "integration"
+
+stitch:
+  name: "Stitch"
+  specialty: "Code Review & PR Management"
+  scenario:
+    title: "Review and improve PR #1234"
+    description: |
+      Review the authentication refactor PR, checking for security issues,
+      code quality, and providing constructive feedback.
+    repository: "5dlabs/api"
+    working_directory: "."
+    task_prompt: |
+      ## Task: Review PR #1234 - Auth Refactor
+      
+      Perform thorough code review of the authentication refactor.
+      
+      ### Review Checklist
+      - [ ] Security: No credentials in code, proper token handling
+      - [ ] Performance: No N+1 queries, efficient caching
+      - [ ] Testing: Adequate coverage, edge cases handled
+      - [ ] Documentation: API changes documented
+      - [ ] Breaking changes: Migration path clear
+      
+      ### Focus Areas
+      - JWT token validation logic
+      - Session management changes
+      - Database schema migrations
+      - API contract changes
+      
+      ### Deliverables
+      - Line-by-line review comments
+      - Security findings (if any)
+      - Suggested improvements
+      - Approval or request changes
+    expected_tools:
+      - github (PR diff)
+      - codebase_search (related code)
+    success_markers:
+      - "review"
+      - "suggestion"
+      - "approve"
+
+morgan:
+  name: "Morgan"
+  specialty: "Documentation & Product"
+  scenario:
+    title: "Create API documentation from OpenAPI spec"
+    description: |
+      Generate comprehensive API documentation from the OpenAPI spec,
+      including examples, error codes, and integration guides.
+    repository: "5dlabs/docs"
+    working_directory: "api"
+    task_prompt: |
+      ## Task: API Documentation
+      
+      Create developer documentation in `api/`.
+      
+      ### Requirements
+      - Parse OpenAPI 3.0 spec
+      - Generate endpoint documentation
+      - Add request/response examples
+      - Document error codes and handling
+      - Create quickstart guide
+      - Add authentication section
+      
+      ### Output Files
+      - `getting-started.md`
+      - `authentication.md`
+      - `endpoints/` directory with per-resource docs
+      - `errors.md`
+      - `examples/` with code samples
+      
+      ### Acceptance Criteria
+      - [ ] All endpoints documented
+      - [ ] Working code examples
+      - [ ] Error codes table
+      - [ ] Authentication guide
+      - [ ] Links validated
+    expected_tools:
+      - file reading (OpenAPI spec)
+      - file editing
+    success_markers:
+      - "endpoint"
+      - "example"
+      - "authentication"
+
+atlas:
+  name: "Atlas"
+  specialty: "Git Integration & Merging"
+  scenario:
+    title: "Resolve merge conflicts in feature branch"
+    description: |
+      Integrate the long-running feature branch with main, resolving
+      conflicts while preserving both sets of changes correctly.
+    repository: "5dlabs/cto"
+    working_directory: "."
+    task_prompt: |
+      ## Task: Merge Feature Branch
+      
+      Integrate `feature/new-scheduler` into `main`.
+      
+      ### Conflict Areas
+      - `src/scheduler/mod.rs` - Both branches modified
+      - `Cargo.toml` - Dependency version conflicts
+      - `tests/scheduler_tests.rs` - New tests on both sides
+      
+      ### Requirements
+      - Preserve all functionality from both branches
+      - Resolve Cargo.toml to latest compatible versions
+      - Merge test files keeping all test cases
+      - Ensure CI passes after merge
+      - No loss of commit history
+      
+      ### Acceptance Criteria
+      - [ ] All conflicts resolved
+      - [ ] Both feature sets working
+      - [ ] Tests passing
+      - [ ] Clean git history
+      - [ ] No regression in functionality
+    expected_tools:
+      - git operations
+      - codebase_search
+      - file editing
+    success_markers:
+      - "merge"
+      - "conflict"
+      - "resolved"
+

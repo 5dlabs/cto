@@ -127,11 +127,11 @@ agents:
       **Project Management Mode:**
       When running as a project manager daemon:
       - Create and maintain GitHub Projects for workflow visibility
-      - Create GitHub Issues for each TaskMaster task
+      - Create GitHub Issues for each task
       - Monitor workflow progress via Kubernetes API
       - Update Project status fields in real-time
       - Process human feedback from issue comments
-      - Maintain bidirectional sync between TaskMaster and GitHub
+      - Maintain bidirectional sync between tasks and GitHub
     tools:
       remote: []
 
@@ -1341,6 +1341,30 @@ notifications:
     # Secret containing DISCORD_WEBHOOK_URL (synced from Vault)
     secretName: "cto-notifications-secrets"
     secretKey: "DISCORD_WEBHOOK_URL"
+
+# Linear integration configuration
+linear:
+  # Master switch to enable Linear integration
+  enabled: false
+  # Webhook configuration
+  webhook:
+    # Secret containing LINEAR_WEBHOOK_SECRET (synced from Vault)
+    secretName: "cto-linear-secrets"
+    secretKey: "LINEAR_WEBHOOK_SECRET"
+    # Maximum age for webhook timestamps in milliseconds (default: 60 seconds)
+    maxTimestampAgeMs: 60000
+  # OAuth configuration
+  oauth:
+    # Secret containing LINEAR_ACCESS_TOKEN (synced from Vault)
+    secretName: "cto-linear-secrets"
+    accessTokenKey: "LINEAR_ACCESS_TOKEN"
+  # Agent configuration
+  agent:
+    # Team ID in Linear for creating issues
+    teamId: ""
+    # Default labels to apply to created issues
+    defaultLabels:
+      - "cto-managed"
 
 # Health checks
 healthCheck:

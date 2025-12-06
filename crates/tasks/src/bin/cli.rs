@@ -8,6 +8,7 @@
 #![allow(clippy::disallowed_macros)]
 #![allow(clippy::uninlined_format_args)]
 
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -15,7 +16,10 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 
 use tasks::ai::schemas::ComplexityReport;
-use tasks::domain::{AIDomain, ConfigDomain, DependencyDomain, TagsDomain, TasksDomain};
+use tasks::domain::{
+    docs::generate_all_docs, AIDomain, ConfigDomain, DependencyDomain, IntakeConfig, IntakeDomain,
+    TagsDomain, TasksDomain,
+};
 use tasks::entities::{TaskPriority, TaskStatus};
 use tasks::errors::TasksError;
 use tasks::storage::FileStorage;
@@ -397,6 +401,67 @@ enum Commands {
         /// AI model to use
         #[arg(long)]
         model: Option<String>,
+
+        /// Tag context
+        #[arg(long)]
+        tag: Option<String>,
+    },
+
+    /// Generate individual task files
+    Generate {
+        /// Output directory (default: same as tasks file)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Tag context
+        #[arg(long)]
+        tag: Option<String>,
+    },
+
+    /// Run complete intake workflow: PRD → tasks → docs
+    Intake {
+        /// Path to the PRD file
+        #[arg(long, default_value = ".tasks/docs/prd.txt")]
+        prd: PathBuf,
+
+        /// Path to the architecture file (optional)
+        #[arg(long)]
+        architecture: Option<PathBuf>,
+
+        /// Number of tasks to generate (0 = auto)
+        #[arg(short, long, default_value = "15")]
+        num_tasks: i32,
+
+        /// Skip task expansion into subtasks
+        #[arg(long)]
+        no_expand: bool,
+
+        /// Skip complexity analysis
+        #[arg(long)]
+        no_analyze: bool,
+
+        /// Complexity threshold (1-10) for expansion
+        #[arg(long, default_value = "5")]
+        threshold: i32,
+
+        /// Use research mode for AI operations
+        #[arg(short, long)]
+        research: bool,
+
+        /// AI model to use
+        #[arg(long)]
+        model: Option<String>,
+
+        /// Output directory (default: .tasks)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Generate documentation (XML, MD) for all tasks
+    GenerateDocs {
+        /// Output directory for docs (default: .tasks/docs)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
 
         /// Tag context
         #[arg(long)]
@@ -1374,6 +1439,206 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 "Tokens used: {} in, {} out",
                 usage.input_tokens, usage.output_tokens
             ));
+        }
+
+        Commands::Generate { output, tag } => {
+            check_initialized(&tasks_domain).await?;
+
+            let tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
+
+            if tasks.is_empty() {
+                ui::print_info("No tasks to generate files for");
+                return Ok(());
+            }
+
+            // Determine output directory
+            let output_dir = output.unwrap_or_else(|| project_path.join(".tasks").join("tasks"));
+            tokio::fs::create_dir_all(&output_dir).await?;
+
+            let mut generated = 0;
+            for task in &tasks {
+                // Zero-pad task ID to 3 digits for proper sorting
+                let padded_id = format!("{:0>3}", task.id);
+                let task_file = output_dir.join(format!("task-{padded_id}.md"));
+
+                // Generate markdown content
+                let mut content = String::new();
+                writeln!(content, "# Task {}: {}\n", task.id, task.title).ok();
+                writeln!(content, "**Status:** {}", task.status).ok();
+                writeln!(content, "**Priority:** {}", task.priority).ok();
+
+                if !task.dependencies.is_empty() {
+                    writeln!(
+                        content,
+                        "**Dependencies:** {}",
+                        task.dependencies.join(", ")
+                    )
+                    .ok();
+                }
+                content.push('\n');
+
+                content.push_str("## Description\n\n");
+                content.push_str(&task.description);
+                content.push_str("\n\n");
+
+                if !task.details.is_empty() {
+                    content.push_str("## Implementation Details\n\n");
+                    content.push_str(&task.details);
+                    content.push_str("\n\n");
+                }
+
+                if !task.test_strategy.is_empty() {
+                    content.push_str("## Test Strategy\n\n");
+                    content.push_str(&task.test_strategy);
+                    content.push_str("\n\n");
+                }
+
+                // Include subtasks if any
+                if !task.subtasks.is_empty() {
+                    content.push_str("## Subtasks\n\n");
+                    for subtask in &task.subtasks {
+                        writeln!(
+                            content,
+                            "- [ ] **{}.{}** {} ({})",
+                            task.id, subtask.id, subtask.title, subtask.status
+                        )
+                        .ok();
+                        if !subtask.description.is_empty() {
+                            writeln!(content, "  - {}", subtask.description).ok();
+                        }
+                    }
+                    content.push('\n');
+                }
+
+                tokio::fs::write(&task_file, &content).await.map_err(|e| {
+                    TasksError::FileWriteError {
+                        path: task_file.display().to_string(),
+                        reason: e.to_string(),
+                    }
+                })?;
+
+                generated += 1;
+            }
+
+            ui::print_success(&format!(
+                "Generated {} task file(s) in {}",
+                generated,
+                output_dir.display()
+            ));
+        }
+
+        Commands::Intake {
+            prd,
+            architecture,
+            num_tasks,
+            no_expand,
+            no_analyze,
+            threshold,
+            research,
+            model,
+            output,
+        } => {
+            // Initialize if not already
+            if !tasks_domain.is_initialized().await? {
+                tasks_domain.init().await?;
+                ui::print_info("Initialized tasks structure");
+            }
+
+            // Verify PRD exists
+            if !prd.exists() {
+                return Err(TasksError::FileReadError {
+                    path: prd.display().to_string(),
+                    reason: "PRD file not found".to_string(),
+                });
+            }
+
+            let output_dir = output.unwrap_or_else(|| project_path.join(".tasks"));
+
+            let config = IntakeConfig {
+                prd_path: prd,
+                architecture_path: architecture,
+                num_tasks,
+                expand: !no_expand,
+                analyze: !no_analyze,
+                complexity_threshold: threshold,
+                research,
+                model,
+                output_dir: output_dir.clone(),
+            };
+
+            ui::print_info("Starting intake workflow...");
+            ui::print_info(&format!("  PRD: {}", config.prd_path.display()));
+            if let Some(arch) = &config.architecture_path {
+                ui::print_info(&format!("  Architecture: {}", arch.display()));
+            }
+            ui::print_info(&format!("  Target tasks: ~{}", config.num_tasks));
+            ui::print_info(&format!("  Expand: {}", config.expand));
+            ui::print_info(&format!("  Analyze: {}", config.analyze));
+
+            let intake_domain =
+                IntakeDomain::new(Arc::clone(&storage) as Arc<dyn tasks::storage::Storage>);
+            let result = intake_domain.run(&config).await?;
+
+            println!();
+            ui::print_success("Intake complete!");
+            println!();
+            println!("{}", "Summary:".bold());
+            println!("  {} Tasks generated: {}", "•".cyan(), result.tasks_count);
+            println!(
+                "  {} Subtasks generated: {}",
+                "•".cyan(),
+                result.subtasks_count
+            );
+            println!(
+                "  {} Documentation dirs: {}",
+                "•".cyan(),
+                result.docs_result.task_dirs_created
+            );
+            println!(
+                "  {} Tokens used: {} in, {} out",
+                "•".cyan(),
+                result.total_input_tokens,
+                result.total_output_tokens
+            );
+            println!();
+            ui::print_info(&format!("Tasks saved to: {}", result.tasks_file.display()));
+            ui::print_info(&format!(
+                "Docs saved to: {}",
+                output_dir.join("docs").display()
+            ));
+        }
+
+        Commands::GenerateDocs { output, tag } => {
+            check_initialized(&tasks_domain).await?;
+
+            let tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
+
+            if tasks.is_empty() {
+                ui::print_info("No tasks to generate documentation for");
+                return Ok(());
+            }
+
+            let output_dir = output.unwrap_or_else(|| project_path.join(".tasks").join("docs"));
+
+            ui::print_info(&format!(
+                "Generating documentation for {} tasks...",
+                tasks.len()
+            ));
+
+            let result = generate_all_docs(&tasks, &output_dir).await?;
+
+            ui::print_success(&format!(
+                "Generated documentation for {} tasks",
+                result.task_dirs_created
+            ));
+            println!("  {} XML files: {}", "•".cyan(), result.xml_files);
+            println!("  {} Prompt files: {}", "•".cyan(), result.prompt_files);
+            println!(
+                "  {} Acceptance criteria files: {}",
+                "•".cyan(),
+                result.acceptance_files
+            );
+            ui::print_info(&format!("Output directory: {}", output_dir.display()));
         }
     }
 

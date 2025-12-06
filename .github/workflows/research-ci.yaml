@@ -1,0 +1,239 @@
+---
+name: Research CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/research/**'
+      - 'infra/images/research/**'
+      - '.github/workflows/research-ci.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/research/**'
+      - 'infra/images/research/**'
+      - '.github/workflows/research-ci.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      research: ${{ steps.filter.outputs.research }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            research:
+              - 'crates/research/**'
+              - '!crates/research/**/*.md'
+            docker:
+              - 'infra/images/research/**'
+
+  # Rust linting (format + clippy pedantic)
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    outputs:
+      format-needed: ${{ steps.format-check.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-research-ci"
+
+      - name: Check formatting
+        id: format-check
+        run: |
+          echo "🔧 Checking cargo fmt..."
+          if ! cargo fmt -p research -- --check; then
+            echo "📝 Formatting issues detected"
+            echo "format-needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "format-needed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ Code formatting is correct"
+          fi
+
+      - name: Run Clippy (pedantic)
+        env:
+          # Disable default RUSTFLAGS from setup-rust-toolchain so crate's Cargo.toml
+          # lint configuration (pedantic deny + specific allows) is respected
+          RUSTFLAGS: ""
+        run: |
+          echo "🔍 Running clippy with pedantic warnings..."
+          # Use crate's Cargo.toml lint configuration (pedantic deny + specific allows)
+          cargo clippy -p research --all-targets
+
+  # Run tests
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-research-ci"
+
+      - name: Run all tests
+        run: |
+          echo "🧪 Running all research tests..."
+          cargo test -p research --all-targets
+
+  # Build check (ensure it compiles for release)
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-research-ci"
+
+      - name: Build release binary
+        run: |
+          echo "🔨 Building research binary..."
+          cargo build -p research --release --bin research
+          echo "✅ Release build successful"
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/images/research/Dockerfile
+          failure-threshold: warning
+
+  # Build and push Docker image (only on push to main, not PRs)
+  build-docker:
+    needs: [lint-rust, test-rust, build-check, docker-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup optimized Rust environment
+        run: |
+          echo "🚀 Setting up optimized Rust build environment..."
+          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          # Check if both rustc and cargo are available and working
+          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+            echo "✅ Rust toolchain ready: $(rustc --version)"
+          else
+            echo "🔧 Installing/repairing Rust toolchain..."
+            rustup toolchain uninstall stable 2>/dev/null || true
+            for _ in 1 2 3; do
+              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+              if rustup toolchain install stable && rustup default stable; then
+                break
+              fi
+            done
+          fi
+
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
+
+      - name: Build release binary
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+        run: |
+          echo "🔨 Building research for linux/amd64..."
+          cargo build -p research --release --bin research
+
+          # Copy binary to Docker context root
+          cp target/release/research research
+          chmod +x research
+
+          echo "✅ Binary copied to Docker context"
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/research/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "research") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./infra/images/research/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/research:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/research:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/research:${{ steps.version.outputs.short-sha }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## 🔬 Research Docker Image Built"
+            echo ""
+            echo "**Tags:**"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/research:latest\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/research:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/research:${{ steps.version.outputs.short-sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+

@@ -1,13 +1,13 @@
 //! Template paths for heal remediation agents.
 //!
-//! Heal templates are located in `/agent-templates/heal/{cli}/`
+//! Heal templates are located in `/templates/heal/{cli}/`
 //! where {cli} is either "claude" or "factory".
 
 /// Template path constants for heal agents.
-pub const HEAL_CLAUDE_AGENTS_TEMPLATE: &str = "/agent-templates/heal/claude/agents.md.hbs";
-pub const HEAL_CLAUDE_CONTAINER_TEMPLATE: &str = "/agent-templates/heal/claude/container.sh.hbs";
-pub const HEAL_FACTORY_AGENTS_TEMPLATE: &str = "/agent-templates/heal/factory/agents.md.hbs";
-pub const HEAL_FACTORY_CONTAINER_TEMPLATE: &str = "/agent-templates/heal/factory/container.sh.hbs";
+pub const HEAL_CLAUDE_AGENTS_TEMPLATE: &str = "/templates/heal/claude/agents.md.hbs";
+pub const HEAL_CLAUDE_CONTAINER_TEMPLATE: &str = "/templates/heal/claude/container.sh.hbs";
+pub const HEAL_FACTORY_AGENTS_TEMPLATE: &str = "/templates/heal/factory/agents.md.hbs";
+pub const HEAL_FACTORY_CONTAINER_TEMPLATE: &str = "/templates/heal/factory/container.sh.hbs";
 
 /// Template path utilities for heal remediation.
 pub struct HealTemplatePaths;
@@ -38,7 +38,7 @@ impl HealTemplatePaths {
             "factory" => "factory",
             _ => "claude",
         };
-        format!("/agent-templates/heal/{cli}")
+        format!("/templates/heal/{cli}")
     }
 }
 
@@ -90,11 +90,11 @@ mod tests {
     fn test_template_dir() {
         assert_eq!(
             HealTemplatePaths::template_dir("claude"),
-            "/agent-templates/heal/claude"
+            "/templates/heal/claude"
         );
         assert_eq!(
             HealTemplatePaths::template_dir("factory"),
-            "/agent-templates/heal/factory"
+            "/templates/heal/factory"
         );
     }
 }

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="13" priority="medium" agent="blaze">
+    <meta>
+        <title>Implement team activity feed and member management UI</title>
+        <priority>medium</priority>
+        <dependencies>12, 8</dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 13 with production-quality code.</role>
+
+    <context>
+        <overview>Create React components for displaying team activity timeline and managing team members with role assignment</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add activity_log table: (id uuid, team_id uuid, user_id uuid, action varchar, entity_type varchar, entity_id uuid, timestamp timestamptz)
+2. Create GET /api/teams/:id/activity endpoint:
+   - Return last 50 activities with user details
+3. Build React components:
+   - ActivityFeed.tsx: timeline view with icons for each action type
+   - MemberList.tsx: table with member name, role, actions
+   - RoleSelector.tsx: dropdown to change member role (owner/admin only)
+4. Implement member management endpoints:
+   - POST /api/teams/:id/members: add member via invite code
+   - PATCH /api/teams/:id/members/:user_id: update role
+   - DELETE /api/teams/:id/members/:user_id: remove member
+5. Log activities on task create/update/delete, member add/remove
+6. Real-time activity updates via WebSocket</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-13): Implement team activity feed and member management UI</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration test: perform actions, verify logged in activity_log. UI test: render activity feed, verify actions displayed. Test role change UI requires admin. Test member removal</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

@@ -35,6 +35,8 @@ pub struct FileStorage {
 
 impl FileStorage {
     /// Create a new file storage instance
+    ///
+    /// Uses `.tasks/` directory for project task storage.
     pub fn new(project_path: impl AsRef<Path>) -> Self {
         let project_path = project_path.as_ref().to_path_buf();
         let tasks_dir = project_path.join(".tasks");
@@ -249,6 +251,7 @@ impl Storage for FileStorage {
                             tags: Vec::new(),
                             assignee: subtask.assignee.clone(),
                             complexity: None,
+                            agent_hint: None,
                         }));
                     }
                 }

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="3" priority="high" agent="rex">
+    <meta>
+        <title>Build team management API endpoints</title>
+        <priority>high</priority>
+        <dependencies>2</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 3 with production-quality code.</role>
+
+    <context>
+        <overview>Implement CRUD operations for teams including creation, member management, and invite link generation with 7-day expiry</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create team and team_members database tables with foreign keys
+2. Implement POST /api/teams with name, description validation
+3. Add GET /api/teams/:id with member count aggregation
+4. Build PATCH /api/teams/:id for team settings updates
+5. Create invite link system with 7-day expiry using Redis
+6. Add team membership validation middleware
+
+```rust
+#[derive(sqlx::FromRow, Serialize)]
+struct Team {
+    id: Uuid,
+    name: String,
+    description: Option&lt;String&gt;,
+    created_at: DateTime&lt;Utc&gt;,
+    member_count: i64,
+}
+
+// POST /api/teams
+async fn create_team(auth: AuthUser, Json(payload): Json&lt;CreateTeamRequest&gt;) -&gt; Result&lt;Json&lt;Team&gt;&gt;
+
+// Invite link with Redis expiry
+async fn generate_invite(team_id: Uuid, redis: &amp;redis::Client) -&gt; Result&lt;String&gt;
+```</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-3): Build team management API endpoints</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>API integration tests for all team endpoints, test invite link expiry behavior, validate team ownership permissions, test member count accuracy</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

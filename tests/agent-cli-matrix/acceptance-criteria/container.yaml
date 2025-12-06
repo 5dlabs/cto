@@ -1,0 +1,97 @@
+# Container Script Acceptance Criteria
+# Defines what makes a valid container.sh output
+
+criteria:
+  # Must-have checks (test fails if any fail)
+  required:
+    - id: renders_without_error
+      description: "Template renders without Handlebars errors"
+      severity: critical
+
+    - id: not_empty
+      description: "Output is not empty"
+      severity: critical
+
+    - id: bash_script
+      description: "Contains bash shebang or set -e"
+      check: "contains_any(['#!/bin/bash', 'set -e', 'set -'])"
+      severity: critical
+
+    - id: has_cli_invoke
+      description: "Contains CLI-specific invocation"
+      check: "contains_cli_marker()"
+      severity: critical
+
+  # Structural checks
+  structure:
+    - id: has_header
+      description: "Contains header partial output (environment info)"
+      check: "contains('ENVIRONMENT CONFIGURATION')"
+      severity: high
+
+    - id: has_github_auth
+      description: "Contains GitHub authentication setup"
+      check: "contains_any(['GIT_AUTHOR_NAME', 'gh auth'])"
+      severity: high
+
+    - id: has_git_setup
+      description: "Contains Git repository setup"
+      check: "contains_any(['git clone', 'git config'])"
+      severity: high
+
+    - id: has_task_files
+      description: "Contains task file handling"
+      check: "contains('/task-files/')"
+      severity: high
+
+    - id: has_completion
+      description: "Contains completion marker handling"
+      check: "contains_any(['COMPLETION_MARKER', 'completion'])"
+      severity: medium
+
+  # Size checks
+  size:
+    - id: minimum_size
+      description: "Container script is at least 5KB (indicates all partials included)"
+      check: "size_bytes >= 5000"
+      severity: medium
+
+    - id: maximum_size
+      description: "Container script is less than 100KB (sanity check)"
+      check: "size_bytes <= 100000"
+      severity: low
+
+  # CLI-specific checks
+  cli_specific:
+    claude:
+      - id: claude_cli_present
+        description: "Contains Claude CLI invocation"
+        check: "contains_any(['claude', 'CLAUDE_CMD'])"
+
+    codex:
+      - id: codex_cli_present
+        description: "Contains Codex CLI invocation"
+        check: "contains_any(['codex', 'CODEX_CMD'])"
+
+    cursor:
+      - id: cursor_cli_present
+        description: "Contains Cursor CLI invocation"
+        check: "contains_any(['cursor', 'CURSOR_CMD'])"
+
+    factory:
+      - id: factory_cli_present
+        description: "Contains Factory CLI invocation"
+        check: "contains_any(['factory', 'FACTORY_CMD'])"
+
+    gemini:
+      - id: gemini_cli_present
+        description: "Contains Gemini CLI invocation"
+        check: "contains_any(['gemini', 'GEMINI_CMD'])"
+
+    opencode:
+      - id: opencode_cli_present
+        description: "Contains OpenCode CLI invocation"
+        check: "contains_any(['opencode', 'OPENCODE_CMD'])"
+
+
+

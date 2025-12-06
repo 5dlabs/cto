@@ -1,119 +1,36 @@
 #!/bin/bash
-# =============================================================================
-# Unified Intake Script - PRD Parsing + Documentation Generation
-# =============================================================================
-# This script combines the intake (PRD parsing, TaskMaster setup) and docs
-# generation workflows into a single operation.
-#
-# Phases:
-#   1. Repository setup and GitHub authentication
-#   2. TaskMaster initialization and PRD parsing
-#   3. Context enrichment via Firecrawl (optional)
-#   4. Documentation generation via Claude
-#   5. Single PR creation with complete project structure
-# =============================================================================
+set -euo pipefail
 
-set -e
-
-# Disable TaskMaster auto-update to prevent infinite loops in containerized environments
-export TASKMASTER_SKIP_AUTO_UPDATE=1
-export CI=1
-
-# Force output to be unbuffered
-exec 2>&1
-
-# =============================================================================
-# Error Handling - Prevent Silent Failures
-# =============================================================================
-# Write errors to shared PVC before exit to prevent silent failures (A2 alerts)
-INTAKE_ERROR_DIR="${WORKSPACE_PVC:-/workspace}/intake-errors"
-INTAKE_POD_NAME="${POD_NAME:-$(hostname)}"
-INTAKE_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-# Function to log errors to shared storage
-log_error_to_pvc() {
-    local exit_code="$1"
-    local line_no="$2"
-    local command="$3"
-    local timestamp
-    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-    # Create error directory if it exists (shared PVC)
-    mkdir -p "$INTAKE_ERROR_DIR" 2>/dev/null || true
-
-    # Write error report
-    local error_file="$INTAKE_ERROR_DIR/error-${INTAKE_POD_NAME}-$(date +%s).log"
-    {
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "INTAKE ERROR REPORT"
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "Pod Name: $INTAKE_POD_NAME"
-        echo "Start Time: $INTAKE_START_TIME"
-        echo "Error Time: $timestamp"
-        echo "Exit Code: $exit_code"
-        echo "Failed at Line: $line_no"
-        echo "Failed Command: $command"
-        echo ""
-        echo "Configuration:"
-        echo "  Project: ${PROJECT_NAME:-unknown}"
-        echo "  Repository: ${REPOSITORY_URL:-unknown}"
-        echo "  Config File: ${CONFIG_FILE:-unknown}"
-        echo ""
-        echo "Environment:"
-        echo "  PWD: $(pwd)"
-        echo "  USER: $(whoami)"
-        echo ""
-        echo "Last 50 lines of output available in container logs"
-        echo "═══════════════════════════════════════════════════════════════"
-    } > "$error_file" 2>/dev/null || true
-
-    echo "📝 Error logged to: $error_file" >&2
-}
-
-# Enhanced error trap that logs to PVC before exit
-trap_handler() {
-    local exit_code=$?
-    local line_no=$1
-    local command="$BASH_COMMAND"
-
-    echo "" >&2
-    echo "❌ ═══════════════════════════════════════════════════════════════" >&2
-    echo "❌ INTAKE FAILURE DETECTED" >&2
-    echo "❌ ═══════════════════════════════════════════════════════════════" >&2
-    echo "❌ Exit code: $exit_code" >&2
-    echo "❌ Line: $line_no" >&2
-    echo "❌ Command: $command" >&2
-    echo "❌ Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >&2
-    echo "❌ ═══════════════════════════════════════════════════════════════" >&2
-
-    # Log to PVC for persistence
-    log_error_to_pvc "$exit_code" "$line_no" "$command"
-
-    # Ensure output is flushed before exit
-    sync 2>/dev/null || true
-    sleep 1
-
-    exit "$exit_code"
-}
-
-trap 'trap_handler $LINENO' ERR
+# =========================================================================
+# Unified Intake Script
+# This script runs the tasks CLI to parse PRD and generate documentation
+# =========================================================================
 
 echo "🚀 Starting Unified Intake Process"
 echo "================================="
-echo "📍 Script version: unified-intake v1.1.0"
-echo "📅 Timestamp: $INTAKE_START_TIME"
-echo "📦 Pod: $INTAKE_POD_NAME"
-
-# =============================================================================
-# Phase 1: Configuration and Environment Setup
-# =============================================================================
+echo "📍 Script version: unified-intake v2.0.0 (tasks CLI)"
+echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "📦 Pod: ${HOSTNAME:-unknown}"
 echo ""
+
+# =========================================================================
+# Phase 1: Configuration and Environment Setup
+# =========================================================================
 echo "📋 Phase 1: Configuration and Environment Setup"
 echo "================================================"
 
-# Load configuration from mounted ConfigMap
 CONFIG_FILE="/intake-files/config.json"
-PRD_FILE="/intake-files/prd.txt"
+
+# Support both .txt and .md PRD files
+if [ -f "/intake-files/prd.txt" ]; then
+    PRD_FILE="/intake-files/prd.txt"
+elif [ -f "/intake-files/prd.md" ]; then
+    PRD_FILE="/intake-files/prd.md"
+else
+    echo "❌ No PRD file found (tried prd.txt, prd.md)"
+    exit 1
+fi
+
 ARCH_FILE="/intake-files/architecture.md"
 
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -121,754 +38,195 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-# Parse configuration
 echo "📄 Loading configuration..."
 PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
 REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
-GITHUB_APP=$(jq -r '.github_app' "$CONFIG_FILE")
-
-# Model configuration
-PRIMARY_MODEL=$(jq -r '.primary_model' "$CONFIG_FILE")
-PRIMARY_PROVIDER=$(jq -r '.primary_provider' "$CONFIG_FILE")
-RESEARCH_MODEL=$(jq -r '.research_model' "$CONFIG_FILE")
-RESEARCH_PROVIDER=$(jq -r '.research_provider' "$CONFIG_FILE")
-FALLBACK_MODEL=$(jq -r '.fallback_model' "$CONFIG_FILE")
-FALLBACK_PROVIDER=$(jq -r '.fallback_provider' "$CONFIG_FILE")
-
-# Unified intake parameters
-DOCS_MODEL=$(jq -r '.docs_model // .primary_model' "$CONFIG_FILE")
-ENRICH_CONTEXT=$(jq -r '.enrich_context // true' "$CONFIG_FILE")
-INCLUDE_CODEBASE=$(jq -r '.include_codebase // false' "$CONFIG_FILE")
-
-# Task generation parameters
-NUM_TASKS=$(jq -r '.num_tasks // 50' "$CONFIG_FILE")
+GITHUB_APP=$(jq -r '.github_app // "5DLabs-Morgan"' "$CONFIG_FILE")
+PRIMARY_MODEL=$(jq -r '.primary_model // "claude-sonnet-4-5-20250929"' "$CONFIG_FILE")
+NUM_TASKS=$(jq -r '.num_tasks // 15' "$CONFIG_FILE")
 EXPAND_TASKS=$(jq -r '.expand_tasks // true' "$CONFIG_FILE")
 ANALYZE_COMPLEXITY=$(jq -r '.analyze_complexity // true' "$CONFIG_FILE")
 
 echo "  ✓ Project: $PROJECT_NAME"
 echo "  ✓ Repository: $REPOSITORY_URL"
 echo "  ✓ GitHub App: $GITHUB_APP"
-echo "  ✓ Primary Model: $PRIMARY_MODEL ($PRIMARY_PROVIDER)"
-echo "  ✓ Research Model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)"
-echo "  ✓ Docs Model: $DOCS_MODEL"
-echo "  ✓ Context Enrichment: $ENRICH_CONTEXT"
-
-# Disable interactive Git prompts
-export GIT_TERMINAL_PROMPT=0
-export GIT_ASKPASS=/bin/true
-export SSH_ASKPASS=/bin/true
-
-# =============================================================================
-# Phase 1.1: GitHub App Authentication
-# =============================================================================
+echo "  ✓ Model: $PRIMARY_MODEL"
+echo "  ✓ Tasks: ~$NUM_TASKS"
 echo ""
+
+# =========================================================================
+# Phase 2: GitHub Authentication
+# =========================================================================
 echo "🔐 Setting up GitHub App authentication..."
 
-generate_github_token() {
+# Generate GitHub token from app credentials
+if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
     echo "Generating fresh GitHub App token..."
     
-    if [ -z "$GITHUB_APP_PRIVATE_KEY" ] || [ -z "$GITHUB_APP_ID" ]; then
-        echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
-        return 1
-    fi
-    
-    TEMP_KEY_FILE="/tmp/github-app-key.pem"
-    echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
-    chmod 600 "$TEMP_KEY_FILE"
-    
-    # Generate JWT token
-    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    # Create JWT
     NOW=$(date +%s)
+    IAT=$((NOW - 60))
     EXP=$((NOW + 600))
-    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
     
-    # Get installation ID
-    REPO_OWNER=$(echo "$REPOSITORY_URL" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
-    REPO_NAME=$(echo "$REPOSITORY_URL" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+    HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
     
-    INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 \
-        -H "Authorization: Bearer $JWT_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
+    SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
     
-    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+    # Get installation token
+    INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+    INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
     
-    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-        # Try org installation
-        ORG_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 \
-            -H "Authorization: Bearer $JWT_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/orgs/$REPO_OWNER/installation")
-        INSTALLATION_ID=$(echo "$ORG_RESPONSE" | jq -r '.id')
+    if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+        TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+        GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+        
+        if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
+            export GITHUB_TOKEN
+            git config --global credential.helper "!f() { echo \"password=$GITHUB_TOKEN\"; }; f"
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+            echo "✅ GitHub authentication configured"
+        else
+            echo "⚠️ Could not get installation token, using default auth"
+        fi
+    else
+        echo "⚠️ Could not get installation ID, using default auth"
     fi
-    
-    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-        echo "❌ Failed to get installation ID"
-        rm -f "$TEMP_KEY_FILE"
-        return 1
-    fi
-    
-    # Get access token
-    GITHUB_TOKEN=$(curl -s -L --retry 5 --retry-delay 2 -X POST \
-        -H "Authorization: Bearer $JWT_TOKEN" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
-    
-    rm -f "$TEMP_KEY_FILE"
-    
-    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
-        echo "❌ Failed to generate GitHub token"
-        return 1
-    fi
-    
-    export GITHUB_TOKEN
-    export GH_TOKEN="$GITHUB_TOKEN"
-    export TOKEN_GENERATED_AT=$(date +%s)
-    
-    # Configure git credentials
-    git config --global --replace-all credential.helper store
-    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-    
-    # Configure gh CLI
-    echo "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token 2>/dev/null || true
-    
-    echo "✅ GitHub authentication configured"
-    return 0
-}
-
-if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
-    generate_github_token || exit 1
 else
-    echo "⚠️ GitHub App credentials not found"
-    exit 1
+    echo "⚠️ GitHub App credentials not provided, using default auth"
 fi
-
-# =============================================================================
-# Phase 2: Repository Clone and TaskMaster Setup
-# =============================================================================
 echo ""
-echo "📦 Phase 2: Repository Clone and TaskMaster Setup"
-echo "=================================================="
+
+# =========================================================================
+# Phase 3: Repository Clone
+# =========================================================================
+echo "📦 Phase 2: Repository Clone and Setup"
+echo "======================================="
 
 CLONE_DIR="/tmp/repo-$(date +%s)"
 echo "📂 Cloning repository to: $CLONE_DIR"
-git clone "$REPOSITORY_URL" "$CLONE_DIR" || {
-    echo "❌ Git clone failed"
-    exit 1
-}
-cd "$CLONE_DIR"
 
-# Configure git identity
-git config user.name "Unified Intake Bot"
-git config user.email "intake@5dlabs.com"
+git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+cd "$CLONE_DIR" || exit 1
 
-# Normalize project name
+git config user.name "Morgan Intake"
+git config user.email "morgan@5dlabs.com"
+
+# Normalize project directory name
 PROJECT_DIR_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
 PROJECT_DIR="$CLONE_DIR/$PROJECT_DIR_NAME"
-
 mkdir -p "$PROJECT_DIR"
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR" || exit 1
 
-# Set up nvm if available
-if [ -s "/usr/local/nvm/nvm.sh" ]; then
-    export NVM_DIR="/usr/local/nvm"
-    . "$NVM_DIR/nvm.sh"
-    echo "✅ Node version: $(node --version)"
-fi
-
-# Initialize TaskMaster
-echo "🚀 Initializing TaskMaster project..."
-task-master init --yes \
-    --name "$PROJECT_NAME" \
-    --description "Auto-generated project from unified intake" \
-    --version "0.1.0" \
-    --rules "claude" \
-    --skip-install || {
-    echo "⚠️ TaskMaster init failed, creating structure manually..."
-    mkdir -p .taskmaster/docs .taskmaster/tasks .taskmaster/reports
-}
-
-# Copy PRD and architecture
-mkdir -p .taskmaster/docs
-cp "$PRD_FILE" ".taskmaster/docs/prd.txt"
-if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
-    cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
-fi
-
-# Configure TaskMaster models with debug logging enabled
-cat > .taskmaster/config.json << EOF
-{
-  "project": {
-    "name": "$PROJECT_NAME",
-    "description": "Auto-generated project from unified intake",
-    "version": "0.1.0"
-  },
-  "models": {
-    "main": {
-      "provider": "$PRIMARY_PROVIDER",
-      "modelId": "$PRIMARY_MODEL",
-      "maxTokens": 64000,
-      "temperature": 0.2
-    },
-    "research": {
-      "provider": "$RESEARCH_PROVIDER",
-      "modelId": "$RESEARCH_MODEL",
-      "maxTokens": 32000,
-      "temperature": 0.1
-    },
-    "fallback": {
-      "provider": "$FALLBACK_PROVIDER",
-      "modelId": "$FALLBACK_MODEL",
-      "maxTokens": 8000,
-      "temperature": 0.7
-    }
-  },
-  "global": {
-    "defaultTag": "master",
-    "logLevel": "debug",
-    "debug": true
-  }
-}
-EOF
-
-echo "✅ TaskMaster configured"
-echo "📋 Config contents:"
-cat .taskmaster/config.json
-
-# =============================================================================
-# Phase 2.1: Parse PRD and Generate Tasks
-# =============================================================================
+# =========================================================================
+# Phase 4: Prepare Input Files
+# =========================================================================
 echo ""
-echo "📄 Parsing PRD to generate tasks..."
-echo "  → Provider: $PRIMARY_PROVIDER"
-echo "  → Model: $PRIMARY_MODEL"
-echo "  → Research Provider: $RESEARCH_PROVIDER"
-echo "  → Research Model: $RESEARCH_MODEL"
-echo "  → Num Tasks: $NUM_TASKS"
-echo "  → This may take several minutes for large PRDs with research enabled..."
+echo "📝 Setting up input files..."
+
+mkdir -p .tasks/docs
+cp "$PRD_FILE" ".tasks/docs/prd.txt"
+[ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && cp "$ARCH_FILE" ".tasks/docs/architecture.md"
+
+# =========================================================================
+# Phase 5: Run Tasks CLI Intake
+# =========================================================================
 echo ""
-
-# Start a background progress indicator
-(
-    i=0
-    while true; do
-        i=$((i + 1))
-        echo "  ⏳ TaskMaster running... (${i}m elapsed)"
-        sleep 60
-    done
-) &
-PROGRESS_PID=$!
-
-# Run parse-prd with verbose output
-task-master parse-prd \
-    --input ".taskmaster/docs/prd.txt" \
-    --force \
-    --num-tasks "$NUM_TASKS" \
-    --research 2>&1 || {
-    kill $PROGRESS_PID 2>/dev/null || true
-    echo "❌ Failed to parse PRD"
-    exit 1
-}
-
-# Stop progress indicator
-kill $PROGRESS_PID 2>/dev/null || true
-
-# Resolve tasks file path
-TASKS_FILE=".taskmaster/tasks/tasks.json"
-if [ ! -f "$TASKS_FILE" ]; then
-    TASKS_FILE=$(find .taskmaster -maxdepth 2 -name tasks.json | head -n 1)
-fi
-
-if [ ! -f "$TASKS_FILE" ]; then
-    echo "❌ tasks.json not found after parsing"
-    exit 1
-fi
-
-echo "✅ Tasks generated: $TASKS_FILE"
-
-# Analyze complexity if requested
-if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
-    echo "🔍 Analyzing task complexity..."
-    mkdir -p .taskmaster/reports
-    task-master analyze-complexity --file "$TASKS_FILE" || echo "⚠️ Complexity analysis failed"
-fi
-
-# Expand tasks if requested
-if [ "$EXPAND_TASKS" = "true" ]; then
-    echo "🌳 Expanding tasks with subtasks..."
-    task-master expand --all --force --file "$TASKS_FILE" || echo "⚠️ Task expansion failed"
-fi
-
-# Add agent hints based on task content
-echo "🎯 Adding agent routing hints..."
-jq '
-  def is_frontend_task:
-    (.title + " " + (.description // "") + " " + (.details // "")) 
-    | test("frontend|react|component|ui|interface|styling|css|html|jsx|tsx"; "i");
-  
-  def is_integration_task:
-    (.title + " " + (.description // "") + " " + (.details // "")) 
-    | test("test|testing|integration|e2e|end.to.end|qa|quality"; "i");
-  
-  if .master.tasks then
-    .master.tasks |= map(
-      if .agentHint then .
-      elif is_frontend_task then . + {"agentHint": "frontend"}
-      elif is_integration_task then . + {"agentHint": "integration"}
-      else . end)
-  elif .tasks then
-    .tasks |= map(
-      if .agentHint then .
-      elif is_frontend_task then . + {"agentHint": "frontend"}
-      elif is_integration_task then . + {"agentHint": "integration"}
-      else . end)
-  else . end
-' "$TASKS_FILE" > "$TASKS_FILE.tmp" && mv "$TASKS_FILE.tmp" "$TASKS_FILE"
-
-echo "✅ Agent hints added"
-
-# Generate individual task files
-echo "📝 Generating individual task files..."
-task-master generate
-
-# =============================================================================
-# Phase 3: Context Enrichment via Firecrawl (Optional)
-# =============================================================================
-if [ "$ENRICH_CONTEXT" = "true" ]; then
-    echo ""
-    echo "🔗 Phase 3: Context Enrichment via Firecrawl"
-    echo "============================================="
-    
-    # Extract URLs from PRD
-    URLS=$(grep -oP 'https?://[^\s<>"]+' "$PRD_FILE" 2>/dev/null | sort -u | head -10)
-    
-    if [ -n "$URLS" ]; then
-        echo "📋 Found URLs in PRD:"
-        echo "$URLS" | head -5
-        
-        # Create context enrichment file
-        CONTEXT_FILE=".taskmaster/docs/enriched-context.md"
-        echo "# Enriched Context from PRD References" > "$CONTEXT_FILE"
-        echo "" >> "$CONTEXT_FILE"
-        echo "This context was automatically extracted from URLs referenced in the PRD." >> "$CONTEXT_FILE"
-        echo "Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$CONTEXT_FILE"
-        echo "" >> "$CONTEXT_FILE"
-        
-        # Note: Full Firecrawl integration would happen here
-        # For now, we just document the URLs that would be enriched
-        echo "## Referenced URLs" >> "$CONTEXT_FILE"
-        echo "" >> "$CONTEXT_FILE"
-        for url in $URLS; do
-            echo "- $url" >> "$CONTEXT_FILE"
-        done
-        
-        echo "✅ Context enrichment file created"
-    else
-        echo "ℹ️ No URLs found in PRD, skipping context enrichment"
-    fi
-else
-    echo ""
-    echo "ℹ️ Context enrichment disabled"
-fi
-
-# =============================================================================
-# Phase 4: Documentation Generation
-# =============================================================================
-echo ""
-echo "📚 Phase 4: Documentation Generation"
+echo "🚀 Phase 3: Running tasks CLI intake"
 echo "====================================="
 
-# Generate documentation files for each task
-TASK_COUNT=$(jq '(.master.tasks // .tasks) | length' "$TASKS_FILE")
-echo "📋 Processing $TASK_COUNT tasks..."
+# Verify tasks CLI is available
+if ! command -v tasks &> /dev/null; then
+    echo "❌ tasks CLI not found in PATH"
+    exit 1
+fi
+echo "✓ tasks CLI found: $(which tasks)"
+tasks --version 2>&1 || true
 
-# Extract tasks and generate docs for each
-jq -c '(.master.tasks // .tasks)[]' "$TASKS_FILE" | while IFS= read -r task_json; do
-    task_id=$(echo "$task_json" | jq -r '.id')
-    title=$(echo "$task_json" | jq -r '.title // "No Title"')
-    description=$(echo "$task_json" | jq -r '.description // ""')
-    details=$(echo "$task_json" | jq -r '.details // ""')
-    test_strategy=$(echo "$task_json" | jq -r '.testStrategy // ""')
-    priority=$(echo "$task_json" | jq -r '.priority // "medium"')
-    dependencies=$(echo "$task_json" | jq -r '.dependencies // [] | join(", ")')
-    
-    if [ -z "$task_id" ] || [ "$task_id" = "null" ]; then
-        continue
-    fi
-    
-    echo "  📝 Generating docs for Task $task_id: $title"
-    
-    task_dir=".taskmaster/docs/task-$task_id"
-    mkdir -p "$task_dir"
-    
-    # Generate task.md
-    cat > "$task_dir/task.md" << TASK_MD
-# Task $task_id: $title
+# Build intake command
+INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
 
-## Overview
-$description
+# Add architecture if present
+[ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
 
-## Priority
-$priority
+# Add model if specified
+[ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
 
-## Dependencies
-${dependencies:-None}
+# Optionally skip expansion/analysis
+[ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
+[ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
 
-## Implementation Details
-$details
+echo "  → Running: $INTAKE_CMD"
+eval "$INTAKE_CMD" || exit 1
 
-## Test Strategy
-$test_strategy
-TASK_MD
+# Verify tasks were generated
+TASKS_FILE=".tasks/tasks/tasks.json"
+if [ ! -f "$TASKS_FILE" ]; then
+    echo "❌ tasks.json not found at $TASKS_FILE"
+    exit 1
+fi
 
-    # Infer domain/persona from task title and description
-    # This enables principle #6: Role-Playing (Persona)
-    inferred_role="Senior Software Engineer"
-    if echo "$title $description" | grep -qiE 'frontend|ui|react|component|css|tailwind|design'; then
-        inferred_role="Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX"
-    elif echo "$title $description" | grep -qiE 'backend|api|server|database|rust|postgres'; then
-        inferred_role="Senior Backend Engineer with expertise in Rust, APIs, and database systems"
-    elif echo "$title $description" | grep -qiE 'devops|deploy|kubernetes|helm|infra|ci/cd'; then
-        inferred_role="Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD"
-    elif echo "$title $description" | grep -qiE 'test|qa|quality|validation'; then
-        inferred_role="Senior QA Engineer with expertise in test automation and quality assurance"
-    elif echo "$title $description" | grep -qiE 'security|auth|encryption|oauth'; then
-        inferred_role="Senior Security Engineer with expertise in authentication and secure coding"
-    elif echo "$title $description" | grep -qiE 'data|analytics|ml|ai|model'; then
-        inferred_role="Senior Data Engineer with expertise in data pipelines and analytics"
-    fi
+TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
+echo "✅ Generated $TASK_COUNT tasks with documentation"
 
-    # Generate prompt.md with Master Prompting 2026 framework
-    # Applies all 6 Core Principles:
-    # 1. Clarity & Specificity - Structured sections with clear constraints
-    # 2. Few-Shot Prompting - Example output format included
-    # 3. Chain of Thought - Step-by-step reasoning instructions
-    # 4. Iterative Refinement - Self-critique checklist
-    # 5. Context & Knowledge Leverage - Background and project context
-    # 6. Role-Playing (Persona) - Domain-specific expert persona
-    cat > "$task_dir/prompt.md" << PROMPT_MD
-# Implementation Prompt for Task $task_id
-
-## Role (Persona)
-You are a $inferred_role. Your primary responsibility is implementing Task $task_id with production-quality code that follows best practices and project conventions.
-
-## Context (Background)
-**Task Priority:** $priority
-**Dependencies:** ${dependencies:-None (this task can start immediately)}
-**Scope:** $description
-
-This task is part of a larger project. Review the PRD and architecture documents in \`.taskmaster/docs/\` to understand the full context before implementing.
-
-## Task (Specific Instructions)
-**Objective:** $title
-
-### Requirements
-$details
-
-### Constraints & Formatting
-- **Code Style:** Match existing codebase patterns and conventions
-- **Output Format:** Pull request with clear, atomic commits
-- **Documentation:** Update relevant docs and inline comments
-- **Testing:** Include unit tests for new functionality
-- **PR Title Format:** \`feat(task-$task_id): $title\`
-
-## Steps (Chain of Thought)
-Think step-by-step before implementing. Do not skip steps:
-
-1. **Analyze Context**
-   - Review existing code patterns in the repository
-   - Identify files that need modification
-   - Check for existing utilities or patterns to reuse
-
-2. **Plan Implementation**
-   - Outline your approach before writing code
-   - Identify potential edge cases and error scenarios
-   - Consider backward compatibility if modifying existing code
-
-3. **Implement Solution**
-   - Write clean, well-documented code
-   - Follow the single responsibility principle
-   - Use meaningful variable and function names
-
-4. **Write Tests**
-   - Create tests that verify the acceptance criteria
-   - Include edge case coverage
-   - Ensure tests are deterministic and fast
-
-5. **Self-Review**
-   - Review your own code for issues before submitting
-   - Check for security vulnerabilities
-   - Verify all acceptance criteria are met
-
-6. **Submit PR**
-   - Create a comprehensive PR description
-   - Link to this task in the PR body
-   - Request review from appropriate team members
-
-## Acceptance Criteria
-$test_strategy
-
-## Self-Critique Checklist (Iterative Refinement)
-Before submitting your PR, verify each item:
-
-- [ ] **Functionality:** Does the implementation meet all requirements?
-- [ ] **Edge Cases:** Are boundary conditions and error states handled?
-- [ ] **Security:** Are there any potential security vulnerabilities?
-- [ ] **Performance:** Is the solution efficient for expected scale?
-- [ ] **Maintainability:** Is the code readable and well-documented?
-- [ ] **Testing:** Do all tests pass? Is coverage adequate?
-- [ ] **Conventions:** Does the code follow project style guidelines?
-
-## Example Output (Few-Shot)
-Your PR should follow this structure:
-
-\`\`\`markdown
-## Summary
-Brief description of what this PR implements for Task $task_id.
-
-## Changes
-- List of specific changes made
-- Files modified/added
-
-## Testing
-- How the changes were tested
-- Test commands to verify
-
-## Checklist
-- [ ] Tests pass
-- [ ] Linting passes
-- [ ] Documentation updated
-\`\`\`
-PROMPT_MD
-
-    # Generate acceptance-criteria.md
-    cat > "$task_dir/acceptance-criteria.md" << AC_MD
-# Acceptance Criteria for Task $task_id
-
-## Task
-$title
-
-## Criteria
-
-### Functional Requirements
-$details
-
-### Testing Requirements
-$test_strategy
-
-### Definition of Done
-- [ ] All functional requirements implemented
-- [ ] Tests written and passing
-- [ ] Code reviewed and approved
-- [ ] Documentation updated
-AC_MD
-
-    # Generate task.xml with Master Prompting 2026 framework
-    cat > "$task_dir/task.xml" << TASK_XML
-<?xml version="1.0" encoding="UTF-8"?>
-<prompt version="2026.1">
-    <!-- Principle #6: Role-Playing (Persona) -->
-    <role>
-        <persona>$inferred_role</persona>
-        <responsibility>Implement Task $task_id with production-quality code</responsibility>
-    </role>
-
-    <!-- Principle #5: Context & Knowledge Leverage -->
-    <context>
-        <background>Review .taskmaster/docs/ for full project context</background>
-        <priority>$priority</priority>
-        <dependencies>${dependencies:-None}</dependencies>
-    </context>
-
-    <!-- Principle #1: Clarity & Specificity -->
-    <task>
-        <id>$task_id</id>
-        <title>$title</title>
-        <description>$description</description>
-    </task>
-
-    <requirements>
-        <details>
-$details
-        </details>
-        <constraints>
-            <item>Match existing codebase patterns</item>
-            <item>Include unit tests for new functionality</item>
-            <item>Update documentation as needed</item>
-            <item>PR title format: feat(task-$task_id): $title</item>
-        </constraints>
-    </requirements>
-
-    <!-- Principle #3: Chain of Thought -->
-    <steps reasoning="step-by-step">
-        <step order="1">Analyze existing code patterns and identify files to modify</step>
-        <step order="2">Plan implementation approach and identify edge cases</step>
-        <step order="3">Implement solution with clean, documented code</step>
-        <step order="4">Write tests to verify acceptance criteria</step>
-        <step order="5">Self-review for security and maintainability issues</step>
-        <step order="6">Submit PR with comprehensive description</step>
-    </steps>
-
-    <!-- Principle #4: Iterative Refinement -->
-    <acceptance_criteria>
-$test_strategy
-    </acceptance_criteria>
-
-    <self_critique>
-        <check>Does implementation meet all requirements?</check>
-        <check>Are edge cases and error states handled?</check>
-        <check>Are there security vulnerabilities?</check>
-        <check>Is the code maintainable and documented?</check>
-        <check>Do all tests pass with adequate coverage?</check>
-    </self_critique>
-
-    <!-- Principle #2: Few-Shot Prompting -->
-    <example_output format="PR">
-        <summary>Brief description of Task $task_id implementation</summary>
-        <changes>List of specific changes made</changes>
-        <testing>How changes were verified</testing>
-    </example_output>
-</prompt>
-TASK_XML
-
-done
-
-echo "✅ Documentation generated for all tasks"
-
-# =============================================================================
-# Phase 5: Create Pull Request
-# =============================================================================
+# =========================================================================
+# Phase 6: Create Pull Request
+# =========================================================================
 echo ""
-echo "🔀 Phase 5: Creating Pull Request"
+echo "🔀 Phase 4: Creating Pull Request"
 echo "=================================="
 
-cd "$CLONE_DIR"
+cd "$CLONE_DIR" || exit 1
 
-# Create branch
 BRANCH_NAME="intake-${PROJECT_DIR_NAME}-$(date +%Y%m%d-%H%M%S)"
-echo "🌿 Creating branch: $BRANCH_NAME"
 git checkout -b "$BRANCH_NAME"
-
-# Add all changes
 git add -A
+git commit -m "feat: intake for $PROJECT_NAME
 
-# Build commit message
-COMMIT_MSG="feat: unified intake for $PROJECT_NAME
+- $TASK_COUNT tasks generated
+- XML + Markdown documentation per task
+- Agent routing hints added
+- Complexity analysis: $ANALYZE_COMPLEXITY
+- Task expansion: $EXPAND_TASKS
 
-- Parsed PRD and generated TaskMaster tasks
-- Created comprehensive documentation
-- Added agent routing hints
-- Generated individual task files
+🤖 Generated by Morgan (tasks CLI v2)"
 
-🤖 Auto-generated by unified intake workflow
-- Model: $PRIMARY_MODEL
-- Tasks: $(jq '(.master.tasks // .tasks) | length' "$PROJECT_DIR/$TASKS_FILE") generated"
-
-if [ "$EXPAND_TASKS" = "true" ]; then
-    COMMIT_MSG="$COMMIT_MSG
-- Expanded with subtasks"
-fi
-
-if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
-    COMMIT_MSG="$COMMIT_MSG
-- Complexity analysis performed"
-fi
-
-if [ "$ENRICH_CONTEXT" = "true" ]; then
-    COMMIT_MSG="$COMMIT_MSG
-- Context enrichment enabled"
-fi
-
-git commit -m "$COMMIT_MSG"
-
-# Push branch
-echo "📤 Pushing branch..."
 git push -u origin "$BRANCH_NAME"
 
-# Refresh token if needed
-if [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
-    NOW=$(date +%s)
-    TOKEN_AGE=$((NOW - ${TOKEN_GENERATED_AT:-0}))
-    if [ $TOKEN_AGE -gt 3000 ]; then
-        generate_github_token
-    fi
-fi
+gh pr create \
+    --title "🚀 Intake: $PROJECT_NAME" \
+    --body "## Intake: $PROJECT_NAME
 
-# Create PR
-echo "📝 Creating pull request..."
-
-PR_BODY="## 🎉 Unified Intake: $PROJECT_NAME
-
-This PR contains the complete project structure generated by the unified intake workflow.
-
-### 📋 What was processed:
-- ✅ PRD document parsed
-$([ -f "$PROJECT_DIR/.taskmaster/docs/architecture.md" ] && echo "- ✅ Architecture document included")
-- ✅ TaskMaster initialized
-- ✅ Tasks generated ($(jq '(.master.tasks // .tasks) | length' "$PROJECT_DIR/$TASKS_FILE") tasks)
-$([ "$ANALYZE_COMPLEXITY" = "true" ] && echo "- ✅ Complexity analysis performed")
-$([ "$EXPAND_TASKS" = "true" ] && echo "- ✅ Tasks expanded with subtasks")
-$([ "$ENRICH_CONTEXT" = "true" ] && echo "- ✅ Context enrichment enabled")
-- ✅ Documentation generated (task.md, prompt.md, acceptance-criteria.md, task.xml)
-
-### 🏗️ Generated Structure:
+### Generated Structure
 \`\`\`
 $PROJECT_DIR_NAME/
-├── .taskmaster/
-│   ├── config.json
+├── .tasks/
 │   ├── docs/
 │   │   ├── prd.txt
-│   │   ├── architecture.md
+│   │   ├── architecture.md (if provided)
 │   │   └── task-*/
-│   │       ├── task.md
+│   │       ├── prompt.xml
 │   │       ├── prompt.md
-│   │       ├── acceptance-criteria.md
-│   │       └── task.xml
-│   └── tasks/
-│       └── tasks.json
-└── README.md
+│   │       └── acceptance.md
+│   ├── tasks/
+│   │   └── tasks.json
+│   └── reports/
+│       └── complexity-report.json
 \`\`\`
 
-### 🤖 Configuration:
-- **Primary Model**: $PRIMARY_MODEL ($PRIMARY_PROVIDER)
-- **Research Model**: $RESEARCH_MODEL ($RESEARCH_PROVIDER)
-- **Docs Model**: $DOCS_MODEL
-- **Context Enrichment**: $ENRICH_CONTEXT
+### Stats
+- **Tasks**: $TASK_COUNT
+- **Model**: $PRIMARY_MODEL
+- **Expansion**: $EXPAND_TASKS
+- **Complexity**: $ANALYZE_COMPLEXITY
 
-### 🎯 Next Steps:
-1. Review the generated tasks and documentation
-2. Merge this PR to add the project
-3. Use \`cto play\` to implement tasks
-
-🤖 Auto-generated by unified intake workflow"
-
-gh pr create \
-    --title "🚀 Unified Intake: $PROJECT_NAME" \
-    --body "$PR_BODY" \
+🤖 Generated by Morgan (tasks CLI v2)" \
     --head "$BRANCH_NAME" \
-    --base main || {
-    echo "⚠️ Failed to create PR, but branch has been pushed"
-    echo "Branch: $BRANCH_NAME"
-    echo "You can create the PR manually"
-}
+    --base main || echo "⚠️ PR creation failed, branch pushed: $BRANCH_NAME"
 
 echo ""
-echo "✅ Unified intake complete!"
-echo "================================="
-echo "Project: $PROJECT_NAME"
-echo "Location: $PROJECT_DIR"
-echo "Branch: $BRANCH_NAME"
-echo "Repository: $REPOSITORY_URL"
-echo "Tasks generated: $(jq '(.master.tasks // .tasks) | length' "$PROJECT_DIR/$TASKS_FILE")"
-
-
-
-
-
-
-
-
-
+echo "════════════════════════════════════════════════════════════════"
+echo "║ ✅ Intake completed successfully!"
+echo "════════════════════════════════════════════════════════════════"
 

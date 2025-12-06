@@ -1836,7 +1836,7 @@ spec:
           }
 
           # Load task metadata from tasks.json when available
-          TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks/tasks.json"
+          TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks/tasks.json"
           TASK_ENTRY=""
           if [ -f "$TASKS_JSON" ]; then
             TASK_ENTRY=$(jq -c --arg tid "$TASK_ID" '
@@ -1869,7 +1869,7 @@ spec:
 
           # Attempt to locate task file for supplemental metadata
           TASK_FILE=""
-          TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks"
+          TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks"
           if [ -d "$TASK_BASE_DIR" ]; then
             PADDED_ID=""
             case "$TASK_ID" in

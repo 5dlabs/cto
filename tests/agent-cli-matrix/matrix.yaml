@@ -1,0 +1,190 @@
+# Agent × CLI Test Matrix Definition
+# This file defines all valid combinations of agents, CLIs, and jobs for testing
+
+metadata:
+  version: "1.0.0"
+  description: "Comprehensive test matrix for agent/CLI combinations"
+  last_updated: "2024-12-06"
+
+# Supported CLIs
+clis:
+  claude:
+    name: "Claude Code"
+    config_file: "settings.json"
+    memory_file: "CLAUDE.md"
+    config_format: "json"
+  codex:
+    name: "OpenAI Codex"
+    config_file: "codex-config.toml"
+    memory_file: "AGENTS.md"
+    config_format: "toml"
+  cursor:
+    name: "Cursor"
+    config_file: "cursor-cli-config.json"
+    memory_file: "AGENTS.md"
+    config_format: "json"
+  factory:
+    name: "Factory"
+    config_file: "factory-cli-config.json"
+    memory_file: "AGENTS.md"
+    config_format: "json"
+  gemini:
+    name: "Gemini"
+    config_file: "settings.json"
+    memory_file: "GEMINI.md"
+    config_format: "json"
+  opencode:
+    name: "OpenCode"
+    config_file: "opencode-config.json"
+    memory_file: "AGENTS.md"
+    config_format: "json"
+
+# Agent definitions
+agents:
+  # Coding specialists (support all CLIs)
+  rex:
+    github_app: "5DLabs-Rex"
+    specialty: "Rust"
+    jobs:
+      - coder
+      - healer
+    supported_clis: [claude, codex, cursor, factory, gemini, opencode]
+    keywords: [rust, cargo, tokio, async, systems]
+
+  blaze:
+    github_app: "5DLabs-Blaze"
+    specialty: "Frontend/React"
+    jobs:
+      - coder
+      - healer
+    supported_clis: [claude, codex, cursor, factory, gemini, opencode]
+    keywords: [frontend, react, ui, typescript, css]
+
+  grizz:
+    github_app: "5DLabs-Grizz"
+    specialty: "Go"
+    jobs:
+      - coder
+      - healer
+    supported_clis: [claude, codex, cursor, factory, gemini, opencode]
+    keywords: [go, golang, goroutine, channels]
+
+  nova:
+    github_app: "5DLabs-Nova"
+    specialty: "Node.js/TypeScript"
+    jobs:
+      - coder
+      - healer
+      - docs
+    supported_clis: [claude, codex, cursor, factory, gemini, opencode]
+    keywords: [node, typescript, javascript, npm, express]
+
+  tap:
+    github_app: "5DLabs-Tap"
+    specialty: "Expo Mobile"
+    jobs:
+      - coder
+      - healer
+    supported_clis: [claude, codex, cursor, factory, gemini, opencode]
+    keywords: [mobile, expo, ios, android, react native]
+
+  spark:
+    github_app: "5DLabs-Spark"
+    specialty: "Electron Desktop"
+    jobs:
+      - coder
+      - healer
+    supported_clis: [claude, codex, cursor, factory, gemini, opencode]
+    keywords: [electron, desktop, ipc, tray, native]
+
+  # Specialized agents (limited CLI support)
+  bolt:
+    github_app: "5DLabs-Bolt"
+    specialty: "Deployment"
+    jobs:
+      - deploy
+      - healer
+    supported_clis: [claude, factory]
+    keywords: [deploy, ci, cd, pipeline, release]
+
+  cipher:
+    github_app: "5DLabs-Cipher"
+    specialty: "Security"
+    jobs:
+      - security
+      - healer
+    supported_clis: [claude, factory]
+    keywords: [security, vulnerab, audit, scan]
+
+  cleo:
+    github_app: "5DLabs-Cleo"
+    specialty: "Quality Assurance"
+    jobs:
+      - quality
+    supported_clis: [claude, factory]
+    keywords: [quality, review, standards, lint]
+
+  tess:
+    github_app: "5DLabs-Tess"
+    specialty: "Testing"
+    jobs:
+      - test
+    supported_clis: [claude, factory]
+    keywords: [test, qa, coverage, spec]
+
+  stitch:
+    github_app: "5DLabs-Stitch"
+    specialty: "Code Review"
+    jobs:
+      - review
+    supported_clis: [claude, factory]
+    keywords: [review, pr, pull request, feedback]
+
+  morgan:
+    github_app: "5DLabs-Morgan"
+    specialty: "Documentation/PM"
+    jobs:
+      - docs
+      - intake
+      - pm
+    supported_clis: [claude]
+    keywords: [document, prd, spec, requirement]
+
+  atlas:
+    github_app: "5DLabs-Atlas"
+    specialty: "Integration"
+    jobs:
+      - integration
+      - intake
+    supported_clis: [claude]
+    keywords: [merge, conflict, integrate, rebase]
+
+# Test scenarios
+# These define specific test configurations beyond the matrix
+scenarios:
+  standard_implementation:
+    description: "Standard implementation task"
+    run_type: "implementation"
+    expected_job: "coder"
+
+  healer_task:
+    description: "Bug fix / incident response"
+    run_type: "implementation"
+    template_setting: "heal/claude"
+    expected_job: "healer"
+
+  intake_task:
+    description: "PRD ingestion task"
+    run_type: "intake"
+    expected_job: "intake"
+
+  documentation_task:
+    description: "Documentation generation"
+    run_type: "documentation"
+    expected_job: "docs"
+
+  integration_task:
+    description: "Branch integration/merge"
+    run_type: "integration"
+    expected_job: "integration"
+

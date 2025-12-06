@@ -84,7 +84,7 @@ echo ""
 # 4. Template Validation (Handlebars syntax)
 # =========================================================================
 echo -e "${CYAN}[4/6] Validating Handlebars templates...${NC}"
-TEMPLATE="infra/charts/controller/agent-templates/watch/factory/container-watch-monitor.sh.hbs"
+TEMPLATE="infra/charts/controller/templates/watch/factory/container-watch-monitor.sh.hbs"
 
 if [ -f "$TEMPLATE" ]; then
     # Check for required Handlebars variables

@@ -115,12 +115,12 @@ Define volume mounts for agent prompts
 {{- end }}
 
 {{/*
-Define volume mounts for agent templates (all mounted to /agent-templates)
+Define volume mounts for agent templates (all mounted to /templates)
 Note: Kubernetes projected volumes allow merging multiple ConfigMaps into one directory
 */}}
 {{- define "platform.agentTemplateVolumeMounts" -}}
-- name: agent-templates
-  mountPath: /agent-templates
+- name: templates
+  mountPath: /templates
   readOnly: true
 {{- end }}
 
@@ -128,41 +128,41 @@ Note: Kubernetes projected volumes allow merging multiple ConfigMaps into one di
 Define projected volume for agent templates (merges all ConfigMaps)
 */}}
 {{- define "platform.agentTemplateProjectedVolume" -}}
-- name: agent-templates
+- name: templates
   projected:
     sources:
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-shared
+        name: {{ include "controller.fullname" . }}-templates-shared
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-claude-code
+        name: {{ include "controller.fullname" . }}-templates-claude-code
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-claude-docs
+        name: {{ include "controller.fullname" . }}-templates-claude-docs
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-codex
+        name: {{ include "controller.fullname" . }}-templates-codex
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-cursor
+        name: {{ include "controller.fullname" . }}-templates-cursor
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-factory
+        name: {{ include "controller.fullname" . }}-templates-factory
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-opencode
+        name: {{ include "controller.fullname" . }}-templates-opencode
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-integration
+        name: {{ include "controller.fullname" . }}-templates-integration
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-watch
+        name: {{ include "controller.fullname" . }}-templates-watch
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-healer
+        name: {{ include "controller.fullname" . }}-templates-healer
         optional: true
     - configMap:
-        name: {{ include "controller.fullname" . }}-agent-templates-intake
+        name: {{ include "controller.fullname" . }}-templates-intake
         optional: true
 {{- end }}
 

@@ -1,12 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/installer",
     "crates/controller",
     "crates/healer",
+    "crates/installer",
+    "crates/linear",
     "crates/mcp",
     "crates/metal",
     "crates/notify",
+    "crates/research",
     "crates/tasks",
     "crates/tools",
     "crates/utils",

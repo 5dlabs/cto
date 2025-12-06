@@ -10,12 +10,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATES_DIR="$ROOT_DIR/infra/charts/controller/agent-templates"
+TEMPLATES_DIR="$ROOT_DIR/infra/charts/controller/templates"
 
 echo "🔧 Updating agent templates for task-specific workspace isolation..."
 echo ""
 
-# Find all .hbs files in agent-templates
+# Find all .hbs files in templates
 FILES=$(find "$TEMPLATES_DIR" -name "*.sh.hbs" -type f)
 FILE_COUNT=$(echo "$FILES" | wc -l | tr -d ' ')
 
@@ -117,7 +117,7 @@ echo ""
 echo "📦 Backups saved with .bak extension"
 echo ""
 echo "🧪 Next steps:"
-echo "   1. Review changes: git diff infra/charts/controller/agent-templates/"
+echo "   1. Review changes: git diff infra/charts/controller/templates/"
 echo "   2. Test with a sample workflow"
-echo "   3. Clean up backups: find infra/charts/controller/agent-templates/ -name '*.bak' -delete"
+echo "   3. Clean up backups: find infra/charts/controller/templates/ -name '*.bak' -delete"
 
