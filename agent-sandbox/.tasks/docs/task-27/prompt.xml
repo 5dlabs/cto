@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="27" priority="high" agent="bolt">
+    <meta>
+        <title>Setup observability with Prometheus metrics and structured logging</title>
+        <priority>high</priority>
+        <dependencies>16</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 27 with production-quality code.</role>
+
+    <context>
+        <overview>Implement Prometheus metrics endpoint, structured JSON logging with trace IDs, and health check endpoints for Kubernetes.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add dependencies:
+   - prometheus = &quot;0.13&quot;
+   - tracing = &quot;0.1&quot;
+   - tracing-subscriber = { version = &quot;0.3&quot;, features = [&quot;json&quot;, &quot;env-filter&quot;] }
+   - uuid = { version = &quot;1&quot;, features = [&quot;v4&quot;] }
+2. Create infra/metrics.rs:
+   - Register metrics: http_requests_total (counter), http_request_duration_seconds (histogram), active_websocket_connections (gauge), task_operations_total (counter)
+   - Middleware to record metrics on each request
+3. Implement infra/tracing.rs:
+   - Initialize tracing_subscriber with JSON formatter
+   - Generate trace_id (UUID v4) per request, inject into logs
+   - Log level from RUST_LOG env var
+4. Add endpoints in api/health.rs:
+   - GET /health/live -&gt; 200 OK (liveness probe)
+   - GET /health/ready -&gt; checks DB and Redis connections, 200 if healthy
+   - GET /metrics -&gt; Prometheus text format
+5. Add trace_id to response headers: X-Trace-Id
+6. Log format: {&quot;timestamp&quot;, &quot;level&quot;, &quot;trace_id&quot;, &quot;message&quot;, &quot;fields&quot;}
+7. Instrument key functions with tracing spans</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-27): Setup observability with Prometheus metrics and structured logging</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for metrics recording. Integration tests: make requests, verify metrics incremented. Check /health/ready returns 503 when DB unavailable. Verify logs are valid JSON with trace_ids. Load test and verify metrics in Prometheus. Test log filtering with RUST_LOG.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

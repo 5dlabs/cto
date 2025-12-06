@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="25" priority="medium" agent="rex">
+    <meta>
+        <title>Implement email notifications with user preferences</title>
+        <priority>medium</priority>
+        <dependencies>23</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 25 with production-quality code.</role>
+
+    <context>
+        <overview>Set up email notification system for task mentions and due date reminders with user-configurable preferences using background job queue.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add dependencies: lettre = &quot;0.11&quot;, tokio-cron-scheduler = &quot;0.9&quot;
+2. Create domain/notification.rs:
+   - NotificationType enum (Mention, DueDateReminder, TaskAssigned)
+   - NotificationPreferences struct (email_enabled, mention_enabled, reminder_enabled)
+3. Add notification_preferences column to users table (JSONB)
+4. Implement infra/email.rs:
+   - EmailService using lettre SMTP
+   - send_task_mention(to, task, mentioned_by) -&gt; Result&lt;()&gt;
+   - send_due_date_reminder(to, task) -&gt; Result&lt;()&gt;
+   - HTML email templates in templates/ directory
+5. Create api/notifications.rs:
+   - GET /api/users/me/notification-preferences
+   - PATCH /api/users/me/notification-preferences
+6. Implement background jobs:
+   - Parse task description for @mentions on create/update
+   - Cron job (runs hourly) to check tasks due in next 24 hours
+   - Queue jobs in Redis list: LPUSH email_queue {job_json}
+   - Worker process: BRPOP email_queue, send email, retry on failure
+7. Add SMTP config: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-25): Implement email notifications with user preferences</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for mention parsing. Integration tests: create task with @mention, verify email sent if preference enabled. Test due date reminder job finds tasks due tomorrow. Test preference updates respected. Mock SMTP in tests. Verify email queue processes jobs and retries failures.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

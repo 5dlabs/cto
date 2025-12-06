@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="22" priority="high" agent="rex">
+    <meta>
+        <title>Implement invite link generation with expiration</title>
+        <priority>high</priority>
+        <dependencies>21</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 22 with production-quality code.</role>
+
+    <context>
+        <overview>Create endpoint to generate time-limited invite links for teams with 7-day expiration and single-use token validation.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Extend domain/team.rs with InviteLink struct
+2. Implement infra/invite_repository.rs:
+   - create_invite(team_id, created_by) -&gt; InviteLink with random token
+   - get_invite_by_token(token) -&gt; Option&lt;InviteLink&gt; (only if not expired)
+   - delete_invite(token) -&gt; Result&lt;()&gt;
+3. Add to api/teams.rs:
+   - POST /api/teams/:id/invite (requires admin role)
+     - Generates UUID token
+     - Stores in database with expires_at = now() + 7 days
+     - Returns full invite URL: {BASE_URL}/invite/{token}
+   - POST /api/invite/{token}/accept (requires auth)
+     - Validates token not expired
+     - Checks user not already member
+     - Adds user to team with Member role
+     - Deletes invite token (single use)
+4. Use uuid crate for token generation
+5. Add scheduled job to clean expired invites (runs daily)</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-22): Implement invite link generation with expiration</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests: admin creates invite, verify token stored with correct expiration. Non-member accepts invite, verify added as member. Test expired token returns 404. Test already-member returns 400. Verify token deleted after acceptance. Test viewer cannot create invite.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

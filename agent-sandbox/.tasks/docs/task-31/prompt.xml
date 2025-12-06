@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="31" priority="medium" agent="blaze">
+    <meta>
+        <title>Implement team activity feed and member management UI</title>
+        <priority>medium</priority>
+        <dependencies>30</dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 31 with production-quality code.</role>
+
+    <context>
+        <overview>Create React components for team activity timeline and member management interface with role assignment.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create backend endpoint in api/teams.rs:
+   - GET /api/teams/:id/activity -&gt; recent events (task created, member joined, etc.)
+   - GET /api/teams/:id/members -&gt; list members with roles
+   - PATCH /api/teams/:id/members/:user_id -&gt; update member role (admin only)
+   - DELETE /api/teams/:id/members/:user_id -&gt; remove member (admin only)
+2. Store activity events in new table: team_events
+   - Columns: id, team_id, event_type, actor_id, metadata (JSONB), created_at
+   - Index on (team_id, created_at DESC)
+3. Create React components:
+   - src/components/ActivityFeed.tsx (timeline of events)
+   - src/components/MemberList.tsx (table with avatars, roles)
+   - src/components/MemberRoleSelect.tsx (dropdown for role change)
+   - src/components/InviteModal.tsx (generate invite link)
+4. Implement pagination for activity feed (infinite scroll)
+5. Add confirmation dialog for member removal
+6. Display member roles with badges (Owner, Admin, Member, Viewer)
+7. Disable role changes for owners and self
+8. Add route: /teams/:id/members</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-31): Implement team activity feed and member management UI</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests: fetch activity feed, verify events ordered by date. Test member list displays correct roles. Admin updates member role, verify API call and UI update. Test remove member with confirmation. Verify non-admin cannot change roles. Test invite link generation and copy to clipboard.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

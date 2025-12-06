@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="21" priority="high" agent="cipher">
+    <meta>
+        <title>Implement Team Management CRUD endpoints with RBAC</title>
+        <priority>high</priority>
+        <dependencies>17, 18</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 21 with production-quality code.</role>
+
+    <context>
+        <overview>Create team management endpoints with role-based access control enforcing owner/admin/member/viewer permissions.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create domain/team.rs with:
+   - Team, TeamMember structs
+   - TeamRole enum (Owner, Admin, Member, Viewer)
+   - Permission checks: can_update_team(role), can_invite(role)
+2. Implement infra/team_repository.rs with sqlx queries:
+   - create_team(name, description, owner_id) -&gt; Team
+   - get_team_by_id(id) -&gt; Option&lt;Team&gt; with member count
+   - update_team(id, name, description) -&gt; Result&lt;Team&gt;
+   - get_user_role_in_team(user_id, team_id) -&gt; Option&lt;TeamRole&gt;
+3. Create api/teams.rs with handlers:
+   - POST /api/teams (requires auth) -&gt; creates team, adds creator as owner
+   - GET /api/teams/:id (requires member role) -&gt; returns team with member_count
+   - PATCH /api/teams/:id (requires admin role) -&gt; updates team
+4. Implement RequireTeamRole(role) extractor that:
+   - Validates user is team member
+   - Checks role meets minimum requirement
+   - Returns 403 Forbidden if insufficient permissions</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-21): Implement Team Management CRUD endpoints with RBAC</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests: create team as user A, verify user A is owner. User B cannot access team. Add user B as member, verify they can GET but not PATCH. Test admin can PATCH. Verify member counts are accurate.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

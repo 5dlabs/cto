@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="23" priority="high" agent="rex">
+    <meta>
+        <title>Implement Task CRUD endpoints with filtering and soft delete</title>
+        <priority>high</priority>
+        <dependencies>21</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 23 with production-quality code.</role>
+
+    <context>
+        <overview>Create task management endpoints with status/assignee/date range filtering and soft delete with 30-day retention.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create domain/task.rs with:
+   - Task struct, TaskStatus enum (Todo, InProgress, Done)
+   - TaskFilter struct (status, assignee_id, due_date_start, due_date_end)
+2. Implement infra/task_repository.rs:
+   - create_task(team_id, title, description, assignee_id, due_date) -&gt; Task
+   - get_tasks(team_id, filter: TaskFilter) -&gt; Vec&lt;Task&gt; (WHERE deleted_at IS NULL)
+   - get_task_by_id(id) -&gt; Option&lt;Task&gt;
+   - update_task(id, updates) -&gt; Result&lt;Task&gt;
+   - soft_delete_task(id) -&gt; Result&lt;()&gt; (SET deleted_at = NOW())
+   - hard_delete_old_tasks() -&gt; Result&lt;usize&gt; (DELETE WHERE deleted_at &lt; NOW() - INTERVAL &apos;30 days&apos;)
+3. Create api/tasks.rs:
+   - POST /api/teams/:team_id/tasks (requires member role)
+   - GET /api/teams/:team_id/tasks?status=todo&amp;assignee=uuid&amp;due_after=date&amp;due_before=date
+   - GET /api/tasks/:id (requires team member)
+   - PATCH /api/tasks/:id (requires assignee or admin)
+   - DELETE /api/tasks/:id (soft delete, requires admin)
+4. Validate assignee is team member before creating task
+5. Add background job for hard_delete_old_tasks (runs daily)</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-23): Implement Task CRUD endpoints with filtering and soft delete</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests: create task, verify in list. Filter by status, assignee, date range. Update task status. Soft delete task, verify not in list but exists in DB. Test hard delete after 30 days. Verify member can create, only admin can delete. Test assignee validation.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

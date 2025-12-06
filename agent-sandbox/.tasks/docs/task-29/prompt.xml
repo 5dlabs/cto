@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="29" priority="medium" agent="tap">
+    <meta>
+        <title>Implement GDPR compliance with data export and deletion</title>
+        <priority>medium</priority>
+        <dependencies>23</dependencies>
+        <agent_hint>tap</agent_hint>
+    </meta>
+
+    <role>You are a Senior Mobile Engineer with expertise in React Native and cross-platform development. Implement Task 29 with production-quality code.</role>
+
+    <context>
+        <overview>Create endpoints for user data export and account deletion to comply with GDPR right to access and right to be forgotten.</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create api/gdpr.rs:
+   - GET /api/users/me/export (requires auth)
+     - Collect all user data: profile, teams, tasks, notifications
+     - Generate JSON export file
+     - Include metadata: export_date, data_version
+   - DELETE /api/users/me (requires auth + password confirmation)
+     - Soft delete user (set deleted_at)
+     - Anonymize user data (replace email with deleted_{uuid}@example.com)
+     - Remove from all teams
+     - Reassign owned tasks to team admins
+     - Delete device tokens, OAuth tokens, refresh tokens
+     - Schedule hard delete after 30 days
+2. Implement infra/gdpr.rs:
+   - export_user_data(user_id) -&gt; Result&lt;UserDataExport&gt;
+   - anonymize_user(user_id) -&gt; Result&lt;()&gt;
+3. Create background job for hard deletion:
+   - Runs daily, deletes users where deleted_at &lt; NOW() - 30 days
+   - Cascade delete user&apos;s created tasks, comments, etc.
+4. Add audit log for GDPR operations
+5. Ensure all user queries filter out deleted_at IS NULL</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-29): Implement GDPR compliance with data export and deletion</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests: export user data, verify completeness. Delete account, verify anonymization and team removal. Test task reassignment. Verify hard delete after 30 days. Test deleted user cannot login. Verify GDPR operations logged.</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
