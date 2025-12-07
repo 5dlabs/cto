@@ -2,6 +2,7 @@
 
 pub mod agent_comms;
 pub mod callbacks;
+pub mod github;
 pub mod intake;
 pub mod play;
 
@@ -10,5 +11,6 @@ pub use agent_comms::{
     AgentMessage, RunningAgent,
 };
 pub use callbacks::{handle_intake_complete, handle_tasks_json_callback, CallbackState};
+pub use github::{handle_github_webhook, IntakeMetadata, PullRequestEvent};
 pub use intake::{IntakeRequest, IntakeResult, IntakeTask, TasksJson};
 pub use play::{PlayRequest, PlayResult};

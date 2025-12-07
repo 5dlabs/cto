@@ -18,6 +18,7 @@ use crate::handlers::callbacks::{
     handle_intake_complete, handle_play_complete, handle_status_sync, handle_tasks_json_callback,
     CallbackState,
 };
+use crate::handlers::github::handle_github_webhook;
 use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
 use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
 use crate::webhooks::{
@@ -44,8 +45,12 @@ pub fn build_router(state: AppState) -> Router {
     });
 
     Router::new()
-        // Webhook endpoint
+        // Webhook endpoints
         .route("/webhooks/linear", post(linear_webhook_handler))
+        .route(
+            "/webhooks/github",
+            post(handle_github_webhook).with_state(callback_state.clone()),
+        )
         // Callback endpoints for Argo workflows
         .route(
             "/callbacks/intake-complete",

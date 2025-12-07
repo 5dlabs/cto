@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Linear Issue representation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -356,4 +357,92 @@ impl TaskStatus {
             Self::Cancelled => "canceled",
         }
     }
+}
+
+/// Agent status labels for Linear issues
+/// 
+/// These labels indicate the current state of agent processing on an issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentStatus {
+    /// Waiting for agent to start processing
+    Pending,
+    /// Agent is actively working on the task
+    Working,
+    /// Agent is blocked waiting for user input
+    Blocked,
+    /// Agent has created a PR for review
+    PrCreated,
+    /// Agent has successfully completed the task
+    Complete,
+    /// Agent encountered an error
+    Error,
+}
+
+impl fmt::Display for AgentStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_label_name())
+    }
+}
+
+impl AgentStatus {
+    /// Convert status to Linear label name
+    #[must_use]
+    pub const fn to_label_name(&self) -> &'static str {
+        match self {
+            Self::Pending => "agent:pending",
+            Self::Working => "agent:working",
+            Self::Blocked => "agent:blocked",
+            Self::PrCreated => "agent:pr-created",
+            Self::Complete => "agent:complete",
+            Self::Error => "agent:error",
+        }
+    }
+
+    /// Get label color for this status (hex)
+    #[must_use]
+    pub const fn to_color(&self) -> &'static str {
+        match self {
+            Self::Pending => "#9CA3AF",    // Gray
+            Self::Working => "#3B82F6",    // Blue
+            Self::Blocked => "#F59E0B",    // Amber
+            Self::PrCreated => "#8B5CF6",  // Purple
+            Self::Complete => "#10B981",   // Green
+            Self::Error => "#EF4444",      // Red
+        }
+    }
+
+    /// Create from sidecar status string
+    #[must_use]
+    pub fn from_sidecar_status(status: &str) -> Self {
+        match status {
+            "pending" | "queued" => Self::Pending,
+            "blocked" | "awaiting_input" | "elicitation" => Self::Blocked,
+            "review" | "pr_created" | "pr-created" => Self::PrCreated,
+            "complete" | "done" | "success" | "succeeded" => Self::Complete,
+            "failed" | "error" | "errored" => Self::Error,
+            // Default to working for unknown states (including in_progress, working, running)
+            _ => Self::Working,
+        }
+    }
+}
+
+/// Input for creating a Linear project
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCreateInput {
+    /// Project name
+    pub name: String,
+    /// Project description (markdown)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Team IDs to associate with the project
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team_ids: Option<Vec<String>>,
+    /// Lead user ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lead_id: Option<String>,
+    /// Target completion date
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_date: Option<String>,
 }

@@ -9,8 +9,9 @@ use crate::activities::{
     AgentActivityCreateInput, AgentActivityCreateResponse, AGENT_ACTIVITY_CREATE_MUTATION,
 };
 use crate::models::{
-    Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document, Issue,
-    IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput, Label, Team, WorkflowState,
+    AgentStatus, Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document, Issue,
+    IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput, Label, Project,
+    ProjectCreateInput, Team, WorkflowState,
 };
 
 /// Linear API endpoint
@@ -659,6 +660,200 @@ impl LinearClient {
             .issue_label_create
             .issue_label
             .ok_or_else(|| anyhow!("Failed to create label"))
+    }
+
+    /// Set labels on an issue (replaces existing labels)
+    #[instrument(skip(self), fields(issue_id = %issue_id))]
+    pub async fn set_issue_labels(&self, issue_id: &str, label_ids: &[String]) -> Result<Issue> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            id: &'a str,
+            #[serde(rename = "labelIds")]
+            label_ids: &'a [String],
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "issueUpdate")]
+            issue_update: IssueUpdateResult,
+        }
+
+        #[derive(Deserialize)]
+        struct IssueUpdateResult {
+            success: bool,
+            issue: Option<Issue>,
+        }
+
+        const MUTATION: &str = r"
+            mutation SetIssueLabels($id: String!, $labelIds: [String!]!) {
+                issueUpdate(id: $id, input: { labelIds: $labelIds }) {
+                    success
+                    issue {
+                        id
+                        identifier
+                        title
+                        labels {
+                            nodes {
+                                id
+                                name
+                                color
+                            }
+                        }
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self
+            .execute(MUTATION, Variables { id: issue_id, label_ids })
+            .await?;
+
+        if !response.issue_update.success {
+            return Err(anyhow!("Failed to set issue labels"));
+        }
+
+        response
+            .issue_update
+            .issue
+            .ok_or_else(|| anyhow!("Issue not returned after updating labels"))
+    }
+
+    /// Add a label to an issue (preserves existing labels)
+    #[instrument(skip(self), fields(issue_id = %issue_id, label_id = %label_id))]
+    pub async fn add_issue_label(&self, issue_id: &str, label_id: &str) -> Result<Issue> {
+        // First get existing labels
+        let issue = self.get_issue(issue_id).await?;
+        let mut label_ids: Vec<String> = issue.labels.iter().map(|l| l.id.clone()).collect();
+        
+        // Add new label if not already present
+        if !label_ids.contains(&label_id.to_string()) {
+            label_ids.push(label_id.to_string());
+        }
+        
+        self.set_issue_labels(issue_id, &label_ids).await
+    }
+
+    /// Remove a label from an issue
+    #[instrument(skip(self), fields(issue_id = %issue_id, label_id = %label_id))]
+    pub async fn remove_issue_label(&self, issue_id: &str, label_id: &str) -> Result<Issue> {
+        // First get existing labels
+        let issue = self.get_issue(issue_id).await?;
+        let label_ids: Vec<String> = issue
+            .labels
+            .iter()
+            .filter(|l| l.id != label_id)
+            .map(|l| l.id.clone())
+            .collect();
+        
+        self.set_issue_labels(issue_id, &label_ids).await
+    }
+
+    /// Update agent status label on an issue
+    /// 
+    /// This removes any existing agent:* labels and adds the new one.
+    /// Status labels: agent:pending, agent:working, agent:blocked, agent:pr-created, agent:complete, agent:error
+    #[instrument(skip(self), fields(issue_id = %issue_id, team_id = %team_id, status = %status))]
+    pub async fn update_agent_status_label(
+        &self,
+        issue_id: &str,
+        team_id: &str,
+        status: AgentStatus,
+    ) -> Result<Issue> {
+        // Get the issue to check existing labels
+        let issue = self.get_issue(issue_id).await?;
+        
+        // Filter out existing agent:* labels and collect IDs
+        let mut label_ids: Vec<String> = issue
+            .labels
+            .iter()
+            .filter(|l| !l.name.starts_with("agent:"))
+            .map(|l| l.id.clone())
+            .collect();
+        
+        // Get or create the new status label
+        let label_name = status.to_label_name();
+        let new_label = self.get_or_create_label(team_id, label_name).await?;
+        label_ids.push(new_label.id);
+        
+        self.set_issue_labels(issue_id, &label_ids).await
+    }
+
+    // =========================================================================
+    // Project Operations
+    // =========================================================================
+
+    /// Create a new project
+    #[instrument(skip(self, input), fields(name = %input.name))]
+    pub async fn create_project(&self, input: ProjectCreateInput) -> Result<Project> {
+        #[derive(Serialize)]
+        struct Variables {
+            input: ProjectCreateInput,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "projectCreate")]
+            project_create: ProjectCreateResult,
+        }
+
+        #[derive(Deserialize)]
+        struct ProjectCreateResult {
+            success: bool,
+            project: Option<Project>,
+        }
+
+        const MUTATION: &str = r"
+            mutation CreateProject($input: ProjectCreateInput!) {
+                projectCreate(input: $input) {
+                    success
+                    project {
+                        id
+                        name
+                        description
+                        url
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(MUTATION, Variables { input }).await?;
+
+        if !response.project_create.success {
+            return Err(anyhow!("Failed to create project"));
+        }
+
+        response
+            .project_create
+            .project
+            .ok_or_else(|| anyhow!("Project not returned after creation"))
+    }
+
+    /// Get a project by ID
+    #[instrument(skip(self), fields(project_id = %project_id))]
+    pub async fn get_project(&self, project_id: &str) -> Result<Project> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            id: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            project: Project,
+        }
+
+        const QUERY: &str = r"
+            query GetProject($id: String!) {
+                project(id: $id) {
+                    id
+                    name
+                    description
+                    url
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, Variables { id: project_id }).await?;
+        Ok(response.project)
     }
 
     // =========================================================================

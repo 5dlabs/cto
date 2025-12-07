@@ -13,7 +13,10 @@ use std::collections::{BTreeMap, HashMap};
 use tracing::{error, info, warn};
 
 use crate::config::{CtoConfig, IntakeConfig};
-use crate::models::{Issue, IssueCreateInput, IssueRelationCreateInput, IssueRelationType, Label};
+use crate::models::{
+    Issue, IssueCreateInput, IssueRelationCreateInput, IssueRelationType, Label, Project,
+    ProjectCreateInput,
+};
 use crate::LinearClient;
 
 /// Agent assignments for different task types.
@@ -581,6 +584,16 @@ pub async fn create_task_issues(
     request: &IntakeRequest,
     tasks: &[IntakeTask],
 ) -> Result<HashMap<i32, String>> {
+    create_task_issues_with_project(client, request, tasks, None).await
+}
+
+/// Create Linear issues for generated tasks, optionally linked to a project.
+pub async fn create_task_issues_with_project(
+    client: &LinearClient,
+    request: &IntakeRequest,
+    tasks: &[IntakeTask],
+    project_id: Option<&str>,
+) -> Result<HashMap<i32, String>> {
     let mut task_issue_map = HashMap::new();
 
     // Get workflow states for the team.
@@ -594,10 +607,16 @@ pub async fn create_task_issues(
     let cto_task_label = client
         .get_or_create_label(&request.team_id, "cto-task")
         .await?;
+    
+    // Get or create agent:pending label for new tasks
+    let agent_pending_label = client
+        .get_or_create_label(&request.team_id, "agent:pending")
+        .await?;
 
     info!(
         task_count = tasks.len(),
         parent_issue = %request.prd_identifier,
+        project_id = ?project_id,
         "Creating task issues"
     );
 
@@ -618,7 +637,7 @@ pub async fn create_task_issues(
         // Format task description with details.
         let description = format_task_description(task);
 
-        let mut label_ids = vec![cto_task_label.id.clone()];
+        let mut label_ids = vec![cto_task_label.id.clone(), agent_pending_label.id.clone()];
         if let Some(label) = priority_label {
             label_ids.push(label.id);
         }
@@ -630,7 +649,7 @@ pub async fn create_task_issues(
             parent_id: Some(request.prd_issue_id.clone()),
             priority: Some(task.priority),
             label_ids: Some(label_ids),
-            project_id: None,
+            project_id: project_id.map(String::from),
             state_id: Some(initial_state.id.clone()),
         };
 
@@ -687,6 +706,66 @@ pub async fn create_task_issues(
     }
 
     Ok(task_issue_map)
+}
+
+/// Create a Linear project for an intake request.
+///
+/// Creates a project linked to the PRD issue's team, with appropriate
+/// description and metadata.
+pub async fn create_intake_project(
+    client: &LinearClient,
+    request: &IntakeRequest,
+    task_count: usize,
+) -> Result<Project> {
+    // Determine project name from PRD title
+    let project_name = derive_project_name(&request.title);
+
+    let description = format!(
+        "## Project Overview\n\n\
+         Generated from PRD: **{}** ({})\n\n\
+         This project contains {} tasks for implementation.\n\n\
+         ---\n\n\
+         *Created by CTO Agent intake workflow*",
+        request.title, request.prd_identifier, task_count
+    );
+
+    let input = ProjectCreateInput {
+        name: project_name,
+        description: Some(description),
+        team_ids: Some(vec![request.team_id.clone()]),
+        lead_id: None,
+        target_date: None,
+    };
+
+    let project = client.create_project(input).await?;
+
+    info!(
+        project_id = %project.id,
+        project_name = %project.name,
+        prd = %request.prd_identifier,
+        "Created Linear project for intake"
+    );
+
+    Ok(project)
+}
+
+/// Derive a clean project name from PRD title.
+fn derive_project_name(title: &str) -> String {
+    // Remove common prefixes
+    let cleaned = title
+        .trim()
+        .strip_prefix("[PRD]")
+        .or_else(|| title.strip_prefix("PRD:"))
+        .or_else(|| title.strip_prefix("PRD -"))
+        .unwrap_or(title)
+        .trim();
+
+    // Limit length
+    if cleaned.len() > 100 {
+        format!("{}...", &cleaned[..97])
+    } else {
+        cleaned.to_string()
+    }
 }
 
 /// Format task description for Linear issue.

@@ -10,10 +10,11 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use super::intake::{
-    create_task_issues, generate_completion_summary, IntakeRequest, IntakeTask, TasksJson,
-    TechStack,
+    create_intake_project, create_task_issues_with_project, generate_completion_summary,
+    IntakeRequest, IntakeTask, TasksJson, TechStack,
 };
 use crate::config::CtoConfig;
+use crate::models::AgentStatus;
 use crate::LinearClient;
 
 /// Callback payload for intake workflow completion.
@@ -56,6 +57,7 @@ pub struct CallbackState {
 ///
 /// This is called by the Argo intake workflow when it completes.
 /// It creates Linear sub-issues for each generated task.
+#[allow(clippy::too_many_lines)]
 pub async fn handle_intake_complete(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<IntakeCompleteCallback>,
@@ -101,6 +103,55 @@ pub async fn handle_intake_complete(
         })));
     };
 
+    // Create intake request from callback
+    let request = IntakeRequest {
+        session_id: payload.session_id.clone(),
+        prd_issue_id: payload.issue_id.clone(),
+        prd_identifier: payload.issue_identifier.clone(),
+        team_id: payload.team_id.clone(),
+        title: payload
+            .workflow_name
+            .clone()
+            .unwrap_or_else(|| "Intake Project".to_string()),
+        prd_content: String::new(), // Not needed for issue creation
+        architecture_content: None,
+        repository_url: None,
+        source_branch: None,
+        tech_stack: TechStack::default(), // Not needed for issue creation
+        cto_config: CtoConfig::default(), // Not needed for issue creation
+    };
+
+    // Create project first
+    if let Err(e) = client
+        .emit_thought(
+            &payload.session_id,
+            "Creating Linear project for this intake...",
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to emit thought activity");
+    }
+
+    let project = match create_intake_project(client, &request, payload.tasks.len()).await {
+        Ok(p) => {
+            info!(
+                session_id = %payload.session_id,
+                project_id = %p.id,
+                project_name = %p.name,
+                "Created project for intake"
+            );
+            Some(p)
+        }
+        Err(e) => {
+            warn!(
+                session_id = %payload.session_id,
+                error = %e,
+                "Failed to create project, continuing without project"
+            );
+            None
+        }
+    };
+
     // Emit progress activity
     if let Err(e) = client
         .emit_thought(
@@ -112,28 +163,15 @@ pub async fn handle_intake_complete(
         warn!(error = %e, "Failed to emit thought activity");
     }
 
-    // Create intake request from callback
-    let request = IntakeRequest {
-        session_id: payload.session_id.clone(),
-        prd_issue_id: payload.issue_id.clone(),
-        prd_identifier: payload.issue_identifier.clone(),
-        team_id: payload.team_id.clone(),
-        title: String::new(),       // Not needed for issue creation
-        prd_content: String::new(), // Not needed for issue creation
-        architecture_content: None,
-        repository_url: None,
-        source_branch: None,
-        tech_stack: TechStack::default(), // Not needed for issue creation
-        cto_config: CtoConfig::default(), // Not needed for issue creation
-    };
-
-    // Create task issues
-    match create_task_issues(client, &request, &payload.tasks).await {
+    // Create task issues (with project if created)
+    let project_id = project.as_ref().map(|p| p.id.as_str());
+    match create_task_issues_with_project(client, &request, &payload.tasks, project_id).await {
         Ok(task_issue_map) => {
             let created_count = task_issue_map.len();
             info!(
                 session_id = %payload.session_id,
                 created_count = created_count,
+                project_id = ?project_id,
                 "Created task issues"
             );
 
@@ -150,7 +188,9 @@ pub async fn handle_intake_complete(
                 "tasks_received": payload.tasks.len(),
                 "issues_created": created_count,
                 "task_issue_map": task_issue_map,
-                "workflow_name": payload.workflow_name
+                "workflow_name": payload.workflow_name,
+                "project_id": project.as_ref().map(|p| &p.id),
+                "project_name": project.as_ref().map(|p| &p.name)
             })))
         }
         Err(e) => {
@@ -254,7 +294,7 @@ pub struct PlayCompleteCallback {
 /// Handle play workflow completion callback.
 ///
 /// This is called by the Argo play workflow when it completes.
-/// It updates the Linear issue state and emits completion activity.
+/// It updates the Linear issue state, agent status label, and emits completion activity.
 pub async fn handle_play_complete(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<PlayCompleteCallback>,
@@ -277,6 +317,31 @@ pub async fn handle_play_complete(
     };
 
     let success = payload.workflow_status == "Succeeded";
+    
+    // Determine the final agent status
+    let agent_status = if success {
+        AgentStatus::PrCreated // PR created, awaiting review
+    } else {
+        AgentStatus::Error
+    };
+
+    // Update agent status label
+    if let Err(e) = client
+        .update_agent_status_label(
+            &payload.linear_issue_id,
+            &payload.linear_team_id,
+            agent_status,
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to update agent status label");
+    } else {
+        info!(
+            issue_id = %payload.linear_issue_id,
+            label = %agent_status.to_label_name(),
+            "Updated agent status label on workflow completion"
+        );
+    }
 
     if success {
         // Emit success response
@@ -296,13 +361,13 @@ pub async fn handle_play_complete(
             warn!(error = %e, "Failed to emit completion response");
         }
 
-        // Update issue state to "Done" or "In Review"
+        // Update issue state to "In Review"
         if let Ok(states) = client.get_team_workflow_states(&payload.linear_team_id).await {
-            // Look for "In Review" or "Done" state
+            // Look for "In Review" state first
             let target_state = states
                 .iter()
-                .find(|s| s.name == "In Review" || s.state_type == "started")
-                .or_else(|| states.iter().find(|s| s.state_type == "completed"));
+                .find(|s| s.name == "In Review")
+                .or_else(|| states.iter().find(|s| s.state_type == "started"));
 
             if let Some(state) = target_state {
                 if let Err(e) = client
@@ -341,7 +406,8 @@ pub async fn handle_play_complete(
         "status": if success { "success" } else { "error" },
         "session_id": payload.linear_session_id,
         "workflow_name": payload.workflow_name,
-        "workflow_status": payload.workflow_status
+        "workflow_status": payload.workflow_status,
+        "agent_label": agent_status.to_label_name()
     })))
 }
 
@@ -385,7 +451,8 @@ pub struct StatusSyncPayload {
 /// Handle status sync from sidecar.
 ///
 /// This endpoint receives status updates from the sidecar container
-/// and syncs them to Linear (issue state + agent activities).
+/// and syncs them to Linear (issue state + agent status labels + activities).
+#[allow(clippy::too_many_lines)]
 pub async fn handle_status_sync(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<StatusSyncPayload>,
@@ -436,6 +503,25 @@ pub async fn handle_status_sync(
                 warn!(error = %e, "Failed to update issue state");
             }
         }
+    }
+
+    // Update agent status label
+    let agent_status = AgentStatus::from_sidecar_status(&payload.status.status);
+    if let Err(e) = client
+        .update_agent_status_label(
+            &payload.linear_issue_id,
+            &payload.linear_team_id,
+            agent_status,
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to update agent status label");
+    } else {
+        info!(
+            issue_id = %payload.linear_issue_id,
+            label = %agent_status.to_label_name(),
+            "Updated agent status label"
+        );
     }
 
     // Emit activity based on status
@@ -489,7 +575,8 @@ pub async fn handle_status_sync(
     Ok(Json(json!({
         "status": "success",
         "session_id": payload.linear_session_id,
-        "task_status": payload.status.status
+        "task_status": payload.status.status,
+        "agent_label": agent_status.to_label_name()
     })))
 }
 
