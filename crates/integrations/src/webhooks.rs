@@ -77,6 +77,8 @@ pub enum WebhookType {
     AgentSessionEvent,
     /// Issue event
     Issue,
+    /// Issue attachment event (link added/removed)
+    IssueAttachment,
     /// Comment event
     Comment,
     /// App user notification
@@ -264,6 +266,31 @@ impl WebhookPayload {
         self.data
             .as_ref()
             .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Try to get the attachment URL from `IssueAttachment` events
+    #[must_use]
+    pub fn get_attachment_url(&self) -> Option<String> {
+        self.data.as_ref().and_then(|v| {
+            v.get("url").and_then(|u| u.as_str()).map(String::from)
+        })
+    }
+
+    /// Try to get the issue ID from `IssueAttachment` events
+    #[must_use]
+    pub fn get_attachment_issue_id(&self) -> Option<String> {
+        self.data.as_ref().and_then(|v| {
+            // Try nested issue.id first, then issueId
+            v.get("issue")
+                .and_then(|i| i.get("id"))
+                .and_then(|id| id.as_str())
+                .map(String::from)
+                .or_else(|| {
+                    v.get("issueId")
+                        .and_then(|id| id.as_str())
+                        .map(String::from)
+                })
+        })
     }
 }
 

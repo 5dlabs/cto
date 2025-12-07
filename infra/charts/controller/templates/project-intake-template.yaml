@@ -188,7 +188,7 @@ spec:
         - name: configmap-name
       container:
         image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
-        imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
+        imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "IfNotPresent" }}
         command: ["/bin/bash"]
         args: ["/templates/intake_unified-intake.sh"]
         workingDir: /workspace
@@ -270,6 +270,13 @@ spec:
           # CLI for documentation generation phase
           - name: CLI
             value: "{{`{{workflow.parameters.cli}}`}}"
+          # Linear OAuth token for streaming status updates
+          - name: LINEAR_OAUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: linear-secrets
+                key: LINEAR_OAUTH_TOKEN
+                optional: true
       volumes:
         - name: intake-files
           configMap:
@@ -285,20 +292,23 @@ spec:
         parameters:
         - name: configmap-name
       script:
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        image: bitnami/kubectl:latest
         command: ["/bin/sh"]
         source: |
           #!/bin/sh
           echo "Cleaning up ConfigMap: {{`{{inputs.parameters.configmap-name}}`}}"
+          # Delete from the same namespace where the workflow runs (cto)
           kubectl delete configmap "{{`{{inputs.parameters.configmap-name}}`}}" \
-            -n {{ .Values.argo.namespace | default "argo" }} \
+            -n {{ .Release.Namespace }} \
             --ignore-not-found=true
           echo "Cleanup complete"
 
     # Exit handler for Linear callbacks
+    # Note: The main task callback is now sent directly from the intake script.
+    # This exit handler only sends a status update for failed workflows.
     - name: exit-handler
       script:
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        image: curlimages/curl:8.5.0
         command: ["/bin/sh"]
         source: |
           #!/bin/sh
@@ -306,8 +316,10 @@ spec:
           
           SESSION_ID="{{`{{workflow.parameters.linear-session-id}}`}}"
           ISSUE_ID="{{`{{workflow.parameters.linear-issue-id}}`}}"
+          ISSUE_IDENTIFIER="{{`{{workflow.parameters.linear-issue-identifier}}`}}"
+          TEAM_ID="{{`{{workflow.parameters.linear-team-id}}`}}"
           CALLBACK_URL="{{`{{workflow.parameters.linear-callback-url}}`}}"
-          CONFIGMAP="{{`{{workflow.parameters.configmap-name}}`}}"
+          WORKFLOW_STATUS="{{`{{workflow.status}}`}}"
           
           # Skip if no Linear session configured
           if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "" ]; then
@@ -315,30 +327,36 @@ spec:
             exit 0
           fi
           
-          echo "Sending intake completion callback to Linear service..."
+          echo "Exit handler running..."
           echo "  Session ID: $SESSION_ID"
-          echo "  Issue ID: $ISSUE_ID"
-          echo "  Workflow Status: {{`{{workflow.status}}`}}"
+          echo "  Issue Identifier: $ISSUE_IDENTIFIER"
+          echo "  Workflow Status: $WORKFLOW_STATUS"
           
-          # Build callback payload
-          PAYLOAD=$(cat <<EOF
+          # Only send callback if workflow failed
+          # Success callbacks are sent directly from the intake script
+          if [ "$WORKFLOW_STATUS" != "Succeeded" ]; then
+            echo "Workflow failed - sending error callback to Linear"
+            
+            PAYLOAD=$(cat <<EOF
           {
-            "workflow_name": "{{`{{workflow.name}}`}}",
-            "workflow_status": "{{`{{workflow.status}}`}}",
-            "linear_session_id": "$SESSION_ID",
-            "linear_issue_id": "$ISSUE_ID",
-            "linear_team_id": "{{`{{workflow.parameters.linear-team-id}}`}}",
-            "configmap_name": "$CONFIGMAP",
-            "project_name": "{{`{{workflow.parameters.project-name}}`}}",
-            "duration_seconds": "{{`{{workflow.duration}}`}}"
+            "sessionId": "$SESSION_ID",
+            "issueId": "$ISSUE_ID",
+            "issueIdentifier": "$ISSUE_IDENTIFIER",
+            "teamId": "$TEAM_ID",
+            "workflowName": "{{`{{workflow.name}}`}}",
+            "tasks": [],
+            "success": false,
+            "error": "Intake workflow failed with status: $WORKFLOW_STATUS"
           }
           EOF
           )
-          
-          # Send callback
-          curl -s -X POST "$CALLBACK_URL/callbacks/intake-complete" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "Warning: Callback failed, continuing..."
+            
+            curl -s -X POST "$CALLBACK_URL/callbacks/intake-complete" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" || echo "Warning: Callback failed"
+          else
+            echo "Workflow succeeded - tasks callback already sent from intake script"
+          fi
           
           echo "Exit handler complete"
 

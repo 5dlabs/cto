@@ -1,0 +1,52 @@
+# Claude image with tasks CLI for Kind testing
+# Multi-stage build: compile tasks for Linux, then add to claude image
+
+# ===== BUILDER STAGE =====
+FROM rust:latest AS builder
+
+WORKDIR /build
+
+# Copy entire workspace for proper dependency resolution
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+
+# Build only the tasks package for linux/arm64
+RUN cargo build --release --package tasks --bin tasks
+
+# ===== RUNTIME STAGE =====
+# Use the kind-local runtime image (already built for arm64)
+FROM ghcr.io/5dlabs/runtime:kind-local
+
+ARG TZ
+ENV TZ="$TZ"
+
+ARG USERNAME=node
+ENV DEVCONTAINER=true
+
+# Setup workspace and user environment
+RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.cache && \
+    chown -R 1000:1000 /home/node/.claude /home/node/.config /home/node/.cache
+
+WORKDIR /workspace
+
+# Install Claude (generic VERSION only) as root, then drop to node
+USER root
+ARG VERSION=latest
+RUN npm install -g @anthropic-ai/claude-code@${VERSION}
+
+# Copy tasks binary from builder
+COPY --from=builder /build/target/release/tasks /usr/local/bin/tasks
+RUN chmod +x /usr/local/bin/tasks
+
+# Verify tasks installation
+RUN tasks --help 2>&1 | head -5 || echo "tasks CLI installed"
+
+# Configure Claude-specific environment
+USER node
+
+# Configure Claude-specific git identity
+RUN git config --global user.name "5D Labs Agent" && \
+    git config --global user.email "agent@5dlabs.com"
+
+# Final setup
+USER node

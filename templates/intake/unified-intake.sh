@@ -8,10 +8,89 @@ set -euo pipefail
 
 echo "🚀 Starting Unified Intake Process"
 echo "================================="
-echo "📍 Script version: unified-intake v2.0.0 (tasks CLI)"
+echo "📍 Script version: unified-intake v2.1.0 (tasks CLI + Linear streaming)"
 echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "📦 Pod: ${HOSTNAME:-unknown}"
 echo ""
+
+# =========================================================================
+# Linear API Helper Functions (for real-time status streaming)
+# =========================================================================
+
+# Emit a thought/status message to Linear agent dialog
+# Uses agentActivityCreate mutation per Linear Agent API docs
+# Usage: emit_linear_status "message"
+emit_linear_status() {
+    local message="$1"
+    local session_id="${LINEAR_SESSION_ID:-}"
+    local api_key="${LINEAR_OAUTH_TOKEN:-}"
+    
+    # Only emit if Linear is configured
+    if [ -z "$session_id" ] || [ "$session_id" = "null" ] || [ "$session_id" = "" ]; then
+        return 0
+    fi
+    if [ -z "$api_key" ]; then
+        return 0
+    fi
+    
+    # GraphQL mutation per Linear Agent API docs
+    # https://linear.app/developers/agent-interaction#sending-agent-activities
+    local payload
+    payload=$(jq -n \
+        --arg sessionId "$session_id" \
+        --arg body "$message" \
+        '{
+            query: "mutation AgentActivityCreate($input: AgentActivityCreateInput!) { agentActivityCreate(input: $input) { success } }",
+            variables: {
+                input: {
+                    agentSessionId: $sessionId,
+                    content: {
+                        type: "thought",
+                        body: $body
+                    }
+                }
+            }
+        }')
+    
+    # Fire and forget - don't block on response
+    curl -s -X POST "https://api.linear.app/graphql" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: $api_key" \
+        -d "$payload" > /dev/null 2>&1 &
+}
+
+# Emit an error message to Linear
+emit_linear_error() {
+    local message="$1"
+    local session_id="${LINEAR_SESSION_ID:-}"
+    local api_key="${LINEAR_OAUTH_TOKEN:-}"
+    
+    if [ -z "$session_id" ] || [ "$session_id" = "null" ] || [ -z "$api_key" ]; then
+        return 0
+    fi
+    
+    local payload
+    payload=$(jq -n \
+        --arg sessionId "$session_id" \
+        --arg body "$message" \
+        '{
+            query: "mutation AgentActivityCreate($input: AgentActivityCreateInput!) { agentActivityCreate(input: $input) { success } }",
+            variables: {
+                input: {
+                    agentSessionId: $sessionId,
+                    content: {
+                        type: "error",
+                        body: $body
+                    }
+                }
+            }
+        }')
+    
+    curl -s -X POST "https://api.linear.app/graphql" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: $api_key" \
+        -d "$payload" > /dev/null 2>&1 || true
+}
 
 # =========================================================================
 # Phase 1: Configuration and Environment Setup
@@ -47,12 +126,25 @@ NUM_TASKS=$(jq -r '.num_tasks // 15' "$CONFIG_FILE")
 EXPAND_TASKS=$(jq -r '.expand_tasks // true' "$CONFIG_FILE")
 ANALYZE_COMPLEXITY=$(jq -r '.analyze_complexity // true' "$CONFIG_FILE")
 
+# Load Linear session config (for streaming updates)
+LINEAR_SESSION_ID=$(jq -r '.linear_session_id // ""' "$CONFIG_FILE")
+LINEAR_ISSUE_ID=$(jq -r '.linear_issue_id // ""' "$CONFIG_FILE")
+LINEAR_ISSUE_IDENTIFIER=$(jq -r '.linear_issue_identifier // ""' "$CONFIG_FILE")
+LINEAR_TEAM_ID=$(jq -r '.linear_team_id // ""' "$CONFIG_FILE")
+LINEAR_CALLBACK_URL=${LINEAR_CALLBACK_URL:-"http://linear-svc.cto.svc.cluster.local:8081"}
+
 echo "  ✓ Project: $PROJECT_NAME"
 echo "  ✓ Repository: $REPOSITORY_URL"
 echo "  ✓ GitHub App: $GITHUB_APP"
 echo "  ✓ Model: $PRIMARY_MODEL"
 echo "  ✓ Tasks: ~$NUM_TASKS"
+if [ -n "$LINEAR_SESSION_ID" ] && [ "$LINEAR_SESSION_ID" != "null" ]; then
+    echo "  ✓ Linear: $LINEAR_ISSUE_IDENTIFIER (streaming enabled)"
+fi
 echo ""
+
+# Emit initial status to Linear
+emit_linear_status "🚀 Starting intake process for **$PROJECT_NAME**\n\n- Repository: \`$REPOSITORY_URL\`\n- Target tasks: ~$NUM_TASKS\n- Model: $PRIMARY_MODEL"
 
 # =========================================================================
 # Phase 2: GitHub Authentication
@@ -104,11 +196,15 @@ echo ""
 echo "📦 Phase 2: Repository Clone and Setup"
 echo "======================================="
 
+emit_linear_status "📦 Cloning repository..."
+
 CLONE_DIR="/tmp/repo-$(date +%s)"
 echo "📂 Cloning repository to: $CLONE_DIR"
 
-git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+git clone "$REPOSITORY_URL" "$CLONE_DIR" || { emit_linear_error "Failed to clone repository: $REPOSITORY_URL"; exit 1; }
 cd "$CLONE_DIR" || exit 1
+
+emit_linear_status "✅ Repository cloned successfully"
 
 git config user.name "Morgan Intake"
 git config user.email "morgan@5dlabs.com"
@@ -136,9 +232,12 @@ echo ""
 echo "🚀 Phase 3: Running tasks CLI intake"
 echo "====================================="
 
+emit_linear_status "🤖 Analyzing PRD and generating tasks...\n\nThis may take a few minutes as I:\n1. Parse the requirements\n2. Break down into ~$NUM_TASKS tasks\n3. Analyze complexity\n4. Generate documentation"
+
 # Verify tasks CLI is available
 if ! command -v tasks &> /dev/null; then
     echo "❌ tasks CLI not found in PATH"
+    emit_linear_error "tasks CLI not found in container image"
     exit 1
 fi
 echo "✓ tasks CLI found: $(which tasks)"
@@ -158,17 +257,72 @@ INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
 [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
 
 echo "  → Running: $INTAKE_CMD"
-eval "$INTAKE_CMD" || exit 1
+if ! eval "$INTAKE_CMD"; then
+    emit_linear_error "Task generation failed. Check the workflow logs for details."
+    exit 1
+fi
 
 # Verify tasks were generated
 TASKS_FILE=".tasks/tasks/tasks.json"
 if [ ! -f "$TASKS_FILE" ]; then
     echo "❌ tasks.json not found at $TASKS_FILE"
+    emit_linear_error "Task generation completed but tasks.json was not created"
     exit 1
 fi
 
 TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
 echo "✅ Generated $TASK_COUNT tasks with documentation"
+
+emit_linear_status "✅ Generated **$TASK_COUNT tasks**\n\nNow creating PR with the task breakdown..."
+
+# =========================================================================
+# Phase 5.5: Send Tasks to Linear (if configured)
+# =========================================================================
+# (LINEAR_SESSION_ID, LINEAR_ISSUE_ID, etc. already loaded in Phase 1)
+
+if [ -n "$LINEAR_SESSION_ID" ] && [ "$LINEAR_SESSION_ID" != "null" ] && [ "$LINEAR_SESSION_ID" != "" ]; then
+    echo ""
+    echo "📤 Sending tasks to Linear..."
+    echo "  Session ID: $LINEAR_SESSION_ID"
+    echo "  Issue: $LINEAR_ISSUE_IDENTIFIER"
+    
+    # Read tasks.json and prepare callback payload
+    TASKS_JSON=$(cat "$TASKS_FILE" | jq -c '.')
+    
+    PAYLOAD=$(jq -n \
+        --arg sessionId "$LINEAR_SESSION_ID" \
+        --arg issueId "$LINEAR_ISSUE_ID" \
+        --arg issueIdentifier "$LINEAR_ISSUE_IDENTIFIER" \
+        --arg teamId "$LINEAR_TEAM_ID" \
+        --arg workflowName "${WORKFLOW_NAME:-unified-intake}" \
+        --argjson tasksJson "$TASKS_JSON" \
+        '{
+            sessionId: $sessionId,
+            issueId: $issueId,
+            issueIdentifier: $issueIdentifier,
+            teamId: $teamId,
+            workflowName: $workflowName,
+            tasksJson: ($tasksJson | tostring)
+        }')
+    
+    RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$LINEAR_CALLBACK_URL/callbacks/tasks-json" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD" 2>/dev/null || echo -e "\n000")
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+    BODY=$(echo "$RESPONSE" | head -n -1)
+    
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo "  ✅ Tasks sent to Linear successfully"
+        echo "  Response: $BODY"
+    else
+        echo "  ⚠️ Failed to send tasks to Linear (HTTP $HTTP_CODE)"
+        echo "  Response: $BODY"
+        # Don't fail the workflow if Linear callback fails
+    fi
+else
+    echo ""
+    echo "ℹ️ Linear session not configured, skipping Linear callback"
+fi
 
 # =========================================================================
 # Phase 6: Create Pull Request
@@ -223,10 +377,20 @@ $PROJECT_DIR_NAME/
 
 🤖 Generated by Morgan (tasks CLI v2)" \
     --head "$BRANCH_NAME" \
-    --base main || echo "⚠️ PR creation failed, branch pushed: $BRANCH_NAME"
+    --base main || { echo "⚠️ PR creation failed, branch pushed: $BRANCH_NAME"; emit_linear_status "⚠️ PR creation failed, but branch was pushed: \`$BRANCH_NAME\`"; }
+
+# Get PR URL if available
+PR_URL=$(gh pr view "$BRANCH_NAME" --json url -q '.url' 2>/dev/null || echo "")
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo "║ ✅ Intake completed successfully!"
 echo "════════════════════════════════════════════════════════════════"
+
+# Emit final success message with PR link
+if [ -n "$PR_URL" ]; then
+    emit_linear_status "✅ **Intake completed!**\n\n📋 Generated **$TASK_COUNT tasks** for $PROJECT_NAME\n\n🔗 **Pull Request**: $PR_URL\n\nOnce merged, I'll create Linear issues for each task."
+else
+    emit_linear_status "✅ **Intake completed!**\n\n📋 Generated **$TASK_COUNT tasks** for $PROJECT_NAME\n\n📂 Branch: \`$BRANCH_NAME\`"
+fi
 

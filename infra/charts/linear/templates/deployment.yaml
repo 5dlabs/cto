@@ -76,6 +76,15 @@ spec:
                   key: {{ .Values.secrets.githubTokenKey }}
                   optional: true
             {{- end }}
+            # GitHub webhook auto-configuration
+            {{- if .Values.github.webhookCallbackUrl }}
+            - name: WEBHOOK_CALLBACK_URL
+              value: {{ .Values.github.webhookCallbackUrl | quote }}
+            {{- end }}
+            {{- if .Values.github.webhookRepos }}
+            - name: GITHUB_WEBHOOK_REPOS
+              value: {{ .Values.github.webhookRepos | quote }}
+            {{- end }}
             # Intake configuration
             - name: GITHUB_APP_NAME
               value: {{ .Values.intake.githubApp | quote }}

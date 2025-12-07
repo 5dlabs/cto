@@ -20,6 +20,10 @@ pub struct Config {
     pub github_token: Option<String>,
     /// Kubernetes namespace.
     pub namespace: String,
+    /// Webhook callback URL (for GitHub webhooks to call back to this service).
+    pub webhook_callback_url: Option<String>,
+    /// GitHub repositories to auto-configure webhooks on (comma-separated, e.g., "5dlabs/cto,5dlabs/other").
+    pub github_webhook_repos: Vec<String>,
     /// Intake configuration.
     pub intake: IntakeConfig,
     /// Play configuration.
@@ -46,6 +50,11 @@ impl Default for Config {
             oauth_token: env::var("LINEAR_OAUTH_TOKEN").ok(),
             github_token: env::var("GITHUB_TOKEN").ok(),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "cto".to_string()),
+            webhook_callback_url: env::var("WEBHOOK_CALLBACK_URL").ok(),
+            github_webhook_repos: env::var("GITHUB_WEBHOOK_REPOS")
+                .ok()
+                .map(|s| s.split(',').map(|r| r.trim().to_string()).collect())
+                .unwrap_or_default(),
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),
         }

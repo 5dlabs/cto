@@ -69,6 +69,14 @@ secrets:
   # GitHub token for API calls (optional, but needed for task fetching)
   githubTokenKey: GITHUB_TOKEN
 
+# GitHub webhook auto-configuration
+github:
+  # Callback URL for GitHub webhooks (e.g., https://linear-webhooks.5dlabs.ai)
+  # If set, the service will auto-create webhooks on the configured repos
+  webhookCallbackUrl: ""
+  # Comma-separated list of repos to configure webhooks on (e.g., "5dlabs/cto,5dlabs/other")
+  webhookRepos: ""
+
 # Workflow configuration
 intake:
   githubApp: cto-dev

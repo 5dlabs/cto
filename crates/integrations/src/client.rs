@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context, Result};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument, warn};
 
 use crate::activities::{
     AgentActivityCreateInput, AgentActivityCreateResponse, AGENT_ACTIVITY_CREATE_MUTATION,
@@ -199,6 +199,73 @@ impl LinearClient {
         let response: Response = self.execute(QUERY, Variables { id: issue_id }).await?;
         debug!("Retrieved issue: {}", response.issue.identifier);
         Ok(response.issue)
+    }
+
+    /// Get the active agent session ID for an issue (if any).
+    ///
+    /// This checks if the issue has been delegated to an agent and returns
+    /// the session ID if there's an active (not completed) session.
+    #[instrument(skip(self), fields(issue_id = %issue_id))]
+    pub async fn get_active_session_for_issue(&self, issue_id: &str) -> Result<Option<String>> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            id: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            issue: Option<IssueWithSessions>,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct IssueWithSessions {
+            agent_sessions: AgentSessionsConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct AgentSessionsConnection {
+            nodes: Vec<AgentSessionNode>,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct AgentSessionNode {
+            id: String,
+            status: String,
+        }
+
+        const QUERY: &str = r"
+            query GetIssueAgentSessions($id: String!) {
+                issue(id: $id) {
+                    agentSessions {
+                        nodes {
+                            id
+                            status
+                        }
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, Variables { id: issue_id }).await?;
+
+        // Find an active session (status is not "completed" or "cancelled")
+        let active_session = response.issue.and_then(|i| {
+            i.agent_sessions
+                .nodes
+                .into_iter()
+                .find(|s| s.status != "completed" && s.status != "cancelled")
+                .map(|s| s.id)
+        });
+
+        if let Some(ref session_id) = active_session {
+            debug!(session_id = %session_id, "Found active agent session");
+        } else {
+            debug!("No active agent session found");
+        }
+
+        Ok(active_session)
     }
 
     /// Create a new issue
@@ -660,6 +727,152 @@ impl LinearClient {
             .issue_label_create
             .issue_label
             .ok_or_else(|| anyhow!("Failed to create label"))
+    }
+
+    /// Get or create a workspace-level label by name with optional color.
+    ///
+    /// Workspace labels are available to all teams.
+    #[instrument(skip(self), fields(name = %name))]
+    pub async fn get_or_create_workspace_label(
+        &self,
+        name: &str,
+        color: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<Label> {
+        // First try to find existing workspace label (no team filter)
+        #[derive(Serialize)]
+        struct FindVariables<'a> {
+            name: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct FindResponse {
+            #[serde(rename = "issueLabels")]
+            issue_labels: LabelsConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct LabelsConnection {
+            nodes: Vec<Label>,
+        }
+
+        const FIND_QUERY: &str = r"
+            query FindWorkspaceLabel($name: String!) {
+                issueLabels(filter: { 
+                    name: { eq: $name }
+                }) {
+                    nodes {
+                        id
+                        name
+                        color
+                    }
+                }
+            }
+        ";
+
+        let find_response: FindResponse = self.execute(FIND_QUERY, FindVariables { name }).await?;
+
+        if let Some(label) = find_response.issue_labels.nodes.into_iter().next() {
+            return Ok(label);
+        }
+
+        // Create new workspace label (no teamId = workspace-level)
+        #[derive(Serialize)]
+        struct CreateVariables<'a> {
+            name: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            color: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            description: Option<&'a str>,
+        }
+
+        #[derive(Deserialize)]
+        struct CreateResponse {
+            #[serde(rename = "issueLabelCreate")]
+            issue_label_create: LabelCreateResult,
+        }
+
+        #[derive(Deserialize)]
+        struct LabelCreateResult {
+            success: bool,
+            #[serde(rename = "issueLabel")]
+            issue_label: Option<Label>,
+        }
+
+        const CREATE_MUTATION: &str = r"
+            mutation CreateWorkspaceLabel($name: String!, $color: String, $description: String) {
+                issueLabelCreate(input: { name: $name, color: $color, description: $description }) {
+                    success
+                    issueLabel {
+                        id
+                        name
+                        color
+                    }
+                }
+            }
+        ";
+
+        let create_response: CreateResponse = self
+            .execute(
+                CREATE_MUTATION,
+                CreateVariables {
+                    name,
+                    color,
+                    description,
+                },
+            )
+            .await?;
+
+        if create_response.issue_label_create.success {
+            info!(name = %name, "Created workspace label");
+        }
+
+        create_response
+            .issue_label_create
+            .issue_label
+            .ok_or_else(|| anyhow!("Failed to create workspace label: {name}"))
+    }
+
+    /// Ensure all CTO configuration labels exist in the workspace.
+    ///
+    /// Creates labels for CLI and model selection if they don't already exist.
+    /// Should be called on server initialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if label creation fails (typically due to permissions).
+    #[instrument(skip(self))]
+    pub async fn ensure_cto_config_labels(&self) -> Result<Vec<Label>> {
+        use crate::handlers::intake::CTO_CONFIG_LABELS;
+
+        let mut created_labels = Vec::new();
+
+        for (name, color, description) in CTO_CONFIG_LABELS {
+            match self
+                .get_or_create_workspace_label(name, Some(color), Some(description))
+                .await
+            {
+                Ok(label) => {
+                    created_labels.push(label);
+                }
+                Err(e) => {
+                    // Log but don't fail - label might already exist with different case
+                    // or we might not have permissions
+                    warn!(
+                        name = %name,
+                        error = %e,
+                        "Failed to ensure CTO config label exists"
+                    );
+                }
+            }
+        }
+
+        info!(
+            count = created_labels.len(),
+            "Ensured CTO config labels exist"
+        );
+
+        Ok(created_labels)
     }
 
     /// Set labels on an issue (replaces existing labels)

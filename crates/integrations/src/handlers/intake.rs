@@ -88,11 +88,38 @@ pub struct IntakeRequest {
 const KNOWN_CLIS: &[&str] = &["claude", "cursor", "codex", "dexter", "opencode"];
 
 /// Known model shortcut labels mapped to full model names.
+/// Uses Claude CLI aliases that always point to latest versions.
 const KNOWN_MODEL_LABELS: &[(&str, &str)] = &[
-    ("sonnet", "claude-sonnet-4-20250514"),
-    ("opus", "claude-opus-4-20250514"),
+    // Claude aliases (always latest)
+    ("sonnet", "sonnet"),                           // Latest Sonnet (currently 4.5)
+    ("opus", "opus"),                               // Latest Opus 4.5 🆕
+    // Specific versions (pinned)
+    ("claude-sonnet-4-5", "claude-sonnet-4-5-20250929"),
+    ("claude-opus-4-5", "claude-opus-4-5-20250929"),
+    ("claude-sonnet-4", "claude-sonnet-4-20250514"),
+    ("claude-opus-4", "claude-opus-4-20250514"),
+    // Other models
+    ("gpt-4o", "gpt-4o"),
     ("gpt-4.1", "gpt-4.1"),
     ("o3", "o3"),
+];
+
+/// Labels to auto-create for CLI/Model configuration.
+/// Format: (`label_name`, `color`, `description`)
+pub const CTO_CONFIG_LABELS: &[(&str, &str, &str)] = &[
+    // CLI labels (blue shades)
+    ("cli:claude", "#3B82F6", "Use Claude CLI for this task"),
+    ("cli:cursor", "#60A5FA", "Use Cursor for this task"),
+    ("cli:codex", "#93C5FD", "Use Codex for this task"),
+    ("cli:opencode", "#BFDBFE", "Use OpenCode for this task"),
+    // Model labels (purple shades) - using aliases for latest
+    ("model:sonnet", "#8B5CF6", "Use latest Sonnet model"),
+    ("model:opus", "#7C3AED", "Use latest Opus model (4.5)"),
+    // Model labels - specific versions
+    ("model:claude-sonnet-4-5", "#A78BFA", "Use Claude Sonnet 4.5"),
+    ("model:claude-opus-4-5", "#6D28D9", "Use Claude Opus 4.5"),
+    // Other models
+    ("model:gpt-4o", "#EC4899", "Use GPT-4o"),
 ];
 
 /// Wrapper for frontmatter parsing that contains the cto config.
@@ -153,10 +180,12 @@ pub fn parse_cto_frontmatter(description: &str) -> Option<CtoConfig> {
 
 /// Extract CTO config from issue labels.
 ///
-/// Looks for labels in the format:
-/// - `CTO CLI/claude`, `CTO CLI/cursor`, etc. (grouped labels)
+/// Looks for labels in the format (highest to lowest priority):
+/// - `cli:claude`, `cli:cursor`, etc. (prefixed labels - recommended)
+/// - `model:sonnet`, `model:opus`, etc. (prefixed labels - recommended)
+/// - `CTO CLI/claude`, `CTO CLI/cursor`, etc. (grouped labels - Linear UI friendly)
+/// - `CTO Model/sonnet`, `CTO Model/opus`, etc. (grouped labels - Linear UI friendly)
 /// - `claude`, `cursor`, etc. (flat labels - for CLI)
-/// - `CTO Model/sonnet`, `CTO Model/opus`, etc. (grouped labels)
 /// - `sonnet`, `opus`, etc. (flat labels - for model shortcuts)
 #[must_use]
 pub fn extract_config_from_labels(labels: &[Label]) -> CtoConfig {
@@ -165,8 +194,8 @@ pub fn extract_config_from_labels(labels: &[Label]) -> CtoConfig {
     for label in labels {
         let name = label.name.to_lowercase();
 
-        // Check for grouped label format: "CTO CLI/xxx" or "CTO Model/xxx"
-        if let Some(cli) = name.strip_prefix("cto cli/") {
+        // HIGHEST PRIORITY: Check for prefixed format: "cli:xxx" or "model:xxx"
+        if let Some(cli) = name.strip_prefix("cli:") {
             let cli = cli.trim();
             if KNOWN_CLIS.contains(&cli) {
                 config.cli = Some(cli.to_string());
@@ -174,7 +203,7 @@ pub fn extract_config_from_labels(labels: &[Label]) -> CtoConfig {
             }
         }
 
-        if let Some(model_label) = name.strip_prefix("cto model/") {
+        if let Some(model_label) = name.strip_prefix("model:") {
             let model_label = model_label.trim();
             // Check if it's a shortcut or a full model name
             if let Some((_, full_model)) = KNOWN_MODEL_LABELS
@@ -187,6 +216,32 @@ pub fn extract_config_from_labels(labels: &[Label]) -> CtoConfig {
                 config.model = Some(model_label.to_string());
             }
             continue;
+        }
+
+        // Check for grouped label format: "CTO CLI/xxx" or "CTO Model/xxx"
+        if config.cli.is_none() {
+            if let Some(cli) = name.strip_prefix("cto cli/") {
+                let cli = cli.trim();
+                if KNOWN_CLIS.contains(&cli) {
+                    config.cli = Some(cli.to_string());
+                    continue;
+                }
+            }
+        }
+
+        if config.model.is_none() {
+            if let Some(model_label) = name.strip_prefix("cto model/") {
+                let model_label = model_label.trim();
+                if let Some((_, full_model)) = KNOWN_MODEL_LABELS
+                    .iter()
+                    .find(|(short, _)| *short == model_label)
+                {
+                    config.model = Some((*full_model).to_string());
+                } else {
+                    config.model = Some(model_label.to_string());
+                }
+                continue;
+            }
         }
 
         // Check for flat CLI labels
@@ -296,6 +351,87 @@ pub fn strip_frontmatter(description: &str) -> String {
     }
 }
 
+/// Extract GitHub repository URL from issue attachments.
+///
+/// Looks for attachments with URLs that look like GitHub repository URLs.
+/// Returns the first matching URL found.
+#[must_use]
+pub fn extract_repository_url(issue: &Issue) -> Option<String> {
+    // Check attachments for GitHub repository links
+    for attachment in &issue.attachments {
+        if let Some(url) = &attachment.url {
+            if is_github_repo_url(url) {
+                return Some(normalize_github_url(url));
+            }
+        }
+    }
+
+    // Also check description for GitHub URLs as fallback
+    if let Some(desc) = &issue.description {
+        if let Some(url) = find_github_url_in_text(desc) {
+            return Some(normalize_github_url(&url));
+        }
+    }
+
+    None
+}
+
+/// Check if a URL looks like a GitHub repository URL.
+#[must_use]
+pub fn is_github_repo_url(url: &str) -> bool {
+    let url_lower = url.to_lowercase();
+    // Match patterns like:
+    // - https://github.com/owner/repo
+    // - https://github.com/owner/repo.git
+    // - https://github.com/owner/repo/...
+    (url_lower.starts_with("https://github.com/") || url_lower.starts_with("http://github.com/"))
+        && url_lower
+            .trim_start_matches("https://github.com/")
+            .trim_start_matches("http://github.com/")
+            .contains('/')
+}
+
+/// Normalize a GitHub URL to the canonical form.
+fn normalize_github_url(url: &str) -> String {
+    let mut url = url.to_string();
+
+    // Remove .git suffix (case-insensitive)
+    if url.to_lowercase().ends_with(".git") {
+        url = url[..url.len() - 4].to_string();
+    }
+
+    // Remove trailing slashes
+    while url.ends_with('/') {
+        url.pop();
+    }
+
+    // Extract just the owner/repo part
+    if let Some(path) = url
+        .strip_prefix("https://github.com/")
+        .or_else(|| url.strip_prefix("http://github.com/"))
+    {
+        // Split by / and take first two parts (owner/repo)
+        let parts: Vec<&str> = path.split('/').take(2).collect();
+        if parts.len() == 2 {
+            return format!("https://github.com/{}/{}", parts[0], parts[1]);
+        }
+    }
+
+    url
+}
+
+/// Find a GitHub URL in text content.
+fn find_github_url_in_text(text: &str) -> Option<String> {
+    // Simple regex-like search for GitHub URLs
+    for word in text.split_whitespace() {
+        let word = word.trim_matches(|c| c == '(' || c == ')' || c == '[' || c == ']');
+        if is_github_repo_url(word) {
+            return Some(word.to_string());
+        }
+    }
+    None
+}
+
 /// Task from intake workflow output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntakeTask {
@@ -342,6 +478,9 @@ pub struct IntakeResult {
 ///
 /// This function extracts the PRD content, CTO config from labels/frontmatter,
 /// and any linked documents from the issue.
+///
+/// Description is optional - if not provided, will use the issue title as a minimal PRD
+/// and extract the repository URL from attachments.
 pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeRequest> {
     let team_id = issue
         .team
@@ -350,19 +489,34 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         .id
         .clone();
 
-    let raw_description = issue
-        .description
-        .clone()
-        .ok_or_else(|| anyhow!("PRD issue has no description"))?;
+    // Extract repository URL from attachments first (works even without description)
+    let repository_url = extract_repository_url(issue);
 
-    // Extract CTO config from labels and frontmatter
-    let cto_config = extract_cto_config(issue);
+    // Description is optional - use title as minimal PRD if not provided
+    let (prd_content, cto_config) = if let Some(raw_description) = &issue.description {
+        if raw_description.trim().is_empty() {
+            // Empty description - use title
+            (
+                format!("# {}\n\nImplement the feature described in the title.", issue.title),
+                CtoConfig::default(),
+            )
+        } else {
+            // Extract CTO config from frontmatter
+            let cto_config = extract_cto_config(issue);
+            // Strip frontmatter from PRD content
+            let prd_content = strip_frontmatter(raw_description);
+            (prd_content, cto_config)
+        }
+    } else {
+        // No description - use title as minimal PRD
+        (
+            format!("# {}\n\nImplement the feature described in the title.", issue.title),
+            CtoConfig::default(),
+        )
+    };
 
     // Extract tech stack from labels
     let tech_stack = extract_tech_stack(&issue.labels);
-
-    // Strip frontmatter from PRD content (if present)
-    let prd_content = strip_frontmatter(&raw_description);
 
     // For now, we don't have a way to link documents directly.
     // TODO: Parse document links from description (e.g., Linear document URLs).
@@ -376,8 +530,8 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         title: issue.title.clone(),
         prd_content,
         architecture_content,
-        repository_url: None, // Not extracted from attachments in this version
-        source_branch: None,  // Default to main
+        repository_url,
+        source_branch: None, // Default to main
         tech_stack,
         cto_config,
     })
@@ -446,6 +600,7 @@ pub async fn submit_intake_workflow(
         // Linear-specific metadata for callbacks.
         "linear_session_id": request.session_id,
         "linear_issue_id": request.prd_issue_id,
+        "linear_issue_identifier": request.prd_identifier,
         "linear_team_id": request.team_id,
     });
 
@@ -1037,6 +1192,27 @@ Content here";
     }
 
     #[test]
+    fn test_extract_config_from_labels_prefixed() {
+        // Test the new cli: and model: prefix format (highest priority)
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "cli:cursor".to_string(),
+                color: None,
+            },
+            Label {
+                id: "2".to_string(),
+                name: "model:opus".to_string(),
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.cli, Some("cursor".to_string()));
+        assert_eq!(config.model, Some("opus".to_string())); // Uses alias for latest
+    }
+
+    #[test]
     fn test_extract_config_from_labels_grouped() {
         let labels = vec![
             Label {
@@ -1053,7 +1229,7 @@ Content here";
 
         let config = extract_config_from_labels(&labels);
         assert_eq!(config.cli, Some("cursor".to_string()));
-        assert_eq!(config.model, Some("claude-opus-4-20250514".to_string()));
+        assert_eq!(config.model, Some("opus".to_string())); // Uses alias for latest
     }
 
     #[test]
@@ -1073,7 +1249,7 @@ Content here";
 
         let config = extract_config_from_labels(&labels);
         assert_eq!(config.cli, Some("claude".to_string()));
-        assert_eq!(config.model, Some("claude-sonnet-4-20250514".to_string()));
+        assert_eq!(config.model, Some("sonnet".to_string())); // Uses alias for latest
     }
 
     #[test]
@@ -1133,5 +1309,58 @@ Content here";
 
         let config = extract_config_from_labels(&labels);
         assert_eq!(config.model, Some("claude-sonnet-4-20250514".to_string()));
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_specific_version() {
+        // Test using specific version labels
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "model:claude-opus-4-5".to_string(),
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.model, Some("claude-opus-4-5-20250929".to_string()));
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_priority() {
+        // Prefixed labels should take priority over grouped and flat labels
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "cli:cursor".to_string(), // This should win (prefixed)
+                color: None,
+            },
+            Label {
+                id: "2".to_string(),
+                name: "CTO CLI/codex".to_string(), // This should be ignored
+                color: None,
+            },
+            Label {
+                id: "3".to_string(),
+                name: "claude".to_string(), // This should be ignored
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.cli, Some("cursor".to_string()));
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_gpt4o() {
+        // Test GPT-4o model
+        let labels = vec![Label {
+            id: "1".to_string(),
+            name: "model:gpt-4o".to_string(),
+            color: None,
+        }];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.model, Some("gpt-4o".to_string()));
     }
 }

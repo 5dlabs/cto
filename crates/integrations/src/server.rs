@@ -274,6 +274,9 @@ pub async fn linear_webhook_handler(
         (WebhookType::AgentSessionEvent, WebhookAction::Prompted) => {
             handle_session_prompted(&state, &payload).await
         }
+        (WebhookType::IssueAttachment, WebhookAction::Created) => {
+            handle_attachment_added(&state, &payload).await
+        }
         _ => {
             debug!(
                 event_type = ?payload.event_type,
@@ -318,8 +321,63 @@ async fn handle_session_created(
         "Processing new agent session"
     );
 
+    // Log raw issue data from webhook
+    info!(
+        session_id = %session_id,
+        issue_id = %issue.id,
+        webhook_labels_count = issue.labels.len(),
+        webhook_attachments_count = issue.attachments.len(),
+        "Issue data from webhook payload"
+    );
+
+    // Webhook payloads often don't include full issue data (labels, attachments)
+    // Fetch the full issue from the API to get accurate labels
+    let full_issue = if let Some(client) = &state.linear_client {
+        match client.get_issue(&issue.id).await {
+            Ok(fetched) => {
+                info!(
+                    session_id = %session_id,
+                    fetched_labels_count = fetched.labels.len(),
+                    fetched_attachments_count = fetched.attachments.len(),
+                    "Fetched full issue from API"
+                );
+                fetched
+            }
+            Err(e) => {
+                warn!(
+                    session_id = %session_id,
+                    error = %e,
+                    "Failed to fetch issue from API, using webhook data"
+                );
+                issue.clone()
+            }
+        }
+    } else {
+        warn!(session_id = %session_id, "No Linear client, using webhook issue data");
+        issue.clone()
+    };
+
     // Check issue labels to determine workflow type
-    let labels: Vec<&str> = issue.labels.iter().map(|l| l.name.as_str()).collect();
+    let labels: Vec<&str> = full_issue.labels.iter().map(|l| l.name.as_str()).collect();
+
+    info!(
+        session_id = %session_id,
+        labels = ?labels,
+        attachments_count = full_issue.attachments.len(),
+        "Analyzing issue for workflow type"
+    );
+
+    // Log attachment details for debugging
+    for (i, attachment) in full_issue.attachments.iter().enumerate() {
+        info!(
+            session_id = %session_id,
+            attachment_index = i,
+            attachment_id = %attachment.id,
+            attachment_title = ?attachment.title,
+            attachment_url = ?attachment.url,
+            "Issue attachment"
+        );
+    }
 
     let is_prd = labels
         .iter()
@@ -328,9 +386,18 @@ async fn handle_session_created(
         .iter()
         .any(|l| *l == "task" || *l == "cto-task" || l.starts_with("task-"));
 
+    info!(
+        session_id = %session_id,
+        is_prd = is_prd,
+        is_task = is_task,
+        labels = ?labels,
+        "Workflow type detection results"
+    );
+
     if is_prd {
         info!(
             session_id = %session_id,
+            labels = ?labels,
             "Detected PRD issue - triggering intake workflow"
         );
 
@@ -344,8 +411,8 @@ async fn handle_session_created(
             }
         }
 
-        // Extract intake request from issue
-        let intake_request = match extract_intake_request(session_id, issue) {
+        // Extract intake request from issue (using full issue with labels/attachments)
+        let intake_request = match extract_intake_request(session_id, &full_issue) {
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract intake request");
@@ -361,6 +428,48 @@ async fn handle_session_created(
                 })));
             }
         };
+
+        // Log extracted intake request details
+        debug!(
+            session_id = %session_id,
+            prd_issue_id = %intake_request.prd_issue_id,
+            prd_identifier = %intake_request.prd_identifier,
+            team_id = %intake_request.team_id,
+            repository_url = ?intake_request.repository_url,
+            source_branch = ?intake_request.source_branch,
+            cli = ?intake_request.cto_config.cli,
+            model = ?intake_request.cto_config.model,
+            tech_stack_backend = ?intake_request.tech_stack.backend,
+            tech_stack_frontend = ?intake_request.tech_stack.frontend,
+            tech_stack_languages = ?intake_request.tech_stack.languages,
+            "Extracted intake request"
+        );
+
+        // Validate repository URL is present
+        if intake_request.repository_url.is_none() {
+            warn!(
+                issue_id = %issue.id,
+                "No repository URL found in issue attachments or description"
+            );
+            if let Some(client) = &state.linear_client {
+                let _ = client
+                    .emit_error(
+                        session_id,
+                        "**Missing Repository URL**\n\n\
+                        Please add a GitHub repository link to this issue:\n\n\
+                        1. Click **Add Link** (or use the attachment icon)\n\
+                        2. Paste your GitHub repository URL (e.g., `https://github.com/owner/repo`)\n\
+                        3. Re-assign to the agent to retry\n\n\
+                        The repository URL tells me where to commit the generated tasks and code.",
+                    )
+                    .await;
+            }
+            return Ok(Json(json!({
+                "status": "error",
+                "error": "Missing repository URL - please add a GitHub link attachment to the issue",
+                "session_id": session_id
+            })));
+        }
 
         // Submit intake workflow
         match submit_intake_workflow(
@@ -396,9 +505,9 @@ async fn handle_session_created(
                     "workflow_name": result.workflow_name,
                     "configmap_name": result.configmap_name,
                     "issue": {
-                        "id": issue.id,
-                        "identifier": issue.identifier,
-                        "title": issue.title
+                        "id": full_issue.id,
+                        "identifier": full_issue.identifier,
+                        "title": full_issue.title
                     }
                 })))
             }
@@ -523,6 +632,184 @@ async fn handle_session_created(
             "available_labels": labels,
             "hint": "Add 'prd' label for intake, or 'task' label for play workflow"
         })))
+    }
+}
+
+/// Handle attachment added to an issue.
+///
+/// This allows the user to add a GitHub repository URL after initially delegating
+/// the issue to the agent. If the attachment is a GitHub URL and the issue has
+/// the appropriate labels, triggers the intake workflow.
+#[allow(clippy::too_many_lines)]
+async fn handle_attachment_added(
+    state: &AppState,
+    payload: &WebhookPayload,
+) -> Result<Json<Value>, StatusCode> {
+    use crate::handlers::intake::is_github_repo_url;
+
+    // Get attachment URL
+    let Some(attachment_url) = payload.get_attachment_url() else {
+        debug!("Attachment event without URL - ignoring");
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "no_attachment_url"
+        })));
+    };
+
+    // Only process GitHub repository URLs
+    if !is_github_repo_url(&attachment_url) {
+        debug!(url = %attachment_url, "Attachment is not a GitHub repo URL - ignoring");
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "not_github_repo"
+        })));
+    }
+
+    // Get the issue ID from the attachment event
+    let Some(issue_id) = payload.get_attachment_issue_id() else {
+        warn!("Attachment event without issue ID");
+        return Err(StatusCode::BAD_REQUEST);
+    };
+
+    info!(
+        issue_id = %issue_id,
+        url = %attachment_url,
+        "GitHub repository URL attached to issue"
+    );
+
+    // Fetch the full issue to check labels and active session
+    let Some(client) = &state.linear_client else {
+        error!("Linear client not configured");
+        return Ok(Json(json!({
+            "status": "error",
+            "error": "Linear client not configured"
+        })));
+    };
+
+    let full_issue = match client.get_issue(&issue_id).await {
+        Ok(issue) => issue,
+        Err(e) => {
+            error!(error = %e, "Failed to fetch issue");
+            return Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to fetch issue: {e}")
+            })));
+        }
+    };
+
+    // Check if the issue has PRD labels
+    let labels: Vec<&str> = full_issue.labels.iter().map(|l| l.name.as_str()).collect();
+    let is_intake = labels
+        .iter()
+        .any(|l| matches!(l.to_lowercase().as_str(), "prd" | "intake" | "product-requirement"));
+
+    if !is_intake {
+        debug!(
+            issue_id = %issue_id,
+            labels = ?labels,
+            "Issue does not have intake labels - ignoring attachment"
+        );
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "no_intake_labels"
+        })));
+    }
+
+    // Check if there's an active agent session on this issue
+    // We'll try to get the session from the issue's agent sessions
+    let session_id = match client.get_active_session_for_issue(&issue_id).await {
+        Ok(Some(session_id)) => session_id,
+        Ok(None) => {
+            debug!(
+                issue_id = %issue_id,
+                "No active agent session on issue - ignoring attachment"
+            );
+            return Ok(Json(json!({
+                "status": "ignored",
+                "reason": "no_active_session",
+                "hint": "Assign the issue to the agent first"
+            })));
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to check for active session");
+            return Ok(Json(json!({
+                "status": "ignored",
+                "reason": "session_check_failed",
+                "error": format!("{e}")
+            })));
+        }
+    };
+
+    info!(
+        issue_id = %issue_id,
+        session_id = %session_id,
+        "Found active session - triggering intake after URL attachment"
+    );
+
+    // Notify user
+    let _ = client
+        .emit_thought(
+            &session_id,
+            "GitHub repository URL detected! Starting PRD processing...",
+        )
+        .await;
+
+    // Extract intake request
+    let intake_request = match extract_intake_request(&session_id, &full_issue) {
+        Ok(req) => req,
+        Err(e) => {
+            error!(error = %e, "Failed to extract intake request");
+            let _ = client
+                .emit_error(&session_id, format!("Failed to start intake: {e}"))
+                .await;
+            return Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to extract intake request: {e}"),
+                "session_id": session_id
+            })));
+        }
+    };
+
+    // Submit intake workflow
+    match submit_intake_workflow(
+        &state.kube_client,
+        &state.config.namespace,
+        &intake_request,
+        &state.config.intake,
+    )
+    .await
+    {
+        Ok(result) => {
+            info!(
+                workflow_name = %result.workflow_name,
+                "Intake workflow submitted after URL attachment"
+            );
+
+            let _ = client
+                .emit_action(&session_id, "Started intake workflow", &result.workflow_name)
+                .await;
+
+            Ok(Json(json!({
+                "status": "accepted",
+                "workflow": "intake",
+                "trigger": "attachment_added",
+                "session_id": session_id,
+                "workflow_name": result.workflow_name,
+                "issue_id": issue_id
+            })))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to submit intake workflow");
+            let _ = client
+                .emit_error(&session_id, format!("Failed to start intake: {e}"))
+                .await;
+
+            Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to submit intake workflow: {e}"),
+                "session_id": session_id
+            })))
+        }
     }
 }
 

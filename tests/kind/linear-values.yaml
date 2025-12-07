@@ -40,6 +40,13 @@ secrets:
   webhookSecretKey: LINEAR_WEBHOOK_SECRET
   githubTokenKey: GITHUB_TOKEN
 
+# GitHub webhook auto-configuration for Kind
+github:
+  # Use the dev Cloudflare tunnel for Kind testing
+  webhookCallbackUrl: "https://linear-webhooks-dev.5dlabs.ai"
+  # Auto-configure webhook on the main CTO repo
+  webhookRepos: "5dlabs/cto"
+
 # Workflow configuration for local testing
 intake:
   githubApp: cto-dev
