@@ -66,6 +66,15 @@ regex = "1.10"
 # Base64 encoding (for API auth)
 base64 = "0.22"
 
+# CLI detection
+which = "7.0"
+
+# Shared CLI types
+cli = { path = "../cli" }
+
+# Temporary directories
+tempfile = "3.8"
+
 [features]
 default = ["ai"]
 ai = []

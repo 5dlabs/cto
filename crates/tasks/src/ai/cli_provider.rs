@@ -667,9 +667,9 @@ impl CLITextGenerator {
                 "google/gemini-3-pro-preview",
             ],
             CLIType::Gemini => vec![
-                // Gemini 3 (latest)
-                "gemini-3-pro-preview",
-                "gemini-3-pro",
+                // Gemini 2.5 (latest)
+                "gemini-2.5-flash",
+                "gemini-2.5-pro",
                 // Gemini 2.0
                 "gemini-2.0-flash",
                 "gemini-2.0-pro",

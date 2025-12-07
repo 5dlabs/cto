@@ -125,8 +125,8 @@ fn get_default_model(cli_type: CLIType) -> &'static str {
         CLIType::OpenHands => "claude-opus-4-5-20251101",
         // Grok: Use Grok 3
         CLIType::Grok => "grok-3",
-        // Gemini: Use Gemini 2.0 Flash (more available quota)
-        CLIType::Gemini => "gemini-2.0-flash",
+        // Gemini: Use Gemini 2.5 Flash (better quota availability)
+        CLIType::Gemini => "gemini-2.5-flash",
         // Qwen: Use Qwen Max
         CLIType::Qwen => "qwen-max",
     }
