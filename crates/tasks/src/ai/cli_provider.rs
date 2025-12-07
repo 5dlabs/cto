@@ -486,7 +486,11 @@ impl CLITextGenerator {
     fn parse_cli_output(&self, output: &str, _model: &str) -> TasksResult<(String, TokenUsage)> {
         // Log output for debugging
         let output_preview = if output.len() > 500 {
-            format!("{}...[truncated {} chars]", &output[..500], output.len() - 500)
+            format!(
+                "{}...[truncated {} chars]",
+                &output[..500],
+                output.len() - 500
+            )
         } else {
             output.to_string()
         };
@@ -508,15 +512,24 @@ impl CLITextGenerator {
                     if json.get("type").and_then(|v| v.as_str()) == Some("item.completed") {
                         if let Some(item) = json.get("item") {
                             if item.get("type").and_then(|v| v.as_str()) == Some("agent_message") {
-                                agent_message = item.get("text").and_then(|v| v.as_str()).map(String::from);
+                                agent_message =
+                                    item.get("text").and_then(|v| v.as_str()).map(String::from);
                             }
                         }
                     }
                     // Codex format: turn.completed with usage
                     if json.get("type").and_then(|v| v.as_str()) == Some("turn.completed") {
                         if let Some(usage_obj) = json.get("usage") {
-                            usage.input_tokens = usage_obj.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                            usage.output_tokens = usage_obj.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                            usage.input_tokens = usage_obj
+                                .get("input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0)
+                                as u32;
+                            usage.output_tokens = usage_obj
+                                .get("output_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0)
+                                as u32;
                         }
                     }
                     // OpenCode format: type "text" with part.text
@@ -536,8 +549,12 @@ impl CLITextGenerator {
                     if json.get("type").and_then(|v| v.as_str()) == Some("step_finish") {
                         if let Some(part) = json.get("part") {
                             if let Some(tokens) = part.get("tokens") {
-                                usage.input_tokens = tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                                usage.output_tokens = tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                                usage.input_tokens =
+                                    tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0)
+                                        as u32;
+                                usage.output_tokens =
+                                    tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0)
+                                        as u32;
                             }
                         }
                     }
