@@ -1,7 +1,41 @@
 //! Linear entity type definitions.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Helper to deserialize either:
+/// - GraphQL pagination `{ nodes: [...] }` format
+/// - Direct array `[...]` format (webhooks)
+/// - null/missing (returns empty vec)
+fn deserialize_nodes<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+
+    // First deserialize to a generic Value to inspect the structure
+    let value: Option<Value> = Option::deserialize(deserializer)?;
+
+    match value {
+        Some(Value::Array(arr)) => {
+            // Direct array format (webhooks)
+            serde_json::from_value(Value::Array(arr)).map_err(D::Error::custom)
+        }
+        Some(Value::Object(obj)) => {
+            // GraphQL { nodes: [...] } format
+            if let Some(nodes) = obj.get("nodes") {
+                serde_json::from_value(nodes.clone()).map_err(D::Error::custom)
+            } else {
+                // Object without nodes - return empty
+                Ok(Vec::new())
+            }
+        }
+        // null, missing, or other types - return empty
+        None | Some(_) => Ok(Vec::new()),
+    }
+}
 
 /// Linear Issue representation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,7 +66,7 @@ pub struct Issue {
     #[serde(default)]
     pub priority: i32,
     /// Labels on the issue
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_nodes")]
     pub labels: Vec<Label>,
     /// Issue delegate (agent assignment)
     #[serde(default)]
@@ -40,12 +74,32 @@ pub struct Issue {
     /// Issue assignee (human owner)
     #[serde(default)]
     pub assignee: Option<User>,
+    /// Issue attachments (resource links)
+    #[serde(default, deserialize_with = "deserialize_nodes")]
+    pub attachments: Vec<Attachment>,
     /// Created timestamp
     #[serde(default)]
     pub created_at: Option<DateTime<Utc>>,
     /// Updated timestamp
     #[serde(default)]
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Linear attachment (resource link)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Attachment {
+    /// Unique identifier
+    pub id: String,
+    /// Attachment title
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Attachment URL
+    #[serde(default)]
+    pub url: Option<String>,
+    /// Source type (e.g., "github", "api")
+    #[serde(default)]
+    pub source_type: Option<String>,
 }
 
 /// Linear workflow state
@@ -135,18 +189,6 @@ pub struct Project {
     /// URL to the project
     #[serde(default)]
     pub url: Option<String>,
-}
-
-/// Linear attachment
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Attachment {
-    /// Unique identifier
-    pub id: String,
-    /// Attachment title
-    pub title: String,
-    /// Attachment URL
-    pub url: String,
 }
 
 /// Linear comment
