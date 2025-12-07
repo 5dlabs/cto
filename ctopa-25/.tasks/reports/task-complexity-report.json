@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "generatedAt": "2025-12-07T07:03:42.133964884+00:00",
+    "tasksFile": ".tasks/tasks.json",
+    "model": "claude-sonnet-4-20250514",
+    "threshold": 5
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Setup Rust project foundation with Axum",
+      "complexityScore": 3,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard project initialization with well-documented dependencies. Straightforward setup with minimal technical challenges."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Setup PostgreSQL database schema",
+      "complexityScore": 4,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Design database schema with relationships, 2) Create migration files with proper constraints, 3) Setup migration runner and validation",
+      "reasoning": "Moderate complexity due to schema design decisions, foreign key relationships, and migration management. Critical foundation component."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Implement Redis connection and configuration",
+      "complexityScore": 3,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Standard Redis integration with connection pooling. Well-established patterns with good library support."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Create core application structure and routing",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Setup application state and dependency injection, 2) Create router structure with versioning, 3) Implement middleware stack, 4) Add graceful shutdown handling",
+      "reasoning": "Medium-high complexity as it establishes core architecture patterns. Multiple components need to work together correctly."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement JWT authentication system",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into: 1) JWT token generation and validation, 2) Password hashing and verification, 3) Authentication middleware, 4) Login/logout endpoints, 5) Refresh token rotation mechanism",
+      "reasoning": "High complexity due to security requirements, token management, and multiple authentication flows. Critical for application security."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Implement rate limiting middleware",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) Implement sliding window algorithm with Redis, 2) Create rate limiting middleware with different limits, 3) Add proper HTTP headers and error responses",
+      "reasoning": "Moderately high complexity due to algorithm implementation and Redis integration. Requires careful testing of edge cases."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Create user management endpoints",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) User registration with validation, 2) User profile retrieval, 3) Profile update functionality, 4) User preferences management",
+      "reasoning": "Medium complexity with standard CRUD operations, validation logic, and security considerations."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Implement team management API",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into: 1) Team CRUD operations, 2) Role-based authorization system, 3) Member management, 4) Invite link generation, 5) Team settings management, 6) Permission validation middleware",
+      "reasoning": "High complexity due to role-based access control, invite system, and complex authorization logic. Multiple interacting components."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Build task management system",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into: 1) Task CRUD operations, 2) Advanced filtering and search, 3) Soft delete implementation, 4) Task assignment validation, 5) Status management and transitions",
+      "reasoning": "High complexity due to comprehensive filtering, soft delete logic, and business rule validation. Core feature with many edge cases."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Add OAuth2 integration (Google, GitHub)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into: 1) OAuth2 flow implementation with PKCE, 2) Google provider integration, 3) GitHub provider integration, 4) Account linking logic, 5) Secure token storage",
+      "reasoning": "High complexity due to OAuth2 protocol implementation, multiple providers, and secure token handling. External API dependencies."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Implement WebSocket real-time notifications",
+      "complexityScore": 9,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into: 1) WebSocket connection management, 2) Authentication for WebSocket connections, 3) Redis pub/sub integration, 4) Message broadcasting system, 5) Connection cleanup and error handling, 6) Reconnection logic",
+      "reasoning": "Very high complexity due to real-time communication, connection management, and distributed messaging. Requires careful handling of edge cases."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Setup email notification system",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) SMTP configuration and email templates, 2) Mention detection system, 3) Due date reminder scheduling, 4) User preference filtering",
+      "reasoning": "Moderately high complexity due to template management, scheduling, and text parsing for mentions. External service dependencies."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Add push notification support (FCM)",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) FCM integration and configuration, 2) Device token management, 3) Notification payload creation, 4) Token refresh and cleanup",
+      "reasoning": "High complexity due to Firebase integration, token lifecycle management, and mobile platform considerations."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Create React dashboard foundation",
+      "complexityScore": 4,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into: 1) React project setup with TypeScript and Tailwind, 2) Authentication context and protected routing, 3) Theme system and API client configuration",
+      "reasoning": "Moderate complexity for frontend foundation setup. Standard React patterns with some configuration complexity."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "Build Kanban board component",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into: 1) Drag-and-drop implementation, 2) Kanban board layout and columns, 3) Task card components, 4) WebSocket integration for real-time updates, 5) Task creation and editing modals",
+      "reasoning": "High complexity due to drag-and-drop interactions, real-time updates, and complex UI state management."
+    },
+    {
+      "taskId": 16,
+      "taskTitle": "Implement team management UI",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Team dashboard layout, 2) Member management interface, 3) Invite system UI, 4) Activity feed component",
+      "reasoning": "Moderately high complexity due to role-based UI, invite flows, and real-time activity updates."
+    },
+    {
+      "taskId": 17,
+      "taskTitle": "Add observability and monitoring",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Prometheus metrics implementation, 2) Structured logging setup, 3) Health check endpoints, 4) Custom application metrics",
+      "reasoning": "Medium complexity with standard observability patterns. Important for production readiness but well-documented approaches."
+    },
+    {
+      "taskId": 18,
+      "taskTitle": "Implement GDPR compliance features",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Data export functionality, 2) Account deletion with cascading, 3) Data anonymization, 4) Audit logging system",
+      "reasoning": "High complexity due to legal compliance requirements, data handling across multiple systems, and audit trail implementation."
+    },
+    {
+      "taskId": 19,
+      "taskTitle": "Create Docker and Kubernetes deployment",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down into: 1) Multi-stage Dockerfile creation, 2) Docker Compose for local development, 3) Kubernetes manifests and configuration, 4) Auto-scaling and resource management",
+      "reasoning": "Moderately high complexity due to containerization best practices, Kubernetes configuration, and auto-scaling setup."
+    },
+    {
+      "taskId": 20,
+      "taskTitle": "Performance optimization and final testing",
+      "complexityScore": 9,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into: 1) Database query optimization and indexing, 2) Connection pool tuning, 3) Response caching implementation, 4) WebSocket optimization, 5) Load testing setup, 6) Performance profiling and bottleneck analysis",
+      "reasoning": "Very high complexity requiring deep system understanding, performance analysis skills, and comprehensive testing. Critical for production readiness."
+    }
+  ]
+}

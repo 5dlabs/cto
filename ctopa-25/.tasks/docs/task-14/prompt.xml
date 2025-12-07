@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="14" priority="medium" agent="cipher">
+    <meta>
+        <title>Create React dashboard foundation</title>
+        <priority>medium</priority>
+        <dependencies>5</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 14 with production-quality code.</role>
+
+    <context>
+        <overview>Setup React 18 + TypeScript + Tailwind project with routing and authentication</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. npx create-react-app dashboard --template typescript
+2. Add dependencies: react-router-dom, @tanstack/react-query, tailwindcss
+3. Setup authentication context and protected routes
+4. Create layout components with navigation
+5. Add dark/light theme support with context
+6. Configure API client with axios</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-14): Create React dashboard foundation</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify React app builds, routing works, authentication flow, and theme switching</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

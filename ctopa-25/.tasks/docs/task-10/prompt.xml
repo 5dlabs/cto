@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="10" priority="medium" agent="cipher">
+    <meta>
+        <title>Add OAuth2 integration (Google, GitHub)</title>
+        <priority>medium</priority>
+        <dependencies>5</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 10 with production-quality code.</role>
+
+    <context>
+        <overview>Implement OAuth2 flow for external authentication providers</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add oauth2 and reqwest dependencies
+2. Create src/auth/oauth.rs module
+3. Implement Google OAuth2 flow with PKCE
+4. Add GitHub OAuth2 integration
+5. Handle account linking and user creation
+6. Store OAuth tokens securely</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-10): Add OAuth2 integration (Google, GitHub)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test OAuth2 flows for both providers, account creation, and token handling</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

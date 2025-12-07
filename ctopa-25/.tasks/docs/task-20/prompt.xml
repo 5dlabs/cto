@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="20" priority="high" agent="rex">
+    <meta>
+        <title>Performance optimization and final testing</title>
+        <priority>high</priority>
+        <dependencies>19</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 20 with production-quality code.</role>
+
+    <context>
+        <overview>Optimize for API response time &lt; 100ms p95 and 1000 concurrent WebSocket connections</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add database query optimization and indexing
+2. Implement connection pooling tuning
+3. Add response caching for read-heavy endpoints
+4. Optimize WebSocket connection handling
+5. Add load testing with k6 or similar
+6. Profile and optimize critical paths</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-20): Performance optimization and final testing</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Load test API endpoints for p95 &lt; 100ms, test 1000 concurrent WebSocket connections, verify performance metrics</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
