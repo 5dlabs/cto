@@ -120,4 +120,3 @@ impl CliAdapter for CursorAdapter {
         Ok(health)
     }
 }
-

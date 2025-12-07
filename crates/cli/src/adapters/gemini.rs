@@ -308,4 +308,3 @@ impl CliAdapter for GeminiAdapter {
         Ok(health)
     }
 }
-

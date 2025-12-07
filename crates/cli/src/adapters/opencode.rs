@@ -330,4 +330,3 @@ impl CliAdapter for OpenCodeAdapter {
         Ok(health)
     }
 }
-
