@@ -251,6 +251,11 @@ jobs:
             context: ./infra/images/gemini
             file: ./infra/images/gemini/Dockerfile
             version_type: dir_hash
+          - id: dexter
+            image: dexter
+            context: ./infra/images/dexter
+            file: ./infra/images/dexter/Dockerfile
+            version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
 
