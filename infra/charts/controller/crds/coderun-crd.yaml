@@ -168,6 +168,23 @@ spec:
                     items:
                       type: string
                     description: "Model rotation array for retry attempts"
+              linearIntegration:
+                type: object
+                description: "Linear integration configuration for status sync sidecar"
+                properties:
+                  sessionId:
+                    type: string
+                    description: "Linear agent session ID for activity updates"
+                  issueId:
+                    type: string
+                    description: "Linear issue ID for status updates"
+                  teamId:
+                    type: string
+                    description: "Linear team ID for workflow state mapping"
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Whether to enable Linear status sync sidecar"
           status:
             type: object
             properties:

@@ -45,6 +45,18 @@ spec:
             - name: NAMESPACE
               value: {{ .Values.linear.namespace | quote }}
             # Secrets from Kubernetes secret
+            - name: LINEAR_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.oauthClientIdKey }}
+                  optional: true
+            - name: LINEAR_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.oauthClientSecretKey }}
+                  optional: true
             - name: LINEAR_OAUTH_TOKEN
               valueFrom:
                 secretKeyRef:

@@ -48,6 +48,26 @@ fn default_enable_docker() -> bool {
     true
 }
 
+/// Linear integration configuration for status sync
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct LinearIntegration {
+    /// Whether Linear status sync is enabled
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Linear agent session ID for activity updates
+    #[serde(rename = "sessionId", default)]
+    pub session_id: Option<String>,
+
+    /// Linear issue ID for status updates
+    #[serde(rename = "issueId", default)]
+    pub issue_id: Option<String>,
+
+    /// Linear team ID for workflow state mapping
+    #[serde(rename = "teamId", default)]
+    pub team_id: Option<String>,
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -168,6 +188,10 @@ pub struct CodeRunSpec {
     /// CLI configuration for CLI-agnostic operation (optional)
     #[serde(default, rename = "cliConfig")]
     pub cli_config: Option<CLIConfig>,
+
+    /// Linear integration configuration for status sync sidecar
+    #[serde(default, rename = "linearIntegration")]
+    pub linear_integration: Option<LinearIntegration>,
 }
 
 /// Status of the `CodeRun`

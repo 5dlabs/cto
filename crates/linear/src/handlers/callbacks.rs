@@ -11,7 +11,9 @@ use tracing::{error, info, warn};
 
 use super::intake::{
     create_task_issues, generate_completion_summary, IntakeRequest, IntakeTask, TasksJson,
+    TechStack,
 };
+use crate::config::CtoConfig;
 use crate::LinearClient;
 
 /// Callback payload for intake workflow completion.
@@ -121,6 +123,8 @@ pub async fn handle_intake_complete(
         architecture_content: None,
         repository_url: None,
         source_branch: None,
+        tech_stack: TechStack::default(), // Not needed for issue creation
+        cto_config: CtoConfig::default(), // Not needed for issue creation
     };
 
     // Create task issues
@@ -224,6 +228,269 @@ pub async fn handle_tasks_json_callback(
     };
 
     handle_intake_complete(state, Json(full_callback)).await
+}
+
+/// Callback payload for play workflow completion.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlayCompleteCallback {
+    /// Workflow name that completed.
+    pub workflow_name: String,
+    /// Workflow status (Succeeded, Failed, etc.).
+    pub workflow_status: String,
+    /// Linear session ID for activity updates.
+    pub linear_session_id: String,
+    /// Linear issue ID (task issue).
+    pub linear_issue_id: String,
+    /// Linear team ID.
+    pub linear_team_id: String,
+    /// Task ID.
+    #[serde(default)]
+    pub task_id: Option<String>,
+    /// Repository.
+    #[serde(default)]
+    pub repository: Option<String>,
+}
+
+/// Handle play workflow completion callback.
+///
+/// This is called by the Argo play workflow when it completes.
+/// It updates the Linear issue state and emits completion activity.
+pub async fn handle_play_complete(
+    State(state): State<Arc<CallbackState>>,
+    Json(payload): Json<PlayCompleteCallback>,
+) -> Result<Json<Value>, StatusCode> {
+    info!(
+        session_id = %payload.linear_session_id,
+        workflow_name = %payload.workflow_name,
+        workflow_status = %payload.workflow_status,
+        "Received play completion callback"
+    );
+
+    // Get Linear client
+    let Some(client) = &state.linear_client else {
+        error!("Linear client not configured");
+        return Ok(Json(json!({
+            "status": "error",
+            "error": "Linear client not configured",
+            "session_id": payload.linear_session_id
+        })));
+    };
+
+    let success = payload.workflow_status == "Succeeded";
+
+    if success {
+        // Emit success response
+        let summary = format!(
+            "## Task Implementation Complete\n\n\
+             **Workflow:** `{}`\n\
+             **Status:** ✅ Succeeded\n\n\
+             The implementation has been completed and a PR has been created. \
+             Please review the changes and merge when ready.",
+            payload.workflow_name
+        );
+
+        if let Err(e) = client
+            .emit_response(&payload.linear_session_id, &summary)
+            .await
+        {
+            warn!(error = %e, "Failed to emit completion response");
+        }
+
+        // Update issue state to "Done" or "In Review"
+        if let Ok(states) = client.get_team_workflow_states(&payload.linear_team_id).await {
+            // Look for "In Review" or "Done" state
+            let target_state = states
+                .iter()
+                .find(|s| s.name == "In Review" || s.state_type == "started")
+                .or_else(|| states.iter().find(|s| s.state_type == "completed"));
+
+            if let Some(state) = target_state {
+                if let Err(e) = client
+                    .update_issue(
+                        &payload.linear_issue_id,
+                        crate::models::IssueUpdateInput {
+                            state_id: Some(state.id.clone()),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                {
+                    warn!(error = %e, "Failed to update issue state");
+                }
+            }
+        }
+    } else {
+        // Emit failure response
+        let error_msg = format!(
+            "## Task Implementation Failed\n\n\
+             **Workflow:** `{}`\n\
+             **Status:** ❌ {}\n\n\
+             The implementation workflow failed. Please check the logs and retry.",
+            payload.workflow_name, payload.workflow_status
+        );
+
+        if let Err(e) = client
+            .emit_error(&payload.linear_session_id, error_msg)
+            .await
+        {
+            warn!(error = %e, "Failed to emit error activity");
+        }
+    }
+
+    Ok(Json(json!({
+        "status": if success { "success" } else { "error" },
+        "session_id": payload.linear_session_id,
+        "workflow_name": payload.workflow_name,
+        "workflow_status": payload.workflow_status
+    })))
+}
+
+/// Task status from sidecar.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SidecarTaskStatus {
+    /// Current status (e.g., `in_progress`, `testing`, `review`, `complete`, `failed`)
+    pub status: String,
+    /// Current stage (e.g., "implementation", "quality", "testing")
+    #[serde(default)]
+    pub stage: Option<String>,
+    /// Progress percentage (0-100)
+    #[serde(default)]
+    pub progress: Option<u8>,
+    /// Current activity description
+    #[serde(default)]
+    pub activity: Option<String>,
+    /// Error message if failed
+    #[serde(default)]
+    pub error: Option<String>,
+    /// PR URL if created
+    #[serde(default)]
+    pub pr_url: Option<String>,
+}
+
+/// Status update payload from sidecar.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StatusSyncPayload {
+    /// Linear session ID
+    pub linear_session_id: String,
+    /// Linear issue ID
+    pub linear_issue_id: String,
+    /// Linear team ID
+    pub linear_team_id: String,
+    /// Task status
+    pub status: SidecarTaskStatus,
+    /// Workflow name
+    pub workflow_name: String,
+}
+
+/// Handle status sync from sidecar.
+///
+/// This endpoint receives status updates from the sidecar container
+/// and syncs them to Linear (issue state + agent activities).
+pub async fn handle_status_sync(
+    State(state): State<Arc<CallbackState>>,
+    Json(payload): Json<StatusSyncPayload>,
+) -> Result<Json<Value>, StatusCode> {
+    info!(
+        session_id = %payload.linear_session_id,
+        status = %payload.status.status,
+        stage = ?payload.status.stage,
+        "Received status sync from sidecar"
+    );
+
+    // Get Linear client
+    let Some(client) = &state.linear_client else {
+        return Ok(Json(json!({
+            "status": "skipped",
+            "reason": "Linear client not configured"
+        })));
+    };
+
+    // Map status to Linear workflow state
+    let linear_state_type = match payload.status.status.as_str() {
+        "complete" | "done" => "completed",
+        // All other states (in_progress, testing, quality, review, failed, error, etc.)
+        // stay in "started" - use activity for errors
+        _ => "started",
+    };
+
+    // Update issue state if we can map it
+    if let Ok(states) = client.get_team_workflow_states(&payload.linear_team_id).await {
+        // Find appropriate state based on status
+        let target_state = match payload.status.status.as_str() {
+            "review" => states.iter().find(|s| s.name == "In Review"),
+            "complete" | "done" => states.iter().find(|s| s.state_type == "completed"),
+            _ => states.iter().find(|s| s.state_type == linear_state_type),
+        };
+
+        if let Some(state) = target_state {
+            if let Err(e) = client
+                .update_issue(
+                    &payload.linear_issue_id,
+                    crate::models::IssueUpdateInput {
+                        state_id: Some(state.id.clone()),
+                        ..Default::default()
+                    },
+                )
+                .await
+            {
+                warn!(error = %e, "Failed to update issue state");
+            }
+        }
+    }
+
+    // Emit activity based on status
+    let activity_message = if let Some(activity) = &payload.status.activity {
+        activity.clone()
+    } else {
+        match payload.status.status.as_str() {
+            "in_progress" => format!(
+                "Working on task... {}",
+                payload.status.stage.as_deref().unwrap_or("implementation")
+            ),
+            "testing" => "Running tests...".to_string(),
+            "quality" => "Running quality checks...".to_string(),
+            "review" => "Ready for review".to_string(),
+            "complete" => "Task completed".to_string(),
+            "failed" => format!(
+                "Task failed: {}",
+                payload.status.error.as_deref().unwrap_or("Unknown error")
+            ),
+            other => format!("Status: {other}"),
+        }
+    };
+
+    // Emit appropriate activity type
+    let emit_result = if payload.status.status == "failed" {
+        client
+            .emit_error(&payload.linear_session_id, activity_message)
+            .await
+    } else if payload.status.status == "complete" {
+        let response = if let Some(pr_url) = &payload.status.pr_url {
+            format!(
+                "## Task Implementation Complete\n\n\
+                 **Status:** ✅ Complete\n\
+                 **PR:** {pr_url}\n\n\
+                 The implementation is ready for review."
+            )
+        } else {
+            "## Task Implementation Complete\n\n**Status:** ✅ Complete".to_string()
+        };
+        client.emit_response(&payload.linear_session_id, &response).await
+    } else {
+        client
+            .emit_thought(&payload.linear_session_id, activity_message)
+            .await
+    };
+
+    if let Err(e) = emit_result {
+        warn!(error = %e, "Failed to emit activity");
+    }
+
+    Ok(Json(json!({
+        "status": "success",
+        "session_id": payload.linear_session_id,
+        "task_status": payload.status.status
+    })))
 }
 
 #[cfg(test)]

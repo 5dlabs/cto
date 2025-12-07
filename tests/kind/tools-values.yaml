@@ -1,0 +1,227 @@
+---
+# Tools MCP Server - Kind Local Values
+# Based on: infra/gitops/applications/cto/tools.yaml
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/5dlabs/tools
+  pullPolicy: IfNotPresent
+  tag: "kind-local"
+
+# No image pull secrets needed for local images
+imagePullSecrets: []
+
+fullnameOverride: "tools"
+
+serviceAccount:
+  create: true
+  automount: true
+  name: "tools"
+
+rbac:
+  create: true
+  clusterWide: true
+
+podSecurityContext:
+  fsGroup: 1001
+  supplementalGroups: [2375]
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 2375
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+ingress:
+  enabled: false
+
+# Resource overrides for local development
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: "10Gi"
+
+# Volumes
+volumes:
+  - name: config
+    configMap:
+      name: tools-config
+  - name: cto-config
+    configMap:
+      name: cto-config
+  - name: tmp
+    emptyDir: {}
+  - name: docker-sock-dir
+    emptyDir: {}
+  - name: docker-data
+    emptyDir: {}
+  - name: home-mcp-pvc
+    persistentVolumeClaim:
+      claimName: home-mcp-data
+
+volumeMounts:
+  - name: config
+    mountPath: /config
+    readOnly: true
+  - name: cto-config
+    mountPath: /cto
+    readOnly: true
+  - name: tmp
+    mountPath: /tmp
+  - name: data
+    mountPath: /data
+  - name: home-mcp-pvc
+    mountPath: /home/mcp
+  - name: docker-sock-dir
+    mountPath: /var/run
+
+# Environment variables
+env:
+  - name: PORT
+    value: "3000"
+  - name: PROJECT_DIR
+    value: "/config"
+  - name: SYSTEM_CONFIG_PATH
+    value: "/config"
+  - name: RUST_LOG
+    value: "info,kube=debug,tools=trace"
+  - name: KUBECONFIG
+    value: "/data/.kube/config"
+
+# Set working directory to writable location
+workingDir: "/tmp"
+
+# Simplified MCP server configuration for local development
+# Remote servers that don't require secrets work without configuration
+config:
+  servers:
+    # OpenMemory - points to local deployment
+    openmemory:
+      name: "OpenMemory"
+      description: "Long-term memory system for AI agents"
+      transport: "http"
+      url: "http://openmemory.cto.svc.cluster.local:8080/mcp"
+      workingDirectory: "/tmp"
+
+    # Context7 - free to use
+    context7:
+      name: "Context7"
+      description: "Up-to-date library documentation and code examples"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@upstash/context7-mcp"]
+      workingDirectory: "/tmp"
+
+    # Kubernetes - uses in-cluster config
+    kubernetes:
+      name: "Kubernetes"
+      description: "Kubernetes cluster management"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "kubernetes-mcp-server@latest"]
+      workingDirectory: "/tmp"
+      enabled: true
+
+    # GitHub - optional, works if GITHUB_PERSONAL_ACCESS_TOKEN is set
+    github:
+      name: "GitHub"
+      description: "GitHub API operations"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-github"]
+      workingDirectory: "/tmp"
+
+    # shadcn/ui - no auth required
+    shadcn:
+      name: "shadcn/ui"
+      description: "Official shadcn/ui MCP server"
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "shadcn@latest", "mcp"]
+      workingDirectory: "/workspace"
+
+    # AI Elements - remote HTTP server
+    ai-elements:
+      name: "AI Elements"
+      description: "AI-native UI component library"
+      transport: "http"
+      url: "https://registry.ai-sdk.dev/api/mcp"
+      workingDirectory: "/tmp"
+
+    # Cloudflare Docs - remote HTTP server
+    cloudflare-docs:
+      name: "Cloudflare Documentation"
+      description: "Cloudflare products and APIs reference"
+      transport: "http"
+      url: "https://docs.mcp.cloudflare.com/mcp"
+      workingDirectory: "/tmp"
+
+    # PostgreSQL AI Guide - remote HTTP server
+    pg-aiguide:
+      name: "PostgreSQL AI Guide"
+      description: "AI-optimized PostgreSQL expertise"
+      transport: "http"
+      url: "https://mcp.tigerdata.com/docs"
+      workingDirectory: "/tmp"
+
+    # Solana - remote HTTP server
+    solana:
+      name: "Solana"
+      description: "Solana blockchain development tools"
+      transport: "http"
+      url: "https://mcp.solana.com/mcp"
+      workingDirectory: "/tmp"
+
+    # Better Auth - remote HTTP server
+    better-auth:
+      name: "Better Auth"
+      description: "Framework-agnostic authentication"
+      transport: "http"
+      url: "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp"
+      workingDirectory: "/tmp"
+
+# CTO Platform Configuration (simplified for local)
+ctoConfig:
+  version: "1.0"
+  defaults:
+    code:
+      model: "claude-sonnet-4-20250514"
+      repository: "5dlabs/cto"
+      cli: "claude"
+
+# Monitoring disabled for local
+monitoring:
+  enabled: false
+
+# Network policy disabled for local
+networkPolicy:
+  enabled: false
+
+# Pod disruption budget disabled for local
+podDisruptionBudget:
+  enabled: false
+
+# Disable standalone MCP servers
+mcpServers:
+  k8s:
+    enabled: false
+

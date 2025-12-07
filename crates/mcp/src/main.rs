@@ -2912,10 +2912,21 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .get()
         .ok_or_else(|| anyhow!("Configuration not loaded"))?;
 
-    // Auto-detect repository from git (using workspace directory)
-    eprintln!("🔍 Auto-detecting repository from git...");
-    let repository_name = get_git_repository_url_in_dir(Some(&workspace_dir))?;
-    eprintln!("📦 Using repository: {repository_name}");
+    // Get repository - use provided value or auto-detect from git
+    let repository_name = if let Some(repo) = arguments.get("repository").and_then(|v| v.as_str()) {
+        eprintln!("📦 Using provided repository: {repo}");
+        // Validate format (should be org/repo)
+        if !repo.contains('/') || repo.starts_with("https://") {
+            return Err(anyhow!("Repository must be in org/repo format (e.g., '5dlabs/agent-sandbox')"));
+        }
+        repo.to_string()
+    } else {
+        // Auto-detect repository from git (using workspace directory)
+        eprintln!("🔍 Auto-detecting repository from git...");
+        let detected = get_git_repository_url_in_dir(Some(&workspace_dir))?;
+        eprintln!("📦 Using repository: {detected}");
+        detected
+    };
     let repository_url = format!("https://github.com/{repository_name}");
 
     // Auto-detect current branch (using workspace directory)

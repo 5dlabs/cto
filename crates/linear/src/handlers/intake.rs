@@ -12,9 +12,43 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use tracing::{error, info, warn};
 
-use crate::config::IntakeConfig;
-use crate::models::{Issue, IssueCreateInput, IssueRelationCreateInput, IssueRelationType};
+use crate::config::{CtoConfig, IntakeConfig};
+use crate::models::{Issue, IssueCreateInput, IssueRelationCreateInput, IssueRelationType, Label};
 use crate::LinearClient;
+
+/// Agent assignments for different task types.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentConfig {
+    /// Backend agent.
+    #[serde(default)]
+    pub backend: Option<String>,
+    /// Frontend agent.
+    #[serde(default)]
+    pub frontend: Option<String>,
+    /// Testing agent.
+    #[serde(default)]
+    pub testing: Option<String>,
+    /// Quality agent.
+    #[serde(default)]
+    pub quality: Option<String>,
+}
+
+/// Tech stack configuration extracted from issue labels.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TechStack {
+    /// Backend framework/language.
+    #[serde(default)]
+    pub backend: Option<String>,
+    /// Frontend framework.
+    #[serde(default)]
+    pub frontend: Option<String>,
+    /// Programming languages.
+    #[serde(default)]
+    pub languages: Vec<String>,
+    /// Agent assignments.
+    #[serde(default)]
+    pub agents: AgentConfig,
+}
 
 /// Intake request extracted from a Linear webhook.
 #[derive(Debug, Clone)]
@@ -37,6 +71,226 @@ pub struct IntakeRequest {
     pub repository_url: Option<String>,
     /// Source branch.
     pub source_branch: Option<String>,
+    /// Tech stack from labels.
+    pub tech_stack: TechStack,
+    /// CTO configuration from labels/frontmatter.
+    pub cto_config: CtoConfig,
+}
+
+// =========================================================================
+// CTO Configuration Extraction
+// =========================================================================
+
+/// Known CLI options from labels.
+const KNOWN_CLIS: &[&str] = &["claude", "cursor", "codex", "dexter", "opencode"];
+
+/// Known model shortcut labels mapped to full model names.
+const KNOWN_MODEL_LABELS: &[(&str, &str)] = &[
+    ("sonnet", "claude-sonnet-4-20250514"),
+    ("opus", "claude-opus-4-20250514"),
+    ("gpt-4.1", "gpt-4.1"),
+    ("o3", "o3"),
+];
+
+/// Wrapper for frontmatter parsing that contains the cto config.
+#[derive(Debug, Deserialize)]
+struct FrontmatterWrapper {
+    cto: Option<CtoConfig>,
+}
+
+/// Parse YAML frontmatter from issue description.
+///
+/// Supports format:
+/// ```text
+/// ---
+/// cto:
+///   cli: cursor
+///   model: claude-opus-4-20250514
+/// ---
+/// Actual PRD content...
+/// ```
+///
+/// Returns `None` if no valid frontmatter is found or parsing fails.
+#[must_use]
+pub fn parse_cto_frontmatter(description: &str) -> Option<CtoConfig> {
+    // Check for frontmatter delimiter
+    let trimmed = description.trim_start();
+    if !trimmed.starts_with("---") {
+        return None;
+    }
+
+    // Find the closing delimiter
+    let after_first = &trimmed[3..];
+    let end_pos = after_first.find("\n---")?;
+
+    // Extract the YAML content between delimiters
+    let yaml_content = &after_first[..end_pos].trim();
+
+    // Parse the YAML
+    match serde_yaml::from_str::<FrontmatterWrapper>(yaml_content) {
+        Ok(wrapper) => {
+            if let Some(config) = wrapper.cto {
+                if !config.is_empty() {
+                    info!(
+                        cli = ?config.cli,
+                        model = ?config.model,
+                        "Extracted CTO config from frontmatter"
+                    );
+                    return Some(config);
+                }
+            }
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to parse frontmatter YAML");
+            None
+        }
+    }
+}
+
+/// Extract CTO config from issue labels.
+///
+/// Looks for labels in the format:
+/// - `CTO CLI/claude`, `CTO CLI/cursor`, etc. (grouped labels)
+/// - `claude`, `cursor`, etc. (flat labels - for CLI)
+/// - `CTO Model/sonnet`, `CTO Model/opus`, etc. (grouped labels)
+/// - `sonnet`, `opus`, etc. (flat labels - for model shortcuts)
+#[must_use]
+pub fn extract_config_from_labels(labels: &[Label]) -> CtoConfig {
+    let mut config = CtoConfig::default();
+
+    for label in labels {
+        let name = label.name.to_lowercase();
+
+        // Check for grouped label format: "CTO CLI/xxx" or "CTO Model/xxx"
+        if let Some(cli) = name.strip_prefix("cto cli/") {
+            let cli = cli.trim();
+            if KNOWN_CLIS.contains(&cli) {
+                config.cli = Some(cli.to_string());
+                continue;
+            }
+        }
+
+        if let Some(model_label) = name.strip_prefix("cto model/") {
+            let model_label = model_label.trim();
+            // Check if it's a shortcut or a full model name
+            if let Some((_, full_model)) = KNOWN_MODEL_LABELS
+                .iter()
+                .find(|(short, _)| *short == model_label)
+            {
+                config.model = Some((*full_model).to_string());
+            } else {
+                // Assume it's a full model name
+                config.model = Some(model_label.to_string());
+            }
+            continue;
+        }
+
+        // Check for flat CLI labels
+        if config.cli.is_none() && KNOWN_CLIS.contains(&name.as_str()) {
+            config.cli = Some(name.clone());
+            continue;
+        }
+
+        // Check for flat model shortcut labels
+        if config.model.is_none() {
+            if let Some((_, full_model)) = KNOWN_MODEL_LABELS
+                .iter()
+                .find(|(short, _)| *short == name.as_str())
+            {
+                config.model = Some((*full_model).to_string());
+            }
+        }
+    }
+
+    if !config.is_empty() {
+        info!(
+            cli = ?config.cli,
+            model = ?config.model,
+            "Extracted CTO config from labels"
+        );
+    }
+
+    config
+}
+
+/// Extract CTO config from issue (labels + frontmatter).
+///
+/// Resolution order: Description frontmatter > Labels
+/// Frontmatter values override label values.
+#[must_use]
+pub fn extract_cto_config(issue: &Issue) -> CtoConfig {
+    // 1. Extract from labels
+    let mut config = extract_config_from_labels(&issue.labels);
+
+    // 2. Parse frontmatter (overrides labels)
+    if let Some(desc) = &issue.description {
+        if let Some(fm_config) = parse_cto_frontmatter(desc) {
+            config.merge(&fm_config);
+        }
+    }
+
+    config
+}
+
+/// Extract tech stack from issue labels.
+fn extract_tech_stack(labels: &[Label]) -> TechStack {
+    let label_names: Vec<String> = labels.iter().map(|l| l.name.to_lowercase()).collect();
+
+    let mut tech_stack = TechStack::default();
+
+    // Backend detection
+    if label_names.iter().any(|l| l == "rust") {
+        tech_stack.backend = Some("rust".to_string());
+        tech_stack.languages.push("rust".to_string());
+    }
+    if label_names.iter().any(|l| l == "python") {
+        tech_stack.backend = Some("python".to_string());
+        tech_stack.languages.push("python".to_string());
+    }
+    if label_names.iter().any(|l| l == "go" || l == "golang") {
+        tech_stack.backend = Some("go".to_string());
+        tech_stack.languages.push("go".to_string());
+    }
+    if label_names.iter().any(|l| l == "node" || l == "nodejs") {
+        tech_stack.backend = Some("node".to_string());
+    }
+
+    // Frontend detection
+    if label_names.iter().any(|l| l == "react") {
+        tech_stack.frontend = Some("react".to_string());
+    }
+    if label_names.iter().any(|l| l == "vue") {
+        tech_stack.frontend = Some("vue".to_string());
+    }
+    if label_names.iter().any(|l| l == "svelte") {
+        tech_stack.frontend = Some("svelte".to_string());
+    }
+    if label_names.iter().any(|l| l == "typescript" || l == "ts") {
+        tech_stack.languages.push("typescript".to_string());
+    }
+
+    tech_stack
+}
+
+/// Strip frontmatter from description content.
+///
+/// Returns the description with the YAML frontmatter block removed.
+#[must_use]
+pub fn strip_frontmatter(description: &str) -> String {
+    let trimmed = description.trim_start();
+    if !trimmed.starts_with("---") {
+        return description.to_string();
+    }
+
+    let after_first = &trimmed[3..];
+    if let Some(end_pos) = after_first.find("\n---") {
+        // Skip past the closing --- and any following newline
+        let rest = &after_first[end_pos + 4..];
+        rest.trim_start_matches('\n').to_string()
+    } else {
+        description.to_string()
+    }
 }
 
 /// Task from intake workflow output.
@@ -83,7 +337,8 @@ pub struct IntakeResult {
 
 /// Extract intake request from a Linear issue.
 ///
-/// This function extracts the PRD content and any linked documents from the issue.
+/// This function extracts the PRD content, CTO config from labels/frontmatter,
+/// and any linked documents from the issue.
 pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeRequest> {
     let team_id = issue
         .team
@@ -92,10 +347,19 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         .id
         .clone();
 
-    let prd_content = issue
+    let raw_description = issue
         .description
         .clone()
         .ok_or_else(|| anyhow!("PRD issue has no description"))?;
+
+    // Extract CTO config from labels and frontmatter
+    let cto_config = extract_cto_config(issue);
+
+    // Extract tech stack from labels
+    let tech_stack = extract_tech_stack(&issue.labels);
+
+    // Strip frontmatter from PRD content (if present)
+    let prd_content = strip_frontmatter(&raw_description);
 
     // For now, we don't have a way to link documents directly.
     // TODO: Parse document links from description (e.g., Linear document URLs).
@@ -109,8 +373,10 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         title: issue.title.clone(),
         prd_content,
         architecture_content,
-        repository_url: None, // Will be extracted from Linear project settings or provided
+        repository_url: None, // Not extracted from attachments in this version
         source_branch: None,  // Default to main
+        tech_stack,
+        cto_config,
     })
 }
 
@@ -129,25 +395,55 @@ pub async fn submit_intake_workflow(
     let configmap_name = format!("intake-linear-{project_name}-{timestamp}");
     let workflow_name = format!("intake-linear-{project_name}-{timestamp}");
 
+    // Default repository URL if not provided in the request.
+    let repository_url = request
+        .repository_url
+        .clone()
+        .unwrap_or_else(|| "https://github.com/5dlabs/cto".to_string());
+    let source_branch = request
+        .source_branch
+        .clone()
+        .unwrap_or_else(|| "main".to_string());
+
+    // Apply CTO config overrides from labels/frontmatter
+    let cli = request
+        .cto_config
+        .cli
+        .as_deref()
+        .unwrap_or(&config.cli);
+    let primary_model = request
+        .cto_config
+        .model
+        .as_deref()
+        .unwrap_or(&config.primary_model);
+
+    if !request.cto_config.is_empty() {
+        info!(
+            cli = %cli,
+            model = %primary_model,
+            "Using CTO config overrides from issue"
+        );
+    }
+
     // Prepare config JSON for the workflow.
     let config_json = serde_json::json!({
         "project_name": project_name,
-        "repository_url": request.repository_url.clone().unwrap_or_default(),
+        "repository_url": repository_url,
         "github_app": config.github_app,
-        "primary_model": config.primary_model,
+        "primary_model": primary_model,
         "research_model": config.research_model,
         "fallback_model": config.fallback_model,
         "primary_provider": config.primary_provider,
         "research_provider": config.research_provider,
         "fallback_provider": config.fallback_provider,
-        "model": config.primary_model,
+        "model": primary_model,
         "num_tasks": config.num_tasks,
         "expand_tasks": config.expand_tasks,
         "analyze_complexity": config.analyze_complexity,
         "docs_model": config.docs_model,
         "enrich_context": config.enrich_context,
         "include_codebase": config.include_codebase,
-        "cli": config.cli,
+        "cli": cli,
         // Linear-specific metadata for callbacks.
         "linear_session_id": request.session_id,
         "linear_issue_id": request.prd_issue_id,
@@ -197,15 +493,6 @@ pub async fn submit_intake_workflow(
     info!(configmap_name = %configmap_name, "Created intake ConfigMap");
 
     // Submit Argo workflow.
-    let repository_url = request
-        .repository_url
-        .clone()
-        .unwrap_or_else(|| "https://github.com/5dlabs/cto".to_string());
-    let source_branch = request
-        .source_branch
-        .clone()
-        .unwrap_or_else(|| "main".to_string());
-
     let output = tokio::process::Command::new("argo")
         .args([
             "submit",
@@ -226,7 +513,7 @@ pub async fn submit_intake_workflow(
             "-p",
             &format!("github-app={}", config.github_app),
             "-p",
-            &format!("primary-model={}", config.primary_model),
+            &format!("primary-model={primary_model}"),
             "-p",
             &format!("research-model={}", config.research_model),
             "-p",
@@ -250,7 +537,23 @@ pub async fn submit_intake_workflow(
             "-p",
             &format!("include-codebase={}", config.include_codebase),
             "-p",
-            &format!("cli={}", config.cli),
+            &format!("cli={cli}"),
+            // Linear callback parameters
+            "-p",
+            &format!("linear-session-id={}", request.session_id),
+            "-p",
+            &format!("linear-issue-id={}", request.prd_issue_id),
+            "-p",
+            &format!("linear-issue-identifier={}", request.prd_identifier),
+            "-p",
+            &format!("linear-team-id={}", request.team_id),
+            // Labels for pod discovery (used for two-way communication)
+            "-l",
+            &format!("linear-session={}", request.session_id),
+            "-l",
+            &format!("cto.5dlabs.io/linear-issue={}", request.prd_identifier),
+            "-l",
+            "cto.5dlabs.io/agent-type=intake",
             "--wait=false",
         ])
         .output()
@@ -552,5 +855,208 @@ mod tests {
         assert_eq!(sanitize_project_name("TSK-123"), "tsk-123");
         assert_eq!(sanitize_project_name("My Project!"), "my-project");
         assert_eq!(sanitize_project_name("test_name"), "test-name");
+    }
+
+    // =========================================================================
+    // CTO Config Extraction Tests
+    // =========================================================================
+
+    #[test]
+    fn test_parse_cto_frontmatter_valid() {
+        let description = r#"---
+cto:
+  cli: cursor
+  model: claude-opus-4-20250514
+---
+## PRD: My Feature
+
+This is the actual content."#;
+
+        let config = parse_cto_frontmatter(description).unwrap();
+        assert_eq!(config.cli, Some("cursor".to_string()));
+        assert_eq!(config.model, Some("claude-opus-4-20250514".to_string()));
+    }
+
+    #[test]
+    fn test_parse_cto_frontmatter_cli_only() {
+        let description = r#"---
+cto:
+  cli: codex
+---
+Content here"#;
+
+        let config = parse_cto_frontmatter(description).unwrap();
+        assert_eq!(config.cli, Some("codex".to_string()));
+        assert_eq!(config.model, None);
+    }
+
+    #[test]
+    fn test_parse_cto_frontmatter_model_only() {
+        let description = r#"---
+cto:
+  model: gpt-4.1
+---
+Content here"#;
+
+        let config = parse_cto_frontmatter(description).unwrap();
+        assert_eq!(config.cli, None);
+        assert_eq!(config.model, Some("gpt-4.1".to_string()));
+    }
+
+    #[test]
+    fn test_parse_cto_frontmatter_no_frontmatter() {
+        let description = "Just regular content without frontmatter";
+        assert!(parse_cto_frontmatter(description).is_none());
+    }
+
+    #[test]
+    fn test_parse_cto_frontmatter_no_cto_section() {
+        let description = r#"---
+title: My PRD
+author: Someone
+---
+Content here"#;
+
+        assert!(parse_cto_frontmatter(description).is_none());
+    }
+
+    #[test]
+    fn test_parse_cto_frontmatter_empty_cto() {
+        let description = r#"---
+cto:
+---
+Content here"#;
+
+        assert!(parse_cto_frontmatter(description).is_none());
+    }
+
+    #[test]
+    fn test_parse_cto_frontmatter_invalid_yaml() {
+        let description = r#"---
+cto: [invalid yaml here
+---
+Content"#;
+
+        assert!(parse_cto_frontmatter(description).is_none());
+    }
+
+    #[test]
+    fn test_strip_frontmatter() {
+        let description = r#"---
+cto:
+  cli: cursor
+---
+## My PRD
+
+Content here"#;
+
+        let stripped = strip_frontmatter(description);
+        assert_eq!(stripped, "## My PRD\n\nContent here");
+    }
+
+    #[test]
+    fn test_strip_frontmatter_no_frontmatter() {
+        let description = "Just regular content";
+        let stripped = strip_frontmatter(description);
+        assert_eq!(stripped, "Just regular content");
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_grouped() {
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "CTO CLI/cursor".to_string(),
+                color: None,
+            },
+            Label {
+                id: "2".to_string(),
+                name: "CTO Model/opus".to_string(),
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.cli, Some("cursor".to_string()));
+        assert_eq!(config.model, Some("claude-opus-4-20250514".to_string()));
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_flat() {
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "claude".to_string(),
+                color: None,
+            },
+            Label {
+                id: "2".to_string(),
+                name: "sonnet".to_string(),
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.cli, Some("claude".to_string()));
+        assert_eq!(config.model, Some("claude-sonnet-4-20250514".to_string()));
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_mixed() {
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "CTO CLI/codex".to_string(),
+                color: None,
+            },
+            Label {
+                id: "2".to_string(),
+                name: "gpt-4.1".to_string(), // flat model label
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.cli, Some("codex".to_string()));
+        assert_eq!(config.model, Some("gpt-4.1".to_string()));
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_empty() {
+        let labels: Vec<Label> = vec![];
+        let config = extract_config_from_labels(&labels);
+        assert!(config.is_empty());
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_unrelated() {
+        let labels = vec![
+            Label {
+                id: "1".to_string(),
+                name: "bug".to_string(),
+                color: None,
+            },
+            Label {
+                id: "2".to_string(),
+                name: "high-priority".to_string(),
+                color: None,
+            },
+        ];
+
+        let config = extract_config_from_labels(&labels);
+        assert!(config.is_empty());
+    }
+
+    #[test]
+    fn test_extract_config_from_labels_full_model_in_group() {
+        // If someone uses a full model name in the group label
+        let labels = vec![Label {
+            id: "1".to_string(),
+            name: "CTO Model/claude-sonnet-4-20250514".to_string(),
+            color: None,
+        }];
+
+        let config = extract_config_from_labels(&labels);
+        assert_eq!(config.model, Some("claude-sonnet-4-20250514".to_string()));
     }
 }

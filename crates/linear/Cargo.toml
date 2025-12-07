@@ -11,6 +11,10 @@ description = "Linear API client and webhook service for CTO platform integratio
 name = "linear"
 path = "src/bin/linear.rs"
 
+[[bin]]
+name = "status-sync"
+path = "src/bin/status-sync.rs"
+
 [dependencies]
 # Workspace dependencies
 tokio.workspace = true
@@ -43,6 +47,9 @@ subtle = "2.5"
 
 # Regex for task ID extraction
 regex = "1"
+
+# YAML frontmatter parsing
+serde_yaml = "0.9"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

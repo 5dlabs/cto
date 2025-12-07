@@ -5,7 +5,8 @@
 use anyhow::{anyhow, Context, Result};
 use tracing::{info, warn};
 
-use crate::config::PlayConfig;
+use crate::config::{CtoConfig, PlayConfig};
+use crate::handlers::intake::extract_cto_config;
 use crate::models::Issue;
 
 /// Play request extracted from a Linear webhook.
@@ -27,6 +28,8 @@ pub struct PlayRequest {
     pub description: Option<String>,
     /// GitHub repository URL (if known).
     pub repository_url: Option<String>,
+    /// CTO configuration from labels/frontmatter.
+    pub cto_config: CtoConfig,
 }
 
 /// Result of submitting a play workflow.
@@ -50,6 +53,9 @@ pub fn extract_play_request(session_id: &str, issue: &Issue) -> Result<PlayReque
     // Try to extract task ID from issue title (e.g., "Task 1: ..." or "Task-1: ...")
     let task_id = extract_task_id_from_title(&issue.title);
 
+    // Extract CTO config from labels and frontmatter
+    let cto_config = extract_cto_config(issue);
+
     Ok(PlayRequest {
         session_id: session_id.to_string(),
         task_issue_id: issue.id.clone(),
@@ -59,6 +65,7 @@ pub fn extract_play_request(session_id: &str, issue: &Issue) -> Result<PlayReque
         title: issue.title.clone(),
         description: issue.description.clone(),
         repository_url: None, // Will be extracted from project settings or provided
+        cto_config,
     })
 }
 
@@ -94,6 +101,7 @@ fn extract_task_id_from_title(title: &str) -> Option<u32> {
 }
 
 /// Submit a play workflow to Kubernetes.
+#[allow(clippy::too_many_lines)]
 pub async fn submit_play_workflow(
     namespace: &str,
     request: &PlayRequest,
@@ -120,6 +128,21 @@ pub async fn submit_play_workflow(
     let timestamp = chrono::Utc::now().timestamp();
     let workflow_name = format!("play-linear-{task_id}-{timestamp}");
 
+    // Apply CTO config overrides from labels/frontmatter
+    let model = request
+        .cto_config
+        .model
+        .as_deref()
+        .unwrap_or(&config.model);
+
+    if !request.cto_config.is_empty() {
+        info!(
+            model = %model,
+            cli = ?request.cto_config.cli,
+            "Using CTO config overrides from issue"
+        );
+    }
+
     // Build workflow parameters
     let workflow_template = if config.parallel_execution {
         "workflowtemplate/play-project-workflow-template"
@@ -142,7 +165,7 @@ pub async fn submit_play_workflow(
         "-p".to_string(),
         format!("github-app={}", config.github_app),
         "-p".to_string(),
-        format!("model={}", config.model),
+        format!("model={model}"),
         "-p".to_string(),
         format!("implementation-agent={}", config.implementation_agent),
         "-p".to_string(),
@@ -160,6 +183,8 @@ pub async fn submit_play_workflow(
         format!("linear-session-id={}", request.session_id),
         "-p".to_string(),
         format!("linear-issue-id={}", request.task_issue_id),
+        "-p".to_string(),
+        format!("linear-team-id={}", request.team_id),
         "-l".to_string(),
         format!("linear-session={}", request.session_id),
         "-l".to_string(),

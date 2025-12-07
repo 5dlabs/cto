@@ -1,7 +1,8 @@
 # RBAC for Linear service
 # Allows the service to:
 # - Create ConfigMaps for intake workflows
-# - List/watch workflows in the namespace
+# - Create and manage workflows
+# - Access workflow templates
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -14,9 +15,13 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["create", "get", "list", "watch", "delete"]
-  # Workflow monitoring (read-only)
+  # Workflow creation and management
   - apiGroups: ["argoproj.io"]
     resources: ["workflows"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch", "update"]
+  # Access to workflow templates
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtemplates", "clusterworkflowtemplates"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

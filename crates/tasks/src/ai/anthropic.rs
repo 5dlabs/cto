@@ -1,8 +1,10 @@
 //! Anthropic Claude AI provider implementation.
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::io::{self, Write};
 
 use crate::errors::{TasksError, TasksResult};
 
@@ -54,6 +56,9 @@ struct AnthropicRequest {
     temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stop_sequences: Option<Vec<String>>,
+    /// Enable streaming for progress output
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    stream: bool,
 }
 
 /// Anthropic API response content
@@ -91,6 +96,64 @@ struct AnthropicError {
 #[derive(Debug, Deserialize)]
 struct AnthropicErrorResponse {
     error: AnthropicError,
+}
+
+/// Streaming event types
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum StreamEvent {
+    #[serde(rename = "message_start")]
+    MessageStart { message: StreamMessage },
+    #[serde(rename = "content_block_start")]
+    ContentBlockStart { index: usize, content_block: ContentBlock },
+    #[serde(rename = "content_block_delta")]
+    ContentBlockDelta { index: usize, delta: ContentDelta },
+    #[serde(rename = "content_block_stop")]
+    ContentBlockStop { index: usize },
+    #[serde(rename = "message_delta")]
+    MessageDelta { delta: MessageDeltaContent, usage: Option<StreamUsage> },
+    #[serde(rename = "message_stop")]
+    MessageStop,
+    #[serde(rename = "ping")]
+    Ping,
+    #[serde(rename = "error")]
+    Error { error: AnthropicError },
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamMessage {
+    id: String,
+    model: String,
+    usage: StreamUsage,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamUsage {
+    input_tokens: u32,
+    #[serde(default)]
+    output_tokens: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContentBlock {
+    #[serde(rename = "type")]
+    block_type: String,
+    #[serde(default)]
+    text: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContentDelta {
+    #[serde(rename = "type")]
+    delta_type: String,
+    #[serde(default)]
+    text: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct MessageDeltaContent {
+    #[serde(default)]
+    stop_reason: Option<String>,
 }
 
 /// Anthropic Claude provider.
@@ -187,6 +250,7 @@ impl AIProvider for AnthropicProvider {
 
         let (system, converted_messages) = self.convert_messages(messages);
 
+        // Use streaming for progress output
         let request = AnthropicRequest {
             model: model.to_string(),
             messages: converted_messages,
@@ -194,7 +258,10 @@ impl AIProvider for AnthropicProvider {
             system,
             temperature: options.temperature,
             stop_sequences: options.stop_sequences.clone(),
+            stream: true,
         };
+
+        eprintln!("    📡 Calling Claude API (streaming)...");
 
         let response = self
             .client
@@ -208,13 +275,13 @@ impl AIProvider for AnthropicProvider {
             .map_err(|e| TasksError::Ai(format!("Anthropic API request failed: {}", e)))?;
 
         let status = response.status();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| TasksError::Ai(format!("Failed to read response: {}", e)))?;
-
+        
         if !status.is_success() {
-            // Try to parse error response
+            let body = response
+                .text()
+                .await
+                .map_err(|e| TasksError::Ai(format!("Failed to read response: {}", e)))?;
+            
             if let Ok(error_response) = serde_json::from_str::<AnthropicErrorResponse>(&body) {
                 return Err(TasksError::Ai(format!(
                     "Anthropic API error: {} - {}",
@@ -227,26 +294,89 @@ impl AIProvider for AnthropicProvider {
             )));
         }
 
-        let api_response: AnthropicResponse = serde_json::from_str(&body)
-            .map_err(|e| TasksError::Ai(format!("Failed to parse response: {}", e)))?;
+        // Process streaming response
+        let mut full_text = String::new();
+        let mut input_tokens = 0u32;
+        let mut output_tokens = 0u32;
+        let mut response_model = model.to_string();
+        let mut char_count = 0usize;
+        let mut last_progress = 0usize;
 
-        // Extract text from content blocks
-        let text = api_response
-            .content
-            .iter()
-            .filter(|c| c.content_type == "text")
-            .map(|c| c.text.as_str())
-            .collect::<Vec<_>>()
-            .join("");
+        let mut stream = response.bytes_stream();
+        let mut buffer = String::new();
+
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result
+                .map_err(|e| TasksError::Ai(format!("Stream read error: {}", e)))?;
+            
+            let chunk_str = String::from_utf8_lossy(&chunk);
+            buffer.push_str(&chunk_str);
+
+            // Process complete SSE events from buffer
+            while let Some(event_end) = buffer.find("\n\n") {
+                let event_data = buffer[..event_end].to_string();
+                buffer = buffer[event_end + 2..].to_string();
+
+                // Parse SSE event
+                for line in event_data.lines() {
+                    if let Some(data) = line.strip_prefix("data: ") {
+                        if data == "[DONE]" {
+                            continue;
+                        }
+
+                        if let Ok(event) = serde_json::from_str::<StreamEvent>(data) {
+                            match event {
+                                StreamEvent::MessageStart { message } => {
+                                    response_model = message.model;
+                                    input_tokens = message.usage.input_tokens;
+                                    eprintln!("    📥 Input tokens: {}", input_tokens);
+                                    eprint!("    📝 Generating: ");
+                                    let _ = io::stderr().flush();
+                                }
+                                StreamEvent::ContentBlockDelta { delta, .. } => {
+                                    if delta.delta_type == "text_delta" {
+                                        full_text.push_str(&delta.text);
+                                        char_count += delta.text.len();
+                                        
+                                        // Print progress every 500 chars
+                                        if char_count - last_progress >= 500 {
+                                            eprint!(".");
+                                            let _ = io::stderr().flush();
+                                            last_progress = char_count;
+                                        }
+                                    }
+                                }
+                                StreamEvent::MessageDelta { usage, .. } => {
+                                    if let Some(u) = usage {
+                                        output_tokens = u.output_tokens;
+                                    }
+                                }
+                                StreamEvent::MessageStop => {
+                                    eprintln!(" done!");
+                                    eprintln!("    📤 Output tokens: {}, chars: {}", output_tokens, char_count);
+                                }
+                                StreamEvent::Error { error } => {
+                                    return Err(TasksError::Ai(format!(
+                                        "Stream error: {} - {}",
+                                        error.error_type, error.message
+                                    )));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(AIResponse {
-            text,
+            text: full_text,
             usage: TokenUsage {
-                input_tokens: api_response.usage.input_tokens,
-                output_tokens: api_response.usage.output_tokens,
-                total_tokens: api_response.usage.input_tokens + api_response.usage.output_tokens,
+                input_tokens,
+                output_tokens,
+                total_tokens: input_tokens + output_tokens,
             },
-            model: api_response.model,
+            model: response_model,
             provider: "anthropic".to_string(),
         })
     }

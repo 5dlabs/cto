@@ -70,9 +70,25 @@ spec:
       - name: cli
         description: "CLI to use for documentation generation (claude, cursor, codex)"
         value: "claude"
+      # Linear integration parameters (optional)
+      - name: linear-session-id
+        description: "Linear agent session ID for callbacks"
+        value: ""
+      - name: linear-issue-id
+        description: "Linear issue ID for callbacks"
+        value: ""
+      - name: linear-team-id
+        description: "Linear team ID for callbacks"
+        value: ""
+      - name: linear-callback-url
+        description: "Linear service callback URL"
+        value: "http://linear-svc.cto.svc.cluster.local:8081"
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
+  
+  # Exit handler for callbacks (including Linear)
+  onExit: exit-handler
 
   # Workflow timeout (2 hours for intake processing)
   activeDeadlineSeconds: 7200
@@ -278,6 +294,53 @@ spec:
             -n {{ .Values.argo.namespace | default "argo" }} \
             --ignore-not-found=true
           echo "Cleanup complete"
+
+    # Exit handler for Linear callbacks
+    - name: exit-handler
+      script:
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          SESSION_ID="{{`{{workflow.parameters.linear-session-id}}`}}"
+          ISSUE_ID="{{`{{workflow.parameters.linear-issue-id}}`}}"
+          CALLBACK_URL="{{`{{workflow.parameters.linear-callback-url}}`}}"
+          CONFIGMAP="{{`{{workflow.parameters.configmap-name}}`}}"
+          
+          # Skip if no Linear session configured
+          if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "" ]; then
+            echo "No Linear session configured, skipping callback"
+            exit 0
+          fi
+          
+          echo "Sending intake completion callback to Linear service..."
+          echo "  Session ID: $SESSION_ID"
+          echo "  Issue ID: $ISSUE_ID"
+          echo "  Workflow Status: {{`{{workflow.status}}`}}"
+          
+          # Build callback payload
+          PAYLOAD=$(cat <<EOF
+          {
+            "workflow_name": "{{`{{workflow.name}}`}}",
+            "workflow_status": "{{`{{workflow.status}}`}}",
+            "linear_session_id": "$SESSION_ID",
+            "linear_issue_id": "$ISSUE_ID",
+            "linear_team_id": "{{`{{workflow.parameters.linear-team-id}}`}}",
+            "configmap_name": "$CONFIGMAP",
+            "project_name": "{{`{{workflow.parameters.project-name}}`}}",
+            "duration_seconds": "{{`{{workflow.duration}}`}}"
+          }
+          EOF
+          )
+          
+          # Send callback
+          curl -s -X POST "$CALLBACK_URL/callbacks/intake-complete" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Warning: Callback failed, continuing..."
+          
+          echo "Exit handler complete"
 
   # TTL strategy for workflow cleanup
   ttlStrategy:
