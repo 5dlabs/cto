@@ -38,6 +38,7 @@ secrets:
   oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
   oauthTokenKey: LINEAR_OAUTH_TOKEN
   webhookSecretKey: LINEAR_WEBHOOK_SECRET
+  githubTokenKey: GITHUB_TOKEN
 
 # Workflow configuration for local testing
 intake:

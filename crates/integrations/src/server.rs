@@ -42,6 +42,7 @@ pub struct AppState {
 pub fn build_router(state: AppState) -> Router {
     let callback_state = Arc::new(CallbackState {
         linear_client: state.linear_client.clone(),
+        github_token: state.config.github_token.clone(),
     });
 
     Router::new()

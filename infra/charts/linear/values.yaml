@@ -66,6 +66,8 @@ secrets:
   oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
   oauthTokenKey: LINEAR_OAUTH_TOKEN
   webhookSecretKey: LINEAR_WEBHOOK_SECRET
+  # GitHub token for API calls (optional, but needed for task fetching)
+  githubTokenKey: GITHUB_TOKEN
 
 # Workflow configuration
 intake:

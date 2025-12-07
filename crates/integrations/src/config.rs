@@ -16,6 +16,8 @@ pub struct Config {
     pub enabled: bool,
     /// Linear OAuth token for API calls.
     pub oauth_token: Option<String>,
+    /// GitHub token for API calls (fetching files from repos).
+    pub github_token: Option<String>,
     /// Kubernetes namespace.
     pub namespace: String,
     /// Intake configuration.
@@ -42,6 +44,7 @@ impl Default for Config {
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
             oauth_token: env::var("LINEAR_OAUTH_TOKEN").ok(),
+            github_token: env::var("GITHUB_TOKEN").ok(),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "cto".to_string()),
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),

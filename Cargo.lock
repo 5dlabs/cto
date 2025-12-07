@@ -1817,6 +1817,7 @@ version = "0.12.38"
 dependencies = [
  "anyhow",
  "axum 0.8.7",
+ "base64 0.22.1",
  "chrono",
  "hex",
  "hmac",

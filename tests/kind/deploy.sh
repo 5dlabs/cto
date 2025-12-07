@@ -48,12 +48,16 @@ echo ""
 echo "5. Deploying Linear/Integrations server..."
 if docker images | grep -q "ghcr.io/5dlabs/linear.*kind-local"; then
   # Create placeholder secrets for Linear
+  # Note: For real testing, export these env vars with actual values:
+  #   export LINEAR_OAUTH_TOKEN="your-token"
+  #   export GITHUB_TOKEN="your-github-token"
   kubectl create secret generic linear-secrets \
     --namespace cto \
-    --from-literal=LINEAR_OAUTH_CLIENT_ID="placeholder" \
-    --from-literal=LINEAR_OAUTH_CLIENT_SECRET="placeholder" \
-    --from-literal=LINEAR_OAUTH_TOKEN="placeholder" \
-    --from-literal=LINEAR_WEBHOOK_SECRET="placeholder" \
+    --from-literal=LINEAR_OAUTH_CLIENT_ID="${LINEAR_OAUTH_CLIENT_ID:-placeholder}" \
+    --from-literal=LINEAR_OAUTH_CLIENT_SECRET="${LINEAR_OAUTH_CLIENT_SECRET:-placeholder}" \
+    --from-literal=LINEAR_OAUTH_TOKEN="${LINEAR_OAUTH_TOKEN:-placeholder}" \
+    --from-literal=LINEAR_WEBHOOK_SECRET="${LINEAR_WEBHOOK_SECRET:-placeholder}" \
+    --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN:-placeholder}" \
     --dry-run=client -o yaml | kubectl apply -f -
   
   helm upgrade --install linear "${CHARTS_DIR}/linear" \

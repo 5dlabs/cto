@@ -51,6 +51,8 @@ fn default_true() -> bool {
 pub struct CallbackState {
     /// Linear client for API calls.
     pub linear_client: Option<LinearClient>,
+    /// GitHub token for API calls (fetching files from repos).
+    pub github_token: Option<String>,
 }
 
 /// Handle intake workflow completion callback.

@@ -9,6 +9,10 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::Json,
 };
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use reqwest::header::{
+    HeaderMap as ReqwestHeaders, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -124,6 +128,147 @@ pub struct IntakeMetadata {
     pub project_name: Option<String>,
 }
 
+/// GitHub API response for file contents
+#[derive(Debug, Clone, Deserialize)]
+struct GitHubFileContent {
+    /// File content (base64 encoded)
+    content: String,
+    /// Encoding type
+    encoding: String,
+    /// File path (kept for debugging but not used)
+    #[allow(dead_code)]
+    path: String,
+}
+
+/// Tasks JSON structure from repository
+#[derive(Debug, Clone, Deserialize)]
+pub struct TasksJsonFile {
+    /// List of tasks
+    pub tasks: Vec<TaskFromJson>,
+    /// Metadata about the tasks
+    #[serde(default)]
+    pub metadata: Option<TasksMetadata>,
+}
+
+/// Metadata about the tasks
+#[derive(Debug, Clone, Deserialize)]
+pub struct TasksMetadata {
+    /// Project name
+    #[serde(default)]
+    pub project_name: Option<String>,
+    /// PRD identifier
+    #[serde(default)]
+    pub prd_id: Option<String>,
+}
+
+/// Fetch a file from a GitHub repository at a specific commit
+async fn fetch_file_from_github(
+    owner: &str,
+    repo: &str,
+    path: &str,
+    commit_sha: &str,
+    github_token: Option<&str>,
+) -> anyhow::Result<String> {
+    let url =
+        format!("https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={commit_sha}");
+
+    let client = reqwest::Client::new();
+    let mut headers = ReqwestHeaders::new();
+    headers.insert(
+        ACCEPT,
+        HeaderValue::from_static("application/vnd.github.v3+json"),
+    );
+    headers.insert(USER_AGENT, HeaderValue::from_static("cto-integrations/1.0"));
+
+    if let Some(token) = github_token {
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}"))
+                .map_err(|e| anyhow::anyhow!("Invalid token: {e}"))?,
+        );
+    }
+
+    let response = client
+        .get(&url)
+        .headers(headers)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("GitHub API request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(anyhow::anyhow!("GitHub API returned {status}: {body}"));
+    }
+
+    let file_content: GitHubFileContent = response
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse GitHub response: {e}"))?;
+
+    if file_content.encoding != "base64" {
+        return Err(anyhow::anyhow!(
+            "Unexpected encoding: {}",
+            file_content.encoding
+        ));
+    }
+
+    // Decode base64 content (GitHub includes newlines in the content)
+    let content_clean: String = file_content
+        .content
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let decoded = BASE64
+        .decode(&content_clean)
+        .map_err(|e| anyhow::anyhow!("Failed to decode base64: {e}"))?;
+
+    String::from_utf8(decoded).map_err(|e| anyhow::anyhow!("File content is not valid UTF-8: {e}"))
+}
+
+/// Fetch tasks.json from repository at merge commit
+async fn fetch_tasks_json(
+    owner: &str,
+    repo: &str,
+    commit_sha: &str,
+    github_token: Option<&str>,
+    project_name: Option<&str>,
+) -> anyhow::Result<TasksJsonFile> {
+    // Try multiple possible paths for tasks.json
+    let paths = if let Some(name) = project_name {
+        vec![
+            format!("{name}/.tasks/tasks.json"),
+            ".tasks/tasks.json".to_string(),
+            "tasks.json".to_string(),
+        ]
+    } else {
+        vec![".tasks/tasks.json".to_string(), "tasks.json".to_string()]
+    };
+
+    for path in &paths {
+        debug!(path = %path, "Trying to fetch tasks.json");
+        match fetch_file_from_github(owner, repo, path, commit_sha, github_token).await {
+            Ok(content) => {
+                let tasks: TasksJsonFile = serde_json::from_str(&content)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse tasks.json: {e}"))?;
+                info!(
+                    path = %path,
+                    task_count = tasks.tasks.len(),
+                    "Successfully fetched tasks.json"
+                );
+                return Ok(tasks);
+            }
+            Err(e) => {
+                debug!(path = %path, error = %e, "Failed to fetch from path");
+            }
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "Could not find tasks.json in any expected location: {paths:?}"
+    ))
+}
+
 /// Handle GitHub webhook
 #[allow(clippy::too_many_lines)]
 pub async fn handle_github_webhook(
@@ -220,7 +365,9 @@ pub async fn handle_github_webhook(
     };
 
     // Create project and issues
-    match create_project_from_intake(client, &payload, &metadata).await {
+    match create_project_from_intake(client, &payload, &metadata, state.github_token.as_deref())
+        .await
+    {
         Ok(result) => {
             info!(
                 project_id = %result.project_id,
@@ -352,10 +499,12 @@ struct IntakeProjectResult {
 }
 
 /// Create a Linear project from a merged intake PR
+#[allow(clippy::too_many_lines)]
 async fn create_project_from_intake(
     client: &LinearClient,
     payload: &PullRequestEvent,
     metadata: &IntakeMetadata,
+    github_token: Option<&str>,
 ) -> anyhow::Result<IntakeProjectResult> {
     // Determine project name
     let project_name = metadata
@@ -390,16 +539,64 @@ async fn create_project_from_intake(
         "Created Linear project"
     );
 
-    // Now we need to get tasks.json from the merged PR
-    // For now, we'll create a placeholder - in practice this would be fetched
-    // from the repository or passed via the callback
-    let issue_count = 0; // TODO: Parse tasks.json and create issues
+    // Get merge commit SHA
+    let Some(merge_commit_sha) = &payload.pull_request.merge_commit_sha else {
+        warn!("No merge commit SHA available, cannot fetch tasks.json");
+        return Ok(IntakeProjectResult {
+            project_id: project.id,
+            project_name: project.name,
+            project_url: project.url,
+            issue_count: 0,
+        });
+    };
 
-    // In a full implementation, we would:
-    // 1. Fetch tasks.json from the repository at the merge commit
-    // 2. Parse the tasks
-    // 3. Create Linear issues for each task
-    // 4. Link them to the project
+    // Parse owner and repo from full_name
+    let full_name = &payload.repository.full_name;
+    let parts: Vec<&str> = full_name.split('/').collect();
+    if parts.len() != 2 {
+        return Err(anyhow::anyhow!("Invalid repository full_name: {full_name}"));
+    }
+    let owner = parts[0];
+    let repo = parts[1];
+
+    // Fetch tasks.json from the repository
+    let tasks_json = match fetch_tasks_json(
+        owner,
+        repo,
+        merge_commit_sha,
+        github_token,
+        metadata.project_name.as_deref(),
+    )
+    .await
+    {
+        Ok(tasks) => tasks,
+        Err(e) => {
+            warn!(error = %e, "Could not fetch tasks.json, project created without issues");
+            return Ok(IntakeProjectResult {
+                project_id: project.id,
+                project_name: project.name,
+                project_url: project.url,
+                issue_count: 0,
+            });
+        }
+    };
+
+    // Create Linear issues from tasks
+    let created_issues = create_issues_from_tasks(
+        client,
+        &metadata.team_id,
+        &project.id,
+        &metadata.prd_issue_id,
+        &tasks_json.tasks,
+    )
+    .await?;
+    let issue_count = created_issues.len();
+
+    info!(
+        project_id = %project.id,
+        issue_count = issue_count,
+        "Created Linear issues from tasks.json"
+    );
 
     Ok(IntakeProjectResult {
         project_id: project.id,

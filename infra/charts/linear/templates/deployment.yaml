@@ -67,6 +67,15 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.secretName }}
                   key: {{ .Values.secrets.webhookSecretKey }}
+            # GitHub token for API calls
+            {{- if .Values.secrets.githubTokenKey }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.githubTokenKey }}
+                  optional: true
+            {{- end }}
             # Intake configuration
             - name: GITHUB_APP_NAME
               value: {{ .Values.intake.githubApp | quote }}
