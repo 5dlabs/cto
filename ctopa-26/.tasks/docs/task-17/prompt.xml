@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="17" priority="medium" agent="blaze">
+    <meta>
+        <title>Implement team management UI</title>
+        <priority>medium</priority>
+        <dependencies>15</dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 17 with production-quality code.</role>
+
+    <context>
+        <overview>Create team management interface for member administration and settings</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create TeamSettings component for team configuration
+2. Implement MemberList component with role management
+3. Add team invitation UI with link generation and sharing
+4. Create team creation and editing forms
+5. Implement role-based UI permissions (show/hide actions)
+6. Add team switching functionality in navigation
+7. Create team activity feed component</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-17): Implement team management UI</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>E2E tests for team management workflows and unit tests for role-based UI rendering</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="15" priority="medium" agent="cipher">
+    <meta>
+        <title>Implement authentication UI and API integration</title>
+        <priority>medium</priority>
+        <dependencies>14, 6</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 15 with production-quality code.</role>
+
+    <context>
+        <overview>Create login/register forms and integrate with backend authentication API</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create AuthContext for managing authentication state
+2. Implement Login and Register components with form validation
+3. Add OAuth2 login buttons for Google and GitHub
+4. Implement JWT token storage and refresh logic
+5. Create ProtectedRoute component for route protection
+6. Add API client with automatic token refresh interceptors
+7. Handle authentication errors and token expiration</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-15): Implement authentication UI and API integration</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>E2E tests for login/register flows and unit tests for authentication state management</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

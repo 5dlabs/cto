@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="14" priority="medium" agent="blaze">
+    <meta>
+        <title>Setup React frontend project foundation</title>
+        <priority>medium</priority>
+        <dependencies></dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 14 with production-quality code.</role>
+
+    <context>
+        <overview>Initialize React 18 + TypeScript + Tailwind project for team dashboard</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create React app with Vite and TypeScript template
+2. Install dependencies: react@18, typescript, tailwindcss, @types/react
+3. Configure Tailwind CSS with dark/light theme support
+4. Setup project structure: components/, pages/, hooks/, utils/, types/
+5. Add API client configuration with axios
+6. Configure environment variables for API endpoint</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-14): Setup React frontend project foundation</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify React app builds and runs with hot reload and Tailwind styles working</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

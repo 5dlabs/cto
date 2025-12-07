@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="13" priority="high" agent="bolt">
+    <meta>
+        <title>Implement health check endpoints</title>
+        <priority>high</priority>
+        <dependencies>3, 4</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 13 with production-quality code.</role>
+
+    <context>
+        <overview>Create liveness and readiness health check endpoints for Kubernetes</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create health.rs module with health check handlers
+2. Implement GET /health/live - basic liveness check (always returns 200)
+3. Implement GET /health/ready - readiness check (database and Redis connectivity)
+4. Add dependency health checks with timeout handling
+5. Return detailed health status in JSON format
+6. Add graceful shutdown handling for health checks</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-13): Implement health check endpoints</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for health check logic and integration tests with database/Redis failures</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

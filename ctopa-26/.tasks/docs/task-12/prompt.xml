@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="12" priority="high" agent="rex">
+    <meta>
+        <title>Add structured logging and observability</title>
+        <priority>high</priority>
+        <dependencies>1</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 12 with production-quality code.</role>
+
+    <context>
+        <overview>Implement structured JSON logging with trace IDs and Prometheus metrics</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add tracing and tracing-subscriber dependencies
+2. Configure JSON logging with request trace IDs using tracing spans
+3. Add metrics collection using prometheus crate
+4. Implement custom metrics: request_duration, active_connections, task_operations
+5. Create /metrics endpoint for Prometheus scraping
+6. Add request/response logging middleware with sanitization
+7. Configure log levels via environment variables</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-12): Add structured logging and observability</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify JSON log format and metrics endpoint functionality with sample requests</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

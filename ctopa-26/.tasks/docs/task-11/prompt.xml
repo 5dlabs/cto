@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="11" priority="medium" agent="rex">
+    <meta>
+        <title>Implement real-time notification system</title>
+        <priority>medium</priority>
+        <dependencies>10</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 11 with production-quality code.</role>
+
+    <context>
+        <overview>Create notification service with WebSocket, email, and push notification support</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create notifications.rs service module
+2. Implement notification types: task_assigned, task_updated, task_due_soon, mention
+3. Add email notification using SMTP (lettre crate)
+4. Integrate FCM for mobile push notifications
+5. Store user notification preferences in database
+6. Create notification queue using Redis pub/sub
+7. Add background worker for processing notification queue</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-11): Implement real-time notification system</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for notification logic and integration tests for email/push delivery with mock services</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

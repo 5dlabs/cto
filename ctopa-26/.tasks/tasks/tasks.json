@@ -1,0 +1,1933 @@
+{
+  "metadata": {
+    "completedCount": 0,
+    "lastModified": "2025-12-07T10:14:38.116988715+00:00",
+    "taskCount": 20,
+    "version": "1.0.0"
+  },
+  "tasks": [
+    {
+      "agentHint": "rex",
+      "dependencies": [],
+      "description": "Initialize the TeamSync API project with Rust/Axum foundation and core dependencies",
+      "details": "1. Create new Rust project with `cargo init`\n2. Add dependencies to Cargo.toml: axum = \"0.7\", tokio = { version = \"1.0\", features = [\"full\"] }, serde = { version = \"1.0\", features = [\"derive\"] }, sqlx = { version = \"0.7\", features = [\"postgres\", \"runtime-tokio-rustls\", \"chrono\", \"uuid\"] }, redis = \"0.24\", uuid = { version = \"1.0\", features = [\"v4\"] }, chrono = { version = \"0.4\", features = [\"serde\"] }\n3. Setup basic main.rs with axum server skeleton\n4. Configure workspace structure with separate modules for handlers, models, database",
+      "id": "1",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:09:33.622136421Z",
+          "dependencies": [],
+          "description": "Create a new Rust project using cargo init and set up the basic project structure",
+          "details": "Run `cargo init teamsync-api --name teamsync-api` to create the project. Verify that Cargo.toml and src/main.rs are created with default content. Ensure the project name and basic metadata are properly configured.",
+          "id": 1,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify project builds with `cargo build` and runs with `cargo run`",
+          "title": "Initialize new Rust project",
+          "updatedAt": "2025-12-07T10:09:33.622136421Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:33.622137213Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Add all required dependencies to Cargo.toml including Axum, Tokio, Serde, SQLx, Redis, UUID, and Chrono",
+          "details": "Add the following dependencies to Cargo.toml: axum = \"0.7\", tokio = { version = \"1.0\", features = [\"full\"] }, serde = { version = \"1.0\", features = [\"derive\"] }, sqlx = { version = \"0.7\", features = [\"postgres\", \"runtime-tokio-rustls\", \"chrono\", \"uuid\"] }, redis = \"0.24\", uuid = { version = \"1.0\", features = [\"v4\"] }, chrono = { version = \"0.4\", features = [\"serde\"] }. Also add any necessary dev-dependencies.",
+          "id": 2,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Run `cargo check` to verify all dependencies resolve correctly",
+          "title": "Configure Cargo.toml with core dependencies",
+          "updatedAt": "2025-12-07T10:09:33.622137213Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:33.622137796Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Set up the project's module structure with separate directories for handlers, models, and database components",
+          "details": "Create the following directory structure: src/handlers/ (for HTTP request handlers), src/models/ (for data models and structs), src/database/ (for database connection and queries), src/config/ (for configuration management). Create mod.rs files in each directory and update src/main.rs to declare these modules.",
+          "id": 3,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify all modules can be imported and compiled without errors",
+          "title": "Create workspace module structure",
+          "updatedAt": "2025-12-07T10:09:33.622137796Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:33.622137963Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Create the main server setup with Axum including basic routing and server startup logic",
+          "details": "Update src/main.rs to include: async main function with tokio runtime, basic Axum app creation with Router, a simple health check route (/health), server binding to localhost:3000, proper error handling for server startup. Include necessary imports for axum::Router, axum::response::Json, and tokio.",
+          "id": 4,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Start the server and verify it responds to GET /health with a 200 status code",
+          "title": "Implement basic Axum server skeleton",
+          "updatedAt": "2025-12-07T10:09:33.622137963Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:33.622138046Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Create configuration management for environment variables and application settings",
+          "details": "Create src/config/mod.rs with a Config struct that handles database URL, Redis URL, server port, and other environment variables. Implement loading from environment variables with sensible defaults. Add a .env.example file showing required environment variables. Set up proper error handling for missing critical configuration.",
+          "id": 5,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test configuration loading with various environment variable combinations",
+          "title": "Add basic project configuration and environment setup",
+          "updatedAt": "2025-12-07T10:09:33.622138046Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:33.622138171Z",
+          "dependencies": [
+            "5"
+          ],
+          "description": "Run comprehensive tests to ensure all components work together and the foundation is solid",
+          "details": "Perform final verification by running cargo build, cargo test, and cargo run. Ensure the server starts successfully, all modules compile without warnings, dependencies are properly integrated, and the project structure is clean and organized. Document any setup instructions in README.md.",
+          "id": 6,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Full integration test including server startup, module compilation, and basic API endpoint verification",
+          "title": "Verify complete project setup and integration",
+          "updatedAt": "2025-12-07T10:09:33.622138171Z"
+        }
+      ],
+      "testStrategy": "Verify project compiles successfully with `cargo build` and basic server starts on localhost",
+      "title": "Setup Rust project foundation and dependencies"
+    },
+    {
+      "agentHint": "cipher",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Create database schema for teams, users, tasks, and authentication with sqlx migrations",
+      "details": "1. Create sqlx migration files in migrations/\n2. Define users table: id (UUID), email, name, created_at, updated_at\n3. Define teams table: id (UUID), name, description, owner_id (FK), created_at\n4. Define team_members table: team_id (FK), user_id (FK), role (enum), joined_at\n5. Define tasks table: id (UUID), team_id (FK), title, description, assignee_id (FK), status (enum), due_date, created_at, updated_at, deleted_at\n6. Add indexes for performance on foreign keys and status fields",
+      "id": "2",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:09:46.558846719Z",
+          "dependencies": [],
+          "description": "Create the initial migration file for the users table with proper UUID primary key, email uniqueness, and timestamp fields",
+          "details": "Create migration file 001_create_users_table.sql with users table containing: id (UUID PRIMARY KEY), email (VARCHAR UNIQUE NOT NULL), name (VARCHAR NOT NULL), created_at (TIMESTAMPTZ DEFAULT NOW()), updated_at (TIMESTAMPTZ DEFAULT NOW()). Include proper constraints and enable uuid-ossp extension if needed.",
+          "id": 1,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test migration runs successfully and creates table with correct schema, constraints, and indexes",
+          "title": "Create users table migration",
+          "updatedAt": "2025-12-07T10:09:46.558846719Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:46.558850094Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create migration for teams table and team_members junction table with proper foreign key relationships and role enumeration",
+          "details": "Create migration file 002_create_teams_and_members.sql with: teams table (id UUID PRIMARY KEY, name VARCHAR NOT NULL, description TEXT, owner_id UUID REFERENCES users(id), created_at TIMESTAMPTZ) and team_members table (team_id UUID REFERENCES teams(id), user_id UUID REFERENCES users(id), role VARCHAR CHECK role IN ('owner', 'admin', 'member'), joined_at TIMESTAMPTZ, PRIMARY KEY (team_id, user_id))",
+          "id": 2,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify foreign key constraints work correctly and role enumeration prevents invalid values",
+          "title": "Create teams and team_members tables migration",
+          "updatedAt": "2025-12-07T10:09:46.558850094Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:46.558851594Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Create the tasks table migration with all required fields, foreign key relationships, and status enumeration for task management",
+          "details": "Create migration file 003_create_tasks_table.sql with tasks table containing: id (UUID PRIMARY KEY), team_id (UUID REFERENCES teams(id) NOT NULL), title (VARCHAR NOT NULL), description (TEXT), assignee_id (UUID REFERENCES users(id)), status (VARCHAR CHECK status IN ('todo', 'in_progress', 'review', 'done') DEFAULT 'todo'), due_date (DATE), created_at (TIMESTAMPTZ DEFAULT NOW()), updated_at (TIMESTAMPTZ DEFAULT NOW()), deleted_at (TIMESTAMPTZ)",
+          "id": 3,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test status enumeration constraints and foreign key relationships, verify soft delete functionality with deleted_at",
+          "title": "Create tasks table migration with status enumeration",
+          "updatedAt": "2025-12-07T10:09:46.558851594Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:09:46.558852594Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Create migration to add database indexes on foreign keys and frequently queried fields for optimal query performance",
+          "details": "Create migration file 004_add_indexes_and_constraints.sql with indexes: CREATE INDEX idx_teams_owner_id ON teams(owner_id), CREATE INDEX idx_team_members_user_id ON team_members(user_id), CREATE INDEX idx_tasks_team_id ON tasks(team_id), CREATE INDEX idx_tasks_assignee_id ON tasks(assignee_id), CREATE INDEX idx_tasks_status ON tasks(status), CREATE INDEX idx_tasks_due_date ON tasks(due_date WHERE due_date IS NOT NULL)",
+          "id": 4,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Run EXPLAIN ANALYZE on common queries to verify index usage and performance improvements",
+          "title": "Add performance indexes and constraints optimization",
+          "updatedAt": "2025-12-07T10:09:46.558852594Z"
+        }
+      ],
+      "testStrategy": "Run migrations with `sqlx migrate run` and verify all tables created with proper constraints and indexes",
+      "title": "Setup PostgreSQL database schema and migrations"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "2"
+      ],
+      "description": "Setup PostgreSQL connection pool and define Rust models for database entities",
+      "details": "1. Create database.rs module with connection pool setup using sqlx::PgPool\n2. Define models in models/ directory: User, Team, TeamMember, Task structs with sqlx derives\n3. Implement From traits for converting between database rows and models\n4. Add database configuration from environment variables (DATABASE_URL)\n5. Create database repository pattern with traits for each entity",
+      "id": "3",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:10:02.336680170Z",
+          "dependencies": [],
+          "description": "Create the core database module with PostgreSQL connection pool configuration using sqlx::PgPool, including environment variable configuration and connection validation.",
+          "details": "Create src/database.rs module with PgPool setup, DATABASE_URL environment variable loading, connection pool configuration (min/max connections, timeouts), and connection validation function. Include proper error handling for connection failures and pool initialization.",
+          "id": 1,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for connection pool creation, integration tests for database connectivity, and error handling tests for invalid connection strings",
+          "title": "Setup PostgreSQL connection pool and database module",
+          "updatedAt": "2025-12-07T10:10:02.336680170Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:02.336683545Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create Rust structs for User and Team entities with appropriate sqlx derives and field mappings to database schema.",
+          "details": "Create src/models/user.rs and src/models/team.rs with User and Team structs. Include sqlx::FromRow derives, proper field types (id, name, email, created_at, etc.), and implement Display and Debug traits. Add validation attributes and ensure proper mapping to PostgreSQL data types.",
+          "id": 2,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for model serialization/deserialization and field validation tests",
+          "title": "Define User and Team database models",
+          "updatedAt": "2025-12-07T10:10:02.336683545Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:02.336684420Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create Rust structs for TeamMember and Task entities with sqlx derives, foreign key relationships, and proper field mappings.",
+          "details": "Create src/models/team_member.rs and src/models/task.rs with TeamMember and Task structs. Include foreign key references (user_id, team_id), status enums, timestamps, and relationship mappings. Implement sqlx::FromRow derives and proper PostgreSQL type mappings for complex fields like status enums.",
+          "id": 3,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for model creation, foreign key relationship validation, and enum serialization tests",
+          "title": "Define TeamMember and Task database models",
+          "updatedAt": "2025-12-07T10:10:02.336684420Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:02.336684712Z",
+          "dependencies": [
+            "2",
+            "3"
+          ],
+          "description": "Create repository traits and implementations for each entity providing CRUD operations and database abstraction layer.",
+          "details": "Create src/repositories/ directory with trait definitions for UserRepository, TeamRepository, TeamMemberRepository, and TaskRepository. Implement concrete structs with sqlx queries for create, read, update, delete operations. Include query builders for filtering and pagination, and proper error handling with custom error types.",
+          "id": 4,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with test database, mock repository implementations for unit testing, and transaction rollback tests",
+          "title": "Implement repository pattern with database traits",
+          "updatedAt": "2025-12-07T10:10:02.336684712Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:02.336684962Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Implement comprehensive error handling for database operations and From traits for converting between database rows and model structs.",
+          "details": "Create custom DatabaseError enum with variants for connection errors, query errors, and constraint violations. Implement From traits for converting sqlx::Row to model structs, handling null values and type conversions. Add error mapping from sqlx errors to application errors and implement proper logging for database operations.",
+          "id": 5,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Error handling tests for various failure scenarios, From trait conversion tests, and logging verification tests",
+          "title": "Configure database error handling and From trait implementations",
+          "updatedAt": "2025-12-07T10:10:02.336684962Z"
+        }
+      ],
+      "testStrategy": "Unit tests for model serialization/deserialization and integration tests for database connectivity",
+      "title": "Implement database connection and models"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Configure Redis connection for session management and rate limiting",
+      "details": "1. Add Redis client configuration in redis.rs module\n2. Create connection pool with redis::aio::ConnectionManager\n3. Implement session storage interface using Redis with TTL\n4. Setup rate limiting storage with Redis counters and sliding window\n5. Add Redis configuration from environment (REDIS_URL)",
+      "id": "4",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:10:11.913366967Z",
+          "dependencies": [],
+          "description": "Configure Redis client with connection pool and environment-based configuration for the application",
+          "details": "Create redis.rs module with Redis client configuration using redis::aio::ConnectionManager. Implement connection pool setup with proper error handling and connection retry logic. Add environment variable support for REDIS_URL configuration. Include connection health checks and graceful connection management.",
+          "id": 1,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for connection establishment, integration tests for Redis connectivity, and error handling tests for connection failures",
+          "title": "Setup Redis connection and client configuration",
+          "updatedAt": "2025-12-07T10:10:11.913366967Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:11.913370175Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create session storage implementation using Redis with TTL management for user sessions",
+          "details": "Implement session storage interface using Redis as the backend store. Create functions for session creation, retrieval, update, and deletion with automatic TTL (time-to-live) management. Design session data serialization/deserialization using JSON or binary format. Include session expiration handling and cleanup mechanisms.",
+          "id": 2,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for session CRUD operations, TTL expiration tests, and integration tests with mock Redis instances",
+          "title": "Implement Redis-based session storage interface",
+          "updatedAt": "2025-12-07T10:10:11.913370175Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:11.913371383Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create rate limiting storage system using Redis counters with sliding window algorithm and TTL management",
+          "details": "Implement rate limiting using Redis counters with sliding window algorithm for accurate rate limiting. Create functions to track request counts per client/IP with configurable time windows and limits. Use Redis atomic operations for thread-safe counter increments. Implement automatic cleanup of expired rate limit entries using TTL and periodic cleanup tasks.",
+          "id": 3,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for rate limit calculations, stress tests for concurrent requests, and integration tests for sliding window accuracy",
+          "title": "Implement Redis-based rate limiting with sliding window",
+          "updatedAt": "2025-12-07T10:10:11.913371383Z"
+        }
+      ],
+      "testStrategy": "Integration tests for Redis connectivity and basic set/get operations with TTL verification",
+      "title": "Setup Redis connection and caching layer"
+    },
+    {
+      "agentHint": "cipher",
+      "dependencies": [
+        "3",
+        "4"
+      ],
+      "description": "Create JWT-based authentication with access and refresh tokens",
+      "details": "1. Add jsonwebtoken and bcrypt dependencies\n2. Create auth.rs module with JWT token generation/validation\n3. Implement AuthService with login, refresh, logout methods\n4. Create middleware for JWT validation using axum::middleware\n5. Store refresh tokens in Redis with 7-day expiration\n6. Implement password hashing with bcrypt\n7. Add JWT secret configuration from environment",
+      "id": "5",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:10:29.582812586Z",
+          "dependencies": [],
+          "description": "Install required dependencies and configure JWT security settings including secret key management and token expiration times",
+          "details": "Add jsonwebtoken, bcrypt, and redis dependencies to Cargo.toml. Create environment configuration for JWT_SECRET, ACCESS_TOKEN_EXPIRY (15min), REFRESH_TOKEN_EXPIRY (7days), and Redis connection settings. Set up proper secret key rotation strategy and ensure secrets are loaded from environment variables with validation.",
+          "id": 1,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for configuration loading and validation of required environment variables",
+          "title": "Set up JWT dependencies and security configuration",
+          "updatedAt": "2025-12-07T10:10:29.582812586Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:29.582815836Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create secure password hashing and verification functions using bcrypt with appropriate cost factors",
+          "details": "Implement hash_password() function with bcrypt cost factor of 12. Create verify_password() function for authentication. Add password strength validation. Include proper error handling for hashing failures and timing attack prevention through constant-time comparison.",
+          "id": 2,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for password hashing, verification, and edge cases like empty passwords",
+          "title": "Implement password hashing with bcrypt",
+          "updatedAt": "2025-12-07T10:10:29.582815836Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:29.582817044Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Build core JWT functionality for creating access tokens, refresh tokens, and validating token claims",
+          "details": "Create auth.rs module with generate_access_token() and generate_refresh_token() functions. Implement validate_token() with proper claim verification including expiration, issuer, and custom claims. Add token blacklisting capability and proper error handling for malformed, expired, or invalid tokens.",
+          "id": 3,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for token generation, validation, expiration handling, and malformed token scenarios",
+          "title": "Create JWT token generation and validation module",
+          "updatedAt": "2025-12-07T10:10:29.582817044Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:29.582817461Z",
+          "dependencies": [
+            "2",
+            "3"
+          ],
+          "description": "Create service layer handling login, token refresh, and logout operations with proper business logic",
+          "details": "Build AuthService struct with login(username, password) returning access/refresh token pair. Implement refresh_token(refresh_token) for token renewal. Create logout(refresh_token) for token invalidation. Include rate limiting for login attempts and proper error responses for authentication failures.",
+          "id": 4,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for login flow, token refresh cycle, logout functionality, and rate limiting",
+          "title": "Implement AuthService with authentication methods",
+          "updatedAt": "2025-12-07T10:10:29.582817461Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:29.582817627Z",
+          "dependencies": [
+            "1",
+            "3"
+          ],
+          "description": "Configure Redis integration for storing refresh tokens with automatic expiration and cleanup",
+          "details": "Set up Redis connection pool and implement refresh token storage with 7-day TTL. Create functions for store_refresh_token(), validate_refresh_token(), and revoke_refresh_token(). Include Redis connection error handling, automatic reconnection, and cleanup of expired tokens.",
+          "id": 5,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with Redis for token storage, expiration, and connection failure scenarios",
+          "title": "Set up Redis refresh token storage with expiration",
+          "updatedAt": "2025-12-07T10:10:29.582817627Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:29.582818919Z",
+          "dependencies": [
+            "3",
+            "4",
+            "5"
+          ],
+          "description": "Build Axum middleware for automatic JWT validation on protected routes with proper error handling",
+          "details": "Create JWT middleware using axum::middleware::from_fn. Extract Bearer tokens from Authorization header, validate using auth module, and inject user claims into request extensions. Handle missing tokens, invalid tokens, and expired tokens with appropriate HTTP status codes (401, 403). Include optional role-based access control.",
+          "id": 6,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for middleware with valid/invalid tokens, missing headers, and protected route access",
+          "title": "Create JWT validation middleware for Axum",
+          "updatedAt": "2025-12-07T10:10:29.582818919Z"
+        }
+      ],
+      "testStrategy": "Unit tests for token generation/validation and integration tests for auth flow including token refresh",
+      "title": "Implement JWT authentication system"
+    },
+    {
+      "agentHint": "cipher",
+      "dependencies": [
+        "5"
+      ],
+      "description": "Add OAuth2 authentication providers for Google and GitHub login",
+      "details": "1. Add oauth2 crate dependency\n2. Create oauth.rs module with OAuth2 client configuration\n3. Implement OAuth2 authorization flow handlers for Google and GitHub\n4. Add callback endpoints: /auth/google/callback, /auth/github/callback\n5. Store OAuth2 client credentials in environment variables\n6. Link OAuth2 accounts to existing users or create new users\n7. Generate JWT tokens after successful OAuth2 authentication",
+      "id": "6",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:10:42.076863800Z",
+          "dependencies": [],
+          "description": "Add oauth2 crate dependency and create oauth.rs module with OAuth2 client configuration for Google and GitHub providers",
+          "details": "Add oauth2 crate to Cargo.toml, create src/oauth.rs module, implement OAuth2Client struct with configuration for Google and GitHub providers, set up client ID and secret loading from environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET)",
+          "id": 1,
+          "parentId": "6",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for OAuth2Client initialization and configuration validation",
+          "title": "Set up OAuth2 dependencies and client configuration",
+          "updatedAt": "2025-12-07T10:10:42.076863800Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:42.076867092Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create authorization flow handler for Google OAuth2 authentication including redirect URL generation and state management",
+          "details": "Implement /auth/google endpoint that generates authorization URL with proper scopes (email, profile), creates secure state parameter for CSRF protection, stores state in session/cache, and redirects user to Google OAuth2 authorization server",
+          "id": 2,
+          "parentId": "6",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for authorization URL generation and state parameter validation",
+          "title": "Implement OAuth2 authorization flow handlers for Google",
+          "updatedAt": "2025-12-07T10:10:42.076867092Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:42.076868133Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create authorization flow handler for GitHub OAuth2 authentication including redirect URL generation and state management",
+          "details": "Implement /auth/github endpoint that generates authorization URL with proper scopes (user:email), creates secure state parameter for CSRF protection, stores state in session/cache, and redirects user to GitHub OAuth2 authorization server",
+          "id": 3,
+          "parentId": "6",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for authorization URL generation and state parameter validation",
+          "title": "Implement OAuth2 authorization flow handlers for GitHub",
+          "updatedAt": "2025-12-07T10:10:42.076868133Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:42.076868383Z",
+          "dependencies": [
+            "2",
+            "3"
+          ],
+          "description": "Create callback endpoints for both Google and GitHub that handle authorization codes, exchange them for access tokens, and fetch user information",
+          "details": "Implement /auth/google/callback and /auth/github/callback endpoints that validate state parameter, exchange authorization code for access token, fetch user profile information (email, name, avatar), and handle error cases (denied access, invalid state, token exchange failures)",
+          "id": 4,
+          "parentId": "6",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with mocked OAuth2 providers and error scenario testing",
+          "title": "Implement OAuth2 callback endpoints and token exchange",
+          "updatedAt": "2025-12-07T10:10:42.076868383Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:42.076870300Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Link OAuth2 accounts to existing users or create new users, and generate JWT tokens after successful authentication",
+          "details": "Implement user lookup by email from OAuth2 profile, create new user account if not exists, link OAuth2 provider info to user record, generate JWT token with user claims, set secure HTTP-only cookie with JWT, and redirect to dashboard or original requested page",
+          "id": 5,
+          "parentId": "6",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for user linking logic and JWT generation, integration tests for complete OAuth2 flow",
+          "title": "Implement user account linking and JWT token generation",
+          "updatedAt": "2025-12-07T10:10:42.076870300Z"
+        }
+      ],
+      "testStrategy": "Integration tests with mock OAuth2 providers and manual testing with real OAuth2 flows",
+      "title": "Implement OAuth2 integration (Google and GitHub)"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "4",
+        "5"
+      ],
+      "description": "Create rate limiting middleware using Redis for API protection",
+      "details": "1. Create rate_limit.rs module with sliding window algorithm\n2. Implement middleware that checks Redis counters per IP/user\n3. Configure limits: 100 req/min for authenticated users, 20 req/min for anonymous\n4. Use Redis EXPIRE and INCR commands for efficient counting\n5. Return 429 Too Many Requests with Retry-After header\n6. Add rate limit headers to all responses (X-RateLimit-Limit, X-RateLimit-Remaining)",
+      "id": "7",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:10:56.943588709Z",
+          "dependencies": [],
+          "description": "Create the core sliding window algorithm for accurate rate limiting with time-based windows",
+          "details": "Create rate_limit.rs module with sliding window algorithm implementation. Design time-based window tracking that maintains request timestamps within a rolling time window. Implement efficient window sliding logic that removes expired entries and counts current requests. Include helper functions for window calculations and timestamp management.",
+          "id": 1,
+          "parentId": "7",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for window sliding logic, timestamp calculations, and edge cases like window boundaries",
+          "title": "Implement sliding window rate limiting algorithm",
+          "updatedAt": "2025-12-07T10:10:56.943588709Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:56.943592126Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Build Redis-based counter system for tracking request counts per IP/user with automatic expiration",
+          "details": "Implement Redis operations using INCR and EXPIRE commands for efficient request counting. Create functions to generate unique keys per IP/user, increment counters atomically, and set appropriate TTL values. Handle Redis connection pooling and error scenarios. Implement separate logic for authenticated users vs anonymous users with different rate limits (100 req/min vs 20 req/min).",
+          "id": 2,
+          "parentId": "7",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with Redis mock, test counter increment/expiration, and concurrent request handling",
+          "title": "Implement Redis counter management system",
+          "updatedAt": "2025-12-07T10:10:56.943592126Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:56.943592709Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Develop middleware that integrates sliding window algorithm with Redis counters and enforces rate limits",
+          "details": "Create middleware function that extracts client IP/user ID from requests, checks current request count against limits using Redis counters and sliding window algorithm. Implement user type detection (authenticated vs anonymous) and apply appropriate limits. Handle rate limit violations by returning 429 Too Many Requests status with proper Retry-After header calculation based on window reset time.",
+          "id": 3,
+          "parentId": "7",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for middleware flow, rate limit enforcement, and proper 429 response generation",
+          "title": "Create rate limiting middleware integration",
+          "updatedAt": "2025-12-07T10:10:56.943592709Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:10:56.943593626Z",
+          "dependencies": [
+            "2",
+            "3"
+          ],
+          "description": "Implement comprehensive rate limit headers for all API responses to inform clients of their usage status",
+          "details": "Add rate limit headers to all API responses: X-RateLimit-Limit (showing current limit), X-RateLimit-Remaining (requests left in window), X-RateLimit-Reset (window reset timestamp). Calculate remaining requests from Redis counters and sliding window state. Ensure headers are added for both successful requests and rate-limited responses. Handle edge cases where Redis is unavailable.",
+          "id": 4,
+          "parentId": "7",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test header presence and accuracy in various scenarios, including successful requests and rate limit violations",
+          "title": "Configure rate limit response headers",
+          "updatedAt": "2025-12-07T10:10:56.943593626Z"
+        }
+      ],
+      "testStrategy": "Unit tests for rate limiting logic and load tests to verify limits are enforced correctly",
+      "title": "Implement rate limiting middleware"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "5",
+        "7"
+      ],
+      "description": "Create REST API endpoints for team CRUD operations and member management",
+      "details": "1. Create teams.rs handler module\n2. Implement POST /api/teams - create team with name, description\n3. Implement GET /api/teams/:id - get team details with member count\n4. Implement PATCH /api/teams/:id - update team settings (owner/admin only)\n5. Add role-based authorization checks using middleware\n6. Implement team member invitation system with UUID tokens\n7. Add POST /api/teams/:id/invite endpoint with 7-day expiration",
+      "id": "8",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:11:14.223365926Z",
+          "dependencies": [],
+          "description": "Set up the teams handler module and implement basic team creation and retrieval endpoints with proper request/response structures.",
+          "details": "Create src/handlers/teams.rs module with POST /api/teams endpoint for team creation (name, description validation) and GET /api/teams/:id endpoint for retrieving team details. Include proper error handling, request validation, and response serialization using serde.",
+          "id": 1,
+          "parentId": "8",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for endpoint handlers, integration tests for API responses and validation",
+          "title": "Create teams.rs handler module with basic CRUD endpoints",
+          "updatedAt": "2025-12-07T10:11:14.223365926Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:14.223369676Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Add PATCH /api/teams/:id endpoint that allows team owners and admins to update team settings with proper authorization checks.",
+          "details": "Implement PATCH /api/teams/:id endpoint with validation to ensure only team owners or admins can update team settings. Include fields for name, description updates and proper error responses for unauthorized access attempts.",
+          "id": 2,
+          "parentId": "8",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test authorization scenarios, valid/invalid update requests, and permission edge cases",
+          "title": "Implement team update endpoint with owner validation",
+          "updatedAt": "2025-12-07T10:11:14.223369676Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:14.223371051Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Develop middleware to handle role-based access control for team operations, checking user permissions against team membership and roles.",
+          "details": "Create authorization middleware that validates user roles (owner, admin, member) for team operations. Implement permission checking functions that can be reused across different team endpoints, with proper error handling for unauthorized access.",
+          "id": 3,
+          "parentId": "8",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test different role combinations, unauthorized access attempts, and middleware integration",
+          "title": "Create role-based authorization middleware for team operations",
+          "updatedAt": "2025-12-07T10:11:14.223371051Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:14.223372218Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Create the core invitation system that generates secure UUID tokens for team invitations with database storage and token validation.",
+          "details": "Implement invitation token generation using UUID v4, create database schema for storing invitations with team_id, email, token, expiration (7 days), and invited_by fields. Include token validation logic and cleanup for expired invitations.",
+          "id": 4,
+          "parentId": "8",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test token generation, validation, expiration logic, and database operations",
+          "title": "Implement team invitation system with UUID tokens",
+          "updatedAt": "2025-12-07T10:11:14.223372218Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:14.223372801Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Implement the team invitation endpoint that creates and sends invitation tokens to new team members with 7-day expiration.",
+          "details": "Create POST /api/teams/:id/invite endpoint that accepts email addresses, validates sender permissions (owner/admin only), generates invitation tokens with 7-day expiration, and stores invitation records. Include duplicate invitation handling and proper error responses.",
+          "id": 5,
+          "parentId": "8",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test invitation creation, permission validation, expiration handling, and duplicate invitation scenarios",
+          "title": "Add POST /api/teams/:id/invite endpoint with expiration handling",
+          "updatedAt": "2025-12-07T10:11:14.223372801Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:14.223373384Z",
+          "dependencies": [
+            "5"
+          ],
+          "description": "Implement input validation for all team endpoints and enhance team details endpoint to include member count and role information.",
+          "details": "Add comprehensive input validation for team names, descriptions, email formats in invitations. Enhance GET /api/teams/:id endpoint to return member count, team roles, and invitation status. Include rate limiting for invitation endpoints and proper error messages for all validation failures.",
+          "id": 6,
+          "parentId": "8",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test all validation scenarios, member count accuracy, rate limiting, and comprehensive error handling",
+          "title": "Add comprehensive validation and member count features",
+          "updatedAt": "2025-12-07T10:11:14.223373384Z"
+        }
+      ],
+      "testStrategy": "Integration tests for all endpoints with different user roles and authorization scenarios",
+      "title": "Implement team management API endpoints"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "8"
+      ],
+      "description": "Create REST API endpoints for task CRUD operations with filtering and soft delete",
+      "details": "1. Create tasks.rs handler module\n2. Implement POST /api/teams/:team_id/tasks - create task\n3. Implement GET /api/teams/:team_id/tasks - list tasks with filters (status, assignee, due_date)\n4. Implement GET /api/tasks/:id, PATCH /api/tasks/:id, DELETE /api/tasks/:id\n5. Add soft delete with deleted_at timestamp and 30-day cleanup job\n6. Implement query parameter parsing for filters\n7. Add validation for task status enum (todo/in-progress/done)",
+      "id": "9",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:11:33.401159004Z",
+          "dependencies": [],
+          "description": "Set up the foundational handler module for task-related API endpoints with proper imports and module organization.",
+          "details": "Create src/handlers/tasks.rs module with necessary imports (axum, serde, sqlx, uuid, chrono). Set up handler function signatures and basic error handling structure. Include proper module exports and integration with main router.",
+          "id": 1,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for module structure and basic handler function signatures",
+          "title": "Create tasks.rs handler module and basic structure",
+          "updatedAt": "2025-12-07T10:11:33.401159004Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:33.401160046Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create the endpoint for creating new tasks within a specific team with proper validation and database insertion.",
+          "details": "Implement create_task handler function with team_id path parameter validation, request body parsing for task creation (title, description, assignee_id, due_date, priority). Add database insertion logic with proper error handling and return created task with 201 status.",
+          "id": 2,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for successful task creation, validation errors, and team authorization",
+          "title": "Implement POST /api/teams/:team_id/tasks endpoint",
+          "updatedAt": "2025-12-07T10:11:33.401160046Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:33.401160754Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create the endpoint for listing tasks within a team with support for filtering by status, assignee, and due date.",
+          "details": "Implement list_tasks handler with query parameter parsing for filters (status, assignee_id, due_date_from, due_date_to, limit, offset). Build dynamic SQL queries based on provided filters, implement pagination, and return filtered task list with metadata.",
+          "id": 3,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for various filter combinations, pagination, and empty result handling",
+          "title": "Implement GET /api/teams/:team_id/tasks with filtering",
+          "updatedAt": "2025-12-07T10:11:33.401160754Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:33.401161004Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create individual task management endpoints for retrieving, updating, and deleting specific tasks by ID.",
+          "details": "Implement get_task_by_id (return single task or 404), update_task (PATCH with partial updates for title, description, status, assignee_id, due_date), and delete_task handlers. Include proper authorization checks and validation for each operation.",
+          "id": 4,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for each CRUD operation including authorization, validation, and error cases",
+          "title": "Implement GET, PATCH, DELETE /api/tasks/:id endpoints",
+          "updatedAt": "2025-12-07T10:11:33.401161004Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:33.401161213Z",
+          "dependencies": [
+            "2",
+            "4"
+          ],
+          "description": "Add comprehensive validation for task status transitions and enum values across all endpoints.",
+          "details": "Create TaskStatus enum (Todo, InProgress, Done) with proper serialization/deserialization. Implement validation logic for status transitions, add validation middleware for status values in create and update operations, and ensure consistent status handling across all endpoints.",
+          "id": 5,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for status enum validation and integration tests for status transition rules",
+          "title": "Implement task status enum validation",
+          "updatedAt": "2025-12-07T10:11:33.401161213Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:33.401161921Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Add soft delete functionality to task deletion operations using timestamp-based marking instead of hard deletion.",
+          "details": "Modify delete_task handler to set deleted_at timestamp instead of removing records. Update all query operations to filter out soft-deleted tasks by default. Add database migration for deleted_at column and implement restore functionality for accidentally deleted tasks.",
+          "id": 6,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for soft delete behavior, query filtering, and restore functionality",
+          "title": "Implement soft delete with deleted_at timestamp",
+          "updatedAt": "2025-12-07T10:11:33.401161921Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:33.401162171Z",
+          "dependencies": [
+            "6"
+          ],
+          "description": "Create a scheduled background job to permanently remove tasks that have been soft-deleted for more than 30 days.",
+          "details": "Implement cleanup job using tokio-cron-scheduler or similar. Create hard delete function for tasks where deleted_at is older than 30 days. Set up job scheduling configuration and logging for cleanup operations. Include job status monitoring and error handling.",
+          "id": 7,
+          "parentId": "9",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for cleanup logic and integration tests for scheduled job execution",
+          "title": "Implement 30-day cleanup job for deleted tasks",
+          "updatedAt": "2025-12-07T10:11:33.401162171Z"
+        }
+      ],
+      "testStrategy": "Integration tests for CRUD operations, filtering, and soft delete functionality with cleanup verification",
+      "title": "Implement task management API endpoints"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "9"
+      ],
+      "description": "Implement WebSocket endpoint for live task updates and team activity",
+      "details": "1. Add axum WebSocket support with tokio-tungstenite\n2. Create websocket.rs module with connection management\n3. Implement /ws endpoint with authentication via query parameter JWT\n4. Create WebSocket connection pool grouped by team_id\n5. Add Redis pub/sub for broadcasting updates across server instances\n6. Handle WebSocket connection lifecycle (connect, disconnect, heartbeat)\n7. Support 1000 concurrent connections with connection limits",
+      "id": "10",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:11:53.278148389Z",
+          "dependencies": [],
+          "description": "Add axum WebSocket support dependencies and create basic /ws endpoint handler with tokio-tungstenite integration",
+          "details": "Add tokio-tungstenite and axum WebSocket dependencies to Cargo.toml. Create basic WebSocket endpoint at /ws route that accepts WebSocket upgrade requests. Implement initial WebSocket handler function that can accept connections and perform the protocol upgrade handshake.",
+          "id": 1,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for endpoint registration and basic WebSocket upgrade functionality",
+          "title": "Setup WebSocket endpoint with axum integration",
+          "updatedAt": "2025-12-07T10:11:53.278148389Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:53.278151680Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Add authentication middleware to validate JWT tokens passed as query parameters in WebSocket connection requests",
+          "details": "Create authentication handler that extracts JWT token from query parameters (?token=...). Validate token using existing JWT validation logic. Extract user_id and team_id from validated token. Reject connections with invalid or missing tokens with appropriate error codes.",
+          "id": 2,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with valid/invalid tokens and missing token scenarios",
+          "title": "Implement JWT authentication for WebSocket connections",
+          "updatedAt": "2025-12-07T10:11:53.278151680Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:53.278153264Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Develop dedicated WebSocket module with connection pool structure and basic connection tracking functionality",
+          "details": "Create websocket.rs module with WebSocketConnection struct containing user_id, team_id, and connection handle. Implement WebSocketPool struct with HashMap<team_id, Vec<WebSocketConnection>> for grouping connections by team. Add methods for adding, removing, and retrieving connections by team_id.",
+          "id": 3,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for connection pool operations and team-based grouping",
+          "title": "Create websocket.rs module with connection management",
+          "updatedAt": "2025-12-07T10:11:53.278153264Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:53.278154097Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Integrate Redis publish/subscribe functionality to broadcast WebSocket messages across multiple server instances",
+          "details": "Add redis crate dependency and create Redis connection pool. Implement publisher that sends messages to Redis channels named by team_id. Create subscriber that listens to team channels and forwards messages to local WebSocket connections. Handle Redis connection failures with reconnection logic.",
+          "id": 4,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with Redis instance and multi-server simulation",
+          "title": "Implement Redis pub/sub for broadcasting updates",
+          "updatedAt": "2025-12-07T10:11:53.278154097Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:53.278155264Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Implement complete connection lifecycle including connect, disconnect, error handling, and cleanup procedures",
+          "details": "Add connection establishment logic with proper error handling. Implement disconnect detection and cleanup of connections from pool. Handle network errors, client disconnections, and server-side connection termination. Add logging for connection events and maintain connection statistics.",
+          "id": 5,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "End-to-end tests for connection lifecycle scenarios and error conditions",
+          "title": "Handle WebSocket connection lifecycle management",
+          "updatedAt": "2025-12-07T10:11:53.278155264Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:53.278155764Z",
+          "dependencies": [
+            "5"
+          ],
+          "description": "Add ping/pong heartbeat system to detect stale connections and maintain connection health monitoring",
+          "details": "Implement periodic ping messages sent to all active connections every 30 seconds. Handle pong responses from clients and track response times. Automatically disconnect connections that fail to respond to heartbeat within 60 seconds. Add connection health metrics and monitoring.",
+          "id": 6,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for heartbeat timing and integration tests for connection cleanup",
+          "title": "Implement heartbeat mechanism for connection health",
+          "updatedAt": "2025-12-07T10:11:53.278155764Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:11:53.278156597Z",
+          "dependencies": [
+            "6"
+          ],
+          "description": "Implement scalability optimizations and connection limits to support 1000 concurrent WebSocket connections efficiently",
+          "details": "Add connection limiting middleware with configurable maximum connections per server (1000). Implement efficient connection tracking with minimal memory overhead. Add connection rate limiting per IP/user. Optimize message broadcasting with batch operations and async processing. Add monitoring for connection counts and performance metrics.",
+          "id": 7,
+          "parentId": "10",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Load testing with 1000 simulated connections and performance benchmarking",
+          "title": "Optimize for 1000 concurrent connections with limits",
+          "updatedAt": "2025-12-07T10:11:53.278156597Z"
+        }
+      ],
+      "testStrategy": "Load tests for concurrent WebSocket connections and integration tests for message broadcasting",
+      "title": "Setup WebSocket infrastructure for real-time updates"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "10"
+      ],
+      "description": "Create notification service with WebSocket, email, and push notification support",
+      "details": "1. Create notifications.rs service module\n2. Implement notification types: task_assigned, task_updated, task_due_soon, mention\n3. Add email notification using SMTP (lettre crate)\n4. Integrate FCM for mobile push notifications\n5. Store user notification preferences in database\n6. Create notification queue using Redis pub/sub\n7. Add background worker for processing notification queue",
+      "id": "11",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:12:14.273431009Z",
+          "dependencies": [],
+          "description": "Create the foundational structure for the notification system including database schemas, service interfaces, and notification type definitions",
+          "details": "Define notification data models in the database (notifications table with fields: id, user_id, type, title, message, read_status, created_at). Create notification type enums (task_assigned, task_updated, task_due_soon, mention). Design service trait interfaces for different notification channels. Set up migrations for notification-related tables.",
+          "id": 1,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for data models and service interfaces",
+          "title": "Design notification service architecture and data models",
+          "updatedAt": "2025-12-07T10:12:14.273431009Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273434384Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create the main notification service module with basic CRUD operations and notification dispatch logic",
+          "details": "Create notifications.rs module with NotificationService struct. Implement methods for creating, reading, updating, and deleting notifications. Add notification dispatch logic that routes to appropriate channels based on user preferences. Include methods for marking notifications as read/unread and bulk operations.",
+          "id": 2,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for all CRUD operations and integration tests for notification dispatch",
+          "title": "Implement core notifications.rs service module",
+          "updatedAt": "2025-12-07T10:12:14.273434384Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273435634Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Set up WebSocket connections to push real-time notifications to connected clients",
+          "details": "Integrate WebSocket support using tokio-tungstenite or similar. Create WebSocket handler for notification subscriptions. Implement connection management for multiple users. Add real-time notification broadcasting when new notifications are created. Handle connection lifecycle (connect, disconnect, reconnect).",
+          "id": 3,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for WebSocket connections and real-time message delivery",
+          "title": "Implement WebSocket integration for real-time notifications",
+          "updatedAt": "2025-12-07T10:12:14.273435634Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273436134Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Configure email sending capabilities using the lettre crate with SMTP support",
+          "details": "Integrate lettre crate for SMTP email sending. Configure SMTP settings (server, port, authentication). Create email templates for different notification types. Implement EmailNotificationService with methods for sending formatted emails. Add retry logic for failed email deliveries and proper error handling.",
+          "id": 4,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests with mock SMTP server and integration tests with real email service",
+          "title": "Set up email notification service using SMTP",
+          "updatedAt": "2025-12-07T10:12:14.273436134Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273436468Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Integrate FCM to send push notifications to mobile devices",
+          "details": "Set up Firebase project and obtain service account credentials. Integrate FCM SDK or HTTP API for sending push notifications. Implement PushNotificationService with methods for device token registration and message sending. Handle different payload formats for iOS and Android. Add batch sending capabilities for multiple devices.",
+          "id": 5,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with FCM test environment and device token validation",
+          "title": "Configure Firebase Cloud Messaging for push notifications",
+          "updatedAt": "2025-12-07T10:12:14.273436468Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273437051Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create system for users to manage their notification preferences across different channels",
+          "details": "Create user_notification_preferences table with fields for email_enabled, push_enabled, websocket_enabled, and notification_types. Implement UserPreferencesService for CRUD operations. Add API endpoints for users to update preferences. Create default preference settings for new users. Include preference validation logic.",
+          "id": 6,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for preference management and API endpoint tests",
+          "title": "Implement user notification preferences management",
+          "updatedAt": "2025-12-07T10:12:14.273437051Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273437676Z",
+          "dependencies": [
+            "2",
+            "6"
+          ],
+          "description": "Set up Redis pub/sub system for queuing and processing notifications asynchronously",
+          "details": "Configure Redis connection and pub/sub channels. Create NotificationQueue service using Redis for queuing notification jobs. Implement message serialization/deserialization for notification payloads. Add queue monitoring and dead letter queue handling. Include priority queue support for urgent notifications.",
+          "id": 7,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with Redis instance and queue processing verification",
+          "title": "Implement Redis queue for notification processing",
+          "updatedAt": "2025-12-07T10:12:14.273437676Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:14.273438093Z",
+          "dependencies": [
+            "3",
+            "4",
+            "5",
+            "7"
+          ],
+          "description": "Implement background service that processes queued notifications and sends them through appropriate channels",
+          "details": "Create background worker using tokio tasks that subscribes to Redis notification queue. Implement worker logic to process notifications based on user preferences and send through appropriate channels (WebSocket, email, push). Add error handling, retry logic, and logging. Include graceful shutdown and worker health monitoring.",
+          "id": 8,
+          "parentId": "11",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for end-to-end notification processing and worker reliability tests",
+          "title": "Create background worker for notification queue processing",
+          "updatedAt": "2025-12-07T10:12:14.273438093Z"
+        }
+      ],
+      "testStrategy": "Unit tests for notification logic and integration tests for email/push delivery with mock services",
+      "title": "Implement real-time notification system"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Implement structured JSON logging with trace IDs and Prometheus metrics",
+      "details": "1. Add tracing and tracing-subscriber dependencies\n2. Configure JSON logging with request trace IDs using tracing spans\n3. Add metrics collection using prometheus crate\n4. Implement custom metrics: request_duration, active_connections, task_operations\n5. Create /metrics endpoint for Prometheus scraping\n6. Add request/response logging middleware with sanitization\n7. Configure log levels via environment variables",
+      "id": "12",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:12:29.002557419Z",
+          "dependencies": [],
+          "description": "Set up tracing and tracing-subscriber dependencies to implement structured JSON logging with request trace IDs using tracing spans",
+          "details": "Add tracing and tracing-subscriber crates to Cargo.toml. Configure tracing subscriber with JSON formatter. Implement trace ID generation and propagation through request spans. Set up log level configuration via environment variables (RUST_LOG). Create logging initialization function that sets up the global subscriber with proper formatting and filtering.",
+          "id": 1,
+          "parentId": "12",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for trace ID generation and propagation. Integration tests to verify JSON log format and trace ID consistency across request lifecycle.",
+          "title": "Configure structured JSON logging with trace IDs",
+          "updatedAt": "2025-12-07T10:12:29.002557419Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:29.002560919Z",
+          "dependencies": [],
+          "description": "Add prometheus crate and implement custom metrics collection for request_duration, active_connections, and task_operations",
+          "details": "Add prometheus crate to dependencies. Create metrics registry and define custom metrics: request_duration (histogram), active_connections (gauge), and task_operations (counter). Implement metrics collection functions that can be called throughout the application. Set up proper metric labels and buckets for histograms. Create metrics manager module to centralize metric definitions and collection logic.",
+          "id": 2,
+          "parentId": "12",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for metrics registration and collection. Mock tests to verify metric values are updated correctly during operations.",
+          "title": "Implement Prometheus metrics collection system",
+          "updatedAt": "2025-12-07T10:12:29.002560919Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:29.002561544Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Implement /metrics HTTP endpoint that exposes collected metrics in Prometheus format for scraping",
+          "details": "Create HTTP handler for /metrics endpoint that returns metrics in Prometheus text format. Integrate with existing web framework to expose the endpoint. Implement proper content-type headers (text/plain; version=0.0.4). Add endpoint documentation and ensure it's accessible for Prometheus scraping. Handle potential errors during metric serialization gracefully.",
+          "id": 3,
+          "parentId": "12",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests to verify /metrics endpoint returns valid Prometheus format. Load tests to ensure endpoint performance under scraping load.",
+          "title": "Create Prometheus metrics endpoint",
+          "updatedAt": "2025-12-07T10:12:29.002561544Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:29.002562919Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Create middleware that combines structured logging with metrics collection for comprehensive request observability including sanitization",
+          "details": "Implement middleware that wraps requests with tracing spans containing trace IDs. Add request/response logging with sensitive data sanitization (headers, query params, body content). Integrate metrics collection to track request duration, increment request counters, and update active connection gauges. Ensure trace IDs are propagated through the entire request lifecycle and included in all log entries. Add configurable sanitization rules for PII and sensitive data.",
+          "id": 4,
+          "parentId": "12",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for complete request tracing flow. Tests to verify sensitive data sanitization. Performance tests to measure middleware overhead on request processing.",
+          "title": "Integrate request tracing middleware with logging and metrics",
+          "updatedAt": "2025-12-07T10:12:29.002562919Z"
+        }
+      ],
+      "testStrategy": "Verify JSON log format and metrics endpoint functionality with sample requests",
+      "title": "Add structured logging and observability"
+    },
+    {
+      "agentHint": "bolt",
+      "dependencies": [
+        "3",
+        "4"
+      ],
+      "description": "Create liveness and readiness health check endpoints for Kubernetes",
+      "details": "1. Create health.rs module with health check handlers\n2. Implement GET /health/live - basic liveness check (always returns 200)\n3. Implement GET /health/ready - readiness check (database and Redis connectivity)\n4. Add dependency health checks with timeout handling\n5. Return detailed health status in JSON format\n6. Add graceful shutdown handling for health checks",
+      "id": "13",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:12:39.168046965Z",
+          "dependencies": [],
+          "description": "Implement basic liveness endpoint that always returns 200 OK to indicate the application is running",
+          "details": "Create health.rs module with GET /health/live endpoint handler. This endpoint should perform minimal checks and always return HTTP 200 with a simple JSON response indicating the service is alive. No external dependency checks required for liveness.",
+          "id": 1,
+          "parentId": "13",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests to verify endpoint returns 200 status and correct JSON format",
+          "title": "Create liveness health check endpoint",
+          "updatedAt": "2025-12-07T10:12:39.168046965Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:39.168050840Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create readiness endpoint that verifies database and Redis connectivity with timeout handling",
+          "details": "Implement GET /health/ready endpoint that checks database connection, Redis connectivity, and other critical dependencies. Include configurable timeout handling for each dependency check. Return detailed JSON status with individual component health. Endpoint should return 200 if all dependencies are healthy, 503 if any are unhealthy.",
+          "id": 2,
+          "parentId": "13",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with mock dependencies, timeout simulation, and various failure scenarios",
+          "title": "Implement readiness endpoint with dependency checks",
+          "updatedAt": "2025-12-07T10:12:39.168050840Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:39.168051965Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Implement graceful shutdown behavior that properly handles health check requests during application termination",
+          "details": "Add shutdown signal handling that transitions health endpoints to return appropriate status during graceful shutdown. Liveness should continue returning 200, but readiness should return 503 to stop receiving new traffic. Implement proper cleanup of health check resources and ensure existing health check requests complete gracefully.",
+          "id": 3,
+          "parentId": "13",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "End-to-end tests simulating shutdown scenarios and verifying health endpoint behavior during termination",
+          "title": "Add graceful shutdown handling for health checks",
+          "updatedAt": "2025-12-07T10:12:39.168051965Z"
+        }
+      ],
+      "testStrategy": "Unit tests for health check logic and integration tests with database/Redis failures",
+      "title": "Implement health check endpoints"
+    },
+    {
+      "agentHint": "blaze",
+      "dependencies": [],
+      "description": "Initialize React 18 + TypeScript + Tailwind project for team dashboard",
+      "details": "1. Create React app with Vite and TypeScript template\n2. Install dependencies: react@18, typescript, tailwindcss, @types/react\n3. Configure Tailwind CSS with dark/light theme support\n4. Setup project structure: components/, pages/, hooks/, utils/, types/\n5. Add API client configuration with axios\n6. Configure environment variables for API endpoint",
+      "id": "14",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:12:58.996850002Z",
+          "dependencies": [],
+          "description": "Initialize a new React project using Vite build tool with TypeScript template for better performance and type safety",
+          "details": "Run 'npm create vite@latest team-dashboard -- --template react-ts' to create the project. This will set up a modern React 18 project with Vite as the build tool and TypeScript configuration out of the box.",
+          "id": 1,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify project structure is created and dev server starts successfully with 'npm run dev'",
+          "title": "Create React app with Vite and TypeScript template",
+          "updatedAt": "2025-12-07T10:12:58.996850002Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996853710Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Install React 18, TypeScript, and essential type definitions for the project",
+          "details": "Navigate to project directory and install dependencies: 'npm install react@18 @types/react @types/react-dom typescript'. Verify package.json includes correct versions and TypeScript configuration is properly set up.",
+          "id": 2,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Check package.json for correct versions and run 'npm run build' to ensure TypeScript compilation works",
+          "title": "Install core dependencies",
+          "updatedAt": "2025-12-07T10:12:58.996853710Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996854252Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Set up Tailwind CSS framework with PostCSS and Autoprefixer for utility-first styling",
+          "details": "Install Tailwind: 'npm install -D tailwindcss postcss autoprefixer'. Run 'npx tailwindcss init -p' to create config files. Update tailwind.config.js with content paths: ['./index.html', './src/**/*.{js,ts,jsx,tsx}']",
+          "id": 3,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Add Tailwind directives to CSS and test basic utility classes render correctly",
+          "title": "Install and configure Tailwind CSS",
+          "updatedAt": "2025-12-07T10:12:58.996854252Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996854377Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Setup Tailwind CSS configuration to support both dark and light themes with proper color schemes",
+          "details": "Update tailwind.config.js to include darkMode: 'class' configuration. Define custom color palette for both themes. Create theme toggle utility and context provider for managing theme state across the application.",
+          "id": 4,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test theme switching functionality and verify dark/light mode classes apply correctly",
+          "title": "Configure dark/light theme support",
+          "updatedAt": "2025-12-07T10:12:58.996854377Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996855252Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Create organized directory structure for components, pages, hooks, utilities, and type definitions",
+          "details": "Create directories: src/components/, src/pages/, src/hooks/, src/utils/, src/types/. Add index.ts barrel exports in each directory. Create basic folder structure with README files explaining the purpose of each directory.",
+          "id": 5,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify all directories are created and barrel exports work correctly with test imports",
+          "title": "Setup project folder structure",
+          "updatedAt": "2025-12-07T10:12:58.996855252Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996855794Z",
+          "dependencies": [
+            "5"
+          ],
+          "description": "Set up Axios HTTP client library for making API requests with proper configuration",
+          "details": "Install axios: 'npm install axios @types/axios'. Create src/utils/api.ts with axios instance configuration including base URL, timeout, and default headers. Add request/response interceptors for error handling.",
+          "id": 6,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test API client configuration with a mock request and verify interceptors work correctly",
+          "title": "Install and configure Axios for API client",
+          "updatedAt": "2025-12-07T10:12:58.996855794Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996856002Z",
+          "dependencies": [
+            "6"
+          ],
+          "description": "Setup environment variable configuration for API endpoint and other environment-specific settings",
+          "details": "Create .env.example and .env.local files. Define VITE_API_BASE_URL variable. Update vite.config.ts to handle environment variables. Create src/config/environment.ts to centralize environment variable access with proper typing.",
+          "id": 7,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify environment variables are loaded correctly and API base URL is configurable across different environments",
+          "title": "Configure environment variables",
+          "updatedAt": "2025-12-07T10:12:58.996856002Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:12:58.996856169Z",
+          "dependencies": [
+            "4",
+            "7"
+          ],
+          "description": "Clean up default Vite template files and update project configuration for team dashboard specific needs",
+          "details": "Remove default Vite template components and styles. Update index.html title and meta tags. Configure tsconfig.json with proper path mapping. Add .gitignore entries for environment files and build artifacts.",
+          "id": 8,
+          "parentId": "14",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Run full build process and verify no template artifacts remain, all imports resolve correctly",
+          "title": "Update project configuration and cleanup",
+          "updatedAt": "2025-12-07T10:12:58.996856169Z"
+        }
+      ],
+      "testStrategy": "Verify React app builds and runs with hot reload and Tailwind styles working",
+      "title": "Setup React frontend project foundation"
+    },
+    {
+      "agentHint": "cipher",
+      "dependencies": [
+        "14",
+        "6"
+      ],
+      "description": "Create login/register forms and integrate with backend authentication API",
+      "details": "1. Create AuthContext for managing authentication state\n2. Implement Login and Register components with form validation\n3. Add OAuth2 login buttons for Google and GitHub\n4. Implement JWT token storage and refresh logic\n5. Create ProtectedRoute component for route protection\n6. Add API client with automatic token refresh interceptors\n7. Handle authentication errors and token expiration",
+      "id": "15",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:13:13.471063967Z",
+          "dependencies": [],
+          "description": "Create React Context for managing global authentication state including user data, login status, and authentication methods",
+          "details": "Create AuthContext with React.createContext, implement AuthProvider component with state for user, isAuthenticated, isLoading. Add methods for login, logout, and user data updates. Include proper TypeScript interfaces for auth state and context methods.",
+          "id": 1,
+          "parentId": "15",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for AuthContext methods and state updates",
+          "title": "Set up AuthContext and authentication state management",
+          "updatedAt": "2025-12-07T10:13:13.471063967Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:13.471066551Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Implement responsive login and register components with comprehensive form validation and error handling",
+          "details": "Build Login and Register components using React Hook Form or Formik. Add validation for email format, password strength, confirm password matching. Include error display, loading states, and form submission handling. Style with consistent UI framework and ensure mobile responsiveness.",
+          "id": 2,
+          "parentId": "15",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Component testing for form validation, error states, and user interactions",
+          "title": "Create Login and Register forms with validation",
+          "updatedAt": "2025-12-07T10:13:13.471066551Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:13.471067634Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Add Google and GitHub OAuth2 login buttons with proper integration and callback handling",
+          "details": "Integrate OAuth2 providers using libraries like react-oauth/google for Google and GitHub OAuth App. Create OAuth login buttons, handle authorization callbacks, extract user data from OAuth responses, and integrate with AuthContext. Handle OAuth errors and edge cases.",
+          "id": 3,
+          "parentId": "15",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for OAuth flows and mock OAuth provider responses",
+          "title": "Implement OAuth2 login buttons and integration",
+          "updatedAt": "2025-12-07T10:13:13.471067634Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:13.471067842Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create secure token management system with automatic refresh capabilities and proper storage handling",
+          "details": "Implement secure token storage using httpOnly cookies or secure localStorage. Create token refresh logic with automatic renewal before expiration. Add token validation, expiration checking, and cleanup on logout. Handle refresh token rotation and storage security best practices.",
+          "id": 4,
+          "parentId": "15",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for token management functions and integration tests for refresh flows",
+          "title": "Implement JWT token storage and refresh logic",
+          "updatedAt": "2025-12-07T10:13:13.471067842Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:13.471068051Z",
+          "dependencies": [
+            "1",
+            "4"
+          ],
+          "description": "Build route protection system and configure API client with automatic authentication and token refresh",
+          "details": "Create ProtectedRoute component that checks authentication status and redirects unauthorized users. Implement API client using axios or fetch with request/response interceptors for automatic token attachment and refresh. Handle 401 responses, token expiration, and authentication errors with proper user feedback and logout triggers.",
+          "id": 5,
+          "parentId": "15",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for route protection and API interceptor behavior with various auth states",
+          "title": "Create ProtectedRoute component and API client with interceptors",
+          "updatedAt": "2025-12-07T10:13:13.471068051Z"
+        }
+      ],
+      "testStrategy": "E2E tests for login/register flows and unit tests for authentication state management",
+      "title": "Implement authentication UI and API integration"
+    },
+    {
+      "agentHint": "blaze",
+      "dependencies": [
+        "15"
+      ],
+      "description": "Create interactive Kanban board for task management with drag-and-drop functionality",
+      "details": "1. Install react-beautiful-dnd for drag-and-drop\n2. Create KanbanBoard component with columns for todo/in-progress/done\n3. Implement TaskCard component with task details and actions\n4. Add drag-and-drop handlers for task status updates\n5. Integrate with task API endpoints for real-time updates\n6. Add task filtering and search functionality\n7. Implement optimistic UI updates with error handling",
+      "id": "16",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:13:27.946713127Z",
+          "dependencies": [],
+          "description": "Create the basic Kanban board component structure with columns for todo, in-progress, and done states, including responsive layout and styling",
+          "details": "Install react-beautiful-dnd dependency, create KanbanBoard component with three main columns (Todo, In Progress, Done), implement responsive grid layout using CSS Grid or Flexbox, add column headers and basic styling, set up proper component hierarchy and props structure",
+          "id": 1,
+          "parentId": "16",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for component rendering, responsive layout tests, accessibility tests for keyboard navigation",
+          "title": "Set up Kanban board layout and structure",
+          "updatedAt": "2025-12-07T10:13:27.946713127Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:27.946715043Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create reusable TaskCard component that displays task information including title, description, assignee, priority, and action buttons",
+          "details": "Design TaskCard component with task title, description, assignee avatar, priority indicator, due date, and action buttons (edit, delete), implement proper prop types and default values, add hover effects and visual feedback, ensure cards are properly sized and styled within columns",
+          "id": 2,
+          "parentId": "16",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Component unit tests, visual regression tests, interaction tests for buttons and hover states",
+          "title": "Implement TaskCard component with task details",
+          "updatedAt": "2025-12-07T10:13:27.946715043Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:27.946715377Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Add drag-and-drop capabilities using react-beautiful-dnd to allow tasks to be moved between columns and reordered within columns",
+          "details": "Set up DragDropContext, Droppable areas for each column, and Draggable TaskCard components, implement onDragEnd handler to update task positions and status, add visual feedback during drag operations (placeholder, drag preview), handle edge cases like dropping outside valid areas",
+          "id": 3,
+          "parentId": "16",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for drag-and-drop scenarios, accessibility tests for keyboard drag-and-drop, performance tests for large task lists",
+          "title": "Implement drag-and-drop functionality",
+          "updatedAt": "2025-12-07T10:13:27.946715377Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:27.946715543Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Connect the Kanban board to backend API endpoints for fetching, updating, and syncing task data with real-time capabilities",
+          "details": "Implement API calls for fetching tasks, updating task status and position, create real-time subscription using WebSockets or Server-Sent Events, handle API responses and error states, implement loading states during API calls, sync local state with server state",
+          "id": 4,
+          "parentId": "16",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "API integration tests, WebSocket connection tests, error handling tests, network failure simulation tests",
+          "title": "Integrate with task API and implement real-time updates",
+          "updatedAt": "2025-12-07T10:13:27.946715543Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:27.946716002Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Implement task filtering and search functionality along with optimistic UI updates that provide immediate feedback before server confirmation",
+          "details": "Create search input component with real-time filtering, implement filter options (by assignee, priority, due date), add optimistic updates for drag-and-drop operations that immediately update UI before API confirmation, implement rollback mechanism for failed operations, add error handling with user notifications",
+          "id": 5,
+          "parentId": "16",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Search functionality tests, filter combination tests, optimistic update rollback tests, error state handling tests",
+          "title": "Add filtering, search, and optimistic UI updates",
+          "updatedAt": "2025-12-07T10:13:27.946716002Z"
+        }
+      ],
+      "testStrategy": "E2E tests for drag-and-drop functionality and integration tests with task API",
+      "title": "Build Kanban board UI with drag-and-drop"
+    },
+    {
+      "agentHint": "blaze",
+      "dependencies": [
+        "15"
+      ],
+      "description": "Create team management interface for member administration and settings",
+      "details": "1. Create TeamSettings component for team configuration\n2. Implement MemberList component with role management\n3. Add team invitation UI with link generation and sharing\n4. Create team creation and editing forms\n5. Implement role-based UI permissions (show/hide actions)\n6. Add team switching functionality in navigation\n7. Create team activity feed component",
+      "id": "17",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:13:46.122486427Z",
+          "dependencies": [],
+          "description": "Build a comprehensive team settings component that allows team administrators to configure team-wide settings including team name, description, visibility, and general preferences.",
+          "details": "Create TeamSettings.tsx component with form fields for team name, description, visibility settings (public/private), team avatar upload, and general team preferences. Include validation, error handling, and integration with team API endpoints. Implement responsive design with proper form styling and loading states.",
+          "id": 1,
+          "parentId": "17",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for form validation, integration tests for API calls, and visual regression tests for responsive design",
+          "title": "Create TeamSettings component for team configuration",
+          "updatedAt": "2025-12-07T10:13:46.122486427Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:46.122494927Z",
+          "dependencies": [],
+          "description": "Create a member management interface that displays team members, their roles, and provides functionality for role assignment and member removal with proper permission checks.",
+          "details": "Build MemberList.tsx component displaying member avatars, names, email addresses, roles, and join dates. Implement role dropdown for admins to change member roles (owner, admin, member, viewer). Add remove member functionality with confirmation dialogs. Include search and filter capabilities for large teams. Implement proper permission checks to show/hide actions based on current user's role.",
+          "id": 2,
+          "parentId": "17",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for role management logic, integration tests for member operations, and accessibility tests for interactive elements",
+          "title": "Implement MemberList component with role management",
+          "updatedAt": "2025-12-07T10:13:46.122494927Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:46.122495427Z",
+          "dependencies": [],
+          "description": "Develop an invitation system UI that allows team administrators to invite new members via email or shareable links with customizable permissions and expiration settings.",
+          "details": "Create TeamInvitation.tsx component with email invitation form, invitation link generator with expiration settings, and role selection for invitees. Implement copy-to-clipboard functionality for invitation links, email validation, and batch invitation support. Add pending invitations list with resend/revoke capabilities. Include invitation preview and customizable invitation message.",
+          "id": 3,
+          "parentId": "17",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for invitation logic, integration tests for email sending and link generation, and user acceptance tests for invitation flow",
+          "title": "Add team invitation UI with link generation and sharing",
+          "updatedAt": "2025-12-07T10:13:46.122495427Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:46.122495594Z",
+          "dependencies": [
+            "1",
+            "2",
+            "3"
+          ],
+          "description": "Create a comprehensive role-based permission system that dynamically shows or hides UI elements and actions based on the current user's role within the team.",
+          "details": "Develop usePermissions hook and PermissionGuard component to manage role-based UI rendering. Define permission constants for different roles (owner, admin, member, viewer) and actions (invite, remove, edit settings, etc.). Implement conditional rendering throughout team management components to show/hide buttons, forms, and sections based on user permissions. Add permission checking utilities and context providers.",
+          "id": 4,
+          "parentId": "17",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for permission logic, integration tests for role-based rendering, and security tests to ensure proper access control",
+          "title": "Implement role-based UI permissions system",
+          "updatedAt": "2025-12-07T10:13:46.122495594Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:13:46.122496927Z",
+          "dependencies": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ],
+          "description": "Implement team switching navigation component and team activity feed to display recent team actions, member activities, and important team events in chronological order.",
+          "details": "Build TeamSwitcher component in navigation with dropdown showing user's teams and quick switch functionality. Create TeamActivityFeed component displaying chronological list of team activities (member joins/leaves, role changes, settings updates, etc.). Implement real-time updates for activity feed, pagination for large activity lists, and filtering options by activity type. Add activity icons and timestamps with proper formatting.",
+          "id": 5,
+          "parentId": "17",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for team switching logic, integration tests for activity feed updates, and performance tests for real-time functionality",
+          "title": "Create team switching functionality and activity feed",
+          "updatedAt": "2025-12-07T10:13:46.122496927Z"
+        }
+      ],
+      "testStrategy": "E2E tests for team management workflows and unit tests for role-based UI rendering",
+      "title": "Implement team management UI"
+    },
+    {
+      "agentHint": "blaze",
+      "dependencies": [
+        "16",
+        "10"
+      ],
+      "description": "Integrate WebSocket client for real-time task and team updates in the React dashboard",
+      "details": "1. Create WebSocket hook for connection management\n2. Implement real-time task updates in Kanban board\n3. Add connection status indicator in UI\n4. Handle WebSocket reconnection logic with exponential backoff\n5. Add real-time notifications with toast messages\n6. Implement user presence indicators for team members\n7. Add WebSocket authentication with JWT token",
+      "id": "18",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:14:02.376517504Z",
+          "dependencies": [],
+          "description": "Develop a custom React hook for managing WebSocket connections with JWT authentication and connection lifecycle management",
+          "details": "Create useWebSocket hook that handles connection initialization, JWT token authentication, connection state management (connecting, connected, disconnected, error), and provides methods for sending messages. Include proper cleanup on component unmount and token refresh handling.",
+          "id": 1,
+          "parentId": "18",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for hook behavior, connection states, and authentication flow",
+          "title": "Create WebSocket connection hook with authentication",
+          "updatedAt": "2025-12-07T10:14:02.376517504Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:02.376520462Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Add robust reconnection functionality to handle network interruptions and connection failures with exponential backoff strategy",
+          "details": "Implement automatic reconnection with exponential backoff (starting at 1s, max 30s), connection retry limits, and proper error handling. Include manual reconnect capability and connection health monitoring with ping/pong heartbeat mechanism.",
+          "id": 2,
+          "parentId": "18",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for reconnection scenarios and network failure simulation",
+          "title": "Implement WebSocket reconnection logic with exponential backoff",
+          "updatedAt": "2025-12-07T10:14:02.376520462Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:02.376521712Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create a visual indicator component to display WebSocket connection status to users",
+          "details": "Design and implement a connection status indicator (green dot for connected, yellow for connecting, red for disconnected) in the dashboard header. Include tooltip with connection details and manual reconnect button when disconnected.",
+          "id": 3,
+          "parentId": "18",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Visual regression tests and user interaction tests for status indicator",
+          "title": "Add connection status indicator in UI",
+          "updatedAt": "2025-12-07T10:14:02.376521712Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:02.376521837Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Implement real-time synchronization of task changes across all connected clients in the Kanban board component",
+          "details": "Subscribe to task update events via WebSocket, handle real-time task creation, updates, deletion, and status changes. Implement optimistic updates with conflict resolution and proper state synchronization with Redux store.",
+          "id": 4,
+          "parentId": "18",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "End-to-end tests for multi-client task synchronization and state consistency",
+          "title": "Integrate real-time task updates in Kanban board",
+          "updatedAt": "2025-12-07T10:14:02.376521837Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:02.376523045Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Create a notification system that displays real-time updates and events through toast messages",
+          "details": "Build notification handler that listens to WebSocket events and displays contextual toast messages for task assignments, comments, status changes, and team activities. Include notification preferences and sound alerts with proper message queuing.",
+          "id": 5,
+          "parentId": "18",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Component tests for notification display and user preference handling",
+          "title": "Implement real-time notification system with toast messages",
+          "updatedAt": "2025-12-07T10:14:02.376523045Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:02.376523545Z",
+          "dependencies": [
+            "1",
+            "2",
+            "3"
+          ],
+          "description": "Implement real-time user presence system showing which team members are currently online and active",
+          "details": "Create presence tracking system that shows online users with avatars and status indicators. Include user activity tracking (viewing tasks, typing indicators), idle detection after 5 minutes, and proper presence cleanup on disconnect.",
+          "id": 6,
+          "parentId": "18",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for presence synchronization and activity tracking accuracy",
+          "title": "Add user presence indicators for team members",
+          "updatedAt": "2025-12-07T10:14:02.376523545Z"
+        }
+      ],
+      "testStrategy": "Integration tests for WebSocket connection and real-time update functionality",
+      "title": "Add WebSocket integration and real-time updates"
+    },
+    {
+      "agentHint": "bolt",
+      "dependencies": [
+        "13",
+        "18"
+      ],
+      "description": "Setup Docker multi-stage build and Kubernetes deployment configuration",
+      "details": "1. Create multi-stage Dockerfile for Rust API (builder + runtime)\n2. Create Dockerfile for React frontend with nginx\n3. Add docker-compose.yml for local development with PostgreSQL and Redis\n4. Create Kubernetes manifests: deployment, service, configmap, secret\n5. Configure HPA (Horizontal Pod Autoscaler) for API scaling\n6. Add health check configuration in Kubernetes deployment\n7. Setup persistent volumes for PostgreSQL data",
+      "id": "19",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:14:20.107153845Z",
+          "dependencies": [],
+          "description": "Develop a multi-stage Dockerfile that optimizes the Rust API build process with separate builder and runtime stages for minimal production image size.",
+          "details": "Create Dockerfile with builder stage using rust:1.70 for compilation, and distroless/cc-debian11 for runtime. Include cargo build --release, proper dependency caching with cargo-chef, and security configurations. Set up proper user permissions and expose port 8000.",
+          "id": 1,
+          "parentId": "19",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test Docker build process, verify image size optimization, and validate API functionality in container",
+          "title": "Create multi-stage Dockerfile for Rust API",
+          "updatedAt": "2025-12-07T10:14:20.107153845Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:20.107156720Z",
+          "dependencies": [],
+          "description": "Build a production-ready Dockerfile for the React frontend application using multi-stage build with nginx as the web server.",
+          "details": "Create multi-stage Dockerfile with node:18-alpine for build stage and nginx:alpine for serving. Include npm build optimization, nginx configuration for SPA routing, security headers, and gzip compression. Configure nginx to serve static files and proxy API requests.",
+          "id": 2,
+          "parentId": "19",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify build process, test nginx configuration, and validate frontend accessibility and API proxy functionality",
+          "title": "Create Dockerfile for React frontend with nginx",
+          "updatedAt": "2025-12-07T10:14:20.107156720Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:20.107157179Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Create comprehensive docker-compose configuration for local development environment including all services and dependencies.",
+          "details": "Create docker-compose.yml with services for Rust API, React frontend, PostgreSQL 14, and Redis. Include environment variables, volume mounts, networking configuration, and development-specific settings. Add health checks and proper service dependencies with depends_on.",
+          "id": 3,
+          "parentId": "19",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test complete stack startup, verify service communication, and validate database connectivity and data persistence",
+          "title": "Setup docker-compose.yml for local development",
+          "updatedAt": "2025-12-07T10:14:20.107157179Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:20.107157929Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Develop comprehensive Kubernetes manifests for deploying the application including deployments, services, configmaps, and secrets.",
+          "details": "Create separate manifests for API deployment, frontend deployment, PostgreSQL StatefulSet, Redis deployment, and corresponding services. Include ConfigMaps for application configuration, Secrets for sensitive data, and proper labels/selectors. Configure resource limits and requests.",
+          "id": 4,
+          "parentId": "19",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Deploy to test cluster, verify pod creation, test service discovery, and validate configuration injection",
+          "title": "Create Kubernetes deployment and service manifests",
+          "updatedAt": "2025-12-07T10:14:20.107157929Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:20.107160679Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Implement HPA configuration for automatic scaling of the Rust API based on CPU and memory metrics.",
+          "details": "Create HPA manifest targeting API deployment with CPU threshold at 70%, memory threshold at 80%, min replicas: 2, max replicas: 10. Configure metrics server requirements and resource requests in deployment. Add custom metrics if needed for more sophisticated scaling.",
+          "id": 5,
+          "parentId": "19",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test autoscaling behavior under load, verify metrics collection, and validate scaling up/down scenarios",
+          "title": "Configure Horizontal Pod Autoscaler for API scaling",
+          "updatedAt": "2025-12-07T10:14:20.107160679Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:20.107161470Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Configure persistent storage for PostgreSQL and implement comprehensive health check endpoints for all services.",
+          "details": "Create PersistentVolumeClaim for PostgreSQL data with appropriate storage class. Implement health check endpoints (/health, /ready) in API and configure liveness/readiness probes in deployments. Set up proper probe timing and failure thresholds for reliable service management.",
+          "id": 6,
+          "parentId": "19",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify data persistence across pod restarts, test health check endpoints, and validate probe configuration under various failure scenarios",
+          "title": "Setup persistent volumes and health checks",
+          "updatedAt": "2025-12-07T10:14:20.107161470Z"
+        }
+      ],
+      "testStrategy": "Verify Docker builds work and Kubernetes manifests deploy successfully in test cluster",
+      "title": "Create Docker containerization and Kubernetes manifests"
+    },
+    {
+      "agentHint": "tap",
+      "dependencies": [
+        "9",
+        "11"
+      ],
+      "description": "Add data export and deletion capabilities for GDPR compliance",
+      "details": "1. Create GDPR endpoints: GET /api/users/export, DELETE /api/users/delete\n2. Implement data export functionality returning user data in JSON format\n3. Add hard delete functionality that removes all user data and anonymizes references\n4. Create audit log for data deletion requests\n5. Add data retention policy enforcement (30-day soft delete cleanup)\n6. Implement consent management for notification preferences\n7. Add privacy policy acceptance tracking",
+      "id": "20",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-07T10:14:38.115528673Z",
+          "dependencies": [],
+          "description": "Create GET /api/users/export endpoint that returns comprehensive user data in JSON format for GDPR compliance",
+          "details": "Develop endpoint that collects all user data from database tables (profile, preferences, activity logs, etc.), formats into structured JSON response, includes data validation and user authentication checks, handles large datasets with pagination if needed, and ensures secure data transmission",
+          "id": 1,
+          "parentId": "20",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for data collection, integration tests for endpoint response format, security tests for authentication, performance tests for large datasets",
+          "title": "Implement GDPR data export endpoint",
+          "updatedAt": "2025-12-07T10:14:38.115528673Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:38.115531506Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create DELETE /api/users/delete endpoint that permanently removes user data and anonymizes remaining references",
+          "details": "Build comprehensive deletion service that removes user records from all tables, anonymizes foreign key references in related data (replace with generic identifiers), handles cascading deletions properly, maintains referential integrity, and provides rollback capability during development phase",
+          "id": 2,
+          "parentId": "20",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for deletion logic, integration tests for data anonymization, database integrity tests, rollback scenario testing",
+          "title": "Implement hard delete functionality with data anonymization",
+          "updatedAt": "2025-12-07T10:14:38.115531506Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:38.115533090Z",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "description": "Implement comprehensive audit trail for all GDPR-related data export and deletion requests",
+          "details": "Design audit log schema with timestamps, user IDs, operation types, IP addresses, and request details. Implement logging middleware that captures all GDPR operations, stores logs securely with encryption, provides search and filtering capabilities, and includes automated log rotation and archival",
+          "id": 3,
+          "parentId": "20",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for log creation, integration tests for middleware functionality, security tests for log encryption, compliance verification tests",
+          "title": "Create audit logging system for data operations",
+          "updatedAt": "2025-12-07T10:14:38.115533090Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:38.115534090Z",
+          "dependencies": [
+            "2",
+            "3"
+          ],
+          "description": "Create automated system for 30-day soft delete cleanup and data retention policy enforcement",
+          "details": "Build scheduled job system that identifies soft-deleted records older than 30 days, performs hard deletion with proper anonymization, maintains audit trails of cleanup operations, includes configurable retention periods, handles exceptions for legal hold requirements, and provides monitoring and alerting",
+          "id": 4,
+          "parentId": "20",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for cleanup logic, scheduled job testing, edge case testing for legal holds, monitoring and alerting verification",
+          "title": "Implement data retention policy enforcement",
+          "updatedAt": "2025-12-07T10:14:38.115534090Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:38.115534965Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Create comprehensive consent management for user notification preferences and data processing agreements",
+          "details": "Design consent database schema for tracking user preferences, implement consent collection interfaces, create consent withdrawal mechanisms, build consent history tracking, integrate with notification systems, ensure granular control over data processing types, and provide consent export functionality",
+          "id": 5,
+          "parentId": "20",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for consent logic, UI testing for consent interfaces, integration tests with notification systems, consent history verification tests",
+          "title": "Develop consent management system",
+          "updatedAt": "2025-12-07T10:14:38.115534965Z"
+        },
+        {
+          "createdAt": "2025-12-07T10:14:38.115535548Z",
+          "dependencies": [
+            "3",
+            "5"
+          ],
+          "description": "Create system for tracking and managing user acceptance of privacy policy versions and updates",
+          "details": "Build privacy policy version management system, implement acceptance tracking with timestamps and policy versions, create forced acceptance flow for policy updates, integrate with user authentication flow, provide policy change notification system, maintain acceptance history for audit purposes, and ensure compliance reporting capabilities",
+          "id": 6,
+          "parentId": "20",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for version tracking, integration tests for acceptance flow, user experience testing for policy updates, compliance reporting verification",
+          "title": "Implement privacy policy acceptance tracking",
+          "updatedAt": "2025-12-07T10:14:38.115535548Z"
+        }
+      ],
+      "testStrategy": "Integration tests for data export completeness and deletion verification with anonymization checks",
+      "title": "Implement GDPR compliance features"
+    }
+  ]
+}

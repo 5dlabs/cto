@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" priority="high" agent="rex">
+    <meta>
+        <title>Setup Rust project foundation and dependencies</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 1 with production-quality code.</role>
+
+    <context>
+        <overview>Initialize the TeamSync API project with Rust/Axum foundation and core dependencies</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create new Rust project with `cargo init`
+2. Add dependencies to Cargo.toml: axum = &quot;0.7&quot;, tokio = { version = &quot;1.0&quot;, features = [&quot;full&quot;] }, serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }, sqlx = { version = &quot;0.7&quot;, features = [&quot;postgres&quot;, &quot;runtime-tokio-rustls&quot;, &quot;chrono&quot;, &quot;uuid&quot;] }, redis = &quot;0.24&quot;, uuid = { version = &quot;1.0&quot;, features = [&quot;v4&quot;] }, chrono = { version = &quot;0.4&quot;, features = [&quot;serde&quot;] }
+3. Setup basic main.rs with axum server skeleton
+4. Configure workspace structure with separate modules for handlers, models, database</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-1): Setup Rust project foundation and dependencies</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify project compiles successfully with `cargo build` and basic server starts on localhost</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

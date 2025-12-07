@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="16" priority="medium" agent="blaze">
+    <meta>
+        <title>Build Kanban board UI with drag-and-drop</title>
+        <priority>medium</priority>
+        <dependencies>15</dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 16 with production-quality code.</role>
+
+    <context>
+        <overview>Create interactive Kanban board for task management with drag-and-drop functionality</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Install react-beautiful-dnd for drag-and-drop
+2. Create KanbanBoard component with columns for todo/in-progress/done
+3. Implement TaskCard component with task details and actions
+4. Add drag-and-drop handlers for task status updates
+5. Integrate with task API endpoints for real-time updates
+6. Add task filtering and search functionality
+7. Implement optimistic UI updates with error handling</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-16): Build Kanban board UI with drag-and-drop</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>E2E tests for drag-and-drop functionality and integration tests with task API</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

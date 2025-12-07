@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="20" priority="medium" agent="tap">
+    <meta>
+        <title>Implement GDPR compliance features</title>
+        <priority>medium</priority>
+        <dependencies>9, 11</dependencies>
+        <agent_hint>tap</agent_hint>
+    </meta>
+
+    <role>You are a Senior Mobile Engineer with expertise in React Native and cross-platform development. Implement Task 20 with production-quality code.</role>
+
+    <context>
+        <overview>Add data export and deletion capabilities for GDPR compliance</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create GDPR endpoints: GET /api/users/export, DELETE /api/users/delete
+2. Implement data export functionality returning user data in JSON format
+3. Add hard delete functionality that removes all user data and anonymizes references
+4. Create audit log for data deletion requests
+5. Add data retention policy enforcement (30-day soft delete cleanup)
+6. Implement consent management for notification preferences
+7. Add privacy policy acceptance tracking</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-20): Implement GDPR compliance features</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Integration tests for data export completeness and deletion verification with anonymization checks</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

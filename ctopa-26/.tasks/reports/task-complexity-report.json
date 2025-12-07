@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "generatedAt": "2025-12-07T10:09:15.341798177+00:00",
+    "tasksFile": ".tasks/tasks.json",
+    "model": "claude-sonnet-4-20250514",
+    "threshold": 5
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Setup Rust project foundation and dependencies",
+      "complexityScore": 3,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Basic project initialization with well-defined dependencies. Straightforward setup with clear steps and minimal technical challenges."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Setup PostgreSQL database schema and migrations",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down database schema creation into separate migration files for each table, index optimization tasks, and constraint validation steps.",
+      "reasoning": "Moderate complexity due to multiple interconnected tables, foreign key relationships, and performance considerations with indexes. Requires careful schema design."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Implement database connection and models",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Separate into connection pool setup, individual model creation for each entity, repository pattern implementation, and error handling configuration.",
+      "reasoning": "Higher complexity due to connection pool management, model mapping, repository pattern implementation, and proper error handling across multiple database entities."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Setup Redis connection and caching layer",
+      "complexityScore": 4,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Split into Redis connection setup, session storage implementation, and rate limiting storage with TTL management.",
+      "reasoning": "Moderate complexity with Redis connection management, session storage design, and rate limiting implementation requiring careful TTL handling."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement JWT authentication system",
+      "complexityScore": 7,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into JWT token generation, validation middleware, refresh token management, password hashing, session storage, and security configuration.",
+      "reasoning": "High complexity due to security considerations, token lifecycle management, middleware integration, and proper handling of refresh tokens with Redis storage."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Implement OAuth2 integration (Google and GitHub)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Separate OAuth2 client configuration, authorization flow handlers for each provider, callback endpoint implementation, user account linking, and JWT integration.",
+      "reasoning": "High complexity due to OAuth2 flow implementation, multiple provider integration, account linking logic, and security considerations for external authentication."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Implement rate limiting middleware",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Split into sliding window algorithm implementation, Redis counter management, middleware integration, and response header configuration.",
+      "reasoning": "Moderate-high complexity requiring efficient algorithm implementation, Redis operations optimization, and proper middleware integration with different user types."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Implement team management API endpoints",
+      "complexityScore": 7,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into individual CRUD endpoints, role-based authorization middleware, invitation system, member management, and validation logic.",
+      "reasoning": "High complexity due to role-based authorization, invitation system with expiration, multiple endpoints with different permission levels, and team member management."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement task management API endpoints",
+      "complexityScore": 8,
+      "recommendedSubtasks": 7,
+      "expansionPrompt": "Separate into individual CRUD endpoints, filtering and query parameter handling, soft delete implementation, validation logic, cleanup job scheduling, and status management.",
+      "reasoning": "High complexity due to comprehensive CRUD operations, complex filtering logic, soft delete with cleanup jobs, and status enum validation across multiple endpoints."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Setup WebSocket infrastructure for real-time updates",
+      "complexityScore": 9,
+      "recommendedSubtasks": 7,
+      "expansionPrompt": "Break down into WebSocket endpoint setup, connection pool management, authentication handling, Redis pub/sub integration, connection lifecycle management, heartbeat implementation, and scalability optimization.",
+      "reasoning": "Very high complexity due to WebSocket connection management, Redis pub/sub for scaling, authentication integration, and handling 1000 concurrent connections with proper lifecycle management."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Implement real-time notification system",
+      "complexityScore": 9,
+      "recommendedSubtasks": 8,
+      "expansionPrompt": "Separate into notification service design, WebSocket integration, email service setup, push notification configuration, user preferences management, Redis queue implementation, background worker creation, and notification type handling.",
+      "reasoning": "Very high complexity involving multiple notification channels (WebSocket, email, push), queue management, background processing, user preferences, and integration with external services."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Add structured logging and observability",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Split into logging configuration, metrics collection setup, Prometheus endpoint implementation, and middleware integration for request tracing.",
+      "reasoning": "Moderate complexity requiring proper logging structure, metrics collection, Prometheus integration, and trace ID management across requests."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Implement health check endpoints",
+      "complexityScore": 4,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down into liveness endpoint, readiness endpoint with dependency checks, and graceful shutdown handling.",
+      "reasoning": "Moderate complexity with dependency health checks, timeout handling, and proper Kubernetes integration requirements."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Setup React frontend project foundation",
+      "complexityScore": 3,
+      "recommendedSubtasks": 0,
+      "expansionPrompt": "",
+      "reasoning": "Basic React project setup with well-established tooling. Straightforward configuration with minimal technical challenges."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "Implement authentication UI and API integration",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Separate into AuthContext setup, login/register forms, OAuth2 UI integration, token management, protected routes, and API client configuration.",
+      "reasoning": "Moderate-high complexity due to state management, form validation, OAuth2 integration, token refresh logic, and route protection implementation."
+    },
+    {
+      "taskId": 16,
+      "taskTitle": "Build Kanban board UI with drag-and-drop",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down into Kanban board layout, drag-and-drop implementation, task card components, API integration, filtering functionality, and optimistic updates.",
+      "reasoning": "High complexity due to drag-and-drop implementation, real-time updates, optimistic UI updates, and complex state management for task movements."
+    },
+    {
+      "taskId": 17,
+      "taskTitle": "Implement team management UI",
+      "complexityScore": 6,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Separate into team settings UI, member management interface, invitation system UI, role-based permissions, team switching, and activity feed.",
+      "reasoning": "Moderate-high complexity due to role-based UI rendering, invitation system, member management, and multiple interconnected components."
+    },
+    {
+      "taskId": 18,
+      "taskTitle": "Add WebSocket integration and real-time updates",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into WebSocket hook creation, real-time update integration, connection management, reconnection logic, notification system, and presence indicators.",
+      "reasoning": "High complexity due to WebSocket connection management, real-time state synchronization, reconnection logic, and integration with existing UI components."
+    },
+    {
+      "taskId": 19,
+      "taskTitle": "Create Docker containerization and Kubernetes manifests",
+      "complexityScore": 7,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Separate into Rust API Dockerfile, React frontend Dockerfile, docker-compose setup, Kubernetes manifests, HPA configuration, and persistent volume setup.",
+      "reasoning": "High complexity due to multi-stage builds, Kubernetes configuration, auto-scaling setup, and proper production deployment considerations."
+    },
+    {
+      "taskId": 20,
+      "taskTitle": "Implement GDPR compliance features",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down into data export endpoint, data deletion implementation, audit logging, retention policy enforcement, consent management, and privacy policy tracking.",
+      "reasoning": "High complexity due to legal compliance requirements, data anonymization, audit trails, and comprehensive data handling across the entire system."
+    }
+  ]
+}

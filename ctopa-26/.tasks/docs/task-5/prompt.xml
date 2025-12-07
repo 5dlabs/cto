@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="5" priority="high" agent="cipher">
+    <meta>
+        <title>Implement JWT authentication system</title>
+        <priority>high</priority>
+        <dependencies>3, 4</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 5 with production-quality code.</role>
+
+    <context>
+        <overview>Create JWT-based authentication with access and refresh tokens</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add jsonwebtoken and bcrypt dependencies
+2. Create auth.rs module with JWT token generation/validation
+3. Implement AuthService with login, refresh, logout methods
+4. Create middleware for JWT validation using axum::middleware
+5. Store refresh tokens in Redis with 7-day expiration
+6. Implement password hashing with bcrypt
+7. Add JWT secret configuration from environment</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-5): Implement JWT authentication system</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for token generation/validation and integration tests for auth flow including token refresh</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
