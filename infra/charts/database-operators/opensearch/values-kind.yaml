@@ -48,3 +48,4 @@ opensearch-operator:
         - ALL
     readOnlyRootFilesystem: true
 
+

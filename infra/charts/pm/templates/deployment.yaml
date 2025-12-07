@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "linear.fullname" . }}
+  name: {{ include "pm.fullname" . }}
   labels:
-    {{- include "linear.labels" . | nindent 4 }}
+    {{- include "pm.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "linear.selectorLabels" . | nindent 6 }}
+      {{- include "pm.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,13 +16,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "linear.selectorLabels" . | nindent 8 }}
+        {{- include "pm.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "linear.serviceAccountName" . }}
+      serviceAccountName: {{ include "pm.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -33,17 +33,19 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.linear.port }}
+              containerPort: {{ .Values.pm.port }}
               protocol: TCP
           env:
+            - name: PM_PROVIDER
+              value: {{ .Values.pm.provider | quote }}
             - name: LINEAR_ENABLED
               value: {{ .Values.linear.enabled | quote }}
             - name: LINEAR_PORT
-              value: {{ .Values.linear.port | quote }}
+              value: {{ .Values.pm.port | quote }}
             - name: LINEAR_MAX_TIMESTAMP_AGE_MS
-              value: {{ .Values.linear.maxTimestampAgeMs | quote }}
+              value: {{ .Values.pm.maxTimestampAgeMs | quote }}
             - name: NAMESPACE
-              value: {{ .Values.linear.namespace | quote }}
+              value: {{ .Values.pm.namespace | quote }}
             # Secrets from Kubernetes secret
             - name: LINEAR_OAUTH_CLIENT_ID
               valueFrom:
@@ -88,6 +90,23 @@ spec:
               value: {{ .Values.intake.numTasks | quote }}
             - name: INTAKE_CLI
               value: {{ .Values.intake.cli | quote }}
+            # GitHub configuration (for repo creation and webhooks)
+            {{- if .Values.github.defaultOrg }}
+            - name: GITHUB_DEFAULT_ORG
+              value: {{ .Values.github.defaultOrg | quote }}
+            {{- end }}
+            {{- if .Values.github.webhookCallbackUrl }}
+            - name: WEBHOOK_CALLBACK_URL
+              value: {{ .Values.github.webhookCallbackUrl | quote }}
+            {{- end }}
+            {{- if .Values.github.tokenSecretKey }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.github.tokenSecretKey }}
+                  optional: true
+            {{- end }}
             # Play configuration
             - name: PLAY_MODEL
               value: {{ .Values.play.model | quote }}

@@ -394,15 +394,17 @@ pub async fn submit_intake_workflow(
     config: &IntakeConfig,
 ) -> Result<IntakeResult> {
     let timestamp = chrono::Utc::now().timestamp();
-    let project_name = sanitize_project_name(&request.prd_identifier);
-    let configmap_name = format!("intake-linear-{project_name}-{timestamp}");
-    let workflow_name = format!("intake-linear-{project_name}-{timestamp}");
+    // Use sanitized identifier for ConfigMap/workflow naming
+    let workflow_project_name = sanitize_project_name(&request.prd_identifier);
+    let configmap_name = format!("intake-linear-{workflow_project_name}-{timestamp}");
+    let workflow_name = format!("intake-linear-{workflow_project_name}-{timestamp}");
 
-    // Default repository URL if not provided in the request.
-    let repository_url = request
-        .repository_url
-        .clone()
-        .unwrap_or_else(|| "https://github.com/5dlabs/cto".to_string());
+    // Use issue title for new repo creation (the workflow will sanitize it)
+    // This is passed as project-name parameter to the workflow
+    let project_name_for_repo = &request.title;
+
+    // Pass empty string if no repository URL - workflow will create a new repo
+    let repository_url = request.repository_url.clone().unwrap_or_default();
     let source_branch = request
         .source_branch
         .clone()
@@ -426,7 +428,7 @@ pub async fn submit_intake_workflow(
 
     // Prepare config JSON for the workflow.
     let config_json = serde_json::json!({
-        "project_name": project_name,
+        "project_name": project_name_for_repo,
         "repository_url": repository_url,
         "github_app": config.github_app,
         "primary_model": primary_model,
@@ -504,7 +506,7 @@ pub async fn submit_intake_workflow(
             "-p",
             &format!("configmap-name={configmap_name}"),
             "-p",
-            &format!("project-name={project_name}"),
+            &format!("project-name={project_name_for_repo}"),
             "-p",
             &format!("repository-url={repository_url}"),
             "-p",
@@ -537,6 +539,17 @@ pub async fn submit_intake_workflow(
             &format!("include-codebase={}", config.include_codebase),
             "-p",
             &format!("cli={cli}"),
+            // GitHub repo creation parameters (for creating new repos when no URL provided)
+            "-p",
+            &format!(
+                "webhook-callback-url={}",
+                config.webhook_callback_url.as_deref().unwrap_or("")
+            ),
+            "-p",
+            &format!(
+                "github-default-org={}",
+                config.github_default_org.as_deref().unwrap_or("")
+            ),
             // Linear callback parameters
             "-p",
             &format!("linear-session-id={}", request.session_id),

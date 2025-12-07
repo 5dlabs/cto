@@ -1,10 +1,10 @@
-# Kind-specific values for linear/integrations service
+# Kind-specific values for PM (Project Management) service
 # Overrides for local development
 
 replicaCount: 1
 
 image:
-  repository: ghcr.io/5dlabs/linear
+  repository: ghcr.io/5dlabs/pm-server
   pullPolicy: IfNotPresent
   tag: kind-local
 
@@ -23,21 +23,31 @@ resources:
     cpu: 50m
     memory: 64Mi
 
-# Linear service configuration
-linear:
-  enabled: true
+# PM service configuration
+pm:
+  provider: linear
   port: 8081
   maxTimestampAgeMs: 60000
   namespace: cto
 
+# Linear-specific configuration (when pm.provider=linear)
+linear:
+  enabled: true
+
 # For Kind, we'll create a placeholder secret
 # In production, use Vault or external-secrets
 secrets:
-  secretName: linear-secrets
+  secretName: pm-secrets
   oauthClientIdKey: LINEAR_OAUTH_CLIENT_ID
   oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
   oauthTokenKey: LINEAR_OAUTH_TOKEN
   webhookSecretKey: LINEAR_WEBHOOK_SECRET
+
+# GitHub configuration (for local testing)
+github:
+  defaultOrg: ""  # Set via secret or env var
+  webhookCallbackUrl: ""  # Set via ngrok or tunnel for local testing
+  tokenSecretKey: GITHUB_TOKEN
 
 # Workflow configuration for local testing
 intake:
@@ -61,4 +71,3 @@ play:
   frontendAgent: blaze
   parallelExecution: false
   autoMerge: false
-

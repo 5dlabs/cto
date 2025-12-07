@@ -1,14 +1,14 @@
 apiVersion: v2
-name: linear
-description: Linear webhook service for CTO platform integration
+name: pm
+description: Project Management integration service for CTO platform
 type: application
 version: 0.1.0
 appVersion: "0.12.38"
 keywords:
+  - project-management
   - linear
   - webhook
   - cto
 maintainers:
   - name: 5D Labs
     url: https://5dlabs.ai
-

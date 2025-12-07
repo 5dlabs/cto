@@ -70,9 +70,12 @@ spec:
       - name: cli
         description: "CLI to use for documentation generation (claude, cursor, codex)"
         value: "claude"
-      # GitHub webhook auto-configuration (runs before intake)
+      # GitHub configuration (for new repo creation and webhooks)
       - name: webhook-callback-url
-        description: "External URL for GitHub webhooks (e.g., https://linear-webhooks.5dlabs.ai)"
+        description: "External URL for GitHub webhooks (e.g., https://linear-webhooks.example.com)"
+        value: ""
+      - name: github-default-org
+        description: "Default GitHub organization for creating new repositories"
         value: ""
       # Linear integration parameters (optional)
       - name: linear-session-id
@@ -86,7 +89,7 @@ spec:
         value: ""
       - name: linear-callback-url
         description: "Linear service callback URL"
-        value: "http://linear-svc.cto.svc.cluster.local:8081"
+        value: "http://pm-svc.cto.svc.cluster.local:8081"
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
@@ -115,6 +118,8 @@ spec:
               value: "{{`{{workflow.parameters.project-name}}`}}"
             - name: webhook-callback-url
               value: "{{`{{workflow.parameters.webhook-callback-url}}`}}"
+            - name: github-default-org
+              value: "{{`{{workflow.parameters.github-default-org}}`}}"
 
       # Step 1: Generate intake configuration
       - - name: generate-intake-config
@@ -322,6 +327,7 @@ spec:
         - name: repository-url
         - name: project-name
         - name: webhook-callback-url
+        - name: github-default-org
       script:
         name: github
         image: curlimages/curl:8.5.0
@@ -334,9 +340,14 @@ spec:
           REPO_URL="{{`{{inputs.parameters.repository-url}}`}}"
           PROJECT_NAME="{{`{{inputs.parameters.project-name}}`}}"
           CALLBACK_URL="{{`{{inputs.parameters.webhook-callback-url}}`}}"
+          PARAM_DEFAULT_ORG="{{`{{inputs.parameters.github-default-org}}`}}"
           
-          # Default organization for new repos
-          DEFAULT_ORG="${GITHUB_ORG:-5dlabs}"
+          # Default organization for new repos (from parameter, env var, or empty)
+          DEFAULT_ORG="${PARAM_DEFAULT_ORG:-${GITHUB_ORG:-}}"
+          
+          if [ -z "$DEFAULT_ORG" ]; then
+            echo "⚠ No github-default-org configured - cannot create new repos without existing URL"
+          fi
           
           # Skip if no GitHub token available
           if [ -z "$GITHUB_TOKEN" ]; then
@@ -362,7 +373,13 @@ spec:
             echo "📂 Using existing repository: $OWNER/$REPO"
           else
             # Create new repo from project name
-            echo "📦 No repository URL provided, creating new repo..."
+            echo "📦 No repository URL provided, will attempt to create new repo..."
+            
+            if [ -z "$DEFAULT_ORG" ]; then
+              echo "⚠ No github-default-org configured, cannot create repo without existing URL"
+              echo "  Set GITHUB_DEFAULT_ORG or provide a repository-url in the issue"
+              exit 0
+            fi
             
             if [ -z "$PROJECT_NAME" ] || [ "$PROJECT_NAME" = "" ]; then
               echo "⚠ No project name available, cannot create repo"
@@ -534,7 +551,7 @@ spec:
           - name: GITHUB_TOKEN
             valueFrom:
               secretKeyRef:
-                name: linear-secrets
+                name: pm-secrets
                 key: GITHUB_TOKEN
                 optional: true
           - name: GITHUB_ORG

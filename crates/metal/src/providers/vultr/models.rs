@@ -265,3 +265,4 @@ pub struct OperatingSystem {
     /// OS family.
     pub family: String,
 }
+

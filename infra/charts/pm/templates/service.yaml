@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "linear.fullname" . }}-svc
+  name: {{ include "pm.fullname" . }}-svc
   labels:
-    {{- include "linear.labels" . | nindent 4 }}
+    {{- include "pm.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,5 +12,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "linear.selectorLabels" . | nindent 4 }}
-
+    {{- include "pm.selectorLabels" . | nindent 4 }}

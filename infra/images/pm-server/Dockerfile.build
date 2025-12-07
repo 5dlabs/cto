@@ -7,7 +7,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
-# Build the linear binary
+# Build the PM server binary (currently Linear implementation)
 RUN cargo build --release -p integrations --bin linear
 
 # Runtime stage
@@ -34,9 +34,10 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 
 WORKDIR /app
 
-COPY --from=builder /build/target/release/linear /app/linear
+# Copy the linear binary as pm-server
+COPY --from=builder /build/target/release/linear /app/pm-server
 
-RUN chmod +x /app/linear && chown -R app:app /app
+RUN chmod +x /app/pm-server && chown -R app:app /app
 
 USER app
 
@@ -45,4 +46,4 @@ EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
 
-CMD ["./linear"]
+CMD ["./pm-server"]

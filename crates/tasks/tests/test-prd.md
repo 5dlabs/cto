@@ -20,3 +20,4 @@ Build a simple REST API for managing tasks with authentication.
 - PostgreSQL database
 - JWT for authentication
 
+

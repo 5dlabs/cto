@@ -40,3 +40,4 @@
 // TODO: Implement E2EE support (Olm/Megolm)
 // TODO: Implement room management
 // TODO: Implement message formatting (Matrix markdown)
+

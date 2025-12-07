@@ -38,3 +38,4 @@ strimzi-kafka-operator:
   leaderElection:
     enable: true
 
+

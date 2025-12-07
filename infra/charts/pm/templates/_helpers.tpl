@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "linear.name" -}}
+{{- define "pm.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "linear.fullname" -}}
+{{- define "pm.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "linear.chart" -}}
+{{- define "pm.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "linear.labels" -}}
-helm.sh/chart: {{ include "linear.chart" . }}
-{{ include "linear.selectorLabels" . }}
+{{- define "pm.labels" -}}
+helm.sh/chart: {{ include "pm.chart" . }}
+{{ include "pm.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -43,19 +43,18 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "linear.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "linear.name" . }}
+{{- define "pm.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "pm.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "linear.serviceAccountName" -}}
+{{- define "pm.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "linear.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "pm.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
-

@@ -54,3 +54,4 @@ pub struct NotionDatabase {
     /// Database title
     pub title: Option<String>,
 }
+

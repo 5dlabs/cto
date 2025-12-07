@@ -17,10 +17,11 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 WORKDIR /app
 
 # Copy pre-built binary (placed by CI workflow into build context)
-COPY linear /app/linear
+# The binary is built as 'linear' but deployed as 'pm-server'
+COPY linear /app/pm-server
 
 # Make binary executable and change ownership to app user  
-RUN chmod +x /app/linear && \
+RUN chmod +x /app/pm-server && \
     chown -R app:app /app
 
 # Switch to non-root user
@@ -34,7 +35,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
 
 # Run the application
-CMD ["./linear"]
-
-
-
+CMD ["./pm-server"]

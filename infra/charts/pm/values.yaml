@@ -1,10 +1,10 @@
-# Default values for linear service
+# Default values for PM (Project Management) service
 # This is a YAML-formatted file.
 
 replicaCount: 1
 
 image:
-  repository: ghcr.io/5dlabs/linear
+  repository: ghcr.io/5dlabs/pm-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -45,10 +45,11 @@ tolerations: []
 
 affinity: {}
 
-# Linear service configuration
-linear:
-  # Enable Linear integration
-  enabled: true
+# PM service configuration
+pm:
+  # Which PM provider to use (linear, asana, jira, etc.)
+  # Currently only 'linear' is implemented
+  provider: linear
   # HTTP server port
   port: 8081
   # Maximum webhook timestamp age in milliseconds
@@ -56,16 +57,32 @@ linear:
   # Kubernetes namespace for workflow operations
   namespace: cto
 
+# Linear-specific configuration (when pm.provider=linear)
+linear:
+  # Enable Linear integration
+  enabled: true
+
 # Secrets configuration
 # These should be provided via Vault or external secrets
 secrets:
-  # Name of the Kubernetes secret containing Linear credentials
-  secretName: linear-secrets
-  # Keys in the secret
+  # Name of the Kubernetes secret containing credentials
+  secretName: pm-secrets
+  # Linear keys (when pm.provider=linear)
   oauthClientIdKey: LINEAR_OAUTH_CLIENT_ID
   oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
   oauthTokenKey: LINEAR_OAUTH_TOKEN
   webhookSecretKey: LINEAR_WEBHOOK_SECRET
+
+# GitHub configuration (for repo creation and webhooks)
+github:
+  # Default organization for creating new repositories
+  # When no repository URL is provided, repos are created in this org
+  defaultOrg: ""
+  # External URL for GitHub webhooks (e.g., https://pm-webhooks.example.com)
+  # Set this to the publicly accessible URL of your PM service
+  webhookCallbackUrl: ""
+  # Key in the secrets for GitHub PAT (for webhook management)
+  tokenSecretKey: GITHUB_TOKEN
 
 # Workflow configuration
 intake:
@@ -90,5 +107,4 @@ play:
   parallelExecution: false
   autoMerge: false
   # Default repository (optional)
-  # repository: "https://github.com/5dlabs/cto"
-
+  # repository: "https://github.com/org/repo"

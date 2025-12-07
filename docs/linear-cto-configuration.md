@@ -175,3 +175,4 @@ Only supported CLIs and models are recognized:
 
 No new Linear API calls are required - labels are already included in webhook payloads and `get_issue()` responses. The configuration extraction happens automatically when processing Linear events.
 
+

@@ -43,29 +43,30 @@ helm upgrade --install healer "${CHARTS_DIR}/universal-app" \
   --wait --timeout 5m
 echo "   ✓ Healer server deployed"
 
-# 5. Deploy Linear/Integrations server (if image exists)
+# 5. Deploy PM (Project Management) server (if image exists)
 echo ""
-echo "5. Deploying Linear/Integrations server..."
-if docker images | grep -q "ghcr.io/5dlabs/linear.*kind-local"; then
-  # Create placeholder secrets for Linear
-  kubectl create secret generic linear-secrets \
+echo "5. Deploying PM server..."
+if docker images | grep -q "ghcr.io/5dlabs/pm-server.*kind-local"; then
+  # Create placeholder secrets for PM
+  kubectl create secret generic pm-secrets \
     --namespace cto \
     --from-literal=LINEAR_OAUTH_CLIENT_ID="placeholder" \
     --from-literal=LINEAR_OAUTH_CLIENT_SECRET="placeholder" \
     --from-literal=LINEAR_OAUTH_TOKEN="placeholder" \
     --from-literal=LINEAR_WEBHOOK_SECRET="placeholder" \
+    --from-literal=GITHUB_TOKEN="placeholder" \
     --dry-run=client -o yaml | kubectl apply -f -
   
-  helm upgrade --install linear "${CHARTS_DIR}/linear" \
-    -f "${SCRIPT_DIR}/linear-values.yaml" \
+  helm upgrade --install pm "${CHARTS_DIR}/pm" \
+    -f "${SCRIPT_DIR}/pm-values.yaml" \
     -n cto \
     --wait --timeout 5m
-  echo "   ✓ Linear/Integrations server deployed"
+  echo "   ✓ PM server deployed"
 else
-  echo "   ⚠️  Linear image not found (ghcr.io/5dlabs/linear:kind-local)"
+  echo "   ⚠️  PM server image not found (ghcr.io/5dlabs/pm-server:kind-local)"
   echo "      Build and load with:"
-  echo "      cd infra/images/linear && docker build -f Dockerfile.build -t ghcr.io/5dlabs/linear:kind-local ../../../"
-  echo "      kind load docker-image ghcr.io/5dlabs/linear:kind-local"
+  echo "      cd infra/images/pm-server && docker build -f Dockerfile.build -t ghcr.io/5dlabs/pm-server:kind-local ../../../"
+  echo "      kind load docker-image ghcr.io/5dlabs/pm-server:kind-local"
 fi
 
 echo ""
@@ -81,7 +82,4 @@ echo "Port forward commands:"
 echo "  kubectl port-forward svc/tools -n cto 3000:3000"
 echo "  kubectl port-forward svc/healer -n cto 8080:8080"
 echo "  kubectl port-forward svc/openmemory -n cto 8081:8080"
-echo "  kubectl port-forward svc/linear -n cto 8082:8081"
-
-
-
+echo "  kubectl port-forward svc/pm-svc -n cto 8082:8081"

@@ -81,6 +81,12 @@ pub struct IntakeConfig {
     pub include_codebase: bool,
     /// CLI for documentation generation (claude, cursor, codex).
     pub cli: String,
+    /// Webhook callback URL for GitHub webhooks (e.g., PR merge notifications).
+    /// If not set, GitHub webhook setup will be skipped.
+    pub webhook_callback_url: Option<String>,
+    /// Default GitHub organization for creating new repositories.
+    /// Used when no repository URL is provided in the intake request.
+    pub github_default_org: Option<String>,
 }
 
 impl Default for IntakeConfig {
@@ -110,6 +116,9 @@ impl Default for IntakeConfig {
             enrich_context: true,
             include_codebase: false,
             cli: env::var("INTAKE_CLI").unwrap_or_else(|_| "claude".to_string()),
+            // These should be configured via environment variables for each deployment
+            webhook_callback_url: env::var("WEBHOOK_CALLBACK_URL").ok(),
+            github_default_org: env::var("GITHUB_DEFAULT_ORG").ok(),
         }
     }
 }

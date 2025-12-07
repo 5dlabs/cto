@@ -225,3 +225,4 @@ let response = provider.generate_text("claude-opus-4-5-20251101", &messages, &op
 - `crates/cli` - Shared CLI types (`CLIType` enum, `CliAdapter` trait)
 - `crates/controller` - Controller using CLI adapters for agent execution
 
+
