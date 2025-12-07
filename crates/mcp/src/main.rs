@@ -2793,7 +2793,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
             tasks
                 .get("tasks")
                 .and_then(|t| t.as_array())
-                .map(|a| a.len())
+                .map(Vec::len)
                 .unwrap_or(0)
         } else {
             0
@@ -2803,7 +2803,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
         let docs_dir = project_path.join(".tasks/docs");
         let doc_count = if docs_dir.exists() {
             std::fs::read_dir(&docs_dir)?
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| {
                     e.path().is_dir() && e.file_name().to_string_lossy().starts_with("task-")
                 })
