@@ -63,6 +63,7 @@ struct AnthropicRequest {
 
 /// Anthropic API response content
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicContent {
     #[serde(rename = "type")]
     content_type: String,
@@ -71,6 +72,7 @@ struct AnthropicContent {
 
 /// Anthropic API usage
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicUsage {
     input_tokens: u32,
     output_tokens: u32,
@@ -78,6 +80,7 @@ struct AnthropicUsage {
 
 /// Anthropic API response
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     content: Vec<AnthropicContent>,
     model: String,
@@ -101,6 +104,7 @@ struct AnthropicErrorResponse {
 /// Streaming event types
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 enum StreamEvent {
     #[serde(rename = "message_start")]
     MessageStart { message: StreamMessage },
