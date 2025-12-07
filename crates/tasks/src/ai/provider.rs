@@ -155,7 +155,7 @@ pub trait AIProvider: Send + Sync {
 pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(response: &AIResponse) -> TasksResult<T> {
     // Try to extract JSON from the response text
     let text = response.text.trim();
-    
+
     // Handle cases where AI includes leading prose before JSON block
     // The JSON may contain embedded ``` markers (code examples), so we need to find
     // the LAST ``` which closes the JSON block, not the first one we encounter
