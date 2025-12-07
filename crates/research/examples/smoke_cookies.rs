@@ -4,7 +4,7 @@
 //!
 //! Run with: `cargo run --example smoke_cookies`
 //!
-//! First, create a cookies file with your `auth_token` from browser DevTools:
+//! First, create a cookies file with your `auth_token` from browser `DevTools`:
 //! `echo '{"auth_token": "...", "ct0": "..."}' > .twitter-cookies.json`
 
 #![allow(clippy::single_match_else)] // Match clearer than if-let for error handling

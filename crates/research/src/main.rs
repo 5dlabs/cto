@@ -1,5 +1,8 @@
 //! Research CLI - Twitter/X bookmark research pipeline.
 
+#![allow(clippy::doc_markdown)] // CronJob etc. don't need backticks
+#![allow(clippy::unused_async)] // Async signature needed for interface consistency
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
