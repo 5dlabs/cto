@@ -13,6 +13,7 @@ pub mod schemas;
 
 // Provider implementations
 pub mod anthropic;
+pub mod cli_provider;
 pub mod openai;
 
 // Re-exports
