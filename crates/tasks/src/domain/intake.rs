@@ -147,7 +147,10 @@ impl IntakeDomain {
         };
 
         // 3. Parse PRD to generate tasks
-        tracing::info!("Parsing PRD to generate ~{} tasks...", config.num_tasks);
+        tracing::info!(
+            "Step 1/4: Parsing PRD to generate ~{} tasks...",
+            config.num_tasks
+        );
         let (mut tasks, prd_usage) = self
             .ai_domain
             .parse_prd(
@@ -166,7 +169,7 @@ impl IntakeDomain {
 
         // 4. Analyze complexity if requested
         let complexity_report = if config.analyze {
-            tracing::info!("Analyzing task complexity...");
+            tracing::info!("Step 2/4: Analyzing task complexity...");
             let (report, analyze_usage) = self
                 .ai_domain
                 .analyze_complexity(
@@ -180,17 +183,28 @@ impl IntakeDomain {
             total_input_tokens += analyze_usage.input_tokens;
             total_output_tokens += analyze_usage.output_tokens;
 
+            tracing::info!("Complexity analysis complete");
             Some(report)
         } else {
+            tracing::info!("Step 2/4: Skipping complexity analysis");
             None
         };
 
         // 5. Expand tasks into subtasks if requested
         let mut subtasks_count = 0;
         if config.expand {
-            tracing::info!("Expanding tasks into subtasks...");
+            let tasks_to_expand: Vec<_> = tasks
+                .iter()
+                .filter(|t| t.status != TaskStatus::Done && t.subtasks.is_empty())
+                .map(|t| t.id.clone())
+                .collect();
 
-            for task in &mut tasks {
+            tracing::info!(
+                "Step 3/4: Expanding {} tasks into subtasks...",
+                tasks_to_expand.len()
+            );
+
+            for (idx, task) in tasks.iter_mut().enumerate() {
                 // Skip done tasks
                 if task.status == TaskStatus::Done {
                     continue;
@@ -200,6 +214,13 @@ impl IntakeDomain {
                 if !task.subtasks.is_empty() {
                     continue;
                 }
+
+                tracing::debug!(
+                    "Expanding task {}/{}: {}",
+                    idx + 1,
+                    tasks_to_expand.len(),
+                    task.id
+                );
 
                 match self
                     .ai_domain
@@ -214,6 +235,7 @@ impl IntakeDomain {
                     .await
                 {
                     Ok((subtasks, expand_usage)) => {
+                        tracing::debug!("Generated {} subtasks", subtasks.len());
                         subtasks_count += subtasks.len();
                         task.subtasks = subtasks;
                         total_input_tokens += expand_usage.input_tokens;
@@ -224,6 +246,9 @@ impl IntakeDomain {
                     }
                 }
             }
+            tracing::info!("Generated {} subtasks total", subtasks_count);
+        } else {
+            tracing::info!("Step 3/4: Skipping task expansion");
         }
 
         // 6. Add agent routing hints
@@ -234,6 +259,7 @@ impl IntakeDomain {
                     Some(infer_agent_hint_str(&task.title, &task.description).to_string());
             }
         }
+        tracing::info!("Agent hints assigned");
 
         // 7. Save tasks to storage
         let tasks_dir = config.output_dir.join("tasks");
@@ -269,10 +295,14 @@ impl IntakeDomain {
         }
 
         // 9. Generate documentation
-        tracing::info!("Generating per-task documentation...");
+        tracing::info!("Step 4/4: Generating per-task documentation...");
         let docs_dir = config.output_dir.join("docs");
         let docs_result = generate_all_docs(&tasks, &docs_dir).await?;
 
+        tracing::info!(
+            "Created {} task documentation directories",
+            docs_result.task_dirs_created
+        );
         tracing::info!(
             "Intake complete: {} tasks, {} subtasks, {} doc dirs",
             tasks.len(),

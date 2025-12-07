@@ -62,6 +62,8 @@ secrets:
   # Name of the Kubernetes secret containing Linear credentials
   secretName: linear-secrets
   # Keys in the secret
+  oauthClientIdKey: LINEAR_OAUTH_CLIENT_ID
+  oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
   oauthTokenKey: LINEAR_OAUTH_TOKEN
   webhookSecretKey: LINEAR_WEBHOOK_SECRET
 

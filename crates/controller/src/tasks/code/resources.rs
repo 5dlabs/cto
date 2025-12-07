@@ -948,6 +948,121 @@ impl<'a> CodeResourceManager<'a> {
             containers.push(docker_daemon_spec);
         }
 
+        // Add Linear sidecar if enabled (status sync + log streaming + 2-way comms)
+        if let Some(linear) = &code_run.spec.linear_integration {
+            if linear.enabled {
+                let session_id = linear.session_id.clone().unwrap_or_default();
+                let issue_id = linear.issue_id.clone().unwrap_or_default();
+                let team_id = linear.team_id.clone().unwrap_or_default();
+                let workflow_name = format!("coderun-{}", code_run.name_any());
+
+                // Add shared volume for status file
+                volumes.push(json!({
+                    "name": "linear-status",
+                    "emptyDir": {}
+                }));
+
+                // Add volume mount and env vars to main container for status sync
+                if let Some(main_container) = containers.first_mut() {
+                    // Ensure volumeMounts array exists and add linear-status mount
+                    let mounts = main_container
+                        .as_object_mut()
+                        .and_then(|obj| {
+                            if !obj.contains_key("volumeMounts") {
+                                obj.insert("volumeMounts".to_string(), json!([]));
+                            }
+                            obj.get_mut("volumeMounts")
+                        })
+                        .and_then(|v| v.as_array_mut());
+
+                    if let Some(mounts_arr) = mounts {
+                        mounts_arr.push(json!({
+                            "name": "linear-status",
+                            "mountPath": "/status"
+                        }));
+                    } else {
+                        warn!("Failed to add linear-status volume mount to main container");
+                    }
+
+                    // Ensure env array exists and add status/log env vars
+                    let env = main_container
+                        .as_object_mut()
+                        .and_then(|obj| {
+                            if !obj.contains_key("env") {
+                                obj.insert("env".to_string(), json!([]));
+                            }
+                            obj.get_mut("env")
+                        })
+                        .and_then(|v| v.as_array_mut());
+
+                    if let Some(env_arr) = env {
+                        env_arr.push(json!({
+                            "name": "STATUS_FILE",
+                            "value": "/status/current.json"
+                        }));
+                        // Agent should write logs to file for sidecar to stream
+                        env_arr.push(json!({
+                            "name": "LOG_FILE_PATH",
+                            "value": "/workspace/agent.log"
+                        }));
+                    } else {
+                        warn!("Failed to add STATUS_FILE/LOG_FILE_PATH env vars to main container");
+                    }
+                } else {
+                    warn!("No main container found to configure for Linear integration");
+                }
+
+                // Build sidecar environment variables
+                let mut sidecar_env = vec![
+                    json!({ "name": "STATUS_FILE", "value": "/status/current.json" }),
+                    json!({ "name": "LINEAR_SERVICE_URL", "value": self.config.linear.service_url }),
+                    json!({ "name": "STATUS_POLL_INTERVAL_MS", "value": "5000" }),
+                    json!({ "name": "LOG_POST_INTERVAL_MS", "value": "5000" }),
+                    json!({ "name": "INPUT_POLL_INTERVAL_MS", "value": "2000" }),
+                    json!({ "name": "LINEAR_SESSION_ID", "value": session_id.clone() }),
+                    json!({ "name": "LINEAR_ISSUE_ID", "value": issue_id }),
+                    json!({ "name": "LINEAR_TEAM_ID", "value": team_id }),
+                    json!({ "name": "WORKFLOW_NAME", "value": workflow_name }),
+                    json!({ "name": "RUST_LOG", "value": "info" }),
+                    // New: Log streaming and input polling paths
+                    json!({ "name": "LOG_FILE_PATH", "value": "/workspace/agent.log" }),
+                    json!({ "name": "INPUT_FIFO_PATH", "value": "/workspace/agent-input.jsonl" }),
+                    json!({ "name": "HTTP_PORT", "value": "8080" }),
+                ];
+
+                // Add LINEAR_OAUTH_TOKEN from secret if available
+                sidecar_env.push(json!({
+                    "name": "LINEAR_OAUTH_TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "linear-secrets",
+                            "key": "LINEAR_OAUTH_TOKEN",
+                            "optional": true
+                        }
+                    }
+                }));
+
+                let sidecar_spec = json!({
+                    "name": "linear-sidecar",
+                    "image": self.config.linear.sidecar_image.clone().unwrap_or_else(|| "ghcr.io/5dlabs/linear-sidecar:latest".to_string()),
+                    "env": sidecar_env,
+                    "volumeMounts": [
+                        { "name": "linear-status", "mountPath": "/status" },
+                        { "name": "workspace", "mountPath": "/workspace" }
+                    ],
+                    "ports": [
+                        { "containerPort": 8080, "name": "http" }
+                    ],
+                    "resources": {
+                        "requests": { "cpu": "10m", "memory": "32Mi" },
+                        "limits": { "cpu": "100m", "memory": "64Mi" }
+                    }
+                });
+                containers.push(sidecar_spec);
+                info!("Added Linear sidecar for session {} (status sync + log streaming + 2-way comms)", session_id);
+            }
+        }
+
         // Build Pod spec and set ServiceAccountName (required by CRD)
         let mut pod_spec = json!({
             "shareProcessNamespace": true,

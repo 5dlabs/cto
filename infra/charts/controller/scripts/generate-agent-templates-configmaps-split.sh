@@ -37,7 +37,7 @@ if [ ! -d "$TEMPLATES_PATH" ]; then
 fi
 
 # Define ConfigMap types
-CLI_TYPES=("claude" "cursor" "codex" "opencode" "gemini" "factory")
+CLI_TYPES=("claude" "cursor" "codex" "opencode" "gemini" "factory" "dexter")
 AGENT_TYPES=("intake" "healer" "integration" "watch")
 
 generate_configmap() {
@@ -94,7 +94,7 @@ HEADER_EOF
       # Watch templates from agents/*/watch/ (if any)
       files_list=$(find -L "$TEMPLATES_PATH/agents" -type f -path "*/watch/*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
       ;;
-    claude|cursor|codex|opencode|gemini|factory)
+    claude|cursor|codex|opencode|gemini|factory|dexter)
       # CLI-specific templates from clis/<cli>/
       files_list=$(find -L "$TEMPLATES_PATH/clis/$name" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
       # Also include all agent coder/docs templates (they use CLI partials)

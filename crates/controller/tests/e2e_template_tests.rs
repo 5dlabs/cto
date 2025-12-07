@@ -6,6 +6,8 @@
 //! 2. Templates render correctly with realistic context
 //! 3. Rendered scripts contain expected CLI invocations
 
+#![allow(clippy::doc_markdown)] // Env vars and type names in doc comments are fine
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -481,6 +483,7 @@ mod rendering_tests {
                 enable_docker: false,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }

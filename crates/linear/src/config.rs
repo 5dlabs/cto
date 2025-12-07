@@ -1,5 +1,6 @@
 //! Configuration for the Linear service.
 
+use serde::{Deserialize, Serialize};
 use std::env;
 
 /// Linear webhook handler configuration.
@@ -30,7 +31,9 @@ impl Default for Config {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(8081),
-            webhook_secret: env::var("LINEAR_WEBHOOK_SECRET").ok(),
+            webhook_secret: env::var("LINEAR_WEBHOOK_SECRET")
+                .ok()
+                .filter(|s| !s.is_empty()),
             max_timestamp_age_ms: env::var("LINEAR_MAX_TIMESTAMP_AGE_MS")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -159,6 +162,59 @@ impl Default for PlayConfig {
     }
 }
 
+// =========================================================================
+// CTO Issue-Level Configuration
+// =========================================================================
+
+/// CTO platform configuration extracted from Linear issue labels/frontmatter.
+///
+/// This configuration allows per-issue overrides of CLI and model settings.
+/// Resolution order: Description frontmatter > Labels > Environment defaults
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CtoConfig {
+    /// CLI to use (claude, cursor, codex, dexter, opencode).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cli: Option<String>,
+    /// Model to use (e.g., claude-sonnet-4-20250514, claude-opus-4-20250514).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl CtoConfig {
+    /// Create a new empty CTO config.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Check if config has any values set.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.cli.is_none() && self.model.is_none()
+    }
+
+    /// Merge another config into this one (other takes precedence).
+    pub fn merge(&mut self, other: &Self) {
+        if other.cli.is_some() {
+            self.cli.clone_from(&other.cli);
+        }
+        if other.model.is_some() {
+            self.model.clone_from(&other.model);
+        }
+    }
+}
+
+/// Source of a configuration value (for logging/debugging).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigSource {
+    /// Value from environment/default configuration.
+    Default,
+    /// Value from Linear issue label.
+    Label,
+    /// Value from issue description frontmatter.
+    Frontmatter,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,5 +262,87 @@ mod tests {
         env::remove_var("LINEAR_ENABLED");
         env::remove_var("LINEAR_WEBHOOK_SECRET");
         env::remove_var("LINEAR_PORT");
+    }
+
+    // =========================================================================
+    // CtoConfig Tests
+    // =========================================================================
+
+    #[test]
+    fn test_cto_config_default() {
+        let config = CtoConfig::default();
+        assert!(config.cli.is_none());
+        assert!(config.model.is_none());
+        assert!(config.is_empty());
+    }
+
+    #[test]
+    fn test_cto_config_is_empty() {
+        let empty = CtoConfig::default();
+        assert!(empty.is_empty());
+
+        let with_cli = CtoConfig {
+            cli: Some("claude".to_string()),
+            model: None,
+        };
+        assert!(!with_cli.is_empty());
+
+        let with_model = CtoConfig {
+            cli: None,
+            model: Some("opus".to_string()),
+        };
+        assert!(!with_model.is_empty());
+    }
+
+    #[test]
+    fn test_cto_config_merge() {
+        let mut base = CtoConfig {
+            cli: Some("claude".to_string()),
+            model: Some("sonnet".to_string()),
+        };
+
+        let override_config = CtoConfig {
+            cli: Some("cursor".to_string()),
+            model: None,
+        };
+
+        base.merge(&override_config);
+
+        assert_eq!(base.cli, Some("cursor".to_string()));
+        assert_eq!(base.model, Some("sonnet".to_string())); // unchanged
+    }
+
+    #[test]
+    fn test_cto_config_merge_empty() {
+        let mut base = CtoConfig {
+            cli: Some("claude".to_string()),
+            model: Some("sonnet".to_string()),
+        };
+
+        let empty = CtoConfig::default();
+        base.merge(&empty);
+
+        assert_eq!(base.cli, Some("claude".to_string()));
+        assert_eq!(base.model, Some("sonnet".to_string()));
+    }
+
+    #[test]
+    fn test_cto_config_serialize() {
+        let config = CtoConfig {
+            cli: Some("cursor".to_string()),
+            model: Some("opus".to_string()),
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("cursor"));
+        assert!(json.contains("opus"));
+    }
+
+    #[test]
+    fn test_cto_config_deserialize() {
+        let json = r#"{"cli": "codex", "model": "gpt-4.1"}"#;
+        let config: CtoConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.cli, Some("codex".to_string()));
+        assert_eq!(config.model, Some("gpt-4.1".to_string()));
     }
 }

@@ -1,0 +1,139 @@
+---
+# Healer Resources for Kind Local Deployment
+# Based on: infra/gitops/resources/healer/
+
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: healer
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: monitor
+
+---
+# Role - permissions within cto namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: healer
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: monitor
+rules:
+  # Watch and get pods for alert detection
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Get pod logs for completion analysis
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+
+  # Create and manage CodeRun CRDs for spawning remediation agents
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Read ConfigMaps (for prompts, config)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Read secrets (for API keys)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+
+  # Watch workflows for status
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: healer
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: monitor
+subjects:
+  - kind: ServiceAccount
+    name: healer
+    namespace: cto
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: healer
+
+---
+# PersistentVolumeClaim for healer workspace
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: healer-workspace
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer-workspace
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# ConfigMap for healer configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healer-config
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/component: config
+data:
+  healer-config.json: |
+    {
+      "cli": "Factory",
+      "model": "claude-sonnet-4-20250514",
+      "max_attempts": 3,
+      "time_window_mins": 10,
+      "memory_url": "http://openmemory.cto.svc.cluster.local:8080",
+      "memory_enabled": true
+    }
+
+---
+# Service for healer filebrowser sidecar
+apiVersion: v1
+kind: Service
+metadata:
+  name: healer-filebrowser
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer-filebrowser
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: filebrowser
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/instance: healer
+    app.kubernetes.io/name: universal-app
+

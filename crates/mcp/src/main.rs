@@ -2649,6 +2649,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 /// Local intake mode - runs tasks CLI directly without Argo
 /// This is useful for testing and development
 #[allow(clippy::disallowed_macros)]
+#[allow(clippy::too_many_lines)]
 fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🏠 Running intake in LOCAL mode (no Argo workflow)");
 
@@ -2698,10 +2699,11 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("📋 Using PRD: {}", prd_path.display());
 
     // Get parameters with defaults
+    #[allow(clippy::cast_possible_truncation)]
     let num_tasks = arguments
         .get("num_tasks")
         .and_then(Value::as_i64)
-        .unwrap_or(15) as i32;
+        .map_or(15, |n| n.clamp(1, i64::from(i32::MAX)) as i32);
 
     let expand = arguments
         .get("expand")
@@ -2791,7 +2793,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
             tasks
                 .get("tasks")
                 .and_then(|t| t.as_array())
-                .map(|a| a.len())
+                .map(Vec::len)
                 .unwrap_or(0)
         } else {
             0
@@ -2801,7 +2803,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
         let docs_dir = project_path.join(".tasks/docs");
         let doc_count = if docs_dir.exists() {
             std::fs::read_dir(&docs_dir)?
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| {
                     e.path().is_dir() && e.file_name().to_string_lossy().starts_with("task-")
                 })
@@ -2912,10 +2914,23 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .get()
         .ok_or_else(|| anyhow!("Configuration not loaded"))?;
 
-    // Auto-detect repository from git (using workspace directory)
-    eprintln!("🔍 Auto-detecting repository from git...");
-    let repository_name = get_git_repository_url_in_dir(Some(&workspace_dir))?;
-    eprintln!("📦 Using repository: {repository_name}");
+    // Get repository - use provided value or auto-detect from git
+    let repository_name = if let Some(repo) = arguments.get("repository").and_then(|v| v.as_str()) {
+        eprintln!("📦 Using provided repository: {repo}");
+        // Validate format (should be org/repo)
+        if !repo.contains('/') || repo.starts_with("https://") {
+            return Err(anyhow!(
+                "Repository must be in org/repo format (e.g., '5dlabs/agent-sandbox')"
+            ));
+        }
+        repo.to_string()
+    } else {
+        // Auto-detect repository from git (using workspace directory)
+        eprintln!("🔍 Auto-detecting repository from git...");
+        let detected = get_git_repository_url_in_dir(Some(&workspace_dir))?;
+        eprintln!("📦 Using repository: {detected}");
+        detected
+    };
     let repository_url = format!("https://github.com/{repository_name}");
 
     // Auto-detect current branch (using workspace directory)

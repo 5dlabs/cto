@@ -1,0 +1,64 @@
+# Kind-specific values for linear/integrations service
+# Overrides for local development
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/5dlabs/linear
+  pullPolicy: IfNotPresent
+  tag: kind-local
+
+# No pull secrets needed for Kind
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 8081
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Linear service configuration
+linear:
+  enabled: true
+  port: 8081
+  maxTimestampAgeMs: 60000
+  namespace: cto
+
+# For Kind, we'll create a placeholder secret
+# In production, use Vault or external-secrets
+secrets:
+  secretName: linear-secrets
+  oauthClientIdKey: LINEAR_OAUTH_CLIENT_ID
+  oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
+  oauthTokenKey: LINEAR_OAUTH_TOKEN
+  webhookSecretKey: LINEAR_WEBHOOK_SECRET
+
+# Workflow configuration for local testing
+intake:
+  githubApp: cto-dev
+  primaryModel: claude-sonnet-4-20250514
+  primaryProvider: anthropic
+  researchModel: claude-sonnet-4-20250514
+  researchProvider: anthropic
+  fallbackModel: claude-sonnet-4-20250514
+  fallbackProvider: anthropic
+  docsModel: claude-sonnet-4-20250514
+  numTasks: 20
+  cli: claude
+
+play:
+  githubApp: cto-dev
+  model: claude-sonnet-4-20250514
+  implementationAgent: rex
+  testingAgent: tess
+  qualityAgent: cleo
+  frontendAgent: blaze
+  parallelExecution: false
+  autoMerge: false
+

@@ -400,6 +400,7 @@ mod tests {
                 enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }
@@ -438,6 +439,7 @@ mod tests {
                 enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }
@@ -475,6 +477,7 @@ mod tests {
                 enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }
@@ -553,6 +556,7 @@ mod tests {
                 enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         };
@@ -674,6 +678,7 @@ mod tests {
                 enable_docker: false,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }
@@ -712,6 +717,7 @@ mod tests {
                 enable_docker: false,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }
@@ -852,6 +858,7 @@ mod tests {
                 enable_docker: false,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         }
@@ -908,6 +915,7 @@ mod tests {
                 enable_docker: false,
                 task_requirements: None,
                 service_account_name: None,
+                linear_integration: None,
             },
             status: None,
         };

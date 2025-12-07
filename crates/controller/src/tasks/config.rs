@@ -40,6 +40,35 @@ pub struct ControllerConfig {
     /// Cleanup configuration
     #[serde(default)]
     pub cleanup: CleanupConfig,
+
+    /// Linear integration configuration
+    #[serde(default)]
+    pub linear: LinearConfig,
+}
+
+/// Linear integration configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LinearConfig {
+    /// Sidecar container image for status sync
+    #[serde(rename = "sidecarImage")]
+    pub sidecar_image: Option<String>,
+
+    /// Linear service URL for status sync
+    #[serde(rename = "serviceUrl", default = "default_linear_service_url")]
+    pub service_url: String,
+}
+
+fn default_linear_service_url() -> String {
+    "http://linear-svc.cto.svc.cluster.local:8081".to_string()
+}
+
+impl Default for LinearConfig {
+    fn default() -> Self {
+        Self {
+            sidecar_image: Some("ghcr.io/5dlabs/linear-sidecar:latest".to_string()),
+            service_url: default_linear_service_url(),
+        }
+    }
 }
 
 /// Job configuration
@@ -633,6 +662,7 @@ impl Default for ControllerConfig {
                 failed_job_delay_minutes: 60,
                 delete_configmap: true,
             },
+            linear: LinearConfig::default(),
         }
     }
 }

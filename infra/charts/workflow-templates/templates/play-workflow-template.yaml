@@ -240,6 +240,19 @@ spec:
       - name: final-task
         description: "Whether this is the final task requiring deployment verification (true/false)"
         value: "false"
+      # Linear integration parameters (optional)
+      - name: linear-session-id
+        description: "Linear agent session ID for callbacks"
+        value: ""
+      - name: linear-issue-id
+        description: "Linear issue ID for callbacks"
+        value: ""
+      - name: linear-team-id
+        description: "Linear team ID for callbacks"
+        value: ""
+      - name: linear-callback-url
+        description: "Linear service callback URL"
+        value: "http://linear-svc.cto.svc.cluster.local:8081"
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
@@ -1189,6 +1202,14 @@ spec:
               modelRotation: {{`{{inputs.parameters.model-rotation}}`}}
             # Pass task requirements if available
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
+            # Linear integration for status sync sidecar
+            {{`{{- if ne (workflow.parameters.linear-session-id) "" }}`}}
+            linearIntegration:
+              enabled: true
+              sessionId: "{{`{{workflow.parameters.linear-session-id}}`}}"
+              issueId: "{{`{{workflow.parameters.linear-issue-id}}`}}"
+              teamId: "{{`{{workflow.parameters.linear-team-id}}`}}"
+            {{`{{- end }}`}}
             # Pass PR context as environment if available
             env:
               PR_URL: "{{`{{inputs.parameters.pr-url}}`}}"
@@ -2760,7 +2781,7 @@ spec:
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
       script:
-        image: alpine:3.20
+        image: curlimages/curl:8.11.0
         command: [sh]
         source: |
           #!/bin/sh
@@ -2776,6 +2797,24 @@ spec:
             echo "✅ Workflow completed successfully"
           else
             echo "❌ Workflow failed or was terminated"
+          fi
+
+          # Send Linear callback if session is configured
+          SESSION_ID="{{`{{workflow.parameters.linear-session-id}}`}}"
+          CALLBACK_URL="{{`{{workflow.parameters.linear-callback-url}}`}}"
+          
+          if [ -n "$SESSION_ID" ] && [ "$SESSION_ID" != "" ]; then
+            echo ""
+            echo "Sending play completion callback to Linear service..."
+            echo "  Session ID: $SESSION_ID"
+            
+            PAYLOAD="{\"workflow_name\":\"{{`{{workflow.name}}`}}\",\"workflow_status\":\"{{`{{workflow.status}}`}}\",\"linear_session_id\":\"$SESSION_ID\",\"linear_issue_id\":\"{{`{{workflow.parameters.linear-issue-id}}`}}\",\"linear_team_id\":\"{{`{{workflow.parameters.linear-team-id}}`}}\",\"task_id\":\"{{`{{workflow.parameters.task-id}}`}}\",\"repository\":\"{{`{{workflow.parameters.repository}}`}}\"}"
+            
+            curl -s -X POST "$CALLBACK_URL/callbacks/play-complete" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" || echo "Warning: Linear callback failed"
+          else
+            echo "No Linear session configured, skipping callback"
           fi
 
           echo "Cleanup completed"

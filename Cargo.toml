@@ -4,7 +4,7 @@ members = [
     "crates/controller",
     "crates/healer",
     "crates/installer",
-    "crates/linear",
+    "crates/integrations",
     "crates/mcp",
     "crates/metal",
     "crates/notify",

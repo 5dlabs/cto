@@ -41,12 +41,16 @@ agent:
     factory:
       repository: ghcr.io/5dlabs/factory
       tag: "latest"
+    dexter:
+      repository: ghcr.io/5dlabs/dexter
+      tag: "latest"
   cliProviders:
     claude: anthropic
     codex: openai
     cursor: anthropic
     factory: openai
     opencode: xai  # Primary provider for OpenCode (Grok)
+    dexter: anthropic  # Financial research agent using Claude
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 

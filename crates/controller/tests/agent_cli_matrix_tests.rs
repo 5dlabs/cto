@@ -6,10 +6,18 @@
 //! 2. Memory/system prompts contain expected content
 //! 3. Config files are valid and contain required fields
 //!
-//! Run with: AGENT_TEMPLATES_PATH="$(pwd)/templates" cargo test -p controller --test agent_cli_matrix_tests
+//! Run with:
+//! ```sh
+//! AGENT_TEMPLATES_PATH="$(pwd)/templates" cargo test -p controller --test agent_cli_matrix_tests
+//! ```
 
 #![allow(dead_code)] // Test fixtures have some unused fields for documentation
 #![allow(clippy::disallowed_macros)] // println! is appropriate in tests
+#![allow(clippy::needless_raw_string_hashes)] // Raw strings in test data are fine
+#![allow(clippy::too_many_lines)] // Test data functions are naturally long
+#![allow(clippy::doc_markdown)] // Commands in doc comments don't need backticks
+#![allow(clippy::match_same_arms)] // Explicit arms improve test clarity
+#![allow(clippy::struct_excessive_bools)] // TestResult struct needs multiple status flags
 
 use controller::cli::types::CLIType;
 use controller::crds::coderun::CLIConfig;
@@ -574,6 +582,7 @@ fn create_code_run_with_scenario(agent: &AgentDef, cli_type: CLIType) -> CodeRun
             enable_docker: false,
             task_requirements: Some(agent.scenario.task_prompt.to_string()),
             service_account_name: None,
+            linear_integration: None,
         },
         status: None,
     }
@@ -622,6 +631,7 @@ fn create_test_code_run(github_app: &str, cli_type: CLIType) -> CodeRun {
             enable_docker: false,
             task_requirements: None,
             service_account_name: None,
+            linear_integration: None,
         },
         status: None,
     }
@@ -1151,7 +1161,7 @@ fn get_output_dir() -> PathBuf {
 ///
 /// Run with: AGENT_TEMPLATES_PATH="$(pwd)/templates" cargo test -p controller --test agent_cli_matrix_tests generate_output -- --nocapture --ignored
 #[test]
-#[ignore] // Run explicitly when you want to generate output
+#[ignore = "Run explicitly to generate output files for manual inspection"]
 fn generate_output_for_inspection() {
     let output_dir = get_output_dir();
     let config = ControllerConfig::default();
@@ -1248,7 +1258,7 @@ fn generate_output_for_inspection() {
 ///
 /// Run with: AGENT_TEMPLATES_PATH="$(pwd)/templates" cargo test -p controller --test agent_cli_matrix_tests generate_single_output -- --nocapture --ignored
 #[test]
-#[ignore]
+#[ignore = "Run explicitly to generate single agent/CLI output for debugging"]
 fn generate_single_output() {
     // Configure which agent/CLI to generate
     let agent_name = "rex";

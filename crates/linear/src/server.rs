@@ -8,13 +8,15 @@ use axum::{
     routing::post,
     Router,
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
 use crate::handlers::callbacks::{
-    handle_intake_complete, handle_tasks_json_callback, CallbackState,
+    handle_intake_complete, handle_play_complete, handle_status_sync, handle_tasks_json_callback,
+    CallbackState,
 };
 use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
 use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
@@ -51,12 +53,127 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/callbacks/tasks-json",
-            post(handle_tasks_json_callback).with_state(callback_state),
+            post(handle_tasks_json_callback).with_state(callback_state.clone()),
         )
+        .route(
+            "/callbacks/play-complete",
+            post(handle_play_complete).with_state(callback_state.clone()),
+        )
+        // Status sync endpoint for sidecar
+        .route(
+            "/status/linear-sync",
+            post(handle_status_sync).with_state(callback_state),
+        )
+        // Manual trigger endpoints for testing
+        .route("/trigger/intake", post(trigger_intake))
         // Health check
         .route("/health", axum::routing::get(health_check))
         .route("/ready", axum::routing::get(readiness_check))
         .with_state(state)
+}
+
+/// Request body for manual intake trigger.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TriggerIntakeRequest {
+    /// Linear issue ID or identifier (e.g., "CTOPA-21" or UUID)
+    issue_id: String,
+    /// Optional session ID for activity updates (generates one if not provided)
+    #[serde(default)]
+    session_id: Option<String>,
+}
+
+/// Manually trigger intake workflow for an issue.
+///
+/// This endpoint fetches the issue from Linear and triggers the intake workflow
+/// without requiring an agent session webhook.
+async fn trigger_intake(
+    State(state): State<AppState>,
+    Json(request): Json<TriggerIntakeRequest>,
+) -> Result<Json<Value>, StatusCode> {
+    info!(issue_id = %request.issue_id, "Manual intake trigger requested");
+
+    let Some(client) = &state.linear_client else {
+        error!("Linear client not configured");
+        return Ok(Json(json!({
+            "status": "error",
+            "error": "Linear client not configured"
+        })));
+    };
+
+    // Fetch the issue from Linear
+    let issue = match client.get_issue(&request.issue_id).await {
+        Ok(issue) => issue,
+        Err(e) => {
+            error!(error = %e, "Failed to fetch issue from Linear");
+            return Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to fetch issue: {e}")
+            })));
+        }
+    };
+
+    info!(
+        issue_id = %issue.id,
+        identifier = %issue.identifier,
+        title = %issue.title,
+        "Fetched issue from Linear"
+    );
+
+    // Generate session ID if not provided
+    let session_id = request.session_id.unwrap_or_else(|| {
+        format!("manual-intake-{}", chrono::Utc::now().timestamp())
+    });
+
+    // Extract intake request
+    let intake_request = match extract_intake_request(&session_id, &issue) {
+        Ok(req) => req,
+        Err(e) => {
+            error!(error = %e, "Failed to extract intake request");
+            return Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to extract intake request: {e}")
+            })));
+        }
+    };
+
+    // Submit the workflow
+    let namespace = &state.config.namespace;
+    match submit_intake_workflow(
+        &state.kube_client,
+        namespace,
+        &intake_request,
+        &state.config.intake,
+    )
+    .await
+    {
+        Ok(result) => {
+            info!(
+                workflow_name = %result.workflow_name,
+                configmap_name = %result.configmap_name,
+                "Intake workflow submitted via manual trigger"
+            );
+            Ok(Json(json!({
+                "status": "accepted",
+                "workflow": "intake",
+                "workflow_name": result.workflow_name,
+                "configmap_name": result.configmap_name,
+                "session_id": session_id,
+                "issue": {
+                    "id": issue.id,
+                    "identifier": issue.identifier,
+                    "title": issue.title
+                }
+            })))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to submit intake workflow");
+            Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to submit workflow: {e}")
+            })))
+        }
+    }
 }
 
 /// Health check endpoint.
@@ -183,11 +300,18 @@ async fn handle_session_created(
         StatusCode::BAD_REQUEST
     })?;
 
+    // Get current state name for workflow detection
+    let state_name = issue
+        .state
+        .as_ref()
+        .map_or("unknown", |s| s.name.as_str());
+
     info!(
         session_id = %session_id,
         issue_id = %issue.id,
         issue_identifier = %issue.identifier,
         title = %issue.title,
+        state = %state_name,
         "Processing new agent session"
     );
 
@@ -370,8 +494,9 @@ async fn handle_session_created(
     } else {
         warn!(
             session_id = %session_id,
+            state = %state_name,
             labels = ?labels,
-            "Issue does not have recognized workflow labels"
+            "Issue does not have recognized labels for intake or play workflow"
         );
 
         // Provide helpful guidance
@@ -380,32 +505,38 @@ async fn handle_session_created(
                 .emit_response(
                     session_id,
                     "I couldn't determine the workflow type for this issue.\n\n\
-                    Please add one of the following labels:\n\
-                    - `prd` or `intake` for PRD processing\n\
-                    - `task` or `cto-task` for task implementation",
+                    **To trigger a workflow, add one of these labels:**\n\
+                    - `prd`, `intake`, or `product-requirement` → PRD processing (intake)\n\
+                    - `task` or `cto-task` → Task implementation (play)",
                 )
                 .await;
         }
 
         Ok(Json(json!({
             "status": "ignored",
-            "reason": "no_workflow_labels",
+            "reason": "no_recognized_labels",
             "session_id": session_id,
+            "current_state": state_name,
             "available_labels": labels,
-            "hint": "Add 'prd' or 'intake' label for intake workflow, or 'task'/'cto-task' for play workflow"
+            "hint": "Add 'prd' label for intake, or 'task' label for play workflow"
         })))
     }
 }
 
 /// Handle prompted session (follow-up message or stop signal).
+#[allow(clippy::too_many_lines)]
 async fn handle_session_prompted(
     state: &AppState,
     payload: &WebhookPayload,
 ) -> Result<Json<Value>, StatusCode> {
+    use crate::handlers::agent_comms::{broadcast_to_session, AgentMessage};
+
     let session_id = payload.get_session_id().ok_or_else(|| {
         warn!("Missing session ID in webhook payload");
         StatusCode::BAD_REQUEST
     })?;
+
+    let issue_identifier = payload.get_issue().map(|i| i.identifier.clone());
 
     // Check for stop signal
     if payload.has_stop_signal() {
@@ -418,6 +549,16 @@ async fn handle_session_prompted(
             let _ = client
                 .emit_thought(session_id, "Received stop signal. Cancelling workflow...")
                 .await;
+        }
+
+        // First, try to send stop signal to running agents
+        let stop_msg = AgentMessage::stop("User requested cancellation via Linear");
+        if let Ok(agents) =
+            crate::handlers::agent_comms::find_running_agents(&state.kube_client, &state.config.namespace, session_id).await
+        {
+            for agent in &agents {
+                let _ = crate::handlers::agent_comms::send_message_to_agent(agent, &stop_msg).await;
+            }
         }
 
         // Cancel running workflows for this session
@@ -453,30 +594,93 @@ async fn handle_session_prompted(
         }
     }
 
-    // Get the prompt body
+    // Get the prompt body (user's follow-up message)
     let prompt_body = payload.get_prompt_body();
 
     info!(
         session_id = %session_id,
         has_prompt = prompt_body.is_some(),
+        issue = ?issue_identifier,
         "Received prompted session event"
     );
 
-    // Acknowledge the prompt
-    if let Some(client) = &state.linear_client {
-        if let Some(body) = &prompt_body {
+    // If we have a prompt, forward it to running agents
+    if let Some(body) = &prompt_body {
+        // Emit ephemeral "processing" thought
+        if let Some(client) = &state.linear_client {
             let _ = client
-                .emit_thought(session_id, format!("Received follow-up: {body}"))
+                .emit_ephemeral_thought(session_id, "💭 Processing your message...")
                 .await;
+        }
+
+        // Try to forward to running agents
+        match broadcast_to_session(
+            &state.kube_client,
+            &state.config.namespace,
+            session_id,
+            body,
+            issue_identifier.as_deref(),
+        )
+        .await
+        {
+            Ok(sent_count) => {
+                info!(
+                    session_id = %session_id,
+                    sent_count = sent_count,
+                    "Forwarded message to running agents"
+                );
+
+                if let Some(client) = &state.linear_client {
+                    let _ = client
+                        .emit_thought(
+                            session_id,
+                            format!("📨 Forwarded your message to {sent_count} running agent(s)"),
+                        )
+                        .await;
+                }
+
+                return Ok(Json(json!({
+                    "status": "accepted",
+                    "action": "forwarded",
+                    "session_id": session_id,
+                    "prompt": body,
+                    "agents_notified": sent_count,
+                    "message": "Message forwarded to running agents"
+                })));
+            }
+            Err(e) => {
+                // No running agents found - this is normal if workflow completed
+                warn!(
+                    session_id = %session_id,
+                    error = %e,
+                    "Could not forward message to agents"
+                );
+
+                if let Some(client) = &state.linear_client {
+                    let _ = client
+                        .emit_thought(
+                            session_id,
+                            "⚠️ No active agents found for this session. The workflow may have completed or not started yet.",
+                        )
+                        .await;
+                }
+
+                return Ok(Json(json!({
+                    "status": "accepted",
+                    "action": "no_agents",
+                    "session_id": session_id,
+                    "prompt": body,
+                    "message": "No running agents found to forward message to"
+                })));
+            }
         }
     }
 
-    // TODO: Handle follow-up prompts (could trigger additional actions)
+    // No prompt body - just acknowledge
     Ok(Json(json!({
         "status": "accepted",
         "action": "prompted",
         "session_id": session_id,
-        "prompt": prompt_body,
-        "message": "Prompt received (handling not yet implemented)"
+        "message": "Prompt event received (no message body)"
     })))
 }

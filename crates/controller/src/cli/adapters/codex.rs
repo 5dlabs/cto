@@ -100,7 +100,10 @@ impl CodexAdapter {
             })
     }
 
+    #[allow(clippy::unused_self)] // Required by trait signature
+    #[allow(clippy::unnecessary_wraps)] // Required by trait signature
     fn render_config(&self, context: &Value) -> AdapterResult<String> {
+        use std::fmt::Write;
         // Generate TOML configuration directly (no template needed)
         // This is only used for health checks, so a simplified format is sufficient
         let model = context["model"].as_str().unwrap_or("gpt-4");
@@ -123,26 +126,27 @@ project_doc_max_bytes = {project_doc_max_bytes}
 
         // Add optional fields
         if let Some(temp) = context["temperature"].as_f64() {
-            toml.push_str(&format!("temperature = {temp}\n"));
+            let _ = writeln!(toml, "temperature = {temp}");
         }
         if let Some(max_tokens) = context["max_output_tokens"].as_u64() {
-            toml.push_str(&format!("model_max_output_tokens = {max_tokens}\n"));
+            let _ = writeln!(toml, "model_max_output_tokens = {max_tokens}");
         }
         if let Some(reasoning) = context["model_reasoning_effort"].as_str() {
-            toml.push_str(&format!("model_reasoning_effort = \"{reasoning}\"\n"));
+            let _ = writeln!(toml, "model_reasoning_effort = \"{reasoning}\"");
         }
 
         // Add tools section if present
         if let Some(tools) = context["tools"].as_object() {
             if let Some(url) = tools.get("url").and_then(|v| v.as_str()) {
-                toml.push_str(&format!(
+                let _ = write!(
+                    toml,
                     r#"
 [mcp_servers.tools]
 command = "tools"
 args = ["--url", "{url}", "--working-dir", "/workspace"]
 env = {{ "TOOLS_SERVER_URL" = "{url}" }}
 "#
-                ));
+                );
 
                 if let Some(tool_list) = tools.get("tools").and_then(|v| v.as_array()) {
                     let tools_str: Vec<String> = tool_list
@@ -151,7 +155,7 @@ env = {{ "TOOLS_SERVER_URL" = "{url}" }}
                         .map(|s| format!("\"{s}\""))
                         .collect();
                     if !tools_str.is_empty() {
-                        toml.push_str(&format!("available_tools = [{}]\n", tools_str.join(", ")));
+                        let _ = writeln!(toml, "available_tools = [{}]", tools_str.join(", "));
                     }
                 }
             }
@@ -176,7 +180,8 @@ env = {{ "TOOLS_SERVER_URL" = "{url}" }}
                 .and_then(|v| v.as_str())
                 .unwrap_or("chat");
 
-            toml.push_str(&format!(
+            let _ = write!(
+                toml,
                 r#"
 [model_providers.openai]
 name = "{name}"
@@ -184,7 +189,7 @@ base_url = "{base_url}"
 env_key = "{env_key}"
 wire_api = "{wire_api}"
 "#
-            ));
+            );
         }
 
         Ok(toml)

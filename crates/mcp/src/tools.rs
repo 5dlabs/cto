@@ -47,6 +47,10 @@ fn get_intake_schema() -> Value {
                     "type": "string",
                     "description": "Name of the project subdirectory (required). Will contain .tasks folder with tasks and documentation."
                 },
+                "repository": {
+                    "type": "string",
+                    "description": "Target repository in org/repo format (e.g., '5dlabs/agent-sandbox'). Optional - if not provided, auto-detects from git remote in workspace."
+                },
                 "prd_content": {
                     "type": "string",
                     "description": "PRD content as a string (optional). If not provided, reads from {project_name}/prd.md or {project_name}/prd.txt"
