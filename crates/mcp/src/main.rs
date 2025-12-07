@@ -2649,6 +2649,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 /// Local intake mode - runs tasks CLI directly without Argo
 /// This is useful for testing and development
 #[allow(clippy::disallowed_macros)]
+#[allow(clippy::too_many_lines)]
 fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🏠 Running intake in LOCAL mode (no Argo workflow)");
 
@@ -2698,10 +2699,11 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("📋 Using PRD: {}", prd_path.display());
 
     // Get parameters with defaults
+    #[allow(clippy::cast_possible_truncation)]
     let num_tasks = arguments
         .get("num_tasks")
         .and_then(Value::as_i64)
-        .unwrap_or(15) as i32;
+        .map_or(15, |n| n.clamp(1, i64::from(i32::MAX)) as i32);
 
     let expand = arguments
         .get("expand")
