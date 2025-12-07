@@ -2,7 +2,7 @@
 //!
 //! Tests cookie persistence and bookmark page access using pure Rust.
 //!
-//! Run with: cargo run --example smoke_chromiumoxide
+//! Run with: `cargo run --example smoke_chromiumoxide`
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use futures::StreamExt;

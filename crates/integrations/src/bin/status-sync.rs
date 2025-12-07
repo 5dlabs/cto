@@ -747,6 +747,7 @@ async fn http_server_task(config: Arc<Config>, state: AppState) {
 // =============================================================================
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)] // Main orchestrates multiple async tasks
 async fn main() -> Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt()
