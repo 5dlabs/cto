@@ -22,7 +22,12 @@ const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 const SUPPORTED_MODELS: &[&str] = &[
     // Claude 4.5 models (latest)
     "claude-opus-4-5-20251101",
+    "claude-opus-4-5-20250929", // Alias: common typo (Sonnet date used for Opus)
     "claude-sonnet-4-5-20250929",
+    // Short names for convenience
+    "opus",
+    "sonnet",
+    "haiku",
     // Claude 4.1 models
     "claude-opus-4-1-20250805",
     // Claude 4 models
@@ -35,6 +40,21 @@ const SUPPORTED_MODELS: &[&str] = &[
     "claude-3-sonnet-20240229",
     "claude-3-haiku-20240307",
 ];
+
+/// Normalize model name to the canonical API model name.
+/// Maps short names and common aliases to their correct API identifiers.
+fn normalize_model(model: &str) -> &str {
+    match model {
+        // Short names → latest versions
+        "opus" => "claude-opus-4-5-20251101",
+        "sonnet" => "claude-sonnet-4-5-20250929",
+        "haiku" => "claude-3-5-haiku-20241022",
+        // Common typo: using Sonnet 4.5 date for Opus 4.5
+        "claude-opus-4-5-20250929" => "claude-opus-4-5-20251101",
+        // Everything else passes through
+        _ => model,
+    }
+}
 
 /// Anthropic API request message
 #[derive(Debug, Serialize)]
@@ -262,11 +282,14 @@ impl AIProvider for AnthropicProvider {
             .as_ref()
             .ok_or_else(|| TasksError::Ai("ANTHROPIC_API_KEY not set".to_string()))?;
 
+        // Normalize model name (handles short names and common aliases)
+        let normalized_model = normalize_model(model);
+
         let (system, converted_messages) = self.convert_messages(messages);
 
         // Use streaming for progress output
         let request = AnthropicRequest {
-            model: model.to_string(),
+            model: normalized_model.to_string(),
             messages: converted_messages,
             max_tokens: options.max_tokens.unwrap_or(4096),
             system,

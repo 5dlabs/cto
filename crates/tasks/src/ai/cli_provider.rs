@@ -311,17 +311,17 @@ impl CLITextGenerator {
                 args.push(prompt.to_string());
             }
             CLIType::Codex => {
-                // Codex CLI: codex exec --json -m <model> -- "prompt"
+                // Codex CLI: codex exec --json -m <model> -c max_output_tokens=16000 -- "prompt"
                 // Must use 'exec' subcommand for non-interactive mode
                 args.push("exec".to_string());
                 args.push("--json".to_string());
                 args.push("-m".to_string());
                 args.push(model.to_string());
 
-                if let Some(tokens) = options.max_tokens {
-                    args.push("-c".to_string());
-                    args.push(format!("max_output_tokens={tokens}"));
-                }
+                // Set max output tokens (default to 16000 for detailed task breakdowns)
+                let tokens = options.max_tokens.unwrap_or(16000);
+                args.push("-c".to_string());
+                args.push(format!("max_output_tokens={tokens}"));
 
                 // Skip sandbox for task generation
                 args.push("--skip-git-repo-check".to_string());

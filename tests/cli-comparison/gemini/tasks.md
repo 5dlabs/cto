@@ -1,0 +1,108 @@
+# GEMINI Task Generation Results
+
+**Model:** gemini-2.5-flash
+**Duration:** 23.65s
+**Tasks Generated:** 5
+**Theme Coverage:** 100%
+**Themes Covered:** docker, jwt, api, auth, task, test, error, project, database
+
+---
+
+## Task 1: Project Setup & Database Initialization
+
+**Status:** pending | **Priority:** high
+
+### Description
+
+Initialize the Rust project, configure the Axum web framework, set up PostgreSQL database connectivity using SQLx, and establish a basic database schema with migration capabilities.
+
+### Implementation Details
+
+1. **Project Creation:** Use `cargo new task_manager_api`. 2. **Dependency Management:** Add `axum`, `tokio` (with `full` feature), `serde` (with `derive`), `sqlx` (with `runtime-tokio-rustls`, `postgres`, `macros`, `migrate` features), `dotenvy`, and `tracing` related crates (`tracing`, `tracing-subscriber`) to `Cargo.toml`. 3. **Basic Axum Server:** Implement a minimal `main.rs` to start an Axum server with a `/health` endpoint. 4. **Database Configuration:** Set up `.env` for `DATABASE_URL`. 5. **SQLx Setup:** Initialize SQLx with `sqlx database create` and create an initial migration (`sqlx migrate add create_users_and_tasks_tables`). Define the `users` table (id, username, password_hash, created_at, updated_at) and `tasks` table (id, user_id, title, description, status, priority, created_at, updated_at) in the migration file. Consider using `uuid` crate for IDs. Use `chrono` for timestamps.
+
+### Test Strategy
+
+Verify project builds (`cargo build`). Run database migrations (`sqlx migrate run`) and inspect the PostgreSQL database schema to ensure tables are created correctly. Perform a curl request to `/health` to confirm the server is running.
+
+---
+
+## Task 2: Implement User Authentication Module
+
+**Status:** pending | **Priority:** high
+
+**Dependencies:** 1
+
+### Description
+
+Develop endpoints for user registration, login, logout, and JWT token refresh. Implement secure password hashing and JWT token generation/validation.
+
+### Implementation Details
+
+1. **User Model:** Create a `User` struct in `src/models/user.rs` matching the database schema. 2. **Password Hashing:** Integrate `argon2` crate for secure password hashing and verification during registration and login. 3. **JWT Implementation:** Use the `jsonwebtoken` crate to generate and validate JWTs. Define JWT claims (e.g., user ID, expiration). Store JWT secret in `.env`. 4. **Authentication Handlers:** Create `src/handlers/auth.rs` with:    - `POST /register`: Takes username and password, hashes password, saves user to DB, returns success.    - `POST /login`: Takes username and password, verifies password, generates access and refresh JWTs, returns tokens.    - `POST /refresh`: Takes a refresh token, validates it, issues a new access token.    - `POST /logout`: (Optional, client-side approach preferred) Client deletes tokens. If server-side invalidation is required, implement a token blacklist. 5. **Authentication Middleware:** Create `src/middleware/auth.rs` for protecting routes, extracting user info from JWT, and validating tokens on incoming requests using Axum's `FromRequestParts` or `Extension` pattern.
+
+### Test Strategy
+
+Unit tests for password hashing/verification and JWT encoding/decoding logic. Integration tests for `/register`, `/login`, `/refresh` endpoints, verifying valid and invalid credentials, correct token generation, and the ability to access a simple protected route with a valid JWT.
+
+---
+
+## Task 3: Develop Task Management CRUD Operations
+
+**Status:** pending | **Priority:** medium
+
+**Dependencies:** 1, 2
+
+### Description
+
+Implement RESTful API endpoints for creating, reading, updating, and deleting tasks. Associate tasks with authenticated users and handle task status and priority.
+
+### Implementation Details
+
+1. **Task Model:** Create a `Task` struct in `src/models/task.rs` reflecting the database schema, including `status` (enum: `Pending`, `InProgress`, `Done`) and `priority` (enum: `Low`, `Medium`, `High`). Use `sqlx::types::Uuid` for task IDs. 2. **Task Handlers:** Create `src/handlers/tasks.rs` with the following protected endpoints:    - `POST /tasks`: Create a new task for the authenticated user.    - `GET /tasks`: Retrieve all tasks for the authenticated user.    - `GET /tasks/:id`: Retrieve a specific task by ID for the authenticated user.    - `PUT /tasks/:id`: Update an existing task by ID for the authenticated user.    - `DELETE /tasks/:id`: Delete a task by ID for the authenticated user. 3. **Database Interactions:** Use `sqlx` queries within handlers to perform CRUD operations, ensuring `user_id` is linked to the authenticated user. Ensure `updated_at` timestamps are automatically managed.
+
+### Test Strategy
+
+Integration tests for all CRUD endpoints: verifying successful creation, retrieval (single and list), updates, and deletions for an authenticated user. Test edge cases like attempting to access/modify another user's task (should fail with 403 Forbidden) and non-existent tasks (should return 404 Not Found).
+
+---
+
+## Task 4: Implement Centralized Error Handling & Input Validation
+
+**Status:** pending | **Priority:** medium
+
+**Dependencies:** 1, 2, 3
+
+### Description
+
+Establish a consistent error response structure across the API and implement robust input validation for all incoming request bodies.
+
+### Implementation Details
+
+1. **Custom Error Type:** Create a custom `AppError` enum in `src/error.rs` to encapsulate various API errors (e.g., `Unauthorized`, `Forbidden`, `NotFound`, `InternalServerError`, `Validation`). Implement `IntoResponse` for `AppError` to convert it into appropriate HTTP status codes and JSON error messages. 2. **Input Validation:** Utilize the `validator` and `validator_derive` crates for declarative validation of request DTOs (e.g., `RegisterUser`, `LoginCredentials`, `CreateTask`, `UpdateTask`). Ensure validation errors are caught and transformed into a `422 Unprocessable Entity` response using the `AppError` type. 3. **Integrate Errors:** Refactor existing handlers (auth, tasks) to use the `AppError` type for all error conditions, ensuring a consistent API response format for errors.
+
+### Test Strategy
+
+Unit tests for `AppError` conversion to `IntoResponse`. Integration tests for each endpoint (`/register`, `/login`, `/tasks` CRUD) with intentionally invalid or missing request body fields to verify that `422 Unprocessable Entity` responses are returned with descriptive error messages. Test for common error scenarios (e.g., 401, 403, 404) to ensure `AppError` correctly maps to these HTTP statuses.
+
+---
+
+## Task 5: Deployment Preparation & API Documentation
+
+**Status:** pending | **Priority:** low
+
+**Dependencies:** 1, 2, 3, 4
+
+### Description
+
+Create a `Dockerfile` for containerization, configure environment variables for deployment, and prepare basic API documentation and a `README.md` for project setup and usage.
+
+### Implementation Details
+
+1. **Dockerfile:** Create a multi-stage `Dockerfile` for the Axum application. The first stage builds the Rust binary, and the second stage creates a minimal runtime image (e.g., using `debian:buster-slim` or `distroless/cc`). Expose the correct port. 2. **Environment Configuration:** Review all environment variables used (`DATABASE_URL`, `JWT_SECRET`, etc.) and ensure they are properly configured in the Docker environment or external configuration management. 3. **README.md:** Write a comprehensive `README.md` including:    - Project description.    - Setup instructions (Rust, PostgreSQL, `sqlx-cli`).    - How to run locally.    - Basic API endpoint documentation (routes, methods, request/response examples).    - Information on running tests. 4. **Pre-commit Hooks (Optional but recommended):** Consider adding a `.pre-commit-config.yaml` to enforce `rustfmt` and `clippy` checks.
+
+### Test Strategy
+
+Build the Docker image (`docker build -t task_manager_api .`). Run the Docker container (`docker run -p 8080:8080 task_manager_api`). Verify that the API is accessible and functional from within the container using `curl` commands. Review `README.md` for clarity, accuracy, and completeness for a new developer to get started. Ensure all environment variables are correctly loaded and applied in the container.
+
+---
+
