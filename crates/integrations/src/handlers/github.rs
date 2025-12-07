@@ -125,6 +125,7 @@ pub struct IntakeMetadata {
 }
 
 /// Handle GitHub webhook
+#[allow(clippy::too_many_lines)]
 pub async fn handle_github_webhook(
     State(state): State<Arc<CallbackState>>,
     headers: HeaderMap,
