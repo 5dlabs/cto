@@ -1,0 +1,285 @@
+{
+  "expected_themes": [
+    "project",
+    "database",
+    "auth",
+    "jwt",
+    "task",
+    "api"
+  ],
+  "prd": "# Task Manager API\n\n## Overview\nBuild a REST API for task management with authentication.\n\n## Features\n\n### Authentication\n- JWT-based authentication\n- Login/logout endpoints\n- Token refresh capability\n\n### Task Management\n- CRUD operations for tasks\n- Task status: pending, in-progress, done\n- Task priority: low, medium, high\n\n## Tech Stack\n- Rust with Axum framework\n- PostgreSQL database\n- JWT for authentication\n",
+  "results": [
+    {
+      "cli": "claude",
+      "duration_ms": 210483,
+      "error": null,
+      "extended_thinking": true,
+      "model": "claude-opus-4-5-20251101",
+      "success": true,
+      "task_count": 5,
+      "tasks": [
+        {
+          "description": "Initialize the Rust project structure with Axum web framework, PostgreSQL database connectivity via sqlx, and essential dependencies. This task establishes the foundation for all subsequent features.",
+          "id": "1",
+          "priority": "high",
+          "title": "Setup project foundation with database"
+        },
+        {
+          "description": "Build the authentication layer with JWT token generation, validation, password hashing, and login/logout/refresh endpoints. Uses jsonwebtoken crate for JWT operations and argon2 for secure password hashing.",
+          "id": "2",
+          "priority": "high",
+          "title": "Implement JWT authentication system"
+        },
+        {
+          "description": "Build the core task management API with Create, Read, Update, Delete operations for tasks. Tasks are scoped to authenticated users and support status (pending/in_progress/done) and priority (low/medium/high) fields.",
+          "id": "3",
+          "priority": "high",
+          "title": "Implement task CRUD operations"
+        },
+        {
+          "description": "Implement comprehensive error handling with structured JSON error responses, input validation using validator crate, and consistent error formatting across all endpoints.",
+          "id": "4",
+          "priority": "medium",
+          "title": "Add error handling and validation"
+        },
+        {
+          "description": "Add production-ready middleware including request tracing, CORS configuration, rate limiting, and request timeouts. Also add OpenAPI documentation generation and comprehensive health check endpoints.",
+          "id": "5",
+          "priority": "medium",
+          "title": "Add middleware and API polish"
+        }
+      ],
+      "theme_coverage": 100.0,
+      "themes_covered": [
+        "jwt",
+        "project",
+        "api",
+        "error",
+        "task",
+        "auth",
+        "database"
+      ]
+    },
+    {
+      "cli": "codex",
+      "duration_ms": 18779,
+      "error": null,
+      "extended_thinking": false,
+      "model": "gpt-5.1-codex",
+      "success": true,
+      "task_count": 5,
+      "tasks": [
+        {
+          "description": "Scaffold the Rust workspace with Axum + Tokio runtime, shared configuration, and PostgreSQL connectivity to create a stable foundation for later features.",
+          "id": "1",
+          "priority": "high",
+          "title": "Bootstrap Axum service and environment"
+        },
+        {
+          "description": "Deliver secure login/logout/refresh flows using password hashing and JWT/refresh tokens while exposing the required endpoints.",
+          "id": "2",
+          "priority": "high",
+          "title": "Implement authentication domain with JWT"
+        },
+        {
+          "description": "Define database schema for tasks with statuses/priorities and implement repository functions that abstract PostgreSQL access.",
+          "id": "3",
+          "priority": "medium",
+          "title": "Design task schema and persistence layer"
+        },
+        {
+          "description": "Expose authenticated Axum routes that leverage the repository/service to deliver CRUD with validation and pagination filters.",
+          "id": "4",
+          "priority": "high",
+          "title": "Build task management REST endpoints"
+        },
+        {
+          "description": "Ensure the API meets production readiness with test coverage, security checks, and operational visibility.",
+          "id": "5",
+          "priority": "medium",
+          "title": "End-to-end validation, observability, and hardening"
+        }
+      ],
+      "theme_coverage": 100.0,
+      "themes_covered": [
+        "api",
+        "error",
+        "database",
+        "test",
+        "project",
+        "jwt",
+        "task",
+        "auth",
+        "docker"
+      ]
+    },
+    {
+      "cli": "opencode",
+      "duration_ms": 159529,
+      "error": null,
+      "extended_thinking": false,
+      "model": "anthropic/claude-opus-4-5",
+      "success": true,
+      "task_count": 5,
+      "tasks": [
+        {
+          "description": "Initialize the Rust project structure with all required dependencies, configuration, and database connection pool setup for the Task Manager API.",
+          "id": "1",
+          "priority": "high",
+          "title": "Setup Rust project with Axum and dependencies"
+        },
+        {
+          "description": "Design and implement PostgreSQL database schema for users and tasks tables with proper indexes and constraints using SQLx migrations.",
+          "id": "2",
+          "priority": "high",
+          "title": "Create database schema and migrations"
+        },
+        {
+          "description": "Build complete JWT authentication including password hashing with Argon2, token generation/validation, login/register endpoints, and token refresh capability.",
+          "id": "3",
+          "priority": "high",
+          "title": "Implement JWT authentication system"
+        },
+        {
+          "description": "Create REST API endpoints for complete task management including create, read (single and list), update, and delete operations with proper authorization.",
+          "id": "4",
+          "priority": "high",
+          "title": "Implement Task CRUD endpoints"
+        },
+        {
+          "description": "Implement production-ready middleware stack including CORS, request tracing, rate limiting, and comprehensive error handling with consistent API responses.",
+          "id": "5",
+          "priority": "medium",
+          "title": "Add API middleware, error handling, and documentation"
+        }
+      ],
+      "theme_coverage": 100.0,
+      "themes_covered": [
+        "api",
+        "error",
+        "auth",
+        "task",
+        "project",
+        "jwt",
+        "database"
+      ]
+    },
+    {
+      "cli": "cursor",
+      "duration_ms": 123470,
+      "error": null,
+      "extended_thinking": true,
+      "model": "opus-4.5-thinking",
+      "success": true,
+      "task_count": 5,
+      "tasks": [
+        {
+          "description": "Initialize the Task Manager API crate with required dependencies, database schema, and SQLx migrations. This establishes the core data layer that all other features depend on.",
+          "id": "1",
+          "priority": "high",
+          "title": "Setup project foundation with database layer"
+        },
+        {
+          "description": "Build the authentication layer with JWT token generation, validation, refresh capability, and Axum extractors. This provides the security foundation for protected task endpoints.",
+          "id": "2",
+          "priority": "high",
+          "title": "Implement JWT authentication system"
+        },
+        {
+          "description": "Implement the core task management REST API with all CRUD operations, filtering, and pagination. Tasks are user-scoped and require authentication.",
+          "id": "3",
+          "priority": "high",
+          "title": "Build task CRUD API endpoints"
+        },
+        {
+          "description": "Assemble the complete Axum application with all routes, middleware (CORS, tracing, timeouts), shared state, and graceful shutdown following existing codebase patterns.",
+          "id": "4",
+          "priority": "medium",
+          "title": "Configure HTTP server with middleware stack"
+        },
+        {
+          "description": "Implement robust input validation with helpful error messages and standardized API error responses. This polishes the API for production readiness.",
+          "id": "5",
+          "priority": "medium",
+          "title": "Add input validation and comprehensive error handling"
+        }
+      ],
+      "theme_coverage": 100.0,
+      "themes_covered": [
+        "task",
+        "error",
+        "api",
+        "database",
+        "project",
+        "auth",
+        "jwt"
+      ]
+    },
+    {
+      "cli": "factory",
+      "duration_ms": 109438,
+      "error": null,
+      "extended_thinking": true,
+      "model": "claude-opus-4-5-20251101",
+      "success": true,
+      "task_count": 5,
+      "tasks": [
+        {
+          "description": "Initialize the Rust project with Axum web framework, SQLx for PostgreSQL database access, and essential dependencies. Establish project structure following Rust conventions.",
+          "id": "1",
+          "priority": "high",
+          "title": "Setup project foundation with Axum and PostgreSQL"
+        },
+        {
+          "description": "Design and implement PostgreSQL database schema for users and tasks tables using SQLx migrations. Create corresponding Rust model structs.",
+          "id": "2",
+          "priority": "high",
+          "title": "Implement database schema and migrations"
+        },
+        {
+          "description": "Build complete JWT authentication with login, logout, and token refresh endpoints. Implement secure password hashing and JWT middleware for protected routes.",
+          "id": "3",
+          "priority": "high",
+          "title": "Implement JWT authentication system"
+        },
+        {
+          "description": "Build RESTful endpoints for task management including create, read, update, and delete operations with proper authorization ensuring users can only access their own tasks.",
+          "id": "4",
+          "priority": "high",
+          "title": "Implement Task CRUD API endpoints"
+        },
+        {
+          "description": "Implement comprehensive input validation, OpenAPI documentation, structured error handling, and integration tests to ensure API reliability and developer experience.",
+          "id": "5",
+          "priority": "medium",
+          "title": "Add API documentation, validation, and integration tests"
+        }
+      ],
+      "theme_coverage": 100.0,
+      "themes_covered": [
+        "docker",
+        "database",
+        "api",
+        "error",
+        "project",
+        "task",
+        "jwt",
+        "test",
+        "auth"
+      ]
+    },
+    {
+      "cli": "gemini",
+      "duration_ms": 3580,
+      "error": "AI error: CLI process failed with exit code 1: Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.\nBoth GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY.\nThe --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\nError when talking to Gemini API Full report available at: /var/folders/6m/3_11ln6n6v1g5ckq6n9qh2r00000gn/T/gemini-client-error-Turn.run-sendMessageStream-2025-12-07T18-48-15-784Z.json\n[API Error: You have exhausted your daily quota on this model.]\nAn unexpected critical error occurred:[object Object]",
+      "extended_thinking": false,
+      "model": "gemini-2.0-flash",
+      "success": false,
+      "task_count": 0,
+      "tasks": [],
+      "theme_coverage": 0.0,
+      "themes_covered": []
+    }
+  ],
+  "timestamp": "2025-12-07T18:48:15.813880+00:00"
+}

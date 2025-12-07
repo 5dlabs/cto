@@ -1,0 +1,55 @@
+[package]
+name = "cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared CLI types and adapters for AI coding assistants"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# Schema generation
+schemars = { workspace = true }
+
+# Template engine
+handlebars = { workspace = true }
+
+# Kubernetes (for ContainerContext)
+k8s-openapi = { workspace = true }
+
+# OpenTelemetry
+opentelemetry = { workspace = true }
+
+# Concurrent data structures
+dashmap = "5.4"
+
+# Regex for parsing
+regex = { workspace = true }
+
+# UUID generation
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+serial_test = { workspace = true }
+

@@ -1,0 +1,48 @@
+[package]
+name = "cto-cloud"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cloud provider integrations for CTO Platform (AWS, GCP, Azure)"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# URL handling
+url = "2.5"
+
+# CLI
+clap = { workspace = true }
+
+# Base64 encoding/decoding
+base64 = "0.22"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+wiremock = { workspace = true }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+

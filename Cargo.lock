@@ -725,6 +725,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "cto-cloud"
+version = "0.12.38"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "clap",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "wiremock",
+]
+
+[[package]]
 name = "cto-mcp"
 version = "0.3.0"
 dependencies = [

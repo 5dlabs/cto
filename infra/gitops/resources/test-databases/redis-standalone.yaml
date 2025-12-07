@@ -19,10 +19,9 @@ spec:
     fsGroup: 1000
 
   # Kubernetes configuration - Using Valkey instead of Redis
-  # Valkey 7.2 is a direct fork of Redis 7.2.4 and is fully protocol-compatible
-  # Note: Valkey 8.0+ introduces new features not in Redis 7.x; use 7.2 for operator compatibility
+  # Valkey 8.0 is fully compatible with Redis 7.x protocol
   kubernetesConfig:
-    image: valkey/valkey:7.2-alpine
+    image: valkey/valkey:8.0-alpine
     imagePullPolicy: IfNotPresent
     resources:
       requests:

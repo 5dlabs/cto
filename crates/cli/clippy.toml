@@ -1,0 +1,19 @@
+# Clippy configuration for cli crate
+# Matches project-wide pedantic settings
+
+# Allow common patterns that don't affect correctness
+allow-unwrap-in-tests = true
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 30
+
+# Disallowed methods - prefer tracing over println
+disallowed-methods = [
+    { path = "std::time::SystemTime::now", reason = "Use chrono::Utc::now() for consistent time handling" },
+]
+
+# Disallowed macros - prefer tracing
+disallowed-macros = [
+    { path = "std::println", reason = "Use tracing::info! or tracing::debug! instead" },
+    { path = "std::eprintln", reason = "Use tracing::warn! or tracing::error! instead" },
+]

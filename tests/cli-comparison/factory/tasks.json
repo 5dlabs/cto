@@ -1,0 +1,80 @@
+{
+  "cli": "factory",
+  "duration_ms": 109438,
+  "error": null,
+  "model": "claude-opus-4-5-20251101",
+  "success": true,
+  "task_count": 5,
+  "tasks": [
+    {
+      "dependencies": [],
+      "description": "Initialize the Rust project with Axum web framework, SQLx for PostgreSQL database access, and essential dependencies. Establish project structure following Rust conventions.",
+      "details": "1. Create new Rust binary crate with `cargo new task-manager-api`\n2. Configure Cargo.toml with dependencies:\n   - axum = \"0.8\"\n   - tokio = { version = \"1.40\", features = [\"full\"] }\n   - sqlx = { version = \"0.8\", features = [\"runtime-tokio\", \"postgres\", \"uuid\", \"chrono\"] }\n   - serde = { version = \"1.0\", features = [\"derive\"] }\n   - tower-http = { version = \"0.5\", features = [\"trace\", \"cors\"] }\n   - tracing = \"0.1\"\n   - tracing-subscriber = { version = \"0.3\", features = [\"env-filter\"] }\n   - dotenvy = \"0.15\"\n   - uuid = { version = \"1.10\", features = [\"v4\", \"serde\"] }\n   - chrono = { version = \"0.4\", features = [\"serde\"] }\n3. Create project structure:\n   src/\n   ├── main.rs           # Entry point, server setup\n   ├── config.rs         # Configuration from environment\n   ├── db.rs             # Database connection pool\n   ├── routes/\n   │   └── mod.rs        # Route aggregation\n   ├── handlers/         # Request handlers\n   ├── models/           # Database models\n   └── error.rs          # Custom error types\n4. Setup PostgreSQL connection with SQLx:\n   ```rust\n   use sqlx::postgres::PgPoolOptions;\n   pub async fn create_pool(database_url: &str) -> sqlx::PgPool {\n       PgPoolOptions::new()\n           .max_connections(10)\n           .connect(database_url)\n           .await\n           .expect(\"Failed to create pool\")\n   }\n   ```\n5. Create basic Axum server with health check endpoint\n6. Add .env file for DATABASE_URL and other config\n7. Setup docker-compose.yml for local PostgreSQL instance",
+      "id": "1",
+      "priority": "high",
+      "status": "pending",
+      "test_strategy": "1. Verify `cargo build` completes without errors\n2. Verify `cargo clippy` passes with no warnings\n3. Test health check endpoint returns 200 OK\n4. Verify database connection succeeds with valid credentials\n5. Test graceful error handling for invalid database URL",
+      "title": "Setup project foundation with Axum and PostgreSQL"
+    },
+    {
+      "dependencies": [
+        "1"
+      ],
+      "description": "Design and implement PostgreSQL database schema for users and tasks tables using SQLx migrations. Create corresponding Rust model structs.",
+      "details": "1. Install sqlx-cli: `cargo install sqlx-cli --features postgres`\n2. Create migrations directory and initial migration:\n   ```sql\n   -- migrations/001_initial_schema.sql\n   CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n   CREATE TABLE users (\n       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n       email VARCHAR(255) UNIQUE NOT NULL,\n       password_hash VARCHAR(255) NOT NULL,\n       created_at TIMESTAMPTZ DEFAULT NOW(),\n       updated_at TIMESTAMPTZ DEFAULT NOW()\n   );\n\n   CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'done');\n   CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high');\n\n   CREATE TABLE tasks (\n       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n       title VARCHAR(255) NOT NULL,\n       description TEXT,\n       status task_status DEFAULT 'pending',\n       priority task_priority DEFAULT 'medium',\n       created_at TIMESTAMPTZ DEFAULT NOW(),\n       updated_at TIMESTAMPTZ DEFAULT NOW()\n   );\n\n   CREATE INDEX idx_tasks_user_id ON tasks(user_id);\n   CREATE INDEX idx_tasks_status ON tasks(status);\n   ```\n3. Create Rust models in src/models/:\n   ```rust\n   // src/models/user.rs\n   #[derive(Debug, sqlx::FromRow, Serialize)]\n   pub struct User {\n       pub id: Uuid,\n       pub email: String,\n       #[serde(skip_serializing)]\n       pub password_hash: String,\n       pub created_at: DateTime<Utc>,\n   }\n\n   // src/models/task.rs\n   #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]\n   #[sqlx(type_name = \"task_status\", rename_all = \"snake_case\")]\n   pub enum TaskStatus { Pending, InProgress, Done }\n\n   #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]\n   #[sqlx(type_name = \"task_priority\", rename_all = \"lowercase\")]\n   pub enum TaskPriority { Low, Medium, High }\n   ```\n4. Run migrations: `sqlx migrate run`\n5. Generate SQLx offline mode files: `cargo sqlx prepare`",
+      "id": "2",
+      "priority": "high",
+      "status": "pending",
+      "test_strategy": "1. Verify migrations run successfully: `sqlx migrate run`\n2. Test rollback capability: `sqlx migrate revert`\n3. Verify all model structs compile and derive traits work\n4. Test enum serialization/deserialization for status and priority\n5. Verify foreign key constraints work correctly\n6. Test unique constraint on user email",
+      "title": "Implement database schema and migrations"
+    },
+    {
+      "dependencies": [
+        "2"
+      ],
+      "description": "Build complete JWT authentication with login, logout, and token refresh endpoints. Implement secure password hashing and JWT middleware for protected routes.",
+      "details": "1. Add authentication dependencies to Cargo.toml:\n   - jsonwebtoken = \"9\"\n   - argon2 = \"0.5\"  # Password hashing\n   - validator = { version = \"0.18\", features = [\"derive\"] }\n2. Create JWT configuration in src/auth/jwt.rs:\n   ```rust\n   use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};\n   \n   #[derive(Debug, Serialize, Deserialize)]\n   pub struct Claims {\n       pub sub: String,  // user_id\n       pub exp: usize,   // expiration timestamp\n       pub iat: usize,   // issued at\n       pub token_type: String,  // \"access\" or \"refresh\"\n   }\n   \n   pub fn create_access_token(user_id: &Uuid, secret: &[u8]) -> Result<String, Error> {\n       let exp = Utc::now() + Duration::minutes(15);\n       let claims = Claims { sub: user_id.to_string(), exp: exp.timestamp() as usize, ... };\n       encode(&Header::default(), &claims, &EncodingKey::from_secret(secret))\n   }\n   \n   pub fn create_refresh_token(user_id: &Uuid, secret: &[u8]) -> Result<String, Error> {\n       let exp = Utc::now() + Duration::days(7);\n       // Similar to access token but with longer expiry\n   }\n   ```\n3. Create auth middleware using Axum extractors:\n   ```rust\n   pub async fn auth_middleware<B>(\n       State(state): State<AppState>,\n       mut req: Request<B>,\n       next: Next<B>,\n   ) -> Result<Response, AppError> {\n       let token = req.headers().get(AUTHORIZATION)\n           .and_then(|v| v.to_str().ok())\n           .and_then(|v| v.strip_prefix(\"Bearer \"));\n       // Validate token, extract claims, inject user into request extensions\n   }\n   ```\n4. Implement auth handlers in src/handlers/auth.rs:\n   - POST /api/auth/register - Create new user with hashed password\n   - POST /api/auth/login - Validate credentials, return access + refresh tokens\n   - POST /api/auth/refresh - Exchange refresh token for new access token\n   - POST /api/auth/logout - Invalidate refresh token (store in blacklist or use short-lived tokens)\n5. Password hashing with Argon2:\n   ```rust\n   use argon2::{Argon2, PasswordHash, PasswordVerifier, PasswordHasher};\n   pub fn hash_password(password: &str) -> Result<String, Error> {\n       let salt = SaltString::generate(&mut OsRng);\n       let argon2 = Argon2::default();\n       Ok(argon2.hash_password(password.as_bytes(), &salt)?.to_string())\n   }\n   ```\n6. Store JWT_SECRET in environment, use at least 256-bit secret",
+      "id": "3",
+      "priority": "high",
+      "status": "pending",
+      "test_strategy": "1. Test user registration with valid/invalid email formats\n2. Test login with correct and incorrect credentials\n3. Verify access token expires after 15 minutes\n4. Verify refresh token generates new access token\n5. Test protected endpoint rejects requests without token\n6. Test protected endpoint rejects expired tokens\n7. Verify password is properly hashed (not stored plain)\n8. Test concurrent login from multiple devices\n9. Security test: Verify tokens are invalidated properly",
+      "title": "Implement JWT authentication system"
+    },
+    {
+      "dependencies": [
+        "3"
+      ],
+      "description": "Build RESTful endpoints for task management including create, read, update, and delete operations with proper authorization ensuring users can only access their own tasks.",
+      "details": "1. Create request/response DTOs in src/models/dto.rs:\n   ```rust\n   #[derive(Debug, Deserialize, Validate)]\n   pub struct CreateTaskRequest {\n       #[validate(length(min = 1, max = 255))]\n       pub title: String,\n       pub description: Option<String>,\n       pub priority: Option<TaskPriority>,\n   }\n\n   #[derive(Debug, Deserialize)]\n   pub struct UpdateTaskRequest {\n       pub title: Option<String>,\n       pub description: Option<String>,\n       pub status: Option<TaskStatus>,\n       pub priority: Option<TaskPriority>,\n   }\n\n   #[derive(Debug, Deserialize)]\n   pub struct TaskQuery {\n       pub status: Option<TaskStatus>,\n       pub priority: Option<TaskPriority>,\n       pub page: Option<u32>,\n       pub per_page: Option<u32>,\n   }\n   ```\n2. Implement task handlers in src/handlers/tasks.rs:\n   ```rust\n   // GET /api/tasks - List user's tasks with optional filtering\n   pub async fn list_tasks(\n       State(pool): State<PgPool>,\n       Extension(user): Extension<User>,\n       Query(params): Query<TaskQuery>,\n   ) -> Result<Json<Vec<Task>>, AppError> {\n       let tasks = sqlx::query_as!(Task,\n           r#\"SELECT id, title, description, status as \"status: TaskStatus\", \n              priority as \"priority: TaskPriority\", created_at, updated_at\n           FROM tasks WHERE user_id = $1\n           ORDER BY created_at DESC\n           LIMIT $2 OFFSET $3\"#,\n           user.id, per_page, offset\n       ).fetch_all(&pool).await?;\n       Ok(Json(tasks))\n   }\n\n   // POST /api/tasks - Create new task\n   // GET /api/tasks/:id - Get single task\n   // PUT /api/tasks/:id - Update task\n   // DELETE /api/tasks/:id - Delete task\n   ```\n3. Add authorization check for task ownership:\n   ```rust\n   async fn verify_task_ownership(pool: &PgPool, task_id: Uuid, user_id: Uuid) -> Result<Task, AppError> {\n       sqlx::query_as!(Task, \"SELECT * FROM tasks WHERE id = $1 AND user_id = $2\", task_id, user_id)\n           .fetch_optional(pool).await?\n           .ok_or(AppError::NotFound(\"Task not found\".into()))\n   }\n   ```\n4. Configure routes with auth middleware:\n   ```rust\n   let task_routes = Router::new()\n       .route(\"/\", get(list_tasks).post(create_task))\n       .route(\"/:id\", get(get_task).put(update_task).delete(delete_task))\n       .layer(middleware::from_fn_with_state(state.clone(), auth_middleware));\n   ```\n5. Implement proper error responses with appropriate HTTP status codes",
+      "id": "4",
+      "priority": "high",
+      "status": "pending",
+      "test_strategy": "1. Test create task with valid data returns 201 Created\n2. Test create task with invalid data returns 400 Bad Request\n3. Test list tasks only returns authenticated user's tasks\n4. Test filtering by status and priority works correctly\n5. Test pagination returns correct page size and offset\n6. Test get task by ID returns correct task\n7. Test get non-existent task returns 404\n8. Test get another user's task returns 404 (not 403)\n9. Test update task changes only provided fields\n10. Test delete task removes task from database\n11. Test all endpoints require authentication (401 without token)",
+      "title": "Implement Task CRUD API endpoints"
+    },
+    {
+      "dependencies": [
+        "4"
+      ],
+      "description": "Implement comprehensive input validation, OpenAPI documentation, structured error handling, and integration tests to ensure API reliability and developer experience.",
+      "details": "1. Add documentation dependencies:\n   - utoipa = { version = \"5\", features = [\"axum_extras\"] }\n   - utoipa-swagger-ui = { version = \"8\", features = [\"axum\"] }\n2. Add OpenAPI documentation to handlers:\n   ```rust\n   #[utoipa::path(\n       post,\n       path = \"/api/tasks\",\n       request_body = CreateTaskRequest,\n       responses(\n           (status = 201, description = \"Task created\", body = Task),\n           (status = 400, description = \"Invalid input\"),\n           (status = 401, description = \"Unauthorized\"),\n       ),\n       security((\"bearer_auth\" = []))\n   )]\n   pub async fn create_task(...) { ... }\n   ```\n3. Implement structured error handling:\n   ```rust\n   #[derive(Debug, thiserror::Error)]\n   pub enum AppError {\n       #[error(\"Not found: {0}\")]\n       NotFound(String),\n       #[error(\"Unauthorized\")]\n       Unauthorized,\n       #[error(\"Validation error: {0}\")]\n       Validation(String),\n       #[error(\"Database error\")]\n       Database(#[from] sqlx::Error),\n   }\n\n   impl IntoResponse for AppError {\n       fn into_response(self) -> Response {\n           let (status, message) = match &self {\n               AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),\n               AppError::Unauthorized => (StatusCode::UNAUTHORIZED, \"Unauthorized\".into()),\n               // ...\n           };\n           (status, Json(json!({ \"error\": message }))).into_response()\n       }\n   }\n   ```\n4. Create integration tests in tests/integration/:\n   ```rust\n   // tests/integration/auth_test.rs\n   #[tokio::test]\n   async fn test_register_and_login() {\n       let app = spawn_app().await;\n       let client = reqwest::Client::new();\n       \n       // Register\n       let res = client.post(&format!(\"{}/api/auth/register\", app.address))\n           .json(&json!({ \"email\": \"test@example.com\", \"password\": \"secure123\" }))\n           .send().await.unwrap();\n       assert_eq!(res.status(), 201);\n       \n       // Login\n       let res = client.post(&format!(\"{}/api/auth/login\", app.address))\n           .json(&json!({ \"email\": \"test@example.com\", \"password\": \"secure123\" }))\n           .send().await.unwrap();\n       assert_eq!(res.status(), 200);\n       let body: Value = res.json().await.unwrap();\n       assert!(body[\"access_token\"].is_string());\n   }\n   ```\n5. Add rate limiting with tower middleware\n6. Configure CORS for frontend integration\n7. Add request logging with tracing",
+      "id": "5",
+      "priority": "medium",
+      "status": "pending",
+      "test_strategy": "1. Verify Swagger UI accessible at /swagger-ui\n2. Verify OpenAPI spec downloadable at /api-doc/openapi.json\n3. Run full integration test suite: `cargo test --test '*'`\n4. Test error responses have consistent JSON structure\n5. Test validation errors return helpful messages\n6. Test rate limiting kicks in after threshold\n7. Verify CORS headers present for allowed origins\n8. Test concurrent requests don't cause race conditions\n9. Load test with 100 concurrent users\n10. Security audit: Test SQL injection prevention\n11. Security audit: Test XSS prevention in responses",
+      "title": "Add API documentation, validation, and integration tests"
+    }
+  ],
+  "theme_coverage": 100.0,
+  "themes_covered": [
+    "docker",
+    "database",
+    "api",
+    "error",
+    "project",
+    "task",
+    "jwt",
+    "test",
+    "auth"
+  ]
+}
