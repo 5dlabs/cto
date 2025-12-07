@@ -962,35 +962,59 @@ impl<'a> CodeResourceManager<'a> {
                     "emptyDir": {}
                 }));
 
-                // Add volume mount to main container for status
+                // Add volume mount and env vars to main container for status sync
                 if let Some(main_container) = containers.first_mut() {
-                    if let Some(mounts) = main_container.get_mut("volumeMounts") {
-                        if let Some(mounts_arr) = mounts.as_array_mut() {
-                            mounts_arr.push(json!({
-                                "name": "linear-status",
-                                "mountPath": "/status"
-                            }));
-                        }
+                    // Ensure volumeMounts array exists and add linear-status mount
+                    let mounts = main_container
+                        .as_object_mut()
+                        .and_then(|obj| {
+                            if !obj.contains_key("volumeMounts") {
+                                obj.insert("volumeMounts".to_string(), json!([]));
+                            }
+                            obj.get_mut("volumeMounts")
+                        })
+                        .and_then(|v| v.as_array_mut());
+
+                    if let Some(mounts_arr) = mounts {
+                        mounts_arr.push(json!({
+                            "name": "linear-status",
+                            "mountPath": "/status"
+                        }));
+                    } else {
+                        warn!("Failed to add linear-status volume mount to main container");
                     }
-                    // Add environment variables to main container
-                    if let Some(env) = main_container.get_mut("env") {
-                        if let Some(env_arr) = env.as_array_mut() {
-                            env_arr.push(json!({
-                                "name": "STATUS_FILE",
-                                "value": "/status/current.json"
-                            }));
-                            // Agent should write logs to file for sidecar to stream
-                            env_arr.push(json!({
-                                "name": "LOG_FILE_PATH",
-                                "value": "/workspace/agent.log"
-                            }));
-                        }
+
+                    // Ensure env array exists and add status/log env vars
+                    let env = main_container
+                        .as_object_mut()
+                        .and_then(|obj| {
+                            if !obj.contains_key("env") {
+                                obj.insert("env".to_string(), json!([]));
+                            }
+                            obj.get_mut("env")
+                        })
+                        .and_then(|v| v.as_array_mut());
+
+                    if let Some(env_arr) = env {
+                        env_arr.push(json!({
+                            "name": "STATUS_FILE",
+                            "value": "/status/current.json"
+                        }));
+                        // Agent should write logs to file for sidecar to stream
+                        env_arr.push(json!({
+                            "name": "LOG_FILE_PATH",
+                            "value": "/workspace/agent.log"
+                        }));
+                    } else {
+                        warn!("Failed to add STATUS_FILE/LOG_FILE_PATH env vars to main container");
                     }
+                } else {
+                    warn!("No main container found to configure for Linear integration");
                 }
 
                 // Build sidecar environment variables
                 let mut sidecar_env = vec![
-                    json!({ "name": "STATUS_FILE", "value": "/workspace/status.json" }),
+                    json!({ "name": "STATUS_FILE", "value": "/status/current.json" }),
                     json!({ "name": "LINEAR_SERVICE_URL", "value": self.config.linear.service_url }),
                     json!({ "name": "STATUS_POLL_INTERVAL_MS", "value": "5000" }),
                     json!({ "name": "LOG_POST_INTERVAL_MS", "value": "5000" }),
