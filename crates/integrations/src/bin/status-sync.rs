@@ -774,9 +774,17 @@ async fn main() -> Result<()> {
     }
 
     // Create Linear API client if token available
-    let linear_client = config.linear_oauth_token.as_ref().map(|token| {
-        LinearApiClient::new(token, &config.linear_api_url)
-            .expect("Failed to create Linear API client")
+    let linear_client = config.linear_oauth_token.as_ref().and_then(|token| {
+        match LinearApiClient::new(token, &config.linear_api_url) {
+            Ok(client) => {
+                info!("Linear API client initialized for sidecar");
+                Some(client)
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to create Linear API client, Linear API features disabled");
+                None
+            }
+        }
     });
 
     // Create channels and shared state

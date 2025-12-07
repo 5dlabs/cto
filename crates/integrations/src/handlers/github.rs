@@ -309,7 +309,7 @@ fn extract_intake_metadata(payload: &PullRequestEvent) -> Option<IntakeMetadata>
     // Look for <!-- intake-metadata: {...} --> or ```json intake-metadata\n...\n```
     if let Some(start) = body.find("<!-- intake-metadata:") {
         if let Some(end) = body[start..].find("-->") {
-            let json_str = &body[start + 21..start + end].trim();
+            let json_str = body[start + 21..start + end].trim();
             if let Ok(metadata) = serde_json::from_str::<IntakeMetadata>(json_str) {
                 return Some(metadata);
             }
