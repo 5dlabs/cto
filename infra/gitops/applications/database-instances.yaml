@@ -1,6 +1,7 @@
 ---
 # Argo CD Application for database instances
-# Deploys PostgreSQL and Redis instances to verify operators are working
+# Deploys PostgreSQL and Valkey instances to verify operators are working
+# Note: Using Valkey (BSD-3 licensed Redis fork) instead of Redis for license compliance
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application

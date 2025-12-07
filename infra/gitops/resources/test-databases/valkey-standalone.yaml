@@ -1,13 +1,15 @@
 ---
-# Test Redis instance using OT-CONTAINER-KIT Redis Operator
-# This is a minimal standalone instance for testing the operator
+# Test Valkey instance using OT-CONTAINER-KIT Redis Operator
+# Valkey is a BSD-3 licensed fork of Redis, fully protocol-compatible
+# Using the Redis Operator CRDs with Valkey images for license compliance
+# Source: https://valkey.io/
 apiVersion: redis.redis.opstreelabs.in/v1beta2
 kind: Redis
 metadata:
-  name: test-redis
+  name: test-valkey
   namespace: databases
   labels:
-    app.kubernetes.io/name: test-redis
+    app.kubernetes.io/name: test-valkey
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: cache
 spec:
@@ -16,9 +18,10 @@ spec:
     runAsUser: 1000
     fsGroup: 1000
 
-  # Kubernetes configuration
+  # Kubernetes configuration - Using Valkey instead of Redis
+  # Valkey 8.0 is fully compatible with Redis 7.x protocol
   kubernetesConfig:
-    image: quay.io/opstree/redis:v7.4.6
+    image: valkey/valkey:8.0-alpine
     imagePullPolicy: IfNotPresent
     resources:
       requests:
@@ -28,7 +31,7 @@ spec:
         cpu: 500m
         memory: 512Mi
 
-  # Redis exporter disabled for basic test
+  # Redis exporter works with Valkey (same metrics endpoint)
   redisExporter:
     enabled: false
     image: quay.io/opstree/redis-exporter:v1.44.0

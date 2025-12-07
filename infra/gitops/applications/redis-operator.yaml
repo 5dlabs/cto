@@ -1,7 +1,11 @@
 ---
 # Argo CD Application for OT-CONTAINER-KIT Redis Operator
-# Manages Redis standalone, cluster, replication, and sentinel modes
+# Manages Redis/Valkey standalone, cluster, replication, and sentinel modes
 # Source: https://github.com/OT-CONTAINER-KIT/redis-operator
+#
+# Note: This operator works with both Redis and Valkey images.
+# We use Valkey (BSD-3 licensed) for license compliance in our distribution.
+# The CRD names remain "Redis" but instances use valkey/valkey images.
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application

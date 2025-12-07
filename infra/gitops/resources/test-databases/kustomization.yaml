@@ -7,5 +7,5 @@ namespace: databases
 resources:
   - namespace.yaml
   - postgres-cluster.yaml
-  - redis-standalone.yaml
+  - valkey-standalone.yaml
 
