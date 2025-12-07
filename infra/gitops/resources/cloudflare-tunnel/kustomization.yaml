@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - cluster-tunnel.yaml
   - webhook-binding.yaml
+  - pm-binding.yaml

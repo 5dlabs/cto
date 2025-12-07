@@ -1,0 +1,42 @@
+---
+# TunnelBinding: PM Service Webhooks (Production)
+# Routes webhook traffic to the PM service for all integrations
+#
+# Traffic flow:
+# pm.5dlabs.ai/webhooks/{linear,github,asana,...}
+#   -> Cloudflare Edge
+#   -> cto-main tunnel
+#   -> pm-svc:8081
+#
+# Supported integration paths:
+#   /webhooks/linear  - Linear OAuth app webhooks
+#   /webhooks/github  - GitHub PR/issue webhooks
+#   /webhooks/asana   - (future) Asana webhooks
+#   /webhooks/jira    - (future) Jira webhooks
+#   /health           - Health check endpoint
+#
+# Note: This binding must be in the same namespace as the target service
+# because the cloudflare-operator looks up the service by name in the
+# TunnelBinding's namespace.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: pm-webhooks
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: pm-webhooks
+    app.kubernetes.io/part-of: platform
+    environment: production
+# Note: TunnelBinding v1alpha1 has tunnelRef and subjects at root level, not under spec
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+subjects:
+  - name: pm-svc
+    spec:
+      # Public hostname for PM webhooks (production)
+      fqdn: pm.5dlabs.ai
+      # Path matching - all paths for webhook handling and health checks
+      # Target service (must include protocol)
+      target: http://pm-svc.cto.svc:8081
+
