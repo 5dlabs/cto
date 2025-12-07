@@ -1021,13 +1021,13 @@ Content";
 
     #[test]
     fn test_strip_frontmatter() {
-        let description = r#"---
+        let description = r"---
 cto:
   cli: cursor
 ---
 ## My PRD
 
-Content here"#;
+Content here";
 
         let stripped = strip_frontmatter(description);
         assert_eq!(stripped, "## My PRD\n\nContent here");
