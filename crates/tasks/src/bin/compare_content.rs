@@ -4,7 +4,8 @@
 #![allow(
     clippy::needless_raw_string_hashes,
     clippy::uninlined_format_args,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    clippy::disallowed_macros
 )]
 
 use cli::CLIType;
