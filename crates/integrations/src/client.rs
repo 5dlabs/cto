@@ -56,7 +56,7 @@ impl LinearClient {
     /// Returns error if headers cannot be constructed
     pub fn new(access_token: &str) -> Result<Self> {
         let mut headers = HeaderMap::new();
-        
+
         // Linear API keys (lin_api_*) should NOT use Bearer prefix
         // OAuth tokens should use Bearer prefix
         let auth_value = if access_token.starts_with("lin_api_") {
@@ -64,7 +64,7 @@ impl LinearClient {
         } else {
             format!("Bearer {access_token}")
         };
-        
+
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&auth_value).context("Invalid access token")?,
@@ -705,7 +705,13 @@ impl LinearClient {
         ";
 
         let response: Response = self
-            .execute(MUTATION, Variables { id: issue_id, label_ids })
+            .execute(
+                MUTATION,
+                Variables {
+                    id: issue_id,
+                    label_ids,
+                },
+            )
             .await?;
 
         if !response.issue_update.success {
@@ -724,12 +730,12 @@ impl LinearClient {
         // First get existing labels
         let issue = self.get_issue(issue_id).await?;
         let mut label_ids: Vec<String> = issue.labels.iter().map(|l| l.id.clone()).collect();
-        
+
         // Add new label if not already present
         if !label_ids.contains(&label_id.to_string()) {
             label_ids.push(label_id.to_string());
         }
-        
+
         self.set_issue_labels(issue_id, &label_ids).await
     }
 
@@ -744,12 +750,12 @@ impl LinearClient {
             .filter(|l| l.id != label_id)
             .map(|l| l.id.clone())
             .collect();
-        
+
         self.set_issue_labels(issue_id, &label_ids).await
     }
 
     /// Update agent status label on an issue
-    /// 
+    ///
     /// This removes any existing agent:* labels and adds the new one.
     /// Status labels: agent:pending, agent:working, agent:blocked, agent:pr-created, agent:complete, agent:error
     #[instrument(skip(self), fields(issue_id = %issue_id, team_id = %team_id, status = %status))]
@@ -761,7 +767,7 @@ impl LinearClient {
     ) -> Result<Issue> {
         // Get the issue to check existing labels
         let issue = self.get_issue(issue_id).await?;
-        
+
         // Filter out existing agent:* labels and collect IDs
         let mut label_ids: Vec<String> = issue
             .labels
@@ -769,12 +775,12 @@ impl LinearClient {
             .filter(|l| !l.name.starts_with("agent:"))
             .map(|l| l.id.clone())
             .collect();
-        
+
         // Get or create the new status label
         let label_name = status.to_label_name();
         let new_label = self.get_or_create_label(team_id, label_name).await?;
         label_ids.push(new_label.id);
-        
+
         self.set_issue_labels(issue_id, &label_ids).await
     }
 
@@ -1130,7 +1136,9 @@ impl LinearClient {
             input: AgentSessionUpdateInput::with_plan(plan),
         };
 
-        let response: Response = self.execute(AGENT_SESSION_UPDATE_MUTATION, variables).await?;
+        let response: Response = self
+            .execute(AGENT_SESSION_UPDATE_MUTATION, variables)
+            .await?;
         Ok(response.agent_session_update.success)
     }
 
@@ -1168,7 +1176,9 @@ impl LinearClient {
             input: AgentSessionUpdateInput::with_external_url(url),
         };
 
-        let response: Response = self.execute(AGENT_SESSION_UPDATE_MUTATION, variables).await?;
+        let response: Response = self
+            .execute(AGENT_SESSION_UPDATE_MUTATION, variables)
+            .await?;
         Ok(response.agent_session_update.success)
     }
 

@@ -409,11 +409,7 @@ pub async fn submit_intake_workflow(
         .unwrap_or_else(|| "main".to_string());
 
     // Apply CTO config overrides from labels/frontmatter
-    let cli = request
-        .cto_config
-        .cli
-        .as_deref()
-        .unwrap_or(&config.cli);
+    let cli = request.cto_config.cli.as_deref().unwrap_or(&config.cli);
     let primary_model = request
         .cto_config
         .model
@@ -607,7 +603,7 @@ pub async fn create_task_issues_with_project(
     let cto_task_label = client
         .get_or_create_label(&request.team_id, "cto-task")
         .await?;
-    
+
     // Get or create agent:pending label for new tasks
     let agent_pending_label = client
         .get_or_create_label(&request.team_id, "agent:pending")

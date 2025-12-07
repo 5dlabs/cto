@@ -317,7 +317,7 @@ pub async fn handle_play_complete(
     };
 
     let success = payload.workflow_status == "Succeeded";
-    
+
     // Determine the final agent status
     let agent_status = if success {
         AgentStatus::PrCreated // PR created, awaiting review
@@ -362,7 +362,10 @@ pub async fn handle_play_complete(
         }
 
         // Update issue state to "In Review"
-        if let Ok(states) = client.get_team_workflow_states(&payload.linear_team_id).await {
+        if let Ok(states) = client
+            .get_team_workflow_states(&payload.linear_team_id)
+            .await
+        {
             // Look for "In Review" state first
             let target_state = states
                 .iter()
@@ -481,7 +484,10 @@ pub async fn handle_status_sync(
     };
 
     // Update issue state if we can map it
-    if let Ok(states) = client.get_team_workflow_states(&payload.linear_team_id).await {
+    if let Ok(states) = client
+        .get_team_workflow_states(&payload.linear_team_id)
+        .await
+    {
         // Find appropriate state based on status
         let target_state = match payload.status.status.as_str() {
             "review" => states.iter().find(|s| s.name == "In Review"),
@@ -561,7 +567,9 @@ pub async fn handle_status_sync(
         } else {
             "## Task Implementation Complete\n\n**Status:** ✅ Complete".to_string()
         };
-        client.emit_response(&payload.linear_session_id, &response).await
+        client
+            .emit_response(&payload.linear_session_id, &response)
+            .await
     } else {
         client
             .emit_thought(&payload.linear_session_id, activity_message)

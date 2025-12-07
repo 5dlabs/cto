@@ -2917,7 +2917,9 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("📦 Using provided repository: {repo}");
         // Validate format (should be org/repo)
         if !repo.contains('/') || repo.starts_with("https://") {
-            return Err(anyhow!("Repository must be in org/repo format (e.g., '5dlabs/agent-sandbox')"));
+            return Err(anyhow!(
+                "Repository must be in org/repo format (e.g., '5dlabs/agent-sandbox')"
+            ));
         }
         repo.to_string()
     } else {

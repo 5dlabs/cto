@@ -126,9 +126,9 @@ async fn trigger_intake(
     );
 
     // Generate session ID if not provided
-    let session_id = request.session_id.unwrap_or_else(|| {
-        format!("manual-intake-{}", chrono::Utc::now().timestamp())
-    });
+    let session_id = request
+        .session_id
+        .unwrap_or_else(|| format!("manual-intake-{}", chrono::Utc::now().timestamp()));
 
     // Extract intake request
     let intake_request = match extract_intake_request(&session_id, &issue) {
@@ -306,10 +306,7 @@ async fn handle_session_created(
     })?;
 
     // Get current state name for workflow detection
-    let state_name = issue
-        .state
-        .as_ref()
-        .map_or("unknown", |s| s.name.as_str());
+    let state_name = issue.state.as_ref().map_or("unknown", |s| s.name.as_str());
 
     info!(
         session_id = %session_id,
@@ -558,8 +555,12 @@ async fn handle_session_prompted(
 
         // First, try to send stop signal to running agents
         let stop_msg = AgentMessage::stop("User requested cancellation via Linear");
-        if let Ok(agents) =
-            crate::handlers::agent_comms::find_running_agents(&state.kube_client, &state.config.namespace, session_id).await
+        if let Ok(agents) = crate::handlers::agent_comms::find_running_agents(
+            &state.kube_client,
+            &state.config.namespace,
+            session_id,
+        )
+        .await
         {
             for agent in &agents {
                 let _ = crate::handlers::agent_comms::send_message_to_agent(agent, &stop_msg).await;

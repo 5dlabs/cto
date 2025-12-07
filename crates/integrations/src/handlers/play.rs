@@ -129,11 +129,7 @@ pub async fn submit_play_workflow(
     let workflow_name = format!("play-linear-{task_id}-{timestamp}");
 
     // Apply CTO config overrides from labels/frontmatter
-    let model = request
-        .cto_config
-        .model
-        .as_deref()
-        .unwrap_or(&config.model);
+    let model = request.cto_config.model.as_deref().unwrap_or(&config.model);
 
     if !request.cto_config.is_empty() {
         info!(

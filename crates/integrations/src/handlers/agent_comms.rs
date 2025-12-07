@@ -378,4 +378,3 @@ mod tests {
         assert!(json.contains("User requested cancellation"));
     }
 }
-

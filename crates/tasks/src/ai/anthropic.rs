@@ -108,13 +108,19 @@ enum StreamEvent {
     #[serde(rename = "message_start")]
     MessageStart { message: StreamMessage },
     #[serde(rename = "content_block_start")]
-    ContentBlockStart { index: usize, content_block: ContentBlock },
+    ContentBlockStart {
+        index: usize,
+        content_block: ContentBlock,
+    },
     #[serde(rename = "content_block_delta")]
     ContentBlockDelta { index: usize, delta: ContentDelta },
     #[serde(rename = "content_block_stop")]
     ContentBlockStop { index: usize },
     #[serde(rename = "message_delta")]
-    MessageDelta { delta: MessageDeltaContent, usage: Option<StreamUsage> },
+    MessageDelta {
+        delta: MessageDeltaContent,
+        usage: Option<StreamUsage>,
+    },
     #[serde(rename = "message_stop")]
     MessageStop,
     #[serde(rename = "ping")]
@@ -283,13 +289,13 @@ impl AIProvider for AnthropicProvider {
             .map_err(|e| TasksError::Ai(format!("Anthropic API request failed: {}", e)))?;
 
         let status = response.status();
-        
+
         if !status.is_success() {
             let body = response
                 .text()
                 .await
                 .map_err(|e| TasksError::Ai(format!("Failed to read response: {}", e)))?;
-            
+
             if let Ok(error_response) = serde_json::from_str::<AnthropicErrorResponse>(&body) {
                 return Err(TasksError::Ai(format!(
                     "Anthropic API error: {} - {}",
@@ -314,9 +320,9 @@ impl AIProvider for AnthropicProvider {
         let mut buffer = String::new();
 
         while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result
-                .map_err(|e| TasksError::Ai(format!("Stream read error: {}", e)))?;
-            
+            let chunk =
+                chunk_result.map_err(|e| TasksError::Ai(format!("Stream read error: {}", e)))?;
+
             let chunk_str = String::from_utf8_lossy(&chunk);
             buffer.push_str(&chunk_str);
 
@@ -343,7 +349,7 @@ impl AIProvider for AnthropicProvider {
                                     if delta.delta_type == "text_delta" {
                                         full_text.push_str(&delta.text);
                                         char_count += delta.text.len();
-                                        
+
                                         // Log progress every 500 chars
                                         if char_count - last_progress >= 500 {
                                             tracing::trace!("Generated {} chars...", char_count);
@@ -355,7 +361,11 @@ impl AIProvider for AnthropicProvider {
                                     output_tokens = u.output_tokens;
                                 }
                                 StreamEvent::MessageStop => {
-                                    tracing::debug!("Output tokens: {}, chars: {}", output_tokens, char_count);
+                                    tracing::debug!(
+                                        "Output tokens: {}, chars: {}",
+                                        output_tokens,
+                                        char_count
+                                    );
                                 }
                                 StreamEvent::Error { error } => {
                                     return Err(TasksError::Ai(format!(

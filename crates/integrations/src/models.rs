@@ -402,7 +402,7 @@ impl TaskStatus {
 }
 
 /// Agent status labels for Linear issues
-/// 
+///
 /// These labels indicate the current state of agent processing on an issue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -445,12 +445,12 @@ impl AgentStatus {
     #[must_use]
     pub const fn to_color(&self) -> &'static str {
         match self {
-            Self::Pending => "#9CA3AF",    // Gray
-            Self::Working => "#3B82F6",    // Blue
-            Self::Blocked => "#F59E0B",    // Amber
-            Self::PrCreated => "#8B5CF6",  // Purple
-            Self::Complete => "#10B981",   // Green
-            Self::Error => "#EF4444",      // Red
+            Self::Pending => "#9CA3AF",   // Gray
+            Self::Working => "#3B82F6",   // Blue
+            Self::Blocked => "#F59E0B",   // Amber
+            Self::PrCreated => "#8B5CF6", // Purple
+            Self::Complete => "#10B981",  // Green
+            Self::Error => "#EF4444",     // Red
         }
     }
 

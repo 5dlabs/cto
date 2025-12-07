@@ -450,7 +450,7 @@ pub async fn create_issues_from_tasks(
     tasks: &[TaskFromJson],
 ) -> anyhow::Result<Vec<(u32, String)>> {
     use std::fmt::Write;
-    
+
     let mut created_issues = Vec::new();
 
     for task in tasks {
@@ -515,4 +515,3 @@ pub async fn create_issues_from_tasks(
 
     Ok(created_issues)
 }
-

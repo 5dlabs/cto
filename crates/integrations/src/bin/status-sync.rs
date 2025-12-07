@@ -69,7 +69,9 @@ impl Config {
             linear_session_id: std::env::var("LINEAR_SESSION_ID").unwrap_or_default(),
             linear_issue_id: std::env::var("LINEAR_ISSUE_ID").unwrap_or_default(),
             linear_team_id: std::env::var("LINEAR_TEAM_ID").unwrap_or_default(),
-            linear_oauth_token: std::env::var("LINEAR_OAUTH_TOKEN").ok().filter(|s| !s.is_empty()),
+            linear_oauth_token: std::env::var("LINEAR_OAUTH_TOKEN")
+                .ok()
+                .filter(|s| !s.is_empty()),
             workflow_name: std::env::var("WORKFLOW_NAME").unwrap_or_else(|_| "unknown".to_string()),
 
             status_file: std::env::var("STATUS_FILE")
@@ -238,10 +240,7 @@ impl LinearApiClient {
     /// # Errors
     ///
     /// Returns an error if the GraphQL request fails or the response is invalid.
-    pub async fn get_session_activities(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<SessionActivity>> {
+    pub async fn get_session_activities(&self, session_id: &str) -> Result<Vec<SessionActivity>> {
         #[derive(Serialize)]
         struct Variables<'a> {
             id: &'a str,
@@ -706,7 +705,10 @@ async fn handle_input(
                 (StatusCode::INTERNAL_SERVER_ERROR, "FIFO channel closed")
             }
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "JSON serialization failed"),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "JSON serialization failed",
+        ),
     }
 }
 

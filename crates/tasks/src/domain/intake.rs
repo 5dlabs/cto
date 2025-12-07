@@ -147,7 +147,10 @@ impl IntakeDomain {
         };
 
         // 3. Parse PRD to generate tasks
-        tracing::info!("Step 1/4: Parsing PRD to generate ~{} tasks...", config.num_tasks);
+        tracing::info!(
+            "Step 1/4: Parsing PRD to generate ~{} tasks...",
+            config.num_tasks
+        );
         let (mut tasks, prd_usage) = self
             .ai_domain
             .parse_prd(
@@ -190,12 +193,16 @@ impl IntakeDomain {
         // 5. Expand tasks into subtasks if requested
         let mut subtasks_count = 0;
         if config.expand {
-            let tasks_to_expand: Vec<_> = tasks.iter()
+            let tasks_to_expand: Vec<_> = tasks
+                .iter()
                 .filter(|t| t.status != TaskStatus::Done && t.subtasks.is_empty())
                 .map(|t| t.id.clone())
                 .collect();
-            
-            tracing::info!("Step 3/4: Expanding {} tasks into subtasks...", tasks_to_expand.len());
+
+            tracing::info!(
+                "Step 3/4: Expanding {} tasks into subtasks...",
+                tasks_to_expand.len()
+            );
 
             for (idx, task) in tasks.iter_mut().enumerate() {
                 // Skip done tasks
@@ -208,8 +215,13 @@ impl IntakeDomain {
                     continue;
                 }
 
-                tracing::debug!("Expanding task {}/{}: {}", idx + 1, tasks_to_expand.len(), task.id);
-                
+                tracing::debug!(
+                    "Expanding task {}/{}: {}",
+                    idx + 1,
+                    tasks_to_expand.len(),
+                    task.id
+                );
+
                 match self
                     .ai_domain
                     .expand_task(
@@ -287,7 +299,10 @@ impl IntakeDomain {
         let docs_dir = config.output_dir.join("docs");
         let docs_result = generate_all_docs(&tasks, &docs_dir).await?;
 
-        tracing::info!("Created {} task documentation directories", docs_result.task_dirs_created);
+        tracing::info!(
+            "Created {} task documentation directories",
+            docs_result.task_dirs_created
+        );
         tracing::info!(
             "Intake complete: {} tasks, {} subtasks, {} doc dirs",
             tasks.len(),
