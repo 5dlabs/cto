@@ -37,7 +37,5 @@ subjects:
       # Public hostname for PM webhooks (production)
       fqdn: pm.5dlabs.ai
       # Path matching - all paths for webhook handling and health checks
-      path: /*
       # Target service (must include protocol)
       target: http://pm-svc.cto.svc:8081
-
