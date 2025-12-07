@@ -19,16 +19,19 @@ NAMESPACE=${NAMESPACE:-cto}
 VALUES_FILE_DEFAULT="$CHART_DIR/values.yaml"
 VALUES_FILE=${VALUES_FILE:-$VALUES_FILE_DEFAULT}
 
-# Split ConfigMap template names
+# Split ConfigMap template names (auto-detect from generated files)
 CONFIGMAP_TEMPLATES=(
   "templates-shared.yaml"
-  "templates-claude-code.yaml"
-  "templates-claude-docs.yaml"
+  "templates-claude.yaml"
   "templates-codex.yaml"
   "templates-cursor.yaml"
+  "templates-dexter.yaml"
   "templates-factory.yaml"
-  "templates-opencode.yaml"
+  "templates-gemini.yaml"
+  "templates-healer.yaml"
+  "templates-intake.yaml"
   "templates-integration.yaml"
+  "templates-opencode.yaml"
 )
 
 # Split optional extra Helm args after "--"
