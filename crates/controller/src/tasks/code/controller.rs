@@ -44,7 +44,7 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
     debug!("API clients created successfully");
 
     // Handle finalizers for cleanup
-    let result = finalizer(
+    let result = Box::pin(finalizer(
         &coderuns,
         CODE_FINALIZER_NAME,
         code_run.clone(),
@@ -54,7 +54,7 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
                 FinalizerEvent::Cleanup(cr) => cleanup_code_resources(cr, &ctx).await,
             }
         },
-    )
+    ))
     .await
     .map_err(|e| match e {
         kube::runtime::finalizer::Error::ApplyFailed(err)

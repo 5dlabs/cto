@@ -1766,12 +1766,14 @@ impl CodeTemplateGenerator {
             .unwrap_or_default()
     }
 
+    #[allow(clippy::unnecessary_wraps)] // Keeping Result for consistency with other config generators
     fn generate_codex_config(
         code_run: &CodeRun,
         cli_config: &Value,
         _client_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
+        use std::fmt::Write;
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         // Generate TOML directly (no template needed)
@@ -1782,41 +1784,45 @@ impl CodeTemplateGenerator {
              # Model configuration\n",
         );
 
-        toml.push_str(&format!("model = \"{}\"\n", render_settings.model));
+        let _ = writeln!(toml, "model = \"{}\"", render_settings.model);
 
         if let Some(temp) = render_settings.temperature {
-            toml.push_str(&format!("temperature = {temp}\n"));
+            let _ = writeln!(toml, "temperature = {temp}");
         }
         if let Some(max_tokens) = render_settings.max_output_tokens {
-            toml.push_str(&format!("model_max_output_tokens = {max_tokens}\n"));
+            let _ = writeln!(toml, "model_max_output_tokens = {max_tokens}");
         }
         if let Some(ref effort) = render_settings.reasoning_effort {
-            toml.push_str(&format!("model_reasoning_effort = \"{effort}\"\n"));
+            let _ = writeln!(toml, "model_reasoning_effort = \"{effort}\"");
         }
 
         // Automation settings
         toml.push_str("\n# Automation settings\n");
-        toml.push_str(&format!(
+        let _ = write!(
+            toml,
             "# approval_policy: untrusted | on-failure | on-request | never\n\
              approval_policy = \"{}\"\n",
             render_settings.approval_policy
-        ));
-        toml.push_str(&format!(
+        );
+        let _ = write!(
+            toml,
             "\n# sandbox_mode: read-only | workspace-write | danger-full-access\n\
              sandbox_mode = \"{}\"\n",
             render_settings.sandbox_mode
-        ));
-        toml.push_str(&format!(
+        );
+        let _ = write!(
+            toml,
             "\n# Project documentation limits\n\
              project_doc_max_bytes = {}\n",
             render_settings.project_doc_max_bytes
-        ));
+        );
 
         // Tools MCP server
         if !remote_tools.is_empty() && !render_settings.tools_url.is_empty() {
             let tools_list: Vec<String> =
                 remote_tools.iter().map(|t| format!("  \"{t}\"")).collect();
-            toml.push_str(&format!(
+            let _ = write!(
+                toml,
                 "\n# Tools MCP server for remote tools\n\
                  [mcp_servers.tools]\n\
                  command = \"tools\"\n\
@@ -1829,7 +1835,7 @@ impl CodeTemplateGenerator {
                 render_settings.tools_url,
                 render_settings.tools_url,
                 tools_list.join(",\n")
-            ));
+            );
         }
 
         // Model provider (only add if it's a non-empty object)
@@ -1852,30 +1858,31 @@ impl CodeTemplateGenerator {
                     .and_then(Value::as_str)
                     .unwrap_or("chat");
 
-                toml.push_str(&format!(
+                let _ = write!(
+                    toml,
                     "\n[model_providers.openai]\n\
                      name = \"{name}\"\n\
                      base_url = \"{base_url}\"\n\
                      env_key = \"{env_key}\"\n\
                      wire_api = \"{wire_api}\"\n"
-                ));
+                );
 
                 if let Some(max_retries) =
                     provider.get("request_max_retries").and_then(Value::as_u64)
                 {
-                    toml.push_str(&format!("request_max_retries = {max_retries}\n"));
+                    let _ = writeln!(toml, "request_max_retries = {max_retries}");
                 }
                 if let Some(max_retries) =
                     provider.get("stream_max_retries").and_then(Value::as_u64)
                 {
-                    toml.push_str(&format!("stream_max_retries = {max_retries}\n"));
+                    let _ = writeln!(toml, "stream_max_retries = {max_retries}");
                 }
             }
         }
 
         // Raw additional TOML
         if let Some(ref raw_toml) = render_settings.raw_additional_toml {
-            toml.push_str(&format!("\n{raw_toml}\n"));
+            let _ = write!(toml, "\n{raw_toml}\n");
         }
 
         Ok(toml)

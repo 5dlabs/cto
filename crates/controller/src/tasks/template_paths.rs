@@ -67,11 +67,13 @@ pub const AGENT_TOOLS_TEMPLATE: &str = "agents/{agent}/tools.hbs";
 
 /// Get container template path for an agent/job combination
 /// Falls back to shared container if agent-specific doesn't exist
+#[must_use]
 pub fn agent_container_template(agent: &str, job: &str) -> String {
     format!("{agent}/{job}/container.sh.hbs")
 }
 
 /// Get system prompt path for an agent/job combination
+#[must_use]
 pub fn agent_system_prompt(agent: &str, job: &str) -> String {
     format!("{agent}/{job}/system-prompt.md.hbs")
 }

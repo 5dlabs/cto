@@ -102,6 +102,7 @@ impl GeminiAdapter {
             })
     }
 
+    #[allow(clippy::unused_self)] // Required by trait signature
     fn render_config(&self, context: &Value) -> AdapterResult<String> {
         // Serialize configuration directly (no template needed)
         serde_json::to_string_pretty(context).map_err(|err| {
