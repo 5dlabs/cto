@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="14" priority="high" agent="rex">
+    <meta>
+        <title>Add comprehensive logging and tracing</title>
+        <priority>high</priority>
+        <dependencies>1</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 14 with production-quality code.</role>
+
+    <context>
+        <overview>Implement structured JSON logging with trace IDs for request correlation and debugging</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add tracing and tracing-subscriber dependencies
+2. Configure structured JSON logging with timestamp, level, trace_id, span_id
+3. Add request tracing middleware to generate trace IDs
+4. Implement database query logging with execution times
+5. Add error logging with context and stack traces
+6. Create log correlation across service boundaries</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-14): Add comprehensive logging and tracing</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify JSON log format, test trace ID propagation, validate error logging includes sufficient context</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

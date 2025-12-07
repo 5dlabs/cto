@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="12" priority="medium" agent="rex">
+    <meta>
+        <title>Set up WebSocket endpoint for real-time updates</title>
+        <priority>medium</priority>
+        <dependencies>10</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 12 with production-quality code.</role>
+
+    <context>
+        <overview>Implement WebSocket connection handling for live task updates and team notifications</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add axum WebSocket support and connection upgrade handling
+2. Create WebSocket connection manager to track user sessions by team
+3. Implement authentication for WebSocket connections using JWT
+4. Create message broadcasting system for task updates within teams
+5. Handle connection lifecycle (connect, disconnect, heartbeat)
+6. Add connection limit enforcement (1000 concurrent)</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-12): Set up WebSocket endpoint for real-time updates</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test WebSocket connection establishment, verify authentication, validate message broadcasting and connection limits</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

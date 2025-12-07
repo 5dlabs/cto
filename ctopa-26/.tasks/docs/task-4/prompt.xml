@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="4" priority="high" agent="cipher">
+    <meta>
+        <title>Implement JWT authentication system</title>
+        <priority>high</priority>
+        <dependencies>2, 3</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 4 with production-quality code.</role>
+
+    <context>
+        <overview>Create JWT-based authentication with access and refresh tokens, including token validation middleware</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Add jsonwebtoken and bcrypt dependencies
+2. Create JWT service with token generation/validation functions
+3. Implement auth middleware to extract and validate JWT from Authorization header
+4. Create refresh token rotation mechanism using Redis
+5. Add password hashing utilities with bcrypt
+6. Implement login/logout endpoints with proper token management</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-4): Implement JWT authentication system</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test token generation/validation, verify middleware blocks unauthorized requests, validate refresh token flow</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="17" priority="medium" agent="blaze">
+    <meta>
+        <title>Initialize React dashboard project</title>
+        <priority>medium</priority>
+        <dependencies></dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 17 with production-quality code.</role>
+
+    <context>
+        <overview>Set up React 18 project with TypeScript, Tailwind CSS, and essential dependencies for the team dashboard</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create React 18 project with TypeScript template
+2. Install and configure Tailwind CSS for styling
+3. Add dependencies: react-query, react-router-dom, axios, @dnd-kit/core
+4. Set up project structure: components, pages, hooks, services, types
+5. Configure environment variables for API base URL
+6. Add dark/light theme context and toggle functionality</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-17): Initialize React dashboard project</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Verify project builds and runs, test theme switching, validate TypeScript compilation</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

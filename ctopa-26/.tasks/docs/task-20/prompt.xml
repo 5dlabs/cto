@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="20" priority="high" agent="bolt">
+    <meta>
+        <title>Create Docker and Kubernetes deployment configuration</title>
+        <priority>high</priority>
+        <dependencies>16</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 20 with production-quality code.</role>
+
+    <context>
+        <overview>Build production-ready deployment configuration with multi-stage Docker builds and Kubernetes manifests</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create multi-stage Dockerfile for Rust API (build + runtime stages)
+2. Create Dockerfile for React dashboard with nginx serving
+3. Write Kubernetes manifests: Deployment, Service, ConfigMap, Secret
+4. Configure Horizontal Pod Autoscaler (HPA) for API scaling
+5. Add ingress configuration for external access
+6. Create docker-compose.yml for local development with PostgreSQL and Redis</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-20): Create Docker and Kubernetes deployment configuration</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test Docker builds locally, verify Kubernetes deployment, validate HPA scaling behavior and health checks</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="8" priority="high" agent="rex">
+    <meta>
+        <title>Build team management API endpoints</title>
+        <priority>high</priority>
+        <dependencies>7</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 8 with production-quality code.</role>
+
+    <context>
+        <overview>Implement CRUD operations for teams including creation, updates, and member management</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. POST /api/teams - Create team with owner assignment
+2. GET /api/teams/:id - Fetch team details with member count and role checking
+3. PATCH /api/teams/:id - Update team name/description (admin+ only)
+4. DELETE /api/teams/:id - Soft delete team (owner only)
+5. GET /api/teams/:id/members - List team members with roles
+6. DELETE /api/teams/:id/members/:user_id - Remove member (admin+ only)</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-8): Build team management API endpoints</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test all CRUD operations, verify role-based access, validate member count calculations and soft deletion</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

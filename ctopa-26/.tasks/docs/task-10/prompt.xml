@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="10" priority="high" agent="rex">
+    <meta>
+        <title>Build task management API endpoints</title>
+        <priority>high</priority>
+        <dependencies>8</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 10 with production-quality code.</role>
+
+    <context>
+        <overview>Implement CRUD operations for tasks with filtering, assignment, and status management</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. POST /api/teams/:id/tasks - Create task with validation
+2. GET /api/teams/:id/tasks - List tasks with filtering (status, assignee, due_date range)
+3. GET /api/teams/:id/tasks/:task_id - Get single task details
+4. PATCH /api/teams/:id/tasks/:task_id - Update task (assignee can update status/description)
+5. DELETE /api/teams/:id/tasks/:task_id - Soft delete with 30-day retention
+6. Add query parameters for pagination and sorting</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-10): Build task management API endpoints</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Test all CRUD operations, verify filtering and pagination, validate soft deletion and permission enforcement</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>
