@@ -2,7 +2,7 @@
 //!
 //! This sidecar runs alongside agent pods and provides:
 //! - Status file monitoring and sync to Linear service
-//! - Log file streaming to Linear agent dialog (emit_thought)
+//! - Log file streaming to Linear agent dialog (`emit_thought`)
 //! - Input polling from Linear and forwarding to agent FIFO
 //! - HTTP server for local input injection
 
@@ -63,6 +63,7 @@ pub struct Config {
 
 impl Config {
     /// Load configuration from environment variables.
+    #[must_use]
     pub fn from_env() -> Self {
         Self {
             linear_session_id: std::env::var("LINEAR_SESSION_ID").unwrap_or_default(),
@@ -104,11 +105,13 @@ impl Config {
     }
 
     /// Check if Linear session is configured.
+    #[must_use]
     pub fn has_linear_session(&self) -> bool {
         !self.linear_session_id.is_empty()
     }
 
     /// Check if direct Linear API access is available.
+    #[must_use]
     pub fn has_linear_api(&self) -> bool {
         self.linear_oauth_token.is_some() && self.has_linear_session()
     }
@@ -127,6 +130,10 @@ pub struct LinearApiClient {
 
 impl LinearApiClient {
     /// Create a new Linear API client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client fails to build or the access token is invalid.
     pub fn new(access_token: &str, api_url: &str) -> Result<Self> {
         let mut headers = HeaderMap::new();
 
@@ -156,6 +163,10 @@ impl LinearApiClient {
     }
 
     /// Emit a thought to the Linear agent session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_thought(&self, session_id: &str, body: &str) -> Result<()> {
         #[derive(Serialize)]
         struct Variables<'a> {
@@ -185,13 +196,13 @@ impl LinearApiClient {
             variables: Variables<'a>,
         }
 
-        const MUTATION: &str = r#"
+        const MUTATION: &str = r"
             mutation EmitActivity($input: AgentActivityCreateInput!) {
                 agentActivityCreate(input: $input) {
                     success
                 }
             }
-        "#;
+        ";
 
         let request = Request {
             query: MUTATION,
@@ -223,6 +234,10 @@ impl LinearApiClient {
     }
 
     /// Get agent session activities (for polling user input).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails or the response is invalid.
     pub async fn get_session_activities(
         &self,
         session_id: &str,
@@ -259,7 +274,7 @@ impl LinearApiClient {
             nodes: Vec<SessionActivity>,
         }
 
-        const QUERY: &str = r#"
+        const QUERY: &str = r"
             query GetSessionActivities($id: String!) {
                 agentSession(id: $id) {
                     activities(first: 50, orderBy: createdAt) {
@@ -271,7 +286,7 @@ impl LinearApiClient {
                     }
                 }
             }
-        "#;
+        ";
 
         let request = Request {
             query: QUERY,
@@ -310,11 +325,13 @@ pub struct SessionActivity {
 
 impl SessionActivity {
     /// Check if this is a user message.
+    #[must_use]
     pub fn is_user_message(&self) -> bool {
         self.content.get("userMessage").is_some()
     }
 
     /// Get the user message body if this is a user message.
+    #[must_use]
     pub fn user_message_body(&self) -> Option<&str> {
         self.content
             .get("userMessage")
@@ -808,29 +825,44 @@ async fn main() -> Result<()> {
 
     // Wait for shutdown signal or any task to complete
     tokio::select! {
-        _ = tokio::signal::ctrl_c() => {
+        () = async { tokio::signal::ctrl_c().await.ok(); } => {
             info!("Received SIGINT, shutting down");
         }
-        _ = async {
+        () = async {
             while !shutdown.load(Ordering::SeqCst) {
                 sleep(Duration::from_millis(100)).await;
             }
         } => {
             info!("Shutdown flag set, shutting down");
         }
-        _ = status_handle => {
+        result = status_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Status sync task panicked");
+            }
             warn!("Status sync task exited");
         }
-        _ = log_handle => {
+        result = log_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Log stream task panicked");
+            }
             warn!("Log stream task exited");
         }
-        _ = input_handle => {
+        result = input_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Input poll task panicked");
+            }
             warn!("Input poll task exited");
         }
-        _ = fifo_handle => {
+        result = fifo_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "FIFO writer task panicked");
+            }
             warn!("FIFO writer task exited");
         }
-        _ = http_handle => {
+        result = http_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "HTTP server panicked");
+            }
             warn!("HTTP server exited");
         }
     }

@@ -942,14 +942,14 @@ mod tests {
 
     #[test]
     fn test_parse_cto_frontmatter_valid() {
-        let description = r#"---
+        let description = r"---
 cto:
   cli: cursor
   model: claude-opus-4-20250514
 ---
 ## PRD: My Feature
 
-This is the actual content."#;
+This is the actual content.";
 
         let config = parse_cto_frontmatter(description).unwrap();
         assert_eq!(config.cli, Some("cursor".to_string()));
@@ -958,11 +958,11 @@ This is the actual content."#;
 
     #[test]
     fn test_parse_cto_frontmatter_cli_only() {
-        let description = r#"---
+        let description = r"---
 cto:
   cli: codex
 ---
-Content here"#;
+Content here";
 
         let config = parse_cto_frontmatter(description).unwrap();
         assert_eq!(config.cli, Some("codex".to_string()));
@@ -971,11 +971,11 @@ Content here"#;
 
     #[test]
     fn test_parse_cto_frontmatter_model_only() {
-        let description = r#"---
+        let description = r"---
 cto:
   model: gpt-4.1
 ---
-Content here"#;
+Content here";
 
         let config = parse_cto_frontmatter(description).unwrap();
         assert_eq!(config.cli, None);
@@ -990,31 +990,31 @@ Content here"#;
 
     #[test]
     fn test_parse_cto_frontmatter_no_cto_section() {
-        let description = r#"---
+        let description = r"---
 title: My PRD
 author: Someone
 ---
-Content here"#;
+Content here";
 
         assert!(parse_cto_frontmatter(description).is_none());
     }
 
     #[test]
     fn test_parse_cto_frontmatter_empty_cto() {
-        let description = r#"---
+        let description = r"---
 cto:
 ---
-Content here"#;
+Content here";
 
         assert!(parse_cto_frontmatter(description).is_none());
     }
 
     #[test]
     fn test_parse_cto_frontmatter_invalid_yaml() {
-        let description = r#"---
+        let description = r"---
 cto: [invalid yaml here
 ---
-Content"#;
+Content";
 
         assert!(parse_cto_frontmatter(description).is_none());
     }

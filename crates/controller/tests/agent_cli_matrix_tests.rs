@@ -574,6 +574,7 @@ fn create_code_run_with_scenario(agent: &AgentDef, cli_type: CLIType) -> CodeRun
             enable_docker: false,
             task_requirements: Some(agent.scenario.task_prompt.to_string()),
             service_account_name: None,
+            linear_integration: None,
         },
         status: None,
     }
@@ -622,6 +623,7 @@ fn create_test_code_run(github_app: &str, cli_type: CLIType) -> CodeRun {
             enable_docker: false,
             task_requirements: None,
             service_account_name: None,
+            linear_integration: None,
         },
         status: None,
     }

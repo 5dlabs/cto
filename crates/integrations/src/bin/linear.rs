@@ -35,8 +35,8 @@ async fn main() -> Result<()> {
     info!(namespace = %config.namespace, "Connected to Kubernetes");
 
     // Initialize Linear client
-    let linear_client = match &config.oauth_token {
-        Some(token) => match LinearClient::new(token) {
+    let linear_client = if let Some(token) = &config.oauth_token {
+        match LinearClient::new(token) {
             Ok(client) => {
                 info!("Linear API client configured");
                 Some(client)
@@ -45,11 +45,10 @@ async fn main() -> Result<()> {
                 error!(error = %e, "Failed to create Linear client");
                 None
             }
-        },
-        None => {
-            info!("No LINEAR_OAUTH_TOKEN configured - API calls will be disabled");
-            None
         }
+    } else {
+        info!("No LINEAR_OAUTH_TOKEN configured - API calls will be disabled");
+        None
     };
 
     // Build application state
