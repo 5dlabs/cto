@@ -235,7 +235,7 @@ async fn run_poll(
     if !result.errors.is_empty() {
         println!("   Errors: {}", result.errors.len());
         for err in &result.errors {
-            eprintln!("     - {err}");
+            tracing::warn!("Error: {err}");
         }
     }
 
@@ -256,7 +256,7 @@ async fn run_poll(
                 println!("✅ Pull request created: {pr_url}");
             }
             Err(e) => {
-                eprintln!("❌ Failed to create PR: {e}");
+                tracing::error!("Failed to create PR: {e}");
                 // Don't fail the whole run if PR creation fails
             }
         }

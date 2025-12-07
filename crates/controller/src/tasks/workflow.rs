@@ -360,6 +360,7 @@ mod tests {
                 working_directory: None,
                 github_user: None,
                 github_app: None,
+                linear_integration: None,
             },
             status: None,
         };
@@ -397,6 +398,7 @@ mod tests {
                 working_directory: None,
                 github_user: None,
                 github_app: None,
+                linear_integration: None,
             },
             status: None,
         };

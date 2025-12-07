@@ -2,10 +2,11 @@
 
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::Sha256;
 use subtle::ConstantTimeEq;
 
-use crate::models::{AgentSession, Issue};
+use crate::models::{AgentSession, Comment, Issue};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -54,6 +55,8 @@ pub fn validate_webhook_timestamp(timestamp_ms: i64, max_age_ms: i64) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WebhookAction {
+    /// New entity created (Linear sends "create" for Issue events)
+    Create,
     /// New agent session created (mention or delegation)
     Created,
     /// User sent follow-up prompt to existing session
@@ -62,6 +65,9 @@ pub enum WebhookAction {
     Update,
     /// Generic remove action
     Remove,
+    /// Unknown action (catch-all to avoid parse failures)
+    #[serde(other)]
+    Unknown,
 }
 
 /// Webhook event type
@@ -167,9 +173,10 @@ pub struct WebhookPayload {
     /// Agent activity (for prompted events)
     #[serde(default)]
     pub agent_activity: Option<WebhookAgentActivity>,
-    /// Issue data (for Issue events)
+    /// Generic data payload (varies by event type - Issue, Comment, etc.)
+    /// We use Value to avoid parse failures for different payload structures
     #[serde(default)]
-    pub data: Option<Issue>,
+    pub data: Option<Value>,
     /// Actor who triggered the event
     #[serde(default)]
     pub actor: Option<WebhookActor>,
@@ -241,6 +248,22 @@ impl WebhookPayload {
                 None
             }
         })
+    }
+
+    /// Try to parse the data field as an Issue (for Issue events)
+    #[must_use]
+    pub fn get_issue_data(&self) -> Option<Issue> {
+        self.data
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Try to parse the data field as a Comment (for Comment events)
+    #[must_use]
+    pub fn get_comment_data(&self) -> Option<Comment> {
+        self.data
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 }
 

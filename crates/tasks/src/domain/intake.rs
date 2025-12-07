@@ -147,8 +147,7 @@ impl IntakeDomain {
         };
 
         // 3. Parse PRD to generate tasks
-        eprintln!("\n📋 Step 1/4: Parsing PRD to generate ~{} tasks...", config.num_tasks);
-        tracing::info!("Parsing PRD to generate ~{} tasks...", config.num_tasks);
+        tracing::info!("Step 1/4: Parsing PRD to generate ~{} tasks...", config.num_tasks);
         let (mut tasks, prd_usage) = self
             .ai_domain
             .parse_prd(
@@ -163,13 +162,11 @@ impl IntakeDomain {
         total_input_tokens += prd_usage.input_tokens;
         total_output_tokens += prd_usage.output_tokens;
 
-        eprintln!("  ✅ Generated {} tasks", tasks.len());
         tracing::info!("Generated {} tasks", tasks.len());
 
         // 4. Analyze complexity if requested
         let complexity_report = if config.analyze {
-            eprintln!("\n📊 Step 2/4: Analyzing task complexity...");
-            tracing::info!("Analyzing task complexity...");
+            tracing::info!("Step 2/4: Analyzing task complexity...");
             let (report, analyze_usage) = self
                 .ai_domain
                 .analyze_complexity(
@@ -183,10 +180,10 @@ impl IntakeDomain {
             total_input_tokens += analyze_usage.input_tokens;
             total_output_tokens += analyze_usage.output_tokens;
 
-            eprintln!("  ✅ Complexity analysis complete");
+            tracing::info!("Complexity analysis complete");
             Some(report)
         } else {
-            eprintln!("\n⏭️  Step 2/4: Skipping complexity analysis");
+            tracing::info!("Step 2/4: Skipping complexity analysis");
             None
         };
 
@@ -198,8 +195,7 @@ impl IntakeDomain {
                 .map(|t| t.id.clone())
                 .collect();
             
-            eprintln!("\n🔄 Step 3/4: Expanding {} tasks into subtasks...", tasks_to_expand.len());
-            tracing::info!("Expanding tasks into subtasks...");
+            tracing::info!("Step 3/4: Expanding {} tasks into subtasks...", tasks_to_expand.len());
 
             for (idx, task) in tasks.iter_mut().enumerate() {
                 // Skip done tasks
@@ -212,7 +208,7 @@ impl IntakeDomain {
                     continue;
                 }
 
-                eprint!("  → Task {}/{}: {}... ", idx + 1, tasks_to_expand.len(), task.id);
+                tracing::debug!("Expanding task {}/{}: {}", idx + 1, tasks_to_expand.len(), task.id);
                 
                 match self
                     .ai_domain
@@ -227,25 +223,23 @@ impl IntakeDomain {
                     .await
                 {
                     Ok((subtasks, expand_usage)) => {
-                        eprintln!("{} subtasks", subtasks.len());
+                        tracing::debug!("Generated {} subtasks", subtasks.len());
                         subtasks_count += subtasks.len();
                         task.subtasks = subtasks;
                         total_input_tokens += expand_usage.input_tokens;
                         total_output_tokens += expand_usage.output_tokens;
                     }
                     Err(e) => {
-                        eprintln!("⚠️  failed: {}", e);
                         tracing::warn!("Failed to expand task {}: {}", task.id, e);
                     }
                 }
             }
-            eprintln!("  ✅ Generated {} subtasks total", subtasks_count);
+            tracing::info!("Generated {} subtasks total", subtasks_count);
         } else {
-            eprintln!("\n⏭️  Step 3/4: Skipping task expansion");
+            tracing::info!("Step 3/4: Skipping task expansion");
         }
 
         // 6. Add agent routing hints
-        eprintln!("\n🏷️  Adding agent routing hints...");
         tracing::info!("Adding agent routing hints...");
         for task in &mut tasks {
             if task.agent_hint.is_none() {
@@ -253,7 +247,7 @@ impl IntakeDomain {
                     Some(infer_agent_hint_str(&task.title, &task.description).to_string());
             }
         }
-        eprintln!("  ✅ Agent hints assigned");
+        tracing::info!("Agent hints assigned");
 
         // 7. Save tasks to storage
         let tasks_dir = config.output_dir.join("tasks");
@@ -289,23 +283,11 @@ impl IntakeDomain {
         }
 
         // 9. Generate documentation
-        eprintln!("\n📄 Step 4/4: Generating per-task documentation...");
-        tracing::info!("Generating per-task documentation...");
+        tracing::info!("Step 4/4: Generating per-task documentation...");
         let docs_dir = config.output_dir.join("docs");
         let docs_result = generate_all_docs(&tasks, &docs_dir).await?;
 
-        eprintln!("  ✅ Created {} task documentation directories", docs_result.task_dirs_created);
-        
-        eprintln!("\n════════════════════════════════════════════════════════════════");
-        eprintln!("✅ Intake Complete!");
-        eprintln!("════════════════════════════════════════════════════════════════");
-        eprintln!("Summary:");
-        eprintln!("  • Tasks generated: {}", tasks.len());
-        eprintln!("  • Subtasks generated: {}", subtasks_count);
-        eprintln!("  • Documentation dirs: {}", docs_result.task_dirs_created);
-        eprintln!("  • Tokens used: {} in, {} out", total_input_tokens, total_output_tokens);
-        eprintln!();
-        
+        tracing::info!("Created {} task documentation directories", docs_result.task_dirs_created);
         tracing::info!(
             "Intake complete: {} tasks, {} subtasks, {} doc dirs",
             tasks.len(),

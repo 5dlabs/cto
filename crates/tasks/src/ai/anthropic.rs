@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::io::{self, Write};
 
 use crate::errors::{TasksError, TasksResult};
 
@@ -125,6 +124,7 @@ enum StreamEvent {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct StreamMessage {
     id: String,
     model: String,
@@ -132,6 +132,7 @@ struct StreamMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct StreamUsage {
     input_tokens: u32,
     #[serde(default)]
@@ -139,6 +140,7 @@ struct StreamUsage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ContentBlock {
     #[serde(rename = "type")]
     block_type: String,
@@ -147,6 +149,7 @@ struct ContentBlock {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ContentDelta {
     #[serde(rename = "type")]
     delta_type: String,
@@ -155,6 +158,7 @@ struct ContentDelta {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MessageDeltaContent {
     #[serde(default)]
     stop_reason: Option<String>,
@@ -265,7 +269,7 @@ impl AIProvider for AnthropicProvider {
             stream: true,
         };
 
-        eprintln!("    📡 Calling Claude API (streaming)...");
+        tracing::info!("Calling Claude API (streaming)...");
 
         let response = self
             .client
@@ -333,31 +337,25 @@ impl AIProvider for AnthropicProvider {
                                 StreamEvent::MessageStart { message } => {
                                     response_model = message.model;
                                     input_tokens = message.usage.input_tokens;
-                                    eprintln!("    📥 Input tokens: {}", input_tokens);
-                                    eprint!("    📝 Generating: ");
-                                    let _ = io::stderr().flush();
+                                    tracing::debug!("Input tokens: {}", input_tokens);
                                 }
                                 StreamEvent::ContentBlockDelta { delta, .. } => {
                                     if delta.delta_type == "text_delta" {
                                         full_text.push_str(&delta.text);
                                         char_count += delta.text.len();
                                         
-                                        // Print progress every 500 chars
+                                        // Log progress every 500 chars
                                         if char_count - last_progress >= 500 {
-                                            eprint!(".");
-                                            let _ = io::stderr().flush();
+                                            tracing::trace!("Generated {} chars...", char_count);
                                             last_progress = char_count;
                                         }
                                     }
                                 }
-                                StreamEvent::MessageDelta { usage, .. } => {
-                                    if let Some(u) = usage {
-                                        output_tokens = u.output_tokens;
-                                    }
+                                StreamEvent::MessageDelta { usage: Some(u), .. } => {
+                                    output_tokens = u.output_tokens;
                                 }
                                 StreamEvent::MessageStop => {
-                                    eprintln!(" done!");
-                                    eprintln!("    📤 Output tokens: {}, chars: {}", output_tokens, char_count);
+                                    tracing::debug!("Output tokens: {}, chars: {}", output_tokens, char_count);
                                 }
                                 StreamEvent::Error { error } => {
                                     return Err(TasksError::Ai(format!(
