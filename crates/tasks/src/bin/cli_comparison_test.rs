@@ -5,6 +5,20 @@
 //!
 //! Results are saved to `tests/cli-comparison/` directory.
 
+// Allow pedantic lints in test binary for cleaner test code
+#![allow(
+    clippy::needless_raw_string_hashes,
+    clippy::const_is_empty,
+    clippy::cast_precision_loss,
+    clippy::match_same_arms,
+    clippy::if_not_else,
+    clippy::uninlined_format_args,
+    clippy::ptr_arg,
+    clippy::format_push_string,
+    clippy::single_char_add_str,
+    clippy::map_unwrap_or
+)]
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;

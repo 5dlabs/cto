@@ -483,6 +483,7 @@ impl CLITextGenerator {
     }
 
     /// Parse CLI output and extract the actual content.
+    #[allow(clippy::unnecessary_wraps)]
     fn parse_cli_output(&self, output: &str, _model: &str) -> TasksResult<(String, TokenUsage)> {
         // Log output for debugging
         let output_preview = if output.len() > 500 {
@@ -509,33 +510,34 @@ impl CLITextGenerator {
             for line in output.lines() {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
                     // Codex format: item.completed with agent_message
-                    if json.get("type").and_then(|v| v.as_str()) == Some("item.completed") {
+                    if json.get("type").and_then(serde_json::Value::as_str) == Some("item.completed") {
                         if let Some(item) = json.get("item") {
-                            if item.get("type").and_then(|v| v.as_str()) == Some("agent_message") {
+                            if item.get("type").and_then(serde_json::Value::as_str) == Some("agent_message") {
                                 agent_message =
-                                    item.get("text").and_then(|v| v.as_str()).map(String::from);
+                                    item.get("text").and_then(serde_json::Value::as_str).map(String::from);
                             }
                         }
                     }
                     // Codex format: turn.completed with usage
-                    if json.get("type").and_then(|v| v.as_str()) == Some("turn.completed") {
+                    if json.get("type").and_then(serde_json::Value::as_str) == Some("turn.completed") {
                         if let Some(usage_obj) = json.get("usage") {
-                            usage.input_tokens = usage_obj
-                                .get("input_tokens")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0)
-                                as u32;
-                            usage.output_tokens = usage_obj
-                                .get("output_tokens")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0)
-                                as u32;
+                            #[allow(clippy::cast_possible_truncation)]
+                            {
+                                usage.input_tokens = usage_obj
+                                    .get("input_tokens")
+                                    .and_then(serde_json::Value::as_u64)
+                                    .unwrap_or(0) as u32;
+                                usage.output_tokens = usage_obj
+                                    .get("output_tokens")
+                                    .and_then(serde_json::Value::as_u64)
+                                    .unwrap_or(0) as u32;
+                            }
                         }
                     }
                     // OpenCode format: type "text" with part.text
-                    if json.get("type").and_then(|v| v.as_str()) == Some("text") {
+                    if json.get("type").and_then(serde_json::Value::as_str) == Some("text") {
                         if let Some(part) = json.get("part") {
-                            if let Some(text) = part.get("text").and_then(|v| v.as_str()) {
+                            if let Some(text) = part.get("text").and_then(serde_json::Value::as_str) {
                                 // Concatenate text parts (OpenCode streams in chunks)
                                 if let Some(ref mut msg) = agent_message {
                                     msg.push_str(text);
@@ -546,15 +548,20 @@ impl CLITextGenerator {
                         }
                     }
                     // OpenCode format: step_finish with tokens
-                    if json.get("type").and_then(|v| v.as_str()) == Some("step_finish") {
+                    if json.get("type").and_then(serde_json::Value::as_str) == Some("step_finish") {
                         if let Some(part) = json.get("part") {
                             if let Some(tokens) = part.get("tokens") {
-                                usage.input_tokens =
-                                    tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0)
-                                        as u32;
-                                usage.output_tokens =
-                                    tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0)
-                                        as u32;
+                                #[allow(clippy::cast_possible_truncation)]
+                                {
+                                    usage.input_tokens = tokens
+                                        .get("input")
+                                        .and_then(serde_json::Value::as_u64)
+                                        .unwrap_or(0) as u32;
+                                    usage.output_tokens = tokens
+                                        .get("output")
+                                        .and_then(serde_json::Value::as_u64)
+                                        .unwrap_or(0) as u32;
+                                }
                             }
                         }
                     }
@@ -569,15 +576,16 @@ impl CLITextGenerator {
         // Try to parse as JSON (Claude/Cursor/Factory JSON output format)
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(output) {
             // Claude/Cursor/Factory JSON format: {"type":"result","result":"...","duration_ms":...}
-            if let Some(result) = json.get("result").and_then(|v| v.as_str()) {
+            if let Some(result) = json.get("result").and_then(serde_json::Value::as_str) {
+                #[allow(clippy::cast_possible_truncation)]
                 let usage = TokenUsage {
                     input_tokens: json
                         .get("input_tokens")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                         .unwrap_or(0) as u32,
                     output_tokens: json
                         .get("output_tokens")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                         .unwrap_or(0) as u32,
                     total_tokens: 0,
                 };

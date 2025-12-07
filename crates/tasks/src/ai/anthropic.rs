@@ -46,11 +46,10 @@ const SUPPORTED_MODELS: &[&str] = &[
 fn normalize_model(model: &str) -> &str {
     match model {
         // Short names → latest versions
-        "opus" => "claude-opus-4-5-20251101",
+        // Also handles common typo: using Sonnet 4.5 date for Opus 4.5
+        "opus" | "claude-opus-4-5-20250929" => "claude-opus-4-5-20251101",
         "sonnet" => "claude-sonnet-4-5-20250929",
         "haiku" => "claude-3-5-haiku-20241022",
-        // Common typo: using Sonnet 4.5 date for Opus 4.5
-        "claude-opus-4-5-20250929" => "claude-opus-4-5-20251101",
         // Everything else passes through
         _ => model,
     }
