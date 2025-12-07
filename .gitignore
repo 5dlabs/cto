@@ -133,3 +133,6 @@ agent-remediation-loop/
 
 # Duplicate templates directory (stale copy - real templates are in templates/)
 agent-templates/
+
+# Docs archive (archived documentation, not for version control)
+.docs-archive/
