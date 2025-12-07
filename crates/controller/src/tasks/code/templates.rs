@@ -3340,8 +3340,8 @@ impl CodeTemplateGenerator {
         let job_type = Self::determine_job_type(code_run);
 
         // Map GitHub app to agent name
+        // Explicit patterns document known agents even if some share defaults
         let agent = match github_app {
-            "5DLabs-Rex" | "5DLabs-Rex-Remediation" => "rex",
             "5DLabs-Morgan" => "morgan",
             "5DLabs-Blaze" => "blaze",
             "5DLabs-Cipher" => "cipher",
@@ -3354,7 +3354,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Tap" => "tap",
             "5DLabs-Spark" => "spark",
             "5DLabs-Stitch" => "stitch",
-            _ => "rex", // Default to rex for unknown agents
+            // Rex variants and unknown agents default to rex
+            _ => "rex",
         };
 
         // Agent-specific job type defaults
@@ -3362,7 +3363,6 @@ impl CodeTemplateGenerator {
         let job = match (agent, job_type) {
             // Morgan: docs for coder, otherwise use the requested type
             ("morgan", "coder") => "docs",
-            ("morgan", _) => job_type,
 
             // Cleo: always quality (quality assurance specialist)
             ("cleo", _) => "quality",
@@ -3375,17 +3375,15 @@ impl CodeTemplateGenerator {
 
             // Bolt: deploy by default (deployment specialist)
             ("bolt", "coder") => "deploy",
-            ("bolt", _) => job_type,
 
             // Cipher: security by default (security specialist)
             ("cipher", "coder") => "security",
-            ("cipher", _) => job_type,
 
             // Stitch: review by default (code review specialist)
             ("stitch", _) => "review",
 
-            // Default: use the determined job type
-            (_, _) => job_type,
+            // All other agents/job combinations use the determined job type
+            _ => job_type,
         };
 
         format!("agents/{agent}/{job}/system-prompt.md.hbs")
@@ -3780,14 +3778,13 @@ impl CodeTemplateGenerator {
     /// the CLI-specific invocation logic.
     fn register_cli_invoke_partial(handlebars: &mut Handlebars, cli_type: CLIType) -> Result<()> {
         let cli_name = match cli_type {
-            CLIType::Claude => "claude",
             CLIType::Codex => "codex",
             CLIType::Cursor => "cursor",
             CLIType::Factory => "factory",
             CLIType::Gemini => "gemini",
             CLIType::OpenCode => "opencode",
-            // These CLI types don't have dedicated invoke templates yet; fall back to claude
-            CLIType::OpenHands | CLIType::Grok | CLIType::Qwen => "claude",
+            // Claude and types without dedicated invoke templates fall back to claude
+            CLIType::Claude | CLIType::OpenHands | CLIType::Grok | CLIType::Qwen => "claude",
         };
 
         let invoke_template_path = format!("clis/{cli_name}/invoke.sh.hbs");
