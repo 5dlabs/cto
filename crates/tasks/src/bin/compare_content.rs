@@ -1,5 +1,12 @@
 //! Detailed content comparison between providers.
 
+// Allow pedantic lints in test binary for cleaner test code
+#![allow(
+    clippy::needless_raw_string_hashes,
+    clippy::uninlined_format_args,
+    clippy::too_many_lines
+)]
+
 use cli::CLIType;
 use serde::Deserialize;
 use tasks::ai::anthropic::AnthropicProvider;
