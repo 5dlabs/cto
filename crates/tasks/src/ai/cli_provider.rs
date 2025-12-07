@@ -510,34 +510,45 @@ impl CLITextGenerator {
             for line in output.lines() {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
                     // Codex format: item.completed with agent_message
-                    if json.get("type").and_then(serde_json::Value::as_str) == Some("item.completed") {
+                    if json.get("type").and_then(serde_json::Value::as_str)
+                        == Some("item.completed")
+                    {
                         if let Some(item) = json.get("item") {
-                            if item.get("type").and_then(serde_json::Value::as_str) == Some("agent_message") {
-                                agent_message =
-                                    item.get("text").and_then(serde_json::Value::as_str).map(String::from);
+                            if item.get("type").and_then(serde_json::Value::as_str)
+                                == Some("agent_message")
+                            {
+                                agent_message = item
+                                    .get("text")
+                                    .and_then(serde_json::Value::as_str)
+                                    .map(String::from);
                             }
                         }
                     }
                     // Codex format: turn.completed with usage
-                    if json.get("type").and_then(serde_json::Value::as_str) == Some("turn.completed") {
+                    if json.get("type").and_then(serde_json::Value::as_str)
+                        == Some("turn.completed")
+                    {
                         if let Some(usage_obj) = json.get("usage") {
                             #[allow(clippy::cast_possible_truncation)]
                             {
                                 usage.input_tokens = usage_obj
                                     .get("input_tokens")
                                     .and_then(serde_json::Value::as_u64)
-                                    .unwrap_or(0) as u32;
+                                    .unwrap_or(0)
+                                    as u32;
                                 usage.output_tokens = usage_obj
                                     .get("output_tokens")
                                     .and_then(serde_json::Value::as_u64)
-                                    .unwrap_or(0) as u32;
+                                    .unwrap_or(0)
+                                    as u32;
                             }
                         }
                     }
                     // OpenCode format: type "text" with part.text
                     if json.get("type").and_then(serde_json::Value::as_str) == Some("text") {
                         if let Some(part) = json.get("part") {
-                            if let Some(text) = part.get("text").and_then(serde_json::Value::as_str) {
+                            if let Some(text) = part.get("text").and_then(serde_json::Value::as_str)
+                            {
                                 // Concatenate text parts (OpenCode streams in chunks)
                                 if let Some(ref mut msg) = agent_message {
                                     msg.push_str(text);
@@ -556,11 +567,13 @@ impl CLITextGenerator {
                                     usage.input_tokens = tokens
                                         .get("input")
                                         .and_then(serde_json::Value::as_u64)
-                                        .unwrap_or(0) as u32;
+                                        .unwrap_or(0)
+                                        as u32;
                                     usage.output_tokens = tokens
                                         .get("output")
                                         .and_then(serde_json::Value::as_u64)
-                                        .unwrap_or(0) as u32;
+                                        .unwrap_or(0)
+                                        as u32;
                                 }
                             }
                         }
