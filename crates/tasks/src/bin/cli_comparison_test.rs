@@ -16,7 +16,11 @@
     clippy::ptr_arg,
     clippy::format_push_string,
     clippy::single_char_add_str,
-    clippy::map_unwrap_or
+    clippy::map_unwrap_or,
+    clippy::disallowed_macros,
+    clippy::redundant_closure_for_method_calls,
+    clippy::too_many_lines,
+    clippy::manual_string_new
 )]
 
 use std::collections::HashMap;
