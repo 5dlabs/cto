@@ -1,0 +1,12 @@
+---
+apiVersion: v2
+name: opensearch-operator
+description: OpenSearch Kubernetes Operator
+type: application
+version: 0.1.0
+appVersion: "2.8.0"
+dependencies:
+  - name: opensearch-operator
+    version: "2.8.0"
+    repository: "https://opensearch-project.github.io/opensearch-k8s-operator/"
+

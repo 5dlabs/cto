@@ -1,96 +1,204 @@
 # CLAUDE Task Generation Results
 
 **Model:** claude-opus-4-5-20251101
-**Duration:** 210.48s
+**Duration:** 67.71s
 **Tasks Generated:** 5
 **Theme Coverage:** 100%
-**Themes Covered:** jwt, project, api, error, task, auth, database
+**Themes Covered:** docker, auth, task, jwt, api, database, error, project
 
 ---
 
-## Task 1: Setup project foundation with database
+## Task 1: Setup Rust project with Axum and PostgreSQL foundation
 
 **Status:** pending | **Priority:** high
 
 ### Description
 
-Initialize the Rust project structure with Axum web framework, PostgreSQL database connectivity via sqlx, and essential dependencies. This task establishes the foundation for all subsequent features.
+Initialize the Rust project structure with Axum web framework, database connection pooling, and essential configuration. This establishes the foundation for all subsequent features.
 
 ### Implementation Details
 
-1. Create new crate structure following workspace pattern:
-   ```
-   crates/task-api/
-   ├── Cargo.toml
-   ├── src/
-   │   ├── main.rs
-   │   ├── lib.rs
-   │   ├── config.rs
-   │   └── db.rs
-   └── migrations/
-   ```
-
+1. Initialize Cargo project with `cargo new task-manager-api`
 2. Add dependencies to Cargo.toml:
-   ```toml
-   [dependencies]
-   axum = { workspace = true }  # 0.8.4
-   tokio = { workspace = true }  # 1.40
-   tower = { workspace = true }  # 0.5
-   tower-http = { workspace = true }
-   sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid", "migrate"] }
-   serde = { workspace = true }
-   serde_json = { workspace = true }
-   anyhow = { workspace = true }
-   thiserror = { workspace = true }
-   tracing = { workspace = true }
-   tracing-subscriber = { workspace = true }
-   uuid = { workspace = true }
-   chrono = { workspace = true }
-   ```
+   - axum = "0.7" (web framework)
+   - tokio = { version = "1.0", features = ["full"] } (async runtime)
+   - sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] } (database)
+   - serde = { version = "1.0", features = ["derive"] } (serialization)
+   - serde_json = "1.0"
+   - dotenvy = "0.15" (environment config)
+   - tracing = "0.1" and tracing-subscriber = "0.3" (logging)
+   - uuid = { version = "1.0", features = ["v4", "serde"] }
+   - chrono = { version = "0.4", features = ["serde"] }
 
-3. Create config.rs for environment configuration:
+3. Create project structure:
+   src/
+   ├── main.rs (entry point, server setup)
+   ├── config.rs (environment configuration)
+   ├── db.rs (database pool initialization)
+   ├── routes/
+   │   └── mod.rs
+   ├── handlers/
+   │   └── mod.rs
+   ├── models/
+   │   └── mod.rs
+   └── error.rs (unified error handling)
+
+4. Implement config.rs:
    ```rust
    pub struct Config {
        pub database_url: String,
        pub jwt_secret: String,
-       pub server_port: u16,
+       pub server_addr: String,
    }
-   
    impl Config {
-       pub fn from_env() -> Result<Self, anyhow::Error> {
-           Ok(Self {
-               database_url: std::env::var("DATABASE_URL")?,
-               jwt_secret: std::env::var("JWT_SECRET")?,
-               server_port: std::env::var("PORT").unwrap_or("3000".into()).parse()?,
-           })
-       }
+       pub fn from_env() -> Result<Self, dotenvy::Error> { ... }
    }
    ```
 
-4. Create db.rs with connection pool:
+5. Setup database connection pool in db.rs using sqlx::PgPool
+
+6. Create migrations folder and initial migration for schema setup:
+   - migrations/001_initial_schema.sql
+
+7. Implement main.rs with basic Axum server:
    ```rust
-   use sqlx::postgres::{PgPool, PgPoolOptions};
-   
-   pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
-       PgPoolOptions::new()
-           .max_connections(5)
-           .connect(database_url)
-           .await
+   #[tokio::main]
+   async fn main() {
+       tracing_subscriber::init();
+       let config = Config::from_env().expect("Config error");
+       let pool = PgPool::connect(&config.database_url).await.unwrap();
+       let app = Router::new().with_state(AppState { pool, config });
+       axum::serve(listener, app).await.unwrap();
    }
    ```
 
-5. Create initial migration (migrations/001_initial.sql):
+8. Create .env.example with DATABASE_URL, JWT_SECRET, SERVER_ADDR
+
+### Test Strategy
+
+1. Verify `cargo build` succeeds without errors
+2. Verify `cargo run` starts server and listens on configured port
+3. Test database connection by running `sqlx database create` and `sqlx migrate run`
+4. Add health check endpoint GET /health returning 200 OK
+5. Integration test: HTTP request to /health returns success
+
+---
+
+## Task 2: Implement user model and authentication system with JWT
+
+**Status:** pending | **Priority:** high
+
+**Dependencies:** 1
+
+### Description
+
+Create user registration, login, logout endpoints with JWT token generation and refresh capability. This enables secure access to protected task management endpoints.
+
+### Implementation Details
+
+1. Add authentication dependencies to Cargo.toml:
+   - jsonwebtoken = "9.3" (JWT handling)
+   - argon2 = "0.5" (password hashing - OWASP recommended)
+   - validator = { version = "0.18", features = ["derive"] } (input validation)
+
+2. Create database migration for users table:
    ```sql
-   CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'done');
-   CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high');
-   
    CREATE TABLE users (
        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-       email VARCHAR(255) NOT NULL UNIQUE,
+       email VARCHAR(255) UNIQUE NOT NULL,
        password_hash VARCHAR(255) NOT NULL,
-       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       created_at TIMESTAMPTZ DEFAULT NOW(),
+       updated_at TIMESTAMPTZ DEFAULT NOW()
    );
+   CREATE INDEX idx_users_email ON users(email);
+   ```
+
+3. Implement models/user.rs:
+   ```rust
+   #[derive(sqlx::FromRow, Serialize)]
+   pub struct User { id: Uuid, email: String, created_at: DateTime<Utc> }
+   
+   #[derive(Deserialize, Validate)]
+   pub struct CreateUser {
+       #[validate(email)]
+       email: String,
+       #[validate(length(min = 8))]
+       password: String,
+   }
+   ```
+
+4. Implement auth/jwt.rs:
+   ```rust
+   #[derive(Serialize, Deserialize)]
+   pub struct Claims {
+       sub: String,  // user_id
+       exp: usize,   // expiration timestamp
+       iat: usize,   // issued at
+       token_type: String,  // "access" or "refresh"
+   }
+   
+   pub fn create_access_token(user_id: &Uuid, secret: &str) -> Result<String, Error>
+   pub fn create_refresh_token(user_id: &Uuid, secret: &str) -> Result<String, Error>
+   pub fn verify_token(token: &str, secret: &str) -> Result<Claims, Error>
+   ```
+   - Access token: 15 minute expiry
+   - Refresh token: 7 day expiry
+
+5. Create auth middleware using Axum extractors:
+   ```rust
+   pub struct AuthUser(pub Uuid);
+   
+   #[async_trait]
+   impl<S> FromRequestParts<S> for AuthUser {
+       // Extract Bearer token from Authorization header
+       // Verify JWT and extract user_id
+   }
+   ```
+
+6. Implement handlers/auth.rs:
+   - POST /auth/register: Create user with hashed password
+   - POST /auth/login: Verify credentials, return access + refresh tokens
+   - POST /auth/refresh: Accept refresh token, return new access token
+   - POST /auth/logout: Client-side token deletion (stateless JWT)
+
+7. Password hashing with Argon2id:
+   ```rust
+   use argon2::{Argon2, PasswordHasher, PasswordVerifier};
+   ```
+
+### Test Strategy
+
+1. Unit tests for JWT token generation and verification
+2. Unit tests for password hashing and verification
+3. Integration tests:
+   - POST /auth/register with valid data returns 201 and user object
+   - POST /auth/register with duplicate email returns 409 Conflict
+   - POST /auth/register with invalid email returns 400 Bad Request
+   - POST /auth/login with valid credentials returns tokens
+   - POST /auth/login with invalid credentials returns 401 Unauthorized
+   - POST /auth/refresh with valid refresh token returns new access token
+   - POST /auth/refresh with expired token returns 401
+4. Test AuthUser extractor rejects requests without valid Bearer token
+5. Verify password is never stored in plaintext (check database)
+
+---
+
+## Task 3: Implement Task model and database schema
+
+**Status:** pending | **Priority:** high
+
+**Dependencies:** 1
+
+### Description
+
+Create the Task entity with status and priority enums, database migrations, and repository layer for data access. This establishes the core domain model for task management.
+
+### Implementation Details
+
+1. Create database migration for tasks table:
+   ```sql
+   CREATE TYPE task_status AS ENUM ('pending', 'in-progress', 'done');
+   CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high');
    
    CREATE TABLE tasks (
        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -99,222 +207,49 @@ Initialize the Rust project structure with Axum web framework, PostgreSQL databa
        description TEXT,
        status task_status NOT NULL DEFAULT 'pending',
        priority task_priority NOT NULL DEFAULT 'medium',
-       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       created_at TIMESTAMPTZ DEFAULT NOW(),
+       updated_at TIMESTAMPTZ DEFAULT NOW()
    );
    
    CREATE INDEX idx_tasks_user_id ON tasks(user_id);
    CREATE INDEX idx_tasks_status ON tasks(status);
+   CREATE INDEX idx_tasks_priority ON tasks(priority);
    ```
 
-6. Setup main.rs with basic server:
+2. Implement models/task.rs:
    ```rust
-   #[tokio::main]
-   async fn main() -> Result<(), anyhow::Error> {
-       tracing_subscriber::fmt::init();
-       let config = Config::from_env()?;
-       let pool = create_pool(&config.database_url).await?;
-       sqlx::migrate!().run(&pool).await?;
-       
-       let state = AppState { db: pool, config };
-       let app = Router::new()
-           .route("/health", get(|| async { Json(json!({"status": "healthy"})) }))
-           .with_state(state);
-       
-       let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.server_port)).await?;
-       axum::serve(listener, app).await?;
-       Ok(())
-   }
-   ```
-
-### Test Strategy
-
-1. Unit tests: Verify Config::from_env() parses environment variables correctly with valid and missing values
-2. Integration tests: Verify database connection pool creation succeeds with valid DATABASE_URL
-3. Migration tests: Run sqlx migrate to verify migrations apply without errors
-4. Health check test: GET /health returns 200 with {"status": "healthy"}
-5. Verify the server starts and binds to configured port
-
----
-
-## Task 2: Implement JWT authentication system
-
-**Status:** pending | **Priority:** high
-
-**Dependencies:** 1
-
-### Description
-
-Build the authentication layer with JWT token generation, validation, password hashing, and login/logout/refresh endpoints. Uses jsonwebtoken crate for JWT operations and argon2 for secure password hashing.
-
-### Implementation Details
-
-1. Add auth dependencies to Cargo.toml:
-   ```toml
-   jsonwebtoken = "9.3"
-   argon2 = "0.5"
-   axum-extra = { version = "0.10", features = ["typed-header"] }
-   ```
-
-2. Create src/auth/mod.rs with JWT types:
-   ```rust
-   use serde::{Deserialize, Serialize};
-   use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
-   
-   #[derive(Debug, Serialize, Deserialize)]
-   pub struct Claims {
-       pub sub: String,  // user_id
-       pub exp: i64,
-       pub iat: i64,
-       pub token_type: TokenType,
-   }
-   
-   #[derive(Debug, Serialize, Deserialize, PartialEq)]
-   pub enum TokenType { Access, Refresh }
-   
-   pub fn generate_tokens(user_id: &str, secret: &str) -> Result<(String, String), Error> {
-       let now = chrono::Utc::now();
-       let access_claims = Claims {
-           sub: user_id.to_string(),
-           exp: (now + chrono::Duration::hours(1)).timestamp(),
-           iat: now.timestamp(),
-           token_type: TokenType::Access,
-       };
-       let refresh_claims = Claims {
-           sub: user_id.to_string(),
-           exp: (now + chrono::Duration::days(7)).timestamp(),
-           iat: now.timestamp(),
-           token_type: TokenType::Refresh,
-       };
-       let key = EncodingKey::from_secret(secret.as_bytes());
-       Ok((
-           encode(&Header::default(), &access_claims, &key)?,
-           encode(&Header::default(), &refresh_claims, &key)?,
-       ))
-   }
-   ```
-
-3. Create JWT extractor (src/auth/extractor.rs) following Axum 0.8 pattern:
-   ```rust
-   use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
-   use axum_extra::headers::{Authorization, authorization::Bearer};
-   use axum_extra::TypedHeader;
-   
-   pub struct AuthUser {
-       pub user_id: uuid::Uuid,
-   }
-   
-   #[async_trait]
-   impl<S> FromRequestParts<S> for AuthUser
-   where S: Send + Sync {
-       type Rejection = (StatusCode, Json<Value>);
-       
-       async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-           let TypedHeader(Authorization::<Bearer>(bearer)) = 
-               TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
-                   .await
-                   .map_err(|_| (StatusCode::UNAUTHORIZED, Json(json!({"error": "Missing token"}))))?;
-           
-           // Decode and validate token...
-       }
-   }
-   ```
-
-4. Create auth routes (src/auth/routes.rs):
-   ```rust
-   pub fn auth_routes() -> Router<AppState> {
-       Router::new()
-           .route("/login", post(login))
-           .route("/register", post(register))
-           .route("/refresh", post(refresh_token))
-           .route("/logout", post(logout))
-   }
-   
-   async fn login(State(state): State<AppState>, Json(req): Json<LoginRequest>) -> Result<Json<TokenResponse>, ApiError> {
-       let user = sqlx::query_as!(User, "SELECT * FROM users WHERE email = $1", req.email)
-           .fetch_optional(&state.db).await?
-           .ok_or(ApiError::Unauthorized)?;
-       
-       verify_password(&req.password, &user.password_hash)?;
-       let (access, refresh) = generate_tokens(&user.id.to_string(), &state.config.jwt_secret)?;
-       Ok(Json(TokenResponse { access_token: access, refresh_token: refresh, token_type: "Bearer" }))
-   }
-   ```
-
-5. Implement password hashing:
-   ```rust
-   use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-   use argon2::password_hash::SaltString;
-   
-   pub fn hash_password(password: &str) -> Result<String, Error> {
-       let salt = SaltString::generate(&mut rand::thread_rng());
-       Ok(Argon2::default().hash_password(password.as_bytes(), &salt)?.to_string())
-   }
-   
-   pub fn verify_password(password: &str, hash: &str) -> Result<(), Error> {
-       let parsed = PasswordHash::new(hash)?;
-       Argon2::default().verify_password(password.as_bytes(), &parsed)
-           .map_err(|_| Error::InvalidCredentials)
-   }
-   ```
-
-### Test Strategy
-
-1. Unit tests for JWT generation: verify token structure, expiration times, and claims
-2. Unit tests for password hashing: verify hash_password produces valid argon2 hash, verify_password accepts correct password and rejects wrong password
-3. Integration tests for /auth/register: POST creates user, returns 201, stores hashed password in DB
-4. Integration tests for /auth/login: returns tokens for valid credentials, returns 401 for invalid
-5. Integration tests for /auth/refresh: returns new access token for valid refresh token, rejects expired tokens
-6. Test AuthUser extractor rejects missing/invalid/expired tokens with appropriate error responses
-
----
-
-## Task 3: Implement task CRUD operations
-
-**Status:** pending | **Priority:** high
-
-**Dependencies:** 1, 2
-
-### Description
-
-Build the core task management API with Create, Read, Update, Delete operations for tasks. Tasks are scoped to authenticated users and support status (pending/in_progress/done) and priority (low/medium/high) fields.
-
-### Implementation Details
-
-1. Create task models (src/tasks/models.rs):
-   ```rust
-   use serde::{Deserialize, Serialize};
-   use sqlx::FromRow;
-   
-   #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
-   #[sqlx(type_name = "task_status", rename_all = "snake_case")]
+   #[derive(sqlx::Type, Serialize, Deserialize, Clone, Copy)]
+   #[sqlx(type_name = "task_status", rename_all = "kebab-case")]
    pub enum TaskStatus { Pending, InProgress, Done }
    
-   #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
-   #[sqlx(type_name = "task_priority", rename_all = "snake_case")]
+   #[derive(sqlx::Type, Serialize, Deserialize, Clone, Copy)]
+   #[sqlx(type_name = "task_priority", rename_all = "lowercase")]
    pub enum TaskPriority { Low, Medium, High }
    
-   #[derive(Debug, Serialize, FromRow)]
+   #[derive(sqlx::FromRow, Serialize)]
    pub struct Task {
-       pub id: uuid::Uuid,
-       pub user_id: uuid::Uuid,
+       pub id: Uuid,
+       pub user_id: Uuid,
        pub title: String,
        pub description: Option<String>,
        pub status: TaskStatus,
        pub priority: TaskPriority,
-       pub created_at: chrono::DateTime<chrono::Utc>,
-       pub updated_at: chrono::DateTime<chrono::Utc>,
+       pub created_at: DateTime<Utc>,
+       pub updated_at: DateTime<Utc>,
    }
    
-   #[derive(Debug, Deserialize)]
+   #[derive(Deserialize, Validate)]
    pub struct CreateTask {
+       #[validate(length(min = 1, max = 255))]
        pub title: String,
        pub description: Option<String>,
+       pub status: Option<TaskStatus>,
        pub priority: Option<TaskPriority>,
    }
    
-   #[derive(Debug, Deserialize)]
+   #[derive(Deserialize, Validate)]
    pub struct UpdateTask {
+       #[validate(length(min = 1, max = 255))]
        pub title: Option<String>,
        pub description: Option<String>,
        pub status: Option<TaskStatus>,
@@ -322,454 +257,245 @@ Build the core task management API with Create, Read, Update, Delete operations 
    }
    ```
 
-2. Create task routes (src/tasks/routes.rs):
+3. Implement repository/task.rs with sqlx queries:
    ```rust
-   pub fn task_routes() -> Router<AppState> {
-       Router::new()
-           .route("/", get(list_tasks).post(create_task))
-           .route("/:id", get(get_task).put(update_task).delete(delete_task))
+   impl TaskRepository {
+       pub async fn create(pool: &PgPool, user_id: Uuid, input: CreateTask) -> Result<Task>
+       pub async fn find_by_id(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<Option<Task>>
+       pub async fn find_all_by_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<Task>>
+       pub async fn update(pool: &PgPool, id: Uuid, user_id: Uuid, input: UpdateTask) -> Result<Task>
+       pub async fn delete(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool>
    }
    ```
 
-3. Implement handlers:
-   ```rust
-   // Create task
-   async fn create_task(
-       State(state): State<AppState>,
-       auth: AuthUser,
-       Json(req): Json<CreateTask>,
-   ) -> Result<(StatusCode, Json<Task>), ApiError> {
-       let task = sqlx::query_as!(
-           Task,
-           r#"INSERT INTO tasks (user_id, title, description, priority)
-              VALUES ($1, $2, $3, $4)
-              RETURNING id, user_id, title, description, 
-                        status as "status: TaskStatus",
-                        priority as "priority: TaskPriority",
-                        created_at, updated_at"#,
-           auth.user_id, req.title, req.description,
-           req.priority.unwrap_or(TaskPriority::Medium) as TaskPriority
-       )
-       .fetch_one(&state.db).await?;
-       Ok((StatusCode::CREATED, Json(task)))
-   }
-   
-   // List tasks with optional filters
-   async fn list_tasks(
-       State(state): State<AppState>,
-       auth: AuthUser,
-       Query(params): Query<ListParams>,
-   ) -> Result<Json<Vec<Task>>, ApiError> {
-       let tasks = sqlx::query_as!(
-           Task,
-           r#"SELECT id, user_id, title, description,
-                     status as "status: TaskStatus",
-                     priority as "priority: TaskPriority",
-                     created_at, updated_at
-              FROM tasks WHERE user_id = $1
-              ORDER BY created_at DESC"#,
-           auth.user_id
-       )
-       .fetch_all(&state.db).await?;
-       Ok(Json(tasks))
-   }
-   
-   // Get single task
-   async fn get_task(
-       State(state): State<AppState>,
-       auth: AuthUser,
-       Path(task_id): Path<uuid::Uuid>,
-   ) -> Result<Json<Task>, ApiError> {
-       sqlx::query_as!(...)
-           .fetch_optional(&state.db).await?
-           .ok_or(ApiError::NotFound)
-           .map(Json)
-   }
-   
-   // Update task
-   async fn update_task(
-       State(state): State<AppState>,
-       auth: AuthUser,
-       Path(task_id): Path<uuid::Uuid>,
-       Json(req): Json<UpdateTask>,
-   ) -> Result<Json<Task>, ApiError> {
-       let task = sqlx::query_as!(
-           Task,
-           r#"UPDATE tasks SET
-              title = COALESCE($3, title),
-              description = COALESCE($4, description),
-              status = COALESCE($5, status),
-              priority = COALESCE($6, priority),
-              updated_at = NOW()
-              WHERE id = $1 AND user_id = $2
-              RETURNING ..."#,
-           task_id, auth.user_id, req.title, req.description,
-           req.status as Option<TaskStatus>,
-           req.priority as Option<TaskPriority>
-       )
-       .fetch_optional(&state.db).await?
-       .ok_or(ApiError::NotFound)?;
-       Ok(Json(task))
-   }
-   
-   // Delete task
-   async fn delete_task(
-       State(state): State<AppState>,
-       auth: AuthUser,
-       Path(task_id): Path<uuid::Uuid>,
-   ) -> Result<StatusCode, ApiError> {
-       let result = sqlx::query!(
-           "DELETE FROM tasks WHERE id = $1 AND user_id = $2",
-           task_id, auth.user_id
-       )
-       .execute(&state.db).await?;
-       
-       if result.rows_affected() == 0 {
-           Err(ApiError::NotFound)
-       } else {
-           Ok(StatusCode::NO_CONTENT)
-       }
-   }
-   ```
-
-4. Wire routes in main.rs:
-   ```rust
-   let app = Router::new()
-       .route("/health", get(health))
-       .nest("/auth", auth_routes())
-       .nest("/tasks", task_routes())
-       .with_state(state);
-   ```
+4. Use sqlx::query_as! macro for compile-time query verification
 
 ### Test Strategy
 
-1. Integration tests for POST /tasks: creates task with valid token, returns 401 without token, validates required fields
-2. Integration tests for GET /tasks: returns only tasks belonging to authenticated user, empty array for new user
-3. Integration tests for GET /tasks/:id: returns task if owned by user, 404 for non-existent, 404 for other user's task (not 403 to avoid enumeration)
-4. Integration tests for PUT /tasks/:id: updates specified fields only, preserves unspecified fields, validates enum values for status/priority
-5. Integration tests for DELETE /tasks/:id: returns 204 on success, 404 for non-existent, removes task from database
-6. Test status transitions: pending -> in_progress -> done
-7. Test priority values: low, medium, high accepted; invalid values rejected with 400
+1. Unit tests for TaskStatus and TaskPriority enum serialization/deserialization
+2. Unit tests for CreateTask and UpdateTask validation
+3. Repository integration tests with test database:
+   - Create task and verify all fields persisted correctly
+   - Find task by ID returns correct task
+   - Find task by ID with wrong user_id returns None (isolation)
+   - Update task modifies only specified fields
+   - Update task sets updated_at to current time
+   - Delete task removes from database
+   - find_all_by_user returns only tasks for that user
+4. Test enum storage in PostgreSQL matches expected values
 
 ---
 
-## Task 4: Add error handling and validation
+## Task 4: Implement Task CRUD API endpoints
 
-**Status:** pending | **Priority:** medium
+**Status:** pending | **Priority:** high
 
-**Dependencies:** 1, 2, 3
+**Dependencies:** 2, 3
 
 ### Description
 
-Implement comprehensive error handling with structured JSON error responses, input validation using validator crate, and consistent error formatting across all endpoints.
+Create REST API endpoints for task management with proper authentication, authorization, and input validation. All endpoints require authentication and users can only access their own tasks.
 
 ### Implementation Details
 
-1. Add validation dependency:
-   ```toml
-   validator = { version = "0.18", features = ["derive"] }
+1. Implement handlers/task.rs with all CRUD operations:
+   ```rust
+   // GET /tasks - List all tasks for authenticated user
+   pub async fn list_tasks(
+       State(state): State<AppState>,
+       AuthUser(user_id): AuthUser,
+   ) -> Result<Json<Vec<Task>>, ApiError>
+   
+   // GET /tasks/:id - Get single task
+   pub async fn get_task(
+       State(state): State<AppState>,
+       AuthUser(user_id): AuthUser,
+       Path(task_id): Path<Uuid>,
+   ) -> Result<Json<Task>, ApiError>
+   
+   // POST /tasks - Create new task
+   pub async fn create_task(
+       State(state): State<AppState>,
+       AuthUser(user_id): AuthUser,
+       Json(input): Json<CreateTask>,
+   ) -> Result<(StatusCode, Json<Task>), ApiError>
+   
+   // PUT /tasks/:id - Update task
+   pub async fn update_task(
+       State(state): State<AppState>,
+       AuthUser(user_id): AuthUser,
+       Path(task_id): Path<Uuid>,
+       Json(input): Json<UpdateTask>,
+   ) -> Result<Json<Task>, ApiError>
+   
+   // DELETE /tasks/:id - Delete task
+   pub async fn delete_task(
+       State(state): State<AppState>,
+       AuthUser(user_id): AuthUser,
+       Path(task_id): Path<Uuid>,
+   ) -> Result<StatusCode, ApiError>
    ```
 
-2. Create error types (src/error.rs):
+2. Setup routes in routes/mod.rs:
    ```rust
-   use axum::{response::{IntoResponse, Response}, http::StatusCode, Json};
-   use serde_json::json;
-   
-   #[derive(Debug, thiserror::Error)]
+   pub fn task_routes() -> Router<AppState> {
+       Router::new()
+           .route("/tasks", get(list_tasks).post(create_task))
+           .route("/tasks/:id", get(get_task).put(update_task).delete(delete_task))
+   }
+   ```
+
+3. Implement unified error handling in error.rs:
+   ```rust
    pub enum ApiError {
-       #[error("Resource not found")]
        NotFound,
-       #[error("Unauthorized")]
        Unauthorized,
-       #[error("Invalid credentials")]
-       InvalidCredentials,
-       #[error("Validation error: {0}")]
-       Validation(String),
-       #[error("Conflict: {0}")]
-       Conflict(String),
-       #[error("Internal server error")]
-       Internal(#[from] anyhow::Error),
-       #[error("Database error")]
-       Database(#[from] sqlx::Error),
+       Forbidden,
+       ValidationError(String),
+       InternalError,
    }
    
    impl IntoResponse for ApiError {
        fn into_response(self) -> Response {
-           let (status, error_code, message) = match &self {
-               ApiError::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND", self.to_string()),
-               ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", self.to_string()),
-               ApiError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "INVALID_CREDENTIALS", self.to_string()),
-               ApiError::Validation(msg) => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.clone()),
-               ApiError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg.clone()),
-               ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error".into()),
-               ApiError::Database(e) => {
-                   tracing::error!(error = %e, "Database error");
-                   (StatusCode::INTERNAL_SERVER_ERROR, "DATABASE_ERROR", "Database error".into())
-               }
-           };
-           
-           (status, Json(json!({
-               "error": {
-                   "code": error_code,
-                   "message": message
-               }
-           }))).into_response()
+           let (status, message) = match self { ... };
+           (status, Json(json!({ "error": message }))).into_response()
        }
    }
    ```
 
-3. Add validation to request structs:
+4. Add query parameters for filtering (optional enhancement):
    ```rust
-   use validator::Validate;
-   
-   #[derive(Debug, Deserialize, Validate)]
-   pub struct CreateTask {
-       #[validate(length(min = 1, max = 255, message = "Title must be 1-255 characters"))]
-       pub title: String,
-       #[validate(length(max = 10000, message = "Description too long"))]
-       pub description: Option<String>,
-       pub priority: Option<TaskPriority>,
-   }
-   
-   #[derive(Debug, Deserialize, Validate)]
-   pub struct LoginRequest {
-       #[validate(email(message = "Invalid email format"))]
-       pub email: String,
-       #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
-       pub password: String,
-   }
-   
-   #[derive(Debug, Deserialize, Validate)]
-   pub struct RegisterRequest {
-       #[validate(email(message = "Invalid email format"))]
-       pub email: String,
-       #[validate(length(min = 8, max = 128, message = "Password must be 8-128 characters"))]
-       pub password: String,
+   #[derive(Deserialize)]
+   pub struct TaskFilters {
+       status: Option<TaskStatus>,
+       priority: Option<TaskPriority>,
    }
    ```
 
-4. Create validated JSON extractor:
-   ```rust
-   use axum::{async_trait, extract::{FromRequest, Request}};
-   use validator::Validate;
-   
-   pub struct ValidatedJson<T>(pub T);
-   
-   #[async_trait]
-   impl<S, T> FromRequest<S> for ValidatedJson<T>
-   where
-       S: Send + Sync,
-       T: DeserializeOwned + Validate,
-   {
-       type Rejection = ApiError;
-       
-       async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-           let Json(value) = Json::<T>::from_request(req, state)
-               .await
-               .map_err(|e| ApiError::Validation(e.to_string()))?;
-           
-           value.validate()
-               .map_err(|e| ApiError::Validation(format_validation_errors(&e)))?;
-           
-           Ok(ValidatedJson(value))
-       }
-   }
-   
-   fn format_validation_errors(errors: &validator::ValidationErrors) -> String {
-       errors.field_errors()
-           .iter()
-           .flat_map(|(field, errs)| errs.iter().map(move |e| 
-               format!("{}: {}", field, e.message.as_ref().map(|m| m.to_string()).unwrap_or_default())
-           ))
-           .collect::<Vec<_>>()
-           .join("; ")
-   }
-   ```
-
-5. Handle database constraint violations:
-   ```rust
-   impl From<sqlx::Error> for ApiError {
-       fn from(e: sqlx::Error) -> Self {
-           match &e {
-               sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
-                   ApiError::Conflict("Resource already exists".into())
-               }
-               _ => ApiError::Database(e)
-           }
-       }
-   }
-   ```
+5. Return appropriate HTTP status codes:
+   - 200 OK for successful GET/PUT
+   - 201 Created for successful POST
+   - 204 No Content for successful DELETE
+   - 400 Bad Request for validation errors
+   - 401 Unauthorized for missing/invalid token
+   - 404 Not Found for non-existent resources
 
 ### Test Strategy
 
-1. Test validation errors: POST /auth/register with invalid email returns 400 with validation message
-2. Test validation errors: POST /tasks with empty title returns 400
-3. Test validation errors: POST /tasks with title > 255 chars returns 400
-4. Test not found: GET /tasks/{random-uuid} returns 404 with structured error
-5. Test conflict: POST /auth/register with existing email returns 409
-6. Test unauthorized: Access protected endpoint without token returns 401
-7. Test error response format: All errors return {"error": {"code": "...", "message": "..."}}
-8. Test internal errors don't leak stack traces to client
+1. Integration tests for each endpoint:
+   - GET /tasks returns empty array for new user
+   - POST /tasks creates task and returns 201 with task object
+   - POST /tasks with invalid data returns 400
+   - GET /tasks/:id returns task for owner
+   - GET /tasks/:id returns 404 for non-existent task
+   - GET /tasks/:id returns 404 for task owned by different user (not 403, to prevent enumeration)
+   - PUT /tasks/:id updates task and returns updated object
+   - PUT /tasks/:id with partial data only updates provided fields
+   - DELETE /tasks/:id removes task and returns 204
+   - All endpoints return 401 without valid Bearer token
+2. Test task isolation between users
+3. Test validation errors return proper error messages
+4. Load test with multiple concurrent requests
 
 ---
 
-## Task 5: Add middleware and API polish
+## Task 5: Add API documentation, error handling polish, and deployment configuration
 
 **Status:** pending | **Priority:** medium
 
-**Dependencies:** 1, 2, 3, 4
+**Dependencies:** 4
 
 ### Description
 
-Add production-ready middleware including request tracing, CORS configuration, rate limiting, and request timeouts. Also add OpenAPI documentation generation and comprehensive health check endpoints.
+Finalize the API with OpenAPI documentation, comprehensive error responses, logging, and production-ready configuration. This ensures the API is maintainable and deployable.
 
 ### Implementation Details
 
-1. Add middleware dependencies:
-   ```toml
-   tower-http = { version = "0.5", features = ["trace", "cors", "limit", "timeout", "request-id"] }
-   utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
-   utoipa-swagger-ui = { version = "8", features = ["axum"] }
+1. Add OpenAPI documentation with utoipa:
+   Add to Cargo.toml:
+   - utoipa = { version = "4.2", features = ["axum_extras", "uuid", "chrono"] }
+   - utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
+
+2. Annotate handlers and models:
+   ```rust
+   #[derive(ToSchema)]
+   pub struct Task { ... }
+   
+   #[utoipa::path(
+       get,
+       path = "/tasks",
+       responses(
+           (status = 200, description = "List of tasks", body = Vec<Task>),
+           (status = 401, description = "Unauthorized")
+       ),
+       security(("bearer_auth" = []))
+   )]
+   pub async fn list_tasks(...) { ... }
    ```
 
-2. Configure middleware stack in main.rs:
+3. Setup Swagger UI endpoint:
    ```rust
-   use tower::ServiceBuilder;
-   use tower_http::{
-       trace::TraceLayer,
-       cors::{CorsLayer, Any},
-       timeout::TimeoutLayer,
-       limit::RequestBodyLimitLayer,
-       request_id::{SetRequestIdLayer, PropagateRequestIdLayer},
-   };
-   use std::time::Duration;
-   
-   let middleware = ServiceBuilder::new()
-       .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
-       .layer(PropagateRequestIdLayer::x_request_id())
-       .layer(TraceLayer::new_for_http()
-           .make_span_with(|request: &Request<_>| {
-               let request_id = request.headers()
-                   .get("x-request-id")
-                   .and_then(|v| v.to_str().ok())
-                   .unwrap_or("unknown");
-               tracing::info_span!("http_request",
-                   method = %request.method(),
-                   uri = %request.uri(),
-                   request_id = %request_id
-               )
-           }))
-       .layer(TimeoutLayer::new(Duration::from_secs(30)))
-       .layer(RequestBodyLimitLayer::new(1024 * 1024))  // 1MB
-       .layer(CorsLayer::new()
-           .allow_origin(Any)
-           .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-           .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]));
-   
-   let app = Router::new()
-       // ... routes ...
-       .layer(middleware)
-       .with_state(state);
-   ```
-
-3. Add OpenAPI documentation with utoipa:
-   ```rust
-   use utoipa::OpenApi;
-   use utoipa_swagger_ui::SwaggerUi;
-   
    #[derive(OpenApi)]
    #[openapi(
-       paths(
-           auth::login, auth::register, auth::refresh_token,
-           tasks::create_task, tasks::list_tasks, tasks::get_task,
-           tasks::update_task, tasks::delete_task
-       ),
-       components(schemas(
-           Task, CreateTask, UpdateTask, TaskStatus, TaskPriority,
-           LoginRequest, RegisterRequest, TokenResponse, ApiError
-       )),
-       tags(
-           (name = "auth", description = "Authentication endpoints"),
-           (name = "tasks", description = "Task management endpoints")
-       )
+       paths(list_tasks, get_task, create_task, update_task, delete_task),
+       components(schemas(Task, CreateTask, UpdateTask, TaskStatus, TaskPriority)),
+       tags((name = "tasks", description = "Task management endpoints"))
    )]
    struct ApiDoc;
    
-   // Add to router:
-   .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+   // Mount at /swagger-ui
    ```
 
-4. Enhanced health check:
+4. Enhance error responses with structured format:
    ```rust
-   #[derive(Serialize)]
-   struct HealthResponse {
-       status: &'static str,
-       version: &'static str,
-       database: DatabaseHealth,
-   }
-   
-   #[derive(Serialize)]
-   struct DatabaseHealth {
-       connected: bool,
-       latency_ms: Option<u64>,
-   }
-   
-   async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
-       let start = std::time::Instant::now();
-       let db_ok = sqlx::query("SELECT 1").execute(&state.db).await.is_ok();
-       let latency = start.elapsed().as_millis() as u64;
-       
-       Json(HealthResponse {
-           status: if db_ok { "healthy" } else { "degraded" },
-           version: env!("CARGO_PKG_VERSION"),
-           database: DatabaseHealth {
-               connected: db_ok,
-               latency_ms: if db_ok { Some(latency) } else { None },
-           },
-       })
+   #[derive(Serialize, ToSchema)]
+   pub struct ErrorResponse {
+       pub error: String,
+       pub code: String,
+       #[serde(skip_serializing_if = "Option::is_none")]
+       pub details: Option<Vec<String>>,
    }
    ```
 
-5. Add graceful shutdown:
+5. Add request/response logging with tower-http:
    ```rust
-   let listener = tokio::net::TcpListener::bind(addr).await?;
-   axum::serve(listener, app)
-       .with_graceful_shutdown(shutdown_signal())
-       .await?;
-   
-   async fn shutdown_signal() {
-       let ctrl_c = async {
-           tokio::signal::ctrl_c().await.expect("failed to listen for ctrl+c");
-       };
-       #[cfg(unix)]
-       let terminate = async {
-           tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-               .expect("failed to install signal handler")
-               .recv()
-               .await;
-       };
-       #[cfg(not(unix))]
-       let terminate = std::future::pending::<()>();
-       
-       tokio::select! {
-           _ = ctrl_c => {},
-           _ = terminate => {},
-       }
-       tracing::info!("Shutdown signal received");
-   }
+   use tower_http::trace::TraceLayer;
+   let app = Router::new()
+       .merge(routes)
+       .layer(TraceLayer::new_for_http());
    ```
+
+6. Create Dockerfile for deployment:
+   ```dockerfile
+   FROM rust:1.75-slim as builder
+   WORKDIR /app
+   COPY . .
+   RUN cargo build --release
+   
+   FROM debian:bookworm-slim
+   COPY --from=builder /app/target/release/task-manager-api /usr/local/bin/
+   CMD ["task-manager-api"]
+   ```
+
+7. Add docker-compose.yml for local development with PostgreSQL
+
+8. Create README.md with:
+   - Setup instructions
+   - API endpoint documentation
+   - Environment variables reference
+   - Example requests with curl
 
 ### Test Strategy
 
-1. Test CORS: OPTIONS request returns correct CORS headers
-2. Test request timeout: Slow handler returns 408 after timeout
-3. Test body limit: Request > 1MB returns 413
-4. Test request ID: Response includes x-request-id header
-5. Test tracing: Logs include request_id, method, uri for each request
-6. Test health endpoint: Returns database connectivity status and latency
-7. Test OpenAPI: GET /api-docs/openapi.json returns valid OpenAPI spec
-8. Test Swagger UI: GET /swagger-ui loads documentation interface
-9. Test graceful shutdown: Server completes in-flight requests before terminating
+1. Verify Swagger UI loads at /swagger-ui endpoint
+2. Verify OpenAPI spec is valid JSON at /api-docs/openapi.json
+3. Test all documented endpoints match actual implementation
+4. Verify error responses match ErrorResponse schema
+5. Test Docker build succeeds: `docker build -t task-api .`
+6. Test docker-compose up starts both API and database
+7. Verify structured logs are output in production mode
+8. Run full API test suite against Docker container
+9. Verify README instructions work on clean environment
 
 ---
 

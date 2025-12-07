@@ -70,6 +70,10 @@ spec:
       - name: cli
         description: "CLI to use for documentation generation (claude, cursor, codex)"
         value: "claude"
+      # GitHub webhook auto-configuration (runs before intake)
+      - name: webhook-callback-url
+        description: "External URL for GitHub webhooks (e.g., https://linear-webhooks.5dlabs.ai)"
+        value: ""
       # Linear integration parameters (optional)
       - name: linear-session-id
         description: "Linear agent session ID for callbacks"
@@ -100,6 +104,19 @@ spec:
     # Main intake execution flow
     - name: intake-main
       steps:
+      # Step 0: Ensure GitHub repo exists and webhook is configured for PR events
+      - - name: ensure-github-repo
+          template: ensure-github-repo
+          arguments:
+            parameters:
+            - name: repository-url
+              value: "{{`{{workflow.parameters.repository-url}}`}}"
+            - name: project-name
+              value: "{{`{{workflow.parameters.project-name}}`}}"
+            - name: webhook-callback-url
+              value: "{{`{{workflow.parameters.webhook-callback-url}}`}}"
+
+      # Step 1: Generate intake configuration
       - - name: generate-intake-config
           template: generate-intake-config
           arguments:
@@ -285,20 +302,249 @@ spec:
         parameters:
         - name: configmap-name
       script:
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        image: bitnami/kubectl:latest
+        imagePullPolicy: IfNotPresent
         command: ["/bin/sh"]
         source: |
           #!/bin/sh
           echo "Cleaning up ConfigMap: {{`{{inputs.parameters.configmap-name}}`}}"
           kubectl delete configmap "{{`{{inputs.parameters.configmap-name}}`}}" \
-            -n {{ .Values.argo.namespace | default "argo" }} \
+            -n {{ .Release.Namespace }} \
             --ignore-not-found=true
           echo "Cleanup complete"
+
+    # Ensure GitHub repo exists, has branch protection, and webhook is configured.
+    # If no repository-url is provided, creates a new repo from the project name.
+    # Sets up branch protection rules: require PRs, no direct commits to main.
+    - name: ensure-github-repo
+      inputs:
+        parameters:
+        - name: repository-url
+        - name: project-name
+        - name: webhook-callback-url
+      script:
+        name: github
+        image: curlimages/curl:8.5.0
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          REPO_URL="{{`{{inputs.parameters.repository-url}}`}}"
+          PROJECT_NAME="{{`{{inputs.parameters.project-name}}`}}"
+          CALLBACK_URL="{{`{{inputs.parameters.webhook-callback-url}}`}}"
+          
+          # Default organization for new repos
+          DEFAULT_ORG="${GITHUB_ORG:-5dlabs}"
+          
+          # Skip if no GitHub token available
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "No GITHUB_TOKEN available, skipping GitHub repo setup"
+            exit 0
+          fi
+          
+          # =========================================================================
+          # PHASE 1: Determine or Create Repository
+          # =========================================================================
+          
+          if [ -n "$REPO_URL" ] && [ "$REPO_URL" != "" ]; then
+            # Parse owner/repo from existing URL
+            OWNER_REPO=$(echo "$REPO_URL" | sed 's#^https://github.com/##' | sed 's#^http://github.com/##' | sed 's#^git@github.com:##' | sed 's#\.git$##' | sed 's#/$##')
+            OWNER=$(echo "$OWNER_REPO" | cut -d'/' -f1)
+            REPO=$(echo "$OWNER_REPO" | cut -d'/' -f2)
+            
+            if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
+              echo "Could not parse owner/repo from: $REPO_URL"
+              exit 0
+            fi
+            
+            echo "📂 Using existing repository: $OWNER/$REPO"
+          else
+            # Create new repo from project name
+            echo "📦 No repository URL provided, creating new repo..."
+            
+            if [ -z "$PROJECT_NAME" ] || [ "$PROJECT_NAME" = "" ]; then
+              echo "⚠ No project name available, cannot create repo"
+              exit 0
+            fi
+            
+            # Sanitize project name for repo: lowercase, replace spaces/special chars with hyphens
+            REPO=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+            OWNER="$DEFAULT_ORG"
+            
+            echo "  Creating repo: $OWNER/$REPO"
+            
+            # Check if repo already exists
+            CHECK_RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$OWNER/$REPO")
+            
+            CHECK_CODE=$(echo "$CHECK_RESPONSE" | tail -1)
+            
+            if [ "$CHECK_CODE" = "200" ]; then
+              echo "✓ Repository $OWNER/$REPO already exists"
+            else
+              # Create new repository in the organization
+              CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/orgs/$OWNER/repos" \
+                -d "{
+                  \"name\": \"$REPO\",
+                  \"description\": \"Generated from CTO Platform intake: $PROJECT_NAME\",
+                  \"private\": true,
+                  \"auto_init\": true,
+                  \"has_issues\": true,
+                  \"has_projects\": false,
+                  \"has_wiki\": false
+                }")
+              
+              CREATE_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
+              CREATE_BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
+              
+              if [ "$CREATE_CODE" = "201" ]; then
+                echo "✓ Created new repository: $OWNER/$REPO"
+              else
+                echo "⚠ Could not create repo (HTTP $CREATE_CODE): $CREATE_BODY"
+                exit 0
+              fi
+            fi
+          fi
+          
+          # =========================================================================
+          # PHASE 2: Set Up Branch Protection Rules
+          # =========================================================================
+          echo ""
+          echo "🔒 Setting up branch protection for main..."
+          
+          # Check current branch protection
+          PROTECTION_CHECK=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/branches/main/protection")
+          
+          PROTECTION_CODE=$(echo "$PROTECTION_CHECK" | tail -1)
+          
+          if [ "$PROTECTION_CODE" = "200" ]; then
+            echo "✓ Branch protection already configured for main"
+          else
+            # Set branch protection rules
+            # - Require pull request reviews
+            # - No direct pushes to main
+            # - Require status checks (optional, but good practice)
+            PROTECTION_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$OWNER/$REPO/branches/main/protection" \
+              -d '{
+                "required_status_checks": null,
+                "enforce_admins": false,
+                "required_pull_request_reviews": {
+                  "dismiss_stale_reviews": false,
+                  "require_code_owner_reviews": false,
+                  "required_approving_review_count": 0
+                },
+                "restrictions": null,
+                "required_linear_history": false,
+                "allow_force_pushes": false,
+                "allow_deletions": false,
+                "block_creations": false,
+                "required_conversation_resolution": false,
+                "lock_branch": false,
+                "allow_fork_syncing": false
+              }')
+            
+            PROTECTION_RESP_CODE=$(echo "$PROTECTION_RESPONSE" | tail -1)
+            
+            if [ "$PROTECTION_RESP_CODE" = "200" ]; then
+              echo "✓ Branch protection enabled for main"
+              echo "  - Direct commits blocked"
+              echo "  - Pull requests required"
+            else
+              PROTECTION_BODY=$(echo "$PROTECTION_RESPONSE" | sed '$d')
+              echo "⚠ Could not set branch protection (HTTP $PROTECTION_RESP_CODE)"
+              # Non-fatal - continue anyway
+            fi
+          fi
+          
+          # =========================================================================
+          # PHASE 3: Set Up Webhook for PR Events
+          # =========================================================================
+          echo ""
+          echo "🔗 Setting up webhook..."
+          
+          # Skip webhook if no callback URL
+          if [ -z "$CALLBACK_URL" ] || [ "$CALLBACK_URL" = "" ]; then
+            echo "No webhook-callback-url configured, skipping webhook setup"
+            exit 0
+          fi
+          
+          WEBHOOK_URL="$CALLBACK_URL/webhooks/github"
+          echo "Target webhook URL: $WEBHOOK_URL"
+          
+          # List existing webhooks
+          EXISTING=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/hooks")
+          
+          # Check if webhook with our URL already exists
+          if echo "$EXISTING" | grep -q "\"url\":.*$(echo "$WEBHOOK_URL" | sed 's#/#\\/#g')"; then
+            echo "✓ GitHub webhook already exists for $OWNER/$REPO"
+            exit 0
+          fi
+          
+          # Create new webhook
+          HOOK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/hooks" \
+            -d "{
+              \"name\": \"web\",
+              \"active\": true,
+              \"events\": [\"pull_request\"],
+              \"config\": {
+                \"url\": \"$WEBHOOK_URL\",
+                \"content_type\": \"json\",
+                \"insecure_ssl\": \"0\"
+              }
+            }")
+          
+          HOOK_CODE=$(echo "$HOOK_RESPONSE" | tail -1)
+          
+          if [ "$HOOK_CODE" = "201" ]; then
+            echo "✓ Created GitHub webhook for $OWNER/$REPO"
+          elif [ "$HOOK_CODE" = "422" ]; then
+            echo "✓ GitHub webhook already exists (422 response)"
+          else
+            HOOK_BODY=$(echo "$HOOK_RESPONSE" | sed '$d')
+            echo "⚠ Could not create webhook (HTTP $HOOK_CODE): $HOOK_BODY"
+          fi
+          
+          echo ""
+          echo "✅ GitHub repo setup complete: https://github.com/$OWNER/$REPO"
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: linear-secrets
+                key: GITHUB_TOKEN
+                optional: true
+          - name: GITHUB_ORG
+            value: "{{ ((.Values.github).defaultOrg) | default "5dlabs" }}"
 
     # Exit handler for Linear callbacks
     - name: exit-handler
       script:
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        image: curlimages/curl:8.5.0
+        imagePullPolicy: IfNotPresent
         command: ["/bin/sh"]
         source: |
           #!/bin/sh

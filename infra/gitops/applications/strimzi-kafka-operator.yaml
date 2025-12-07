@@ -1,0 +1,83 @@
+---
+# Strimzi Kafka Operator for Apache Kafka on Kubernetes
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://strimzi.io/
+# 
+# Features:
+# - Kafka cluster management with KRaft (ZooKeeper-less) mode
+# - Topic and user management
+# - Kafka Connect for integrations
+# - Mirror Maker for cross-cluster replication
+# - Schema Registry integration
+#
+# AWS Replacement: Kinesis, MSK
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: strimzi-kafka-operator
+  namespace: argo
+  labels:
+    app.kubernetes.io/name: strimzi-kafka-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/type: messaging
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: default
+  source:
+    repoURL: https://strimzi.io/charts/
+    chart: strimzi-kafka-operator
+    targetRevision: "0.49.0"
+    helm:
+      values: |
+        # Watch all namespaces for Kafka resources
+        watchAnyNamespace: true
+        
+        # Resource limits
+        resources:
+          requests:
+            cpu: 200m
+            memory: 384Mi
+          limits:
+            cpu: 1000m
+            memory: 768Mi
+        
+        # Logging
+        logLevel: INFO
+        
+        # Generate network policies
+        generateNetworkPolicy: false
+        
+        # Labels for log collection
+        labels:
+          platform.5dlabs.io/log-collection: enabled
+        
+        # Leader election for HA
+        leaderElection:
+          enable: true
+        
+        # Create cluster roles for operator
+        createClusterRoles: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: strimzi
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+

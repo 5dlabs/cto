@@ -8,6 +8,9 @@ use std::collections::HashMap;
 
 use crate::errors::TasksResult;
 
+/// Default thinking budget for extended thinking mode (10K tokens).
+pub const DEFAULT_THINKING_BUDGET: u32 = 10_000;
+
 /// Role of a message in a conversation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -92,6 +95,12 @@ pub struct GenerateOptions {
     pub json_mode: bool,
     /// Schema name for structured output
     pub schema_name: Option<String>,
+    /// Enable extended thinking for more complex reasoning
+    pub extended_thinking: bool,
+    /// Budget in tokens for extended thinking
+    pub thinking_budget: Option<u32>,
+    /// Path to MCP config file
+    pub mcp_config: Option<String>,
 }
 
 /// Configuration for an AI provider.
@@ -146,18 +155,50 @@ pub trait AIProvider: Send + Sync {
 pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(response: &AIResponse) -> TasksResult<T> {
     // Try to extract JSON from the response text
     let text = response.text.trim();
-
-    // Sometimes the AI wraps JSON in markdown code blocks
-    let json_text = if text.starts_with("```json") {
-        text.strip_prefix("```json")
-            .and_then(|s| s.strip_suffix("```"))
-            .unwrap_or(text)
-            .trim()
-    } else if text.starts_with("```") {
-        text.strip_prefix("```")
-            .and_then(|s| s.strip_suffix("```"))
-            .unwrap_or(text)
-            .trim()
+    
+    // Handle cases where AI includes leading prose before JSON block
+    // The JSON may contain embedded ``` markers (code examples), so we need to find
+    // the LAST ``` which closes the JSON block, not the first one we encounter
+    let json_text = if let Some(json_start) = text.find("```json") {
+        let after_marker = &text[json_start + "```json".len()..];
+        // Find the LAST ``` which closes the block (not embedded code examples)
+        if let Some(end_idx) = after_marker.rfind("\n```") {
+            after_marker[..end_idx].trim()
+        } else if let Some(end_idx) = after_marker.rfind("```") {
+            after_marker[..end_idx].trim()
+        } else {
+            after_marker.trim()
+        }
+    } else if let Some(code_start) = text.find("```\n{") {
+        // Handle ```\n{ pattern (code block without language tag)
+        let after_marker = &text[code_start + "```\n".len()..];
+        if let Some(end_idx) = after_marker.rfind("\n```") {
+            after_marker[..end_idx].trim()
+        } else if let Some(end_idx) = after_marker.rfind("```") {
+            after_marker[..end_idx].trim()
+        } else {
+            after_marker.trim()
+        }
+    } else if let Some(first_brace) = text.find('{') {
+        // Fallback: find the first { and assume JSON starts there
+        // Find matching closing brace by counting nesting
+        let json_part = &text[first_brace..];
+        let mut depth = 0;
+        let mut end_idx = json_part.len();
+        for (i, c) in json_part.chars().enumerate() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end_idx = i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        &json_part[..end_idx]
     } else {
         text
     };

@@ -1,0 +1,87 @@
+---
+# Test ClickHouse cluster using Altinity Operator
+# Minimal configuration for Kind testing
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-clickhouse
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: test-clickhouse
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: analytics
+spec:
+  defaults:
+    templates:
+      podTemplate: pod-template
+      dataVolumeClaimTemplate: data-volume
+      logVolumeClaimTemplate: log-volume
+      serviceTemplate: service-template
+
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+
+    users:
+      # Default user with password
+      default/password: "clickhouse"
+      default/networks/ip: "::/0"
+      default/access_management: "1"
+
+    profiles:
+      default/max_memory_usage: "1000000000"  # 1GB
+
+    settings:
+      compression/case/method: "lz4"
+
+    zookeeper:
+      # Use ClickHouse Keeper for Kind testing (simpler than external ZK)
+      nodes: []  # Empty = use built-in keeper for single-node
+
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:24.8
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "1Gi"
+                  cpu: "500m"
+
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+
+      - name: log-volume
+        spec:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+
+    serviceTemplates:
+      - name: service-template
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP
+

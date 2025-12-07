@@ -1,0 +1,52 @@
+---
+# Altinity ClickHouse Operator for Kubernetes
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/Altinity/clickhouse-operator
+# 
+# Features:
+# - ClickHouse cluster management
+# - Automatic schema propagation
+# - Replication and sharding
+# - ZooKeeper/Keeper management
+# - Metrics and monitoring integration
+#
+# AWS Replacement: Redshift, Athena
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clickhouse-operator
+  namespace: argo
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/type: analytics
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Altinity/clickhouse-operator
+    path: deploy/operator
+    targetRevision: release-0.25.5
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system  # ClickHouse operator deploys to kube-system by default
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
