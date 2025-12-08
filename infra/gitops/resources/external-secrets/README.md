@@ -9,6 +9,7 @@ The External Secrets Operator automatically syncs secrets from OpenBao into Kube
 ## Components
 
 - **cluster-secret-store.yaml** - ClusterSecretStore that connects to OpenBao
+- **argocd-secrets.yaml** - ExternalSecrets for the `argocd` namespace (repository credentials)
 - **cto-secrets.yaml** - ExternalSecrets for the `cto` namespace
 - **infra-secrets.yaml** - ExternalSecrets for the `infra` namespace
 - **minio-secrets.yaml** - ExternalSecrets for the `minio-screenshots` namespace
@@ -117,6 +118,7 @@ kubectl delete secret <name> -n <namespace>
 
 | OpenBao Path | Kubernetes Secret | Namespace |
 |--------------|-------------------|-----------|
+| `secret/tools-github` | `argocd-repo-creds` | `argocd` |
 | `secret/ghcr-secret` | `ghcr-secret` | `cto` |
 | `secret/api-keys` | `cto-secrets` | `cto` |
 | `secret/linear-sync` | `linear-secrets` | `cto` |
@@ -127,4 +129,15 @@ kubectl delete secret <name> -n <namespace>
 | `secret/github-app-morgan` | `github-app-5dlabs-morgan` | `cto` |
 | `secret/cloudflare` | `cloudflare-api-credentials` | `infra` |
 | `secret/minio-screenshots-credentials` | `minio-screenshots-credentials` | `minio-screenshots` |
+
+## ArgoCD Repository Credentials
+
+The `argocd-repo-creds` secret is critical for ArgoCD to function. It provides credentials for all `https://github.com/5dlabs/*` repositories. If ArgoCD shows errors like "could not read Username for 'https://github.com'", this secret is likely missing.
+
+**Important:** After unsealing OpenBao and creating the token secret, the ArgoCD repo credentials will be automatically synced within the refresh interval (1 hour) or you can force sync by deleting the ExternalSecret and letting it recreate:
+
+```bash
+kubectl delete externalsecret argocd-repo-creds -n argocd
+# ESO will immediately recreate and sync the secret
+```
 
