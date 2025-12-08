@@ -85,7 +85,7 @@ metadata:
   name: platform-org-runners
   namespace: arc-systems
 spec:
-  replicas: 9  # Nine runners for the organization (tripled for increased workload)
+  replicas: 11  # Eleven runners for the organization (scaled up for increased workload)
   template:
     spec:
       # Organization-level configuration
