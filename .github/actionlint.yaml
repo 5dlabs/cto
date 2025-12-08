@@ -12,7 +12,7 @@ self-hosted-runner:
   labels:
     - k8s-runner
 
-# Exclude SC2129 (grouped redirects) - style preference, common in GitHub Actions
-shellcheck:
-  exclude:
-    - SC2129
+# Ignore SC2129 style suggestions about grouped redirects
+# This is common in GitHub Actions scripts with conditional logic
+ignore:
+  - 'SC2129.*grouped redirects'
