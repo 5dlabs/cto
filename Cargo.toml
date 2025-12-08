@@ -16,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.12.38"
+version = "0.13.0"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"
