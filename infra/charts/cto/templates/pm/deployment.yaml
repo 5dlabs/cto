@@ -1,0 +1,39 @@
+{{- if .Values.pm.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.pm.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.pm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.pm.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.pm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cto.pm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.pm.fullname" . }}
+      containers:
+        - name: pm
+          image: "{{ .Values.pm.image.repository }}:{{ .Values.pm.image.tag }}"
+          imagePullPolicy: {{ .Values.pm.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pm.service.port }}
+              protocol: TCP
+          env:
+            - name: PM_PROVIDER
+              value: {{ .Values.pm.provider | quote }}
+            - name: KUBERNETES_NAMESPACE
+              value: {{ include "cto.namespace" . }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.pm.secrets.secretName }}
+          resources:
+            {{- toYaml .Values.pm.resources | nindent 12 }}
+{{- end }}

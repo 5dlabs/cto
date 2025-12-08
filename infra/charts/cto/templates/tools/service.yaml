@@ -1,0 +1,18 @@
+{{- if .Values.tools.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto.tools.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.tools.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.tools.service.type }}
+  ports:
+    - port: {{ .Values.tools.service.port }}
+      targetPort: {{ .Values.tools.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto.tools.selectorLabels" . | nindent 4 }}
+{{- end }}

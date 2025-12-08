@@ -1,0 +1,37 @@
+{{- if .Values.healer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto.healer.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.healer.service.type }}
+  ports:
+    - port: {{ .Values.healer.service.port }}
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto.healer.selectorLabels" . | nindent 4 }}
+---
+{{- if .Values.healer.filebrowser.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto.healer.fullname" . }}-filebrowser
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.healer.filebrowser.port }}
+      targetPort: {{ .Values.healer.filebrowser.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto.healer.selectorLabels" . | nindent 4 }}
+{{- end }}
+{{- end }}

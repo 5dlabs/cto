@@ -1,0 +1,59 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.controller.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.controller.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cto.controller.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/controller/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.controller.fullname" . }}
+      containers:
+        - name: controller
+          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: KUBERNETES_NAMESPACE
+              value: {{ include "cto.namespace" . }}
+            - name: SERVER_HOST
+              value: {{ .Values.controller.config.serverHost | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.controller.config.serverPort | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.controller.config.rustLog | quote }}
+            - name: TEMPLATES_VERSION
+              value: {{ .Values.controller.templatesVersion | quote }}
+          envFrom:
+            - secretRef:
+                name: cto-secrets
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+{{- end }}

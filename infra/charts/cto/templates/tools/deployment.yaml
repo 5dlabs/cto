@@ -1,0 +1,45 @@
+{{- if .Values.tools.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.tools.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.tools.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.tools.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.tools.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cto.tools.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.tools.fullname" . }}
+      containers:
+        - name: tools
+          image: "{{ .Values.tools.image.repository }}:{{ .Values.tools.image.tag }}"
+          imagePullPolicy: {{ .Values.tools.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.tools.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.tools.service.port | quote }}
+          resources:
+            {{- toYaml .Values.tools.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          {{- if .Values.tools.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "cto.tools.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

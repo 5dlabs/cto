@@ -1,0 +1,18 @@
+{{- if .Values.openmemory.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto.openmemory.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.openmemory.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.openmemory.service.type }}
+  ports:
+    - port: {{ .Values.openmemory.service.port }}
+      targetPort: {{ .Values.openmemory.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto.openmemory.selectorLabels" . | nindent 4 }}
+{{- end }}

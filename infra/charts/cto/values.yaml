@@ -1,0 +1,238 @@
+# =============================================================================
+# CTO Platform - Unified Configuration
+# =============================================================================
+# Single chart for all CTO platform components:
+# - Controller: Agent orchestration and CodeRun management
+# - PM: Project management integrations (Linear)
+# - Tools: MCP server proxy
+# - Healer: Self-healing platform monitor
+# - OpenMemory: Long-term AI agent memory
+# - Sensors: Argo Event sensors for automation
+# - Webhooks: GitHub webhook event handling
+
+# Global configuration shared across all components
+global:
+  namespace: cto
+  imagePullSecrets:
+    - name: ghcr-secret
+  # Storage class for PVCs
+  storageClass: local-path
+
+# =============================================================================
+# Controller - Agent Orchestration
+# =============================================================================
+controller:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/5dlabs/controller
+    pullPolicy: Always
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  
+  # Argo workflow templates
+  argo:
+    enabled: true
+  
+  # Template version - bump to force pod restart
+  templatesVersion: "v1.1.0"
+  
+  config:
+    kubernetesNamespace: "cto"
+    serverHost: "0.0.0.0"
+    serverPort: "8080"
+    rustLog: "debug"
+
+# =============================================================================
+# PM Server - Project Management
+# =============================================================================
+pm:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/5dlabs/pm-server
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 8081
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  # PM provider configuration
+  provider: linear
+  maxTimestampAgeMs: 60000
+  
+  # Linear integration
+  linear:
+    enabled: true
+  
+  # GitHub configuration
+  github:
+    defaultOrg: "5dlabs"
+    webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
+  
+  # Secrets
+  secrets:
+    secretName: linear-secrets
+
+# =============================================================================
+# Tools Server - MCP Proxy
+# =============================================================================
+tools:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/5dlabs/tools
+    pullPolicy: Always
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 3000
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+  
+  rbac:
+    create: true
+    clusterWide: true
+
+# =============================================================================
+# Healer - Self-Healing Monitor
+# =============================================================================
+healer:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/5dlabs/healer
+    pullPolicy: Always
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  
+  config:
+    cli: "Factory"
+    model: "claude-opus-4-5-20250929"
+    maxAttempts: 3
+    timeWindowMins: 10
+    memoryUrl: "http://openmemory.cto.svc:3000"
+    memoryEnabled: true
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+  
+  filebrowser:
+    enabled: true
+    port: 8081
+
+# =============================================================================
+# OpenMemory - AI Agent Memory
+# =============================================================================
+openmemory:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/5dlabs/openmemory
+    pullPolicy: Always
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 3000
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# =============================================================================
+# Sensors - Argo Event Automation
+# =============================================================================
+sensors:
+  enabled: true
+  # Sensors are deployed to the automation namespace
+  namespace: automation
+
+# =============================================================================
+# Webhooks - GitHub Event Handling
+# =============================================================================
+webhooks:
+  enabled: true
+  # EventSource and sensors for GitHub events
+  namespace: automation
+
+# =============================================================================
+# TweakCN - Theme Editor
+# =============================================================================
+tweakcn:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/5dlabs/tweakcn
+    pullPolicy: Always
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 3000
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
