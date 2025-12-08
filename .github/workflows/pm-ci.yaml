@@ -1,0 +1,290 @@
+---
+name: PM CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/integrations/**'
+      - 'infra/images/pm-server/**'
+      - 'infra/charts/pm/**'
+      - '.github/workflows/pm-ci.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/integrations/**'
+      - 'infra/images/pm-server/**'
+      - 'infra/charts/pm/**'
+      - '.github/workflows/pm-ci.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      integrations: ${{ steps.filter.outputs.integrations }}
+      docker: ${{ steps.filter.outputs.docker }}
+      helm: ${{ steps.filter.outputs.helm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            integrations:
+              - 'crates/integrations/**'
+              - '!crates/integrations/**/*.md'
+            docker:
+              - 'infra/images/pm-server/**'
+            helm:
+              - 'infra/charts/pm/**'
+
+  # Rust linting (format + clippy pedantic)
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    outputs:
+      format-needed: ${{ steps.format-check.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-pm-ci"
+
+      - name: Check formatting
+        id: format-check
+        run: |
+          echo "🔧 Checking cargo fmt..."
+          if ! cargo fmt -p integrations -- --check; then
+            echo "📝 Formatting issues detected"
+            echo "format-needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "format-needed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ Code formatting is correct"
+          fi
+
+      - name: Run Clippy (pedantic)
+        run: |
+          echo "🔍 Running clippy with pedantic warnings..."
+          cargo clippy -p integrations --all-targets -- -D warnings -W clippy::pedantic
+
+  # Run tests
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-pm-ci"
+
+      - name: Run all tests
+        run: |
+          echo "🧪 Running all integrations tests..."
+          cargo test -p integrations --all-targets
+
+  # Build check (ensure it compiles for release)
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+        with:
+          workspaces: ". -> target"
+          shared-key: "rust-cache-pm-ci"
+
+      - name: Build release binary
+        run: |
+          echo "🔨 Building linear binary (pm-server)..."
+          cargo build -p integrations --release --bin linear
+          echo "✅ Release build successful"
+
+  # Helm chart validation
+  helm-lint:
+    needs: changes
+    if: needs.changes.outputs.helm == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Lint Helm chart
+        run: |
+          echo "🔍 Linting PM Helm chart..."
+          helm lint infra/charts/pm
+          echo "✅ Helm lint passed"
+
+      - name: Template Helm chart
+        run: |
+          echo "📋 Testing Helm template rendering..."
+          helm template pm infra/charts/pm > /dev/null
+          echo "✅ Helm template passed"
+
+  # Security audit (non-blocking)
+  security-audit:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        id: cargo-audit-cache
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-${{ runner.os }}-0.21.2
+
+      - name: Install cargo-audit
+        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --version 0.21.2
+
+      - name: Run security audit
+        run: |
+          echo "🔒 Running cargo audit..."
+          cargo audit || true
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/images/pm-server/Dockerfile
+          failure-threshold: warning
+
+  # Build and push Docker image (only on push to main, not PRs)
+  build-docker:
+    needs: [lint-rust, test-rust, build-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup optimized Rust environment
+        run: |
+          echo "🚀 Setting up optimized Rust build environment..."
+          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="/home/runner/.cargo/bin:$PATH"
+
+          # Check if both rustc and cargo are available and working
+          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+            echo "✅ Rust toolchain ready: $(rustc --version)"
+          else
+            echo "🔧 Installing/repairing Rust toolchain..."
+            rustup toolchain uninstall stable 2>/dev/null || true
+            for _ in 1 2 3; do
+              rustup toolchain install stable && \
+              rustup toolchain install stable && \
+              rustup default stable && break
+              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+            done
+          fi
+
+          rustc --version
+          cargo --version
+          sccache --version || echo "⚠️ sccache not found"
+
+      - name: Setup sccache
+        run: |
+          export PATH="/home/runner/.cargo/bin:$PATH"
+          export SCCACHE_CACHE_SIZE="50G"
+          export SCCACHE_IDLE_TIMEOUT="0"
+          sccache --stop-server 2>/dev/null || true
+          sccache --start-server
+
+      - name: Build release binary
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTC_WRAPPER: "sccache"
+          SCCACHE_CACHE_SIZE: "50G"
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+        run: |
+          echo "🔨 Building linear binary for linux/amd64..."
+          cargo build -p integrations --release --bin linear
+
+          # Copy binary to Docker context as 'pm-server' (Dockerfile expects 'pm-server' at root)
+          cp target/release/linear pm-server
+          chmod +x pm-server
+
+          echo "✅ Binary copied to Docker context as pm-server"
+          ls -lh pm-server
+          echo "📊 Final sccache stats:"
+          sccache --show-stats
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/integrations/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "integrations") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./infra/images/pm-server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:${{ steps.version.outputs.short-sha }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## 🐳 PM Server Docker Image Built"
+            echo ""
+            echo "**Tags:**"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:latest\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:${{ steps.version.outputs.short-sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
