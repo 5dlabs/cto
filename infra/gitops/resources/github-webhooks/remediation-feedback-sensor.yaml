@@ -39,11 +39,12 @@ spec:
           - path: body.action
             type: string
             value: ["created"]
-          # Filter for comments containing remediation patterns
-          - path: body.comment.body
-            type: string
-            comparator: "regex"
-            value: ["(?i)(🔴.*required changes|fix required|needs changes|remediate|changes requested)"]
+        exprs:
+          # Filter for comments containing remediation patterns (replaces unsupported regex comparator)
+          - expr: 'comment_body contains "🔴" || comment_body contains "required changes" || comment_body contains "fix required" || comment_body contains "needs changes" || comment_body contains "remediate" || comment_body contains "changes requested" || comment_body contains "Required changes" || comment_body contains "Fix required" || comment_body contains "Needs changes" || comment_body contains "Remediate" || comment_body contains "Changes requested"'
+            fields:
+              - name: comment_body
+                path: body.comment.body
           # Ensure comment is on a pull request (not issue)
           - path: body.issue.pull_request.url
             type: string
@@ -65,10 +66,12 @@ spec:
           - path: body.review.state
             type: string
             value: ["changes_requested"]
-          - path: body.review.body
-            type: string
-            comparator: "regex"
-            value: ["(?i)(🔴|required changes|fix required|changes requested|needs work)"]
+        exprs:
+          # Filter for review body containing feedback patterns (replaces unsupported regex comparator)
+          - expr: 'review_body contains "🔴" || review_body contains "required changes" || review_body contains "fix required" || review_body contains "changes requested" || review_body contains "needs work" || review_body contains "Required changes" || review_body contains "Fix required" || review_body contains "Changes requested" || review_body contains "Needs work"'
+            fields:
+              - name: review_body
+                path: body.review.body
 
     # Check Run Remediation (NEW - For Tess check runs)
     - name: check-run-feedback
@@ -101,10 +104,12 @@ spec:
           - path: body.action
             type: string
             value: ["created"]
-          - path: body.comment.body
-            type: string
-            comparator: "regex"
-            value: ["(?i)(@5dlabs-atlas.*remediate|@atlas.*remediate|/remediate|🔧.*fix|🛠️.*fix)"]
+        exprs:
+          # Filter for manual remediation triggers (replaces unsupported regex comparator)
+          - expr: 'manual_comment contains "@5dlabs-atlas" || manual_comment contains "@atlas" || manual_comment contains "/remediate" || manual_comment contains "🔧" || manual_comment contains "🛠️"'
+            fields:
+              - name: manual_comment
+                path: body.comment.body
           - path: body.comment.user.login
             type: string
             comparator: "not in"

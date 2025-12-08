@@ -591,12 +591,12 @@ spec:
           - path: body.pusher.name
             type: string
             value: ["rex-5dlabs[bot]"]
-          # Enhanced filtering for concurrent push events
-          - path: body.ref
-            type: string
-            comparator: "~"
-            value: ["refs/heads/feature/.*", "refs/heads/task-.*"]
         exprs:
+          # Filter for feature/* or task-* branches (replaces unsupported ~ comparator)
+          - expr: 'ref hasPrefix "refs/heads/feature/" || ref hasPrefix "refs/heads/task-"'
+            fields:
+              - name: ref
+                path: body.ref
           # Additional validation for concurrent push events
           - expr: 'body.commits | length > 0'
             fields:
