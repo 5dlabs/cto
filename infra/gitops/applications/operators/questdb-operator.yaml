@@ -1,0 +1,93 @@
+---
+# Argo CD Application for QuestDB Operator
+# Kubernetes Operator for managing QuestDB time-series database instances
+# Source: https://github.com/5dlabs/questdb-operator (fork with fixes)
+# License: Apache 2.0
+#
+# Prerequisites:
+# - cert-manager (for webhook certificates)
+# - CSI Snapshotter (optional, for QuestDBSnapshot resources)
+#
+# Custom Resources:
+# - QuestDB: Manages QuestDB StatefulSet, Services, ConfigMaps, and PVCs
+# - QuestDBSnapshot: Manages volume snapshots of QuestDB data (requires CSI)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: questdb-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: questdb-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project configuration
+  project: platform
+
+  # Source configuration - Using 5dlabs fork with fixes
+  source:
+    repoURL: https://github.com/5dlabs/questdb-operator
+    targetRevision: main
+    path: config/default
+    kustomize:
+      # Override namespace for the operator deployment
+      namespace: infra
+      # Add labels for log collection
+      commonLabels:
+        platform.5dlabs.io/log-collection: enabled
+      commonAnnotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: questdb-operator
+
+  # Destination configuration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore certain differences in CRDs and webhook CA bundles
+  # The operator manages its own certificates via cert-manager
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/conversion
+        - /spec/preserveUnknownFields
+        - /metadata/annotations
+    # Ignore CA bundle differences - managed by cert-manager
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+
+  # Revision history
+  revisionHistoryLimit: 5
+
