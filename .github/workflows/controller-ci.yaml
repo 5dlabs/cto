@@ -120,6 +120,9 @@ jobs:
           name: trivy-results
           path: trivy-results.sarif
 
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+
       - name: Rust security audit
         run: |
           cargo install cargo-audit --version 0.21.2 2>/dev/null || true

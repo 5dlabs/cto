@@ -52,20 +52,26 @@ jobs:
 
       - name: Release summary
         run: |
-          echo "## 🚀 Release Please" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.release.outputs.release_created }}" = "true" ]; then
-            echo "✅ **Release created:** v${{ steps.release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Tag:** \`${{ steps.release.outputs.tag_name }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Downstream workflows will be triggered automatically." >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## 🚀 Release Please"
+              echo ""
+              echo "✅ **Release created:** v${{ steps.release.outputs.version }}"
+              echo ""
+              echo "**Tag:** \`${{ steps.release.outputs.tag_name }}\`"
+              echo ""
+              echo "Downstream workflows will be triggered automatically."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "📋 No release created this run." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Either:" >> $GITHUB_STEP_SUMMARY
-            echo "- A Release PR was created/updated (check open PRs)" >> $GITHUB_STEP_SUMMARY
-            echo "- No releasable changes were detected" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## 🚀 Release Please"
+              echo ""
+              echo "📋 No release created this run."
+              echo ""
+              echo "Either:"
+              echo "- A Release PR was created/updated (check open PRs)"
+              echo "- No releasable changes were detected"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
   # Trigger image builds when a release is created
@@ -118,12 +124,14 @@ jobs:
 
       - name: Build summary
         run: |
-          echo "## 🔄 Triggered Builds" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The following workflows have been triggered:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **binaries-release**: Triggered via workflow_dispatch with version \`${{ needs.release-please.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **agents-build**: Triggered to rebuild with latest runtime" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Note: Tags created by GITHUB_TOKEN don't auto-trigger workflows, so we dispatch explicitly." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🔄 Triggered Builds"
+            echo ""
+            echo "The following workflows have been triggered:"
+            echo ""
+            echo "- **binaries-release**: Triggered via workflow_dispatch with version \`${{ needs.release-please.outputs.version }}\`"
+            echo "- **agents-build**: Triggered to rebuild with latest runtime"
+            echo ""
+            echo "Note: Tags created by GITHUB_TOKEN don't auto-trigger workflows, so we dispatch explicitly."
+          } >> "$GITHUB_STEP_SUMMARY"
 

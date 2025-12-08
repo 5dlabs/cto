@@ -1,12 +1,18 @@
----
-# actionlint configuration
+# Actionlint configuration
 # https://github.com/rhysd/actionlint/blob/main/docs/config.md
+#
+# Note: Actionlint only supports workflow files (.github/workflows/*.yaml)
+# Composite actions (.github/actions/**/action.yaml) have a different schema
+# and must NOT be passed to actionlint.
+#
+# Usage: actionlint .github/workflows/*.yaml
 
 self-hosted-runner:
+  # Our k8s-runner is a self-hosted runner
   labels:
     - k8s-runner
 
-# Ignore shellcheck info-level suggestions (SC2086 double-quoting, SC2129 grouped redirects)
-# These are style preferences, not errors
-config-variables: []
-
+# Exclude SC2129 (grouped redirects) - style preference, common in GitHub Actions
+shellcheck:
+  exclude:
+    - SC2129
