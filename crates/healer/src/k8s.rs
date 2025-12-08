@@ -31,7 +31,6 @@ const EXCLUDED_POD_PREFIXES: &[&str] = &[
     "healer",
     "cto-tools",
     "cto-controller",
-    "vault-mcp-server",
     "openmemory",
     "event-cleaner",
     "workspace-pvc-cleaner",

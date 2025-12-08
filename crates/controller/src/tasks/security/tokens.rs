@@ -104,7 +104,7 @@ impl GitHubTokenManager {
     fn get_github_token(&self) -> TokenResult<String> {
         // In production, this would retrieve from:
         // 1. Kubernetes secrets
-        // 2. Vault/secure key management
+        // 2. OpenBao/secure key management
         // 3. Environment variables (development only)
 
         std::env::var("GITHUB_TOKEN")
