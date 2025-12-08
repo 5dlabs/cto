@@ -274,6 +274,63 @@ tweakcn:
       memory: 256Mi
 
 # =============================================================================
+# Research - Twitter/X Research Pipeline
+# =============================================================================
+research:
+  enabled: true
+  
+  image:
+    repository: ghcr.io/5dlabs/research
+    pullPolicy: Always
+    tag: "latest"
+  
+  # CronJob schedule (every 5 minutes)
+  schedule: "*/5 * * * *"
+  
+  # Research configuration
+  minRelevance: "0.5"
+  batchSize: "10"
+  model: "claude-sonnet-4-20250514"
+  
+  # PR creation
+  createPR: true
+  repo: "5dlabs/cto"
+  baseBranch: "main"
+  researchDir: "docs/research"
+  
+  persistence:
+    size: 5Gi
+    storageClass: ""  # Uses global.storageClass if empty
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# =============================================================================
+# Maintenance - Workspace and Event Cleanup
+# =============================================================================
+maintenance:
+  enabled: true
+  
+  # Kubectl image for cleanup jobs
+  image: bitnami/kubectl:latest
+  
+  # Workspace PVC cleaner
+  pvcCleaner:
+    schedule: "15 * * * *"  # Every hour at :15
+    retentionHours: "12"
+    maxDeletions: "15"
+  
+  # Event cleaner
+  eventCleaner:
+    schedule: "*/30 * * * *"  # Every 30 minutes
+    retentionMinutes: "60"
+
+# =============================================================================
 # Cloudflare Tunnel - Ingress via Cloudflare
 # =============================================================================
 cloudflare:

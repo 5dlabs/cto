@@ -20,6 +20,9 @@ WORKDIR /app
 # Copy pre-built binary (placed by CI workflow into build context)
 COPY agent-controller /app/agent-controller
 
+# Copy templates directory (embedded in image for direct filesystem access)
+COPY templates/ /app/templates/
+
 # Make binary executable and change ownership to app user  
 RUN chmod +x /app/agent-controller && \
     chown -R app:app /app
