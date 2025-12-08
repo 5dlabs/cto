@@ -27,7 +27,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
 spec:
-  project: platform
+  project: default
 
   # Ignore fields that the ClickHouse operator adds to its own deployment
   # The operator self-labels with version and build info which causes perpetual OutOfSync
