@@ -23,22 +23,28 @@ WORKDIR /workspace
 # Install uv (fast Python package manager from Astral)
 USER root
 RUN --mount=type=cache,target=/root/.cache \
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    # Make uv immediately available in PATH for this and subsequent layers
+    ln -sf /root/.local/bin/uv /usr/local/bin/uv
 ENV PATH="/root/.local/bin:$PATH"
 
-# Clone and install Dexter using uv (required for uv-managed projects)
+# Clone Dexter repository
 ARG DEXTER_VERSION=latest
-RUN --mount=type=cache,target=/root/.cache/uv \
-    git clone https://github.com/virattt/dexter.git /opt/dexter && \
-    cd /opt/dexter && \
+RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
     if [ "$DEXTER_VERSION" != "latest" ]; then \
-      git checkout "v${DEXTER_VERSION}"; \
-    fi && \
+      cd /opt/dexter && git checkout "v${DEXTER_VERSION}"; \
+    fi
+
+# Install Dexter using uv (run from within the project directory)
+WORKDIR /opt/dexter
+RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync && \
     ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
 
 # Verify installation
-RUN cd /opt/dexter && uv run python -c "from dexter.agent import Agent; print('✅ Dexter installed successfully')"
+RUN uv run python -c "from dexter.agent import Agent; print('✅ Dexter installed successfully')"
+
+WORKDIR /workspace
 
 # Configure git identity for agent operations
 USER node
