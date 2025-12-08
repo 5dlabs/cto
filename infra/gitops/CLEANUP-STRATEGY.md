@@ -7,7 +7,7 @@
 | Directory | Type | Purpose | Kustomize Features Used |
 |-----------|------|---------|------------------------|
 | `cloudflare-operator/` | Kustomize | Pull upstream + patch | ✅ Remote base + patches |
-| `cloudflare-tunnel/` | Kustomize | List resources | ❌ Just listing files |
+| `cloudflare-tunnel/` | ~~Raw YAML~~ | ~~Tunnel bindings~~ | ✅ Moved to CTO chart |
 | `kilo/` | Kustomize | List resources | ❌ Just listing files |
 | `test-databases/` | Kustomize | Set namespace | ✅ Namespace transform |
 | `external-secrets/` | Raw YAML | ExternalSecrets | N/A |

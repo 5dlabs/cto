@@ -1,0 +1,23 @@
+{{- if and .Values.cloudflare.enabled .Values.webhooks.enabled }}
+---
+# TunnelBinding: GitHub Webhooks
+# Routes GitHub webhook traffic to Argo Events EventSource
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: github-webhooks
+  namespace: {{ .Values.webhooks.namespace }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ .Values.cloudflare.tunnel.name }}
+subjects:
+  - name: github-eventsource-svc
+    spec:
+      fqdn: {{ .Values.cloudflare.bindings.webhooks.hostname }}
+      path: /github/webhook
+      target: http://github-eventsource-svc.{{ .Values.webhooks.namespace }}.svc:12000
+{{- end }}
+
