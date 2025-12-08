@@ -38,4 +38,3 @@ spec:
                 dependencyName: github-any
                 dataKey: body
               dest: spec.containers.0.env.0.value
-

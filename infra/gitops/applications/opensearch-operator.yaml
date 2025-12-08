@@ -2,7 +2,7 @@
 # OpenSearch Kubernetes Operator
 # License: Apache 2.0 - Safe to distribute commercially
 # Source: https://github.com/opensearch-project/opensearch-k8s-operator
-# 
+#
 # Features:
 # - OpenSearch cluster management
 # - OpenSearch Dashboards deployment
@@ -43,30 +43,30 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-          
+
           # Watch all namespaces
           watchNamespace: ""
-          
+
           # Logging
           logging:
             level: info
-        
+
         # Install CRDs
         installCRDs: true
-        
+
         # Service account
         serviceAccount:
           create: true
           name: opensearch-operator
-        
+
         # Common labels
         commonLabels:
           platform.5dlabs.io/log-collection: enabled
-        
+
         # Pod security context
         podSecurityContext:
           runAsNonRoot: true
-        
+
         # Security context
         securityContext:
           allowPrivilegeEscalation: false
@@ -92,5 +92,3 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
-
-

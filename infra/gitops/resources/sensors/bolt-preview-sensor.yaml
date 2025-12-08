@@ -281,4 +281,3 @@ data:
     - Pods: 20 max
 
     This prevents runaway preview deployments from impacting the cluster.
-

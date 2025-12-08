@@ -17,4 +17,3 @@ resources:
   - merge-to-main-sensor.yaml
   - remediation-feedback-sensor.yaml
   # Note: httproute.yaml moved to networking/ subdirectory for github-webhooks-networking app
-

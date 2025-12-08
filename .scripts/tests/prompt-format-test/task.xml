@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="test-1" priority="high">
+    <meta>
+        <title>Create a Simple Calculator Module</title>
+        <estimated_time>10 minutes</estimated_time>
+        <language>rust</language>
+    </meta>
+
+    <role>You are a Rust developer creating a simple calculator module with basic arithmetic operations.</role>
+
+    <goal>Create a Rust module `src/calculator.rs` with functions for add, subtract, multiply, and divide.</goal>
+
+    <requirements>
+        <requirement id="1">
+            <title>Create Calculator Module</title>
+            <description>Create `src/calculator.rs` with these function signatures:</description>
+            <code lang="rust">
+pub fn add(a: i32, b: i32) -> i32
+pub fn subtract(a: i32, b: i32) -> i32
+pub fn multiply(a: i32, b: i32) -> i32
+pub fn divide(a: i32, b: i32) -> Result&lt;i32, &amp;'static str&gt;
+            </code>
+        </requirement>
+        <requirement id="2">
+            <title>Handle Division by Zero</title>
+            <description>The `divide` function must return `Err("division by zero")` when `b` is 0.</description>
+        </requirement>
+        <requirement id="3">
+            <title>Add Tests</title>
+            <description>Create unit tests in the same file using `#[cfg(test)]` module.</description>
+        </requirement>
+        <requirement id="4">
+            <title>Register Module</title>
+            <description>Add `pub mod calculator;` to `src/lib.rs` or `src/main.rs`.</description>
+        </requirement>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion id="1">src/calculator.rs exists</criterion>
+        <criterion id="2">add function implemented correctly</criterion>
+        <criterion id="3">subtract function implemented correctly</criterion>
+        <criterion id="4">multiply function implemented correctly</criterion>
+        <criterion id="5">divide function implemented with Result type</criterion>
+        <criterion id="6">Division by zero returns Err</criterion>
+        <criterion id="7">Unit tests included in #[cfg(test)] module</criterion>
+        <criterion id="8">cargo test passes</criterion>
+        <criterion id="9">cargo clippy passes</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test</command>
+        <command>cargo clippy -- -D warnings</command>
+    </validation>
+
+    <deliverables>
+        <file>src/calculator.rs</file>
+        <file>src/lib.rs (or src/main.rs)</file>
+    </deliverables>
+</task>
+
+
+
+
+
+
+

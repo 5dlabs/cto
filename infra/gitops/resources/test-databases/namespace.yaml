@@ -6,4 +6,3 @@ metadata:
   labels:
     app.kubernetes.io/name: databases
     app.kubernetes.io/part-of: platform
-

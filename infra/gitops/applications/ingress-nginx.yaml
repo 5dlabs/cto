@@ -98,4 +98,3 @@ spec:
         maxDuration: 3m
 
   revisionHistoryLimit: 5
-

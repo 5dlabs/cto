@@ -29,4 +29,3 @@ spec:
       secret:
         name: github-webhook-secret
         key: secret
-

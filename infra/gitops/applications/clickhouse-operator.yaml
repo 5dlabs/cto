@@ -2,7 +2,7 @@
 # Altinity ClickHouse Operator for Kubernetes
 # License: Apache 2.0 - Safe to distribute commercially
 # Source: https://github.com/Altinity/clickhouse-operator
-# 
+#
 # Features:
 # - ClickHouse cluster management
 # - Automatic schema propagation
@@ -49,5 +49,3 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
-
-

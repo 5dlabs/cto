@@ -42,4 +42,3 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 2m
-

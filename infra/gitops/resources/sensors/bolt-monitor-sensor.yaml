@@ -126,4 +126,3 @@ data:
     - **Bolt-Monitor** tracks production health (this mode)
 
     Monitor mode provides **continuous visibility** across all deployment modes.
-

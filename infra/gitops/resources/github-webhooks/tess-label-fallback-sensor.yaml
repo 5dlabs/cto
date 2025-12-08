@@ -212,4 +212,3 @@ spec:
                         fi
 
                         echo "✅ Fallback trigger completed"
-

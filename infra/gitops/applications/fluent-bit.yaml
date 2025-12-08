@@ -307,4 +307,3 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
-

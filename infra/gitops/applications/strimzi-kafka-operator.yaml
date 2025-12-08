@@ -2,7 +2,7 @@
 # Strimzi Kafka Operator for Apache Kafka on Kubernetes
 # License: Apache 2.0 - Safe to distribute commercially
 # Source: https://strimzi.io/
-# 
+#
 # Features:
 # - Kafka cluster management with KRaft (ZooKeeper-less) mode
 # - Topic and user management
@@ -36,7 +36,7 @@ spec:
       values: |
         # Watch all namespaces for Kafka resources
         watchAnyNamespace: true
-        
+
         # Resource limits
         resources:
           requests:
@@ -45,21 +45,21 @@ spec:
           limits:
             cpu: 1000m
             memory: 768Mi
-        
+
         # Logging
         logLevel: INFO
-        
+
         # Generate network policies
         generateNetworkPolicy: false
-        
+
         # Labels for log collection
         labels:
           platform.5dlabs.io/log-collection: enabled
-        
+
         # Leader election for HA
         leaderElection:
           enable: true
-        
+
         # Create cluster roles for operator
         createClusterRoles: true
 
@@ -80,5 +80,3 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
-
-

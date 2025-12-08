@@ -43,4 +43,3 @@ spec:
         maxDuration: 2m
 
   revisionHistoryLimit: 5
-

@@ -1,0 +1,164 @@
+#!/bin/bash
+set -euo pipefail
+
+# Render the agent templates ConfigMaps via Helm and apply them to the cluster.
+# This script handles multiple split ConfigMaps (shared, claude, codex, cursor, factory, opencode).
+# Optional environment overrides:
+#   RELEASE_NAME  - Helm release name (default: controller)
+#   NAMESPACE     - Kubernetes namespace (default: cto)
+#   VALUES_FILE   - Helm values file to include (default: infra/charts/controller/values.yaml)
+# Additional Helm args can be passed after a double dash, e.g.:
+#   ./scripts/apply-templates-configmap.sh -- -f custom-values.yaml
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CHART_DIR="$ROOT_DIR/infra/charts/controller"
+
+RELEASE_NAME=${RELEASE_NAME:-controller}
+NAMESPACE=${NAMESPACE:-cto}
+VALUES_FILE_DEFAULT="$CHART_DIR/values.yaml"
+VALUES_FILE=${VALUES_FILE:-$VALUES_FILE_DEFAULT}
+
+# Split ConfigMap template names (auto-detect from generated files)
+CONFIGMAP_TEMPLATES=(
+  "templates-shared.yaml"
+  "templates-claude.yaml"
+  "templates-codex.yaml"
+  "templates-cursor.yaml"
+  "templates-dexter.yaml"
+  "templates-factory.yaml"
+  "templates-gemini.yaml"
+  "templates-healer.yaml"
+  "templates-intake.yaml"
+  "templates-integration.yaml"
+  "templates-opencode.yaml"
+)
+
+# Split optional extra Helm args after "--"
+HELM_ARGS=()
+if [[ $# -gt 0 ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --)
+        shift
+        HELM_ARGS=("$@")
+        break
+        ;;
+      *)
+        echo "Unknown argument: $1" >&2
+        echo "Usage: $0 [-- <additional helm args>]" >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
+
+if ! command -v helm >/dev/null 2>&1; then
+  echo "❌ Helm must be installed to render the ConfigMaps" >&2
+  exit 1
+fi
+
+echo "🚀 Rendering and applying agent templates ConfigMaps..."
+echo ""
+
+# Process each ConfigMap
+for template in "${CONFIGMAP_TEMPLATES[@]}"; do
+  TMP_FILE=$(mktemp)
+  
+  echo "📦 Processing: $template"
+  
+  if [[ ${#HELM_ARGS[@]} -gt 0 ]]; then
+    helm template "$RELEASE_NAME" "$CHART_DIR" \
+      --namespace "$NAMESPACE" \
+      --values "$VALUES_FILE" \
+      --show-only "templates/$template" \
+      "${HELM_ARGS[@]}" > "$TMP_FILE"
+  else
+    helm template "$RELEASE_NAME" "$CHART_DIR" \
+      --namespace "$NAMESPACE" \
+      --values "$VALUES_FILE" \
+      --show-only "templates/$template" > "$TMP_FILE"
+  fi
+  
+  # Extract ConfigMap name using yq for robust YAML parsing
+  # Falls back to grep if yq is not available
+  if command -v yq >/dev/null 2>&1; then
+    CM_NAME=$(yq eval '.metadata.name' "$TMP_FILE")
+  else
+    # Fallback: Use grep with more robust pattern
+    # Match "name:" at any indentation level under metadata
+    CM_NAME=$(grep -E '^\s*name:\s*\S+' "$TMP_FILE" | grep -v "kind:" | head -1 | sed -E 's/^\s*name:\s*//')
+  fi
+  
+  # Validate that we extracted a non-empty name
+  if [[ -z "$CM_NAME" ]] || [[ "$CM_NAME" == "null" ]]; then
+    echo "❌ Failed to extract ConfigMap name from $template" >&2
+    echo "   Check the YAML structure in the rendered template" >&2
+    echo "   Template content:" >&2
+    head -20 "$TMP_FILE" >&2
+    rm -f "$TMP_FILE"
+    exit 1
+  fi
+  
+  echo "   ConfigMap name: $CM_NAME"
+  
+  # FORCE DELETE/RECREATE instead of patch to guarantee fresh content
+  echo "🗑️  Force deleting: $CM_NAME"
+  kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+
+  DELETE_TIMEOUT=30
+  FORCE_TIMEOUT=15
+  echo "   Waiting up to ${DELETE_TIMEOUT}s for deletion..."
+  if ! kubectl wait --for=delete "configmap/$CM_NAME" -n "$NAMESPACE" --timeout="${DELETE_TIMEOUT}s" >/dev/null 2>&1; then
+    echo "⚠️  $CM_NAME still exists after ${DELETE_TIMEOUT}s, forcing removal"
+    kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --grace-period=0 --force >/dev/null 2>&1 || true
+    echo "   Waiting an additional ${FORCE_TIMEOUT}s for forced deletion..."
+    if ! kubectl wait --for=delete "configmap/$CM_NAME" -n "$NAMESPACE" --timeout="${FORCE_TIMEOUT}s" >/dev/null 2>&1; then
+      echo "❌ Unable to delete $CM_NAME after ${DELETE_TIMEOUT}+${FORCE_TIMEOUT}s. Check for finalizers or admission webhooks." >&2
+      exit 1
+    fi
+  fi
+  echo "   Confirmed deletion of $CM_NAME"
+  
+  # Create with retry logic (handles race condition where CM may reappear)
+  MAX_RETRIES=5
+  RETRY=0
+  SUCCESS=false
+  
+  while [ $RETRY -lt $MAX_RETRIES ]; do
+    OUTPUT=$(kubectl create -f "$TMP_FILE" 2>&1) && {
+      echo "✅ Applied: $template"
+      SUCCESS=true
+      break
+    }
+    
+    RETRY=$((RETRY + 1))
+    
+    # Check if failure was due to AlreadyExists (race condition with ArgoCD/Helm)
+    if echo "$OUTPUT" | grep -q "AlreadyExists"; then
+      echo "⚠️  Attempt $RETRY: ConfigMap recreated by external controller, re-deleting..."
+      kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --wait=true --timeout=10s >/dev/null 2>&1 || true
+      sleep 1
+    else
+      echo "⚠️  Attempt $RETRY failed: $OUTPUT"
+    fi
+    
+    if [ $RETRY -lt $MAX_RETRIES ]; then
+      WAIT=$((RETRY))
+      echo "   Retrying in ${WAIT}s..."
+      sleep $WAIT
+    fi
+  done
+  
+  if [ "$SUCCESS" = "false" ]; then
+    echo "❌ Failed to create $template after $MAX_RETRIES attempts"
+    rm -f "$TMP_FILE"
+    exit 1
+  fi
+  
+  rm -f "$TMP_FILE"
+  echo ""
+done
+
+echo "✅ All agent templates ConfigMaps applied successfully!"
+
