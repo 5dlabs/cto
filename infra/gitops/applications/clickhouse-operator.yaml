@@ -46,6 +46,8 @@ spec:
         - .spec.template.metadata.labels["clickhouse.altinity.com/chop"]
         - .spec.template.metadata.labels["clickhouse.altinity.com/chop-commit"]
         - .spec.template.metadata.labels["clickhouse.altinity.com/chop-date"]
+        # Ignore divisor fields in resourceFieldRef - Kubernetes defaults these to '0'
+        - .spec.template.spec.containers[].env[].valueFrom.resourceFieldRef.divisor
 
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
