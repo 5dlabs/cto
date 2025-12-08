@@ -1,0 +1,25 @@
+---
+# Shared cache PVC for GitHub Actions Runners
+# Supports multiple cache types via subpaths:
+# - /cache (general build cache)
+# - /cache/cargo (Rust dependencies)
+# - /cache/general (npm, pip, etc.)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: runner-cache-pvc
+  namespace: arc-runners
+  labels:
+    app.kubernetes.io/name: runner-cache-pvc
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: cache
+spec:
+  accessModes:
+    - ReadWriteOnce  # local-path limitation - use node affinity for sharing
+  resources:
+    requests:
+      storage: 200Gi  # Large cache for Rust builds and dependencies
+  storageClassName: local-path  # Adjust based on your storage class
+
+
+

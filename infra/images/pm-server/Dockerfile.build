@@ -1,0 +1,58 @@
+# PM Server Multi-stage Dockerfile
+#
+# This Dockerfile builds the pm-server binary from source.
+# Use this for local development or when CI pre-built binaries aren't available.
+#
+# Build from repo root:
+#   docker build -f infra/images/pm-server/Dockerfile.build -t ghcr.io/5dlabs/pm-server:dev .
+
+# Build stage for Linux target using Rust nightly (for edition 2024 support)
+FROM rustlang/rust:nightly-bookworm AS builder
+
+WORKDIR /build
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+# Build the Linear binary (deployed as pm-server)
+RUN cargo build --release -p integrations --bin linear
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# Install runtime dependencies and argo CLI
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install argo CLI
+ARG ARGO_VERSION=v3.7.1
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN curl -sLO "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/argo-linux-amd64.gz" \
+    && gunzip argo-linux-amd64.gz \
+    && chmod +x argo-linux-amd64 \
+    && mv argo-linux-amd64 /usr/local/bin/argo
+
+RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
+
+WORKDIR /app
+
+# Copy the linear binary as pm-server
+COPY --from=builder /build/target/release/linear /app/pm-server
+
+RUN chmod +x /app/pm-server && chown -R app:app /app
+
+USER app
+
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
+
+CMD ["./pm-server"]

@@ -1,0 +1,136 @@
+---
+# Argo CD Application for Prometheus
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 25.27.0
+    chart: prometheus
+    helm:
+      values: |
+        # Prometheus configuration
+        server:
+          persistentVolume:
+            enabled: true
+            storageClass: local-path
+            size: 50Gi
+          # Pod security context
+          securityContext:
+            fsGroup: 65534
+            runAsUser: 65534
+            runAsGroup: 65534
+            runAsNonRoot: true
+          # Pod labels/annotations for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: prometheus
+          # Resource allocation
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+          # Data retention
+          retention: 15d
+          # Enable remote write receiver for OTel collector
+          extraFlags:
+            - web.enable-remote-write-receiver
+          # Global scrape configuration
+          global:
+            scrape_interval: 15s
+            scrape_timeout: 10s
+            evaluation_interval: 15s
+
+        # Scrape configurations
+        serverFiles:
+          prometheus.yml:
+            scrape_configs:
+              # Self-scrape Prometheus
+              - job_name: prometheus
+                static_configs:
+                  - targets:
+                      - localhost:9090
+              # Scrape kube-state-metrics for pod/container status
+              - job_name: kube-state-metrics
+                static_configs:
+                  - targets:
+                      - kube-state-metrics.observability.svc.cluster.local:8080
+                metric_relabel_configs:
+                  # Keep pod and container status metrics
+                  - source_labels: [__name__]
+                    regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*'
+                    action: keep
+              # OTEL collector metrics
+              - job_name: otel-collector
+                static_configs:
+                  - targets:
+                      - otel-collector-opentelemetry-collector.observability.svc.cluster.local:8889
+                    labels:
+                      namespace: observability
+                      service: otel-collector
+              # Loki metrics (for LokiDown alert)
+              - job_name: loki
+                static_configs:
+                  - targets:
+                      - loki-gateway.observability.svc.cluster.local:80
+                    labels:
+                      namespace: observability
+                      service: loki
+              # Alertmanager metrics (for AlertmanagerDown alert)
+              - job_name: alertmanager
+                static_configs:
+                  - targets:
+                      - alertmanager.observability.svc.cluster.local:9093
+                    labels:
+                      namespace: observability
+                      service: alertmanager
+              # Grafana metrics (for GrafanaDown alert)
+              - job_name: grafana
+                static_configs:
+                  - targets:
+                      - grafana.observability.svc.cluster.local:80
+                    labels:
+                      namespace: observability
+                      service: grafana
+
+        # Disable components we don't need (using separate Alertmanager deployment)
+        alertmanager:
+          enabled: false
+
+        # Disable kube-state-metrics (deployed separately)
+        kube-state-metrics:
+          enabled: false
+
+        # Disable prometheus-node-exporter
+        prometheus-node-exporter:
+          enabled: false
+
+        # Disable prometheus-pushgateway
+        prometheus-pushgateway:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

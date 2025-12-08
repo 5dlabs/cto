@@ -1,0 +1,219 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controller.fullname" . }}-task-controller-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    # Task Controller Configuration
+    # Configuration for the CodeRun controller
+
+    # Job configuration
+    job:
+      # No timeout - Claude processes should run as long as needed
+      activeDeadlineSeconds: 7200  # 2 hours default timeout
+
+    # Agent runtime configuration
+    agent:
+      {{- if and .Values.agent.image .Values.agent.image.repository .Values.agent.image.tag }}
+      image:
+        repository: {{ .Values.agent.image.repository | quote }}
+        tag: {{ .Values.agent.image.tag | quote }}
+      {{- end }}
+      cliImages:
+        {{- if .Values.agent.cliImages }}
+        {{- toYaml .Values.agent.cliImages | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
+      cliProviders:
+        {{- if .Values.agent.cliProviders }}
+        {{- toYaml .Values.agent.cliProviders | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
+      agentCliConfigs:
+        {{- $legacy := dict }}
+        {{- if .Values.agent.agentCliConfigs }}
+          {{- range $app, $cfg := .Values.agent.agentCliConfigs }}
+            {{- $normalized := dict }}
+            {{- if hasKey $cfg "cliType" }}
+              {{- $_ := set $normalized "cliType" $cfg.cliType }}
+            {{- else if hasKey $cfg "cli_type" }}
+              {{- $_ := set $normalized "cliType" $cfg.cli_type }}
+            {{- end }}
+            {{- if hasKey $cfg "model" }}
+              {{- $_ := set $normalized "model" $cfg.model }}
+            {{- end }}
+            {{- if hasKey $cfg "maxTokens" }}
+              {{- $_ := set $normalized "maxTokens" $cfg.maxTokens }}
+            {{- end }}
+            {{- if hasKey $cfg "temperature" }}
+              {{- $_ := set $normalized "temperature" $cfg.temperature }}
+            {{- end }}
+            {{- if hasKey $cfg "settings" }}
+              {{- $_ := set $normalized "settings" $cfg.settings }}
+            {{- end }}
+            {{- $_ := set $legacy $app $normalized }}
+          {{- end }}
+        {{- end }}
+
+        {{- $fromAgents := dict }}
+        {{- range $name, $agent := .Values.agents }}
+          {{- if and $agent.githubApp $agent.cli $agent.model }}
+            {{- $cliCfg := dict "cliType" $agent.cli "model" $agent.model }}
+            {{- if hasKey $agent "maxTokens" }}
+              {{- $_ := set $cliCfg "maxTokens" $agent.maxTokens }}
+            {{- end }}
+            {{- if hasKey $agent "temperature" }}
+              {{- $_ := set $cliCfg "temperature" $agent.temperature }}
+            {{- end }}
+            {{- if hasKey $agent "reasoningEffort" }}
+              {{- $_ := set $cliCfg "settings" (dict "reasoningEffort" $agent.reasoningEffort) }}
+            {{- end }}
+            {{- $_ := set $fromAgents $agent.githubApp $cliCfg }}
+          {{- end }}
+        {{- end }}
+
+        {{- $merged := merge $legacy $fromAgents }}
+        {{- range $name, $agent := .Values.agents }}
+          {{- if and $agent.githubApp $agent.reasoningEffort (hasKey $merged $agent.githubApp) }}
+            {{- $cfg := index $merged $agent.githubApp }}
+            {{- if not (hasKey $cfg "settings") }}
+              {{- $_ := set $cfg "settings" (dict) }}
+            {{- end }}
+            {{- if not (hasKey $cfg.settings "reasoningEffort") }}
+              {{- $_ := set $cfg.settings "reasoningEffort" $agent.reasoningEffort }}
+            {{- end }}
+            {{- $_ := set $merged $agent.githubApp $cfg }}
+          {{- end }}
+        {{- end }}
+        {{- if gt (len $merged) 0 }}
+        {{- toYaml $merged | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
+      {{- /* Compute effective ServiceAccount: prefer non-empty agent.serviceAccountName; else cluster-admin SA if created; else omit */ -}}
+      {{- $explicitSA := "" -}}
+      {{- if (hasKey .Values "agent") }}
+      {{- if (hasKey .Values.agent "serviceAccountName") }}
+      {{- $explicitSA = (trim .Values.agent.serviceAccountName) -}}
+      {{- end }}
+      {{- end }}
+      {{- $fallbackSA := "" -}}
+      {{- if .Values.rbac.submitter.clusterAdminServiceAccount.create -}}
+      {{- $fallbackSA = .Values.rbac.submitter.clusterAdminServiceAccount.name -}}
+      {{- end -}}
+      {{- $effectiveSA := coalesce $explicitSA $fallbackSA -}}
+      {{- if $effectiveSA }}
+      serviceAccountName: {{ $effectiveSA | quote }}
+      {{- end }}
+      imagePullSecrets:
+        {{- range .Values.imagePullSecrets }}
+        - {{ .name | quote }}
+        {{- end }}
+      inputBridge:
+        enabled: {{ .Values.agent.inputBridge.enabled | default false }}
+        image:
+          repository: {{ .Values.agent.inputBridge.image.repository | default "" | quote }}
+          tag: {{ .Values.agent.inputBridge.image.tag | default "" | quote }}
+        port: {{ .Values.agent.inputBridge.port | default 8080 }}
+
+    # Secrets configuration (references Kubernetes secrets)
+    secrets:
+      apiKeySecretName: {{ .Values.secrets.apiKeySecretName | quote }}
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+      cliApiKeys:
+        {{- if .Values.secrets.cliApiKeys }}
+        {{- range $cli, $secret := .Values.secrets.cliApiKeys }}
+        {{ $cli }}:
+          secretKey: {{ $secret.secretKey | quote }}
+          {{- if $secret.secretName }}
+          secretName: {{ $secret.secretName | quote }}
+          {{- end }}
+          {{- if $secret.envVar }}
+          envVar: {{ $secret.envVar | quote }}
+          {{- end }}
+        {{- end }}
+        {{- else }}
+        {}
+        {{- end }}
+      providerApiKeys:
+        {{- if .Values.secrets.providerApiKeys }}
+        {{- range $provider, $secret := .Values.secrets.providerApiKeys }}
+        {{ $provider }}:
+          secretKey: {{ $secret.secretKey | quote }}
+          {{- if $secret.secretName }}
+          secretName: {{ $secret.secretName | quote }}
+          {{- end }}
+          {{- if $secret.envVar }}
+          envVar: {{ $secret.envVar | quote }}
+          {{- end }}
+        {{- end }}
+        {{- else }}
+        {}
+        {{- end }}
+
+    # Tool permissions configuration (enterprise policy: allow all tools)
+    permissions:
+      agentToolsOverride: true
+      allow:
+        - "Tool(*)"
+      deny: []
+
+    # Telemetry configuration (used in templates)
+    telemetry:
+      enabled: true
+      otlpEndpoint: "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+      otlpProtocol: "grpc"
+      logsEndpoint: "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+      logsProtocol: "grpc"
+
+    # Storage configuration
+    storage:
+      {{- if .Values.storage.storageClassName }}
+      storageClassName: {{ .Values.storage.storageClassName | quote }}
+      {{- end }}
+      workspaceSize: {{ .Values.storage.workspaceSize | default "10Gi" | quote }}
+
+    # Cleanup configuration (event-driven cleanup by controller)
+    cleanup:
+      enabled: {{ .Values.cleanup.enabled | default true }}
+      completedJobDelayMinutes: {{ .Values.cleanup.completedJobDelayMinutes | default 5 }}
+      failedJobDelayMinutes: {{ .Values.cleanup.failedJobDelayMinutes | default 60 }}
+      deleteConfigMap: {{ .Values.cleanup.deleteConfigMap | default true }}
+
+    # Agent tool profiles (base configuration per agent)
+    {{- if .Values.agents }}
+    agents:
+      {{- range $key, $agent := .Values.agents }}
+      {{ $key }}:
+        githubApp: {{ $agent.githubApp | quote }}
+        {{- if $agent.cli }}
+        cli: {{ $agent.cli | quote }}
+        {{- end }}
+        {{- if $agent.model }}
+        model: {{ $agent.model | quote }}
+        {{- end }}
+        {{- if hasKey $agent "maxTokens" }}
+        maxTokens: {{ $agent.maxTokens }}
+        {{- end }}
+        {{- if hasKey $agent "temperature" }}
+        temperature: {{ $agent.temperature }}
+        {{- end }}
+        {{- if hasKey $agent "reasoningEffort" }}
+        reasoningEffort: {{ $agent.reasoningEffort | quote }}
+        {{- end }}
+        {{- if $agent.tools }}
+        tools:
+          {{- toYaml $agent.tools | nindent 10 }}
+        {{- end }}
+        {{- if $agent.clientConfig }}
+        clientConfig:
+          {{- toYaml $agent.clientConfig | nindent 10 }}
+        {{- end }}
+      {{- end }}
+    {{- end }}

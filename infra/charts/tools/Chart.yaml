@@ -1,0 +1,18 @@
+apiVersion: v2
+name: tools
+description: A Helm chart for Tools - Dynamic MCP tool management and proxy server
+type: application
+version: 1.2.0
+appVersion: 0.13.0
+keywords:
+  - mcp
+  - model-context-protocol
+  - ai
+  - tools
+  - cursor
+home: https://github.com/5dlabs/cto
+sources:
+  - https://github.com/5dlabs/cto
+maintainers:
+  - name: 5D Labs
+    email: team@5dlabs.io

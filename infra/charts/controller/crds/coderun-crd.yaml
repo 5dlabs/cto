@@ -1,0 +1,263 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: coderuns.agents.platform
+spec:
+  group: agents.platform
+  scope: Namespaced
+  names:
+    plural: coderuns
+    singular: coderun
+    kind: CodeRun
+    shortNames:
+    - cr
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Type
+      type: string
+      jsonPath: .spec.runType
+    - name: Task
+      type: integer
+      jsonPath: .spec.taskId
+    - name: Service
+      type: string
+      jsonPath: .spec.service
+    - name: Model
+      type: string
+      jsonPath: .spec.model
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model", "githubApp"]
+            properties:
+              runType:
+                type: string
+                default: "implementation"
+                description: "Type of run: implementation (default), documentation, or intake"
+                enum:
+                - implementation
+                - documentation
+                - intake
+              taskId:
+                type: integer
+                description: "Task ID to implement (required for implementation runs, optional for docs/intake)"
+              service:
+                type: string
+                description: "Target service name"
+              repositoryUrl:
+                type: string
+                description: "Target project repository URL (where implementation work happens)"
+              docsRepositoryUrl:
+                type: string
+                description: "Documentation repository URL (where Task Master definitions come from)"
+              docsProjectDirectory:
+                type: string
+                description: "Project directory within docs repository (e.g. '_projects/simple-api')"
+              docsBranch:
+                type: string
+                default: "main"
+                description: "Docs branch to use (e.g., 'main', 'feature/branch')"
+              workingDirectory:
+                type: string
+                description: "Working directory within target repository (defaults to service name if not specified)"
+              model:
+                type: string
+                description: "Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514)"
+              githubUser:
+                type: string
+                description: "GitHub username for authentication and commits (deprecated - use githubApp)"
+              githubApp:
+                type: string
+                description: "GitHub App name for authentication (e.g., '5DLabs-Rex')"
+              localTools:
+                type: string
+                description: "Local MCP tools/servers to enable (comma-separated)"
+              remoteTools:
+                type: string
+                description: "Remote MCP tools/servers to enable (comma-separated)"
+              contextVersion:
+                type: integer
+                default: 1
+                description: "Context version for retry attempts (incremented on each retry)"
+              promptModification:
+                type: string
+                description: "Additional context for retry attempts"
+              continueSession:
+                type: boolean
+                default: false
+                description: "Whether to continue a previous session"
+              overwriteMemory:
+                type: boolean
+                default: false
+                description: "Whether to overwrite memory before starting"
+              env:
+                type: object
+                additionalProperties:
+                  type: string
+                description: "Environment variables to set in the container"
+              envFromSecrets:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: "Name of the environment variable"
+                    secretName:
+                      type: string
+                      description: "Name of the secret"
+                    secretKey:
+                      type: string
+                      description: "Key within the secret"
+                  required:
+                  - name
+                  - secretName
+                  - secretKey
+                description: "Environment variables from secrets"
+              enableDocker:
+                type: boolean
+                description: "Whether to enable Docker-in-Docker support for this CodeRun (defaults to true)"
+                default: true
+              taskRequirements:
+                type: string
+                description: "Base64-encoded YAML containing task requirements (secrets and environment variables)"
+              serviceAccountName:
+                type: string
+                description: "Optional Kubernetes ServiceAccount for Job pods. If omitted, the namespace default SA is used."
+              cliConfig:
+                type: object
+                description: "CLI-specific configuration for multi-CLI operation"
+                required: ["cliType", "model"]
+                properties:
+                  cliType:
+                    type: string
+                    description: "CLI type to use (claude, codex, cursor, etc.)"
+                  model:
+                    type: string
+                    description: "Model identifier for the selected CLI"
+                  settings:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    description: "Arbitrary CLI-specific settings"
+                  maxTokens:
+                    type: integer
+                    format: int32
+                    description: "Maximum output tokens"
+                  temperature:
+                    type: number
+                    format: float
+                    description: "Sampling temperature"
+                  modelRotation:
+                    type: array
+                    items:
+                      type: string
+                    description: "Model rotation array for retry attempts"
+              linearIntegration:
+                type: object
+                description: "Linear integration configuration for status sync sidecar"
+                properties:
+                  sessionId:
+                    type: string
+                    description: "Linear agent session ID for activity updates"
+                  issueId:
+                    type: string
+                    description: "Linear issue ID for status updates"
+                  teamId:
+                    type: string
+                    description: "Linear team ID for workflow state mapping"
+                  enabled:
+                    type: boolean
+                    default: false
+                    description: "Whether to enable Linear status sync sidecar"
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current phase of the code implementation"
+              message:
+                type: string
+                description: "Human-readable message about the current state"
+              lastUpdate:
+                type: string
+                description: "Timestamp when this phase was reached"
+              jobName:
+                type: string
+                description: "Associated Kubernetes Job name"
+              pullRequestUrl:
+                type: string
+                description: "Pull request URL if created"
+              remediationStatus:
+                type: string
+                description: "Latest remediation status label applied to the PR (needs-fixes, needs-tess, approved, etc.)"
+              qaStatus:
+                type: string
+                description: "QA decision recorded by Tess (approved, changes_requested, pending)"
+              retryCount:
+                type: integer
+                description: "Current retry attempt (if applicable)"
+              conditions:
+                type: array
+                description: "Conditions for the CodeRun"
+                items:
+                  type: object
+                  required: ["type", "status"]
+                  properties:
+                    type:
+                      type: string
+                      description: "Type of condition"
+                    status:
+                      type: string
+                      description: "Status of the condition (True, False, or Unknown)"
+                    lastTransitionTime:
+                      type: string
+                      description: "Last time the condition transitioned (RFC3339 format)"
+                    reason:
+                      type: string
+                      description: "Reason for the condition's last transition"
+                    message:
+                      type: string
+                      description: "Human-readable message about the condition"
+              configmapName:
+                type: string
+                description: "Name of the ConfigMap containing the prompt and context"
+              contextVersion:
+                type: integer
+                description: "Version of the context and prompt used"
+              promptModification:
+                type: string
+                description: "Modification to the prompt if any"
+              promptMode:
+                type: string
+                description: "Mode of prompt (e.g., direct, indirect)"
+              sessionId:
+                type: string
+                description: "Session ID for tracking"
+              finishedAt:
+                type: string
+                description: "Timestamp when the run finished"
+              expireAt:
+                type: string
+                description: "Timestamp when controller should clean up run resources"
+              cleanupCompletedAt:
+                type: string
+                description: "Timestamp when controller cleanup completed"
+              workCompleted:
+                type: boolean
+                description: "Tracks whether the code implementation work has been completed successfully (used for TTL safety)"

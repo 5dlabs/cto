@@ -1,0 +1,34 @@
+---
+# TunnelBinding: GitHub Webhooks
+# Routes GitHub webhook traffic to the Argo Events EventSource
+#
+# Traffic flow:
+# github-webhooks.5dlabs.ai/github/webhook
+#   -> Cloudflare Edge
+#   -> cto-main tunnel
+#   -> github-eventsource-svc:12000
+#
+# Note: This binding must be in the same namespace as the target service
+# because the cloudflare-operator looks up the service by name in the
+# TunnelBinding's namespace.
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: github-webhooks
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: github-webhooks
+    app.kubernetes.io/part-of: platform
+# Note: TunnelBinding v1alpha1 has tunnelRef and subjects at root level, not under spec
+tunnelRef:
+  kind: ClusterTunnel
+  name: cto-main
+subjects:
+  - name: github-eventsource-svc
+    spec:
+      # Public hostname for GitHub webhooks
+      fqdn: github-webhooks.5dlabs.ai
+      # Path matching
+      path: /github/webhook
+      # Target service (must include protocol)
+      target: http://github-eventsource-svc.automation.svc:12000

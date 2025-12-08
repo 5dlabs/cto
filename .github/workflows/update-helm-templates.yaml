@@ -1,0 +1,50 @@
+---
+name: Update Helm Templates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/charts/controller/claude-templates/**'
+      - 'infra/charts/controller/scripts/generate-templates-configmap.sh'
+
+jobs:
+  update-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Regenerate static templates
+        run: |
+          cd infra/charts/controller
+          make generate-templates
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet infra/charts/controller/templates/claude-templates-static.yaml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated templates
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add infra/charts/controller/templates/claude-templates-static.yaml
+          git commit -m "chore: auto-update claude-templates static ConfigMap
+
+          - Regenerated from claude-templates/ source files
+          - Updated by GitHub Action on template changes"
+
+      - name: Push changes
+        if: steps.changes.outputs.changed == 'true'
+        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: main

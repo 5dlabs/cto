@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: engineering-metrics-dashboard
+  namespace: telemetry
+  labels:
+    grafana_dashboard: "1"
+data:
+  engineering-metrics.json: |
+{{ .Files.Get "dashboards/engineering-metrics-dashboard.json" | indent 4 }}

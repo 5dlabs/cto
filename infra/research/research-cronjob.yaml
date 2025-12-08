@@ -1,0 +1,136 @@
+---
+# =============================================================================
+# Research Pipeline CronJob
+# =============================================================================
+# Monitors Twitter/X bookmarks, analyzes relevance with AI, enriches links
+# with Firecrawl, and stores research entries as markdown.
+#
+# Schedule: Every 5 minutes
+# =============================================================================
+
+---
+# PersistentVolumeClaim for research data storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: research-data
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: research-data
+    app.kubernetes.io/part-of: research
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+
+---
+# ServiceAccount for research CronJob
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: research
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: research
+    app.kubernetes.io/part-of: research
+
+---
+# CronJob that polls Twitter bookmarks
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: research-poller
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: research-poller
+    app.kubernetes.io/part-of: research
+spec:
+  # Run every 5 minutes
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: research-poller
+        spec:
+          serviceAccountName: research
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          restartPolicy: OnFailure
+          imagePullSecrets:
+            - name: ghcr-secret
+          # Ensure jobs run on worker nodes, not control plane
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: DoesNotExist
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: research-data
+          containers:
+            - name: research
+              image: ghcr.io/5dlabs/research:latest
+              imagePullPolicy: Always
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+              args:
+                - poll
+                - --output=/data/research
+                - --state=/data/state.json
+                - --min-relevance=0.5
+                - --batch-size=10
+                - --model=claude-sonnet-4-20250514
+                - --create-pr
+                - --repo=5dlabs/cto
+                - --base-branch=main
+                - --research-dir=docs/research
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              env:
+                # Map GitHub PAT to GITHUB_TOKEN
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: tools-github-secrets
+                      key: GITHUB_PERSONAL_ACCESS_TOKEN
+              envFrom:
+                # Twitter cookies (new secret)
+                - secretRef:
+                    name: research-twitter-secrets
+                # Reuse existing API keys from platform
+                - secretRef:
+                    name: cto-secrets
+                - secretRef:
+                    name: tools-firecrawl-secrets
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 512Mi
+                limits:
+                  cpu: 1000m
+                  memory: 2Gi
+

@@ -1,0 +1,40 @@
+---
+# Altinity ClickHouse Operator values for Kind cluster
+# License: Apache 2.0 - Safe to distribute
+# Source: https://github.com/Altinity/clickhouse-operator
+
+# Operator image
+image:
+  repository: altinity/clickhouse-operator
+  tag: "0.25.5"
+  pullPolicy: IfNotPresent
+
+# Metrics exporter image
+metricsExporter:
+  repository: altinity/metrics-exporter
+  tag: "0.25.5"
+  pullPolicy: IfNotPresent
+
+# Namespace to deploy operator
+namespace: clickhouse-operator
+
+# Watch configuration
+watchNamespaces: []  # Empty = watch all namespaces
+
+# Resource limits for Kind
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Log level
+logLevel: 1
+
+# Labels for log collection
+labels:
+  platform.5dlabs.io/log-collection: enabled
+
+

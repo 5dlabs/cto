@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openmemory.fullname" . }}
+  labels:
+    {{- include "openmemory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: memory
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate  # SQLite doesn't support multiple writers
+  selector:
+    matchLabels:
+      {{- include "openmemory.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Telemetry annotations for log collection
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: "openmemory"
+      labels:
+        {{- include "openmemory.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: memory
+        platform.5dlabs.io/log-collection: enabled
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "openmemory.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        {{- if .Values.monitoring.metrics.enabled }}
+        - name: metrics
+          containerPort: {{ .Values.monitoring.metrics.port }}
+          protocol: TCP
+        {{- end }}
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: OM_TIER
+          value: "{{ .Values.tier }}"
+        - name: PORT
+          value: "{{ .Values.service.targetPort }}"
+        - name: DATABASE_PATH
+          value: "{{ .Values.database.path }}"
+        - name: EMBEDDING_PROVIDER
+          value: "{{ .Values.embeddings.provider }}"
+        - name: EMBEDDING_MODEL
+          value: "{{ .Values.embeddings.localModel }}"
+        - name: EMBEDDING_DIMENSIONS
+          value: "{{ .Values.embeddings.dimensions }}"
+        - name: DECAY_ENABLED
+          value: "{{ .Values.memory.decay.enabled }}"
+        - name: DECAY_LAMBDA
+          value: "{{ .Values.memory.decay.lambda }}"
+        - name: MIN_SALIENCE
+          value: "{{ .Values.memory.decay.minSalience }}"
+        - name: WAYPOINTS_ENABLED
+          value: "{{ .Values.memory.waypoints.enabled }}"
+        - name: MAX_WAYPOINT_CONNECTIONS
+          value: "{{ .Values.memory.waypoints.maxConnections }}"
+        - name: SIMILARITY_THRESHOLD
+          value: "{{ .Values.memory.waypoints.similarityThreshold }}"
+        - name: RATE_LIMIT_ENABLED
+          value: "{{ .Values.api.rateLimit.enabled }}"
+        - name: RATE_LIMIT_WINDOW_MS
+          value: "{{ .Values.api.rateLimit.windowMs }}"
+        - name: RATE_LIMIT_MAX_REQUESTS
+          value: "{{ .Values.api.rateLimit.maxRequests }}"
+        - name: METRICS_ENABLED
+          value: "{{ .Values.monitoring.metrics.enabled }}"
+        - name: METRICS_PORT
+          value: "{{ .Values.monitoring.metrics.port }}"
+        {{- if .Values.api.auth.enabled }}
+        - name: AUTH_ENABLED
+          value: "true"
+        - name: AUTH_TYPE
+          value: "{{ .Values.api.auth.type }}"
+        {{- end }}
+        {{- if eq .Values.embeddings.provider "openai" }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openmemory-secrets
+              key: openai-api-key
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.monitoring.healthCheck.path }}
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: {{ .Values.monitoring.healthCheck.intervalSeconds }}
+          timeoutSeconds: {{ .Values.monitoring.healthCheck.timeoutSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.monitoring.healthCheck.path }}
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /config
+        - name: agent-config
+          mountPath: /config/agents
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "openmemory.fullname" . }}-data
+      - name: config
+        configMap:
+          name: {{ include "openmemory.fullname" . }}
+      - name: agent-config
+        configMap:
+          name: {{ include "openmemory.fullname" . }}-agents
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+
+

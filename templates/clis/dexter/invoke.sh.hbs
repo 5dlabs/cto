@@ -1,0 +1,178 @@
+# =========================================================================
+# Dexter Agent CLI Invocation Partial
+#
+# This partial handles ONLY the Dexter CLI command building and execution.
+# Dexter is a Python-based autonomous financial research agent.
+# https://github.com/virattt/dexter
+#
+# Required context variables:
+#   - DEXTER_WORK_DIR: Working directory for Dexter
+#   - PROMPT_CONTENT: The prompt/query to send to Dexter (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use (defaults to claude-sonnet-4-20250514)
+#   - max_steps: Maximum global steps (default: 20)
+#   - max_steps_per_task: Maximum steps per task (default: 5)
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               DEXTER AGENT CLI INVOCATION                    ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Set working directory
+DEXTER_WORK_DIR="${DEXTER_WORK_DIR:-/workspace}"
+cd "$DEXTER_WORK_DIR"
+
+# Configure model (defaults to claude-sonnet-4-20250514)
+{{#if model}}
+export DEXTER_MODEL="{{model}}"
+echo "✓ Using model: {{model}}"
+{{else}}
+export DEXTER_MODEL="${DEXTER_MODEL:-claude-sonnet-4-20250514}"
+echo "✓ Using model: $DEXTER_MODEL"
+{{/if}}
+
+# Configure step limits for safety
+{{#if max_steps}}
+export DEXTER_MAX_STEPS="{{max_steps}}"
+{{else}}
+export DEXTER_MAX_STEPS="${DEXTER_MAX_STEPS:-20}"
+{{/if}}
+
+{{#if max_steps_per_task}}
+export DEXTER_MAX_STEPS_PER_TASK="{{max_steps_per_task}}"
+{{else}}
+export DEXTER_MAX_STEPS_PER_TASK="${DEXTER_MAX_STEPS_PER_TASK:-5}"
+{{/if}}
+
+echo "✓ Max steps: $DEXTER_MAX_STEPS, Max per task: $DEXTER_MAX_STEPS_PER_TASK"
+
+# Verify API keys
+if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ]; then
+    echo "❌ ERROR: No LLM API key found. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY"
+    exit 1
+fi
+echo "✓ LLM API key configured"
+
+if [ -z "$FINANCIAL_DATASETS_API_KEY" ]; then
+    echo "⚠️ WARNING: FINANCIAL_DATASETS_API_KEY not set. Financial research tools may not work."
+else
+    echo "✓ Financial Datasets API key configured"
+fi
+
+# Determine prompt source
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    USER_QUERY="$PROMPT_CONTENT"
+elif [ -f "$DEXTER_WORK_DIR/task/prompt.md" ]; then
+    USER_QUERY=$(cat "$DEXTER_WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Truncate query display for readability
+QUERY_PREVIEW="${USER_QUERY:0:100}"
+if [ ${#USER_QUERY} -gt 100 ]; then
+    QUERY_PREVIEW="${QUERY_PREVIEW}..."
+fi
+
+echo ""
+echo "🔍 Query: $QUERY_PREVIEW"
+echo ""
+echo "🚀 Starting Dexter agent..."
+echo ""
+
+# Create Python runner script
+# Uses heredoc to avoid escaping issues
+cat > /tmp/run_dexter.py << 'DEXTER_SCRIPT'
+#!/usr/bin/env python3
+"""
+Dexter Agent Runner for CTO Platform
+
+Runs Dexter agent with a query from stdin or command line argument.
+Outputs structured results for workflow integration.
+"""
+
+import os
+import sys
+import json
+from datetime import datetime
+
+def main():
+    # Get configuration from environment
+    model = os.environ.get('DEXTER_MODEL', 'claude-sonnet-4-20250514')
+    max_steps = int(os.environ.get('DEXTER_MAX_STEPS', '20'))
+    max_steps_per_task = int(os.environ.get('DEXTER_MAX_STEPS_PER_TASK', '5'))
+    
+    # Get query from args or stdin
+    if len(sys.argv) > 1:
+        query = ' '.join(sys.argv[1:])
+    else:
+        query = sys.stdin.read().strip()
+    
+    if not query:
+        print("Error: No query provided", file=sys.stderr)
+        sys.exit(1)
+    
+    # Import Dexter
+    try:
+        from dexter.agent import Agent
+    except ImportError as e:
+        print(f"Error: Failed to import Dexter: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Initialize agent
+    print(f"📊 Initializing Dexter agent...", file=sys.stderr)
+    print(f"   Model: {model}", file=sys.stderr)
+    print(f"   Max Steps: {max_steps}", file=sys.stderr)
+    print(f"   Max Steps Per Task: {max_steps_per_task}", file=sys.stderr)
+    print("", file=sys.stderr)
+    
+    agent = Agent(
+        max_steps=max_steps,
+        max_steps_per_task=max_steps_per_task,
+        model=model
+    )
+    
+    # Run research
+    try:
+        start_time = datetime.now()
+        answer = agent.run(query)
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        # Output result
+        print("")
+        print("=" * 60)
+        print("📈 DEXTER RESEARCH COMPLETE")
+        print("=" * 60)
+        print(f"Duration: {duration:.1f}s")
+        print("")
+        print(answer)
+        
+    except KeyboardInterrupt:
+        print("\n⚠️ Operation cancelled by user.", file=sys.stderr)
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n❌ Error during research: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+DEXTER_SCRIPT
+
+# Execute Dexter with the query
+# Use printf to handle special characters in query
+printf '%s' "$USER_QUERY" | python3 /tmp/run_dexter.py
+DEXTER_EXIT_CODE=$?
+
+echo ""
+if [ $DEXTER_EXIT_CODE -eq 0 ]; then
+    echo "✓ Dexter execution completed successfully"
+else
+    echo "❌ Dexter execution failed (exit code: $DEXTER_EXIT_CODE)"
+fi
+
+exit $DEXTER_EXIT_CODE
+

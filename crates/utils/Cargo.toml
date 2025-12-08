@@ -1,0 +1,44 @@
+[package]
+name = "utils"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Micro utilities for GitHub operations and other common tasks"
+keywords = ["github", "utilities", "cli", "automation"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "utils"
+path = "src/lib.rs"
+
+[[bin]]
+name = "utils"
+path = "src/main.rs"
+
+[dependencies]
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap.workspace = true
+
+# Text processing
+regex.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"
+

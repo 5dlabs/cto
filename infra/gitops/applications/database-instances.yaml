@@ -1,0 +1,53 @@
+---
+# Argo CD Application for database instances
+# Deploys PostgreSQL and Valkey instances to verify operators are working
+# Note: Using Valkey (BSD-3 licensed Redis fork) instead of Redis for license compliance
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: database-instances
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: database-instances
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project configuration
+  project: platform
+
+  # Source configuration - Using local kustomization
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    path: infra/gitops/resources/test-databases
+    targetRevision: main
+
+  # Destination configuration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: databases
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Revision history
+  revisionHistoryLimit: 5

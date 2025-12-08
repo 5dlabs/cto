@@ -1,0 +1,50 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-cto-binding
+  namespace: cto
+  annotations:
+    description: "Allows argo-workflow ServiceAccount from argo namespace to patch workflows in cto namespace for Play workflow resumption"
+subjects:
+- kind: ServiceAccount
+  name: argo-workflow
+  namespace: automation
+roleRef:
+  kind: Role
+  name: argo-events-workflows-cto
+  apiGroup: rbac.authorization.k8s.io
+---
+# Also ensure argo-workflow can access workflows in its own namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-argo-namespace-binding
+  namespace: automation
+  annotations:
+    description: "Allows argo-workflow ServiceAccount to manage workflows in argo namespace"
+subjects:
+- kind: ServiceAccount
+  name: argo-workflow
+  namespace: automation
+roleRef:
+  kind: ClusterRole
+  name: argo-workflow
+  apiGroup: rbac.authorization.k8s.io
+---
+# Allow argo-workflow SA in cto to create CodeRuns locally
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-local-binding
+  namespace: cto
+  annotations:
+    description: "Allows argo-workflow ServiceAccount in cto namespace to create CodeRuns"
+subjects:
+- kind: ServiceAccount
+  name: argo-workflow
+  namespace: cto
+roleRef:
+  kind: Role
+  name: argo-events-workflows-cto
+  apiGroup: rbac.authorization.k8s.io

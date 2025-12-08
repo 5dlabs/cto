@@ -1,0 +1,98 @@
+{{- if .Values.argo.enabled }}
+---
+# Role for workflow permissions in cto namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-permissions
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: workflow-permissions
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ include "controller.chart" . }}
+rules:
+  # Allow creating ConfigMaps for task markers and archives
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list", "update", "delete", "patch"]
+
+  # Allow creating WorkflowTaskResults for Argo Workflows
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtaskresults"]
+    verbs: ["create", "get", "list", "patch", "update"]
+
+  # Allow managing workflows for play-project-workflow-template
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Allow accessing workflow templates
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtemplates"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding for default service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: default-workflow-permissions
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: default-workflow-permissions
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ include "controller.chart" . }}
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: workflow-permissions
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for argo-workflow service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-permissions
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: argo-workflow-permissions
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ include "controller.chart" . }}
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: workflow-permissions
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for cto service account (used by Stitch and other sensor-triggered workflows)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cto-workflow-permissions
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: cto-workflow-permissions
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ include "controller.chart" . }}
+subjects:
+  - kind: ServiceAccount
+    name: cto
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: workflow-permissions
+  apiGroup: rbac.authorization.k8s.io
+
+{{- end }}

@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controller.fullname" . }}-config
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+data:
+  KUBERNETES_NAMESPACE: {{ .Values.config.kubernetesNamespace | quote }}
+  SERVER_HOST: {{ .Values.config.serverHost | quote }}
+  SERVER_PORT: {{ .Values.config.serverPort | quote }}
+  RUST_LOG: {{ .Values.config.rustLog | quote }}

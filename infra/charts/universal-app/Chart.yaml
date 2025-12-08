@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: universal-app
+version: 0.1.0
+description: Universal Helm chart for deploying applications in the 5dlabs platform
+appVersion: "latest"

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="2" priority="high" agent="cipher">
+    <meta>
+        <title>Implement authentication and authorization system</title>
+        <priority>high</priority>
+        <dependencies>1</dependencies>
+        <agent_hint>cipher</agent_hint>
+    </meta>
+
+    <role>You are a Senior Security Engineer with expertise in authentication and secure coding. Implement Task 2 with production-quality code.</role>
+
+    <context>
+        <overview>Build JWT-based auth with refresh tokens, OAuth2 integration, and role-based permissions with rate limiting</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create user model with roles (owner, admin, member, viewer)
+2. Implement JWT token generation/validation with refresh tokens
+3. Add OAuth2 flows for Google and GitHub using oauth2 crate
+4. Create middleware for role-based authorization
+5. Implement rate limiting (100 req/min auth, 20 req/min anon) using Redis
+6. Add password hashing with argon2
+
+```rust
+#[derive(sqlx::Type, Clone)]
+#[sqlx(type_name = &quot;user_role&quot;, rename_all = &quot;lowercase&quot;)]
+enum UserRole { Owner, Admin, Member, Viewer }
+
+struct AuthMiddleware;
+struct RateLimitMiddleware { redis: redis::Client }
+
+// JWT claims structure
+#[derive(Serialize, Deserialize)]
+struct Claims {
+    sub: Uuid,
+    role: UserRole,
+    exp: usize,
+}
+```</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-2): Implement authentication and authorization system</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for JWT validation, integration tests for OAuth flows, rate limiting tests with Redis, authorization middleware tests for each role level</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

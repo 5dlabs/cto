@@ -1,0 +1,66 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openmemory
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/charts/openmemory
+    helm:
+      releaseName: openmemory
+      values: |
+        # Override values for production
+        image:
+          repository: ghcr.io/5dlabs/openmemory
+          tag: "latest"
+          pullPolicy: Always
+
+        database:
+          storage:
+            size: 20Gi
+            storageClassName: "local-path"
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+
+        monitoring:
+          enabled: true
+          metrics:
+            enabled: true
+
+        api:
+          rateLimit:
+            enabled: true
+            maxRequests: 2000  # Higher limit for multi-agent usage
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      # Note: allowEmpty defaults to false, not specified to avoid OutOfSync
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

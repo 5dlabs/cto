@@ -1,0 +1,76 @@
+---
+# YAML Linting configuration for GitOps files
+
+extends: default
+
+rules:
+  line-length:
+    max: 150
+    level: warning
+
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 1
+
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+
+  truthy:
+    allowed-values: ['true', 'false']
+    check-keys: false
+
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  new-lines:
+    type: unix
+
+  trailing-spaces: enable
+
+  key-duplicates: enable
+
+  # ArgoCD specific relaxations
+  document-start:
+    present: true
+    level: warning
+
+  # Allow longer lines in descriptions and URLs
+  comments-indentation: disable
+
+ignore: |
+  # Ignore generated files
+  **/*generated*.yaml
+  **/*generated*.yml
+
+  # Ignore vendor directories
+  vendor/
+  node_modules/
+
+  # Ignore examples that might have intentional issues
+  **/bad-examples/**
+
+  # Relax indentation rules for examples
+  infra/gitops/databases/examples/**
+
+  # Ignore Talos configuration files (they have their own formatting)
+  infra/talos/config/simple/*.yaml
+
+  # Ignore some Helm chart files that have intentional formatting
+  infra/charts/*/templates/*.yaml
+
+  # Ignore some workflow files that have long lines intentionally
+  .github/workflows/*.yaml
+
+  # Ignore workflow templates that have complex formatting
+  infra/charts/controller/templates/workflowtemplates/*.yaml
+
+  # Ignore some telemetry files that have intentional formatting
+  infra/telemetry/alerts/*.yaml
+  infra/telemetry/values/*.yaml
+
+  # Ignore some examples and references
+  docs/references/argo-events/*.yaml
+  docs/examples/*.yaml

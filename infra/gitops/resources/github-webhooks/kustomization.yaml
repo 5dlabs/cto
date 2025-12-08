@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - eventsource.yaml
+  - eventbus.yaml
+  - sa-rbac.yaml
+  - play-workflow-sensors.yaml
+  # stage-aware-cleo-approval-sensor.yaml - REMOVED: references non-existent wait-for-cleo-approval suspend node
+  - stage-aware-pr-created.yaml
+  - stage-aware-tess-approval-sensor.yaml
+  - tess-label-fallback-sensor.yaml
+  - stage-aware-pr-merged-sensor.yaml
+  # atlas-pr-monitor-sensor.yaml - REMOVED: Atlas only runs at end of play cycle
+  # atlas-conflict-monitor-sensor.yaml - REMOVED: HEAL now handles conflict detection
+  # atlas-batch-integration-sensor.yaml - REMOVED: Phased out, no longer needed
+  - merge-to-main-sensor.yaml
+  - remediation-feedback-sensor.yaml
+  # Note: httproute.yaml moved to networking/ subdirectory for github-webhooks-networking app

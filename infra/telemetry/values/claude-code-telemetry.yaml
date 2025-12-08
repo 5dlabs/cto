@@ -1,0 +1,139 @@
+---
+# Claude Code deployment with telemetry integration
+
+# Secret configuration for API keys
+secrets:
+  # Using PAT as ANTHROPIC_API_KEY per user's instruction
+  anthropicApiKey: "YOUR_ANTHROPIC_API_KEY"
+  githubToken: "YOUR_GITHUB_TOKEN"
+
+# Image configuration
+image:
+  repository: ghcr.io/5dlabs/claude
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Image pull secret for ghcr.io
+imagePullSecrets:
+  - name: ghcr-secret
+
+# Resources - conservative for testing
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Persistence - using local-path storage
+persistence:
+  enabled: true
+  storageClass: "local-path"
+  accessMode: ReadWriteOnce
+  size: 20Gi
+  mountPath: /data
+
+# Telemetry configuration - CRITICAL FOR VALIDATION
+telemetry:
+  enabled: true
+  # Using internal service endpoint
+  otlpEndpoint: "otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+  otlpProtocol: "grpc"
+  otlpInsecure: true
+
+  # Service identification
+  serviceName: "claude-code"
+  serviceVersion: "1.0.0"
+  serviceNamespace: "claude-code"
+
+  # Team/Organization attributes
+  teamName: "platform"
+  department: "engineering"
+  environment: "production"
+  costCenter: "eng-001"
+
+  # Developer/Agent identification
+  githubUser: "claude-agent-001"
+  workingService: "telemetry-validation"
+
+  # Export intervals (milliseconds)
+  metricsExportInterval: "10000"  # 10 seconds for faster validation
+  metricsExportTimeout: "5000"    # 5 seconds
+  logsExportInterval: "5000"       # 5 seconds
+  logsExportTimeout: "5000"        # 5 seconds
+
+  # Cardinality control
+  includeSessionId: true
+  includeAccountUuid: true
+  includeVersion: true
+
+  # Additional OTEL configuration
+  logLevel: "debug"  # Debug for validation
+  logUserPrompts: true  # Enable for testing
+
+  # Custom attributes for testing
+  customAttributes: "test.mode=validation,test.phase=initial"
+
+  # Cluster name
+  clusterName: "talos-prod"
+
+# Development mode for testing
+developmentMode:
+  enabled: false
+  command: ["/bin/sh"]
+  args:
+    - "-c"
+    - |
+      echo "Starting Claude Code with telemetry validation..."
+      echo "OTLP Endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT"
+      echo "Service Name: $OTEL_SERVICE_NAME"
+      echo "Telemetry Enabled: $CLAUDE_CODE_TELEMETRY_ENABLED"
+
+      # Create workspace directory
+      mkdir -p /workspace
+      cd /workspace
+
+      # Since we don't have a valid Anthropic API key, just test telemetry emission
+      echo "Testing telemetry configuration..."
+      echo "CLAUDE_CODE_ENABLE_TELEMETRY=$CLAUDE_CODE_ENABLE_TELEMETRY"
+      echo "OTEL_SERVICE_NAME=$OTEL_SERVICE_NAME"
+      echo "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=$OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+      echo "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=$OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"
+
+      # Keep container running for telemetry testing
+      echo "Container will stay running for telemetry validation..."
+      while true; do
+        echo "Claude Code telemetry test running... $(date)"
+        sleep 60
+      done
+
+# Extra environment variables for debugging
+extraEnvVars:
+  - name: OTEL_LOG_LEVEL
+    value: "debug"
+  - name: OTEL_TRACES_EXPORTER
+    value: "otlp"
+  - name: OTEL_METRICS_EXPORTER
+    value: "otlp"
+  - name: OTEL_LOGS_EXPORTER
+    value: "otlp"
+  - name: DEBUG_TELEMETRY
+    value: "true"
+
+# Log file configuration
+logFile:
+  enabled: true
+  path: /var/log/claude-code
+  filename: telemetry-validation.log
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+

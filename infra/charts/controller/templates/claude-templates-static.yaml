@@ -1,0 +1,16 @@
+# Legacy placeholder for the former claude-templates ConfigMap.
+# Multi-CLI support now stores the real assets in templates-static.yaml.
+# This stub keeps older automation that still expects this template from failing.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controller.fullname" . }}-legacy-claude-templates
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+  annotations:
+    5dlabs.com/legacy-template-stub: "true"
+data:
+  README: |
+    The CLAUDE-specific templates have moved to templates-static.yaml.
+    This ConfigMap is intentionally empty and exists to satisfy legacy CI checks.

@@ -1,0 +1,113 @@
+---
+# Pre-commit hooks for GitOps validation
+# Install with: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yaml]
+        files: ^infra/gitops/.*\.yaml$
+        exclude: ^infra/gitops/databases/examples/.*\.yaml$
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^infra/gitops/.*\.yaml$
+      - id: end-of-file-fixer
+        files: ^infra/gitops/.*\.yaml$
+      - id: check-yaml
+        files: ^infra/gitops/.*\.yaml$
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: detect-private-key
+      - id: check-merge-conflict
+
+  # Security scanning with detect-secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(.*\.example|.*\.md|infra/gitops/databases/examples/.*)$
+
+  # Shell script checks
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        files: ^infra/scripts/.*\.sh$
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        args: [--config=.markdownlint.yaml]
+        files: \.md$
+
+  # Custom local hooks
+  - repo: local
+    hooks:
+      - id: argocd-app-validation
+        name: Validate ArgoCD Applications
+        entry: >
+          bash -c 'for f in infra/gitops/applications/*.yaml; do [ -f "$f" ] || continue;
+          grep -q "kind: Application" "$f" || (echo "Not an Application: $f" && exit 1); done'
+        language: system
+        files: ^infra/gitops/applications/.*\.yaml$
+        pass_filenames: false
+
+      - id: check-resource-limits
+        name: Check Resource Limits
+        entry: >
+          bash -c 'for f in infra/gitops/databases/*.yaml; do [ -f "$f" ] || continue;
+          [[ "$f" == *"examples"* ]] && continue; grep -q "resources:" "$f" || echo "Warning: No resource limits in $f"; done'
+        language: system
+        files: ^infra/gitops/databases/.*\.yaml$
+        exclude: ^infra/gitops/databases/(examples|README).*
+        pass_filenames: false
+
+      - id: no-hardcoded-passwords
+        name: Check for Hardcoded Passwords
+        entry: >
+          bash -c 'grep -r "password:" infra/gitops --include="*.yaml" | grep -v "secretKeyRef" | grep -v "CHANGE_THIS" | grep -v "PASSWORD" && (echo "Found hardcoded password!" && exit 1) || exit 0'
+        language: system
+        files: ^infra/gitops/.*\.yaml$
+        pass_filenames: false
+
+      - id: required-labels
+        name: Check Required Labels
+        entry: >
+          bash -c 'for f in infra/gitops/applications/*.yaml; do [ -f "$f" ] || continue;
+          grep -q "app.kubernetes.io/name:" "$f" || (echo "Missing required label in $f" && exit 1); done'
+        language: system
+        files: ^infra/gitops/applications/.*\.yaml$
+        pass_filenames: false
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3.11
+
+# Don't run on CI
+ci:
+  skip: [detect-secrets]
+
+# Files to exclude globally
+exclude: |
+  (?x)^(
+    .*\.git/.*|
+    .*\.terraform/.*|
+    .*\.idea/.*|
+    vendor/.*|
+    node_modules/.*
+  )$
+
+# Claude templates: Avoid local enforcement to prevent merge conflicts.
+# CI will enforce no-commit policy and regenerate on main.

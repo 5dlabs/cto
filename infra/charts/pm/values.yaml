@@ -1,0 +1,110 @@
+# Default values for PM (Project Management) service
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/5dlabs/pm-server
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8081
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# PM service configuration
+pm:
+  # Which PM provider to use (linear, asana, jira, etc.)
+  # Currently only 'linear' is implemented
+  provider: linear
+  # HTTP server port
+  port: 8081
+  # Maximum webhook timestamp age in milliseconds
+  maxTimestampAgeMs: 60000
+  # Kubernetes namespace for workflow operations
+  namespace: cto
+
+# Linear-specific configuration (when pm.provider=linear)
+linear:
+  # Enable Linear integration
+  enabled: true
+
+# Secrets configuration
+# These should be provided via Vault or external secrets
+secrets:
+  # Name of the Kubernetes secret containing credentials
+  secretName: pm-secrets
+  # Linear keys (when pm.provider=linear)
+  oauthClientIdKey: LINEAR_OAUTH_CLIENT_ID
+  oauthClientSecretKey: LINEAR_OAUTH_CLIENT_SECRET
+  oauthTokenKey: LINEAR_OAUTH_TOKEN
+  webhookSecretKey: LINEAR_WEBHOOK_SECRET
+
+# GitHub configuration (for repo creation and webhooks)
+github:
+  # Default organization for creating new repositories
+  # When no repository URL is provided, repos are created in this org
+  defaultOrg: ""
+  # External URL for GitHub webhooks (e.g., https://pm-webhooks.example.com)
+  # Set this to the publicly accessible URL of your PM service
+  webhookCallbackUrl: ""
+  # Key in the secrets for GitHub PAT (for webhook management)
+  tokenSecretKey: GITHUB_TOKEN
+
+# Workflow configuration
+intake:
+  githubApp: cto-dev
+  primaryModel: claude-sonnet-4-20250514
+  primaryProvider: anthropic
+  researchModel: claude-sonnet-4-20250514
+  researchProvider: anthropic
+  fallbackModel: claude-sonnet-4-20250514
+  fallbackProvider: anthropic
+  docsModel: claude-sonnet-4-20250514
+  numTasks: 50
+  cli: claude
+
+play:
+  githubApp: cto-dev
+  model: claude-sonnet-4-20250514
+  implementationAgent: rex
+  testingAgent: tess
+  qualityAgent: cleo
+  frontendAgent: blaze
+  parallelExecution: false
+  autoMerge: false
+  # Default repository (optional)
+  # repository: "https://github.com/org/repo"

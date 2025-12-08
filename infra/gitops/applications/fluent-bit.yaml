@@ -1,0 +1,309 @@
+---
+# Argo CD Application for Fluent Bit (Kubernetes stdout → OTEL Collector)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fluent-bit
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/part-of: platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://fluent.github.io/helm-charts
+    chart: fluent-bit
+    targetRevision: 0.47.7
+    helm:
+      values: |
+        fullnameOverride: fluent-bit
+        namespaceOverride: telemetry
+        serviceAccount:
+          create: true
+        tolerations: []
+        nodeSelector: {}
+        podAnnotations: {}
+
+        # Use raw Fluent Bit config for portability
+        config:
+          service: |
+            [SERVICE]
+                Flush           1
+                Daemon          Off
+                Log_Level       info
+                Parsers_File    parsers.conf
+                HTTP_Server     On
+                HTTP_Listen     0.0.0.0
+                HTTP_Port       2020
+
+          inputs: |
+            [INPUT]
+                Name              tail
+                Tag               kube.*
+                Path              /var/log/containers/*.log
+                Exclude_Path      /var/log/containers/fluent-bit-*.log
+                Parser            cri
+                Mem_Buf_Limit     50MB
+                Skip_Long_Lines   On
+                Refresh_Interval  5
+
+          filters: |
+            # Enrich with Kubernetes metadata (includes labels and annotations)
+            [FILTER]
+                Name                kubernetes
+                Match               kube.*
+                Kube_URL            https://kubernetes.default.svc:443
+                Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+                Kube_Tag_Prefix     kube.var.log.containers.
+                Merge_Log           On
+                Keep_Log            Off
+                Labels              On
+                Annotations         On
+                K8S-Logging.Parser  On
+                K8S-Logging.Exclude Off
+
+            # Add cluster name and platform identifiers
+            [FILTER]
+                Name                modify
+                Match               kube.*
+                Add                 cluster.name        telemetry-dev
+                Add                 platform.name       cto
+                Add                 platform.version    v1
+
+            # Enrich logs from CTO namespace with service details
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.controller-*_cto_*
+                Add                 service.name        agent-controller
+                Add                 service.component   controller
+                Add                 service.namespace   cto
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*tools*_cto_*
+                Add                 service.name        tools-mcp
+                Add                 service.component   tools
+                Add                 service.namespace   cto
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*openmemory*_cto_*
+                Add                 service.name        openmemory
+                Add                 service.component   memory
+                Add                 service.namespace   cto
+
+            # Enrich logs from observability namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*victoria-logs*_observability_*
+                Add                 service.name        victoria-logs
+                Add                 service.component   logging
+                Add                 service.namespace   observability
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*victoria-metrics*_observability_*
+                Add                 service.name        victoria-metrics
+                Add                 service.component   metrics
+                Add                 service.namespace   observability
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*otel-collector*_observability_*
+                Add                 service.name        otel-collector
+                Add                 service.component   telemetry
+                Add                 service.namespace   observability
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*grafana*_observability_*
+                Add                 service.name        grafana
+                Add                 service.component   visualization
+                Add                 service.namespace   observability
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*kube-state-metrics*_observability_*
+                Add                 service.name        kube-state-metrics
+                Add                 service.component   metrics-exporter
+                Add                 service.namespace   observability
+
+            # Enrich logs from automation namespace (Argo)
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*argo-workflows*_automation_*
+                Add                 service.name        argo-workflows
+                Add                 service.component   workflow-engine
+                Add                 service.namespace   automation
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*argo-events*_automation_*
+                Add                 service.name        argo-events
+                Add                 service.component   event-bus
+                Add                 service.namespace   automation
+
+            # Enrich logs from argocd namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*argocd*_argocd_*
+                Add                 service.name        argocd
+                Add                 service.component   gitops
+                Add                 service.namespace   argocd
+
+            # Enrich logs from vault namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*vault*_vault_*
+                Add                 service.name        vault
+                Add                 service.component   secrets
+                Add                 service.namespace   vault
+
+            # Enrich logs from infra namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*ingress-nginx*_infra_*
+                Add                 service.name        ingress-nginx
+                Add                 service.component   ingress
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*cert-manager*_infra_*
+                Add                 service.name        cert-manager
+                Add                 service.component   certificates
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*arc*controller*_infra_*
+                Add                 service.name        arc-controller
+                Add                 service.component   runner-controller
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*external-dns*_infra_*
+                Add                 service.name        external-dns
+                Add                 service.component   dns
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*cloudnative-pg*_infra_*
+                Add                 service.name        cloudnative-pg-operator
+                Add                 service.component   postgres-operator
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*redis-operator*_infra_*
+                Add                 service.name        redis-operator
+                Add                 service.component   redis-operator
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*vault-secrets*_infra_*
+                Add                 service.name        vault-secrets-operator
+                Add                 service.component   secrets-operator
+                Add                 service.namespace   infra
+
+            # Enrich logs from cloudflare-operator-system namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_cloudflare-operator-system_*
+                Add                 service.name        cloudflare-operator
+                Add                 service.component   tunnel-operator
+                Add                 service.namespace   cloudflare-operator-system
+
+            # Enrich logs from kube-system namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*kilo*_kube-system_*
+                Add                 service.name        kilo
+                Add                 service.component   vpn
+                Add                 service.namespace   kube-system
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*metrics-server*_kube-system_*
+                Add                 service.name        metrics-server
+                Add                 service.component   metrics-server
+                Add                 service.namespace   kube-system
+
+            # Enrich logs from databases namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_databases_*
+                Add                 service.name        database-instance
+                Add                 service.component   database
+                Add                 service.namespace   databases
+
+            # Enrich GitHub webhooks logs from automation namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*github*_automation_*
+                Add                 service.name        github-webhooks
+                Add                 service.component   webhooks
+                Add                 service.namespace   automation
+
+            # Enrich agent logs from agent-platform namespace
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_agent-platform_*
+                Add                 service.name        agent-runtime
+                Add                 service.component   agent
+                Add                 service.namespace   agent-platform
+
+            # Enrich logs from arc-runners namespace (GitHub Actions)
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_arc-runners_*
+                Add                 service.name        github-runner
+                Add                 service.component   ci-runner
+                Add                 service.namespace   arc-runners
+
+          outputs: |
+            # Send to OTEL Collector (which already exports to VictoriaLogs)
+            [OUTPUT]
+                Name                opentelemetry
+                Match               kube.*
+                Host                otel-collector-opentelemetry-collector.observability.svc.cluster.local
+                Port                4318
+                TLS                 Off
+                Logs_uri            /v1/logs
+                # Map the log record into the OTEL body field
+                logs_body_key       log
+                # Map Kubernetes metadata to OTEL Resource attributes
+                logs_resource_metadata_key  kubernetes
+
+          customParsers: |
+            [PARSER]
+                Name        cri
+                Format      regex
+                Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<log>.*)$
+                Time_Key    time
+                Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+        # Mount container logs
+        hostTail:
+          enabled: true
+          path: /var/log/containers
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground

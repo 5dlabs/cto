@@ -1,0 +1,102 @@
+---
+# Example values for deploying a task application
+# This would be used by Tess when deploying completed tasks
+
+# Basic configuration
+replicaCount: 1
+nameOverride: "task-app"
+fullnameOverride: ""
+
+# Image configuration
+image:
+  repository: ghcr.io/5dlabs/task-app
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  hosts:
+    - host: task-app.5dlabs.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: task-app-tls
+      hosts:
+        - task-app.5dlabs.local
+
+# Resource limits
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+# Environment variables
+env:
+  - name: PORT
+    value: "8080"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: ENVIRONMENT
+    value: "development"
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+# Security context
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+
+# Persistence (if needed)
+persistence:
+  enabled: false
+  storageClass: "standard"
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+
+# ConfigMap for application config
+configMap:
+  enabled: false
+  data: {}

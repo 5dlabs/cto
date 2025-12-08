@@ -1,0 +1,118 @@
+---
+# Argo CD Application for Alertmanager
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alertmanager
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 1.12.0
+    chart: alertmanager
+    helm:
+      values: |
+        # Alertmanager configuration
+        replicaCount: 1
+
+        # Persistence
+        persistence:
+          enabled: true
+          storageClass: local-path
+          size: 2Gi
+
+        # Resource allocation
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+        # Pod labels/annotations for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: alertmanager
+
+        # Pod security context (pod-level, not container-level)
+        podSecurityContext:
+          fsGroup: 65534
+
+        # Container security context
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+
+        # Alertmanager configuration
+        config:
+          global:
+            resolve_timeout: 5m
+          route:
+            group_by: ['alertname', 'severity']
+            group_wait: 30s
+            group_interval: 5m
+            repeat_interval: 4h
+            receiver: 'default-receiver'
+            routes:
+              # Critical alerts
+              - match:
+                  severity: critical
+                receiver: 'critical-receiver'
+                continue: true
+              # Warning alerts
+              - match:
+                  severity: warning
+                receiver: 'warning-receiver'
+                continue: true
+          receivers:
+            - name: 'default-receiver'
+              # Placeholder - configure with actual notification channels
+              # webhook_configs:
+              #   - url: 'http://example.com/webhook'
+            - name: 'critical-receiver'
+              # Placeholder for critical alert notifications
+              # slack_configs:
+              #   - api_url: 'https://hooks.slack.com/services/...'
+              #     channel: '#alerts-critical'
+            - name: 'warning-receiver'
+              # Placeholder for warning alert notifications
+              # slack_configs:
+              #   - api_url: 'https://hooks.slack.com/services/...'
+              #     channel: '#alerts-warning'
+          inhibit_rules:
+            # Inhibit warning alerts when critical alerts are firing
+            - source_match:
+                severity: 'critical'
+              target_match:
+                severity: 'warning'
+              equal: ['alertname', 'namespace']
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  # Ignore differences for fields defaulted by Kubernetes API server
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

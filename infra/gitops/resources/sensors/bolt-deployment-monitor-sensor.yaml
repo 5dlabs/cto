@@ -1,0 +1,194 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: bolt-production-deployment
+  namespace: automation
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    - name: pr-merged
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Trigger on PR merged events
+          - path: headers.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          # Only when PR is closed via merge
+          - path: body.action
+            type: string
+            value:
+              - closed
+          - path: body.pull_request.merged
+            type: bool
+            value:
+              - "true"
+          # Filter for ready-for-production label (set by Tess)
+          - path: body.pull_request.labels.[?(@.name=="ready-for-production")].name
+            type: string
+            value:
+              - ready-for-production
+
+  triggers:
+    - template:
+        name: bolt-deployment-validation
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-bolt-deploy-
+                namespace: cto
+                labels:
+                  agent: bolt
+                  trigger: deployment-status
+              spec:
+                githubApp: "5DLabs-Bolt"
+                cli: "Claude"
+                model: "claude-sonnet-4-5-20250929"
+                maxTokens: 4096
+                temperature: 0.3
+                repositoryUrl: ""
+                env:
+                  - name: DEPLOYMENT_STATE
+                    value: ""
+                  - name: DEPLOYMENT_URL
+                    value: ""
+                  - name: PR_NUMBER
+                    value: ""
+                  - name: SERVICE
+                    value: ""
+
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: bolt-deployment-
+                namespace: cto
+              spec:
+                serviceAccountName: agent-workflow-sa
+                entrypoint: validate-deployment
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - name: deployment-state
+                      value: ""
+                    - name: service-name
+                      value: ""
+                templates:
+                  - name: validate-deployment
+                    steps:
+                      - - name: run-bolt
+                          template: bolt-validation
+
+                  - name: bolt-validation
+                    resource:
+                      action: create
+                      manifest: |
+                        apiVersion: agents.platform.5dlabs.ai/v1alpha1
+                        kind: CodeRun
+                        metadata:
+                          generateName: coderun-bolt-
+                          namespace: cto
+                        spec:
+                          githubApp: "5DLabs-Bolt"
+                          cli: "Claude"
+                          model: "claude-sonnet-4-5-20250929"
+
+        parameters:
+          - src:
+              dependencyName: pr-merged
+              dataKey: body.pull_request.number
+            dest: spec.env.0.value
+
+          - src:
+              dependencyName: pr-merged
+              dataKey: body.pull_request.head.ref
+            dest: spec.env.1.value
+
+          - src:
+              dependencyName: pr-merged
+              dataKey: body.repository.clone_url
+            dest: spec.repositoryUrl
+
+          - src:
+              dependencyName: pr-merged
+              dataKey: body.pull_request.head.repo.name
+            dest: spec.env.2.value
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bolt-production-deployment-strategy
+  namespace: automation
+data:
+  strategy.md: |
+    # Bolt Production Deployment Strategy
+
+    ## Trigger: Tess QA Approval
+
+    Bolt is the **FINAL STEP** in the workflow - it only runs after Tess approves QA testing.
+
+    ### Trigger Conditions
+    - PR receives approval from Tess (or any reviewer)
+    - PR is labeled with `ready-for-production`
+    - This indicates all quality gates have passed
+
+    ### Why This Order?
+    **Don't publish untested code publicly!**
+
+    Workflow: Rex → Cleo → Tess approves → Atlas merges → **Bolt (Production)**
+
+    ## Production Deployment Workflow
+
+    ```
+    Tess Approves PR (QA passed)
+      ↓
+    Atlas Merges PR to main
+      ↓
+    Bolt Sensor Triggers (on merge)
+      ↓
+    Create ArgoCD Application
+      ↓
+    Wait for Deployment (Synced + Healthy)
+      ↓
+    Create ngrok Tunnel (Public Access)
+      ↓
+    Verify Public Accessibility
+      ↓
+    Post Production URL to PR ✅
+    ```
+
+    ## Integration with Other Agents
+
+    - **Rex** → Implements code, creates PR
+    - **Cleo** → Validates code quality
+    - **Tess** → QA tests in staging → APPROVE (does NOT merge)
+    - **Atlas** → Merges PR to main (handles ALL merging)
+    - **Bolt** → Publishes to production after merge (FINAL)
+
+    ## Success Criteria
+
+    Bolt marks production deployment as ✅ when:
+    1. ArgoCD application created and synced
+    2. Application status: `Healthy` + `Synced`
+    3. All pods in `Running` state
+    4. ngrok Tunnel provisioned successfully
+    5. Public URL verified accessible
+    6. Production URL posted to PR

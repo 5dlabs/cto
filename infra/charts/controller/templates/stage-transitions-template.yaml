@@ -1,0 +1,203 @@
+{{- if .Values.argo.enabled }}
+---
+# Stage Transitions Template for Multi-Agent Workflow Orchestration
+# This template manages workflow stages and atomic label updates for agent coordination
+
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: stage-transitions-template
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: stage-transitions-template
+    app.kubernetes.io/part-of: platform
+    agents.platform/template-type: stage-transitions
+spec:
+  arguments:
+    parameters:
+      - name: task-id
+        description: "Task ID for correlation"
+      - name: repository
+        description: "Repository context (e.g., 5dlabs/cto)"
+      - name: implementation-max-retries
+        description: "Maximum retry attempts for implementation agent"
+        value: "10"
+      - name: quality-max-retries
+        description: "Maximum retry attempts for quality agent"
+        value: "10"
+      - name: testing-max-retries
+        description: "Maximum retry attempts for testing agent"
+        value: "10"
+
+  serviceAccountName: argo-workflow
+
+  entrypoint: multi-agent-workflow
+
+  templates:
+    # Template for atomic label updates with verification
+    - name: update-workflow-stage
+      inputs:
+        parameters:
+        - name: new-stage
+        - name: retry-attempts
+          default: "3"
+      script:
+        image: bitnami/kubectl:latest
+        command: [bash]
+        source: |
+          set -e
+
+          # Function to update labels atomically
+          update_labels() {
+            echo "Updating workflow stage to {{"{{inputs.parameters.new-stage}}"}}"
+            kubectl patch workflow "{{"{{workflow.name}}"}}" \
+              --type=merge \
+              -p='{"metadata":{"labels":{
+                "current-stage":"{{"{{inputs.parameters.new-stage}}"}}",
+                "task-id":"{{"{{workflow.parameters.task-id}}"}}",
+                "repository":"{{"{{workflow.parameters.repository}}"}}",
+                "updated-at":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+              }}}'
+          }
+
+          # Function to verify label update
+          verify_labels() {
+            echo "Verifying label update"
+            current_stage=$(kubectl get workflow "{{"{{workflow.name}}"}}" -o jsonpath='{.metadata.labels.current-stage}')
+            if [ "$current_stage" != "{{"{{inputs.parameters.new-stage}}"}}" ]; then
+              return 1
+            fi
+            return 0
+          }
+
+          # Retry loop with exponential backoff
+          max_attempts={{"{{inputs.parameters.retry-attempts}}"}}
+          attempt=1
+          delay=5
+
+          while [ $attempt -le $max_attempts ]; do
+            if update_labels && verify_labels; then
+              echo "Successfully updated workflow stage"
+              exit 0
+            fi
+
+            echo "Attempt $attempt failed. Retrying in $delay seconds..."
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+          done
+
+          echo "Failed to update workflow stage after $max_attempts attempts"
+          exit 1
+    # Main workflow orchestrating multiple agents with stage transitions
+    - name: multi-agent-workflow
+      dag:
+        tasks:
+        # Rex Implementation Stage
+        - name: rex-implementation
+          template: agent-coderun
+          arguments:
+            parameters:
+            - name: github-app
+              value: "5DLabs-Rex"
+            - name: max-retries
+              value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
+
+        # Update stage after Rex completes
+        - name: update-to-waiting-pr
+          dependencies: [rex-implementation]
+          template: update-workflow-stage
+          arguments:
+            parameters:
+            - name: new-stage
+              value: waiting-pr-created
+
+        # Wait for PR Creation
+        - name: wait-pr-created
+          dependencies: [update-to-waiting-pr]
+          template: suspend-for-event
+          arguments:
+            parameters:
+            - name: stage
+              value: waiting-pr-created
+
+        # Cleo Quality Stage
+        - name: cleo-quality
+          dependencies: [wait-pr-created]
+          template: agent-coderun
+          arguments:
+            parameters:
+            - name: github-app
+              value: "5DLabs-Cleo"
+            - name: max-retries
+              value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
+
+        # Update stage after Cleo completes
+        - name: update-to-waiting-qa
+          dependencies: [cleo-quality]
+          template: update-workflow-stage
+          arguments:
+            parameters:
+            - name: new-stage
+              value: waiting-ready-for-qa
+
+        # Wait for Ready for QA
+        - name: wait-ready-for-qa
+          dependencies: [update-to-waiting-qa]
+          template: suspend-for-event
+          arguments:
+            parameters:
+            - name: stage
+              value: waiting-ready-for-qa
+
+        # Tess Testing Stage
+        - name: tess-testing
+          dependencies: [wait-ready-for-qa]
+          template: agent-coderun
+          arguments:
+            parameters:
+            - name: github-app
+              value: "5DLabs-Tess"
+            - name: max-retries
+              value: "{{`{{workflow.parameters.testing-max-retries}}`}}"
+
+        # Update stage after Tess completes (skip approval)
+        - name: update-to-waiting-merge
+          dependencies: [tess-testing]
+          template: update-workflow-stage
+          arguments:
+            parameters:
+            - name: new-stage
+              value: waiting-pr-merged
+
+        # Wait for PR Merge
+        - name: wait-pr-merged
+          dependencies: [update-to-waiting-merge]
+          template: suspend-for-event
+          arguments:
+            parameters:
+            - name: stage
+              value: waiting-pr-merged
+
+    # Suspend template that sets workflow stage and waits for events
+    - name: suspend-for-event
+      inputs:
+        parameters:
+        - name: stage
+      suspend: {}
+      metadata:
+        labels:
+          current-stage: "{{"{{inputs.parameters.stage}}"}}"
+          task-id: "{{"{{workflow.parameters.task-id}}"}}"
+          repository: "{{"{{workflow.parameters.repository}}"}}"
+          updated-at: "{{"{{workflow.creationTimestamp}}"}}"
+
+  # Cleanup policy - keep completed workflows for debugging
+  ttlStrategy:
+    secondsAfterCompletion: 86400  # 24 hours
+    secondsAfterFailure: 172800    # 48 hours
+
+  # Pod garbage collection
+  podGC:
+    strategy: OnPodCompletion
+{{- end }}

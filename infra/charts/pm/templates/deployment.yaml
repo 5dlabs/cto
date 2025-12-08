@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pm.fullname" . }}
+  labels:
+    {{- include "pm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "pm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "pm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pm.port }}
+              protocol: TCP
+          env:
+            - name: PM_PROVIDER
+              value: {{ .Values.pm.provider | quote }}
+            - name: LINEAR_ENABLED
+              value: {{ .Values.linear.enabled | quote }}
+            - name: LINEAR_PORT
+              value: {{ .Values.pm.port | quote }}
+            - name: LINEAR_MAX_TIMESTAMP_AGE_MS
+              value: {{ .Values.pm.maxTimestampAgeMs | quote }}
+            - name: NAMESPACE
+              value: {{ .Values.pm.namespace | quote }}
+            # Secrets from Kubernetes secret
+            - name: LINEAR_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.oauthClientIdKey }}
+                  optional: true
+            - name: LINEAR_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.oauthClientSecretKey }}
+                  optional: true
+            - name: LINEAR_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.oauthTokenKey }}
+            - name: LINEAR_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.secrets.webhookSecretKey }}
+            # Intake configuration
+            - name: GITHUB_APP_NAME
+              value: {{ .Values.intake.githubApp | quote }}
+            - name: PRIMARY_MODEL
+              value: {{ .Values.intake.primaryModel | quote }}
+            - name: PRIMARY_PROVIDER
+              value: {{ .Values.intake.primaryProvider | quote }}
+            - name: RESEARCH_MODEL
+              value: {{ .Values.intake.researchModel | quote }}
+            - name: RESEARCH_PROVIDER
+              value: {{ .Values.intake.researchProvider | quote }}
+            - name: FALLBACK_MODEL
+              value: {{ .Values.intake.fallbackModel | quote }}
+            - name: FALLBACK_PROVIDER
+              value: {{ .Values.intake.fallbackProvider | quote }}
+            - name: DOCS_MODEL
+              value: {{ .Values.intake.docsModel | quote }}
+            - name: NUM_TASKS
+              value: {{ .Values.intake.numTasks | quote }}
+            - name: INTAKE_CLI
+              value: {{ .Values.intake.cli | quote }}
+            # GitHub configuration (for repo creation and webhooks)
+            {{- if .Values.github.defaultOrg }}
+            - name: GITHUB_DEFAULT_ORG
+              value: {{ .Values.github.defaultOrg | quote }}
+            {{- end }}
+            {{- if .Values.github.webhookCallbackUrl }}
+            - name: WEBHOOK_CALLBACK_URL
+              value: {{ .Values.github.webhookCallbackUrl | quote }}
+            {{- end }}
+            {{- if .Values.github.tokenSecretKey }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: {{ .Values.github.tokenSecretKey }}
+                  optional: true
+            {{- end }}
+            # Play configuration
+            - name: PLAY_MODEL
+              value: {{ .Values.play.model | quote }}
+            - name: IMPLEMENTATION_AGENT
+              value: {{ .Values.play.implementationAgent | quote }}
+            - name: TESTING_AGENT
+              value: {{ .Values.play.testingAgent | quote }}
+            - name: QUALITY_AGENT
+              value: {{ .Values.play.qualityAgent | quote }}
+            - name: FRONTEND_AGENT
+              value: {{ .Values.play.frontendAgent | quote }}
+            - name: PARALLEL_EXECUTION
+              value: {{ .Values.play.parallelExecution | quote }}
+            - name: AUTO_MERGE
+              value: {{ .Values.play.autoMerge | quote }}
+            {{- if .Values.play.repository }}
+            - name: DEFAULT_REPOSITORY
+              value: {{ .Values.play.repository | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

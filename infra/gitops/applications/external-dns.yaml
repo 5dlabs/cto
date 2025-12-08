@@ -1,0 +1,146 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  # Ignore common Deployment drift fields
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /metadata/generation
+        - /spec/revisionHistoryLimit
+        - /status
+
+  source:
+    repoURL: https://kubernetes-sigs.github.io/external-dns/
+    chart: external-dns
+    targetRevision: 1.15.0
+    helm:
+      values: |
+        # External DNS configuration for Cloudflare
+        provider: cloudflare
+
+        # Domain filter - only manage DNS for 5dlabs.ai
+        domainFilters:
+          - 5dlabs.ai
+
+        # Cloudflare configuration
+        env:
+          - name: CF_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: cloudflare-api-credentials
+                key: api-token
+
+        cloudflare:
+          # Proxy traffic through Cloudflare (orange cloud)
+          proxied: true
+
+        # Sources to watch for DNS records
+        sources:
+          - gateway-httproute
+          - gateway-grpcroute
+          - service
+          - ingress
+
+        # Policy for record ownership
+        policy: upsert-only  # upsert-only = only create/update, don't delete
+
+        # Registry for tracking managed records
+        registry: txt
+        txtOwnerId: external-dns-5dlabs
+        txtPrefix: external-dns-
+
+        # Logging
+        logLevel: info
+        logFormat: text
+
+        # Deployment configuration
+        replicaCount: 1
+
+        # Pod labels for log collection
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing Deployments
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: external-dns
+
+        # Resource limits
+        resources:
+          limits:
+            cpu: 500m
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+
+        # Pod-level security context (fsGroup goes here)
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          fsGroup: 65534
+
+        # Container-level security context (capabilities go here)
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: external-dns
+          annotations: {}
+
+        # RBAC
+        rbac:
+          create: true
+
+        # Interval for DNS updates
+        interval: 1m
+
+        # Additional resilience settings
+        logLevel: info
+        dryRun: false
+        once: false
+
+        # Extra arguments
+        extraArgs:
+          - --cloudflare-dns-records-per-page=100
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+
+  revisionHistoryLimit: 5

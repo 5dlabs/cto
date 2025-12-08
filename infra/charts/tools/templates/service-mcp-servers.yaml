@@ -1,0 +1,34 @@
+{{- /*
+Standalone MCP Server Services
+Creates separate services for each enabled MCP server in mcpServers
+*/ -}}
+{{- range $key, $server := .Values.mcpServers }}
+{{- if $server.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tools.fullname" $ }}-{{ $server.name }}
+  labels:
+    {{- include "tools.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $server.name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $server.service.port | default 8080 }}
+      targetPort: {{ $server.service.targetPort | default 8080 }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "tools.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $server.name }}
+{{- end }}
+{{- end }}
+
+
+
+
+
+
+
+

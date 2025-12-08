@@ -1,0 +1,96 @@
+---
+# OpenSearch Kubernetes Operator
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/opensearch-project/opensearch-k8s-operator
+#
+# Features:
+# - OpenSearch cluster management
+# - OpenSearch Dashboards deployment
+# - Rolling upgrades
+# - Security configuration
+# - Index lifecycle management
+#
+# AWS Replacement: OpenSearch Service, Elasticsearch Service
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensearch-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: opensearch-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/type: search
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: default
+  source:
+    repoURL: https://opensearch-project.github.io/opensearch-k8s-operator/
+    chart: opensearch-operator
+    targetRevision: "2.8.0"
+    helm:
+      values: |
+        # Manager configuration
+        manager:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # Watch all namespaces
+          watchNamespace: ""
+
+          # Logging
+          logging:
+            level: info
+
+        # Install CRDs
+        installCRDs: true
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: opensearch-operator
+
+        # Common labels
+        commonLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        # Pod security context (pod-level)
+        podSecurityContext:
+          runAsNonRoot: true
+
+        # Container security context
+        # Note: capabilities must be under containerSecurityContext, not securityContext
+        # as the chart maps securityContext to pod level incorrectly
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: opensearch-operator
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,36 @@
+---
+# ClusterTunnel: Main Cloudflare Tunnel for CTO Platform
+# This creates a cluster-wide tunnel that can be referenced by TunnelBindings
+# across all namespaces.
+#
+# The operator will:
+# 1. Create the tunnel in Cloudflare
+# 2. Deploy cloudflared pods
+# 3. Manage the tunnel configuration
+#
+# Prerequisites:
+#   - Secret "cloudflare-api-credentials" must exist in cloudflare-operator-system
+#   - Required keys: CLOUDFLARE_API_TOKEN (with Tunnel:Edit, DNS:Edit permissions)
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: ClusterTunnel
+metadata:
+  name: cto-main
+  labels:
+    app.kubernetes.io/name: cto-main-tunnel
+    app.kubernetes.io/part-of: platform
+spec:
+  # Create a new tunnel with this name
+  newTunnel:
+    name: cto-main
+
+  # Cloudflare credentials configuration
+  cloudflare:
+    # Domain for DNS records (must be a zone you own in Cloudflare)
+    domain: 5dlabs.ai
+    # Secret containing CLOUDFLARE_API_TOKEN (in cloudflare-operator-system namespace)
+    secret: cloudflare-api-credentials
+    # Cloudflare Account ID
+    accountId: b73ec19faa187789b3f9d1deb0e0d95f
+
+  # Fallback for unmatched requests
+  fallbackTarget: http_status:404

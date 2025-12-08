@@ -1,0 +1,181 @@
+---
+# Grafana Helm Values for Claude Code Telemetry
+
+# Admin credentials
+adminUser: admin
+adminPassword: admin123!  # Change this in production
+
+# Resource allocation - adjusted for development environment
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Persistence for dashboards and settings
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: local-path
+  # Fix for permission issues in Kind
+  extraPvcLabels: {}
+  inMemory:
+    enabled: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress configuration
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations: {}
+  hosts:
+    - grafana.local
+  path: /
+  pathType: Prefix
+  tls: []
+
+# Data sources configuration - Prometheus and Loki
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    # Remove old Victoria datasources on provision
+    deleteDatasources:
+      - name: VictoriaMetrics
+        orgId: 1
+      - name: VictoriaLogs
+        orgId: 1
+    datasources:
+      # Prometheus datasource
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.observability.svc.cluster.local:80
+        isDefault: true
+        editable: false
+        jsonData:
+          timeInterval: "15s"
+          queryTimeout: "60s"
+          httpMethod: POST
+
+      # Loki datasource
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki-gateway.observability.svc.cluster.local:80
+        editable: false
+        jsonData:
+          maxLines: 1000
+
+      # Alertmanager datasource
+      - name: Alertmanager
+        type: alertmanager
+        access: proxy
+        url: http://alertmanager.observability.svc.cluster.local:9093
+        editable: false
+        jsonData:
+          implementation: prometheus
+
+# Dashboard providers configuration
+# dashboardProviders:
+#   dashboardproviders.yaml:
+#     apiVersion: 1
+#     providers:
+#       - name: 'claude-code-dashboards'
+#         orgId: 1
+#         folder: 'Claude Code'
+#         type: file
+#         disableDeletion: false
+#         editable: true
+#         options:
+#           path: /var/lib/grafana/dashboards/claude-code
+
+# Dashboard configuration as ConfigMap
+# dashboardsConfigMaps:
+#   engineering-metrics: engineering-metrics-dashboard
+
+# Plugins to install (Loki is built-in, no special plugin needed)
+plugins:
+  - grafana-piechart-panel
+  - grafana-worldmap-panel
+
+# RBAC configuration
+rbac:
+  create: true
+  pspEnabled: false
+
+# Service account
+serviceAccount:
+  create: true
+  name: grafana
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  fsGroup: 472
+
+# Environment variables
+env:
+  GF_EXPLORE_ENABLED: true
+  GF_ALERTING_ENABLED: true
+  GF_UNIFIED_ALERTING_ENABLED: true
+
+# Init containers - removed custom init to avoid permission issues
+
+# Grafana.ini configuration
+grafana.ini:
+  server:
+    domain: grafana.local
+    root_url: "%(protocol)s://%(domain)s/"
+
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+
+  log:
+    mode: console
+    level: info
+
+  unified_alerting:
+    enabled: true
+
+  feature_toggles:
+    enable: ngalert
+
+# Sidecar for dynamic dashboard/datasource provisioning
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    folder: /tmp/dashboards
+    provider:
+      name: sidecarProvider
+      orgId: 1
+      folder: 'Claude Code'
+      type: file
+      disableDeletion: false
+      allowUiUpdates: true
+
+  datasources:
+    enabled: true
+    label: grafana_datasource
+
+# Readiness and liveness probes
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 10

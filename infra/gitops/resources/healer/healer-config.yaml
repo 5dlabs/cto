@@ -1,0 +1,21 @@
+---
+# ConfigMap containing healer configuration for CI remediation server
+# Maps to ci::RemediationConfig struct
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healer-config
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/component: config
+data:
+  healer-config.json: |
+    {
+      "cli": "Factory",
+      "model": "claude-opus-4-5-20250929",
+      "max_attempts": 3,
+      "time_window_mins": 10,
+      "memory_url": "http://openmemory.cto-system.svc:3000",
+      "memory_enabled": true
+    }

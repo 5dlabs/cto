@@ -1,0 +1,268 @@
+---
+# Argo CD Project for Platform Infrastructure
+# This defines the security and access policies for platform applications
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-project
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Description
+  description: Platform infrastructure project for agent platform and related services
+
+  # Source repositories that applications in this project can deploy from
+  sourceRepos:
+    - 'https://github.com/5dlabs/cto'
+    - 'https://github.com/5dlabs/cto-apps'  # GitOps repo for Bolt-managed applications
+    - 'https://github.com/5dlabs/docs'
+    # Note: toolman repo has been integrated into cto as the 'tools' crate
+    - 'https://5dlabs.github.io/cto'
+
+    - 'https://github.com/5dlabs/*'
+    - 'https://argoproj.github.io/argo-helm'
+    - 'https://fluent.github.io/helm-charts'
+    - 'https://prometheus-community.github.io/helm-charts'
+    - 'https://grafana.github.io/helm-charts'
+    - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
+    - 'https://victoriametrics.github.io/helm-charts/'
+    - 'https://actions-runner-controller.github.io/actions-runner-controller'
+    - 'https://twingate.github.io/helm-charts'
+    - 'https://github.com/actions/actions-runner-controller'
+    # ARC OCI Helm charts
+    - 'oci://ghcr.io/actions/actions-runner-controller-charts'
+    - 'https://github.com/kubernetes-sigs/gateway-api'
+    - 'https://kubernetes-sigs.github.io/external-dns/'
+    - 'https://kubernetes-sigs.github.io/metrics-server/'
+    # Removed Mailu Helm chart repository
+    # Database operator Helm chart repositories
+    - 'https://cloudnative-pg.github.io/charts'  # CloudNativePG operator
+    - 'https://ot-container-kit.github.io/helm-charts'  # OT-CONTAINER-KIT Redis operator
+    - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'  # Zalando (legacy)
+    - 'https://github.com/spotahome/redis-operator'  # spotahome (legacy)
+    - 'https://github.com/questdb/questdb-operator'
+    # HashiCorp Vault Helm chart repository
+    - 'https://helm.releases.hashicorp.com'
+    # OpenBao (open source Vault fork) Helm chart repository
+    - 'https://openbao.github.io/openbao-helm'
+    # Ingress-NGINX Helm chart repository
+    - 'https://kubernetes.github.io/ingress-nginx'
+    # Cert-Manager Helm chart repository
+    - 'https://charts.jetstack.io'
+    # MinIO Operator Helm chart repository
+    - 'https://operator.min.io'
+    # ClickHouse Operator (Altinity)
+    - 'https://github.com/Altinity/clickhouse-operator'
+
+  # Destinations that applications in this project can deploy to
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+    - namespace: cto
+      server: https://kubernetes.default.svc
+    - namespace: 'cto-preview-*'  # Preview deployments (Bolt)
+      server: https://kubernetes.default.svc
+    - namespace: 'cto-prod-*'     # Production deployments (Bolt)
+      server: https://kubernetes.default.svc
+    - namespace: trader
+      server: https://kubernetes.default.svc
+    - namespace: automation
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    # Observability - metrics, logs, traces
+    - namespace: observability
+      server: https://kubernetes.default.svc
+    # CI/CD runners
+    - namespace: arc-runners
+      server: https://kubernetes.default.svc
+    # System namespaces
+    - namespace: kube-system
+      server: https://kubernetes.default.svc
+    - namespace: default
+      server: https://kubernetes.default.svc
+    # Data layer
+    - namespace: databases
+      server: https://kubernetes.default.svc
+    # Security - secrets management
+    - namespace: vault
+      server: https://kubernetes.default.svc
+    - namespace: openbao
+      server: https://kubernetes.default.svc
+    # Infrastructure - operators, ingress, DNS, certs
+    - namespace: infra
+      server: https://kubernetes.default.svc
+    # Cloudflare Tunnel operator
+    - namespace: cloudflare-operator-system
+      server: https://kubernetes.default.svc
+    # MinIO Object Storage
+    - namespace: minio-operator
+      server: https://kubernetes.default.svc
+    - namespace: minio-screenshots
+      server: https://kubernetes.default.svc
+
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+    - group: cert-manager.io
+      kind: '*'
+    - group: ''
+      kind: Namespace
+    - group: 'rbac.authorization.k8s.io'
+      kind: ClusterRole
+    - group: 'rbac.authorization.k8s.io'
+      kind: ClusterRoleBinding
+    - group: 'apiextensions.k8s.io'
+      kind: CustomResourceDefinition
+    - group: 'admissionregistration.k8s.io'
+      kind: MutatingWebhookConfiguration
+    - group: 'admissionregistration.k8s.io'
+      kind: ValidatingWebhookConfiguration
+    - group: 'apiregistration.k8s.io'
+      kind: APIService
+    - group: 'networking.k8s.io'
+      kind: IngressClass
+    - group: 'gateway.networking.k8s.io'
+      kind: GatewayClass
+    - group: 'agents.platform'
+      kind: '*'
+    - group: 'actions.github.com'
+      kind: '*'
+    # Vault Secrets Operator CRDs
+    - group: 'secrets.hashicorp.com'
+      kind: '*'
+    # Database operator cluster resources
+    - group: 'scheduling.k8s.io'
+      kind: '*'
+    - group: 'acid.zalan.do'
+      kind: '*'
+    # Kilo WireGuard VPN CRDs
+    - group: 'kilo.squat.ai'
+      kind: '*'
+    # MinIO Operator CRDs
+    - group: 'minio.min.io'
+      kind: '*'
+    - group: 'sts.min.io'
+      kind: '*'
+    - group: 'job.min.io'
+      kind: '*'
+    # Cloudflare Tunnel Operator CRDs (ClusterTunnel is cluster-scoped)
+    - group: 'networking.cfargotunnel.com'
+      kind: '*'
+    # ClickHouse Operator CRDs (Altinity)
+    - group: 'clickhouse.altinity.com'
+      kind: '*'
+    - group: 'clickhouse-keeper.altinity.com'
+      kind: '*'
+
+  # Namespace resource whitelist
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: '*'
+    - group: 'apps'
+      kind: '*'
+    - group: 'autoscaling'
+      kind: '*'
+    - group: 'batch'
+      kind: '*'
+    - group: 'extensions'
+      kind: '*'
+    - group: 'networking.k8s.io'
+      kind: '*'
+    - group: 'gateway.networking.k8s.io'
+      kind: '*'
+    - group: 'networking.cfargotunnel.com'
+      kind: '*'
+    - group: 'rbac.authorization.k8s.io'
+      kind: '*'
+    - group: 'argoproj.io'
+      kind: '*'
+    - group: 'agents.platform'
+      kind: '*'
+    - group: 'monitoring.coreos.com'
+      kind: '*'
+    - group: 'cert-manager.io'
+      kind: '*'
+    - group: 'actions.github.com'
+      kind: '*'
+    # Vault Secrets Operator CRDs
+    - group: 'secrets.hashicorp.com'
+      kind: '*'
+    - group: 'policy'
+      kind: '*'
+    - group: 'storage.k8s.io'
+      kind: '*'
+    # Database operator CRDs
+    - group: 'postgresql.cnpg.io'
+      kind: '*'
+    - group: 'redis.redis.opstreelabs.in'
+      kind: '*'
+    - group: 'acid.zalan.do'
+      kind: '*'
+    - group: 'databases.spotahome.com'
+      kind: '*'
+    - group: 'crd.questdb.io'
+      kind: '*'
+    # Kilo WireGuard VPN CRDs
+    - group: 'kilo.squat.ai'
+      kind: '*'
+    # MinIO Operator CRDs
+    - group: 'minio.min.io'
+      kind: '*'
+    - group: 'sts.min.io'
+      kind: '*'
+    - group: 'job.min.io'
+      kind: '*'
+    # ClickHouse Operator CRDs (Altinity)
+    - group: 'clickhouse.altinity.com'
+      kind: '*'
+    - group: 'clickhouse-keeper.altinity.com'
+      kind: '*'
+
+  # Roles for access control
+  roles:
+    - name: admin
+      description: Full admin access to platform project
+      policies:
+        - p, proj:platform:admin, applications, *, platform/*, allow
+        - p, proj:platform:admin, repositories, *, *, allow
+        - p, proj:platform:admin, clusters, *, *, allow
+      groups:
+        - platform:admins
+
+    - name: developer
+      description: Developer access for platform project
+      policies:
+        - p, proj:platform:developer, applications, get, platform/*, allow
+        - p, proj:platform:developer, applications, sync, platform/*, allow
+        - p, proj:platform:developer, applications, action/*, platform/*, allow
+        - p, proj:platform:developer, repositories, get, *, allow
+      groups:
+        - platform:developers
+
+    - name: cicd
+      description: CI/CD access for automated deployments
+      policies:
+        - p, proj:platform:cicd, applications, sync, platform/*, allow
+        - p, proj:platform:cicd, applications, get, platform/*, allow
+        - p, proj:platform:cicd, applications, action/*, platform/*, allow
+        - p, proj:platform:cicd, repositories, get, *, allow
+      groups:
+        - platform:cicd
+
+  # Sync windows (optional - for maintenance windows)
+  syncWindows:
+    - kind: allow
+      schedule: '* * * * *'  # Always allow (remove or modify for maintenance windows)
+      duration: 24h
+      applications:
+        - '*'
+      manualSync: true
+      clusters:
+        - '*'
+      namespaces:
+        - '*'

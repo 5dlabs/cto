@@ -1,0 +1,36 @@
+# Namespace configuration for workflow templates
+# The templates run in 'automation' (where Argo is) but create CRDs in 'cto' (where controller is)
+
+# Namespace where CRDs (CodeRuns) are created - watched by cto-controller
+crdNamespace: cto
+
+# Argo workflow settings
+argo:
+  enabled: true
+
+# Storage configuration for workflows
+storage:
+  storageClassName: local-path
+
+# Agent configuration (copied from controller chart for workflow template compatibility)
+agent:
+  cliImages:
+    codex:
+      repository: ghcr.io/5dlabs/codex
+      tag: "latest"
+    opencode:
+      repository: ghcr.io/5dlabs/opencode
+      tag: "latest"
+    claude:
+      repository: ghcr.io/5dlabs/claude
+      tag: "latest"
+    cursor:
+      repository: ghcr.io/5dlabs/cursor
+      tag: "latest"
+    factory:
+      repository: ghcr.io/5dlabs/factory
+      tag: "latest"
+
+# Agents configuration (for project workflow template)
+agents: {}
+

@@ -1,0 +1,28 @@
+{{- if .Values.rbac.create -}}
+{{- if .Values.rbac.clusterWide -}}
+---
+# ClusterRoleBinding for tools server
+# Binds the ClusterRole to the tools service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "tools.fullname" . }}
+  labels:
+    {{- include "tools.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "tools.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "tools.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
+
+
+
+
+
+
+

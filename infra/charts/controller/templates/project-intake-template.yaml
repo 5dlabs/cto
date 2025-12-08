@@ -1,0 +1,621 @@
+{{- if .Values.argo.enabled }}
+---
+# Argo Workflow Template for Unified Project Intake
+# This template processes new project PRDs, generates tasks,
+# enriches context via Firecrawl, and creates comprehensive documentation
+# in a single operation.
+
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: project-intake
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: project-intake
+spec:
+  arguments:
+    parameters:
+      - name: configmap-name
+        description: "Name of the ConfigMap containing intake files"
+      - name: project-name
+        description: "Project name (auto-detected if not provided)"
+        value: ""
+      - name: repository-url
+        description: "Target repository for the generated project - auto-detected from git"
+        # NO DEFAULT - auto-detected by MCP/script
+      - name: source-branch
+        description: "Source branch to work from - auto-detected from git"
+        # NO DEFAULT - auto-detected by MCP/script
+      - name: github-app
+        description: "GitHub App to use for authentication - REQUIRED from client config"
+        # NO DEFAULT - must be provided by MCP client from config
+      - name: primary-model
+        description: "Primary AI model for main operations (task expansion) - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: research-model
+        description: "Research AI model for PRD analysis and codebase understanding - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: fallback-model
+        description: "Fallback AI model when primary fails - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: primary-provider
+        description: "Primary AI provider (anthropic, openai, claude-code, etc.) - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: research-provider
+        description: "Research AI provider (claude-code, anthropic, etc.) - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: fallback-provider
+        description: "Fallback AI provider - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: num-tasks
+        description: "Target number of tasks to generate - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: expand-tasks
+        description: "Whether to expand tasks with subtasks - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      - name: analyze-complexity
+        description: "Whether to analyze task complexity - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
+      # Unified intake parameters (docs generation)
+      - name: docs-model
+        description: "Model for documentation generation - defaults to primary model"
+        value: ""
+      - name: enrich-context
+        description: "Whether to enrich context via Firecrawl - defaults to true"
+        value: "true"
+      - name: include-codebase
+        description: "Whether to include existing codebase context - defaults to false"
+        value: "false"
+      - name: cli
+        description: "CLI to use for documentation generation (claude, cursor, codex)"
+        value: "claude"
+      # GitHub configuration (for new repo creation and webhooks)
+      - name: webhook-callback-url
+        description: "External URL for GitHub webhooks (e.g., https://linear-webhooks.example.com)"
+        value: ""
+      - name: github-default-org
+        description: "Default GitHub organization for creating new repositories"
+        value: ""
+      # Linear integration parameters (optional)
+      - name: linear-session-id
+        description: "Linear agent session ID for callbacks"
+        value: ""
+      - name: linear-issue-id
+        description: "Linear issue ID for callbacks"
+        value: ""
+      - name: linear-team-id
+        description: "Linear team ID for callbacks"
+        value: ""
+      - name: linear-callback-url
+        description: "Linear service callback URL"
+        value: "http://pm-svc.cto.svc.cluster.local:8081"
+
+  # Service account for workflow execution
+  serviceAccountName: argo-workflow
+  
+  # Exit handler for callbacks (including Linear)
+  onExit: exit-handler
+
+  # Workflow timeout (2 hours for intake processing)
+  activeDeadlineSeconds: 7200
+
+  # Main workflow entrypoint
+  entrypoint: intake-main
+
+  templates:
+    # Main intake execution flow
+    - name: intake-main
+      steps:
+      # Step 0: Ensure GitHub repo exists and webhook is configured for PR events
+      - - name: ensure-github-repo
+          template: ensure-github-repo
+          arguments:
+            parameters:
+            - name: repository-url
+              value: "{{`{{workflow.parameters.repository-url}}`}}"
+            - name: project-name
+              value: "{{`{{workflow.parameters.project-name}}`}}"
+            - name: webhook-callback-url
+              value: "{{`{{workflow.parameters.webhook-callback-url}}`}}"
+            - name: github-default-org
+              value: "{{`{{workflow.parameters.github-default-org}}`}}"
+
+      # Step 1: Generate intake configuration
+      - - name: generate-intake-config
+          template: generate-intake-config
+          arguments:
+            parameters:
+            - name: configmap-name
+              value: "{{`{{workflow.parameters.configmap-name}}`}}"
+            - name: project-name
+              value: "{{`{{workflow.parameters.project-name}}`}}"
+            - name: repository-url
+              value: "{{`{{workflow.parameters.repository-url}}`}}"
+            - name: github-app
+              value: "{{`{{workflow.parameters.github-app}}`}}"
+            - name: primary-model
+              value: "{{`{{workflow.parameters.primary-model}}`}}"
+            - name: research-model
+              value: "{{`{{workflow.parameters.research-model}}`}}"
+            - name: fallback-model
+              value: "{{`{{workflow.parameters.fallback-model}}`}}"
+            - name: primary-provider
+              value: "{{`{{workflow.parameters.primary-provider}}`}}"
+            - name: research-provider
+              value: "{{`{{workflow.parameters.research-provider}}`}}"
+            - name: fallback-provider
+              value: "{{`{{workflow.parameters.fallback-provider}}`}}"
+            - name: num-tasks
+              value: "{{`{{workflow.parameters.num-tasks}}`}}"
+            - name: expand-tasks
+              value: "{{`{{workflow.parameters.expand-tasks}}`}}"
+            - name: analyze-complexity
+              value: "{{`{{workflow.parameters.analyze-complexity}}`}}"
+
+      - - name: run-intake
+          template: intake-container
+          arguments:
+            parameters:
+            - name: configmap-name
+              value: "{{`{{steps.generate-intake-config.outputs.parameters.configmap-name}}`}}"
+
+      - - name: cleanup-config
+          template: cleanup-intake-config
+          arguments:
+            parameters:
+            - name: configmap-name
+              value: "{{`{{steps.generate-intake-config.outputs.parameters.configmap-name}}`}}"
+
+    # Generate intake configuration
+    - name: generate-intake-config
+      inputs:
+        parameters:
+        - name: configmap-name
+        - name: project-name
+        - name: repository-url
+        - name: github-app
+        - name: primary-model
+        - name: research-model
+        - name: fallback-model
+        - name: primary-provider
+        - name: research-provider
+        - name: fallback-provider
+        - name: num-tasks
+        - name: expand-tasks
+        - name: analyze-complexity
+      outputs:
+        parameters:
+        - name: configmap-name
+          valueFrom:
+            path: /tmp/configmap-name
+      script:
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          set -e
+
+          # ConfigMap already created by MCP server, just pass it through
+          echo "Using ConfigMap: {{`{{inputs.parameters.configmap-name}}`}}"
+
+          # Output the ConfigMap name for the next step
+          echo "{{`{{inputs.parameters.configmap-name}}`}}" > /tmp/configmap-name
+          echo "ConfigMap created successfully"
+
+    # Run the intake container
+    - name: intake-container
+      inputs:
+        parameters:
+        - name: configmap-name
+      container:
+        image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
+        imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
+        command: ["/bin/bash"]
+        args: ["/templates/intake_unified-intake.sh"]
+        workingDir: /workspace
+        volumeMounts:
+          - name: intake-files
+            mountPath: /intake-files
+            readOnly: true
+          - name: templates
+            mountPath: /templates
+            readOnly: true
+          - name: agents-config
+            mountPath: /config/agents
+            readOnly: true
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: cto-secrets
+                key: ANTHROPIC_API_KEY
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: cto-secrets
+                key: OPENAI_API_KEY
+          # GitHub App credentials - use the standardized secret name
+          # All GitHub App secrets follow the pattern: github-app-{normalized-name}
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+                optional: true
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+                optional: true
+          - name: GITHUB_APP_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: client-id
+                optional: true
+          - name: GITHUB_APP_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: client-secret
+                optional: true
+          # Intake model and provider configuration
+          - name: GITHUB_APP
+            value: "{{`{{workflow.parameters.github-app}}`}}"
+          - name: PRIMARY_MODEL
+            value: "{{`{{workflow.parameters.primary-model}}`}}"
+          - name: RESEARCH_MODEL
+            value: "{{`{{workflow.parameters.research-model}}`}}"
+          - name: FALLBACK_MODEL
+            value: "{{`{{workflow.parameters.fallback-model}}`}}"
+          - name: PRIMARY_PROVIDER
+            value: "{{`{{workflow.parameters.primary-provider}}`}}"
+          - name: RESEARCH_PROVIDER
+            value: "{{`{{workflow.parameters.research-provider}}`}}"
+          - name: FALLBACK_PROVIDER
+            value: "{{`{{workflow.parameters.fallback-provider}}`}}"
+          - name: NUM_TASKS
+            value: "{{`{{workflow.parameters.num-tasks}}`}}"
+          - name: EXPAND_TASKS
+            value: "{{`{{workflow.parameters.expand-tasks}}`}}"
+          - name: ANALYZE_COMPLEXITY
+            value: "{{`{{workflow.parameters.analyze-complexity}}`}}"
+          # Unified intake: docs generation parameters
+          - name: DOCS_MODEL
+            value: "{{`{{workflow.parameters.docs-model}}`}}"
+          - name: ENRICH_CONTEXT
+            value: "{{`{{workflow.parameters.enrich-context}}`}}"
+          - name: INCLUDE_CODEBASE
+            value: "{{`{{workflow.parameters.include-codebase}}`}}"
+          # CLI for documentation generation phase
+          - name: CLI
+            value: "{{`{{workflow.parameters.cli}}`}}"
+      volumes:
+        - name: intake-files
+          configMap:
+            name: "{{`{{inputs.parameters.configmap-name}}`}}"
+{{ include "platform.agentTemplateProjectedVolume" . | nindent 8 }}
+        - name: agents-config
+          configMap:
+            name: {{ include "controller.fullname" . }}-agents
+
+    # Cleanup the temporary ConfigMap
+    - name: cleanup-intake-config
+      inputs:
+        parameters:
+        - name: configmap-name
+      script:
+        image: bitnami/kubectl:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          echo "Cleaning up ConfigMap: {{`{{inputs.parameters.configmap-name}}`}}"
+          kubectl delete configmap "{{`{{inputs.parameters.configmap-name}}`}}" \
+            -n {{ .Release.Namespace }} \
+            --ignore-not-found=true
+          echo "Cleanup complete"
+
+    # Ensure GitHub repo exists, has branch protection, and webhook is configured.
+    # If no repository-url is provided, creates a new repo from the project name.
+    # Sets up branch protection rules: require PRs, no direct commits to main.
+    - name: ensure-github-repo
+      inputs:
+        parameters:
+        - name: repository-url
+        - name: project-name
+        - name: webhook-callback-url
+        - name: github-default-org
+      script:
+        name: github
+        image: curlimages/curl:8.5.0
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          REPO_URL="{{`{{inputs.parameters.repository-url}}`}}"
+          PROJECT_NAME="{{`{{inputs.parameters.project-name}}`}}"
+          CALLBACK_URL="{{`{{inputs.parameters.webhook-callback-url}}`}}"
+          PARAM_DEFAULT_ORG="{{`{{inputs.parameters.github-default-org}}`}}"
+          
+          # Default organization for new repos (from parameter, env var, or empty)
+          DEFAULT_ORG="${PARAM_DEFAULT_ORG:-${GITHUB_ORG:-}}"
+          
+          if [ -z "$DEFAULT_ORG" ]; then
+            echo "⚠ No github-default-org configured - cannot create new repos without existing URL"
+          fi
+          
+          # Skip if no GitHub token available
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "No GITHUB_TOKEN available, skipping GitHub repo setup"
+            exit 0
+          fi
+          
+          # =========================================================================
+          # PHASE 1: Determine or Create Repository
+          # =========================================================================
+          
+          if [ -n "$REPO_URL" ] && [ "$REPO_URL" != "" ]; then
+            # Parse owner/repo from existing URL
+            OWNER_REPO=$(echo "$REPO_URL" | sed 's#^https://github.com/##' | sed 's#^http://github.com/##' | sed 's#^git@github.com:##' | sed 's#\.git$##' | sed 's#/$##')
+            OWNER=$(echo "$OWNER_REPO" | cut -d'/' -f1)
+            REPO=$(echo "$OWNER_REPO" | cut -d'/' -f2)
+            
+            if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
+              echo "Could not parse owner/repo from: $REPO_URL"
+              exit 0
+            fi
+            
+            echo "📂 Using existing repository: $OWNER/$REPO"
+          else
+            # Create new repo from project name
+            echo "📦 No repository URL provided, will attempt to create new repo..."
+            
+            if [ -z "$DEFAULT_ORG" ]; then
+              echo "⚠ No github-default-org configured, cannot create repo without existing URL"
+              echo "  Set GITHUB_DEFAULT_ORG or provide a repository-url in the issue"
+              exit 0
+            fi
+            
+            if [ -z "$PROJECT_NAME" ] || [ "$PROJECT_NAME" = "" ]; then
+              echo "⚠ No project name available, cannot create repo"
+              exit 0
+            fi
+            
+            # Sanitize project name for repo: lowercase, replace spaces/special chars with hyphens
+            REPO=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+            OWNER="$DEFAULT_ORG"
+            
+            echo "  Creating repo: $OWNER/$REPO"
+            
+            # Check if repo already exists
+            CHECK_RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$OWNER/$REPO")
+            
+            CHECK_CODE=$(echo "$CHECK_RESPONSE" | tail -1)
+            
+            if [ "$CHECK_CODE" = "200" ]; then
+              echo "✓ Repository $OWNER/$REPO already exists"
+            else
+              # Create new repository in the organization
+              CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/orgs/$OWNER/repos" \
+                -d "{
+                  \"name\": \"$REPO\",
+                  \"description\": \"Generated from CTO Platform intake: $PROJECT_NAME\",
+                  \"private\": true,
+                  \"auto_init\": true,
+                  \"has_issues\": true,
+                  \"has_projects\": false,
+                  \"has_wiki\": false
+                }")
+              
+              CREATE_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
+              CREATE_BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
+              
+              if [ "$CREATE_CODE" = "201" ]; then
+                echo "✓ Created new repository: $OWNER/$REPO"
+              else
+                echo "⚠ Could not create repo (HTTP $CREATE_CODE): $CREATE_BODY"
+                exit 0
+              fi
+            fi
+          fi
+          
+          # =========================================================================
+          # PHASE 2: Set Up Branch Protection Rules
+          # =========================================================================
+          echo ""
+          echo "🔒 Setting up branch protection for main..."
+          
+          # Check current branch protection
+          PROTECTION_CHECK=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/branches/main/protection")
+          
+          PROTECTION_CODE=$(echo "$PROTECTION_CHECK" | tail -1)
+          
+          if [ "$PROTECTION_CODE" = "200" ]; then
+            echo "✓ Branch protection already configured for main"
+          else
+            # Set branch protection rules
+            # - Require pull request reviews
+            # - No direct pushes to main
+            # - Require status checks (optional, but good practice)
+            PROTECTION_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$OWNER/$REPO/branches/main/protection" \
+              -d '{
+                "required_status_checks": null,
+                "enforce_admins": false,
+                "required_pull_request_reviews": {
+                  "dismiss_stale_reviews": false,
+                  "require_code_owner_reviews": false,
+                  "required_approving_review_count": 0
+                },
+                "restrictions": null,
+                "required_linear_history": false,
+                "allow_force_pushes": false,
+                "allow_deletions": false,
+                "block_creations": false,
+                "required_conversation_resolution": false,
+                "lock_branch": false,
+                "allow_fork_syncing": false
+              }')
+            
+            PROTECTION_RESP_CODE=$(echo "$PROTECTION_RESPONSE" | tail -1)
+            
+            if [ "$PROTECTION_RESP_CODE" = "200" ]; then
+              echo "✓ Branch protection enabled for main"
+              echo "  - Direct commits blocked"
+              echo "  - Pull requests required"
+            else
+              PROTECTION_BODY=$(echo "$PROTECTION_RESPONSE" | sed '$d')
+              echo "⚠ Could not set branch protection (HTTP $PROTECTION_RESP_CODE)"
+              # Non-fatal - continue anyway
+            fi
+          fi
+          
+          # =========================================================================
+          # PHASE 3: Set Up Webhook for PR Events
+          # =========================================================================
+          echo ""
+          echo "🔗 Setting up webhook..."
+          
+          # Skip webhook if no callback URL
+          if [ -z "$CALLBACK_URL" ] || [ "$CALLBACK_URL" = "" ]; then
+            echo "No webhook-callback-url configured, skipping webhook setup"
+            exit 0
+          fi
+          
+          WEBHOOK_URL="$CALLBACK_URL/webhooks/github"
+          echo "Target webhook URL: $WEBHOOK_URL"
+          
+          # List existing webhooks
+          EXISTING=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/hooks")
+          
+          # Check if webhook with our URL already exists
+          if echo "$EXISTING" | grep -q "\"url\":.*$(echo "$WEBHOOK_URL" | sed 's#/#\\/#g')"; then
+            echo "✓ GitHub webhook already exists for $OWNER/$REPO"
+            exit 0
+          fi
+          
+          # Create new webhook
+          HOOK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$OWNER/$REPO/hooks" \
+            -d "{
+              \"name\": \"web\",
+              \"active\": true,
+              \"events\": [\"pull_request\"],
+              \"config\": {
+                \"url\": \"$WEBHOOK_URL\",
+                \"content_type\": \"json\",
+                \"insecure_ssl\": \"0\"
+              }
+            }")
+          
+          HOOK_CODE=$(echo "$HOOK_RESPONSE" | tail -1)
+          
+          if [ "$HOOK_CODE" = "201" ]; then
+            echo "✓ Created GitHub webhook for $OWNER/$REPO"
+          elif [ "$HOOK_CODE" = "422" ]; then
+            echo "✓ GitHub webhook already exists (422 response)"
+          else
+            HOOK_BODY=$(echo "$HOOK_RESPONSE" | sed '$d')
+            echo "⚠ Could not create webhook (HTTP $HOOK_CODE): $HOOK_BODY"
+          fi
+          
+          echo ""
+          echo "✅ GitHub repo setup complete: https://github.com/$OWNER/$REPO"
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: pm-secrets
+                key: GITHUB_TOKEN
+                optional: true
+          - name: GITHUB_ORG
+            value: "{{ ((.Values.github).defaultOrg) | default "5dlabs" }}"
+
+    # Exit handler for Linear callbacks
+    - name: exit-handler
+      script:
+        image: curlimages/curl:8.5.0
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          SESSION_ID="{{`{{workflow.parameters.linear-session-id}}`}}"
+          ISSUE_ID="{{`{{workflow.parameters.linear-issue-id}}`}}"
+          CALLBACK_URL="{{`{{workflow.parameters.linear-callback-url}}`}}"
+          CONFIGMAP="{{`{{workflow.parameters.configmap-name}}`}}"
+          
+          # Skip if no Linear session configured
+          if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "" ]; then
+            echo "No Linear session configured, skipping callback"
+            exit 0
+          fi
+          
+          echo "Sending intake completion callback to Linear service..."
+          echo "  Session ID: $SESSION_ID"
+          echo "  Issue ID: $ISSUE_ID"
+          echo "  Workflow Status: {{`{{workflow.status}}`}}"
+          
+          # Build callback payload
+          PAYLOAD=$(cat <<EOF
+          {
+            "workflow_name": "{{`{{workflow.name}}`}}",
+            "workflow_status": "{{`{{workflow.status}}`}}",
+            "linear_session_id": "$SESSION_ID",
+            "linear_issue_id": "$ISSUE_ID",
+            "linear_team_id": "{{`{{workflow.parameters.linear-team-id}}`}}",
+            "configmap_name": "$CONFIGMAP",
+            "project_name": "{{`{{workflow.parameters.project-name}}`}}",
+            "duration_seconds": "{{`{{workflow.duration}}`}}"
+          }
+          EOF
+          )
+          
+          # Send callback
+          curl -s -X POST "$CALLBACK_URL/callbacks/intake-complete" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Warning: Callback failed, continuing..."
+          
+          echo "Exit handler complete"
+
+  # TTL strategy for workflow cleanup
+  ttlStrategy:
+    secondsAfterCompletion: 86400    # Keep completed workflows for 24 hours
+    secondsAfterFailure: 259200      # Keep failed workflows for 3 days
+    secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
+
+  # Pod garbage collection
+  # Delete delay increased from 60s to 300s to allow heal system to capture logs
+  # before pods are cleaned up (fixes issue #2576 - A2 alerts with missing logs)
+  podGC:
+    strategy: OnPodCompletion
+    deleteDelayDuration: 300s
+
+{{- end }}

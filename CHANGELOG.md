@@ -1,0 +1,1948 @@
+# Changelog
+
+## [0.13.0](https://github.com/5dlabs/cto/compare/v0.12.38...v0.13.0) (2025-12-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* Template paths have changed. Users must update any references to infra/charts/controller/agent-templates/ to templates/
+* **release:** Version jump from v0.2.x to v0.10.0
+
+### ✨ Features
+
+* add CLI adapter test runner for GitHub Actions ([#2704](https://github.com/5dlabs/cto/issues/2704)) ([61ce1f5](https://github.com/5dlabs/cto/commit/61ce1f559651c907a8e014d2e67e8c6a2c5ad694))
+* add command, args, and extraContainers support to universal-app ([#1869](https://github.com/5dlabs/cto/issues/1869)) ([5b3ee7f](https://github.com/5dlabs/cto/commit/5b3ee7ff05f9e707180529b6d07931e0621f8b9f))
+* add dedicated RBAC for heal and move config to gitops ([d0e9c8c](https://github.com/5dlabs/cto/commit/d0e9c8c2d01227f1cd23825fa5a9b94cf1d123d0))
+* add OpenBao ArgoCD application for secrets management ([#2767](https://github.com/5dlabs/cto/issues/2767)) ([1ab73d1](https://github.com/5dlabs/cto/commit/1ab73d144e65587fc6acf48a14194b4efcaaa864))
+* add OpenBao ArgoCD application for secrets management ([#2776](https://github.com/5dlabs/cto/issues/2776)) ([f51e904](https://github.com/5dlabs/cto/commit/f51e904bd22873d4434a833fc5b5bcf56d44ed11))
+* add pm-server CI workflow for building and pushing Docker image ([#2762](https://github.com/5dlabs/cto/issues/2762)) ([6987637](https://github.com/5dlabs/cto/commit/6987637e73c02dee1734d8ec575109ede6d3ea74))
+* add Stitch PR Review Bot ([#1893](https://github.com/5dlabs/cto/issues/1893)) ([21806f7](https://github.com/5dlabs/cto/commit/21806f78ac8b0782ef61dcfd4d0ceb29c0032f23))
+* add tasks crate - Rust clone of Taskmaster with AI integration ([#1812](https://github.com/5dlabs/cto/issues/1812)) ([3720c5b](https://github.com/5dlabs/cto/commit/3720c5bde06afc2abe29a2091c45e4fe3db44e86))
+* **blaze:** add Effect.ts integration with effect-solutions CLI ([#1855](https://github.com/5dlabs/cto/issues/1855)) ([afaadcb](https://github.com/5dlabs/cto/commit/afaadcb6fcb73da2017e1f5d34d9c4b08d973e54))
+* **blaze:** add Playwright visual verification workflow ([#1859](https://github.com/5dlabs/cto/issues/1859)) ([15d5c42](https://github.com/5dlabs/cto/commit/15d5c42781856f5689de14f55885e03b643c6595))
+* **blaze:** add Prisma ORM as standard database ORM ([#1856](https://github.com/5dlabs/cto/issues/1856)) ([aaae3bb](https://github.com/5dlabs/cto/commit/aaae3bb59099474753d6f1323a34fdc299ce242f))
+* **blaze:** add XState (Stately) state management guidance ([#1857](https://github.com/5dlabs/cto/issues/1857)) ([7de381a](https://github.com/5dlabs/cto/commit/7de381a69a8553b8f8cbe90476a854c22168ddaf))
+* **cd:** add ArgoCD Image Updater and Release Please for automated deployments ([#1892](https://github.com/5dlabs/cto/issues/1892)) ([f44083b](https://github.com/5dlabs/cto/commit/f44083b2d236a0c17c057d4679fd6359251bda0c))
+* **ci:** add ArgoCD full sync workflow on PR merge ([#1775](https://github.com/5dlabs/cto/issues/1775)) ([74cf5d4](https://github.com/5dlabs/cto/commit/74cf5d49dd81999f8c1dde738b8ede68ec5edb2e))
+* **ci:** unify binary releases into single workflow ([#1798](https://github.com/5dlabs/cto/issues/1798)) ([a633baa](https://github.com/5dlabs/cto/commit/a633baa2fcffba0404d87c96c1457ff5c849b42a))
+* **controller:** add heal templates ConfigMap for remediation agents ([#1914](https://github.com/5dlabs/cto/issues/1914)) ([0bb6d78](https://github.com/5dlabs/cto/commit/0bb6d7859805a15937bdd5823a15b85b6b1727a9))
+* **controller:** add intake templates to ConfigMap ([#2451](https://github.com/5dlabs/cto/issues/2451)) ([2481281](https://github.com/5dlabs/cto/commit/248128123ef1d7fbd66b8a4247c516de0fba78d6))
+* **controller:** add review and remediate task types to CodeRun ([#1956](https://github.com/5dlabs/cto/issues/1956)) ([acaa14c](https://github.com/5dlabs/cto/commit/acaa14cd003b879d99154e86498dc61ef1491c4b))
+* deploy Stitch PR review sensor ([#1897](https://github.com/5dlabs/cto/issues/1897)) ([5c5126b](https://github.com/5dlabs/cto/commit/5c5126beaaaf44b101b9d255ed3150b0c349d323))
+* **docs:** add Mintlify documentation configuration ([#1943](https://github.com/5dlabs/cto/issues/1943)) ([6262d04](https://github.com/5dlabs/cto/commit/6262d04d7f5868d4e96482c70ce949cf63cba4ca))
+* E2E self-healing loop with start/monitor/remediate commands ([#1835](https://github.com/5dlabs/cto/issues/1835)) ([e2f80ba](https://github.com/5dlabs/cto/commit/e2f80ba9a28ff759d36c986b2fa9b5f099ca785a))
+* enhance model normalization and CLI token configuration ([ba2bbd0](https://github.com/5dlabs/cto/commit/ba2bbd045c260cf3bbe7b3e36fe38120153610c6))
+* **gitops:** add ArgoCD application for PM service and update CloudFlare tunnel ([#2752](https://github.com/5dlabs/cto/issues/2752)) ([44790f3](https://github.com/5dlabs/cto/commit/44790f3fb04b63bd5ffc3f0267149c4f1f2e1808))
+* **gitops:** add multi-environment setup (dev, staging, prod) ([#2761](https://github.com/5dlabs/cto/issues/2761)) ([ed4636d](https://github.com/5dlabs/cto/commit/ed4636de52e83e043ea4e2b84e89c0a6e61d2033))
+* **gitops:** enable ServerSideApply for staging app-of-apps ([#1795](https://github.com/5dlabs/cto/issues/1795)) ([a9a1472](https://github.com/5dlabs/cto/commit/a9a14724c70d0ec37528baf27c65755e811ef503))
+* **heal:** add A9 alert for stuck CodeRuns ([#1944](https://github.com/5dlabs/cto/issues/1944)) ([06efeba](https://github.com/5dlabs/cto/commit/06efeba3445f87376a219d119f9c4e15d7f1ba0b))
+* **heal:** add alert-type level deduplication to prevent issue spam ([#2510](https://github.com/5dlabs/cto/issues/2510)) ([04a288c](https://github.com/5dlabs/cto/commit/04a288c77d41d7760e4e8895f4ae06c18260b6cf))
+* **heal:** add ConfigMap mount and agent coordination ([#1889](https://github.com/5dlabs/cto/issues/1889)) ([abf0d2e](https://github.com/5dlabs/cto/commit/abf0d2e2291d77f8fbc3c6673efc41338089eb98))
+* **heal:** add debug logging for A2 silent failure detection ([#1882](https://github.com/5dlabs/cto/issues/1882)) ([049818e](https://github.com/5dlabs/cto/commit/049818eb7399bb86589306434fca6fbe6757a2a1))
+* **heal:** add deduplication and exclusion for remediation CodeRuns ([#2072](https://github.com/5dlabs/cto/issues/2072)) ([8c476d6](https://github.com/5dlabs/cto/commit/8c476d631b60b2b77fe6cdaf7a67d4f59da194c6))
+* **heal:** add Docker runtime access and streaming output ([#2532](https://github.com/5dlabs/cto/issues/2532)) ([bc1cdfb](https://github.com/5dlabs/cto/commit/bc1cdfb98fa871a0be3ec6b816a8f36d770dcb14))
+* **heal:** add exclusion list for infrastructure pods ([#1875](https://github.com/5dlabs/cto/issues/1875)) ([8c92a1b](https://github.com/5dlabs/cto/commit/8c92a1be86e783896d494d8d367d68286ecf043f))
+* **heal:** add FACTORY_API_KEY environment variable ([#1873](https://github.com/5dlabs/cto/issues/1873)) ([d0458df](https://github.com/5dlabs/cto/commit/d0458dfb3ac5f3188027afeb995321f6fa39b9ef))
+* **heal:** add filebrowser service for direct cluster access ([#1883](https://github.com/5dlabs/cto/issues/1883)) ([e1416f4](https://github.com/5dlabs/cto/commit/e1416f49c9d12cc5c0ba59850833464aee77298f))
+* **heal:** add filebrowser sidecar for PVC inspection ([#1881](https://github.com/5dlabs/cto/issues/1881)) ([fcf4f1d](https://github.com/5dlabs/cto/commit/fcf4f1df2a63a79cd98f19e1a4009a867628ed2f))
+* **heal:** add GitHub issue integration for remediation workflow ([#1958](https://github.com/5dlabs/cto/issues/1958)) ([936f320](https://github.com/5dlabs/cto/commit/936f3205f3f0f7c49b0b214ff70390d937b7a8d4))
+* **heal:** add Handlebars templating for DRY alert prompts ([#2308](https://github.com/5dlabs/cto/issues/2308)) ([64139fa](https://github.com/5dlabs/cto/commit/64139fa1e36523baf0b630df31130e4cdb659c0c))
+* **heal:** add merge conflict handling and CI iteration to Rex remediation agent ([#2492](https://github.com/5dlabs/cto/issues/2492)) ([67ded38](https://github.com/5dlabs/cto/commit/67ded38c706e6601c2aa892b2f2c021ed66b12b5))
+* **heal:** add Rust caching for faster builds ([#1879](https://github.com/5dlabs/cto/issues/1879)) ([b080d11](https://github.com/5dlabs/cto/commit/b080d110502e666c863d46f7b9e74c6a28598890))
+* **heal:** add worktree isolation and task module for remediation agents ([#1955](https://github.com/5dlabs/cto/issues/1955)) ([44b0e39](https://github.com/5dlabs/cto/commit/44b0e396cee6f736eef36ee47538ea593378a828))
+* **heal:** echo Factory analysis to logs and add heal-config.json ([#1886](https://github.com/5dlabs/cto/issues/1886)) ([cc1a20f](https://github.com/5dlabs/cto/commit/cc1a20fc3d22acafc29961a498fc158fef6b0aa2))
+* **heal:** enhance Pod and ContainerStatus structures with conditions and readiness ([f3e2a30](https://github.com/5dlabs/cto/commit/f3e2a30a8b03d3a6a03e88d7bf41a810ee9f8822))
+* **healer:** add OpenMemory integration for cross-session learning ([#2687](https://github.com/5dlabs/cto/issues/2687)) ([82219b6](https://github.com/5dlabs/cto/commit/82219b65dd62973cef04e135b86206de14783bbf))
+* **healer:** add play orchestration module for tracking parallel tasks ([#2684](https://github.com/5dlabs/cto/issues/2684)) ([0453eca](https://github.com/5dlabs/cto/commit/0453ecacb52e5bb47f937358a1449f48ebf72542))
+* **heal:** implement fetch-logs and spawn-remediation commands ([#1878](https://github.com/5dlabs/cto/issues/1878)) ([2b86efb](https://github.com/5dlabs/cto/commit/2b86efb3c4943a5c096f86de0bb737dd90b11b55))
+* **heal:** infinite iteration with acceptance criteria probes and merge conflict handling ([#2497](https://github.com/5dlabs/cto/issues/2497)) ([d226c6b](https://github.com/5dlabs/cto/commit/d226c6b993002cc89f9c915df00c0f2c643b5ca2))
+* **heal:** iterate until acceptance criteria met with merge conflict handling ([3ad5c65](https://github.com/5dlabs/cto/commit/3ad5c65e50717fe126b42b0e51e986cc3f981945))
+* **heal:** rename watch to heal and use static PVC ([55b5e92](https://github.com/5dlabs/cto/commit/55b5e92d6123ff3dcaa309d62decccd7cc2dd7c9))
+* **heal:** stream Claude output in real-time with text extraction ([#2530](https://github.com/5dlabs/cto/issues/2530)) ([2bb842c](https://github.com/5dlabs/cto/commit/2bb842c2a62c5c8a97a2c7b766a4b30f7b4bc9df))
+* **heal:** stream Claude output in real-time with text extraction ([#2535](https://github.com/5dlabs/cto/issues/2535)) ([0763689](https://github.com/5dlabs/cto/commit/0763689c81e79954e6db6b940581dec4c8f87359))
+* **heal:** stream Claude output to stdout in remediation ([#2522](https://github.com/5dlabs/cto/issues/2522)) ([dacd4eb](https://github.com/5dlabs/cto/commit/dacd4eb13e96d9906f2dca7d91417156a28866a2))
+* **infra:** add MinIO for headless visual testing screenshot storage ([#1810](https://github.com/5dlabs/cto/issues/1810)) ([8df101b](https://github.com/5dlabs/cto/commit/8df101b8df4e96b5563492ecc2587cd82072d6a8))
+* **infra:** add self-hosted tweakcn theme editor ([#2329](https://github.com/5dlabs/cto/issues/2329)) ([71d011e](https://github.com/5dlabs/cto/commit/71d011e5083de9d1ab4e833653cc3582c7847688))
+* **infra:** add self-hosted tweakcn theme editor ([#2330](https://github.com/5dlabs/cto/issues/2330)) ([d234689](https://github.com/5dlabs/cto/commit/d2346891d16d62d8415ddad9550554c7b734b7dd))
+* intake for agent-sandbox ([#2722](https://github.com/5dlabs/cto/issues/2722)) ([d5879a0](https://github.com/5dlabs/cto/commit/d5879a0e7781868ba28bbca5a734c9c828d99d06))
+* **intake:** add verbose logging and progress indicator for TaskMaster ([#2461](https://github.com/5dlabs/cto/issues/2461)) ([a4e77c6](https://github.com/5dlabs/cto/commit/a4e77c6659102c94fae18af8d8db6aa921e98483))
+* **intake:** unified intake with multi-CLI support and DocsRun deprecation ([#1831](https://github.com/5dlabs/cto/issues/1831)) ([6ce00d4](https://github.com/5dlabs/cto/commit/6ce00d41a696c0f0c1df4bcca9213185099fc2fa))
+* Linear integration and tasks crate improvements ([#2725](https://github.com/5dlabs/cto/issues/2725)) ([1d84e23](https://github.com/5dlabs/cto/commit/1d84e2324f4680f39905b35c1d19ec67457b4a4a))
+* **mcp:** add MCP server management tools ([#1797](https://github.com/5dlabs/cto/issues/1797)) ([24fb344](https://github.com/5dlabs/cto/commit/24fb344914c6a553c462a48374291e7164df4751))
+* migrate from Redis to Valkey for license compliance ([30af81a](https://github.com/5dlabs/cto/commit/30af81a56f17abbf1aa96eb959b848c19fa38256))
+* **monitor:** add preflight checks for E2E testing readiness ([#1828](https://github.com/5dlabs/cto/issues/1828)) ([021b2de](https://github.com/5dlabs/cto/commit/021b2def5dec3e2ff0010ce92fee3bf768cd18d0))
+* **monitor:** implement self-healing E2E loop with automatic remediation ([#1830](https://github.com/5dlabs/cto/issues/1830)) ([b441ea9](https://github.com/5dlabs/cto/commit/b441ea909f8aca529d1b90b2a6a209848d66a3f1))
+* **notify:** add Discord notification system for platform events ([#2156](https://github.com/5dlabs/cto/issues/2156)) ([c86be8e](https://github.com/5dlabs/cto/commit/c86be8ead18819583ad8b23d568a2ea7cc2625e1))
+* **release:** bump to v0.10.0 and fix release automation ([#1899](https://github.com/5dlabs/cto/issues/1899)) ([6b63778](https://github.com/5dlabs/cto/commit/6b63778b30065a176ce95dd5d19559bd5495445f))
+* **research:** add PR creation for new research entries ([377c7bc](https://github.com/5dlabs/cto/commit/377c7bc791a7f891f6031a1c9b5fafbd1971c28e))
+* **research:** add PR creation for new research entries ([981f52e](https://github.com/5dlabs/cto/commit/981f52e50980fba491bbc8a308e14b82723638e5))
+* **research:** add PR creation for new research entries ([#2711](https://github.com/5dlabs/cto/issues/2711)) ([49d9791](https://github.com/5dlabs/cto/commit/49d97918505ff9846b08d16b920af16ef1195b7c))
+* **research:** add Twitter/X bookmark research pipeline ([#2703](https://github.com/5dlabs/cto/issues/2703)) ([faa8087](https://github.com/5dlabs/cto/commit/faa8087b36b82921ba4b5856abb73b23c8fcea8b))
+* **stitch:** add inline PR review comments like Cursor Bot ([#1936](https://github.com/5dlabs/cto/issues/1936)) ([aabbbdf](https://github.com/5dlabs/cto/commit/aabbbdf5ff825e7def6d4a01aa40c92d06999509))
+* **stitch:** Enable full PR review with Factory CLI ([#1922](https://github.com/5dlabs/cto/issues/1922)) ([77dad90](https://github.com/5dlabs/cto/commit/77dad904411863104d3f6ef4c05357cd431c6730))
+* **tasks:** Integrate Rust tasks crate into intake workflow ([#2707](https://github.com/5dlabs/cto/issues/2707)) ([efb5792](https://github.com/5dlabs/cto/commit/efb57926d8e4c5f49ce0113b03c60f8d425e4086))
+* **telemetry:** add Victoria Logs ingestion for all platform services ([#1788](https://github.com/5dlabs/cto/issues/1788)) ([b2e6e60](https://github.com/5dlabs/cto/commit/b2e6e6006e7ad6cc61d326f19d813a13ef0100fe))
+* **telemetry:** migrate from Victoria Metrics/Logs to Grafana stack ([#2571](https://github.com/5dlabs/cto/issues/2571)) ([db6710a](https://github.com/5dlabs/cto/commit/db6710a08d3604eb6b0eef46148ab21358e578b4))
+* **templates:** Phase 2 - Context7 on all agents + extended shared partials ([#2154](https://github.com/5dlabs/cto/issues/2154)) ([b217211](https://github.com/5dlabs/cto/commit/b2172114a61443b0f2e039d821e3d8e70a4d882a))
+* **tools:** add 8 new MCP servers for expanded AI capabilities ([#1792](https://github.com/5dlabs/cto/issues/1792)) ([22519dc](https://github.com/5dlabs/cto/commit/22519dc39cbf3e330dd6d26cedb44fdfe1756d58))
+* **tools:** add all available MCP tools to filter ([#1861](https://github.com/5dlabs/cto/issues/1861)) ([62f8bed](https://github.com/5dlabs/cto/commit/62f8bed8788a4f017b840c8220d62aed154cf882))
+* **tools:** add ClusterRole for kubernetes and argocd MCP servers ([#1814](https://github.com/5dlabs/cto/issues/1814)) ([cb5ce33](https://github.com/5dlabs/cto/commit/cb5ce339b38ebc615078cf97573ba92739c273d6))
+* **tools:** add headless screenshot capture and upload support ([#1827](https://github.com/5dlabs/cto/issues/1827)) ([3eaccb6](https://github.com/5dlabs/cto/commit/3eaccb6d819a7c902e154faec0dff88992a3aaa7))
+* **tools:** add OpenMemory MCP integration ([#1860](https://github.com/5dlabs/cto/issues/1860)) ([6f69c42](https://github.com/5dlabs/cto/commit/6f69c42f32c49dca158099020ee42a681c0b4da9))
+* **tools:** add StreamableHTTP session support for MCP servers ([#1811](https://github.com/5dlabs/cto/issues/1811)) ([967d704](https://github.com/5dlabs/cto/commit/967d7044b8b989cb37d3bc93a6088a88740e221b))
+* **tools:** replace k8s-mcp with npx kubernetes-mcp-server ([#1778](https://github.com/5dlabs/cto/issues/1778)) ([d9c6264](https://github.com/5dlabs/cto/commit/d9c62645ef355ef15b8c0e549081121812473b0d))
+* **watch:** add dedicated PVC for Monitor and Remediation agents ([#1842](https://github.com/5dlabs/cto/issues/1842)) ([8c71426](https://github.com/5dlabs/cto/commit/8c714264ea13aadfd1b6d7e53e0fb659fa6cbe6b))
+* **watch:** E2E Watch system with Cargo Dist for play-monitor ([#1786](https://github.com/5dlabs/cto/issues/1786)) ([8ea4009](https://github.com/5dlabs/cto/commit/8ea4009acf001f7f1b3944d0ae0511fd687df0e2))
+* **watch:** implement E2E Watch System with CodeRun-based orchestration ([#1779](https://github.com/5dlabs/cto/issues/1779)) ([50233a0](https://github.com/5dlabs/cto/commit/50233a044e0abec95183d5630ce28877ca27b978))
+
+
+### 🐛 Bug Fixes
+
+* add -L flag to follow symlinks in template generation ([#2149](https://github.com/5dlabs/cto/issues/2149)) ([db82b78](https://github.com/5dlabs/cto/commit/db82b7823b10e5941e693335acd68e7f3b7b3c83))
+* add case normalization for heal CodeRun detection in build_job_spec ([4a7b682](https://github.com/5dlabs/cto/commit/4a7b6829fb077c08342d9fd318747763b23665b8))
+* add cto-mcp binary to tools Docker image build ([#1951](https://github.com/5dlabs/cto/issues/1951)) ([40e2617](https://github.com/5dlabs/cto/commit/40e26174ac616ac8aabe6350ed92d2d665638a81))
+* add GitHub App authentication to heal templates ([#2670](https://github.com/5dlabs/cto/issues/2670)) ([9156508](https://github.com/5dlabs/cto/commit/91565081d4711f8cbe82eab0a095982128d38faa))
+* add missing default values to universal-app chart ([#1874](https://github.com/5dlabs/cto/issues/1874)) ([c70ba4a](https://github.com/5dlabs/cto/commit/c70ba4a3a2d0c8821db215505b0c48a499464339))
+* add ServerSideApply=true to all ArgoCD applications ([#1789](https://github.com/5dlabs/cto/issues/1789)) ([c838359](https://github.com/5dlabs/cto/commit/c838359b21d0b7e4ed64a2f7ae22a1c31937b442))
+* add tools parameters to monitor workflow submission ([#1854](https://github.com/5dlabs/cto/issues/1854)) ([1a286ae](https://github.com/5dlabs/cto/commit/1a286aefc177d06e18a283e145de120389f27c57))
+* address PR review comments from cursor bot ([86cfada](https://github.com/5dlabs/cto/commit/86cfadafd29332ca3afdee49987d401e952e68ef))
+* **alertmanager:** add ignoreDifferences for StatefulSet API defaults ([#2657](https://github.com/5dlabs/cto/issues/2657)) ([aec47bd](https://github.com/5dlabs/cto/commit/aec47bd5520235b5e823355f65e4955b61726827))
+* **argo:** add managed-namespace for cto to see WorkflowTemplates ([#1817](https://github.com/5dlabs/cto/issues/1817)) ([fe0ffeb](https://github.com/5dlabs/cto/commit/fe0ffebaf81fa7d98870ba451ba852016b1d5992))
+* **argo:** use cluster-scoped config instead of managed-namespace ([#1822](https://github.com/5dlabs/cto/issues/1822)) ([a14a1d8](https://github.com/5dlabs/cto/commit/a14a1d8893d0dc53d6eff9d5066c33d37cd9d46e))
+* **argo:** watch both automation and cto namespaces ([#1819](https://github.com/5dlabs/cto/issues/1819)) ([bee5200](https://github.com/5dlabs/cto/commit/bee5200b3244197cf4aca38d24dc02d3a6b544f3))
+* **atlas:** increase TTL and add pod deletion delay for atlas-guardian workflows ([#2620](https://github.com/5dlabs/cto/issues/2620)) ([557f0dd](https://github.com/5dlabs/cto/commit/557f0dda642672d9ab8f9d4774367b9336579fe8)), closes [#2599](https://github.com/5dlabs/cto/issues/2599)
+* auto-correct deprecated Anthropic model IDs in MCP intake ([#2496](https://github.com/5dlabs/cto/issues/2496)) ([c920f0c](https://github.com/5dlabs/cto/commit/c920f0c9b5a49f098cf67f38d1eaf870ae1bce35)), closes [#2488](https://github.com/5dlabs/cto/issues/2488)
+* **cd:** use simple release type and add Image Updater to tools/heal ([#1895](https://github.com/5dlabs/cto/issues/1895)) ([7bf1f3e](https://github.com/5dlabs/cto/commit/7bf1f3e1ecf4ef32bf5e4fe29a4be467dfa796df))
+* change heal PVC access mode from RWX to RWO ([#1866](https://github.com/5dlabs/cto/issues/1866)) ([4984af4](https://github.com/5dlabs/cto/commit/4984af4a3f864bb528573d04529798903498ea58))
+* **ci:** add actions:write permission to release-please workflow ([#1904](https://github.com/5dlabs/cto/issues/1904)) ([ea017c4](https://github.com/5dlabs/cto/commit/ea017c43d7f098565b7cdb2c5347d3e58e8a538a))
+* **ci:** add ServerSideApply to workflow sync operations ([#1839](https://github.com/5dlabs/cto/issues/1839)) ([fa5182e](https://github.com/5dlabs/cto/commit/fa5182eb0cfbfef649e272c0c08bcfaf453d5e89))
+* **ci:** allow SARIF upload failures when Advanced Security is disabled ([#2664](https://github.com/5dlabs/cto/issues/2664)) ([e9c9e34](https://github.com/5dlabs/cto/commit/e9c9e346adb20093d4ecf2d8edd7b3dd35be484a))
+* **ci:** allow SARIF upload to fail without GHAS ([#2662](https://github.com/5dlabs/cto/issues/2662)) ([5de1f59](https://github.com/5dlabs/cto/commit/5de1f590306577f0ba74f3f6964b790354ad22f2))
+* **ci:** consolidate Docker builds and standardize tagging ([#1946](https://github.com/5dlabs/cto/issues/1946)) ([4e8dd31](https://github.com/5dlabs/cto/commit/4e8dd3156db106fa9fe520db12c98db9bea82453))
+* **ci:** correct Docker build artifact name to match upload ([#1806](https://github.com/5dlabs/cto/issues/1806)) ([e678da4](https://github.com/5dlabs/cto/commit/e678da43617e42ed90135bc8b068dacb58bd726c))
+* **ci:** exclude research crate from controller-ci workspace clippy ([3c563be](https://github.com/5dlabs/cto/commit/3c563bea548a59ab0d9c13e872e2ef8f0908e952))
+* **ci:** explicitly trigger binaries-release workflow from release-please ([#2462](https://github.com/5dlabs/cto/issues/2462)) ([4f9f9fa](https://github.com/5dlabs/cto/commit/4f9f9fa703a2fa187480577f0429ca6d95ed825c))
+* **ci:** extract release tag from correct column in gh release list ([#1836](https://github.com/5dlabs/cto/issues/1836)) ([9b80d27](https://github.com/5dlabs/cto/commit/9b80d275127b4856bbfae08aceb3e8c0a63c454c))
+* **ci:** fix controller build target directory and rename workflow ([#1932](https://github.com/5dlabs/cto/issues/1932)) ([490522b](https://github.com/5dlabs/cto/commit/490522b5de1c4c41ed466e6a49a3aff0bb226686))
+* **ci:** fix Docker build paths for controller and heal images ([795adbf](https://github.com/5dlabs/cto/commit/795adbfe0b83f257dea8bbad4e25d29c76870f0f))
+* **ci:** fix race condition in sync completion check ([8a42364](https://github.com/5dlabs/cto/commit/8a423644805e9271d976ffe7301cdc3e39afc193))
+* **ci:** handle rustup concurrent cache conflicts on k8s-runner ([#1948](https://github.com/5dlabs/cto/issues/1948)) ([faeab76](https://github.com/5dlabs/cto/commit/faeab7694fa1983c44f2a67aac4ace45b68d710d))
+* **ci:** iterate releases to find one with assets ([#2503](https://github.com/5dlabs/cto/issues/2503)) ([e25877e](https://github.com/5dlabs/cto/commit/e25877ec5e117631a3da880ae3c25485a5441f5b))
+* **ci:** remove helm-publish workflow that conflicted with tools releases ([#1800](https://github.com/5dlabs/cto/issues/1800)) ([e0dc37b](https://github.com/5dlabs/cto/commit/e0dc37ba5829af18e8d141fb74657f2efb6779e6))
+* **ci:** remove helm-publish workflow that conflicted with tools releases ([#1801](https://github.com/5dlabs/cto/issues/1801)) ([e6cdfa2](https://github.com/5dlabs/cto/commit/e6cdfa25ed75fb355e079eab1fe91d81f78b8061))
+* **ci:** replace play-monitor with heal/controller in binaries-release ([#1927](https://github.com/5dlabs/cto/issues/1927)) ([759b765](https://github.com/5dlabs/cto/commit/759b76530045379ab1004f9dafc88c1e0b0161df))
+* **ci:** respect wait_for_sync input and avoid redundant waits ([7b313ac](https://github.com/5dlabs/cto/commit/7b313ac9290d42279209323c67af5292c5bade52))
+* clippy lint and add trailing newlines ([5a4cbea](https://github.com/5dlabs/cto/commit/5a4cbea8bcd44d10f8976e79966dea129acfcd1b))
+* **controller/heal:** use heal templates, issue- prefix, and repo pre-staging ([94fca4f](https://github.com/5dlabs/cto/commit/94fca4f672dcc0a6575e7aeb004fe2d2321d1b0e))
+* **controller/heal:** use heal templates, issue- prefix, and repo pre-staging ([#2408](https://github.com/5dlabs/cto/issues/2408)) ([7aba875](https://github.com/5dlabs/cto/commit/7aba8757ef08a4c281b846444027ba8ad14008fc))
+* **controller:** add watch templates to ConfigMap and mount for watch workflows ([#1785](https://github.com/5dlabs/cto/issues/1785)) ([455c9f0](https://github.com/5dlabs/cto/commit/455c9f0f0f204d98faaf59b1b9cb7d42962310be))
+* **controller:** handle empty string in CLIType deserialization ([#1832](https://github.com/5dlabs/cto/issues/1832)) ([4ad3067](https://github.com/5dlabs/cto/commit/4ad30670783fc1d2f2bfa7d6a6f7d2bd680c42b3))
+* **controller:** mount heal templates ConfigMap in controller deployment ([#1920](https://github.com/5dlabs/cto/issues/1920)) ([e8a5027](https://github.com/5dlabs/cto/commit/e8a5027ecff6382a5b93d4c3b1d3821a7c20472e))
+* **controller:** properly detect watch CodeRuns for template and naming ([#1840](https://github.com/5dlabs/cto/issues/1840)) ([c48ecac](https://github.com/5dlabs/cto/commit/c48ecac1e8c9ce2e393427bce71520ee5442979a))
+* **controller:** use case-insensitive heal service detection in naming.rs ([2a3a382](https://github.com/5dlabs/cto/commit/2a3a3821ea4c56b05afed66af0add8d8c8dd3c70))
+* **controller:** use heal-remediation- prefix for heal CodeRun pods ([#2386](https://github.com/5dlabs/cto/issues/2386)) ([4aa3430](https://github.com/5dlabs/cto/commit/4aa3430fa1fd5a7b49a2caf1dba040f01b1c2257))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1844](https://github.com/5dlabs/cto/issues/1844)) ([f42988d](https://github.com/5dlabs/cto/commit/f42988dfedce7b327982eb8646b6d05466f8bf14))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1845](https://github.com/5dlabs/cto/issues/1845)) ([04f2eb4](https://github.com/5dlabs/cto/commit/04f2eb47d767ed66883a32ac49bc8ec5ddae84f5))
+* correct ArgoCD Application namespace from 'argo' to 'argocd' ([#2769](https://github.com/5dlabs/cto/issues/2769)) ([3cdba53](https://github.com/5dlabs/cto/commit/3cdba531fb1ff6073d4335b60ad853a26af19b5d))
+* correct resource naming in agent-templates-sync workflow ([#1794](https://github.com/5dlabs/cto/issues/1794)) ([c20ef90](https://github.com/5dlabs/cto/commit/c20ef906484467bb18d2d192726df47693b93117))
+* **dexter:** combine git clone and uv sync into single layer ([7ec922e](https://github.com/5dlabs/cto/commit/7ec922eac8ea1b1f931c55b9e546dbd55fc01d44))
+* **dexter:** enhance Dockerfile for improved installation process ([e6be4c3](https://github.com/5dlabs/cto/commit/e6be4c3299777cfbe7feb3781ce123a1ee1c2316))
+* **dexter:** switch from pip to uv sync for installation ([#2764](https://github.com/5dlabs/cto/issues/2764)) ([f8b0a07](https://github.com/5dlabs/cto/commit/f8b0a0706f5261d64f7942d41d33c532c026baaa))
+* **factory:** prevent script exit on Tools MCP server DNS failure ([#1837](https://github.com/5dlabs/cto/issues/1837)) ([8467866](https://github.com/5dlabs/cto/commit/8467866e9e1b5170863c3d6fbd503b3abcde8d9f))
+* **factory:** set default WORKFLOW_STAGE for standalone runs ([#1838](https://github.com/5dlabs/cto/issues/1838)) ([13e58f2](https://github.com/5dlabs/cto/commit/13e58f2db76ce0c38f538e21c4e2bfeab47ff529))
+* **gitops:** remove app.kubernetes.io/component overrides from podLabels ([#1808](https://github.com/5dlabs/cto/issues/1808)) ([620a958](https://github.com/5dlabs/cto/commit/620a95891c5928ce85ee3690c0be9af607b9b158))
+* **gitops:** remove duplicate ConfigMap templates and unused env apps ([#2763](https://github.com/5dlabs/cto/issues/2763)) ([3231a67](https://github.com/5dlabs/cto/commit/3231a67d16c4ed20c1d9df115165ad9917d5ad7b))
+* **gitops:** remove path matching for PM service webhook handling in CloudFlare tunnel ([230ebef](https://github.com/5dlabs/cto/commit/230ebef81dcdf06af793e1522152c0eae054f915))
+* **gitops:** resolve ArgoCD sync issues for Grafana and Cloudflare Tunnel ([#1813](https://github.com/5dlabs/cto/issues/1813)) ([5a58d0a](https://github.com/5dlabs/cto/commit/5a58d0a2fecd0366f5d41131e803fc78329554e8))
+* **gitops:** update CloudFlare tunnel path for PM service webhook handling ([77ab7a8](https://github.com/5dlabs/cto/commit/77ab7a82825d6c40f1c0f71660502b3b9818c7da))
+* gracefully exit stage-resume workflow when PR params missing ([#2781](https://github.com/5dlabs/cto/issues/2781)) ([167b0ac](https://github.com/5dlabs/cto/commit/167b0acedd5e829562555609ac50b826105ab9a0))
+* **grafana:** remove orphaned Victoria datasources and fix Prometheus port ([#2608](https://github.com/5dlabs/cto/issues/2608)) ([96b5ce7](https://github.com/5dlabs/cto/commit/96b5ce77f869da451bdbad4e1017d28dee34e21e))
+* **grafana:** use correct Prometheus service port (80) ([#2595](https://github.com/5dlabs/cto/issues/2595)) ([ad3b18e](https://github.com/5dlabs/cto/commit/ad3b18e9f214db1278fcabef4008a9d2753be272))
+* handle Linear webhook action variants and flexible payload parsing ([#2737](https://github.com/5dlabs/cto/issues/2737)) ([31db1e9](https://github.com/5dlabs/cto/commit/31db1e92d9b97295a4cc46d7662d4d4ec73d3800))
+* **heal:** add --target-pod to spawn-remediation for deduplication ([#2198](https://github.com/5dlabs/cto/issues/2198)) ([f9a11ac](https://github.com/5dlabs/cto/commit/f9a11ace8626b1f19d84bd827f44c786fd9cde80))
+* **heal:** add atlas-guardian and atlas-batch-integration to A2 excluded pods ([#2640](https://github.com/5dlabs/cto/issues/2640)) ([acaab87](https://github.com/5dlabs/cto/commit/acaab871234044f17634c9f1a82b0921ab7b3a65)), closes [#2633](https://github.com/5dlabs/cto/issues/2633)
+* **heal:** add DAC_OVERRIDE capability to fix PVC permission denied errors ([#1953](https://github.com/5dlabs/cto/issues/1953)) ([6c6a7f8](https://github.com/5dlabs/cto/commit/6c6a7f886b16f996ba4c5eb677115c28c9afa82c))
+* **heal:** add diagnostic logging for A2 alert debugging ([#2328](https://github.com/5dlabs/cto/issues/2328)) ([a5b0ddc](https://github.com/5dlabs/cto/commit/a5b0ddcdccb353739e76c65d9d3627548128572a))
+* **heal:** add filebrowser-service to kustomization ([#1884](https://github.com/5dlabs/cto/issues/1884)) ([2e1bdcb](https://github.com/5dlabs/cto/commit/2e1bdcbbbda0375ab19284d375450b922d9acc5e))
+* **heal:** add in-memory deduplication for pod alerts ([#2152](https://github.com/5dlabs/cto/issues/2152)) ([08880f7](https://github.com/5dlabs/cto/commit/08880f76532f5c30e172f01034a9c016eea859a7))
+* **heal:** add initContainer to fix PVC permissions on startup ([#1931](https://github.com/5dlabs/cto/issues/1931)) ([8e53a4b](https://github.com/5dlabs/cto/commit/8e53a4b7a9fad425c69fbcaed247717625c195dd))
+* **heal:** add MCP config and fix PVC path mismatch in templates ([#2450](https://github.com/5dlabs/cto/issues/2450)) ([41fbc2d](https://github.com/5dlabs/cto/commit/41fbc2df0a01a613bbb624db05fed61710f3e746))
+* **heal:** add periodic pod poller to catch silent failures ([6e628fa](https://github.com/5dlabs/cto/commit/6e628faa0f43b48f2fe4c66291d0ab6c324527d6))
+* **heal:** add retry logic with exponential backoff for git operations ([#2609](https://github.com/5dlabs/cto/issues/2609)) ([1d9994e](https://github.com/5dlabs/cto/commit/1d9994e45b09b8497c06aa2b4e537f45508c52fc))
+* **heal:** add startup grace period to A2 silent failure detection ([#2639](https://github.com/5dlabs/cto/issues/2639)) ([047d24f](https://github.com/5dlabs/cto/commit/047d24fd33a83a4f31612e23311e9c06ffb5d3f4)), closes [#2630](https://github.com/5dlabs/cto/issues/2630)
+* **heal:** add tweakcn to excluded pod prefixes for A8 alerts ([#2634](https://github.com/5dlabs/cto/issues/2634)) ([7e7778b](https://github.com/5dlabs/cto/commit/7e7778b5af483c6e1b4c13608649accfa7b39bbe)), closes [#2627](https://github.com/5dlabs/cto/issues/2627)
+* **heal:** conditionally append .git to repository URL ([e431ba7](https://github.com/5dlabs/cto/commit/e431ba7ba36c0cf2f5b2032eaa96e658e90c5654))
+* **heal:** conditionally append .git to repository URL ([#2420](https://github.com/5dlabs/cto/issues/2420)) ([474b0bc](https://github.com/5dlabs/cto/commit/474b0bcce41fff9ce4055673dbd41fba5866f89c))
+* **heal:** correct CodeRun RBAC apiGroup to agents.platform ([#1906](https://github.com/5dlabs/cto/issues/1906)) ([638bb11](https://github.com/5dlabs/cto/commit/638bb11bd9d11225d06b2f66da3b3f5b37b8c940))
+* **heal:** docker build context and argument list overflow ([#2520](https://github.com/5dlabs/cto/issues/2520)) ([f9d03e4](https://github.com/5dlabs/cto/commit/f9d03e4c0e7027bf8ba45d10d0ecd0b0a59dad72))
+* **healer:** correct config schema to match RemediationConfig struct ([#2694](https://github.com/5dlabs/cto/issues/2694)) ([5d13545](https://github.com/5dlabs/cto/commit/5d13545682487ddaf0aae557fe1a927479b027bf))
+* **healer:** use --addr instead of --port for server command ([#2692](https://github.com/5dlabs/cto/issues/2692)) ([6a41f50](https://github.com/5dlabs/cto/commit/6a41f5000382ac2159cfca17dc370975c6032eb4))
+* **healer:** use Axum 0.7 route syntax {task_id} instead of :task_id ([#2695](https://github.com/5dlabs/cto/issues/2695)) ([a26ef3b](https://github.com/5dlabs/cto/commit/a26ef3b565f142517b562058419783c026d3bb6a))
+* **heal:** exclude infrastructure pods from A8 step timeout alerts ([#2631](https://github.com/5dlabs/cto/issues/2631)) ([2476283](https://github.com/5dlabs/cto/commit/2476283363906bcc0c8e6d6c83fb150f1d0b5e94)), closes [#2625](https://github.com/5dlabs/cto/issues/2625)
+* **heal:** extend TTL for atlas-conflict-monitor workflow pods ([f48829c](https://github.com/5dlabs/cto/commit/f48829c4f1b1d00e4930801d61a1575a7514ba31)), closes [#2599](https://github.com/5dlabs/cto/issues/2599)
+* **heal:** fix CI test command and Dockerfile lint warnings ([#1894](https://github.com/5dlabs/cto/issues/1894)) ([13430fd](https://github.com/5dlabs/cto/commit/13430fd8111c6fd0c45372a0c2f22cc9a98197d0))
+* **heal:** persist agent logs to PVC before pod termination ([#2622](https://github.com/5dlabs/cto/issues/2622)) ([48783f4](https://github.com/5dlabs/cto/commit/48783f48a8e792f61835e70b92e249188074792e))
+* **heal:** prevent glob expansion of mcp__* in Claude command ([cf5916e](https://github.com/5dlabs/cto/commit/cf5916e13799cd0cb04c7e0aaf7c9eeb66f343e0))
+* **heal:** remediate stale ConfigMap detection, GC timing, and dedup logic ([#2560](https://github.com/5dlabs/cto/issues/2560)) ([f81074a](https://github.com/5dlabs/cto/commit/f81074a6a220c6e42530972821b70d40055350d2))
+* **heal:** resolve clippy pedantic warnings ([1efd652](https://github.com/5dlabs/cto/commit/1efd652eaeee07e7afbaf725197ed1750735b8bf))
+* **heal:** skip A2 alerts for containers with exit code 0 ([#2642](https://github.com/5dlabs/cto/issues/2642)) ([a19290b](https://github.com/5dlabs/cto/commit/a19290bc76849d5dfe1801b65f48869071b065cb)), closes [#2636](https://github.com/5dlabs/cto/issues/2636)
+* **heal:** transform PVC paths for remediation pods ([#2441](https://github.com/5dlabs/cto/issues/2441)) ([96b1fe1](https://github.com/5dlabs/cto/commit/96b1fe17ace1c2e6b3c0d041770b2a24e0913521))
+* **heal:** use full github_app name 5DLabs-Rex ([#1909](https://github.com/5dlabs/cto/issues/1909)) ([99822ee](https://github.com/5dlabs/cto/commit/99822ee6bcfcd4742a64b3c3d8609274a3c6fca7))
+* **heal:** use heal-config.json path and custom Claude template ([#1890](https://github.com/5dlabs/cto/issues/1890)) ([c598ad8](https://github.com/5dlabs/cto/commit/c598ad896fffde3013ddf49accbe910a1750c01c))
+* **heal:** use heal-remediation prefix and service for PVC sharing ([#2215](https://github.com/5dlabs/cto/issues/2215)) ([cbf8903](https://github.com/5dlabs/cto/commit/cbf8903b0902af684385b6e708da0132a6bd0367))
+* **heal:** wrap CodeRun in backticks for clippy doc_markdown ([#1880](https://github.com/5dlabs/cto/issues/1880)) ([d9d7d58](https://github.com/5dlabs/cto/commit/d9d7d580a4cb2b67fb55f1257285cd0c7deb56b8))
+* **helm:** add watch templates ConfigMap to controller projected volume ([#1833](https://github.com/5dlabs/cto/issues/1833)) ([08567e1](https://github.com/5dlabs/cto/commit/08567e1d92d7a6bf74f959e54fb1b00a1c762b8a))
+* improve error messaging when tools CLI is missing ([#2511](https://github.com/5dlabs/cto/issues/2511)) ([43ec88c](https://github.com/5dlabs/cto/commit/43ec88cae4897bfd0e9b2afed3550ac70539703f)), closes [#2506](https://github.com/5dlabs/cto/issues/2506)
+* include tools-client version in runtime image tag to trigger rebuilds ([#2508](https://github.com/5dlabs/cto/issues/2508)) ([43c29bc](https://github.com/5dlabs/cto/commit/43c29bcf2baf7e1ec10d33be16ace685a5ebf00a)), closes [#2504](https://github.com/5dlabs/cto/issues/2504)
+* **infra:** add configSecret and project settings for MinIO ([#1820](https://github.com/5dlabs/cto/issues/1820)) ([c8818b6](https://github.com/5dlabs/cto/commit/c8818b69fd90543ec343d72ed2fd5ecaee86cfde))
+* **infra:** add ignoreDifferences for operator-managed fields ([#1818](https://github.com/5dlabs/cto/issues/1818)) ([0108dc4](https://github.com/5dlabs/cto/commit/0108dc447e1e606875c0758bebdce5810ecb5abb))
+* **infra:** add ignoreDifferences for operator-managed fields ([#1823](https://github.com/5dlabs/cto/issues/1823)) ([adda169](https://github.com/5dlabs/cto/commit/adda16944091e5033822d1ff67e5e1661ddd7252))
+* **intake:** add error logging to prevent silent failures ([#2476](https://github.com/5dlabs/cto/issues/2476)) ([1eda3e5](https://github.com/5dlabs/cto/commit/1eda3e5f4cf7d25099651cfe7c9f9f1e6c5c323e))
+* **intake:** correct script path in unified intake workflow template ([#2453](https://github.com/5dlabs/cto/issues/2453)) ([f0f455c](https://github.com/5dlabs/cto/commit/f0f455c6a3259d2c2332656e6b41d8acb73468fa)), closes [#2448](https://github.com/5dlabs/cto/issues/2448)
+* **intake:** disable TaskMaster auto-update in containers ([#2477](https://github.com/5dlabs/cto/issues/2477)) ([ab685d2](https://github.com/5dlabs/cto/commit/ab685d2dbc28f59d7aa086ce5d388612c06fb3f2))
+* **intake:** remove erroneous .hbs extension from script path ([#2459](https://github.com/5dlabs/cto/issues/2459)) ([0518fb1](https://github.com/5dlabs/cto/commit/0518fb1287ec8696ae7c144e48d89e73329ae4bf))
+* **intake:** rename unified-intake.sh.hbs to unified-intake.sh ([#2455](https://github.com/5dlabs/cto/issues/2455)) ([6fa8674](https://github.com/5dlabs/cto/commit/6fa8674ac12feb0f35b446624d4dc03bd7c33bb0))
+* **intake:** revert workflow to use .sh instead of .sh.hbs ([#2457](https://github.com/5dlabs/cto/issues/2457)) ([bbb07bc](https://github.com/5dlabs/cto/commit/bbb07bc77a9e042a672b6543dc7d2a51fd7411ea))
+* **intake:** update deprecated model name claude-3-5-sonnet-20241022 ([#2493](https://github.com/5dlabs/cto/issues/2493)) ([88c0b06](https://github.com/5dlabs/cto/commit/88c0b06c753626c3acda1dde75a74689bbf701ff)), closes [#2490](https://github.com/5dlabs/cto/issues/2490)
+* **intake:** update model name to claude-sonnet-4-5-20250929 ([#2489](https://github.com/5dlabs/cto/issues/2489)) ([11edd86](https://github.com/5dlabs/cto/commit/11edd86692b3275b3444a6b4be0052a2c9454d05))
+* **intake:** use anthropic provider instead of claude-code ([#2468](https://github.com/5dlabs/cto/issues/2468)) ([149e931](https://github.com/5dlabs/cto/commit/149e931e8ee52d57b4a3b4996a9d826684dec062))
+* **loki:** increase ingestion rate limits for high-volume logging ([#2645](https://github.com/5dlabs/cto/issues/2645)) ([75f5898](https://github.com/5dlabs/cto/commit/75f58984eb266969126e3c540d4a16e39b434319))
+* make MCP tools CLI check non-fatal to allow agent to proceed ([#2513](https://github.com/5dlabs/cto/issues/2513)) ([f834e9e](https://github.com/5dlabs/cto/commit/f834e9ecda6c89159dc359f30ce5edff905636af)), closes [#2505](https://github.com/5dlabs/cto/issues/2505)
+* make probes optional in universal-app chart ([#1872](https://github.com/5dlabs/cto/issues/1872)) ([311b763](https://github.com/5dlabs/cto/commit/311b7630d2f3c748ef0ae9eeadb8fd2fe012c266))
+* **monitor:** extract org/repo from URL before passing to workflow ([#1851](https://github.com/5dlabs/cto/issues/1851)) ([70ac563](https://github.com/5dlabs/cto/commit/70ac5637d4e9fc92f82f3cd62388bfd9b8913753))
+* **monitor:** pass docs-repository and docs-project-directory to workflow ([#1852](https://github.com/5dlabs/cto/issues/1852)) ([47070bb](https://github.com/5dlabs/cto/commit/47070bbe0b4f0c213d634b75cdd037f46ba235f7))
+* **monitor:** pass play config as CLI args instead of config file ([#1847](https://github.com/5dlabs/cto/issues/1847)) ([a8bc8ca](https://github.com/5dlabs/cto/commit/a8bc8ca25765ab3188f887c70fc6f28528c0cac5))
+* **monitor:** use env vars for GitHub auth like factory base ([#1850](https://github.com/5dlabs/cto/issues/1850)) ([8f7b41c](https://github.com/5dlabs/cto/commit/8f7b41ccde1976fe13c4a717cdc4ab68c74c5f7a))
+* **monitor:** use monitor/cto-config.json as default config path ([#1849](https://github.com/5dlabs/cto/issues/1849)) ([dee3320](https://github.com/5dlabs/cto/commit/dee332051520efda018e979a99f316e5ddd2d8b1))
+* move cloudflare-operator to cloudflare-operator-system namespace ([#1777](https://github.com/5dlabs/cto/issues/1777)) ([9858cf3](https://github.com/5dlabs/cto/commit/9858cf3469380272ee868c49bbb36b6940a643da))
+* nullify httpGet in heal probes to prevent merge conflict ([#1871](https://github.com/5dlabs/cto/issues/1871)) ([ed9e601](https://github.com/5dlabs/cto/commit/ed9e601790fb12fbc834ba66012a728ff62d0aad))
+* **openmemory:** add missing OM_TIER environment variable ([#2613](https://github.com/5dlabs/cto/issues/2613)) ([195eb10](https://github.com/5dlabs/cto/commit/195eb105e722fae6d498a4ddfc25d684205bf265)), closes [#2557](https://github.com/5dlabs/cto/issues/2557)
+* **openmemory:** add missing OM_TIER environment variable ([#2617](https://github.com/5dlabs/cto/issues/2617)) ([12b56cc](https://github.com/5dlabs/cto/commit/12b56ccdf57d4f713fe2dbda24e29dde308f3469)), closes [#2586](https://github.com/5dlabs/cto/issues/2586)
+* **otel:** add VL-Msg-Field header for Victoria Logs ([#1834](https://github.com/5dlabs/cto/issues/1834)) ([2166ac6](https://github.com/5dlabs/cto/commit/2166ac6684371a7058ead1f5a64c123fb621822e))
+* **play-workflow:** correct variable name CM_NAME to CONFIGMAP_NAME ([#2601](https://github.com/5dlabs/cto/issues/2601)) ([c53e99f](https://github.com/5dlabs/cto/commit/c53e99fca544e56bc26887938f7053d32b0f7d89)), closes [#2569](https://github.com/5dlabs/cto/issues/2569)
+* **play:** add guard to prevent update-to-waiting-merge when resuming ([#1941](https://github.com/5dlabs/cto/issues/1941)) ([e92b6c5](https://github.com/5dlabs/cto/commit/e92b6c583b22c6ef3152fe28de7af9fe1f67793d))
+* **pre-commit:** remove defunct kube-score hook ([a309610](https://github.com/5dlabs/cto/commit/a3096102cb37299c19a2de89abc9fd43bae9a1b1))
+* prevent ArgoCD from overwriting CNPG webhook CA bundles ([#1782](https://github.com/5dlabs/cto/issues/1782)) ([07f2a50](https://github.com/5dlabs/cto/commit/07f2a5021a0912e6d60bb79871384d26ca35d76d))
+* prevent ArgoCD from overwriting CNPG webhook CA bundles ([#1784](https://github.com/5dlabs/cto/issues/1784)) ([e880d24](https://github.com/5dlabs/cto/commit/e880d246069f6a19fe68b92a5953fefd20ba19e3))
+* **release:** add tools-client to binary releases and fix Windows lint ([#1805](https://github.com/5dlabs/cto/issues/1805)) ([dcbcae8](https://github.com/5dlabs/cto/commit/dcbcae82feefe5e1f5b9ced26fda9209937bdd49))
+* remediation CodeRun schema to match CRD ([#1853](https://github.com/5dlabs/cto/issues/1853)) ([dae81ff](https://github.com/5dlabs/cto/commit/dae81ff327dca649ef6cf2983b6fc448c491ae9b))
+* **research:** add --no-sandbox for containerized Chromium ([#2708](https://github.com/5dlabs/cto/issues/2708)) ([39ffb22](https://github.com/5dlabs/cto/commit/39ffb22b6f881eaa71f55a84ea57b4979e1e7852))
+* **research:** disable RUSTFLAGS override in CI to respect Cargo.toml lints ([938b19e](https://github.com/5dlabs/cto/commit/938b19e58ea7a046b0efce5348b095a8d77291d6))
+* **research:** fix PVC storage class and remove duplicate secret source ([8ea68ca](https://github.com/5dlabs/cto/commit/8ea68cabb44dfea78f657da65daa5de4b36064e6))
+* **research:** fix PVC storage class, node affinity, and duplicate processing bug ([a50531a](https://github.com/5dlabs/cto/commit/a50531ad514ec25549db2305742de23297b3e89f))
+* **research:** update Dockerfile to Rust 1.85 for comfy-table MSRV ([#2706](https://github.com/5dlabs/cto/issues/2706)) ([3714d64](https://github.com/5dlabs/cto/commit/3714d642da68bbd48fd0f978541efc01b829f867))
+* **research:** use local-path storage class for PVC ([#2705](https://github.com/5dlabs/cto/issues/2705)) ([5056206](https://github.com/5dlabs/cto/commit/5056206146fa8c2644b965324436381b3725bf1a))
+* resolve argo-events sensor syntax errors blocking github-webhooks ([#2785](https://github.com/5dlabs/cto/issues/2785)) ([6df7a03](https://github.com/5dlabs/cto/commit/6df7a031107e0f5864b87c24f87ca2ec2a824936))
+* resolve clippy warnings and make template tests skip gracefully ([#2729](https://github.com/5dlabs/cto/issues/2729)) ([82defe7](https://github.com/5dlabs/cto/commit/82defe7e7a248e6cc28e16bc1c8c6f8bd981f6ce))
+* restore .github/workflows/ directory ([#1891](https://github.com/5dlabs/cto/issues/1891)) ([260c687](https://github.com/5dlabs/cto/commit/260c6874448bb6094fd8fc5102f1feb2b729d9b0))
+* **sensors:** use proper Argo Events parameter mapping for atlas-conflict-monitor ([#2652](https://github.com/5dlabs/cto/issues/2652)) ([6ba9d0c](https://github.com/5dlabs/cto/commit/6ba9d0cb336e46a56b551f5eff27c2573f5595a8)), closes [#2651](https://github.com/5dlabs/cto/issues/2651)
+* **sensors:** use proper Argo Events parameter mapping for workflow templates ([#2650](https://github.com/5dlabs/cto/issues/2650)) ([7c04519](https://github.com/5dlabs/cto/commit/7c04519d51a0a22df86548cfcc8944071c90c423)), closes [#2643](https://github.com/5dlabs/cto/issues/2643)
+* simplify Stitch sensor to single dependency ([#1903](https://github.com/5dlabs/cto/issues/1903)) ([115ef44](https://github.com/5dlabs/cto/commit/115ef4477d76ae593dff65ff89fa5c940b8aea87))
+* **stitch:** Add Factory and Anthropic API keys ([#1925](https://github.com/5dlabs/cto/issues/1925)) ([5a0920b](https://github.com/5dlabs/cto/commit/5a0920b14b75a36bf3dd4a7458990266640a5ed2))
+* **stitch:** Add GH_TOKEN from tools-github-secrets PAT ([#1926](https://github.com/5dlabs/cto/issues/1926)) ([91209bb](https://github.com/5dlabs/cto/commit/91209bbc4611ff3a3c16d72be996838852af1aee))
+* **stitch:** Add writable home directory for Factory CLI ([#1924](https://github.com/5dlabs/cto/issues/1924)) ([ab0a44c](https://github.com/5dlabs/cto/commit/ab0a44c0630c5f0d09a9d655e815592b8059aa21))
+* **stitch:** use correct service account 'cto' instead of 'cto-controller' ([#1917](https://github.com/5dlabs/cto/issues/1917)) ([b9d3867](https://github.com/5dlabs/cto/commit/b9d3867ec56b45f2a75d6c29d4fc616b0db523e9))
+* **stitch:** use correct service account name 'cto' instead of 'cto-controller' ([#1911](https://github.com/5dlabs/cto/issues/1911)) ([8e4f783](https://github.com/5dlabs/cto/commit/8e4f78322f9767b2be1c20a51c2c083f8d155620))
+* **stitch:** use GitHub App token instead of PAT for reviews ([#1934](https://github.com/5dlabs/cto/issues/1934)) ([c1cf7e2](https://github.com/5dlabs/cto/commit/c1cf7e28d6cea32a7a8ec48e41f32a5135d0c5e3))
+* **stitch:** use jq instead of grep for JSON parsing ([#1939](https://github.com/5dlabs/cto/issues/1939)) ([7d39a3c](https://github.com/5dlabs/cto/commit/7d39a3cff874abf7eb5dcb93b1b4fc4ab7d0c7a4))
+* **tasks:** resolve clippy pedantic warnings ([#2754](https://github.com/5dlabs/cto/issues/2754)) ([e4ec89f](https://github.com/5dlabs/cto/commit/e4ec89f298765b32330b8f63812c26f98c30f4b9))
+* **telemetry:** fix alertmanager security context, loki caching, and otel-collector exporters ([#2588](https://github.com/5dlabs/cto/issues/2588)) ([74dde75](https://github.com/5dlabs/cto/commit/74dde7507349481de486aff1c0d847afc0ff1a92))
+* **templates:** remove orphaned duplicate code in container-rex.sh.hbs ([#1829](https://github.com/5dlabs/cto/issues/1829)) ([0df7ff3](https://github.com/5dlabs/cto/commit/0df7ff31aba13910b5f4f5868734aa8b2182c912))
+* **tools:** add command directive for vault-mcp-server binary ([#1793](https://github.com/5dlabs/cto/issues/1793)) ([f5f99f2](https://github.com/5dlabs/cto/commit/f5f99f27cb1315c7f3cdfb0c00dc211105615648))
+* **tools:** clean up Clippy pedantic lint exclusions ([#1790](https://github.com/5dlabs/cto/issues/1790)) ([e454b3e](https://github.com/5dlabs/cto/commit/e454b3ed58e502c2d507f42d1ff2cfe9fff4eb64))
+* **tools:** configure cargo-dist for proper tools release ([#1796](https://github.com/5dlabs/cto/issues/1796)) ([1ff0e8f](https://github.com/5dlabs/cto/commit/1ff0e8f3a9023932b6a51aea38e37fc9d9d33ab8))
+* **tools:** correct vault-mcp-server binary path to /bin/vault-mcp-server ([#1799](https://github.com/5dlabs/cto/issues/1799)) ([0059b5a](https://github.com/5dlabs/cto/commit/0059b5a9a75b2293056920bc32a230968d4d43bb))
+* **tools:** increase vault-mcp-server probe timeout to 5 seconds ([#1802](https://github.com/5dlabs/cto/issues/1802)) ([57ae358](https://github.com/5dlabs/cto/commit/57ae358682da52cba95d6d436544890e9ae44163))
+* **tools:** initialize tracing subscriber for server logging ([#1787](https://github.com/5dlabs/cto/issues/1787)) ([1adc2ed](https://github.com/5dlabs/cto/commit/1adc2edbee907ac38d34b7afbbd4c6180bc5a421))
+* **tools:** lint fixes and remove unnecessary secretRefs from HTTP MCP servers ([#1803](https://github.com/5dlabs/cto/issues/1803)) ([a36cd66](https://github.com/5dlabs/cto/commit/a36cd669a5e868d450cca2461c95585307c925b1))
+* **tools:** remove OAuth Cloudflare servers, fix Firecrawl to use stdio ([#1809](https://github.com/5dlabs/cto/issues/1809)) ([564009a](https://github.com/5dlabs/cto/commit/564009a6896fd95201cd7552ce943c7f87a5fd6b))
+* **tools:** remove redundant unit test step from CI ([#1898](https://github.com/5dlabs/cto/issues/1898)) ([3226fd9](https://github.com/5dlabs/cto/commit/3226fd9d199388ad2cc59dbe30b87290ac287ff1))
+* **tools:** use /health endpoint for vault-mcp-server probes ([#1804](https://github.com/5dlabs/cto/issues/1804)) ([8102f31](https://github.com/5dlabs/cto/commit/8102f313450d709ff26f77e16aa557a662dd0923))
+* **tools:** use Docker for grafana and victoriametrics MCP servers ([#1807](https://github.com/5dlabs/cto/issues/1807)) ([bb70273](https://github.com/5dlabs/cto/commit/bb70273699d1ee8265208fd087215a8351592f92))
+* **tools:** use HTTP for internal ArgoCD URL ([#1815](https://github.com/5dlabs/cto/issues/1815)) ([ab9728e](https://github.com/5dlabs/cto/commit/ab9728e8dad35c4dbdc8c422b861aa1a8f35a3b3))
+* **tools:** use latest tag to fix ImagePullBackOff ([#1912](https://github.com/5dlabs/cto/issues/1912)) ([906eeca](https://github.com/5dlabs/cto/commit/906eeca8d01d12083595b43f9ec6f173d6606bcb))
+* **tools:** wait for Docker socket in entrypoint ([#1781](https://github.com/5dlabs/cto/issues/1781)) ([9dc4aa7](https://github.com/5dlabs/cto/commit/9dc4aa7fd863d0254375b6c8d0023612fd271a83))
+* trigger initial tweakcn image build for GHCR ([#2480](https://github.com/5dlabs/cto/issues/2480)) ([f8fbebc](https://github.com/5dlabs/cto/commit/f8fbebc8936e3db10625d1950822b3bbcdb88101)), closes [#2475](https://github.com/5dlabs/cto/issues/2475)
+* **tweakcn:** add missing build-time env vars for Next.js ([#2483](https://github.com/5dlabs/cto/issues/2483)) ([0f10e4d](https://github.com/5dlabs/cto/commit/0f10e4d32279ae93ad53e5821c410e6ffc0952e9)), closes [#2475](https://github.com/5dlabs/cto/issues/2475)
+* **tweakcn:** fix deployment by using npm install and correct image pull secret ([#2410](https://github.com/5dlabs/cto/issues/2410)) ([88a9948](https://github.com/5dlabs/cto/commit/88a9948e3365a6588173dc4ff24643977165f753))
+* **tweakcn:** skip prebuild to avoid database dependency ([#2469](https://github.com/5dlabs/cto/issues/2469)) ([172dc01](https://github.com/5dlabs/cto/commit/172dc019df76c1a534622fa65c8d5f09d1f5a181))
+* **tweakcn:** trigger CI to build and push initial GHCR image ([#2487](https://github.com/5dlabs/cto/issues/2487)) ([7aed9bc](https://github.com/5dlabs/cto/commit/7aed9bc43b86ce7dc3b599ceb80973ac10b5f098))
+* **tweakcn:** use pnpm and fix standalone build for Docker ([#2467](https://github.com/5dlabs/cto/issues/2467)) ([a608b21](https://github.com/5dlabs/cto/commit/a608b21e1d8093c98464c101f0921140a8b27e6d))
+* update ClickHouse operator configuration and RBAC settings ([f7759be](https://github.com/5dlabs/cto/commit/f7759beb0432b6fef0cad870246e7e06a27b66c6))
+* update coderun.rs doc comment and add claude-sonnet-4/opus-4 model patterns ([#2494](https://github.com/5dlabs/cto/issues/2494)) ([d2afd81](https://github.com/5dlabs/cto/commit/d2afd81e5aba0bbe6475b5b300c3dfe2ecdaf089))
+* use exec probes for heal instead of HTTP ([#1870](https://github.com/5dlabs/cto/issues/1870)) ([391934c](https://github.com/5dlabs/cto/commit/391934cc937558194ef5282a00a297b99be09378))
+* use Helm chart for ClickHouse operator to fix manifest parsing ([#2770](https://github.com/5dlabs/cto/issues/2770)) ([9114d1c](https://github.com/5dlabs/cto/commit/9114d1c37de856d22548497a66a4521ccb0e148a))
+* use jqPathExpressions for ClickHouse operator ignoreDifferences ([#2779](https://github.com/5dlabs/cto/issues/2779)) ([e8a60ae](https://github.com/5dlabs/cto/commit/e8a60ae4e0d30f6fab982b4cfedddbed8eb84f8a))
+* use linear-secrets for PM deployment ([#2778](https://github.com/5dlabs/cto/issues/2778)) ([681e611](https://github.com/5dlabs/cto/commit/681e611c876f08c9e58625fd6b84fa220c532bf1))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1867](https://github.com/5dlabs/cto/issues/1867)) ([3dae21f](https://github.com/5dlabs/cto/commit/3dae21f19bbe47f6a36ab84958ef4c33020efa87))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1868](https://github.com/5dlabs/cto/issues/1868)) ([c715c3a](https://github.com/5dlabs/cto/commit/c715c3aff0deff830bf005bcdd0feccd041a0ed7))
+* use unified release URLs for tools and play-monitor ([#1858](https://github.com/5dlabs/cto/issues/1858)) ([be9eb9a](https://github.com/5dlabs/cto/commit/be9eb9acd28b5d6866dcbd0bfeaf3fab4405eda4))
+* **watch:** create dedicated monitor container script ([#1841](https://github.com/5dlabs/cto/issues/1841)) ([b933170](https://github.com/5dlabs/cto/commit/b9331708b4dd44f741808694303e854e2472f0f8))
+* **workflow:** add error handling and output defaults to play workflow templates ([#2612](https://github.com/5dlabs/cto/issues/2612)) ([77efff0](https://github.com/5dlabs/cto/commit/77efff09594b579fddef888e5719a287e75d9c7c)), closes [#2563](https://github.com/5dlabs/cto/issues/2563)
+* **workflow:** correct variable name in determine-resume-point stale ConfigMap cleanup ([#2600](https://github.com/5dlabs/cto/issues/2600)) ([e2a27ec](https://github.com/5dlabs/cto/commit/e2a27ec44d9727f9e61b0cea06f2c57628d83305)), closes [#2566](https://github.com/5dlabs/cto/issues/2566)
+* **workflow:** correct variable name in determine-resume-point stale ConfigMap cleanup ([#2600](https://github.com/5dlabs/cto/issues/2600)) ([a804d4f](https://github.com/5dlabs/cto/commit/a804d4f8a0776e3154720d2ec469a520ddab376b)), closes [#2566](https://github.com/5dlabs/cto/issues/2566)
+* **workflow:** correct variable name in determine-resume-point template ([64c402b](https://github.com/5dlabs/cto/commit/64c402b1ccad289d4d2e69484562ed612f72d8bb)), closes [#2573](https://github.com/5dlabs/cto/issues/2573)
+* **workflow:** improve parallel-task-processor error handling and TTL ([#2575](https://github.com/5dlabs/cto/issues/2575)) ([#2605](https://github.com/5dlabs/cto/issues/2605)) ([6cb98ba](https://github.com/5dlabs/cto/commit/6cb98baac37733f0e236dbf0da0801896de330e0))
+* **workflow:** increase pod GC delete delay to 300s for heal log capture ([#2607](https://github.com/5dlabs/cto/issues/2607)) ([9e46c27](https://github.com/5dlabs/cto/commit/9e46c2780799d853927ba16a88ff43eaf7c64458)), closes [#2576](https://github.com/5dlabs/cto/issues/2576)
+* **workflow:** use authenticated GitHub API for script download ([#2648](https://github.com/5dlabs/cto/issues/2648)) ([3bac8d0](https://github.com/5dlabs/cto/commit/3bac8d07f5b06c9a5e2e4ba457ccf557c3b8565e)), closes [#2647](https://github.com/5dlabs/cto/issues/2647)
+
+
+### ⚡ Performance
+
+* **ci:** optimize runtime image build with registry cache ([#2464](https://github.com/5dlabs/cto/issues/2464)) ([c189e9e](https://github.com/5dlabs/cto/commit/c189e9ee8d40e7e1d9305b0ad1fa5c71ac4f4b14))
+
+
+### ♻️ Refactoring
+
+* **ci:** consolidate controller workflows into single CI pipeline ([#1929](https://github.com/5dlabs/cto/issues/1929)) ([8c47fde](https://github.com/5dlabs/cto/commit/8c47fde8ed6ec13b20d0d7eff565c9626b326848))
+* **ci:** update workflow to reflect 'healer' naming convention ([#2674](https://github.com/5dlabs/cto/issues/2674)) ([eb85b91](https://github.com/5dlabs/cto/commit/eb85b9163c892781f16feaf305b451df6d3ea17d))
+* complete heal → healer rename in infra ([#2676](https://github.com/5dlabs/cto/issues/2676)) ([6d90031](https://github.com/5dlabs/cto/commit/6d9003181ce1edf61ba65a3178bd7981e50649c0))
+* consolidate heal build into infrastructure-build workflow ([839723d](https://github.com/5dlabs/cto/commit/839723d6d55edb890481de00d1df6aef32297a36))
+* enhance Handlebars helpers and improve CI router logic ([c68a12e](https://github.com/5dlabs/cto/commit/c68a12e72940994fd728312b76da537f7f5e46c0))
+* **heal:** rename 'heal' to 'healer' and remove obsolete files ([adc2b95](https://github.com/5dlabs/cto/commit/adc2b9556caf5012982a4ea59c6f0b8210004baa))
+* **mcp:** remove docs_ingest tool in favor of Context7 ([#2326](https://github.com/5dlabs/cto/issues/2326)) ([9ef63a6](https://github.com/5dlabs/cto/commit/9ef63a6c2e0fc2dfe2d567d24e2add391684e5af))
+* move heal image to infra/images and remove obsolete watch files ([8abacf7](https://github.com/5dlabs/cto/commit/8abacf707b1b4234b1705bcd89ae0ff0712401ab))
+* remove cto-config and talos-kubeconfig mounts from heal CodeRuns ([969a79c](https://github.com/5dlabs/cto/commit/969a79c66d6e0646e3f2b4343325c088fd2c0778))
+* rename heal to healer ([#2678](https://github.com/5dlabs/cto/issues/2678)) ([8f8d257](https://github.com/5dlabs/cto/commit/8f8d2570d3d460a310173349553576599521c059))
+* reorganize crates and templates ([#2085](https://github.com/5dlabs/cto/issues/2085)) ([cb0f24c](https://github.com/5dlabs/cto/commit/cb0f24cdd5e71ad570e3ee6f507b7ab65ddfc4d9))
+* **state:** streamline error handling and improve code readability ([#2669](https://github.com/5dlabs/cto/issues/2669)) ([fb22a4f](https://github.com/5dlabs/cto/commit/fb22a4ff2e256e1789198f673e6798bb1d1224ac))
+* **templates:** implement shared partial system for DRY templates ([#2109](https://github.com/5dlabs/cto/issues/2109)) ([948d1fc](https://github.com/5dlabs/cto/commit/948d1fc664ff8b9e6fa8f1cdecefe910a67ea4d7))
+* update Gemini model references in CLI provider and tests ([#2751](https://github.com/5dlabs/cto/issues/2751)) ([0e2f153](https://github.com/5dlabs/cto/commit/0e2f1533e81382aa181b252ec9aaefa7609ae1fc))
+
+
+### 📚 Documentation
+
+* add comprehensive MCP tools documentation for observability stack ([#2655](https://github.com/5dlabs/cto/issues/2655)) ([0b1592e](https://github.com/5dlabs/cto/commit/0b1592e4497b906e62d4e253e769060adffba9b7))
+* add Healer CI Remediation Hub summary ([#2696](https://github.com/5dlabs/cto/issues/2696)) ([6ade998](https://github.com/5dlabs/cto/commit/6ade9985e49aa39f740ddbd234387fe6e8a15d70))
+* add Latitude.sh bare metal POC design and research ([#2525](https://github.com/5dlabs/cto/issues/2525)) ([2337549](https://github.com/5dlabs/cto/commit/23375494882f35004326470f5abf911af11266eb))
+* **healer:** add documentation for current and desired functionality ([#2680](https://github.com/5dlabs/cto/issues/2680)) ([e2f9c9a](https://github.com/5dlabs/cto/commit/e2f9c9a76347e4235a01d2991655f26dcfacb963))
+* improve cloudflare-operator configuration documentation ([#1774](https://github.com/5dlabs/cto/issues/1774)) ([2d1b892](https://github.com/5dlabs/cto/commit/2d1b8928814e82b9a0cdfdbca9abe5ae2cba29a5))
+* **research:** add 1 new research entries ([#2720](https://github.com/5dlabs/cto/issues/2720)) ([0ce6271](https://github.com/5dlabs/cto/commit/0ce6271e9793610d0b5f6559c93937b8b4c1070d))
+* **research:** add 1 new research entries ([#2750](https://github.com/5dlabs/cto/issues/2750)) ([429b11b](https://github.com/5dlabs/cto/commit/429b11be571855d0b67714efe6bb953e9447f612))
+* **research:** add 2 new research entries ([#2721](https://github.com/5dlabs/cto/issues/2721)) ([272af50](https://github.com/5dlabs/cto/commit/272af5047c055bfca5ebf3643dc9bee60e4e5617))
+* **research:** add 2 new research entries ([#2748](https://github.com/5dlabs/cto/issues/2748)) ([c363c1f](https://github.com/5dlabs/cto/commit/c363c1f04d7134a4f3b89908bc4a33f295259286))
+* **research:** add 2 new research entries ([#2749](https://github.com/5dlabs/cto/issues/2749)) ([30c2fb1](https://github.com/5dlabs/cto/commit/30c2fb152b173e9731ce61b1dca3b23e839ecdcb))
+* **research:** add 3 new research entries ([#2715](https://github.com/5dlabs/cto/issues/2715)) ([59db680](https://github.com/5dlabs/cto/commit/59db680ee5819a41b64d54a39c1fb8dc1f435cb0))
+* **research:** add 3 new research entries ([#2717](https://github.com/5dlabs/cto/issues/2717)) ([46c538a](https://github.com/5dlabs/cto/commit/46c538ab27eac1f2ac5ed5720471b5e4c152051a))
+* **research:** add 3 new research entries ([#2719](https://github.com/5dlabs/cto/issues/2719)) ([1aec596](https://github.com/5dlabs/cto/commit/1aec596474ce88d53c841ad8728b239c88ddf703))
+* **research:** add 3 new research entries ([#2747](https://github.com/5dlabs/cto/issues/2747)) ([be4d94b](https://github.com/5dlabs/cto/commit/be4d94baf9f0c6213c147ef6d15b7c3b96e00d67))
+* **research:** add 4 new research entries ([#2716](https://github.com/5dlabs/cto/issues/2716)) ([c9650d3](https://github.com/5dlabs/cto/commit/c9650d38ceac1e8533d3378871f6f68f8c4ae4a0))
+* **research:** add 4 new research entries ([#2718](https://github.com/5dlabs/cto/issues/2718)) ([5308b8f](https://github.com/5dlabs/cto/commit/5308b8f1ff0729f649930abe96692d6e2e453a40))
+* **research:** add 5 new research entries ([#2714](https://github.com/5dlabs/cto/issues/2714)) ([1e77494](https://github.com/5dlabs/cto/commit/1e774949148aeb4f392a4d71647ad71e850c9cdb))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([890ab0c](https://github.com/5dlabs/cto/commit/890ab0c96cc565e9990a1f1ab672748609bf09cd))
+* auto-update agent-templates ConfigMap ([74853d5](https://github.com/5dlabs/cto/commit/74853d5855ab93860e83215be53dd255b21aa9c9))
+* auto-update agent-templates ConfigMap ([5de7ea9](https://github.com/5dlabs/cto/commit/5de7ea91b16e5b87b76ce9269a61e541ef454330))
+* auto-update agent-templates ConfigMap ([4b21e41](https://github.com/5dlabs/cto/commit/4b21e41d09240ccc729a2a2cae9c7972e20e91e6))
+* auto-update agent-templates ConfigMap ([5fcfaeb](https://github.com/5dlabs/cto/commit/5fcfaeb4d6a4708543e597ffdd612edbea79f97d))
+* auto-update agent-templates ConfigMap ([b9ece6d](https://github.com/5dlabs/cto/commit/b9ece6d091745c4b1657ad5f370c8fe00199499d))
+* auto-update agent-templates ConfigMap ([c7700bd](https://github.com/5dlabs/cto/commit/c7700bd32dea0697f2ba592f3ea6b9951339db42))
+* auto-update agent-templates ConfigMap ([e4f8e01](https://github.com/5dlabs/cto/commit/e4f8e015aeba32ead71a92f918acd6b654baa3f0))
+* auto-update agent-templates ConfigMap ([2dc74e9](https://github.com/5dlabs/cto/commit/2dc74e9871e175e8389c34d81fef70ef3058cb86))
+* auto-update agent-templates ConfigMap ([322d682](https://github.com/5dlabs/cto/commit/322d682aa7962b24a43a7f82a410384733654f0c))
+* auto-update agent-templates ConfigMap ([d4fffea](https://github.com/5dlabs/cto/commit/d4fffea7f7d72a374ab3026a3179432687a0b404))
+* auto-update agent-templates ConfigMap ([b91799f](https://github.com/5dlabs/cto/commit/b91799f18f46bc7d19aea4b2972b6d01762e2e97))
+* bump TaskMaster to 0.36.0 ([#2460](https://github.com/5dlabs/cto/issues/2460)) ([7a00c09](https://github.com/5dlabs/cto/commit/7a00c09b2ac409aa751ecb9573d2026d05a510e7))
+* **chart:** regenerate agent templates ConfigMaps ([e0cb7ad](https://github.com/5dlabs/cto/commit/e0cb7ad586f3635ec4c7666db2feecc428283dd2))
+* **chart:** regenerate agent templates ConfigMaps ([#1825](https://github.com/5dlabs/cto/issues/1825)) ([4304a34](https://github.com/5dlabs/cto/commit/4304a3473014030a5dc5b34c001f5479aba6956f))
+* **chart:** regenerate agent templates ConfigMaps ([#1848](https://github.com/5dlabs/cto/issues/1848)) ([98be1ca](https://github.com/5dlabs/cto/commit/98be1ca67830aee560cf387b60d378f2cc0383cc))
+* **chart:** regenerate agent templates ConfigMaps ([#2419](https://github.com/5dlabs/cto/issues/2419)) ([5af9d3c](https://github.com/5dlabs/cto/commit/5af9d3cb9dd2a7ffad61f7a3efe554e7f97f7e1d))
+* **chart:** regenerate agent templates ConfigMaps ([#2421](https://github.com/5dlabs/cto/issues/2421)) ([8f859b5](https://github.com/5dlabs/cto/commit/8f859b5602fd5bfd21e139f4e3903199e61b6a64))
+* **chart:** regenerate agent templates ConfigMaps ([#2479](https://github.com/5dlabs/cto/issues/2479)) ([e06eec1](https://github.com/5dlabs/cto/commit/e06eec1f1a4eda8e0b15247127b3a700ffb0fd8d))
+* **chart:** regenerate agent templates ConfigMaps ([#2495](https://github.com/5dlabs/cto/issues/2495)) ([65e1e8a](https://github.com/5dlabs/cto/commit/65e1e8aecc9b5094e24f4596de6353a39b560eab))
+* **chart:** regenerate agent templates ConfigMaps ([#2499](https://github.com/5dlabs/cto/issues/2499)) ([96552de](https://github.com/5dlabs/cto/commit/96552de45c82a167c420a914a9f725ec05d3203e))
+* **chart:** regenerate agent templates ConfigMaps ([#2512](https://github.com/5dlabs/cto/issues/2512)) ([9a910b9](https://github.com/5dlabs/cto/commit/9a910b9f33f70e437fbab3cb0f5cf0a319699a27))
+* **chart:** regenerate agent templates ConfigMaps ([#2515](https://github.com/5dlabs/cto/issues/2515)) ([6d63bbe](https://github.com/5dlabs/cto/commit/6d63bbe2395f26a21b04458708b11d15dd6387fe))
+* **chart:** regenerate agent templates ConfigMaps ([#2610](https://github.com/5dlabs/cto/issues/2610)) ([63c2ec1](https://github.com/5dlabs/cto/commit/63c2ec1325f344b54ef7f8b98c9c99cd71993580))
+* **chart:** regenerate agent templates ConfigMaps ([#2672](https://github.com/5dlabs/cto/issues/2672)) ([5bde3dd](https://github.com/5dlabs/cto/commit/5bde3ddfada55135d73264075238e175c9c5ac41))
+* **chart:** regenerate agent templates ConfigMaps ([#2699](https://github.com/5dlabs/cto/issues/2699)) ([573ae89](https://github.com/5dlabs/cto/commit/573ae893bc59ecdfb7e818715bbdf07c32a739cd))
+* exclude .scripts directory from version control ([#2757](https://github.com/5dlabs/cto/issues/2757)) ([db5b567](https://github.com/5dlabs/cto/commit/db5b5671d29c80e0e729b654252b039150bc1bd0))
+* exclude .scripts directory from version control ([#2758](https://github.com/5dlabs/cto/issues/2758)) ([4325f6e](https://github.com/5dlabs/cto/commit/4325f6e6741c8e22988cc69caed78a00b8eac7f9))
+* exclude docs directory from version control ([#2756](https://github.com/5dlabs/cto/issues/2756)) ([5731586](https://github.com/5dlabs/cto/commit/5731586c0cea470227a61463ec249965074dafdf))
+* release 0.11.0 ([#1901](https://github.com/5dlabs/cto/issues/1901)) ([c725aae](https://github.com/5dlabs/cto/commit/c725aae51edf215346f98ce5d55ff0ce0b6f33bb))
+* release 0.11.0 ([#1902](https://github.com/5dlabs/cto/issues/1902)) ([e52c7ff](https://github.com/5dlabs/cto/commit/e52c7ff7928e1693653394be184cdaea589281b0))
+* release 0.11.1 ([#1905](https://github.com/5dlabs/cto/issues/1905)) ([f9e9796](https://github.com/5dlabs/cto/commit/f9e97967fb2c03742ae81f811882ea5e5606c11f))
+* release 0.11.10 ([#1933](https://github.com/5dlabs/cto/issues/1933)) ([3a4da4a](https://github.com/5dlabs/cto/commit/3a4da4a791b1ea36420af9f054d8b99fadc8c242))
+* release 0.11.11 ([#1935](https://github.com/5dlabs/cto/issues/1935)) ([22a3f56](https://github.com/5dlabs/cto/commit/22a3f568f92d512abbf6550ec4992b9d61bd01ae))
+* release 0.11.12 ([#1937](https://github.com/5dlabs/cto/issues/1937)) ([0fe2cce](https://github.com/5dlabs/cto/commit/0fe2cce7e31397d5e346198675b162bcce5d1ee6))
+* release 0.11.13 ([#1940](https://github.com/5dlabs/cto/issues/1940)) ([5a01019](https://github.com/5dlabs/cto/commit/5a01019620ba5a94b6722f08d316a9b19c221953))
+* release 0.11.14 ([#1942](https://github.com/5dlabs/cto/issues/1942)) ([3fa5974](https://github.com/5dlabs/cto/commit/3fa5974fc95817b8367b5756d4ff8c02418ac3a6))
+* release 0.11.15 ([#1952](https://github.com/5dlabs/cto/issues/1952)) ([0f0b56e](https://github.com/5dlabs/cto/commit/0f0b56e206a131619eef42674fee78dc9ee99331))
+* release 0.11.16 ([#1954](https://github.com/5dlabs/cto/issues/1954)) ([7cb80f7](https://github.com/5dlabs/cto/commit/7cb80f763f4e781b91c04324d04d2ac155f4f60f))
+* release 0.11.17 ([#1960](https://github.com/5dlabs/cto/issues/1960)) ([ff8c9b5](https://github.com/5dlabs/cto/commit/ff8c9b5ad8358efff5a550212244d8682d1d80e7))
+* release 0.11.2 ([#1907](https://github.com/5dlabs/cto/issues/1907)) ([b05f4c3](https://github.com/5dlabs/cto/commit/b05f4c31f86c0b0d974b22966c0c23ac59d1e317))
+* release 0.11.3 ([#1910](https://github.com/5dlabs/cto/issues/1910)) ([18e00e6](https://github.com/5dlabs/cto/commit/18e00e60f8a02e7adb242fd75f2b8735a7a835ee))
+* release 0.11.4 ([#1913](https://github.com/5dlabs/cto/issues/1913)) ([311b0a2](https://github.com/5dlabs/cto/commit/311b0a22f1ff61a7b75ef5c4574b0f68bfb18448))
+* release 0.11.5 ([#1916](https://github.com/5dlabs/cto/issues/1916)) ([b45040c](https://github.com/5dlabs/cto/commit/b45040c3381aa0613411d701109884f76ab104b2))
+* release 0.11.6 ([#1918](https://github.com/5dlabs/cto/issues/1918)) ([fa906ce](https://github.com/5dlabs/cto/commit/fa906ce737750c64191990defa9e7fc91b827d94))
+* release 0.11.7 ([#1921](https://github.com/5dlabs/cto/issues/1921)) ([fb4acbf](https://github.com/5dlabs/cto/commit/fb4acbf9b7f3a379be5b14d23bc25f20a6cdc769))
+* release 0.11.8 ([#1928](https://github.com/5dlabs/cto/issues/1928)) ([a5ac1ba](https://github.com/5dlabs/cto/commit/a5ac1ba59c7a3fcf7bfde10f08e463f55d2f9baa))
+* release 0.11.9 ([#1930](https://github.com/5dlabs/cto/issues/1930)) ([0914709](https://github.com/5dlabs/cto/commit/0914709ce3eaee763c9f96f9d8e40c064a51b21b))
+* release 0.12.0 ([#2077](https://github.com/5dlabs/cto/issues/2077)) ([318a782](https://github.com/5dlabs/cto/commit/318a782071b42d431dd9f73efeabc5d1d64daa98))
+* release 0.12.1 ([#2132](https://github.com/5dlabs/cto/issues/2132)) ([e8d6e17](https://github.com/5dlabs/cto/commit/e8d6e17d8b1a7af67942f908a37f6371d92b8fd6))
+* release 0.12.10 ([#2417](https://github.com/5dlabs/cto/issues/2417)) ([af12c45](https://github.com/5dlabs/cto/commit/af12c458b4e719780269481d15c1c0f03ccd3041))
+* release 0.12.11 ([#2444](https://github.com/5dlabs/cto/issues/2444)) ([4890793](https://github.com/5dlabs/cto/commit/4890793ed671c2da5404ed18cc87f9df261f885a))
+* release 0.12.12 ([#2456](https://github.com/5dlabs/cto/issues/2456)) ([eaa592a](https://github.com/5dlabs/cto/commit/eaa592ae54d5e573aac7963fde573c03cb4e5ea4))
+* release 0.12.13 ([#2458](https://github.com/5dlabs/cto/issues/2458)) ([f5b45b4](https://github.com/5dlabs/cto/commit/f5b45b47dc35cad1e7555b1835ce97dc737b9505))
+* release 0.12.14 ([#2463](https://github.com/5dlabs/cto/issues/2463)) ([329d31a](https://github.com/5dlabs/cto/commit/329d31a8ed33e0b7ef4803d7ecd397c101fb25b9))
+* release 0.12.15 ([#2466](https://github.com/5dlabs/cto/issues/2466)) ([6aaf786](https://github.com/5dlabs/cto/commit/6aaf786df9ee72f5ccaa2cfd41ee2582b029f505))
+* release 0.12.16 ([#2470](https://github.com/5dlabs/cto/issues/2470)) ([c4dc7dc](https://github.com/5dlabs/cto/commit/c4dc7dcdd6506386ddd3f201a492dd5c89666589))
+* release 0.12.17 ([#2478](https://github.com/5dlabs/cto/issues/2478)) ([6eb9e85](https://github.com/5dlabs/cto/commit/6eb9e8572ae4aab55786c9da503360c749ddd14b))
+* release 0.12.18 ([#2481](https://github.com/5dlabs/cto/issues/2481)) ([c338ba7](https://github.com/5dlabs/cto/commit/c338ba719589cae0aa084478d27fb1a65b455e9a))
+* release 0.12.19 ([#2498](https://github.com/5dlabs/cto/issues/2498)) ([aebbacb](https://github.com/5dlabs/cto/commit/aebbacb48b29a09d9292eac4425aaaaf1d3967b2))
+* release 0.12.2 ([#2153](https://github.com/5dlabs/cto/issues/2153)) ([f8d3616](https://github.com/5dlabs/cto/commit/f8d3616e9098bf890500cb2e378bb7fefe3466e5))
+* release 0.12.20 ([#2500](https://github.com/5dlabs/cto/issues/2500)) ([5bcf41a](https://github.com/5dlabs/cto/commit/5bcf41aaba9e06a6982a7400a251e6d8654ac53e))
+* release 0.12.21 ([#2502](https://github.com/5dlabs/cto/issues/2502)) ([b9acf42](https://github.com/5dlabs/cto/commit/b9acf42ec9b89c964fba597b7e9784a39377815c))
+* release 0.12.22 ([#2509](https://github.com/5dlabs/cto/issues/2509)) ([f24814a](https://github.com/5dlabs/cto/commit/f24814a11a7fbdb35723f200816e905bfdc1e34e))
+* release 0.12.23 ([#2523](https://github.com/5dlabs/cto/issues/2523)) ([c625f0c](https://github.com/5dlabs/cto/commit/c625f0c0eef1542e24f724057f7b721517e11c10))
+* release 0.12.24 ([#2527](https://github.com/5dlabs/cto/issues/2527)) ([925573f](https://github.com/5dlabs/cto/commit/925573fbdfa6a5467bf10927bfc86d475e50e6f2))
+* release 0.12.25 ([#2531](https://github.com/5dlabs/cto/issues/2531)) ([1129a6a](https://github.com/5dlabs/cto/commit/1129a6a322002218248f27c2a47fb928d23785d2))
+* release 0.12.26 ([#2533](https://github.com/5dlabs/cto/issues/2533)) ([f7de3b4](https://github.com/5dlabs/cto/commit/f7de3b4bc9fa3ca3daf33df65f81139fb355e14e))
+* release 0.12.27 ([#2538](https://github.com/5dlabs/cto/issues/2538)) ([b7df8c7](https://github.com/5dlabs/cto/commit/b7df8c7b91024293ac97cb295ed6ce5c6d7e3a4c))
+* release 0.12.28 ([#2548](https://github.com/5dlabs/cto/issues/2548)) ([f9e013a](https://github.com/5dlabs/cto/commit/f9e013a5e25279127dbc42df3d00bba2b9a42e14))
+* release 0.12.29 ([#2553](https://github.com/5dlabs/cto/issues/2553)) ([c64c59f](https://github.com/5dlabs/cto/commit/c64c59f67f3f9ad5f80b693a8695ca73b01418d8))
+* release 0.12.3 ([#2158](https://github.com/5dlabs/cto/issues/2158)) ([3769324](https://github.com/5dlabs/cto/commit/376932418864430a5b066d4def037aaf1d59b489))
+* release 0.12.30 ([#2603](https://github.com/5dlabs/cto/issues/2603)) ([637f2fa](https://github.com/5dlabs/cto/commit/637f2fa6b769def99ff4a8f03cdf67b8d57518be))
+* release 0.12.31 ([#2671](https://github.com/5dlabs/cto/issues/2671)) ([47e0f2f](https://github.com/5dlabs/cto/commit/47e0f2f416fa8bb3cf97cbb6697c2ede9898e9cf))
+* release 0.12.32 ([#2677](https://github.com/5dlabs/cto/issues/2677)) ([2ec8681](https://github.com/5dlabs/cto/commit/2ec8681c3843dae1e646ef8fbcc9313382250371))
+* release 0.12.33 ([#2679](https://github.com/5dlabs/cto/issues/2679)) ([07d4ff6](https://github.com/5dlabs/cto/commit/07d4ff603f7a6363d9fd3517b54437b62a4c64b5))
+* release 0.12.34 ([#2686](https://github.com/5dlabs/cto/issues/2686)) ([64bb664](https://github.com/5dlabs/cto/commit/64bb66471e2a10af1ebe82b7960b74d6abd5a446))
+* release 0.12.35 ([#2690](https://github.com/5dlabs/cto/issues/2690)) ([b8f4edd](https://github.com/5dlabs/cto/commit/b8f4eddb0d86a4f42079e08b860ca26a12c4ce8c))
+* release 0.12.36 ([#2693](https://github.com/5dlabs/cto/issues/2693)) ([093f3c8](https://github.com/5dlabs/cto/commit/093f3c8b00a94c76ad3239036f17bf220196d90b))
+* release 0.12.37 ([#2697](https://github.com/5dlabs/cto/issues/2697)) ([30c7d57](https://github.com/5dlabs/cto/commit/30c7d577bae217cf945c4d38551aa56494ac0a7b))
+* release 0.12.38 ([#2698](https://github.com/5dlabs/cto/issues/2698)) ([c6abb46](https://github.com/5dlabs/cto/commit/c6abb4639733abfa5fb1a2d1b2b43edd4aaee853))
+* release 0.12.4 ([#2164](https://github.com/5dlabs/cto/issues/2164)) ([3d03c16](https://github.com/5dlabs/cto/commit/3d03c16d55e5aad510e4f577a3aaff4cbcbab1f4))
+* release 0.12.5 ([#2199](https://github.com/5dlabs/cto/issues/2199)) ([1af35e6](https://github.com/5dlabs/cto/commit/1af35e60fa4a6cc41aafa8d8c9a41c68b0cc7170))
+* release 0.12.6 ([#2320](https://github.com/5dlabs/cto/issues/2320)) ([9a05e8c](https://github.com/5dlabs/cto/commit/9a05e8ca7dbc0905f1e0d885b049eab334aafe79))
+* release 0.12.7 ([#2327](https://github.com/5dlabs/cto/issues/2327)) ([93eceed](https://github.com/5dlabs/cto/commit/93eceed7a9dd5659f14d9b2aca6fc45362608f53))
+* release 0.12.8 ([#2331](https://github.com/5dlabs/cto/issues/2331)) ([f14e0ae](https://github.com/5dlabs/cto/commit/f14e0ae76bf0e347b232dfe80e0d2551877177b1))
+* release 0.12.9 ([#2391](https://github.com/5dlabs/cto/issues/2391)) ([2c0b32a](https://github.com/5dlabs/cto/commit/2c0b32a1d11399f8985a66b51ec8b589be8b1e78))
+* release 0.2.1 ([#1896](https://github.com/5dlabs/cto/issues/1896)) ([3a32715](https://github.com/5dlabs/cto/commit/3a327150ec007daec5d855d4c871734ea26ed21c))
+* release 0.2.2 ([#1900](https://github.com/5dlabs/cto/issues/1900)) ([be39778](https://github.com/5dlabs/cto/commit/be397789c52b2e69d0c1f32def96731b2007db3e))
+* remove .docs-archive from tracking and add to .gitignore ([43a78b0](https://github.com/5dlabs/cto/commit/43a78b0c3c8f592686d1a9d8fb2bd511c18126f8))
+* remove agent templates sync workflow from version control ([#2759](https://github.com/5dlabs/cto/issues/2759)) ([0069d7f](https://github.com/5dlabs/cto/commit/0069d7f5c07dd2f879293aeb1d88fcc8d99e3427))
+* remove Atlas batch integration workflow ([#2689](https://github.com/5dlabs/cto/issues/2689)) ([cba816b](https://github.com/5dlabs/cto/commit/cba816baab8743295d14eca6ff241b0563ca23fd))
+* remove atlas-conflict-monitor-sensor ([#2663](https://github.com/5dlabs/cto/issues/2663)) ([ebbeedc](https://github.com/5dlabs/cto/commit/ebbeedcd05fa4a5bdca5f486098cac10960c16b6))
+* remove deprecated templates for coding and GitHub guidelines, agent configurations, and container scripts ([1bd84ce](https://github.com/5dlabs/cto/commit/1bd84ce97d54e1a749b4a7a321aa1be7f2024305))
+* remove deprecated templates for coding and GitHub guidelines, agent configurations, and container scripts ([feb899a](https://github.com/5dlabs/cto/commit/feb899a18d884374c073743bd92deb77254b5ef7))
+* remove staging and dev environment configurations ([#2765](https://github.com/5dlabs/cto/issues/2765)) ([41bdc6f](https://github.com/5dlabs/cto/commit/41bdc6f56d85d5656591fa21339c6bd0eaa948e3))
+* remove trailing whitespace from multiple YAML files ([180a2d6](https://github.com/5dlabs/cto/commit/180a2d67ad51146097a59829d9e6d7bedb02ba72))
+* **tools:** disable standalone k8s-mcp deployment ([#1780](https://github.com/5dlabs/cto/issues/1780)) ([f6c96a7](https://github.com/5dlabs/cto/commit/f6c96a7f91f57fac0591020f51b67f9daf0892a9))
+* update Cargo.lock and enhance AI provider configuration ([5a8a62b](https://github.com/5dlabs/cto/commit/5a8a62b78b6f7a67f84c7a4a75972a4344842612))
+* update CLI template validation to focus on invoke templates ([66556f7](https://github.com/5dlabs/cto/commit/66556f7ac092619fad9c5275bcd465ca9dbfac23))
+* update dependencies and configuration for cto-cloud ([9288222](https://github.com/5dlabs/cto/commit/928822259d822e496f718f9a87185fc3561261fe))
+* update dependencies to version 0.12.23 and add cto-metal package ([a1a697e](https://github.com/5dlabs/cto/commit/a1a697e73789c9eef4995089c1c143b786cb7ffb))
+* update dependencies to version 0.12.27 and add Cluster command to metal CLI ([52e4db9](https://github.com/5dlabs/cto/commit/52e4db97f9d1f0fd14a23b820d76f795885fe2ba))
+* update documentation and configuration for GitHub integration ([ebc784d](https://github.com/5dlabs/cto/commit/ebc784dc2c268a5774a6a13a8d2d26b907d2282c))
+* update package versions to 0.12.18 in Cargo.lock ([80bffe5](https://github.com/5dlabs/cto/commit/80bffe58f36c21169687346cd9423513346ad67f))
+* update package versions to 0.12.19 in Cargo.lock and improve retry logic in apply-agent-templates-configmap.sh ([78b36b5](https://github.com/5dlabs/cto/commit/78b36b50941f6d4501f7aaa28dd59821ae2740f7))
+
+
+### 👷 CI/CD
+
+* add Dexter financial research agent to CI build matrix ([#2742](https://github.com/5dlabs/cto/issues/2742)) ([1de2cc6](https://github.com/5dlabs/cto/commit/1de2cc6c512f251b8dc7dca7283fd157887eda13))
+
+## [0.12.38](https://github.com/5dlabs/cto/compare/v0.12.37...v0.12.38) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* enhance Handlebars helpers and improve CI router logic ([c68a12e](https://github.com/5dlabs/cto/commit/c68a12e72940994fd728312b76da537f7f5e46c0))
+
+
+### 🔧 Maintenance
+
+* remove deprecated templates for coding and GitHub guidelines, agent configurations, and container scripts ([1bd84ce](https://github.com/5dlabs/cto/commit/1bd84ce97d54e1a749b4a7a321aa1be7f2024305))
+* remove deprecated templates for coding and GitHub guidelines, agent configurations, and container scripts ([feb899a](https://github.com/5dlabs/cto/commit/feb899a18d884374c073743bd92deb77254b5ef7))
+
+## [0.12.37](https://github.com/5dlabs/cto/compare/v0.12.36...v0.12.37) (2025-12-04)
+
+
+### 📚 Documentation
+
+* add Healer CI Remediation Hub summary ([#2696](https://github.com/5dlabs/cto/issues/2696)) ([6ade998](https://github.com/5dlabs/cto/commit/6ade9985e49aa39f740ddbd234387fe6e8a15d70))
+
+## [0.12.36](https://github.com/5dlabs/cto/compare/v0.12.35...v0.12.36) (2025-12-04)
+
+
+### 🐛 Bug Fixes
+
+* **healer:** correct config schema to match RemediationConfig struct ([#2694](https://github.com/5dlabs/cto/issues/2694)) ([5d13545](https://github.com/5dlabs/cto/commit/5d13545682487ddaf0aae557fe1a927479b027bf))
+* **healer:** use --addr instead of --port for server command ([#2692](https://github.com/5dlabs/cto/issues/2692)) ([6a41f50](https://github.com/5dlabs/cto/commit/6a41f5000382ac2159cfca17dc370975c6032eb4))
+* **healer:** use Axum 0.7 route syntax {task_id} instead of :task_id ([#2695](https://github.com/5dlabs/cto/issues/2695)) ([a26ef3b](https://github.com/5dlabs/cto/commit/a26ef3b565f142517b562058419783c026d3bb6a))
+
+## [0.12.35](https://github.com/5dlabs/cto/compare/v0.12.34...v0.12.35) (2025-12-04)
+
+
+### ✨ Features
+
+* **healer:** add OpenMemory integration for cross-session learning ([#2687](https://github.com/5dlabs/cto/issues/2687)) ([82219b6](https://github.com/5dlabs/cto/commit/82219b65dd62973cef04e135b86206de14783bbf))
+
+
+### 🔧 Maintenance
+
+* remove Atlas batch integration workflow ([#2689](https://github.com/5dlabs/cto/issues/2689)) ([cba816b](https://github.com/5dlabs/cto/commit/cba816baab8743295d14eca6ff241b0563ca23fd))
+
+## [0.12.34](https://github.com/5dlabs/cto/compare/v0.12.33...v0.12.34) (2025-12-04)
+
+
+### ✨ Features
+
+* **healer:** add play orchestration module for tracking parallel tasks ([#2684](https://github.com/5dlabs/cto/issues/2684)) ([0453eca](https://github.com/5dlabs/cto/commit/0453ecacb52e5bb47f937358a1449f48ebf72542))
+
+## [0.12.33](https://github.com/5dlabs/cto/compare/v0.12.32...v0.12.33) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* rename heal to healer ([#2678](https://github.com/5dlabs/cto/issues/2678)) ([8f8d257](https://github.com/5dlabs/cto/commit/8f8d2570d3d460a310173349553576599521c059))
+
+
+### 📚 Documentation
+
+* **healer:** add documentation for current and desired functionality ([#2680](https://github.com/5dlabs/cto/issues/2680)) ([e2f9c9a](https://github.com/5dlabs/cto/commit/e2f9c9a76347e4235a01d2991655f26dcfacb963))
+
+## [0.12.32](https://github.com/5dlabs/cto/compare/v0.12.31...v0.12.32) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* complete heal → healer rename in infra ([#2676](https://github.com/5dlabs/cto/issues/2676)) ([6d90031](https://github.com/5dlabs/cto/commit/6d9003181ce1edf61ba65a3178bd7981e50649c0))
+
+## [0.12.31](https://github.com/5dlabs/cto/compare/v0.12.30...v0.12.31) (2025-12-04)
+
+
+### ♻️ Refactoring
+
+* **ci:** update workflow to reflect 'healer' naming convention ([#2674](https://github.com/5dlabs/cto/issues/2674)) ([eb85b91](https://github.com/5dlabs/cto/commit/eb85b9163c892781f16feaf305b451df6d3ea17d))
+* **heal:** rename 'heal' to 'healer' and remove obsolete files ([adc2b95](https://github.com/5dlabs/cto/commit/adc2b9556caf5012982a4ea59c6f0b8210004baa))
+
+
+### 🔧 Maintenance
+
+* **chart:** regenerate agent templates ConfigMaps ([#2672](https://github.com/5dlabs/cto/issues/2672)) ([5bde3dd](https://github.com/5dlabs/cto/commit/5bde3ddfada55135d73264075238e175c9c5ac41))
+
+## [0.12.30](https://github.com/5dlabs/cto/compare/v0.12.29...v0.12.30) (2025-12-04)
+
+
+### ✨ Features
+
+* **telemetry:** migrate from Victoria Metrics/Logs to Grafana stack ([#2571](https://github.com/5dlabs/cto/issues/2571)) ([db6710a](https://github.com/5dlabs/cto/commit/db6710a08d3604eb6b0eef46148ab21358e578b4))
+
+
+### 🐛 Bug Fixes
+
+* add GitHub App authentication to heal templates ([#2670](https://github.com/5dlabs/cto/issues/2670)) ([9156508](https://github.com/5dlabs/cto/commit/91565081d4711f8cbe82eab0a095982128d38faa))
+* **alertmanager:** add ignoreDifferences for StatefulSet API defaults ([#2657](https://github.com/5dlabs/cto/issues/2657)) ([aec47bd](https://github.com/5dlabs/cto/commit/aec47bd5520235b5e823355f65e4955b61726827))
+* **atlas:** increase TTL and add pod deletion delay for atlas-guardian workflows ([#2620](https://github.com/5dlabs/cto/issues/2620)) ([557f0dd](https://github.com/5dlabs/cto/commit/557f0dda642672d9ab8f9d4774367b9336579fe8)), closes [#2599](https://github.com/5dlabs/cto/issues/2599)
+* **ci:** allow SARIF upload failures when Advanced Security is disabled ([#2664](https://github.com/5dlabs/cto/issues/2664)) ([e9c9e34](https://github.com/5dlabs/cto/commit/e9c9e346adb20093d4ecf2d8edd7b3dd35be484a))
+* **ci:** allow SARIF upload to fail without GHAS ([#2662](https://github.com/5dlabs/cto/issues/2662)) ([5de1f59](https://github.com/5dlabs/cto/commit/5de1f590306577f0ba74f3f6964b790354ad22f2))
+* **grafana:** remove orphaned Victoria datasources and fix Prometheus port ([#2608](https://github.com/5dlabs/cto/issues/2608)) ([96b5ce7](https://github.com/5dlabs/cto/commit/96b5ce77f869da451bdbad4e1017d28dee34e21e))
+* **grafana:** use correct Prometheus service port (80) ([#2595](https://github.com/5dlabs/cto/issues/2595)) ([ad3b18e](https://github.com/5dlabs/cto/commit/ad3b18e9f214db1278fcabef4008a9d2753be272))
+* **heal:** add atlas-guardian and atlas-batch-integration to A2 excluded pods ([#2640](https://github.com/5dlabs/cto/issues/2640)) ([acaab87](https://github.com/5dlabs/cto/commit/acaab871234044f17634c9f1a82b0921ab7b3a65)), closes [#2633](https://github.com/5dlabs/cto/issues/2633)
+* **heal:** add retry logic with exponential backoff for git operations ([#2609](https://github.com/5dlabs/cto/issues/2609)) ([1d9994e](https://github.com/5dlabs/cto/commit/1d9994e45b09b8497c06aa2b4e537f45508c52fc))
+* **heal:** add startup grace period to A2 silent failure detection ([#2639](https://github.com/5dlabs/cto/issues/2639)) ([047d24f](https://github.com/5dlabs/cto/commit/047d24fd33a83a4f31612e23311e9c06ffb5d3f4)), closes [#2630](https://github.com/5dlabs/cto/issues/2630)
+* **heal:** add tweakcn to excluded pod prefixes for A8 alerts ([#2634](https://github.com/5dlabs/cto/issues/2634)) ([7e7778b](https://github.com/5dlabs/cto/commit/7e7778b5af483c6e1b4c13608649accfa7b39bbe)), closes [#2627](https://github.com/5dlabs/cto/issues/2627)
+* **heal:** exclude infrastructure pods from A8 step timeout alerts ([#2631](https://github.com/5dlabs/cto/issues/2631)) ([2476283](https://github.com/5dlabs/cto/commit/2476283363906bcc0c8e6d6c83fb150f1d0b5e94)), closes [#2625](https://github.com/5dlabs/cto/issues/2625)
+* **heal:** extend TTL for atlas-conflict-monitor workflow pods ([f48829c](https://github.com/5dlabs/cto/commit/f48829c4f1b1d00e4930801d61a1575a7514ba31)), closes [#2599](https://github.com/5dlabs/cto/issues/2599)
+* **heal:** persist agent logs to PVC before pod termination ([#2622](https://github.com/5dlabs/cto/issues/2622)) ([48783f4](https://github.com/5dlabs/cto/commit/48783f48a8e792f61835e70b92e249188074792e))
+* **heal:** remediate stale ConfigMap detection, GC timing, and dedup logic ([#2560](https://github.com/5dlabs/cto/issues/2560)) ([f81074a](https://github.com/5dlabs/cto/commit/f81074a6a220c6e42530972821b70d40055350d2))
+* **heal:** skip A2 alerts for containers with exit code 0 ([#2642](https://github.com/5dlabs/cto/issues/2642)) ([a19290b](https://github.com/5dlabs/cto/commit/a19290bc76849d5dfe1801b65f48869071b065cb)), closes [#2636](https://github.com/5dlabs/cto/issues/2636)
+* **loki:** increase ingestion rate limits for high-volume logging ([#2645](https://github.com/5dlabs/cto/issues/2645)) ([75f5898](https://github.com/5dlabs/cto/commit/75f58984eb266969126e3c540d4a16e39b434319))
+* **openmemory:** add missing OM_TIER environment variable ([#2613](https://github.com/5dlabs/cto/issues/2613)) ([195eb10](https://github.com/5dlabs/cto/commit/195eb105e722fae6d498a4ddfc25d684205bf265)), closes [#2557](https://github.com/5dlabs/cto/issues/2557)
+* **openmemory:** add missing OM_TIER environment variable ([#2617](https://github.com/5dlabs/cto/issues/2617)) ([12b56cc](https://github.com/5dlabs/cto/commit/12b56ccdf57d4f713fe2dbda24e29dde308f3469)), closes [#2586](https://github.com/5dlabs/cto/issues/2586)
+* **play-workflow:** correct variable name CM_NAME to CONFIGMAP_NAME ([#2601](https://github.com/5dlabs/cto/issues/2601)) ([c53e99f](https://github.com/5dlabs/cto/commit/c53e99fca544e56bc26887938f7053d32b0f7d89)), closes [#2569](https://github.com/5dlabs/cto/issues/2569)
+* **sensors:** use proper Argo Events parameter mapping for atlas-conflict-monitor ([#2652](https://github.com/5dlabs/cto/issues/2652)) ([6ba9d0c](https://github.com/5dlabs/cto/commit/6ba9d0cb336e46a56b551f5eff27c2573f5595a8)), closes [#2651](https://github.com/5dlabs/cto/issues/2651)
+* **sensors:** use proper Argo Events parameter mapping for workflow templates ([#2650](https://github.com/5dlabs/cto/issues/2650)) ([7c04519](https://github.com/5dlabs/cto/commit/7c04519d51a0a22df86548cfcc8944071c90c423)), closes [#2643](https://github.com/5dlabs/cto/issues/2643)
+* **telemetry:** fix alertmanager security context, loki caching, and otel-collector exporters ([#2588](https://github.com/5dlabs/cto/issues/2588)) ([74dde75](https://github.com/5dlabs/cto/commit/74dde7507349481de486aff1c0d847afc0ff1a92))
+* **workflow:** add error handling and output defaults to play workflow templates ([#2612](https://github.com/5dlabs/cto/issues/2612)) ([77efff0](https://github.com/5dlabs/cto/commit/77efff09594b579fddef888e5719a287e75d9c7c)), closes [#2563](https://github.com/5dlabs/cto/issues/2563)
+* **workflow:** correct variable name in determine-resume-point stale ConfigMap cleanup ([#2600](https://github.com/5dlabs/cto/issues/2600)) ([e2a27ec](https://github.com/5dlabs/cto/commit/e2a27ec44d9727f9e61b0cea06f2c57628d83305)), closes [#2566](https://github.com/5dlabs/cto/issues/2566)
+* **workflow:** correct variable name in determine-resume-point stale ConfigMap cleanup ([#2600](https://github.com/5dlabs/cto/issues/2600)) ([a804d4f](https://github.com/5dlabs/cto/commit/a804d4f8a0776e3154720d2ec469a520ddab376b)), closes [#2566](https://github.com/5dlabs/cto/issues/2566)
+* **workflow:** correct variable name in determine-resume-point template ([64c402b](https://github.com/5dlabs/cto/commit/64c402b1ccad289d4d2e69484562ed612f72d8bb)), closes [#2573](https://github.com/5dlabs/cto/issues/2573)
+* **workflow:** improve parallel-task-processor error handling and TTL ([#2575](https://github.com/5dlabs/cto/issues/2575)) ([#2605](https://github.com/5dlabs/cto/issues/2605)) ([6cb98ba](https://github.com/5dlabs/cto/commit/6cb98baac37733f0e236dbf0da0801896de330e0))
+* **workflow:** increase pod GC delete delay to 300s for heal log capture ([#2607](https://github.com/5dlabs/cto/issues/2607)) ([9e46c27](https://github.com/5dlabs/cto/commit/9e46c2780799d853927ba16a88ff43eaf7c64458)), closes [#2576](https://github.com/5dlabs/cto/issues/2576)
+* **workflow:** use authenticated GitHub API for script download ([#2648](https://github.com/5dlabs/cto/issues/2648)) ([3bac8d0](https://github.com/5dlabs/cto/commit/3bac8d07f5b06c9a5e2e4ba457ccf557c3b8565e)), closes [#2647](https://github.com/5dlabs/cto/issues/2647)
+
+
+### 📚 Documentation
+
+* add comprehensive MCP tools documentation for observability stack ([#2655](https://github.com/5dlabs/cto/issues/2655)) ([0b1592e](https://github.com/5dlabs/cto/commit/0b1592e4497b906e62d4e253e769060adffba9b7))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([74853d5](https://github.com/5dlabs/cto/commit/74853d5855ab93860e83215be53dd255b21aa9c9))
+* **chart:** regenerate agent templates ConfigMaps ([#2610](https://github.com/5dlabs/cto/issues/2610)) ([63c2ec1](https://github.com/5dlabs/cto/commit/63c2ec1325f344b54ef7f8b98c9c99cd71993580))
+* remove atlas-conflict-monitor-sensor ([#2663](https://github.com/5dlabs/cto/issues/2663)) ([ebbeedc](https://github.com/5dlabs/cto/commit/ebbeedcd05fa4a5bdca5f486098cac10960c16b6))
+
+## [0.12.29](https://github.com/5dlabs/cto/compare/v0.12.28...v0.12.29) (2025-12-03)
+
+
+### 🔧 Maintenance
+
+* update dependencies to version 0.12.27 and add Cluster command to metal CLI ([52e4db9](https://github.com/5dlabs/cto/commit/52e4db97f9d1f0fd14a23b820d76f795885fe2ba))
+
+## [0.12.28](https://github.com/5dlabs/cto/compare/v0.12.27...v0.12.28) (2025-12-03)
+
+
+### 🔧 Maintenance
+
+* update dependencies to version 0.12.23 and add cto-metal package ([a1a697e](https://github.com/5dlabs/cto/commit/a1a697e73789c9eef4995089c1c143b786cb7ffb))
+
+## [0.12.27](https://github.com/5dlabs/cto/compare/v0.12.26...v0.12.27) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output in real-time with text extraction ([#2535](https://github.com/5dlabs/cto/issues/2535)) ([0763689](https://github.com/5dlabs/cto/commit/0763689c81e79954e6db6b940581dec4c8f87359))
+
+## [0.12.26](https://github.com/5dlabs/cto/compare/v0.12.25...v0.12.26) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add Docker runtime access and streaming output ([#2532](https://github.com/5dlabs/cto/issues/2532)) ([bc1cdfb](https://github.com/5dlabs/cto/commit/bc1cdfb98fa871a0be3ec6b816a8f36d770dcb14))
+
+## [0.12.25](https://github.com/5dlabs/cto/compare/v0.12.24...v0.12.25) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output in real-time with text extraction ([#2530](https://github.com/5dlabs/cto/issues/2530)) ([2bb842c](https://github.com/5dlabs/cto/commit/2bb842c2a62c5c8a97a2c7b766a4b30f7b4bc9df))
+
+## [0.12.24](https://github.com/5dlabs/cto/compare/v0.12.23...v0.12.24) (2025-12-03)
+
+
+### 📚 Documentation
+
+* add Latitude.sh bare metal POC design and research ([#2525](https://github.com/5dlabs/cto/issues/2525)) ([2337549](https://github.com/5dlabs/cto/commit/23375494882f35004326470f5abf911af11266eb))
+
+## [0.12.23](https://github.com/5dlabs/cto/compare/v0.12.22...v0.12.23) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** stream Claude output to stdout in remediation ([#2522](https://github.com/5dlabs/cto/issues/2522)) ([dacd4eb](https://github.com/5dlabs/cto/commit/dacd4eb13e96d9906f2dca7d91417156a28866a2))
+
+
+### 🐛 Bug Fixes
+
+* **heal:** docker build context and argument list overflow ([#2520](https://github.com/5dlabs/cto/issues/2520)) ([f9d03e4](https://github.com/5dlabs/cto/commit/f9d03e4c0e7027bf8ba45d10d0ecd0b0a59dad72))
+
+## [0.12.22](https://github.com/5dlabs/cto/compare/v0.12.21...v0.12.22) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add alert-type level deduplication to prevent issue spam ([#2510](https://github.com/5dlabs/cto/issues/2510)) ([04a288c](https://github.com/5dlabs/cto/commit/04a288c77d41d7760e4e8895f4ae06c18260b6cf))
+
+
+### 🐛 Bug Fixes
+
+* improve error messaging when tools CLI is missing ([#2511](https://github.com/5dlabs/cto/issues/2511)) ([43ec88c](https://github.com/5dlabs/cto/commit/43ec88cae4897bfd0e9b2afed3550ac70539703f)), closes [#2506](https://github.com/5dlabs/cto/issues/2506)
+* include tools-client version in runtime image tag to trigger rebuilds ([#2508](https://github.com/5dlabs/cto/issues/2508)) ([43c29bc](https://github.com/5dlabs/cto/commit/43c29bcf2baf7e1ec10d33be16ace685a5ebf00a)), closes [#2504](https://github.com/5dlabs/cto/issues/2504)
+* make MCP tools CLI check non-fatal to allow agent to proceed ([#2513](https://github.com/5dlabs/cto/issues/2513)) ([f834e9e](https://github.com/5dlabs/cto/commit/f834e9ecda6c89159dc359f30ce5edff905636af)), closes [#2505](https://github.com/5dlabs/cto/issues/2505)
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([5de7ea9](https://github.com/5dlabs/cto/commit/5de7ea91b16e5b87b76ce9269a61e541ef454330))
+* auto-update agent-templates ConfigMap ([4b21e41](https://github.com/5dlabs/cto/commit/4b21e41d09240ccc729a2a2cae9c7972e20e91e6))
+* **chart:** regenerate agent templates ConfigMaps ([#2512](https://github.com/5dlabs/cto/issues/2512)) ([9a910b9](https://github.com/5dlabs/cto/commit/9a910b9f33f70e437fbab3cb0f5cf0a319699a27))
+* **chart:** regenerate agent templates ConfigMaps ([#2515](https://github.com/5dlabs/cto/issues/2515)) ([6d63bbe](https://github.com/5dlabs/cto/commit/6d63bbe2395f26a21b04458708b11d15dd6387fe))
+
+## [0.12.21](https://github.com/5dlabs/cto/compare/v0.12.20...v0.12.21) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** enhance Pod and ContainerStatus structures with conditions and readiness ([f3e2a30](https://github.com/5dlabs/cto/commit/f3e2a30a8b03d3a6a03e88d7bf41a810ee9f8822))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** iterate releases to find one with assets ([#2503](https://github.com/5dlabs/cto/issues/2503)) ([e25877e](https://github.com/5dlabs/cto/commit/e25877ec5e117631a3da880ae3c25485a5441f5b))
+* **heal:** add periodic pod poller to catch silent failures ([6e628fa](https://github.com/5dlabs/cto/commit/6e628faa0f43b48f2fe4c66291d0ab6c324527d6))
+
+## [0.12.20](https://github.com/5dlabs/cto/compare/v0.12.19...v0.12.20) (2025-12-03)
+
+
+### 🔧 Maintenance
+
+* update package versions to 0.12.19 in Cargo.lock and improve retry logic in apply-agent-templates-configmap.sh ([78b36b5](https://github.com/5dlabs/cto/commit/78b36b50941f6d4501f7aaa28dd59821ae2740f7))
+
+## [0.12.19](https://github.com/5dlabs/cto/compare/v0.12.18...v0.12.19) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** infinite iteration with acceptance criteria probes and merge conflict handling ([#2497](https://github.com/5dlabs/cto/issues/2497)) ([d226c6b](https://github.com/5dlabs/cto/commit/d226c6b993002cc89f9c915df00c0f2c643b5ca2))
+
+
+### 🐛 Bug Fixes
+
+* address PR review comments from cursor bot ([86cfada](https://github.com/5dlabs/cto/commit/86cfadafd29332ca3afdee49987d401e952e68ef))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([5fcfaeb](https://github.com/5dlabs/cto/commit/5fcfaeb4d6a4708543e597ffdd612edbea79f97d))
+* **chart:** regenerate agent templates ConfigMaps ([#2495](https://github.com/5dlabs/cto/issues/2495)) ([65e1e8a](https://github.com/5dlabs/cto/commit/65e1e8aecc9b5094e24f4596de6353a39b560eab))
+* update package versions to 0.12.18 in Cargo.lock ([80bffe5](https://github.com/5dlabs/cto/commit/80bffe58f36c21169687346cd9423513346ad67f))
+
+## [0.12.18](https://github.com/5dlabs/cto/compare/v0.12.17...v0.12.18) (2025-12-03)
+
+
+### ✨ Features
+
+* **heal:** add merge conflict handling and CI iteration to Rex remediation agent ([#2492](https://github.com/5dlabs/cto/issues/2492)) ([67ded38](https://github.com/5dlabs/cto/commit/67ded38c706e6601c2aa892b2f2c021ed66b12b5))
+* **heal:** iterate until acceptance criteria met with merge conflict handling ([3ad5c65](https://github.com/5dlabs/cto/commit/3ad5c65e50717fe126b42b0e51e986cc3f981945))
+
+
+### 🐛 Bug Fixes
+
+* auto-correct deprecated Anthropic model IDs in MCP intake ([#2496](https://github.com/5dlabs/cto/issues/2496)) ([c920f0c](https://github.com/5dlabs/cto/commit/c920f0c9b5a49f098cf67f38d1eaf870ae1bce35)), closes [#2488](https://github.com/5dlabs/cto/issues/2488)
+* **heal:** prevent glob expansion of mcp__* in Claude command ([cf5916e](https://github.com/5dlabs/cto/commit/cf5916e13799cd0cb04c7e0aaf7c9eeb66f343e0))
+* **intake:** update deprecated model name claude-3-5-sonnet-20241022 ([#2493](https://github.com/5dlabs/cto/issues/2493)) ([88c0b06](https://github.com/5dlabs/cto/commit/88c0b06c753626c3acda1dde75a74689bbf701ff)), closes [#2490](https://github.com/5dlabs/cto/issues/2490)
+* **intake:** update model name to claude-sonnet-4-5-20250929 ([#2489](https://github.com/5dlabs/cto/issues/2489)) ([11edd86](https://github.com/5dlabs/cto/commit/11edd86692b3275b3444a6b4be0052a2c9454d05))
+* **tweakcn:** add missing build-time env vars for Next.js ([#2483](https://github.com/5dlabs/cto/issues/2483)) ([0f10e4d](https://github.com/5dlabs/cto/commit/0f10e4d32279ae93ad53e5821c410e6ffc0952e9)), closes [#2475](https://github.com/5dlabs/cto/issues/2475)
+* **tweakcn:** trigger CI to build and push initial GHCR image ([#2487](https://github.com/5dlabs/cto/issues/2487)) ([7aed9bc](https://github.com/5dlabs/cto/commit/7aed9bc43b86ce7dc3b599ceb80973ac10b5f098))
+* update coderun.rs doc comment and add claude-sonnet-4/opus-4 model patterns ([#2494](https://github.com/5dlabs/cto/issues/2494)) ([d2afd81](https://github.com/5dlabs/cto/commit/d2afd81e5aba0bbe6475b5b300c3dfe2ecdaf089))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([e4f8e01](https://github.com/5dlabs/cto/commit/e4f8e015aeba32ead71a92f918acd6b654baa3f0))
+* **chart:** regenerate agent templates ConfigMaps ([#2479](https://github.com/5dlabs/cto/issues/2479)) ([e06eec1](https://github.com/5dlabs/cto/commit/e06eec1f1a4eda8e0b15247127b3a700ffb0fd8d))
+
+## [0.12.17](https://github.com/5dlabs/cto/compare/v0.12.16...v0.12.17) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **intake:** add error logging to prevent silent failures ([#2476](https://github.com/5dlabs/cto/issues/2476)) ([1eda3e5](https://github.com/5dlabs/cto/commit/1eda3e5f4cf7d25099651cfe7c9f9f1e6c5c323e))
+* **intake:** disable TaskMaster auto-update in containers ([#2477](https://github.com/5dlabs/cto/issues/2477)) ([ab685d2](https://github.com/5dlabs/cto/commit/ab685d2dbc28f59d7aa086ce5d388612c06fb3f2))
+* trigger initial tweakcn image build for GHCR ([#2480](https://github.com/5dlabs/cto/issues/2480)) ([f8fbebc](https://github.com/5dlabs/cto/commit/f8fbebc8936e3db10625d1950822b3bbcdb88101)), closes [#2475](https://github.com/5dlabs/cto/issues/2475)
+
+## [0.12.16](https://github.com/5dlabs/cto/compare/v0.12.15...v0.12.16) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **tweakcn:** skip prebuild to avoid database dependency ([#2469](https://github.com/5dlabs/cto/issues/2469)) ([172dc01](https://github.com/5dlabs/cto/commit/172dc019df76c1a534622fa65c8d5f09d1f5a181))
+
+## [0.12.15](https://github.com/5dlabs/cto/compare/v0.12.14...v0.12.15) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** fix Docker build paths for controller and heal images ([795adbf](https://github.com/5dlabs/cto/commit/795adbfe0b83f257dea8bbad4e25d29c76870f0f))
+* **intake:** use anthropic provider instead of claude-code ([#2468](https://github.com/5dlabs/cto/issues/2468)) ([149e931](https://github.com/5dlabs/cto/commit/149e931e8ee52d57b4a3b4996a9d826684dec062))
+
+
+### ⚡ Performance
+
+* **ci:** optimize runtime image build with registry cache ([#2464](https://github.com/5dlabs/cto/issues/2464)) ([c189e9e](https://github.com/5dlabs/cto/commit/c189e9ee8d40e7e1d9305b0ad1fa5c71ac4f4b14))
+
+## [0.12.14](https://github.com/5dlabs/cto/compare/v0.12.13...v0.12.14) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** explicitly trigger binaries-release workflow from release-please ([#2462](https://github.com/5dlabs/cto/issues/2462)) ([4f9f9fa](https://github.com/5dlabs/cto/commit/4f9f9fa703a2fa187480577f0429ca6d95ed825c))
+
+## [0.12.13](https://github.com/5dlabs/cto/compare/v0.12.12...v0.12.13) (2025-12-02)
+
+
+### ✨ Features
+
+* **intake:** add verbose logging and progress indicator for TaskMaster ([#2461](https://github.com/5dlabs/cto/issues/2461)) ([a4e77c6](https://github.com/5dlabs/cto/commit/a4e77c6659102c94fae18af8d8db6aa921e98483))
+
+
+### 🐛 Bug Fixes
+
+* **intake:** remove erroneous .hbs extension from script path ([#2459](https://github.com/5dlabs/cto/issues/2459)) ([0518fb1](https://github.com/5dlabs/cto/commit/0518fb1287ec8696ae7c144e48d89e73329ae4bf))
+* **intake:** revert workflow to use .sh instead of .sh.hbs ([#2457](https://github.com/5dlabs/cto/issues/2457)) ([bbb07bc](https://github.com/5dlabs/cto/commit/bbb07bc77a9e042a672b6543dc7d2a51fd7411ea))
+
+
+### 🔧 Maintenance
+
+* bump TaskMaster to 0.36.0 ([#2460](https://github.com/5dlabs/cto/issues/2460)) ([7a00c09](https://github.com/5dlabs/cto/commit/7a00c09b2ac409aa751ecb9573d2026d05a510e7))
+
+## [0.12.12](https://github.com/5dlabs/cto/compare/v0.12.11...v0.12.12) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **intake:** correct script path in unified intake workflow template ([#2453](https://github.com/5dlabs/cto/issues/2453)) ([f0f455c](https://github.com/5dlabs/cto/commit/f0f455c6a3259d2c2332656e6b41d8acb73468fa)), closes [#2448](https://github.com/5dlabs/cto/issues/2448)
+* **intake:** rename unified-intake.sh.hbs to unified-intake.sh ([#2455](https://github.com/5dlabs/cto/issues/2455)) ([6fa8674](https://github.com/5dlabs/cto/commit/6fa8674ac12feb0f35b446624d4dc03bd7c33bb0))
+
+## [0.12.11](https://github.com/5dlabs/cto/compare/v0.12.10...v0.12.11) (2025-12-02)
+
+
+### ✨ Features
+
+* **controller:** add intake templates to ConfigMap ([#2451](https://github.com/5dlabs/cto/issues/2451)) ([2481281](https://github.com/5dlabs/cto/commit/248128123ef1d7fbd66b8a4247c516de0fba78d6))
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add MCP config and fix PVC path mismatch in templates ([#2450](https://github.com/5dlabs/cto/issues/2450)) ([41fbc2d](https://github.com/5dlabs/cto/commit/41fbc2df0a01a613bbb624db05fed61710f3e746))
+* **heal:** transform PVC paths for remediation pods ([#2441](https://github.com/5dlabs/cto/issues/2441)) ([96b1fe1](https://github.com/5dlabs/cto/commit/96b1fe17ace1c2e6b3c0d041770b2a24e0913521))
+
+## [0.12.10](https://github.com/5dlabs/cto/compare/v0.12.9...v0.12.10) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **controller/heal:** use heal templates, issue- prefix, and repo pre-staging ([94fca4f](https://github.com/5dlabs/cto/commit/94fca4f672dcc0a6575e7aeb004fe2d2321d1b0e))
+* **controller/heal:** use heal templates, issue- prefix, and repo pre-staging ([#2408](https://github.com/5dlabs/cto/issues/2408)) ([7aba875](https://github.com/5dlabs/cto/commit/7aba8757ef08a4c281b846444027ba8ad14008fc))
+* **heal:** conditionally append .git to repository URL ([#2420](https://github.com/5dlabs/cto/issues/2420)) ([474b0bc](https://github.com/5dlabs/cto/commit/474b0bcce41fff9ce4055673dbd41fba5866f89c))
+* **tweakcn:** fix deployment by using npm install and correct image pull secret ([#2410](https://github.com/5dlabs/cto/issues/2410)) ([88a9948](https://github.com/5dlabs/cto/commit/88a9948e3365a6588173dc4ff24643977165f753))
+
+
+### 🔧 Maintenance
+
+* auto-update agent-templates ConfigMap ([2dc74e9](https://github.com/5dlabs/cto/commit/2dc74e9871e175e8389c34d81fef70ef3058cb86))
+* auto-update agent-templates ConfigMap ([322d682](https://github.com/5dlabs/cto/commit/322d682aa7962b24a43a7f82a410384733654f0c))
+* **chart:** regenerate agent templates ConfigMaps ([#2419](https://github.com/5dlabs/cto/issues/2419)) ([5af9d3c](https://github.com/5dlabs/cto/commit/5af9d3cb9dd2a7ffad61f7a3efe554e7f97f7e1d))
+* **chart:** regenerate agent templates ConfigMaps ([#2421](https://github.com/5dlabs/cto/issues/2421)) ([8f859b5](https://github.com/5dlabs/cto/commit/8f859b5602fd5bfd21e139f4e3903199e61b6a64))
+
+## [0.12.9](https://github.com/5dlabs/cto/compare/v0.12.8...v0.12.9) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **controller:** use heal-remediation- prefix for heal CodeRun pods ([#2386](https://github.com/5dlabs/cto/issues/2386)) ([4aa3430](https://github.com/5dlabs/cto/commit/4aa3430fa1fd5a7b49a2caf1dba040f01b1c2257))
+
+## [0.12.8](https://github.com/5dlabs/cto/compare/v0.12.7...v0.12.8) (2025-12-02)
+
+
+### ✨ Features
+
+* **infra:** add self-hosted tweakcn theme editor ([#2329](https://github.com/5dlabs/cto/issues/2329)) ([71d011e](https://github.com/5dlabs/cto/commit/71d011e5083de9d1ab4e833653cc3582c7847688))
+* **infra:** add self-hosted tweakcn theme editor ([#2330](https://github.com/5dlabs/cto/issues/2330)) ([d234689](https://github.com/5dlabs/cto/commit/d2346891d16d62d8415ddad9550554c7b734b7dd))
+
+## [0.12.7](https://github.com/5dlabs/cto/compare/v0.12.6...v0.12.7) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add diagnostic logging for A2 alert debugging ([#2328](https://github.com/5dlabs/cto/issues/2328)) ([a5b0ddc](https://github.com/5dlabs/cto/commit/a5b0ddcdccb353739e76c65d9d3627548128572a))
+
+
+### ♻️ Refactoring
+
+* **mcp:** remove docs_ingest tool in favor of Context7 ([#2326](https://github.com/5dlabs/cto/issues/2326)) ([9ef63a6](https://github.com/5dlabs/cto/commit/9ef63a6c2e0fc2dfe2d567d24e2add391684e5af))
+
+## [0.12.6](https://github.com/5dlabs/cto/compare/v0.12.5...v0.12.6) (2025-12-02)
+
+
+### ✨ Features
+
+* **heal:** add Handlebars templating for DRY alert prompts ([#2308](https://github.com/5dlabs/cto/issues/2308)) ([64139fa](https://github.com/5dlabs/cto/commit/64139fa1e36523baf0b630df31130e4cdb659c0c))
+
+## [0.12.5](https://github.com/5dlabs/cto/compare/v0.12.4...v0.12.5) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add --target-pod to spawn-remediation for deduplication ([#2198](https://github.com/5dlabs/cto/issues/2198)) ([f9a11ac](https://github.com/5dlabs/cto/commit/f9a11ace8626b1f19d84bd827f44c786fd9cde80))
+* **heal:** use heal-remediation prefix and service for PVC sharing ([#2215](https://github.com/5dlabs/cto/issues/2215)) ([cbf8903](https://github.com/5dlabs/cto/commit/cbf8903b0902af684385b6e708da0132a6bd0367))
+
+## [0.12.4](https://github.com/5dlabs/cto/compare/v0.12.3...v0.12.4) (2025-12-02)
+
+
+### ✨ Features
+
+* **notify:** add Discord notification system for platform events ([#2156](https://github.com/5dlabs/cto/issues/2156)) ([c86be8e](https://github.com/5dlabs/cto/commit/c86be8ead18819583ad8b23d568a2ea7cc2625e1))
+
+## [0.12.3](https://github.com/5dlabs/cto/compare/v0.12.2...v0.12.3) (2025-12-02)
+
+
+### ✨ Features
+
+* **templates:** Phase 2 - Context7 on all agents + extended shared partials ([#2154](https://github.com/5dlabs/cto/issues/2154)) ([b217211](https://github.com/5dlabs/cto/commit/b2172114a61443b0f2e039d821e3d8e70a4d882a))
+
+## [0.12.2](https://github.com/5dlabs/cto/compare/v0.12.1...v0.12.2) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* add -L flag to follow symlinks in template generation ([#2149](https://github.com/5dlabs/cto/issues/2149)) ([db82b78](https://github.com/5dlabs/cto/commit/db82b7823b10e5941e693335acd68e7f3b7b3c83))
+* **heal:** add in-memory deduplication for pod alerts ([#2152](https://github.com/5dlabs/cto/issues/2152)) ([08880f7](https://github.com/5dlabs/cto/commit/08880f76532f5c30e172f01034a9c016eea859a7))
+
+## [0.12.1](https://github.com/5dlabs/cto/compare/v0.12.0...v0.12.1) (2025-12-02)
+
+
+### ♻️ Refactoring
+
+* **templates:** implement shared partial system for DRY templates ([#2109](https://github.com/5dlabs/cto/issues/2109)) ([948d1fc](https://github.com/5dlabs/cto/commit/948d1fc664ff8b9e6fa8f1cdecefe910a67ea4d7))
+
+## [0.12.0](https://github.com/5dlabs/cto/compare/v0.11.17...v0.12.0) (2025-12-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* Template paths have changed. Users must update any references to infra/charts/controller/agent-templates/ to templates/
+
+### ✨ Features
+
+* **heal:** add deduplication and exclusion for remediation CodeRuns ([#2072](https://github.com/5dlabs/cto/issues/2072)) ([8c476d6](https://github.com/5dlabs/cto/commit/8c476d631b60b2b77fe6cdaf7a67d4f59da194c6))
+
+
+### ♻️ Refactoring
+
+* reorganize crates and templates ([#2085](https://github.com/5dlabs/cto/issues/2085)) ([cb0f24c](https://github.com/5dlabs/cto/commit/cb0f24cdd5e71ad570e3ee6f507b7ab65ddfc4d9))
+
+## [0.11.17](https://github.com/5dlabs/cto/compare/v0.11.16...v0.11.17) (2025-12-01)
+
+
+### ✨ Features
+
+* **controller:** add review and remediate task types to CodeRun ([#1956](https://github.com/5dlabs/cto/issues/1956)) ([acaa14c](https://github.com/5dlabs/cto/commit/acaa14cd003b879d99154e86498dc61ef1491c4b))
+* **heal:** add GitHub issue integration for remediation workflow ([#1958](https://github.com/5dlabs/cto/issues/1958)) ([936f320](https://github.com/5dlabs/cto/commit/936f3205f3f0f7c49b0b214ff70390d937b7a8d4))
+* **heal:** add worktree isolation and task module for remediation agents ([#1955](https://github.com/5dlabs/cto/issues/1955)) ([44b0e39](https://github.com/5dlabs/cto/commit/44b0e396cee6f736eef36ee47538ea593378a828))
+
+## [0.11.16](https://github.com/5dlabs/cto/compare/v0.11.15...v0.11.16) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add DAC_OVERRIDE capability to fix PVC permission denied errors ([#1953](https://github.com/5dlabs/cto/issues/1953)) ([6c6a7f8](https://github.com/5dlabs/cto/commit/6c6a7f886b16f996ba4c5eb677115c28c9afa82c))
+
+## [0.11.15](https://github.com/5dlabs/cto/compare/v0.11.14...v0.11.15) (2025-12-01)
+
+
+### ✨ Features
+
+* **heal:** add A9 alert for stuck CodeRuns ([#1944](https://github.com/5dlabs/cto/issues/1944)) ([06efeba](https://github.com/5dlabs/cto/commit/06efeba3445f87376a219d119f9c4e15d7f1ba0b))
+
+
+### 🐛 Bug Fixes
+
+* add cto-mcp binary to tools Docker image build ([#1951](https://github.com/5dlabs/cto/issues/1951)) ([40e2617](https://github.com/5dlabs/cto/commit/40e26174ac616ac8aabe6350ed92d2d665638a81))
+* **ci:** consolidate Docker builds and standardize tagging ([#1946](https://github.com/5dlabs/cto/issues/1946)) ([4e8dd31](https://github.com/5dlabs/cto/commit/4e8dd3156db106fa9fe520db12c98db9bea82453))
+* **ci:** handle rustup concurrent cache conflicts on k8s-runner ([#1948](https://github.com/5dlabs/cto/issues/1948)) ([faeab76](https://github.com/5dlabs/cto/commit/faeab7694fa1983c44f2a67aac4ace45b68d710d))
+
+## [0.11.14](https://github.com/5dlabs/cto/compare/v0.11.13...v0.11.14) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **play:** add guard to prevent update-to-waiting-merge when resuming ([#1941](https://github.com/5dlabs/cto/issues/1941)) ([e92b6c5](https://github.com/5dlabs/cto/commit/e92b6c583b22c6ef3152fe28de7af9fe1f67793d))
+
+## [0.11.13](https://github.com/5dlabs/cto/compare/v0.11.12...v0.11.13) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use jq instead of grep for JSON parsing ([#1939](https://github.com/5dlabs/cto/issues/1939)) ([7d39a3c](https://github.com/5dlabs/cto/commit/7d39a3cff874abf7eb5dcb93b1b4fc4ab7d0c7a4))
+
+## [0.11.12](https://github.com/5dlabs/cto/compare/v0.11.11...v0.11.12) (2025-12-01)
+
+
+### ✨ Features
+
+* **stitch:** add inline PR review comments like Cursor Bot ([#1936](https://github.com/5dlabs/cto/issues/1936)) ([aabbbdf](https://github.com/5dlabs/cto/commit/aabbbdf5ff825e7def6d4a01aa40c92d06999509))
+
+## [0.11.11](https://github.com/5dlabs/cto/compare/v0.11.10...v0.11.11) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use GitHub App token instead of PAT for reviews ([#1934](https://github.com/5dlabs/cto/issues/1934)) ([c1cf7e2](https://github.com/5dlabs/cto/commit/c1cf7e28d6cea32a7a8ec48e41f32a5135d0c5e3))
+
+## [0.11.10](https://github.com/5dlabs/cto/compare/v0.11.9...v0.11.10) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** fix controller build target directory and rename workflow ([#1932](https://github.com/5dlabs/cto/issues/1932)) ([490522b](https://github.com/5dlabs/cto/commit/490522b5de1c4c41ed466e6a49a3aff0bb226686))
+
+## [0.11.9](https://github.com/5dlabs/cto/compare/v0.11.8...v0.11.9) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** add initContainer to fix PVC permissions on startup ([#1931](https://github.com/5dlabs/cto/issues/1931)) ([8e53a4b](https://github.com/5dlabs/cto/commit/8e53a4b7a9fad425c69fbcaed247717625c195dd))
+
+
+### ♻️ Refactoring
+
+* **ci:** consolidate controller workflows into single CI pipeline ([#1929](https://github.com/5dlabs/cto/issues/1929)) ([8c47fde](https://github.com/5dlabs/cto/commit/8c47fde8ed6ec13b20d0d7eff565c9626b326848))
+
+## [0.11.8](https://github.com/5dlabs/cto/compare/v0.11.7...v0.11.8) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** replace play-monitor with heal/controller in binaries-release ([#1927](https://github.com/5dlabs/cto/issues/1927)) ([759b765](https://github.com/5dlabs/cto/commit/759b76530045379ab1004f9dafc88c1e0b0161df))
+* **stitch:** Add GH_TOKEN from tools-github-secrets PAT ([#1926](https://github.com/5dlabs/cto/issues/1926)) ([91209bb](https://github.com/5dlabs/cto/commit/91209bbc4611ff3a3c16d72be996838852af1aee))
+
+## [0.11.7](https://github.com/5dlabs/cto/compare/v0.11.6...v0.11.7) (2025-12-01)
+
+
+### ✨ Features
+
+* **stitch:** Enable full PR review with Factory CLI ([#1922](https://github.com/5dlabs/cto/issues/1922)) ([77dad90](https://github.com/5dlabs/cto/commit/77dad904411863104d3f6ef4c05357cd431c6730))
+
+
+### 🐛 Bug Fixes
+
+* **controller:** mount heal templates ConfigMap in controller deployment ([#1920](https://github.com/5dlabs/cto/issues/1920)) ([e8a5027](https://github.com/5dlabs/cto/commit/e8a5027ecff6382a5b93d4c3b1d3821a7c20472e))
+* **stitch:** Add Factory and Anthropic API keys ([#1925](https://github.com/5dlabs/cto/issues/1925)) ([5a0920b](https://github.com/5dlabs/cto/commit/5a0920b14b75a36bf3dd4a7458990266640a5ed2))
+* **stitch:** Add writable home directory for Factory CLI ([#1924](https://github.com/5dlabs/cto/issues/1924)) ([ab0a44c](https://github.com/5dlabs/cto/commit/ab0a44c0630c5f0d09a9d655e815592b8059aa21))
+
+## [0.11.6](https://github.com/5dlabs/cto/compare/v0.11.5...v0.11.6) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use correct service account 'cto' instead of 'cto-controller' ([#1917](https://github.com/5dlabs/cto/issues/1917)) ([b9d3867](https://github.com/5dlabs/cto/commit/b9d3867ec56b45f2a75d6c29d4fc616b0db523e9))
+
+## [0.11.5](https://github.com/5dlabs/cto/compare/v0.11.4...v0.11.5) (2025-12-01)
+
+
+### ✨ Features
+
+* **controller:** add heal templates ConfigMap for remediation agents ([#1914](https://github.com/5dlabs/cto/issues/1914)) ([0bb6d78](https://github.com/5dlabs/cto/commit/0bb6d7859805a15937bdd5823a15b85b6b1727a9))
+
+## [0.11.4](https://github.com/5dlabs/cto/compare/v0.11.3...v0.11.4) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** use correct service account name 'cto' instead of 'cto-controller' ([#1911](https://github.com/5dlabs/cto/issues/1911)) ([8e4f783](https://github.com/5dlabs/cto/commit/8e4f78322f9767b2be1c20a51c2c083f8d155620))
+
+## [0.11.3](https://github.com/5dlabs/cto/compare/v0.11.2...v0.11.3) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** use full github_app name 5DLabs-Rex ([#1909](https://github.com/5dlabs/cto/issues/1909)) ([99822ee](https://github.com/5dlabs/cto/commit/99822ee6bcfcd4742a64b3c3d8609274a3c6fca7))
+
+## [0.11.2](https://github.com/5dlabs/cto/compare/v0.11.1...v0.11.2) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* **heal:** correct CodeRun RBAC apiGroup to agents.platform ([#1906](https://github.com/5dlabs/cto/issues/1906)) ([638bb11](https://github.com/5dlabs/cto/commit/638bb11bd9d11225d06b2f66da3b3f5b37b8c940))
+
+## [0.11.1](https://github.com/5dlabs/cto/compare/v0.11.0...v0.11.1) (2025-12-01)
+
+
+### 🐛 Bug Fixes
+
+* simplify Stitch sensor to single dependency ([#1903](https://github.com/5dlabs/cto/issues/1903)) ([115ef44](https://github.com/5dlabs/cto/commit/115ef4477d76ae593dff65ff89fa5c940b8aea87))
+
+
+### 🔧 Maintenance
+
+* release 0.11.0 ([#1902](https://github.com/5dlabs/cto/issues/1902)) ([e52c7ff](https://github.com/5dlabs/cto/commit/e52c7ff7928e1693653394be184cdaea589281b0))
+
+## [0.11.0](https://github.com/5dlabs/cto/compare/v0.10.0...v0.11.0) (2025-12-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **release:** Version jump from v0.2.x to v0.10.0
+
+### ✨ Features
+
+* Add Cloudflare Tunnel for GitHub webhook ingestion ([#1757](https://github.com/5dlabs/cto/issues/1757)) ([a5c0e84](https://github.com/5dlabs/cto/commit/a5c0e84b0a9f60590ba10144281de73de41e0313))
+* add CloudNativePG and Redis operators ([#1677](https://github.com/5dlabs/cto/issues/1677)) ([a07e076](https://github.com/5dlabs/cto/commit/a07e076228b5025a0f70f29b07318d0e8e16427a))
+* add command, args, and extraContainers support to universal-app ([#1869](https://github.com/5dlabs/cto/issues/1869)) ([5b3ee7f](https://github.com/5dlabs/cto/commit/5b3ee7ff05f9e707180529b6d07931e0621f8b9f))
+* Add Context7 and shadcn integration with comprehensive documentation ([bffe060](https://github.com/5dlabs/cto/commit/bffe0606ba2557d0f571b2aac866ef03b3e69ebd))
+* Add Context7 integration and Cursor CLI model configuration ([30eb5a3](https://github.com/5dlabs/cto/commit/30eb5a3f2d6e24a7a17408884fcd9853253dd166))
+* add dedicated RBAC for heal and move config to gitops ([d0e9c8c](https://github.com/5dlabs/cto/commit/d0e9c8c2d01227f1cd23825fa5a9b94cf1d123d0))
+* add E2E play feedback loop with play-monitor CLI ([#1691](https://github.com/5dlabs/cto/issues/1691)) ([6193f77](https://github.com/5dlabs/cto/commit/6193f77609adf2ceca566792aa0352330fb7423f))
+* add E2E reset tooling ([f80a06a](https://github.com/5dlabs/cto/commit/f80a06a1372d46a2f637563b23e218edb6085d13))
+* add event-cleaner CronJob to prevent event accumulation ([#1687](https://github.com/5dlabs/cto/issues/1687)) ([2ffc679](https://github.com/5dlabs/cto/commit/2ffc67981d8a8d5547aab6fa7b538c660c87cfc3))
+* Add GitHub MCP to Toolman for all agents ([9de7f08](https://github.com/5dlabs/cto/commit/9de7f08b34bfd126446ce2fc24d3eac3d3d3b9c7))
+* add intelligent Bugbot comment resolution to Atlas Guardian ([#1644](https://github.com/5dlabs/cto/issues/1644)) ([e65ca66](https://github.com/5dlabs/cto/commit/e65ca6690da54f7256ead28c2b49e768c01c5b12))
+* add Kilo WireGuard VPN (open source Twingate alternative) ([#1709](https://github.com/5dlabs/cto/issues/1709)) ([c6ba2d1](https://github.com/5dlabs/cto/commit/c6ba2d16c728667c22e55f9007638e4fc9f0e1c5))
+* Add MCP tool filtering for agent configurations ([#1613](https://github.com/5dlabs/cto/issues/1613)) ([14fc165](https://github.com/5dlabs/cto/commit/14fc1653d86ef11b4fb255c5f8f12a90517c215b))
+* Add MCP tools listing to Factory initialization ([a04d5fa](https://github.com/5dlabs/cto/commit/a04d5fa668586cba0f430253519e656456c9ca0c))
+* Add MCP tools validation across all CLI agents + Fix Gemini build pipeline ([4ffb9d5](https://github.com/5dlabs/cto/commit/4ffb9d5e1849b688f6c6d10bd4a731cd92d55a9c))
+* add MCP tools validation across all CLI agents and fix Gemini build pipeline ([f928064](https://github.com/5dlabs/cto/commit/f928064a4e1df8ee3ed2bb579bf835be4d7fa0ed))
+* add model rotation support to Claude Rex templates ([#1683](https://github.com/5dlabs/cto/issues/1683)) ([78414e4](https://github.com/5dlabs/cto/commit/78414e4a56f07df1d06c98340b99f9c4e88d0ce3))
+* Add OpenMemory integration for persistent agent memory ([#1612](https://github.com/5dlabs/cto/issues/1612)) ([5b80a75](https://github.com/5dlabs/cto/commit/5b80a756bec0acabe2d2c8faadd67f2311a8aa8a))
+* Add OpenMemory to infrastructure image CI builds ([e1839bd](https://github.com/5dlabs/cto/commit/e1839bd1d9c1d31597cb099e9a8fbd5d7943c78b))
+* Add shadcn to Toolman and expand Kubernetes tools for Tess/Bolt ([d4adfe4](https://github.com/5dlabs/cto/commit/d4adfe4951cf4e3710fe976a1e5ec9df3735c537))
+* Add smart Atlas activation with proper SERVICE extraction ([#1585](https://github.com/5dlabs/cto/issues/1585)) ([cd913b9](https://github.com/5dlabs/cto/commit/cd913b9c93a75948fac691af12744ed3bf10f615))
+* add Stitch PR Review Bot ([#1893](https://github.com/5dlabs/cto/issues/1893)) ([21806f7](https://github.com/5dlabs/cto/commit/21806f78ac8b0782ef61dcfd4d0ceb29c0032f23))
+* add tasks crate - Rust clone of Taskmaster with AI integration ([#1812](https://github.com/5dlabs/cto/issues/1812)) ([3720c5b](https://github.com/5dlabs/cto/commit/3720c5bde06afc2abe29a2091c45e4fe3db44e86))
+* Add tool verification to Factory container initialization ([8abbfda](https://github.com/5dlabs/cto/commit/8abbfda80b0b396885a004681eea7c78acb93cde))
+* Add tool verification to Factory container initialization ([af4efab](https://github.com/5dlabs/cto/commit/af4efab63b0b0b068bee8b7387519380e9130cfa))
+* **agents:** add Context7 instructions with pre-resolved library IDs ([#1695](https://github.com/5dlabs/cto/issues/1695)) ([42703ec](https://github.com/5dlabs/cto/commit/42703ec51112c96ad4d7de267faea4fdfe959201))
+* **argo:** enable enhanced workflow garbage collection ([#1703](https://github.com/5dlabs/cto/issues/1703)) ([016a85f](https://github.com/5dlabs/cto/commit/016a85f34b5f25fd411017d06fb0b2020c776a0b))
+* **atlas:** Complete Atlas Integration Architecture - All 5 Phases ([8d484f5](https://github.com/5dlabs/cto/commit/8d484f5c0296fc36387533c3f0151407ccdeefcb))
+* **atlas:** complete integration architecture with all 5 phases ([64e5a47](https://github.com/5dlabs/cto/commit/64e5a47f17792e11433dcca754ead2d5eab3c7e9))
+* **blaze:** add Effect.ts integration with effect-solutions CLI ([#1855](https://github.com/5dlabs/cto/issues/1855)) ([afaadcb](https://github.com/5dlabs/cto/commit/afaadcb6fcb73da2017e1f5d34d9c4b08d973e54))
+* **blaze:** add Playwright visual verification workflow ([#1859](https://github.com/5dlabs/cto/issues/1859)) ([15d5c42](https://github.com/5dlabs/cto/commit/15d5c42781856f5689de14f55885e03b643c6595))
+* **blaze:** add Prisma ORM as standard database ORM ([#1856](https://github.com/5dlabs/cto/issues/1856)) ([aaae3bb](https://github.com/5dlabs/cto/commit/aaae3bb59099474753d6f1323a34fdc299ce242f))
+* **blaze:** add XState (Stately) state management guidance ([#1857](https://github.com/5dlabs/cto/issues/1857)) ([7de381a](https://github.com/5dlabs/cto/commit/7de381a69a8553b8f8cbe90476a854c22168ddaf))
+* **cd:** add ArgoCD Image Updater and Release Please for automated deployments ([#1892](https://github.com/5dlabs/cto/issues/1892)) ([f44083b](https://github.com/5dlabs/cto/commit/f44083b2d236a0c17c057d4679fd6359251bda0c))
+* **ci:** add ArgoCD full sync workflow on PR merge ([#1775](https://github.com/5dlabs/cto/issues/1775)) ([74cf5d4](https://github.com/5dlabs/cto/commit/74cf5d49dd81999f8c1dde738b8ede68ec5edb2e))
+* **cipher:** Add comprehensive security scanning tools and guidelines ([8ef9f60](https://github.com/5dlabs/cto/commit/8ef9f60f8beea442c41ef1031ba28d0260e7e342))
+* **cipher:** Add comprehensive security scanning tools and guidelines ([2d9dcd9](https://github.com/5dlabs/cto/commit/2d9dcd960d82be775ab1a148df84a9e6692fa4e1))
+* **ci:** unify binary releases into single workflow ([#1798](https://github.com/5dlabs/cto/issues/1798)) ([a633baa](https://github.com/5dlabs/cto/commit/a633baa2fcffba0404d87c96c1457ff5c849b42a))
+* Configure monitoring stack for CLI container logs ([#1629](https://github.com/5dlabs/cto/issues/1629)) ([c2e47b4](https://github.com/5dlabs/cto/commit/c2e47b4ce0f09c501b32a71d69e6ba6501dd5c25))
+* **controller:** Implement complete Gemini CLI adapter ([#1539](https://github.com/5dlabs/cto/issues/1539)) ([0fe84a6](https://github.com/5dlabs/cto/commit/0fe84a66625e09936a0398f852a9ce5590d8e4d6))
+* deploy Stitch PR review sensor ([#1897](https://github.com/5dlabs/cto/issues/1897)) ([5c5126b](https://github.com/5dlabs/cto/commit/5c5126beaaaf44b101b9d255ed3150b0c349d323))
+* E2E self-healing loop with start/monitor/remediate commands ([#1835](https://github.com/5dlabs/cto/issues/1835)) ([e2f80ba](https://github.com/5dlabs/cto/commit/e2f80ba9a28ff759d36c986b2fa9b5f099ca785a))
+* establish BetterAuth as standard authentication solution ([36a0958](https://github.com/5dlabs/cto/commit/36a0958367fc5c24afabd62e1995e71683b8e6e8))
+* Establish BetterAuth as Standard Authentication Solution ([#1611](https://github.com/5dlabs/cto/issues/1611)) ([bb55505](https://github.com/5dlabs/cto/commit/bb555057635d030f2eaab8256869207463b7298c))
+* **gitops:** enable ServerSideApply for staging app-of-apps ([#1795](https://github.com/5dlabs/cto/issues/1795)) ([a9a1472](https://github.com/5dlabs/cto/commit/a9a14724c70d0ec37528baf27c65755e811ef503))
+* **heal:** add ConfigMap mount and agent coordination ([#1889](https://github.com/5dlabs/cto/issues/1889)) ([abf0d2e](https://github.com/5dlabs/cto/commit/abf0d2e2291d77f8fbc3c6673efc41338089eb98))
+* **heal:** add debug logging for A2 silent failure detection ([#1882](https://github.com/5dlabs/cto/issues/1882)) ([049818e](https://github.com/5dlabs/cto/commit/049818eb7399bb86589306434fca6fbe6757a2a1))
+* **heal:** add exclusion list for infrastructure pods ([#1875](https://github.com/5dlabs/cto/issues/1875)) ([8c92a1b](https://github.com/5dlabs/cto/commit/8c92a1be86e783896d494d8d367d68286ecf043f))
+* **heal:** add FACTORY_API_KEY environment variable ([#1873](https://github.com/5dlabs/cto/issues/1873)) ([d0458df](https://github.com/5dlabs/cto/commit/d0458dfb3ac5f3188027afeb995321f6fa39b9ef))
+* **heal:** add filebrowser service for direct cluster access ([#1883](https://github.com/5dlabs/cto/issues/1883)) ([e1416f4](https://github.com/5dlabs/cto/commit/e1416f49c9d12cc5c0ba59850833464aee77298f))
+* **heal:** add filebrowser sidecar for PVC inspection ([#1881](https://github.com/5dlabs/cto/issues/1881)) ([fcf4f1d](https://github.com/5dlabs/cto/commit/fcf4f1df2a63a79cd98f19e1a4009a867628ed2f))
+* **heal:** add Rust caching for faster builds ([#1879](https://github.com/5dlabs/cto/issues/1879)) ([b080d11](https://github.com/5dlabs/cto/commit/b080d110502e666c863d46f7b9e74c6a28598890))
+* **heal:** echo Factory analysis to logs and add heal-config.json ([#1886](https://github.com/5dlabs/cto/issues/1886)) ([cc1a20f](https://github.com/5dlabs/cto/commit/cc1a20fc3d22acafc29961a498fc158fef6b0aa2))
+* **heal:** implement fetch-logs and spawn-remediation commands ([#1878](https://github.com/5dlabs/cto/issues/1878)) ([2b86efb](https://github.com/5dlabs/cto/commit/2b86efb3c4943a5c096f86de0bb737dd90b11b55))
+* **heal:** rename watch to heal and use static PVC ([55b5e92](https://github.com/5dlabs/cto/commit/55b5e92d6123ff3dcaa309d62decccd7cc2dd7c9))
+* implement structured prompting pattern for Atlas Guardian ([#1648](https://github.com/5dlabs/cto/issues/1648)) ([529f6ec](https://github.com/5dlabs/cto/commit/529f6ecd17ec887da90a1733ccc6fea009daa849))
+* **infra:** add MinIO for headless visual testing screenshot storage ([#1810](https://github.com/5dlabs/cto/issues/1810)) ([8df101b](https://github.com/5dlabs/cto/commit/8df101b8df4e96b5563492ecc2587cd82072d6a8))
+* **infra:** remove External Secrets Operator in favor of Vault ([#1715](https://github.com/5dlabs/cto/issues/1715)) ([0d7b98f](https://github.com/5dlabs/cto/commit/0d7b98f6ec413c4d97731f1411f94b63dfed3c25))
+* **intake:** unified intake with multi-CLI support and DocsRun deprecation ([#1831](https://github.com/5dlabs/cto/issues/1831)) ([6ce00d4](https://github.com/5dlabs/cto/commit/6ce00d41a696c0f0c1df4bcca9213185099fc2fa))
+* Integrate OpenMemory for all agents via Toolman ([#1637](https://github.com/5dlabs/cto/issues/1637)) ([e4b5b60](https://github.com/5dlabs/cto/commit/e4b5b606c531b633bfa0aba86cf34aecf876c4bf))
+* integrate toolman into CTO monorepo as 'tools' crate ([#1721](https://github.com/5dlabs/cto/issues/1721)) ([80c1a3a](https://github.com/5dlabs/cto/commit/80c1a3a3d97d17ccd9479a2f5a00c15fa80c7131))
+* List all available tools in Factory verification output ([1fe08be](https://github.com/5dlabs/cto/commit/1fe08be1be05511752379b601770fc29627df133))
+* make Atlas Bugbot resolution support all CLIs with better promp… ([#1646](https://github.com/5dlabs/cto/issues/1646)) ([c23a297](https://github.com/5dlabs/cto/commit/c23a297632e441030f74c2c769113d4877351447))
+* **mcp:** add add_docs tool for doc ingestion via Firecrawl ([#1724](https://github.com/5dlabs/cto/issues/1724)) ([081f804](https://github.com/5dlabs/cto/commit/081f8049f61cb6705f7a29e5bb32b7ed67606232))
+* **mcp:** add MCP server management tools ([#1797](https://github.com/5dlabs/cto/issues/1797)) ([24fb344](https://github.com/5dlabs/cto/commit/24fb344914c6a553c462a48374291e7164df4751))
+* migrate agents from memory_* to openmemory_* tools ([#1673](https://github.com/5dlabs/cto/issues/1673)) ([80009a1](https://github.com/5dlabs/cto/commit/80009a1ce0e7766d033c30ccf160635733b967f9))
+* **monitor:** add multi-watch infrastructure for comprehensive E2E monitoring ([#1698](https://github.com/5dlabs/cto/issues/1698)) ([463a09e](https://github.com/5dlabs/cto/commit/463a09e8aedc8bc097d6c003408fff4d66d14f5c))
+* **monitor:** add preflight checks for E2E testing readiness ([#1828](https://github.com/5dlabs/cto/issues/1828)) ([021b2de](https://github.com/5dlabs/cto/commit/021b2def5dec3e2ff0010ce92fee3bf768cd18d0))
+* **monitor:** implement self-healing E2E loop with automatic remediation ([#1830](https://github.com/5dlabs/cto/issues/1830)) ([b441ea9](https://github.com/5dlabs/cto/commit/b441ea909f8aca529d1b90b2a6a209848d66a3f1))
+* Mount Context7 API key to all agent containers ([52cef22](https://github.com/5dlabs/cto/commit/52cef225a274891fa15bc477419ea152c3fe7f66))
+* Mount Context7 API key to all agent containers ([f658978](https://github.com/5dlabs/cto/commit/f6589783244802bea473153b0f13462781a5ee7a))
+* move cloudflare-operator to infra namespace ([#1765](https://github.com/5dlabs/cto/issues/1765)) ([656d106](https://github.com/5dlabs/cto/commit/656d1060d4e18ad996d66bdcd2c47a55a8765e85))
+* **release:** bump to v0.10.0 and fix release automation ([#1899](https://github.com/5dlabs/cto/issues/1899)) ([6b63778](https://github.com/5dlabs/cto/commit/6b63778b30065a176ce95dd5d19559bd5495445f))
+* replace Twingate with Kilo WireGuard VPN ([#1718](https://github.com/5dlabs/cto/issues/1718)) ([19a2758](https://github.com/5dlabs/cto/commit/19a2758e4cb86e2f54cc109cc6ebaacedba1f3bf))
+* restore E2E reset tooling ([c1cdbbf](https://github.com/5dlabs/cto/commit/c1cdbbf075cecc8d8050ee2584850e5b9d96bd64))
+* restore E2E reset tooling ([18a4ed6](https://github.com/5dlabs/cto/commit/18a4ed6356cb8a05c40bc2faa167e0817eb707d4))
+* **spark:** add mobile agent + fix regex escape dots ([#1708](https://github.com/5dlabs/cto/issues/1708)) ([51c4fc0](https://github.com/5dlabs/cto/commit/51c4fc0eb3f47e5363f1c5f7327e46ddc2dda39c))
+* **task-0:** add workspace-level clippy.toml configuration ([#1590](https://github.com/5dlabs/cto/issues/1590)) ([a835bc3](https://github.com/5dlabs/cto/commit/a835bc359bc127f53ba41589b42d03dff3de0746))
+* **task-0:** comprehensive clippy configuration and CI improvements ([#1600](https://github.com/5dlabs/cto/issues/1600)) ([14a8954](https://github.com/5dlabs/cto/commit/14a89546f06138b3cbf3f9d220b7e4f99180d5f9))
+* **task-0:** standardize client-config.json with agent docs query tools ([#1649](https://github.com/5dlabs/cto/issues/1649)) ([fd52669](https://github.com/5dlabs/cto/commit/fd5266928874b7030c23d0153a2fb9f32f83e2bd))
+* **telemetry:** add OpenTelemetry configuration for Codex, Gemini, and Factory CLIs ([#1693](https://github.com/5dlabs/cto/issues/1693)) ([5070267](https://github.com/5dlabs/cto/commit/507026795066e9cd7637280cf839cd5287719da7))
+* **telemetry:** add Victoria Logs ingestion for all platform services ([#1788](https://github.com/5dlabs/cto/issues/1788)) ([b2e6e60](https://github.com/5dlabs/cto/commit/b2e6e6006e7ad6cc61d326f19d813a13ef0100fe))
+* **telemetry:** Deploy Grafana with Victoria Metrics and Logs datasources ([#1692](https://github.com/5dlabs/cto/issues/1692)) ([fc39be2](https://github.com/5dlabs/cto/commit/fc39be2d8adb982fc9bafe57daf13f1fb9fc5eb8))
+* **tools:** add 8 new MCP servers for expanded AI capabilities ([#1792](https://github.com/5dlabs/cto/issues/1792)) ([22519dc](https://github.com/5dlabs/cto/commit/22519dc39cbf3e330dd6d26cedb44fdfe1756d58))
+* **tools:** add all available MCP tools to filter ([#1861](https://github.com/5dlabs/cto/issues/1861)) ([62f8bed](https://github.com/5dlabs/cto/commit/62f8bed8788a4f017b840c8220d62aed154cf882))
+* **tools:** add ClusterRole for kubernetes and argocd MCP servers ([#1814](https://github.com/5dlabs/cto/issues/1814)) ([cb5ce33](https://github.com/5dlabs/cto/commit/cb5ce339b38ebc615078cf97573ba92739c273d6))
+* **tools:** add headless screenshot capture and upload support ([#1827](https://github.com/5dlabs/cto/issues/1827)) ([3eaccb6](https://github.com/5dlabs/cto/commit/3eaccb6d819a7c902e154faec0dff88992a3aaa7))
+* **tools:** add OpenMemory MCP integration ([#1860](https://github.com/5dlabs/cto/issues/1860)) ([6f69c42](https://github.com/5dlabs/cto/commit/6f69c42f32c49dca158099020ee42a681c0b4da9))
+* **tools:** add StreamableHTTP session support for MCP servers ([#1811](https://github.com/5dlabs/cto/issues/1811)) ([967d704](https://github.com/5dlabs/cto/commit/967d7044b8b989cb37d3bc93a6088a88740e221b))
+* **tools:** consolidate MCP server configuration and fix deployment ([#1771](https://github.com/5dlabs/cto/issues/1771)) ([884384c](https://github.com/5dlabs/cto/commit/884384c5b802cc2b24d96b0d609826381b80f5bc))
+* **tools:** integrate k8s-mcp as deployment within tools chart ([#1732](https://github.com/5dlabs/cto/issues/1732)) ([146fff0](https://github.com/5dlabs/cto/commit/146fff05e673729689d9db31aaae865b9c9cf365))
+* **tools:** replace k8s-mcp with npx kubernetes-mcp-server ([#1778](https://github.com/5dlabs/cto/issues/1778)) ([d9c6264](https://github.com/5dlabs/cto/commit/d9c62645ef355ef15b8c0e549081121812473b0d))
+* validate MCP tool access for agents ([#1592](https://github.com/5dlabs/cto/issues/1592)) ([c49f33d](https://github.com/5dlabs/cto/commit/c49f33d1655c8c97a46a1000cf577e702226d47b))
+* **vault:** implement HashiCorp Vault for secret management ([#1694](https://github.com/5dlabs/cto/issues/1694)) ([9a73254](https://github.com/5dlabs/cto/commit/9a7325459bf7f1b0ea58ebac4b923c1d2fb64760))
+* **vault:** implement Vault Secrets Operator (VSO) ([#1701](https://github.com/5dlabs/cto/issues/1701)) ([1d43eae](https://github.com/5dlabs/cto/commit/1d43eae3dbb53293ecbb9c5e483b74429f9c2611))
+* **watch:** add dedicated PVC for Monitor and Remediation agents ([#1842](https://github.com/5dlabs/cto/issues/1842)) ([8c71426](https://github.com/5dlabs/cto/commit/8c714264ea13aadfd1b6d7e53e0fb659fa6cbe6b))
+* **watch:** E2E Watch system with Cargo Dist for play-monitor ([#1786](https://github.com/5dlabs/cto/issues/1786)) ([8ea4009](https://github.com/5dlabs/cto/commit/8ea4009acf001f7f1b3944d0ae0511fd687df0e2))
+* **watch:** implement E2E Watch System with CodeRun-based orchestration ([#1779](https://github.com/5dlabs/cto/issues/1779)) ([50233a0](https://github.com/5dlabs/cto/commit/50233a044e0abec95183d5630ce28877ca27b978))
+
+
+### 🐛 Bug Fixes
+
+* add case normalization for heal CodeRun detection in build_job_spec ([4a7b682](https://github.com/5dlabs/cto/commit/4a7b6829fb077c08342d9fd318747763b23665b8))
+* Add cipher-complete marker cleanup to prevent false completion signals ([0423d99](https://github.com/5dlabs/cto/commit/0423d998f06ce0d1ea88a5c4f8da13510a5e424b))
+* Add Context7 API key to agent-platform-secrets ([09701b4](https://github.com/5dlabs/cto/commit/09701b4ce22052916073befa9eee026cc6adb831))
+* Add Context7 API key to agent-platform-secrets ([9258203](https://github.com/5dlabs/cto/commit/9258203992c6de04448524392065637280676573))
+* add debugging and actual tool display for Factory agents ([#1610](https://github.com/5dlabs/cto/issues/1610)) ([c71fe89](https://github.com/5dlabs/cto/commit/c71fe891143190fc6c0557016ae09f2edbcd87b3))
+* add dist/ to gitignore ([45d24b7](https://github.com/5dlabs/cto/commit/45d24b7b0b85e403f35acfc1bdf5f64fc71506ce))
+* add dist/ to gitignore ([72d1571](https://github.com/5dlabs/cto/commit/72d15713e2e389b80c9d41ffb897f1d8a4060ea6))
+* add github-eventsource-svc to networking kustomization ([#1763](https://github.com/5dlabs/cto/issues/1763)) ([cf9e56a](https://github.com/5dlabs/cto/commit/cf9e56a89851ae9fd73a8138ff8a100ada03fa35))
+* add missing apiVersion and kind to github-webhooks networking kustomization ([#1631](https://github.com/5dlabs/cto/issues/1631)) ([5e7be4d](https://github.com/5dlabs/cto/commit/5e7be4d3bf037abf12b1e544326d9b74e0072bc5))
+* add missing argo-events-sa ServiceAccount for sensors ([#1768](https://github.com/5dlabs/cto/issues/1768)) ([2adbecc](https://github.com/5dlabs/cto/commit/2adbecc265b74af724f310549a210e3581d1bff3))
+* add missing default values to universal-app chart ([#1874](https://github.com/5dlabs/cto/issues/1874)) ([c70ba4a](https://github.com/5dlabs/cto/commit/c70ba4a3a2d0c8821db215505b0c48a499464339))
+* add missing final-task parameter to parallel workflow processors ([#1607](https://github.com/5dlabs/cto/issues/1607)) ([15c3d3f](https://github.com/5dlabs/cto/commit/15c3d3ffb2d5b297e5ee93ad5be44be781f97300))
+* add missing PVC for doc-server postgres ([#1681](https://github.com/5dlabs/cto/issues/1681)) ([5e20d99](https://github.com/5dlabs/cto/commit/5e20d991400e3e8ee3d5e21cf0d40b46275ef79c))
+* add missing Toolman secrets for context7 and GitHub in agent-platform namespace ([d2f08de](https://github.com/5dlabs/cto/commit/d2f08de11c08de567293892c0a233cf534683ad0))
+* add required redisExporter.image to Redis instance ([#1679](https://github.com/5dlabs/cto/issues/1679)) ([00cfda2](https://github.com/5dlabs/cto/commit/00cfda202791cdeb76077927ce2e471070a27a32))
+* Add required taskId field to Atlas batch integration sensor ([9937df5](https://github.com/5dlabs/cto/commit/9937df5995d810f2de251f5102e9a0fc623e8765))
+* Add required taskId field to Atlas batch integration sensor ([792c8fb](https://github.com/5dlabs/cto/commit/792c8fba81a3da0d000edc686491b0a3224df085))
+* add ServerSideApply=true to all ArgoCD applications ([#1789](https://github.com/5dlabs/cto/issues/1789)) ([c838359](https://github.com/5dlabs/cto/commit/c838359b21d0b7e4ed64a2f7ae22a1c31937b442))
+* add sync-wave annotations to cloudflare-api-credentials VaultStaticSecret ([#1767](https://github.com/5dlabs/cto/issues/1767)) ([9eb8703](https://github.com/5dlabs/cto/commit/9eb870383c2052fbb874a1a047cca08b6f819c2b))
+* add tool filtering to Claude and Cursor MCP configurations ([bf9484a](https://github.com/5dlabs/cto/commit/bf9484a3137f7bd9deb1ea8454542c210fe0144e))
+* add tool filtering to Claude and Cursor MCP configurations ([#1614](https://github.com/5dlabs/cto/issues/1614)) ([c5e8b23](https://github.com/5dlabs/cto/commit/c5e8b2391b60c4ee39659922ce5e88d70797d53e))
+* add tools parameters to monitor workflow submission ([#1854](https://github.com/5dlabs/cto/issues/1854)) ([1a286ae](https://github.com/5dlabs/cto/commit/1a286aefc177d06e18a283e145de120389f27c57))
+* **agents:** close FIFO writer before waiting for Claude to prevent deadlock ([#1551](https://github.com/5dlabs/cto/issues/1551)) ([951c95e](https://github.com/5dlabs/cto/commit/951c95e2a97ee49e82219ba15f3952ed1bdb73e4))
+* **agents:** correct agent-done signal path mismatch causing premature docker shutdown ([#1545](https://github.com/5dlabs/cto/issues/1545)) ([6af08a9](https://github.com/5dlabs/cto/commit/6af08a92d45e2cef9cb842a41ac2bd5e13b5059a))
+* **agents:** Make Cleo post PR reviews instead of comments ([291237c](https://github.com/5dlabs/cto/commit/291237cfaa526726324995ded00dc353060ab66c))
+* **agents:** Make Cleo post PR reviews instead of comments ([f32c0f1](https://github.com/5dlabs/cto/commit/f32c0f162a087e866965ec606db7eb1c87f5cba0))
+* **agents:** PR correlation - filter to OPEN PRs and sort by date ([#1536](https://github.com/5dlabs/cto/issues/1536)) ([303b076](https://github.com/5dlabs/cto/commit/303b0760ecb5bd00b50913146c38fb73a18d11e7))
+* **agents:** remove label refreshing and add CI checking - systematic fix ([#1535](https://github.com/5dlabs/cto/issues/1535)) ([0bc5a01](https://github.com/5dlabs/cto/commit/0bc5a01c23af2339ac3550417eb86d68f92359cc))
+* all three critical agent review and integration issues ([4473851](https://github.com/5dlabs/cto/commit/447385145db30f6dfc823fe81d9098b2d73f8000))
+* arc-controller use OCI registry for Helm chart ([#1734](https://github.com/5dlabs/cto/issues/1734)) ([1ac244d](https://github.com/5dlabs/cto/commit/1ac244de8e260a07a73dd2e816f70e5b514dcb41))
+* **arc-runner:** add ConfigMap delete permission and prevent sentinel race ([#1547](https://github.com/5dlabs/cto/issues/1547)) ([721e6ce](https://github.com/5dlabs/cto/commit/721e6cedf9ae41e9ae4b329384b6481289c3fcf0))
+* **argo:** add managed-namespace for cto to see WorkflowTemplates ([#1817](https://github.com/5dlabs/cto/issues/1817)) ([fe0ffeb](https://github.com/5dlabs/cto/commit/fe0ffebaf81fa7d98870ba451ba852016b1d5992))
+* **argocd:** add kilo.squat.ai to namespaceResourceWhitelist ([#1722](https://github.com/5dlabs/cto/issues/1722)) ([3afed66](https://github.com/5dlabs/cto/commit/3afed66a5f243aaef6462c519af4bfb42d25b5f7))
+* **argo:** use cluster-scoped config instead of managed-namespace ([#1822](https://github.com/5dlabs/cto/issues/1822)) ([a14a1d8](https://github.com/5dlabs/cto/commit/a14a1d8893d0dc53d6eff9d5066c33d37cd9d46e))
+* **argo:** watch both automation and cto namespaces ([#1819](https://github.com/5dlabs/cto/issues/1819)) ([bee5200](https://github.com/5dlabs/cto/commit/bee5200b3244197cf4aca38d24dc02d3a6b544f3))
+* Atlas integration stages missing from workflow resume logic ([#1601](https://github.com/5dlabs/cto/issues/1601)) ([3ef6268](https://github.com/5dlabs/cto/commit/3ef62684650c6a3452b8ebd7a8a62f0aebbab028))
+* **atlas:** prevent Atlas from creating task-zero PRs ([#1537](https://github.com/5dlabs/cto/issues/1537)) ([b688a7b](https://github.com/5dlabs/cto/commit/b688a7badcd0963c9856cac172b4cf2b8a3d58fc))
+* **atlas:** remove Task 0 default and standardize service names ([1ca9f1f](https://github.com/5dlabs/cto/commit/1ca9f1fbd7f313c79c5c66b6d9f991ca7a928c55))
+* **atlas:** Remove Task 0 default and standardize service names ([85c92eb](https://github.com/5dlabs/cto/commit/85c92eb107eaacf95d0b7acda29e4533f944087b))
+* **atlas:** use GitHub API instead of gh CLI and handle UNKNOWN mergeable status ([1a00a9f](https://github.com/5dlabs/cto/commit/1a00a9f67d30449a454317d8d12dab470fc60433))
+* Bugbot issue and add GitHub App permissions documentation ([df892ea](https://github.com/5dlabs/cto/commit/df892eaa637296c08d428689ac6ae13530ea1486))
+* build and deploy OpenMemory image ([#1667](https://github.com/5dlabs/cto/issues/1667)) ([34128c5](https://github.com/5dlabs/cto/commit/34128c5f101b0d6b9405402cc2fe35cb8812d959))
+* **cd:** use simple release type and add Image Updater to tools/heal ([#1895](https://github.com/5dlabs/cto/issues/1895)) ([7bf1f3e](https://github.com/5dlabs/cto/commit/7bf1f3e1ecf4ef32bf5e4fe29a4be467dfa796df))
+* change heal PVC access mode from RWX to RWO ([#1866](https://github.com/5dlabs/cto/issues/1866)) ([4984af4](https://github.com/5dlabs/cto/commit/4984af4a3f864bb528573d04529798903498ea58))
+* Change submodule URL from HTTPS to SSH for Argo CD compatibility ([ee11d24](https://github.com/5dlabs/cto/commit/ee11d24d4172a65afea82e9774a4e7758c3e0707))
+* **ci:** add ServerSideApply to workflow sync operations ([#1839](https://github.com/5dlabs/cto/issues/1839)) ([fa5182e](https://github.com/5dlabs/cto/commit/fa5182eb0cfbfef649e272c0c08bcfaf453d5e89))
+* **ci:** correct Docker build artifact name to match upload ([#1806](https://github.com/5dlabs/cto/issues/1806)) ([e678da4](https://github.com/5dlabs/cto/commit/e678da43617e42ed90135bc8b068dacb58bd726c))
+* **ci:** extract release tag from correct column in gh release list ([#1836](https://github.com/5dlabs/cto/issues/1836)) ([9b80d27](https://github.com/5dlabs/cto/commit/9b80d275127b4856bbfae08aceb3e8c0a63c454c))
+* **ci:** fix race condition in sync completion check ([8a42364](https://github.com/5dlabs/cto/commit/8a423644805e9271d976ffe7301cdc3e39afc193))
+* **ci:** force delete/recreate ConfigMaps with retry logic ([#1540](https://github.com/5dlabs/cto/issues/1540)) ([07bc4db](https://github.com/5dlabs/cto/commit/07bc4dbc3648beb9e78aa1815ac8b66ac93bc8ec))
+* **ci:** handle git diff failures in ArgoCD validation workflow ([#1596](https://github.com/5dlabs/cto/issues/1596)) ([17b806a](https://github.com/5dlabs/cto/commit/17b806a6e436f773c712d2fc67181a9e99639ea5))
+* **ci:** improve sync-configmap verification logic ([59bf394](https://github.com/5dlabs/cto/commit/59bf3947e5d2f0f9cc0cacd5b0faff05c4f28773))
+* **ci:** improve sync-configmap verification logic ([#1548](https://github.com/5dlabs/cto/issues/1548)) ([d499e44](https://github.com/5dlabs/cto/commit/d499e4442a73ba2251a49b3783b6727024625c45))
+* **cipher:** add completion probe and gitignore-aware security scanning ([#1544](https://github.com/5dlabs/cto/issues/1544)) ([d9a8645](https://github.com/5dlabs/cto/commit/d9a86457663c38ea5e388bbfeb58e9ee1b892e08))
+* **ci:** remove helm-publish workflow that conflicted with tools releases ([#1800](https://github.com/5dlabs/cto/issues/1800)) ([e0dc37b](https://github.com/5dlabs/cto/commit/e0dc37ba5829af18e8d141fb74657f2efb6779e6))
+* **ci:** remove helm-publish workflow that conflicted with tools releases ([#1801](https://github.com/5dlabs/cto/issues/1801)) ([e6cdfa2](https://github.com/5dlabs/cto/commit/e6cdfa25ed75fb355e079eab1fe91d81f78b8061))
+* **ci:** respect wait_for_sync input and avoid redundant waits ([7b313ac](https://github.com/5dlabs/cto/commit/7b313ac9290d42279209323c67af5292c5bade52))
+* **ci:** verify ConfigMap content not just existence ([#1538](https://github.com/5dlabs/cto/issues/1538)) ([565964a](https://github.com/5dlabs/cto/commit/565964a68eadb318311fa9df7994ec96d54677b8))
+* clippy lint and add trailing newlines ([5a4cbea](https://github.com/5dlabs/cto/commit/5a4cbea8bcd44d10f8976e79966dea129acfcd1b))
+* **clippy:** use map_or and direct method reference in health check ([39fa18b](https://github.com/5dlabs/cto/commit/39fa18b2243d617d5ce28394ed1adf4ca9bf40b4))
+* **clippy:** use map_or and direct method reference in health check ([0044b9a](https://github.com/5dlabs/cto/commit/0044b9a29cef228881d36d9761489c5a8c6ce6a6))
+* **cloudflare:** add leader election namespace patch ([#1769](https://github.com/5dlabs/cto/issues/1769)) ([6671da6](https://github.com/5dlabs/cto/commit/6671da6468bf7f0e3858e6db7e331853dae84802))
+* comprehensive Cipher completion marker implementation across all CLIs ([3b0b097](https://github.com/5dlabs/cto/commit/3b0b09744c53c6ae17ea7c1da524b0745f933d6e))
+* comprehensive completion markers for ALL agents (Rex, Cleo, Tess, Cipher) ([7775d17](https://github.com/5dlabs/cto/commit/7775d17b725c15e565aaf8bb16f06f4b585ca640))
+* concurrent execution check failing on self-reference ([#1609](https://github.com/5dlabs/cto/issues/1609)) ([912a7ab](https://github.com/5dlabs/cto/commit/912a7abb603b404c43fe41a6be789f7cdbce4079))
+* **configmaps:** add ServerSideApply to avoid annotation size limit ([06011f5](https://github.com/5dlabs/cto/commit/06011f5b8947c8dfb639c9f552c806bb6cf60f96))
+* **configmaps:** use ServerSideApply to avoid 262KB annotation limit ([964e431](https://github.com/5dlabs/cto/commit/964e43162a8f0f26f7cfa02d32a8bc149a5ecafa))
+* configure aggressive event retention cleanup for EventBus ([#1650](https://github.com/5dlabs/cto/issues/1650)) ([95d3b6a](https://github.com/5dlabs/cto/commit/95d3b6aa497538c821e0c97ed3db80f9db2d0fd6))
+* **controller:** add env var fallback for PR number in job names ([#1668](https://github.com/5dlabs/cto/issues/1668)) ([916dfed](https://github.com/5dlabs/cto/commit/916dfed8c0ee2e0986f970f3eae439ab6b17c785))
+* **controller:** add PR number to job names and fix session cleanup pattern ([#1663](https://github.com/5dlabs/cto/issues/1663)) ([9c247da](https://github.com/5dlabs/cto/commit/9c247dad51016df4b00f01d02df0876088b83c6b))
+* **controller:** add watch templates to ConfigMap and mount for watch workflows ([#1785](https://github.com/5dlabs/cto/issues/1785)) ([455c9f0](https://github.com/5dlabs/cto/commit/455c9f0f0f204d98faaf59b1b9cb7d42962310be))
+* **controller:** align Claude ConfigMap naming with generated templates ([#1710](https://github.com/5dlabs/cto/issues/1710)) ([04f3be3](https://github.com/5dlabs/cto/commit/04f3be34dd2679607ebff2c3aef804db7f888c07))
+* **controller:** check both data and binaryData fields in ConfigMap health check ([ea4237f](https://github.com/5dlabs/cto/commit/ea4237f720e8ef5ffcf4c2d550af5e8e72958afc))
+* **controller:** check both data and binaryData in ConfigMap health check ([e1337fb](https://github.com/5dlabs/cto/commit/e1337fb4a43e923e3a43fa60f1192fa1c7aeb752))
+* **controller:** handle empty string in CLIType deserialization ([#1832](https://github.com/5dlabs/cto/issues/1832)) ([4ad3067](https://github.com/5dlabs/cto/commit/4ad30670783fc1d2f2bfa7d6a6f7d2bd680c42b3))
+* **controller:** properly detect watch CodeRuns for template and naming ([#1840](https://github.com/5dlabs/cto/issues/1840)) ([c48ecac](https://github.com/5dlabs/cto/commit/c48ecac1e8c9ce2e393427bce71520ee5442979a))
+* **controller:** resolve clippy boolean assertion warning ([5a6cd63](https://github.com/5dlabs/cto/commit/5a6cd634073bb774ee6078089e43c3f7fd7af819))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1844](https://github.com/5dlabs/cto/issues/1844)) ([f42988d](https://github.com/5dlabs/cto/commit/f42988dfedce7b327982eb8646b6d05466f8bf14))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1845](https://github.com/5dlabs/cto/issues/1845)) ([04f2eb4](https://github.com/5dlabs/cto/commit/04f2eb47d767ed66883a32ac49bc8ec5ddae84f5))
+* convert PrometheusRule to ConfigMap for VictoriaMetrics compatibility ([47c37bd](https://github.com/5dlabs/cto/commit/47c37bd2c298f54abb2b1b9330d5f5da2a3c647e))
+* Convert PrometheusRule to ConfigMap for VictoriaMetrics compatibility ([30f8106](https://github.com/5dlabs/cto/commit/30f81060f9c5d84a4f94da84c5f570ecda3ce235))
+* correct app.kubernetes.io/name label for database-instances ([#1682](https://github.com/5dlabs/cto/issues/1682)) ([ad1b441](https://github.com/5dlabs/cto/commit/ad1b441feb620dc7c0d2f3dab69cb3e882f7dd9d))
+* correct CodeRun format in Atlas sensors for merge conflict detection ([4355054](https://github.com/5dlabs/cto/commit/43550540c2f6fb68cdbfcbe09725c32b758929c5))
+* correct CodeRun format in Atlas sensors for merge conflict detection ([67aecc3](https://github.com/5dlabs/cto/commit/67aecc3eee6a652e1135dd7f7b103b6b672ac444))
+* Correct grep pattern for tool listing ([d37a80a](https://github.com/5dlabs/cto/commit/d37a80a1013a2498229f041ab9449a33797c71f6))
+* correct kubeconfig subPath in k8s-mcp deployment ([#1754](https://github.com/5dlabs/cto/issues/1754)) ([94be631](https://github.com/5dlabs/cto/commit/94be631f87dbbdc317c8986717a072c7d2ca7efb))
+* correct OCI Helm chart format for arc-controller ([6d406ab](https://github.com/5dlabs/cto/commit/6d406abf6a96239fba3477e881e22d6c9bce28cf))
+* correct OCI URL format for arc-controller ([#1735](https://github.com/5dlabs/cto/issues/1735)) ([5a81f11](https://github.com/5dlabs/cto/commit/5a81f1194c73d567db9d6d3fa0311f244d1e4424))
+* correct path for extracting remote tools in generate_mcp_config ([7f39f43](https://github.com/5dlabs/cto/commit/7f39f4378349dbcf666a65f4bdd62fce98a08ad9))
+* correct resource naming in agent-templates-sync workflow ([#1794](https://github.com/5dlabs/cto/issues/1794)) ([c20ef90](https://github.com/5dlabs/cto/commit/c20ef906484467bb18d2d192726df47693b93117))
+* Correctly render auth metadata and add router to UserProfile ([023607b](https://github.com/5dlabs/cto/commit/023607bf1321ab98241cfe94a01f9df23c41de0f))
+* critical Tess-Atlas handoff failure causing workflow deadlocks ([6167438](https://github.com/5dlabs/cto/commit/616743839f9ed94452e2d8de4c963be2667eafba))
+* Deploy OpenMemory by moving to correct ArgoCD directory ([f452926](https://github.com/5dlabs/cto/commit/f452926f98ad454e1cb78924046c67be9434fd06))
+* Disable Atlas PR monitor and remove Task 0 ([51f1c34](https://github.com/5dlabs/cto/commit/51f1c3414f4092e8ed206f16f25239a3152ad1a9))
+* enable Atlas Guardian CI failure monitoring ([#1635](https://github.com/5dlabs/cto/issues/1635)) ([12dba61](https://github.com/5dlabs/cto/commit/12dba61da1d512ab876de29904a99ffd060bef8d))
+* enable CodeRun creation in atlas-conflict-monitor webhook flow ([#1643](https://github.com/5dlabs/cto/issues/1643)) ([70f94d2](https://github.com/5dlabs/cto/commit/70f94d24967c41f63b8d4cac37446ffaf2e0eb81))
+* enable Context7 and GitHub MCP tools in Toolman ([b9f3387](https://github.com/5dlabs/cto/commit/b9f3387af89e20777af2261142b25128a44f9d37))
+* ensure cipher defers approvals to Tess ([5d4e54e](https://github.com/5dlabs/cto/commit/5d4e54e32941cab24c7bc14fc1c7c0b2e7b572cd))
+* ensure cipher defers approvals to Tess ([b6a4701](https://github.com/5dlabs/cto/commit/b6a4701bd0e529bc3adbbd5599c3a95d8d538ed4))
+* ensure only Cipher agents create completion marker ([5566d7c](https://github.com/5dlabs/cto/commit/5566d7cad7adc84a943b967d4eb8782b30a99645))
+* escape Helm template syntax in bash pattern matching ([#1689](https://github.com/5dlabs/cto/issues/1689)) ([93c77eb](https://github.com/5dlabs/cto/commit/93c77eb06b0233b0c45c7b44d1f47810fdb6c909))
+* eventbus maxAge quoting and platform-runners namespace ([ec3b205](https://github.com/5dlabs/cto/commit/ec3b2050abd900e420b78e4852ceb93803369a20))
+* **factory:** prevent script exit on Tools MCP server DNS failure ([#1837](https://github.com/5dlabs/cto/issues/1837)) ([8467866](https://github.com/5dlabs/cto/commit/8467866e9e1b5170863c3d6fbd503b3abcde8d9f))
+* **factory:** set default WORKFLOW_STAGE for standalone runs ([#1838](https://github.com/5dlabs/cto/issues/1838)) ([13e58f2](https://github.com/5dlabs/cto/commit/13e58f2db76ce0c38f538e21c4e2bfeab47ff529))
+* Fix Argo CD submodule authentication issues ([9a9dce0](https://github.com/5dlabs/cto/commit/9a9dce05e430cf400892b79a28cbf67ab3478f36))
+* Generate client-config.json from cto-config.json for all agents ([#1627](https://github.com/5dlabs/cto/issues/1627)) ([755d9e3](https://github.com/5dlabs/cto/commit/755d9e36a45b51c05560bf0a98c00a5b4d02b94e))
+* GitHub API propagation delay causing label detection to fail ([1f227fa](https://github.com/5dlabs/cto/commit/1f227faacbbce99b688f506b59c0de223aed2a3b))
+* **gitops:** add ServerSideApply to cto app-of-apps for ownership transfer ([#1727](https://github.com/5dlabs/cto/issues/1727)) ([55f5658](https://github.com/5dlabs/cto/commit/55f5658d690f8530f91ade4a2a616f797c284923))
+* **gitops:** disable recurse in platform-apps to resolve SharedResourceWarning ([#1726](https://github.com/5dlabs/cto/issues/1726)) ([e3b7083](https://github.com/5dlabs/cto/commit/e3b70830e2bd8d36acc683e3ddbe98c65391d1ad))
+* **gitops:** remove allowEmpty: false from openmemory ([#1717](https://github.com/5dlabs/cto/issues/1717)) ([7bd97ca](https://github.com/5dlabs/cto/commit/7bd97cadbac9a7e99b756341486434593829128d))
+* **gitops:** remove app.kubernetes.io/component overrides from podLabels ([#1808](https://github.com/5dlabs/cto/issues/1808)) ([620a958](https://github.com/5dlabs/cto/commit/620a95891c5928ce85ee3690c0be9af607b9b158))
+* **gitops:** remove invalid serviceAccountName field from Application specs ([#1713](https://github.com/5dlabs/cto/issues/1713)) ([8e93187](https://github.com/5dlabs/cto/commit/8e93187cf9b8b1d5291aa102f69948e07fbb4402))
+* **gitops:** remove references to deleted ExternalSecret files in kustomization ([#1712](https://github.com/5dlabs/cto/issues/1712)) ([d7edcfd](https://github.com/5dlabs/cto/commit/d7edcfd8ecc07aecf64f3da2eff0361fbfa462f6))
+* **gitops:** resolve ArgoCD sync issues for Grafana and Cloudflare Tunnel ([#1813](https://github.com/5dlabs/cto/issues/1813)) ([5a58d0a](https://github.com/5dlabs/cto/commit/5a58d0a2fecd0366f5d41131e803fc78329554e8))
+* **gitops:** restore missing Argo CD applications and resolve sync issues ([#1636](https://github.com/5dlabs/cto/issues/1636)) ([107b718](https://github.com/5dlabs/cto/commit/107b718a55b0fd781431fe22f4d94afb5bc2f8bd))
+* handle markdown in cursor completion probe ([#1550](https://github.com/5dlabs/cto/issues/1550)) ([0b5c66a](https://github.com/5dlabs/cto/commit/0b5c66ab804dbf2f1691b22100b3f2c22c3b4d9a))
+* **heal:** add filebrowser-service to kustomization ([#1884](https://github.com/5dlabs/cto/issues/1884)) ([2e1bdcb](https://github.com/5dlabs/cto/commit/2e1bdcbbbda0375ab19284d375450b922d9acc5e))
+* **heal:** fix CI test command and Dockerfile lint warnings ([#1894](https://github.com/5dlabs/cto/issues/1894)) ([13430fd](https://github.com/5dlabs/cto/commit/13430fd8111c6fd0c45372a0c2f22cc9a98197d0))
+* **heal:** resolve clippy pedantic warnings ([1efd652](https://github.com/5dlabs/cto/commit/1efd652eaeee07e7afbaf725197ed1750735b8bf))
+* **heal:** use heal-config.json path and custom Claude template ([#1890](https://github.com/5dlabs/cto/issues/1890)) ([c598ad8](https://github.com/5dlabs/cto/commit/c598ad896fffde3013ddf49accbe910a1750c01c))
+* **heal:** wrap CodeRun in backticks for clippy doc_markdown ([#1880](https://github.com/5dlabs/cto/issues/1880)) ([d9d7d58](https://github.com/5dlabs/cto/commit/d9d7d580a4cb2b67fb55f1257285cd0c7deb56b8))
+* **helm:** add watch templates ConfigMap to controller projected volume ([#1833](https://github.com/5dlabs/cto/issues/1833)) ([08567e1](https://github.com/5dlabs/cto/commit/08567e1d92d7a6bf74f959e54fb1b00a1c762b8a))
+* **infra:** add configSecret and project settings for MinIO ([#1820](https://github.com/5dlabs/cto/issues/1820)) ([c8818b6](https://github.com/5dlabs/cto/commit/c8818b69fd90543ec343d72ed2fd5ecaee86cfde))
+* **infra:** add ignoreDifferences for operator-managed fields ([#1818](https://github.com/5dlabs/cto/issues/1818)) ([0108dc4](https://github.com/5dlabs/cto/commit/0108dc447e1e606875c0758bebdce5810ecb5abb))
+* **infra:** add ignoreDifferences for operator-managed fields ([#1823](https://github.com/5dlabs/cto/issues/1823)) ([adda169](https://github.com/5dlabs/cto/commit/adda16944091e5033822d1ff67e5e1661ddd7252))
+* ingress-nginx sync conflicts with existing deployment ([#1736](https://github.com/5dlabs/cto/issues/1736)) ([c56257a](https://github.com/5dlabs/cto/commit/c56257a89624c22a6da5420271be1cc75826da74))
+* keep review agents on existing PRs ([#1542](https://github.com/5dlabs/cto/issues/1542)) ([1c9319f](https://github.com/5dlabs/cto/commit/1c9319fbd6ef887bc4fa2d64647b0b5648eb3eb0))
+* **lint:** remove trailing spaces and add newline at EOF ([5bbe9df](https://github.com/5dlabs/cto/commit/5bbe9df5333942365540c99d7f2b63837a158970))
+* make probes optional in universal-app chart ([#1872](https://github.com/5dlabs/cto/issues/1872)) ([311b763](https://github.com/5dlabs/cto/commit/311b7630d2f3c748ef0ae9eeadb8fd2fe012c266))
+* **mcp:** use docsProjectDirectory for tasks.json lookup ([#1591](https://github.com/5dlabs/cto/issues/1591)) ([0820f79](https://github.com/5dlabs/cto/commit/0820f792345dabcb60eff0a1a4f6892574a1de38))
+* **metrics-server:** increase kubelet scrape timeout to 30s ([#1697](https://github.com/5dlabs/cto/issues/1697)) ([a6d6c49](https://github.com/5dlabs/cto/commit/a6d6c49d939d4259ea25b0754e1c05723a6d17f5))
+* **monitor:** extract org/repo from URL before passing to workflow ([#1851](https://github.com/5dlabs/cto/issues/1851)) ([70ac563](https://github.com/5dlabs/cto/commit/70ac5637d4e9fc92f82f3cd62388bfd9b8913753))
+* **monitor:** pass docs-repository and docs-project-directory to workflow ([#1852](https://github.com/5dlabs/cto/issues/1852)) ([47070bb](https://github.com/5dlabs/cto/commit/47070bbe0b4f0c213d634b75cdd037f46ba235f7))
+* **monitor:** pass play config as CLI args instead of config file ([#1847](https://github.com/5dlabs/cto/issues/1847)) ([a8bc8ca](https://github.com/5dlabs/cto/commit/a8bc8ca25765ab3188f887c70fc6f28528c0cac5))
+* **monitor:** use env vars for GitHub auth like factory base ([#1850](https://github.com/5dlabs/cto/issues/1850)) ([8f7b41c](https://github.com/5dlabs/cto/commit/8f7b41ccde1976fe13c4a717cdc4ab68c74c5f7a))
+* **monitor:** use monitor/cto-config.json as default config path ([#1849](https://github.com/5dlabs/cto/issues/1849)) ([dee3320](https://github.com/5dlabs/cto/commit/dee332051520efda018e979a99f316e5ddd2d8b1))
+* Morgan status update regression - align TaskMaster mapping with GitHub Project field options ([14b8a52](https://github.com/5dlabs/cto/commit/14b8a52ef996c31dc78ad205498af0b364d7d5d2))
+* Morgan status update regression - align TaskMaster mapping with GitHub Project field options ([26c9bad](https://github.com/5dlabs/cto/commit/26c9bad6edcab18f18fa32dd6fc2d91262b4d9ef))
+* **morgan:** detect running agents by pod name pattern ([e3b3d0e](https://github.com/5dlabs/cto/commit/e3b3d0eb760e3ced75de19d38a2edd14b1138a1d))
+* **morgan:** detect running agents by pod name pattern ([5022118](https://github.com/5dlabs/cto/commit/5022118f5124c9c638c0eda8cf91204cbc040833))
+* **morgan:** fix syntax errors in pod detection logic ([cff427a](https://github.com/5dlabs/cto/commit/cff427a313a626984e6c573b4e639b17efcaea6a))
+* **morgan:** fix syntax errors in pod detection logic ([a7c3354](https://github.com/5dlabs/cto/commit/a7c33547b592c30799498d63ee9db76a5176928c))
+* **morgan:** mirror status into legacy stage ([c47ede3](https://github.com/5dlabs/cto/commit/c47ede35def8996114a80b483c136e5005b31a96))
+* **morgan:** sync status and stage fields ([be6e0ae](https://github.com/5dlabs/cto/commit/be6e0aeeb60171f3a4ce3350185733a557894690))
+* mount Context7 and GitHub secrets as environment variables in Toolman ([0906777](https://github.com/5dlabs/cto/commit/09067770bd364f0751fa9d602a9bcdcbc5a8e67b))
+* move cloudflare-operator to cloudflare-operator-system namespace ([#1777](https://github.com/5dlabs/cto/issues/1777)) ([9858cf3](https://github.com/5dlabs/cto/commit/9858cf3469380272ee868c49bbb36b6940a643da))
+* Move OpenMemory application to correct ArgoCD applications directory ([a1ac6fa](https://github.com/5dlabs/cto/commit/a1ac6fa1f1c7846643003ebd33687c723688f26f))
+* nullify httpGet in heal probes to prevent merge conflict ([#1871](https://github.com/5dlabs/cto/issues/1871)) ([ed9e601](https://github.com/5dlabs/cto/commit/ed9e601790fb12fbc834ba66012a728ff62d0aad))
+* OpenMemory image build and toolman URL ([#1671](https://github.com/5dlabs/cto/issues/1671)) ([1b4abd9](https://github.com/5dlabs/cto/commit/1b4abd9bc103b0b9321e93687b2fb0bae5f16035)), closes [#1670](https://github.com/5dlabs/cto/issues/1670)
+* **otel:** add VL-Msg-Field header for Victoria Logs ([#1834](https://github.com/5dlabs/cto/issues/1834)) ([2166ac6](https://github.com/5dlabs/cto/commit/2166ac6684371a7058ead1f5a64c123fb621822e))
+* **postgres:** remove readOnlyRootFilesystem incompatible with Spilo ([#1533](https://github.com/5dlabs/cto/issues/1533)) ([3212feb](https://github.com/5dlabs/cto/commit/3212feb96cbde63266baa3d4f4efcefd22fd67a7))
+* prevent ArgoCD from overwriting CNPG webhook CA bundles ([#1782](https://github.com/5dlabs/cto/issues/1782)) ([07f2a50](https://github.com/5dlabs/cto/commit/07f2a5021a0912e6d60bb79871384d26ca35d76d))
+* prevent ArgoCD from overwriting CNPG webhook CA bundles ([#1784](https://github.com/5dlabs/cto/issues/1784)) ([e880d24](https://github.com/5dlabs/cto/commit/e880d246069f6a19fe68b92a5953fefd20ba19e3))
+* prevent Cipher from posting duplicate reviews ([#1546](https://github.com/5dlabs/cto/issues/1546)) ([7d0cb6a](https://github.com/5dlabs/cto/commit/7d0cb6adc65191cdc7b3b0cfb4cb4115fe94aafb))
+* prevent infinite Cipher security agent iterations ([a381d80](https://github.com/5dlabs/cto/commit/a381d80a53689d45324ded01d9ce41d96de255ff))
+* prevent infinite Cipher security agent iterations ([83808d5](https://github.com/5dlabs/cto/commit/83808d53167f7ae184df4fc1e1dcd9a5e6e97103))
+* prevent infinite iterations for ALL agents (Rex, Cleo, Tess, Cipher) ([f277f55](https://github.com/5dlabs/cto/commit/f277f5571bbc00216edaaa8e3296a008e65e0a83))
+* **rbac:** add delete permission for ConfigMaps to arc-runner ([#1541](https://github.com/5dlabs/cto/issues/1541)) ([ee5fc91](https://github.com/5dlabs/cto/commit/ee5fc915e1645fffe3d514d914cf968910692d68))
+* **release:** add tools-client to binary releases and fix Windows lint ([#1805](https://github.com/5dlabs/cto/issues/1805)) ([dcbcae8](https://github.com/5dlabs/cto/commit/dcbcae82feefe5e1f5b9ced26fda9209937bdd49))
+* remediate tools MCP server warnings and failures ([#1755](https://github.com/5dlabs/cto/issues/1755)) ([0438fbd](https://github.com/5dlabs/cto/commit/0438fbdd7ad66e92eecf3627142afb2f802c7062))
+* remediation CodeRun schema to match CRD ([#1853](https://github.com/5dlabs/cto/issues/1853)) ([dae81ff](https://github.com/5dlabs/cto/commit/dae81ff327dca649ef6cf2983b6fc448c491ae9b))
+* Remove broken submodule blocking ArgoCD ([4204122](https://github.com/5dlabs/cto/commit/4204122d3ef8ac7d3e173f4829481c58c32bac8f))
+* Remove broken submodule docs/tasks-reference blocking ArgoCD ([34d97a4](https://github.com/5dlabs/cto/commit/34d97a4f196254ce78dea27bcc3fea3f34b3985f))
+* Remove broken submodule reference for docs/tasks-reference ([f73c532](https://github.com/5dlabs/cto/commit/f73c532af3af5f486d71f7704c8d59d2221b1bc6))
+* Remove cto-parallel-test submodule (not needed for deployments) ([a8eb4ed](https://github.com/5dlabs/cto/commit/a8eb4ed13ac4021b99380e18bb0e068021099d48))
+* remove duplicate Atlas sensors and add template version tracking ([9255199](https://github.com/5dlabs/cto/commit/92551994e969c50ce70926f5b3d1354b11469a41))
+* remove duplicate cto app-of-apps causing SharedResourceWarning ([#1744](https://github.com/5dlabs/cto/issues/1744)) ([efc85bd](https://github.com/5dlabs/cto/commit/efc85bd007ffc3365c93e31405030a85cf0a9d65))
+* remove duplicate VaultStaticSecret definitions ([#1766](https://github.com/5dlabs/cto/issues/1766)) ([70252e1](https://github.com/5dlabs/cto/commit/70252e12fff4c9f1047a8dd2565bbff4882d885b))
+* remove empty env overrides for Context7 and GitHub in Toolman config ([4777d19](https://github.com/5dlabs/cto/commit/4777d1903da120e194658b8e02bd36296aa030a2))
+* remove empty env overrides for Context7 and GitHub in Toolman config ([#1589](https://github.com/5dlabs/cto/issues/1589)) ([32145f9](https://github.com/5dlabs/cto/commit/32145f98e68a523425757076ccef8df1de42ad5b))
+* remove filesystem server and update to OpenMemory tools ([#1674](https://github.com/5dlabs/cto/issues/1674)) ([8f45de2](https://github.com/5dlabs/cto/commit/8f45de2b5b7aec36e6b01a04501cc0bcc7000dc2))
+* remove maxAge config from eventbus to fix NATS type error ([#1742](https://github.com/5dlabs/cto/issues/1742)) ([10a4247](https://github.com/5dlabs/cto/commit/10a4247cd269764c74cd5b81ad4a646963886b5a))
+* Remove the broken submodule entry completely. ([34d97a4](https://github.com/5dlabs/cto/commit/34d97a4f196254ce78dea27bcc3fea3f34b3985f))
+* remove trader namespace and duplicate entries from ghcr.yaml ([#1743](https://github.com/5dlabs/cto/issues/1743)) ([f9cdf74](https://github.com/5dlabs/cto/commit/f9cdf741884c760be4430f2136a45926a6bbdca1))
+* remove trailing spaces from tess-label-fallback-sensor.yaml ([39d9422](https://github.com/5dlabs/cto/commit/39d9422716a42fd3b60b80bea0352fa63010cd1c))
+* remove unused MCP servers (postgres, redis, reddit) ([#1762](https://github.com/5dlabs/cto/issues/1762)) ([f6da3ce](https://github.com/5dlabs/cto/commit/f6da3ce1a13ea907b7cfae5edae038d69a919996))
+* Remove unused submodule causing Argo CD failures ([8abf966](https://github.com/5dlabs/cto/commit/8abf96635cdf5377f1a3fe9504f2d9a5ffe6348f))
+* replace hardcoded agent-platform namespace references ([#1745](https://github.com/5dlabs/cto/issues/1745)) ([a693182](https://github.com/5dlabs/cto/commit/a693182d7c0c01d466510164301add592ad0a710))
+* replace undefined FACTORY_WORK_DIR with CLAUDE_WORK_DIR in Claude container templates ([#1640](https://github.com/5dlabs/cto/issues/1640)) ([c4b0756](https://github.com/5dlabs/cto/commit/c4b07564508165684af11f15d225d99c82b6ce6c))
+* resolve agent stability issues causing crashes and workflow failures ([#1688](https://github.com/5dlabs/cto/issues/1688)) ([dcbbbd3](https://github.com/5dlabs/cto/commit/dcbbbd31e8fa013f98c6b974bca1e2b53f03950c))
+* resolve Atlas Guardian documentation cascade and sensor syntax error ([#1658](https://github.com/5dlabs/cto/issues/1658)) ([eeb09f2](https://github.com/5dlabs/cto/commit/eeb09f2419bcdd13da0eb69f5aaaca807e4bea68))
+* resolve MCP tools configuration regressions (3 critical issues) ([#1599](https://github.com/5dlabs/cto/issues/1599)) ([c19f44a](https://github.com/5dlabs/cto/commit/c19f44a28fd143f49d77079f5310124c1aff7110))
+* resolve merge conflict markers in atlas-conflict-monitor-sensor ([#1647](https://github.com/5dlabs/cto/issues/1647)) ([073429a](https://github.com/5dlabs/cto/commit/073429a5b9a15ce454567108421108171fb057db))
+* resolve merge conflict markers in factory container script ([cf69a36](https://github.com/5dlabs/cto/commit/cf69a36f5c159ede854e59c77d79702e910be2d8))
+* Resolve merge conflicts and Clippy warning in container scripts ([2e4c9f5](https://github.com/5dlabs/cto/commit/2e4c9f5dc8976c224cc514c437a747e7c3971ce2))
+* resolve metrics-server panic and remove vault setup ([#1700](https://github.com/5dlabs/cto/issues/1700)) ([2fe62e2](https://github.com/5dlabs/cto/commit/2fe62e276e76bab00f33dc744a1b1b0905d4bf2d))
+* resolve OpenTelemetry collector YAML syntax error in ArgoCD appl… ([#1638](https://github.com/5dlabs/cto/issues/1638)) ([229e4a5](https://github.com/5dlabs/cto/commit/229e4a5b1a1cab4d54ca1bc45e33b9f7ae2abf78))
+* resolve three bugs in Cleo container script ([#1634](https://github.com/5dlabs/cto/issues/1634)) ([feb16ce](https://github.com/5dlabs/cto/commit/feb16cea3a6046f3c3f51244bb802a6e5599da1f))
+* resolve tools Docker CI failures ([#1756](https://github.com/5dlabs/cto/issues/1756)) ([dc51e3a](https://github.com/5dlabs/cto/commit/dc51e3ae4702a4e69997f236fbca2dfa194ce6d3))
+* resolve YAML line-length warnings in GitOps files ([44f05a2](https://github.com/5dlabs/cto/commit/44f05a207d18e4ec557fcb362400f02e1d16a6cc))
+* resolve YAML line-length warnings in GitOps files ([81d63d9](https://github.com/5dlabs/cto/commit/81d63d9b04f46fac4f7ee05730771d0ad93a8777))
+* Resolve YAML linting and Helm validation errors ([d572d2e](https://github.com/5dlabs/cto/commit/d572d2ea03616014ddba61aa1afbcd2c7c4d4a41))
+* resolve YAML parsing error in otel-collector ArgoCD application ([#1661](https://github.com/5dlabs/cto/issues/1661)) ([7c58080](https://github.com/5dlabs/cto/commit/7c580806041bb44a20f3fd644ff65fb8772598ca))
+* restore .github/workflows/ directory ([#1891](https://github.com/5dlabs/cto/issues/1891)) ([260c687](https://github.com/5dlabs/cto/commit/260c6874448bb6094fd8fc5102f1feb2b729d9b0))
+* restore missing httproute.yaml to github-webhooks kustomization ([#1630](https://github.com/5dlabs/cto/issues/1630)) ([cd72d49](https://github.com/5dlabs/cto/commit/cd72d4960b92809d344b304137453e246955f541))
+* restore Morgan PM ConfigMap that was incorrectly deleted ([#1686](https://github.com/5dlabs/cto/issues/1686)) ([3658656](https://github.com/5dlabs/cto/commit/36586560201a2b69da2abe29b780695b587fa5fe))
+* **secrets:** revert ExternalSecrets to use secret-store instead of vault-secret-store ([#1699](https://github.com/5dlabs/cto/issues/1699)) ([35cd489](https://github.com/5dlabs/cto/commit/35cd489806960993111fed062e839ab422c73707))
+* **sensors:** enable Atlas Guardian CI and conflict monitoring ([#1642](https://github.com/5dlabs/cto/issues/1642)) ([0e48ebc](https://github.com/5dlabs/cto/commit/0e48ebccb7a223494398756de110d9a487e99610))
+* **sensors:** remove invalid cli field from Atlas conflict monitor ([#1669](https://github.com/5dlabs/cto/issues/1669)) ([f386595](https://github.com/5dlabs/cto/commit/f3865953f10f753b1c7a0216df116f3851c23e47))
+* **sensors:** switch CI/bug remediation to Atlas and remove orphaned sensors ([#1770](https://github.com/5dlabs/cto/issues/1770)) ([1d03e66](https://github.com/5dlabs/cto/commit/1d03e66a5425e1f9885190755dcd51a1f359ded6))
+* separate workingDirectory and docsProjectDirectory in play workflow ([e4650ae](https://github.com/5dlabs/cto/commit/e4650aeaf775ff4d20ff76cb7a0ef6eaa2bf734a))
+* Separate workingDirectory and docsProjectDirectory in play workflow ([0f2b94d](https://github.com/5dlabs/cto/commit/0f2b94dbe31784170dc77006ffc85bc8ca10c3ae))
+* stabilize agent template configmap sync ([#1543](https://github.com/5dlabs/cto/issues/1543)) ([ea04680](https://github.com/5dlabs/cto/commit/ea04680dc38811f93e310f43baac14319a1c5240))
+* stale completion markers preventing agent work ([#1605](https://github.com/5dlabs/cto/issues/1605)) ([831bc23](https://github.com/5dlabs/cto/commit/831bc235d14085f37ede21642479ea374a2bba55))
+* switch ARC controller from OCI to Git repo source ([#1749](https://github.com/5dlabs/cto/issues/1749)) ([3023050](https://github.com/5dlabs/cto/commit/3023050ce643f063e18492670093af8ff99be89b))
+* **telemetry:** disable PrometheusRule CRD that requires Prometheus Operator ([#1676](https://github.com/5dlabs/cto/issues/1676)) ([c4c77c0](https://github.com/5dlabs/cto/commit/c4c77c0d2c4e748b78a7a9f78193d6af77fc90c3))
+* **templates:** remove orphaned duplicate code in container-rex.sh.hbs ([#1829](https://github.com/5dlabs/cto/issues/1829)) ([0df7ff3](https://github.com/5dlabs/cto/commit/0df7ff31aba13910b5f4f5868734aa8b2182c912))
+* **tess:** create Claude template to prevent container exit hang ([#1534](https://github.com/5dlabs/cto/issues/1534)) ([f02bf7f](https://github.com/5dlabs/cto/commit/f02bf7fe8faa5a28f41b2e5c74f0d3e369829c76))
+* **toolman:** correct pg-aiguide MCP server URL ([#1706](https://github.com/5dlabs/cto/issues/1706)) ([7affba0](https://github.com/5dlabs/cto/commit/7affba063e5213244312974b823c9b90278bb72b))
+* **toolman:** correct pg-aiguide MCP server URL ([#1707](https://github.com/5dlabs/cto/issues/1707)) ([6ce3ab1](https://github.com/5dlabs/cto/commit/6ce3ab1676e59e633559b9c4946d419ef47a5121))
+* **tools:** add command directive for vault-mcp-server binary ([#1793](https://github.com/5dlabs/cto/issues/1793)) ([f5f99f2](https://github.com/5dlabs/cto/commit/f5f99f27cb1315c7f3cdfb0c00dc211105615648))
+* **tools:** clean up Clippy pedantic lint exclusions ([#1790](https://github.com/5dlabs/cto/issues/1790)) ([e454b3e](https://github.com/5dlabs/cto/commit/e454b3ed58e502c2d507f42d1ff2cfe9fff4eb64))
+* **tools:** configure cargo-dist for proper tools release ([#1796](https://github.com/5dlabs/cto/issues/1796)) ([1ff0e8f](https://github.com/5dlabs/cto/commit/1ff0e8f3a9023932b6a51aea38e37fc9d9d33ab8))
+* **tools:** correct vault-mcp-server binary path to /bin/vault-mcp-server ([#1799](https://github.com/5dlabs/cto/issues/1799)) ([0059b5a](https://github.com/5dlabs/cto/commit/0059b5a9a75b2293056920bc32a230968d4d43bb))
+* **tools:** increase vault-mcp-server probe timeout to 5 seconds ([#1802](https://github.com/5dlabs/cto/issues/1802)) ([57ae358](https://github.com/5dlabs/cto/commit/57ae358682da52cba95d6d436544890e9ae44163))
+* **tools:** initialize tracing subscriber for server logging ([#1787](https://github.com/5dlabs/cto/issues/1787)) ([1adc2ed](https://github.com/5dlabs/cto/commit/1adc2edbee907ac38d34b7afbbd4c6180bc5a421))
+* **tools:** lint fixes and remove unnecessary secretRefs from HTTP MCP servers ([#1803](https://github.com/5dlabs/cto/issues/1803)) ([a36cd66](https://github.com/5dlabs/cto/commit/a36cd669a5e868d450cca2461c95585307c925b1))
+* **tools:** remove OAuth Cloudflare servers, fix Firecrawl to use stdio ([#1809](https://github.com/5dlabs/cto/issues/1809)) ([564009a](https://github.com/5dlabs/cto/commit/564009a6896fd95201cd7552ce943c7f87a5fd6b))
+* **tools:** remove redundant unit test step from CI ([#1898](https://github.com/5dlabs/cto/issues/1898)) ([3226fd9](https://github.com/5dlabs/cto/commit/3226fd9d199388ad2cc59dbe30b87290ac287ff1))
+* **tools:** use /health endpoint for vault-mcp-server probes ([#1804](https://github.com/5dlabs/cto/issues/1804)) ([8102f31](https://github.com/5dlabs/cto/commit/8102f313450d709ff26f77e16aa557a662dd0923))
+* **tools:** use Docker for grafana and victoriametrics MCP servers ([#1807](https://github.com/5dlabs/cto/issues/1807)) ([bb70273](https://github.com/5dlabs/cto/commit/bb70273699d1ee8265208fd087215a8351592f92))
+* **tools:** use HTTP for internal ArgoCD URL ([#1815](https://github.com/5dlabs/cto/issues/1815)) ([ab9728e](https://github.com/5dlabs/cto/commit/ab9728e8dad35c4dbdc8c422b861aa1a8f35a3b3))
+* **tools:** wait for Docker socket in entrypoint ([#1781](https://github.com/5dlabs/cto/issues/1781)) ([9dc4aa7](https://github.com/5dlabs/cto/commit/9dc4aa7fd863d0254375b6c8d0023612fd271a83))
+* transform github-pat secret key for ARC controller ([#1731](https://github.com/5dlabs/cto/issues/1731)) ([f93d486](https://github.com/5dlabs/cto/commit/f93d48680fa348d66dca593f6e2e28901ca36313))
+* update CI workflows for cto namespace refactor ([#1750](https://github.com/5dlabs/cto/issues/1750)) ([284b66e](https://github.com/5dlabs/cto/commit/284b66e3f0fe7fa50a5789a030203171269d6df8))
+* update ClusterTunnel to v1alpha2 API version ([#1759](https://github.com/5dlabs/cto/issues/1759)) ([d64519d](https://github.com/5dlabs/cto/commit/d64519d2900b3a56be8ec404df39135ccbab923c))
+* update OpenCode test for new exec-based config format ([d201b72](https://github.com/5dlabs/cto/commit/d201b7299dd1cf6c61fcb8d37c43fefa085180a2))
+* update tools install URL to CTO monorepo ([#1751](https://github.com/5dlabs/cto/issues/1751)) ([57e9987](https://github.com/5dlabs/cto/commit/57e9987230ae659ddf2e349dac987b3f51910c5f))
+* use CONFIGMAP_PREFIX env var for ConfigMap names ([#1725](https://github.com/5dlabs/cto/issues/1725)) ([6b965c4](https://github.com/5dlabs/cto/commit/6b965c4c86bb4c5660635c99fcdf8976cbe1aea4))
+* use correct hostname and target format for Cloudflare TunnelBinding ([#1764](https://github.com/5dlabs/cto/issues/1764)) ([55ed44b](https://github.com/5dlabs/cto/commit/55ed44b016411127d74de3659bd7d7b544a12de9))
+* use correct Redis image tag v7.4.6 ([#1680](https://github.com/5dlabs/cto/issues/1680)) ([2572762](https://github.com/5dlabs/cto/commit/25727623e02e3ae2abeb56db002ebcc01623114a))
+* use cto namespace for Argo workflow URLs and CLI commands ([#1747](https://github.com/5dlabs/cto/issues/1747)) ([ad24e1e](https://github.com/5dlabs/cto/commit/ad24e1e0e3a224bb384328842138adeabd3f9315))
+* use exec probes for heal instead of HTTP ([#1870](https://github.com/5dlabs/cto/issues/1870)) ([391934c](https://github.com/5dlabs/cto/commit/391934cc937558194ef5282a00a297b99be09378))
+* use global cto-mcp binary in test template MCP config ([#1696](https://github.com/5dlabs/cto/issues/1696)) ([ca62733](https://github.com/5dlabs/cto/commit/ca627331ac82de5e5518f9b89977f1429f0128ec))
+* Use HTTPS for submodule to match Argo CD authentication ([ae2f1e7](https://github.com/5dlabs/cto/commit/ae2f1e77153f630cdaa2f7f4d95d3f68dd03f724))
+* Use HTTPS for submodule to match main repo authentication ([51757e5](https://github.com/5dlabs/cto/commit/51757e5479628ccefba79a9818a3a27a71b05f54))
+* use infra namespace, correct API versions and schemas for Cloudflare Tunnel ([#1761](https://github.com/5dlabs/cto/issues/1761)) ([0a634d7](https://github.com/5dlabs/cto/commit/0a634d7325ea8555b4c34ad74bd9e5f2961846fd))
+* Use local-path storage class for OpenMemory PVC ([4339f2d](https://github.com/5dlabs/cto/commit/4339f2d38e01e4b3e0862dab615b474feb240e11))
+* Use local-path storage class for OpenMemory PVC ([b46717e](https://github.com/5dlabs/cto/commit/b46717e9034a0fe85b1b7d459d1b2d0693a10cd0))
+* Use npx for GitHub MCP instead of Docker ([c5a1299](https://github.com/5dlabs/cto/commit/c5a1299aa479c2fc993bd6619444392977435771))
+* Use npx for GitHub MCP instead of Docker ([8f1aa60](https://github.com/5dlabs/cto/commit/8f1aa6078ee87d0d43ae13f32de116d7f6cd70f7))
+* use projected volume to mount integration templates and add PR labels ([#1651](https://github.com/5dlabs/cto/issues/1651)) ([609d399](https://github.com/5dlabs/cto/commit/609d3996758899ef657b367e181b65997c264181))
+* use Replace sync strategy for CloudNativePG CRDs ([#1678](https://github.com/5dlabs/cto/issues/1678)) ([178cd61](https://github.com/5dlabs/cto/commit/178cd61f5b21f748ab11663f2a1b83e60405fda9))
+* use Talos kubeconfig-in-cluster ConfigMap for Kilo ([#1711](https://github.com/5dlabs/cto/issues/1711)) ([37a4374](https://github.com/5dlabs/cto/commit/37a4374619654f51a1f08810052bc25de4c8e8e5))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1867](https://github.com/5dlabs/cto/issues/1867)) ([3dae21f](https://github.com/5dlabs/cto/commit/3dae21f19bbe47f6a36ab84958ef4c33020efa87))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1868](https://github.com/5dlabs/cto/issues/1868)) ([c715c3a](https://github.com/5dlabs/cto/commit/c715c3aff0deff830bf005bcdd0feccd041a0ed7))
+* use unified release URLs for tools and play-monitor ([#1858](https://github.com/5dlabs/cto/issues/1858)) ([be9eb9a](https://github.com/5dlabs/cto/commit/be9eb9acd28b5d6866dcbd0bfeaf3fab4405eda4))
+* **vault:** ignore StatefulSet volumeClaimTemplates diff ([#1705](https://github.com/5dlabs/cto/issues/1705)) ([be71fd1](https://github.com/5dlabs/cto/commit/be71fd19531c2f6f68519bbc10cc539070fde6bd))
+* **vault:** use default service account for cross-namespace auth ([#1704](https://github.com/5dlabs/cto/issues/1704)) ([ce95bc7](https://github.com/5dlabs/cto/commit/ce95bc7a9e3acaa18d6bcf43c85ad0a3402c17f4))
+* **watch:** create dedicated monitor container script ([#1841](https://github.com/5dlabs/cto/issues/1841)) ([b933170](https://github.com/5dlabs/cto/commit/b9331708b4dd44f741808694303e854e2472f0f8))
+* **workflow:** correct wait-for-job-creation success condition ([1664fe7](https://github.com/5dlabs/cto/commit/1664fe7db870d686eff8778783ce3fca15298a00))
+* **workflow:** correct wait-for-job-creation success condition syntax ([5c76200](https://github.com/5dlabs/cto/commit/5c7620040034cb115da3735e85459d3ab2bdc6bf))
+* **workflow:** fast-forward stage label when resuming from later stages ([#1685](https://github.com/5dlabs/cto/issues/1685)) ([5313b7f](https://github.com/5dlabs/cto/commit/5313b7f13e49a7be409b87573c69a2253b61b3d0))
+* **workflow:** resolve Cleo resume pipeline issues ([#1598](https://github.com/5dlabs/cto/issues/1598)) ([f86b63b](https://github.com/5dlabs/cto/commit/f86b63bc9e1ec531f05653bb29eea1a7d64633a1))
+* **workflow:** use variable to escape template pattern in is_valid_param ([#1690](https://github.com/5dlabs/cto/issues/1690)) ([a8c38ba](https://github.com/5dlabs/cto/commit/a8c38ba65ff8649cc77013f28ae815274344a980))
+
+
+### ♻️ Refactoring
+
+* comprehensive namespace consolidation ([#1738](https://github.com/5dlabs/cto/issues/1738)) ([4a5259c](https://github.com/5dlabs/cto/commit/4a5259cc0123de83bdda108b3386b62d2f7b32d9))
+* consolidate and clean up Kubernetes namespaces ([#1728](https://github.com/5dlabs/cto/issues/1728)) ([4a24d3c](https://github.com/5dlabs/cto/commit/4a24d3c19c2850dcc9ab7c9cb9d4877264109def))
+* consolidate heal build into infrastructure-build workflow ([839723d](https://github.com/5dlabs/cto/commit/839723d6d55edb890481de00d1df6aef32297a36))
+* consolidate namespaces - operators + move Atlas alerts to CTO ([#1733](https://github.com/5dlabs/cto/issues/1733)) ([862ea80](https://github.com/5dlabs/cto/commit/862ea80f1354edec582c192db8e9e6669b5ff210))
+* move heal image to infra/images and remove obsolete watch files ([8abacf7](https://github.com/5dlabs/cto/commit/8abacf707b1b4234b1705bcd89ae0ff0712401ab))
+* remove cto-config and talos-kubeconfig mounts from heal CodeRuns ([969a79c](https://github.com/5dlabs/cto/commit/969a79c66d6e0646e3f2b4343325c088fd2c0778))
+* rename agent-platform namespace to cto ([#1723](https://github.com/5dlabs/cto/issues/1723)) ([32828df](https://github.com/5dlabs/cto/commit/32828dfb3589439190535b9eb02a1f8e418429c6))
+
+
+### 📚 Documentation
+
+* Add OpenMemory deployment validation and status documentation ([5490503](https://github.com/5dlabs/cto/commit/5490503e52c2a91808aed38c518b87a89a1728a4))
+* add PR description for Toolman Context7 and GitHub fix ([de82ad3](https://github.com/5dlabs/cto/commit/de82ad32199e5b680f37d7967a0773c1867d54a0))
+* **e2e:** improve quick-e2e-reset script with permission requirements ([#1632](https://github.com/5dlabs/cto/issues/1632)) ([7191da4](https://github.com/5dlabs/cto/commit/7191da4e2114e6168b79bdfc690334075d68d2b3))
+* improve cloudflare-operator configuration documentation ([#1774](https://github.com/5dlabs/cto/issues/1774)) ([2d1b892](https://github.com/5dlabs/cto/commit/2d1b8928814e82b9a0cdfdbca9abe5ae2cba29a5))
+* improve Kilo DNS setup instructions ([#1714](https://github.com/5dlabs/cto/issues/1714)) ([b7e4848](https://github.com/5dlabs/cto/commit/b7e4848d48dc5e1416d5f217ebc92a0dd1cb2505))
+* **task-0:** Atlas Guardian conflict resolution verification for PR [#1640](https://github.com/5dlabs/cto/issues/1640) ([f615042](https://github.com/5dlabs/cto/commit/f615042796960ed174078971a998ce9ecc90a02b))
+* **task-0:** Atlas Guardian session completion for PR [#1662](https://github.com/5dlabs/cto/issues/1662) merge ([#1664](https://github.com/5dlabs/cto/issues/1664)) ([1a7982c](https://github.com/5dlabs/cto/commit/1a7982c3cad5f24207368fe91ee4458a0edbbf6a))
+* **task-0:** Atlas Guardian session documentation for PRs [#1637](https://github.com/5dlabs/cto/issues/1637) and [#1638](https://github.com/5dlabs/cto/issues/1638) ([#1654](https://github.com/5dlabs/cto/issues/1654)) ([366a9a4](https://github.com/5dlabs/cto/commit/366a9a4bd468a808efe54e6b6d719dafd6a474a1))
+* **task-0:** Atlas Guardian session for PR [#1627](https://github.com/5dlabs/cto/issues/1627) merge ([d1e6629](https://github.com/5dlabs/cto/commit/d1e66290c9e8254fa77a08caf87368e5d1189140))
+* **task-0:** Atlas Guardian session for PR [#1627](https://github.com/5dlabs/cto/issues/1627) merge ([1e9ad74](https://github.com/5dlabs/cto/commit/1e9ad745ee8624db9fe45eaf2ba27abce9a1cae3))
+* **task-0:** Atlas Guardian session for PR [#1654](https://github.com/5dlabs/cto/issues/1654) and [#1651](https://github.com/5dlabs/cto/issues/1651) merges ([#1655](https://github.com/5dlabs/cto/issues/1655)) ([db4a27a](https://github.com/5dlabs/cto/commit/db4a27af0002a555b3672ee6a260b7633d56c7e4))
+* **task-0:** Atlas Guardian session for PR [#1655](https://github.com/5dlabs/cto/issues/1655) merge ([#1656](https://github.com/5dlabs/cto/issues/1656)) ([a7cf802](https://github.com/5dlabs/cto/commit/a7cf802eaec5aef52f416e53aa13be8b9938046a))
+* **task-0:** Atlas Guardian session for PR [#1656](https://github.com/5dlabs/cto/issues/1656) merge ([#1657](https://github.com/5dlabs/cto/issues/1657)) ([33a05f7](https://github.com/5dlabs/cto/commit/33a05f75a4f453afe55f32819747d63996823940))
+* **task-0:** Atlas Guardian session for PR [#1657](https://github.com/5dlabs/cto/issues/1657) merge ([#1659](https://github.com/5dlabs/cto/issues/1659)) ([0a62883](https://github.com/5dlabs/cto/commit/0a6288360b37e153dced2077ee234ce9d96be7f8))
+* **task-0:** Atlas Guardian session for PR [#1659](https://github.com/5dlabs/cto/issues/1659) merge ([#1660](https://github.com/5dlabs/cto/issues/1660)) ([8b9f0a3](https://github.com/5dlabs/cto/commit/8b9f0a3c0a4f2a2f0092e2cd871920bfa5c2856c))
+* **task-0:** Atlas Guardian session for PR [#1660](https://github.com/5dlabs/cto/issues/1660) merge ([#1662](https://github.com/5dlabs/cto/issues/1662)) ([9525c2f](https://github.com/5dlabs/cto/commit/9525c2ff4d635c0d2a2ce82fd9d42ab6a9779cf2))
+
+
+### 🔧 Maintenance
+
+* Add deployment instructions to .gitignore ([2d50304](https://github.com/5dlabs/cto/commit/2d5030465ae377288d20e006ca6b1a563af20485))
+* auto-update agent-templates ConfigMap ([d4fffea](https://github.com/5dlabs/cto/commit/d4fffea7f7d72a374ab3026a3179432687a0b404))
+* auto-update agent-templates ConfigMap ([b91799f](https://github.com/5dlabs/cto/commit/b91799f18f46bc7d19aea4b2972b6d01762e2e97))
+* auto-update agent-templates ConfigMap ([4582310](https://github.com/5dlabs/cto/commit/4582310d8a0ad2fcc6442c4c7bca8772e873d37c))
+* auto-update agent-templates ConfigMap ([451cb37](https://github.com/5dlabs/cto/commit/451cb3744f11760f2baab7b3a519182475a79dd6))
+* auto-update agent-templates ConfigMap ([32a35ff](https://github.com/5dlabs/cto/commit/32a35ffd35b066d7f513299bd33cc8ed29a8d8a4))
+* auto-update agent-templates ConfigMap ([8776790](https://github.com/5dlabs/cto/commit/8776790e61fa99509b6cc1efa54bfa30fb92f6a6))
+* auto-update agent-templates ConfigMap ([cc22f69](https://github.com/5dlabs/cto/commit/cc22f691945bdc3a0c957d65eafd4c49005b49d8))
+* auto-update agent-templates ConfigMap ([cc50a87](https://github.com/5dlabs/cto/commit/cc50a8731ef8bb077b10f9fdea4f147bfdc8c51d))
+* auto-update agent-templates ConfigMap ([6365505](https://github.com/5dlabs/cto/commit/6365505b15bc7ba9db0f5c33d16b2e46b4634a3b))
+* auto-update agent-templates ConfigMap ([11b095b](https://github.com/5dlabs/cto/commit/11b095b8396be5ec9849ac36431bb936621344d2))
+* auto-update agent-templates ConfigMap ([0749860](https://github.com/5dlabs/cto/commit/0749860a575613d20a046aa9409b95eb500732d0))
+* auto-update agent-templates ConfigMap ([b502769](https://github.com/5dlabs/cto/commit/b502769067af1d5e4d11f2d959ede2c65165e9b6))
+* auto-update agent-templates ConfigMap ([9cdbdd8](https://github.com/5dlabs/cto/commit/9cdbdd8ef7012545aa86c838aabfd37603899a3f))
+* auto-update agent-templates ConfigMap ([8ccdae1](https://github.com/5dlabs/cto/commit/8ccdae14a7ada4822cd5c3183a50e5634a6db029))
+* auto-update agent-templates ConfigMap ([ebd6476](https://github.com/5dlabs/cto/commit/ebd64761a7d8f068d2a2cfbd278a4422260bc00c))
+* auto-update agent-templates ConfigMap ([a83cb65](https://github.com/5dlabs/cto/commit/a83cb65351e8a5ac76d0568dc2e56f0ce9c564ae))
+* auto-update agent-templates ConfigMap ([6b37c80](https://github.com/5dlabs/cto/commit/6b37c80e09f89641888a19791066df31a8707852))
+* auto-update agent-templates ConfigMap ([fbe66f0](https://github.com/5dlabs/cto/commit/fbe66f0a97b8bfd238277fe9f48a1a6a572711ef))
+* auto-update agent-templates ConfigMap ([6ce0e77](https://github.com/5dlabs/cto/commit/6ce0e77e75b8e33c96437cecde85c803cab6c13b))
+* auto-update agent-templates ConfigMap ([7c6ae01](https://github.com/5dlabs/cto/commit/7c6ae01817cc864a5abd4643078f168172f69fbf))
+* auto-update agent-templates ConfigMap ([a4d0885](https://github.com/5dlabs/cto/commit/a4d0885d9d329e14bc4a74baf98bf00edd5937a8))
+* **chart:** regenerate agent templates ConfigMaps ([e0cb7ad](https://github.com/5dlabs/cto/commit/e0cb7ad586f3635ec4c7666db2feecc428283dd2))
+* **chart:** regenerate agent templates ConfigMaps ([77a5b58](https://github.com/5dlabs/cto/commit/77a5b583b430e7e56e84354ccff6687b930506d2))
+* **chart:** regenerate agent templates ConfigMaps ([4e16217](https://github.com/5dlabs/cto/commit/4e16217b62fe19ef9924627096107da59c5f2e09))
+* **chart:** regenerate agent templates ConfigMaps ([881d06e](https://github.com/5dlabs/cto/commit/881d06ec552549d2730cec4b125f9f93c9ba449c))
+* **chart:** regenerate agent templates ConfigMaps ([71da44a](https://github.com/5dlabs/cto/commit/71da44a36671428e8498aa513dd37746b10caf39))
+* **chart:** regenerate agent templates ConfigMaps ([1171f11](https://github.com/5dlabs/cto/commit/1171f11d6da0d109557af6666ac69db757e23207))
+* **chart:** regenerate agent templates ConfigMaps ([726575b](https://github.com/5dlabs/cto/commit/726575b791c3f2384d249f090574fb6cf60900f3))
+* **chart:** regenerate agent templates ConfigMaps ([7057e21](https://github.com/5dlabs/cto/commit/7057e2150f5b524e21873ff216de39e92edb6bca))
+* **chart:** regenerate agent templates ConfigMaps ([6b0995a](https://github.com/5dlabs/cto/commit/6b0995a8107781e6304cdcfd8f0c5dd926d6a294))
+* **chart:** regenerate agent templates ConfigMaps ([#1549](https://github.com/5dlabs/cto/issues/1549)) ([b29aa6c](https://github.com/5dlabs/cto/commit/b29aa6c5ddbe62f5ccbe26c2b2f33619d0ca0815))
+* **chart:** regenerate agent templates ConfigMaps ([#1594](https://github.com/5dlabs/cto/issues/1594)) ([50fbe0a](https://github.com/5dlabs/cto/commit/50fbe0a3ff65f23c3ed89a0d7db868c45194aad5))
+* **chart:** regenerate agent templates ConfigMaps ([#1684](https://github.com/5dlabs/cto/issues/1684)) ([757bf06](https://github.com/5dlabs/cto/commit/757bf06aaab6449cca554a4cf7c0fe0bfee9f52c))
+* **chart:** regenerate agent templates ConfigMaps ([#1825](https://github.com/5dlabs/cto/issues/1825)) ([4304a34](https://github.com/5dlabs/cto/commit/4304a3473014030a5dc5b34c001f5479aba6956f))
+* **chart:** regenerate agent templates ConfigMaps ([#1848](https://github.com/5dlabs/cto/issues/1848)) ([98be1ca](https://github.com/5dlabs/cto/commit/98be1ca67830aee560cf387b60d378f2cc0383cc))
+* **infra:** remove doc-server and associated database infrastructure ([#1720](https://github.com/5dlabs/cto/issues/1720)) ([553dbd7](https://github.com/5dlabs/cto/commit/553dbd70b3a2c38f612c959727b6fd0f846731a5))
+* Merge main to resolve conflicts ([6605981](https://github.com/5dlabs/cto/commit/660598177fddb28e34cd99ece0163ef543eddcfa))
+* release 0.2.1 ([#1896](https://github.com/5dlabs/cto/issues/1896)) ([3a32715](https://github.com/5dlabs/cto/commit/3a327150ec007daec5d855d4c871734ea26ed21c))
+* remove Better Auth integration ([#1672](https://github.com/5dlabs/cto/issues/1672)) ([8cda329](https://github.com/5dlabs/cto/commit/8cda329c93c9567f310c4290688154f87fad5d54))
+* remove doc-server references and docs_ingest tool ([#1730](https://github.com/5dlabs/cto/issues/1730)) ([3e4d16c](https://github.com/5dlabs/cto/commit/3e4d16ca652c2ddc270058db700159b676ef026c))
+* remove NGrok in favor of Cloudflare Tunnel ([#1758](https://github.com/5dlabs/cto/issues/1758)) ([8b88f7a](https://github.com/5dlabs/cto/commit/8b88f7a6dc64f2ee41ff76f7b0fb12d59f4f8f96))
+* remove Rust docs MCP server ([#1760](https://github.com/5dlabs/cto/issues/1760)) ([11bff96](https://github.com/5dlabs/cto/commit/11bff9647073770fd9656cd4db25f5cf06324b2a))
+* remove temporary task and session files from root ([#1675](https://github.com/5dlabs/cto/issues/1675)) ([00dac75](https://github.com/5dlabs/cto/commit/00dac7543fbb18615682ffe6b74e60fe25ea0333))
+* remove unused testing and toolman-client directories ([#1719](https://github.com/5dlabs/cto/issues/1719)) ([62c27c3](https://github.com/5dlabs/cto/commit/62c27c3abe959868fe36d7945b5a493f53c6e386))
+* resolve merge conflicts from main ([9b654a5](https://github.com/5dlabs/cto/commit/9b654a557baaa78771a97071006f8318eb3ce25c))
+* **task-0:** OpenMemory integration cleanup and configuration standardization ([#1652](https://github.com/5dlabs/cto/issues/1652)) ([5261efa](https://github.com/5dlabs/cto/commit/5261efa76e59363090e152f819664b0f25e4cc9e))
+* **tools:** disable standalone k8s-mcp deployment ([#1780](https://github.com/5dlabs/cto/issues/1780)) ([f6c96a7](https://github.com/5dlabs/cto/commit/f6c96a7f91f57fac0591020f51b67f9daf0892a9))
+* update agent templates ConfigMaps ([74e0b8e](https://github.com/5dlabs/cto/commit/74e0b8e521d6d00b0d25c7ff7d23c078049534ca))
+* update agent templates ConfigMaps ([026dcf7](https://github.com/5dlabs/cto/commit/026dcf710b28b601853656e51a43c57e60024b64))
+* update agent templates ConfigMaps ([6a37ffe](https://github.com/5dlabs/cto/commit/6a37ffede3637ea41407d1b51d62a35660f49abe))
+
+## [0.2.1](https://github.com/5dlabs/cto/compare/v0.2.0...v0.2.1) (2025-12-01)
+
+
+### ✨ Features
+
+* Add Cloudflare Tunnel for GitHub webhook ingestion ([#1757](https://github.com/5dlabs/cto/issues/1757)) ([a5c0e84](https://github.com/5dlabs/cto/commit/a5c0e84b0a9f60590ba10144281de73de41e0313))
+* add CloudNativePG and Redis operators ([#1677](https://github.com/5dlabs/cto/issues/1677)) ([a07e076](https://github.com/5dlabs/cto/commit/a07e076228b5025a0f70f29b07318d0e8e16427a))
+* add command, args, and extraContainers support to universal-app ([#1869](https://github.com/5dlabs/cto/issues/1869)) ([5b3ee7f](https://github.com/5dlabs/cto/commit/5b3ee7ff05f9e707180529b6d07931e0621f8b9f))
+* Add Context7 and shadcn integration with comprehensive documentation ([bffe060](https://github.com/5dlabs/cto/commit/bffe0606ba2557d0f571b2aac866ef03b3e69ebd))
+* Add Context7 integration and Cursor CLI model configuration ([30eb5a3](https://github.com/5dlabs/cto/commit/30eb5a3f2d6e24a7a17408884fcd9853253dd166))
+* add dedicated RBAC for heal and move config to gitops ([d0e9c8c](https://github.com/5dlabs/cto/commit/d0e9c8c2d01227f1cd23825fa5a9b94cf1d123d0))
+* add E2E play feedback loop with play-monitor CLI ([#1691](https://github.com/5dlabs/cto/issues/1691)) ([6193f77](https://github.com/5dlabs/cto/commit/6193f77609adf2ceca566792aa0352330fb7423f))
+* add E2E reset tooling ([f80a06a](https://github.com/5dlabs/cto/commit/f80a06a1372d46a2f637563b23e218edb6085d13))
+* add event-cleaner CronJob to prevent event accumulation ([#1687](https://github.com/5dlabs/cto/issues/1687)) ([2ffc679](https://github.com/5dlabs/cto/commit/2ffc67981d8a8d5547aab6fa7b538c660c87cfc3))
+* Add GitHub MCP to Toolman for all agents ([9de7f08](https://github.com/5dlabs/cto/commit/9de7f08b34bfd126446ce2fc24d3eac3d3d3b9c7))
+* add intelligent Bugbot comment resolution to Atlas Guardian ([#1644](https://github.com/5dlabs/cto/issues/1644)) ([e65ca66](https://github.com/5dlabs/cto/commit/e65ca6690da54f7256ead28c2b49e768c01c5b12))
+* add Kilo WireGuard VPN (open source Twingate alternative) ([#1709](https://github.com/5dlabs/cto/issues/1709)) ([c6ba2d1](https://github.com/5dlabs/cto/commit/c6ba2d16c728667c22e55f9007638e4fc9f0e1c5))
+* Add MCP tool filtering for agent configurations ([#1613](https://github.com/5dlabs/cto/issues/1613)) ([14fc165](https://github.com/5dlabs/cto/commit/14fc1653d86ef11b4fb255c5f8f12a90517c215b))
+* Add MCP tools listing to Factory initialization ([a04d5fa](https://github.com/5dlabs/cto/commit/a04d5fa668586cba0f430253519e656456c9ca0c))
+* Add MCP tools validation across all CLI agents + Fix Gemini build pipeline ([4ffb9d5](https://github.com/5dlabs/cto/commit/4ffb9d5e1849b688f6c6d10bd4a731cd92d55a9c))
+* add MCP tools validation across all CLI agents and fix Gemini build pipeline ([f928064](https://github.com/5dlabs/cto/commit/f928064a4e1df8ee3ed2bb579bf835be4d7fa0ed))
+* add model rotation support to Claude Rex templates ([#1683](https://github.com/5dlabs/cto/issues/1683)) ([78414e4](https://github.com/5dlabs/cto/commit/78414e4a56f07df1d06c98340b99f9c4e88d0ce3))
+* Add OpenMemory integration for persistent agent memory ([#1612](https://github.com/5dlabs/cto/issues/1612)) ([5b80a75](https://github.com/5dlabs/cto/commit/5b80a756bec0acabe2d2c8faadd67f2311a8aa8a))
+* Add OpenMemory to infrastructure image CI builds ([e1839bd](https://github.com/5dlabs/cto/commit/e1839bd1d9c1d31597cb099e9a8fbd5d7943c78b))
+* Add shadcn to Toolman and expand Kubernetes tools for Tess/Bolt ([d4adfe4](https://github.com/5dlabs/cto/commit/d4adfe4951cf4e3710fe976a1e5ec9df3735c537))
+* Add smart Atlas activation with proper SERVICE extraction ([#1585](https://github.com/5dlabs/cto/issues/1585)) ([cd913b9](https://github.com/5dlabs/cto/commit/cd913b9c93a75948fac691af12744ed3bf10f615))
+* add Stitch PR Review Bot ([#1893](https://github.com/5dlabs/cto/issues/1893)) ([21806f7](https://github.com/5dlabs/cto/commit/21806f78ac8b0782ef61dcfd4d0ceb29c0032f23))
+* add tasks crate - Rust clone of Taskmaster with AI integration ([#1812](https://github.com/5dlabs/cto/issues/1812)) ([3720c5b](https://github.com/5dlabs/cto/commit/3720c5bde06afc2abe29a2091c45e4fe3db44e86))
+* Add tool verification to Factory container initialization ([8abbfda](https://github.com/5dlabs/cto/commit/8abbfda80b0b396885a004681eea7c78acb93cde))
+* Add tool verification to Factory container initialization ([af4efab](https://github.com/5dlabs/cto/commit/af4efab63b0b0b068bee8b7387519380e9130cfa))
+* **agents:** add Context7 instructions with pre-resolved library IDs ([#1695](https://github.com/5dlabs/cto/issues/1695)) ([42703ec](https://github.com/5dlabs/cto/commit/42703ec51112c96ad4d7de267faea4fdfe959201))
+* **argo:** enable enhanced workflow garbage collection ([#1703](https://github.com/5dlabs/cto/issues/1703)) ([016a85f](https://github.com/5dlabs/cto/commit/016a85f34b5f25fd411017d06fb0b2020c776a0b))
+* **atlas:** Complete Atlas Integration Architecture - All 5 Phases ([8d484f5](https://github.com/5dlabs/cto/commit/8d484f5c0296fc36387533c3f0151407ccdeefcb))
+* **atlas:** complete integration architecture with all 5 phases ([64e5a47](https://github.com/5dlabs/cto/commit/64e5a47f17792e11433dcca754ead2d5eab3c7e9))
+* **blaze:** add Effect.ts integration with effect-solutions CLI ([#1855](https://github.com/5dlabs/cto/issues/1855)) ([afaadcb](https://github.com/5dlabs/cto/commit/afaadcb6fcb73da2017e1f5d34d9c4b08d973e54))
+* **blaze:** add Playwright visual verification workflow ([#1859](https://github.com/5dlabs/cto/issues/1859)) ([15d5c42](https://github.com/5dlabs/cto/commit/15d5c42781856f5689de14f55885e03b643c6595))
+* **blaze:** add Prisma ORM as standard database ORM ([#1856](https://github.com/5dlabs/cto/issues/1856)) ([aaae3bb](https://github.com/5dlabs/cto/commit/aaae3bb59099474753d6f1323a34fdc299ce242f))
+* **blaze:** add XState (Stately) state management guidance ([#1857](https://github.com/5dlabs/cto/issues/1857)) ([7de381a](https://github.com/5dlabs/cto/commit/7de381a69a8553b8f8cbe90476a854c22168ddaf))
+* **cd:** add ArgoCD Image Updater and Release Please for automated deployments ([#1892](https://github.com/5dlabs/cto/issues/1892)) ([f44083b](https://github.com/5dlabs/cto/commit/f44083b2d236a0c17c057d4679fd6359251bda0c))
+* **ci:** add ArgoCD full sync workflow on PR merge ([#1775](https://github.com/5dlabs/cto/issues/1775)) ([74cf5d4](https://github.com/5dlabs/cto/commit/74cf5d49dd81999f8c1dde738b8ede68ec5edb2e))
+* **ci:** add workflow_dispatch trigger to infra-ci ([#1529](https://github.com/5dlabs/cto/issues/1529)) ([f8b08e7](https://github.com/5dlabs/cto/commit/f8b08e73f70a25af2ef585dffb9997e9c3600af6))
+* **cipher:** Add comprehensive security scanning tools and guidelines ([8ef9f60](https://github.com/5dlabs/cto/commit/8ef9f60f8beea442c41ef1031ba28d0260e7e342))
+* **cipher:** Add comprehensive security scanning tools and guidelines ([2d9dcd9](https://github.com/5dlabs/cto/commit/2d9dcd960d82be775ab1a148df84a9e6692fa4e1))
+* **ci:** unify binary releases into single workflow ([#1798](https://github.com/5dlabs/cto/issues/1798)) ([a633baa](https://github.com/5dlabs/cto/commit/a633baa2fcffba0404d87c96c1457ff5c849b42a))
+* Configure monitoring stack for CLI container logs ([#1629](https://github.com/5dlabs/cto/issues/1629)) ([c2e47b4](https://github.com/5dlabs/cto/commit/c2e47b4ce0f09c501b32a71d69e6ba6501dd5c25))
+* **controller:** Implement complete Gemini CLI adapter ([#1539](https://github.com/5dlabs/cto/issues/1539)) ([0fe84a6](https://github.com/5dlabs/cto/commit/0fe84a66625e09936a0398f852a9ce5590d8e4d6))
+* E2E self-healing loop with start/monitor/remediate commands ([#1835](https://github.com/5dlabs/cto/issues/1835)) ([e2f80ba](https://github.com/5dlabs/cto/commit/e2f80ba9a28ff759d36c986b2fa9b5f099ca785a))
+* establish BetterAuth as standard authentication solution ([36a0958](https://github.com/5dlabs/cto/commit/36a0958367fc5c24afabd62e1995e71683b8e6e8))
+* Establish BetterAuth as Standard Authentication Solution ([#1611](https://github.com/5dlabs/cto/issues/1611)) ([bb55505](https://github.com/5dlabs/cto/commit/bb555057635d030f2eaab8256869207463b7298c))
+* **gitops:** enable ServerSideApply for staging app-of-apps ([#1795](https://github.com/5dlabs/cto/issues/1795)) ([a9a1472](https://github.com/5dlabs/cto/commit/a9a14724c70d0ec37528baf27c65755e811ef503))
+* **heal:** add ConfigMap mount and agent coordination ([#1889](https://github.com/5dlabs/cto/issues/1889)) ([abf0d2e](https://github.com/5dlabs/cto/commit/abf0d2e2291d77f8fbc3c6673efc41338089eb98))
+* **heal:** add debug logging for A2 silent failure detection ([#1882](https://github.com/5dlabs/cto/issues/1882)) ([049818e](https://github.com/5dlabs/cto/commit/049818eb7399bb86589306434fca6fbe6757a2a1))
+* **heal:** add exclusion list for infrastructure pods ([#1875](https://github.com/5dlabs/cto/issues/1875)) ([8c92a1b](https://github.com/5dlabs/cto/commit/8c92a1be86e783896d494d8d367d68286ecf043f))
+* **heal:** add FACTORY_API_KEY environment variable ([#1873](https://github.com/5dlabs/cto/issues/1873)) ([d0458df](https://github.com/5dlabs/cto/commit/d0458dfb3ac5f3188027afeb995321f6fa39b9ef))
+* **heal:** add filebrowser service for direct cluster access ([#1883](https://github.com/5dlabs/cto/issues/1883)) ([e1416f4](https://github.com/5dlabs/cto/commit/e1416f49c9d12cc5c0ba59850833464aee77298f))
+* **heal:** add filebrowser sidecar for PVC inspection ([#1881](https://github.com/5dlabs/cto/issues/1881)) ([fcf4f1d](https://github.com/5dlabs/cto/commit/fcf4f1df2a63a79cd98f19e1a4009a867628ed2f))
+* **heal:** add Rust caching for faster builds ([#1879](https://github.com/5dlabs/cto/issues/1879)) ([b080d11](https://github.com/5dlabs/cto/commit/b080d110502e666c863d46f7b9e74c6a28598890))
+* **heal:** echo Factory analysis to logs and add heal-config.json ([#1886](https://github.com/5dlabs/cto/issues/1886)) ([cc1a20f](https://github.com/5dlabs/cto/commit/cc1a20fc3d22acafc29961a498fc158fef6b0aa2))
+* **heal:** implement fetch-logs and spawn-remediation commands ([#1878](https://github.com/5dlabs/cto/issues/1878)) ([2b86efb](https://github.com/5dlabs/cto/commit/2b86efb3c4943a5c096f86de0bb737dd90b11b55))
+* **heal:** rename watch to heal and use static PVC ([55b5e92](https://github.com/5dlabs/cto/commit/55b5e92d6123ff3dcaa309d62decccd7cc2dd7c9))
+* implement structured prompting pattern for Atlas Guardian ([#1648](https://github.com/5dlabs/cto/issues/1648)) ([529f6ec](https://github.com/5dlabs/cto/commit/529f6ecd17ec887da90a1733ccc6fea009daa849))
+* **infra:** add MinIO for headless visual testing screenshot storage ([#1810](https://github.com/5dlabs/cto/issues/1810)) ([8df101b](https://github.com/5dlabs/cto/commit/8df101b8df4e96b5563492ecc2587cd82072d6a8))
+* **infra:** remove External Secrets Operator in favor of Vault ([#1715](https://github.com/5dlabs/cto/issues/1715)) ([0d7b98f](https://github.com/5dlabs/cto/commit/0d7b98f6ec413c4d97731f1411f94b63dfed3c25))
+* **intake:** unified intake with multi-CLI support and DocsRun deprecation ([#1831](https://github.com/5dlabs/cto/issues/1831)) ([6ce00d4](https://github.com/5dlabs/cto/commit/6ce00d41a696c0f0c1df4bcca9213185099fc2fa))
+* Integrate OpenMemory for all agents via Toolman ([#1637](https://github.com/5dlabs/cto/issues/1637)) ([e4b5b60](https://github.com/5dlabs/cto/commit/e4b5b606c531b633bfa0aba86cf34aecf876c4bf))
+* integrate toolman into CTO monorepo as 'tools' crate ([#1721](https://github.com/5dlabs/cto/issues/1721)) ([80c1a3a](https://github.com/5dlabs/cto/commit/80c1a3a3d97d17ccd9479a2f5a00c15fa80c7131))
+* List all available tools in Factory verification output ([1fe08be](https://github.com/5dlabs/cto/commit/1fe08be1be05511752379b601770fc29627df133))
+* make Atlas Bugbot resolution support all CLIs with better promp… ([#1646](https://github.com/5dlabs/cto/issues/1646)) ([c23a297](https://github.com/5dlabs/cto/commit/c23a297632e441030f74c2c769113d4877351447))
+* **mcp:** add add_docs tool for doc ingestion via Firecrawl ([#1724](https://github.com/5dlabs/cto/issues/1724)) ([081f804](https://github.com/5dlabs/cto/commit/081f8049f61cb6705f7a29e5bb32b7ed67606232))
+* **mcp:** add MCP server management tools ([#1797](https://github.com/5dlabs/cto/issues/1797)) ([24fb344](https://github.com/5dlabs/cto/commit/24fb344914c6a553c462a48374291e7164df4751))
+* migrate agents from memory_* to openmemory_* tools ([#1673](https://github.com/5dlabs/cto/issues/1673)) ([80009a1](https://github.com/5dlabs/cto/commit/80009a1ce0e7766d033c30ccf160635733b967f9))
+* **monitor:** add multi-watch infrastructure for comprehensive E2E monitoring ([#1698](https://github.com/5dlabs/cto/issues/1698)) ([463a09e](https://github.com/5dlabs/cto/commit/463a09e8aedc8bc097d6c003408fff4d66d14f5c))
+* **monitor:** add preflight checks for E2E testing readiness ([#1828](https://github.com/5dlabs/cto/issues/1828)) ([021b2de](https://github.com/5dlabs/cto/commit/021b2def5dec3e2ff0010ce92fee3bf768cd18d0))
+* **monitor:** implement self-healing E2E loop with automatic remediation ([#1830](https://github.com/5dlabs/cto/issues/1830)) ([b441ea9](https://github.com/5dlabs/cto/commit/b441ea909f8aca529d1b90b2a6a209848d66a3f1))
+* Mount Context7 API key to all agent containers ([52cef22](https://github.com/5dlabs/cto/commit/52cef225a274891fa15bc477419ea152c3fe7f66))
+* Mount Context7 API key to all agent containers ([f658978](https://github.com/5dlabs/cto/commit/f6589783244802bea473153b0f13462781a5ee7a))
+* move cloudflare-operator to infra namespace ([#1765](https://github.com/5dlabs/cto/issues/1765)) ([656d106](https://github.com/5dlabs/cto/commit/656d1060d4e18ad996d66bdcd2c47a55a8765e85))
+* replace Twingate with Kilo WireGuard VPN ([#1718](https://github.com/5dlabs/cto/issues/1718)) ([19a2758](https://github.com/5dlabs/cto/commit/19a2758e4cb86e2f54cc109cc6ebaacedba1f3bf))
+* restore E2E reset tooling ([c1cdbbf](https://github.com/5dlabs/cto/commit/c1cdbbf075cecc8d8050ee2584850e5b9d96bd64))
+* restore E2E reset tooling ([18a4ed6](https://github.com/5dlabs/cto/commit/18a4ed6356cb8a05c40bc2faa167e0817eb707d4))
+* **spark:** add mobile agent + fix regex escape dots ([#1708](https://github.com/5dlabs/cto/issues/1708)) ([51c4fc0](https://github.com/5dlabs/cto/commit/51c4fc0eb3f47e5363f1c5f7327e46ddc2dda39c))
+* **task-0:** add workspace-level clippy.toml configuration ([#1590](https://github.com/5dlabs/cto/issues/1590)) ([a835bc3](https://github.com/5dlabs/cto/commit/a835bc359bc127f53ba41589b42d03dff3de0746))
+* **task-0:** comprehensive clippy configuration and CI improvements ([#1600](https://github.com/5dlabs/cto/issues/1600)) ([14a8954](https://github.com/5dlabs/cto/commit/14a89546f06138b3cbf3f9d220b7e4f99180d5f9))
+* **task-0:** standardize client-config.json with agent docs query tools ([#1649](https://github.com/5dlabs/cto/issues/1649)) ([fd52669](https://github.com/5dlabs/cto/commit/fd5266928874b7030c23d0153a2fb9f32f83e2bd))
+* **telemetry:** add OpenTelemetry configuration for Codex, Gemini, and Factory CLIs ([#1693](https://github.com/5dlabs/cto/issues/1693)) ([5070267](https://github.com/5dlabs/cto/commit/507026795066e9cd7637280cf839cd5287719da7))
+* **telemetry:** add Victoria Logs ingestion for all platform services ([#1788](https://github.com/5dlabs/cto/issues/1788)) ([b2e6e60](https://github.com/5dlabs/cto/commit/b2e6e6006e7ad6cc61d326f19d813a13ef0100fe))
+* **telemetry:** Deploy Grafana with Victoria Metrics and Logs datasources ([#1692](https://github.com/5dlabs/cto/issues/1692)) ([fc39be2](https://github.com/5dlabs/cto/commit/fc39be2d8adb982fc9bafe57daf13f1fb9fc5eb8))
+* **tools:** add 8 new MCP servers for expanded AI capabilities ([#1792](https://github.com/5dlabs/cto/issues/1792)) ([22519dc](https://github.com/5dlabs/cto/commit/22519dc39cbf3e330dd6d26cedb44fdfe1756d58))
+* **tools:** add all available MCP tools to filter ([#1861](https://github.com/5dlabs/cto/issues/1861)) ([62f8bed](https://github.com/5dlabs/cto/commit/62f8bed8788a4f017b840c8220d62aed154cf882))
+* **tools:** add ClusterRole for kubernetes and argocd MCP servers ([#1814](https://github.com/5dlabs/cto/issues/1814)) ([cb5ce33](https://github.com/5dlabs/cto/commit/cb5ce339b38ebc615078cf97573ba92739c273d6))
+* **tools:** add headless screenshot capture and upload support ([#1827](https://github.com/5dlabs/cto/issues/1827)) ([3eaccb6](https://github.com/5dlabs/cto/commit/3eaccb6d819a7c902e154faec0dff88992a3aaa7))
+* **tools:** add OpenMemory MCP integration ([#1860](https://github.com/5dlabs/cto/issues/1860)) ([6f69c42](https://github.com/5dlabs/cto/commit/6f69c42f32c49dca158099020ee42a681c0b4da9))
+* **tools:** add StreamableHTTP session support for MCP servers ([#1811](https://github.com/5dlabs/cto/issues/1811)) ([967d704](https://github.com/5dlabs/cto/commit/967d7044b8b989cb37d3bc93a6088a88740e221b))
+* **tools:** consolidate MCP server configuration and fix deployment ([#1771](https://github.com/5dlabs/cto/issues/1771)) ([884384c](https://github.com/5dlabs/cto/commit/884384c5b802cc2b24d96b0d609826381b80f5bc))
+* **tools:** integrate k8s-mcp as deployment within tools chart ([#1732](https://github.com/5dlabs/cto/issues/1732)) ([146fff0](https://github.com/5dlabs/cto/commit/146fff05e673729689d9db31aaae865b9c9cf365))
+* **tools:** replace k8s-mcp with npx kubernetes-mcp-server ([#1778](https://github.com/5dlabs/cto/issues/1778)) ([d9c6264](https://github.com/5dlabs/cto/commit/d9c62645ef355ef15b8c0e549081121812473b0d))
+* validate MCP tool access for agents ([#1592](https://github.com/5dlabs/cto/issues/1592)) ([c49f33d](https://github.com/5dlabs/cto/commit/c49f33d1655c8c97a46a1000cf577e702226d47b))
+* **vault:** implement HashiCorp Vault for secret management ([#1694](https://github.com/5dlabs/cto/issues/1694)) ([9a73254](https://github.com/5dlabs/cto/commit/9a7325459bf7f1b0ea58ebac4b923c1d2fb64760))
+* **vault:** implement Vault Secrets Operator (VSO) ([#1701](https://github.com/5dlabs/cto/issues/1701)) ([1d43eae](https://github.com/5dlabs/cto/commit/1d43eae3dbb53293ecbb9c5e483b74429f9c2611))
+* **watch:** add dedicated PVC for Monitor and Remediation agents ([#1842](https://github.com/5dlabs/cto/issues/1842)) ([8c71426](https://github.com/5dlabs/cto/commit/8c714264ea13aadfd1b6d7e53e0fb659fa6cbe6b))
+* **watch:** E2E Watch system with Cargo Dist for play-monitor ([#1786](https://github.com/5dlabs/cto/issues/1786)) ([8ea4009](https://github.com/5dlabs/cto/commit/8ea4009acf001f7f1b3944d0ae0511fd687df0e2))
+* **watch:** implement E2E Watch System with CodeRun-based orchestration ([#1779](https://github.com/5dlabs/cto/issues/1779)) ([50233a0](https://github.com/5dlabs/cto/commit/50233a044e0abec95183d5630ce28877ca27b978))
+
+
+### 🐛 Bug Fixes
+
+* add case normalization for heal CodeRun detection in build_job_spec ([4a7b682](https://github.com/5dlabs/cto/commit/4a7b6829fb077c08342d9fd318747763b23665b8))
+* Add cipher-complete marker cleanup to prevent false completion signals ([0423d99](https://github.com/5dlabs/cto/commit/0423d998f06ce0d1ea88a5c4f8da13510a5e424b))
+* Add Context7 API key to agent-platform-secrets ([09701b4](https://github.com/5dlabs/cto/commit/09701b4ce22052916073befa9eee026cc6adb831))
+* Add Context7 API key to agent-platform-secrets ([9258203](https://github.com/5dlabs/cto/commit/9258203992c6de04448524392065637280676573))
+* add debugging and actual tool display for Factory agents ([#1610](https://github.com/5dlabs/cto/issues/1610)) ([c71fe89](https://github.com/5dlabs/cto/commit/c71fe891143190fc6c0557016ae09f2edbcd87b3))
+* add dist/ to gitignore ([45d24b7](https://github.com/5dlabs/cto/commit/45d24b7b0b85e403f35acfc1bdf5f64fc71506ce))
+* add dist/ to gitignore ([72d1571](https://github.com/5dlabs/cto/commit/72d15713e2e389b80c9d41ffb897f1d8a4060ea6))
+* add github-eventsource-svc to networking kustomization ([#1763](https://github.com/5dlabs/cto/issues/1763)) ([cf9e56a](https://github.com/5dlabs/cto/commit/cf9e56a89851ae9fd73a8138ff8a100ada03fa35))
+* add missing apiVersion and kind to github-webhooks networking kustomization ([#1631](https://github.com/5dlabs/cto/issues/1631)) ([5e7be4d](https://github.com/5dlabs/cto/commit/5e7be4d3bf037abf12b1e544326d9b74e0072bc5))
+* add missing argo-events-sa ServiceAccount for sensors ([#1768](https://github.com/5dlabs/cto/issues/1768)) ([2adbecc](https://github.com/5dlabs/cto/commit/2adbecc265b74af724f310549a210e3581d1bff3))
+* add missing default values to universal-app chart ([#1874](https://github.com/5dlabs/cto/issues/1874)) ([c70ba4a](https://github.com/5dlabs/cto/commit/c70ba4a3a2d0c8821db215505b0c48a499464339))
+* add missing final-task parameter to parallel workflow processors ([#1607](https://github.com/5dlabs/cto/issues/1607)) ([15c3d3f](https://github.com/5dlabs/cto/commit/15c3d3ffb2d5b297e5ee93ad5be44be781f97300))
+* add missing PVC for doc-server postgres ([#1681](https://github.com/5dlabs/cto/issues/1681)) ([5e20d99](https://github.com/5dlabs/cto/commit/5e20d991400e3e8ee3d5e21cf0d40b46275ef79c))
+* add missing Toolman secrets for context7 and GitHub in agent-platform namespace ([d2f08de](https://github.com/5dlabs/cto/commit/d2f08de11c08de567293892c0a233cf534683ad0))
+* add required redisExporter.image to Redis instance ([#1679](https://github.com/5dlabs/cto/issues/1679)) ([00cfda2](https://github.com/5dlabs/cto/commit/00cfda202791cdeb76077927ce2e471070a27a32))
+* Add required taskId field to Atlas batch integration sensor ([9937df5](https://github.com/5dlabs/cto/commit/9937df5995d810f2de251f5102e9a0fc623e8765))
+* Add required taskId field to Atlas batch integration sensor ([792c8fb](https://github.com/5dlabs/cto/commit/792c8fba81a3da0d000edc686491b0a3224df085))
+* add ServerSideApply=true to all ArgoCD applications ([#1789](https://github.com/5dlabs/cto/issues/1789)) ([c838359](https://github.com/5dlabs/cto/commit/c838359b21d0b7e4ed64a2f7ae22a1c31937b442))
+* add sync-wave annotations to cloudflare-api-credentials VaultStaticSecret ([#1767](https://github.com/5dlabs/cto/issues/1767)) ([9eb8703](https://github.com/5dlabs/cto/commit/9eb870383c2052fbb874a1a047cca08b6f819c2b))
+* add tool filtering to Claude and Cursor MCP configurations ([bf9484a](https://github.com/5dlabs/cto/commit/bf9484a3137f7bd9deb1ea8454542c210fe0144e))
+* add tool filtering to Claude and Cursor MCP configurations ([#1614](https://github.com/5dlabs/cto/issues/1614)) ([c5e8b23](https://github.com/5dlabs/cto/commit/c5e8b2391b60c4ee39659922ce5e88d70797d53e))
+* add tools parameters to monitor workflow submission ([#1854](https://github.com/5dlabs/cto/issues/1854)) ([1a286ae](https://github.com/5dlabs/cto/commit/1a286aefc177d06e18a283e145de120389f27c57))
+* address remaining high-severity security alerts ([#1532](https://github.com/5dlabs/cto/issues/1532)) ([e0578f2](https://github.com/5dlabs/cto/commit/e0578f24ff5164e27a1078a50f37d91a95454ac3))
+* **agents:** close FIFO writer before waiting for Claude to prevent deadlock ([#1551](https://github.com/5dlabs/cto/issues/1551)) ([951c95e](https://github.com/5dlabs/cto/commit/951c95e2a97ee49e82219ba15f3952ed1bdb73e4))
+* **agents:** correct agent-done signal path mismatch causing premature docker shutdown ([#1545](https://github.com/5dlabs/cto/issues/1545)) ([6af08a9](https://github.com/5dlabs/cto/commit/6af08a92d45e2cef9cb842a41ac2bd5e13b5059a))
+* **agents:** Make Cleo post PR reviews instead of comments ([291237c](https://github.com/5dlabs/cto/commit/291237cfaa526726324995ded00dc353060ab66c))
+* **agents:** Make Cleo post PR reviews instead of comments ([f32c0f1](https://github.com/5dlabs/cto/commit/f32c0f162a087e866965ec606db7eb1c87f5cba0))
+* **agents:** PR correlation - filter to OPEN PRs and sort by date ([#1536](https://github.com/5dlabs/cto/issues/1536)) ([303b076](https://github.com/5dlabs/cto/commit/303b0760ecb5bd00b50913146c38fb73a18d11e7))
+* **agents:** remove label refreshing and add CI checking - systematic fix ([#1535](https://github.com/5dlabs/cto/issues/1535)) ([0bc5a01](https://github.com/5dlabs/cto/commit/0bc5a01c23af2339ac3550417eb86d68f92359cc))
+* **agents:** resolve systemic workflow issues - Atlas sensor and Tess hanging ([#1531](https://github.com/5dlabs/cto/issues/1531)) ([0eac9e0](https://github.com/5dlabs/cto/commit/0eac9e02d8faf52f1f7ee3fdf1aed5947605c035))
+* all three critical agent review and integration issues ([4473851](https://github.com/5dlabs/cto/commit/447385145db30f6dfc823fe81d9098b2d73f8000))
+* arc-controller use OCI registry for Helm chart ([#1734](https://github.com/5dlabs/cto/issues/1734)) ([1ac244d](https://github.com/5dlabs/cto/commit/1ac244de8e260a07a73dd2e816f70e5b514dcb41))
+* **arc-runner:** add ConfigMap delete permission and prevent sentinel race ([#1547](https://github.com/5dlabs/cto/issues/1547)) ([721e6ce](https://github.com/5dlabs/cto/commit/721e6cedf9ae41e9ae4b329384b6481289c3fcf0))
+* **argo:** add managed-namespace for cto to see WorkflowTemplates ([#1817](https://github.com/5dlabs/cto/issues/1817)) ([fe0ffeb](https://github.com/5dlabs/cto/commit/fe0ffebaf81fa7d98870ba451ba852016b1d5992))
+* **argocd:** add kilo.squat.ai to namespaceResourceWhitelist ([#1722](https://github.com/5dlabs/cto/issues/1722)) ([3afed66](https://github.com/5dlabs/cto/commit/3afed66a5f243aaef6462c519af4bfb42d25b5f7))
+* **argo:** use cluster-scoped config instead of managed-namespace ([#1822](https://github.com/5dlabs/cto/issues/1822)) ([a14a1d8](https://github.com/5dlabs/cto/commit/a14a1d8893d0dc53d6eff9d5066c33d37cd9d46e))
+* **argo:** watch both automation and cto namespaces ([#1819](https://github.com/5dlabs/cto/issues/1819)) ([bee5200](https://github.com/5dlabs/cto/commit/bee5200b3244197cf4aca38d24dc02d3a6b544f3))
+* Atlas integration stages missing from workflow resume logic ([#1601](https://github.com/5dlabs/cto/issues/1601)) ([3ef6268](https://github.com/5dlabs/cto/commit/3ef62684650c6a3452b8ebd7a8a62f0aebbab028))
+* **atlas:** prevent Atlas from creating task-zero PRs ([#1537](https://github.com/5dlabs/cto/issues/1537)) ([b688a7b](https://github.com/5dlabs/cto/commit/b688a7badcd0963c9856cac172b4cf2b8a3d58fc))
+* **atlas:** remove Task 0 default and standardize service names ([1ca9f1f](https://github.com/5dlabs/cto/commit/1ca9f1fbd7f313c79c5c66b6d9f991ca7a928c55))
+* **atlas:** Remove Task 0 default and standardize service names ([85c92eb](https://github.com/5dlabs/cto/commit/85c92eb107eaacf95d0b7acda29e4533f944087b))
+* **atlas:** use GitHub API instead of gh CLI and handle UNKNOWN mergeable status ([1a00a9f](https://github.com/5dlabs/cto/commit/1a00a9f67d30449a454317d8d12dab470fc60433))
+* Bugbot issue and add GitHub App permissions documentation ([df892ea](https://github.com/5dlabs/cto/commit/df892eaa637296c08d428689ac6ae13530ea1486))
+* build and deploy OpenMemory image ([#1667](https://github.com/5dlabs/cto/issues/1667)) ([34128c5](https://github.com/5dlabs/cto/commit/34128c5f101b0d6b9405402cc2fe35cb8812d959))
+* **cd:** use simple release type and add Image Updater to tools/heal ([#1895](https://github.com/5dlabs/cto/issues/1895)) ([7bf1f3e](https://github.com/5dlabs/cto/commit/7bf1f3e1ecf4ef32bf5e4fe29a4be467dfa796df))
+* change heal PVC access mode from RWX to RWO ([#1866](https://github.com/5dlabs/cto/issues/1866)) ([4984af4](https://github.com/5dlabs/cto/commit/4984af4a3f864bb528573d04529798903498ea58))
+* Change submodule URL from HTTPS to SSH for Argo CD compatibility ([ee11d24](https://github.com/5dlabs/cto/commit/ee11d24d4172a65afea82e9774a4e7758c3e0707))
+* **ci:** add ServerSideApply to workflow sync operations ([#1839](https://github.com/5dlabs/cto/issues/1839)) ([fa5182e](https://github.com/5dlabs/cto/commit/fa5182eb0cfbfef649e272c0c08bcfaf453d5e89))
+* **ci:** correct Docker build artifact name to match upload ([#1806](https://github.com/5dlabs/cto/issues/1806)) ([e678da4](https://github.com/5dlabs/cto/commit/e678da43617e42ed90135bc8b068dacb58bd726c))
+* **ci:** extract release tag from correct column in gh release list ([#1836](https://github.com/5dlabs/cto/issues/1836)) ([9b80d27](https://github.com/5dlabs/cto/commit/9b80d275127b4856bbfae08aceb3e8c0a63c454c))
+* **ci:** fix race condition in sync completion check ([8a42364](https://github.com/5dlabs/cto/commit/8a423644805e9271d976ffe7301cdc3e39afc193))
+* **ci:** force delete/recreate ConfigMaps with retry logic ([#1540](https://github.com/5dlabs/cto/issues/1540)) ([07bc4db](https://github.com/5dlabs/cto/commit/07bc4dbc3648beb9e78aa1815ac8b66ac93bc8ec))
+* **ci:** handle git diff failures in ArgoCD validation workflow ([#1596](https://github.com/5dlabs/cto/issues/1596)) ([17b806a](https://github.com/5dlabs/cto/commit/17b806a6e436f773c712d2fc67181a9e99639ea5))
+* **ci:** improve sync-configmap verification logic ([59bf394](https://github.com/5dlabs/cto/commit/59bf3947e5d2f0f9cc0cacd5b0faff05c4f28773))
+* **ci:** improve sync-configmap verification logic ([#1548](https://github.com/5dlabs/cto/issues/1548)) ([d499e44](https://github.com/5dlabs/cto/commit/d499e4442a73ba2251a49b3783b6727024625c45))
+* **cipher:** add completion probe and gitignore-aware security scanning ([#1544](https://github.com/5dlabs/cto/issues/1544)) ([d9a8645](https://github.com/5dlabs/cto/commit/d9a86457663c38ea5e388bbfeb58e9ee1b892e08))
+* **ci:** remove helm-publish workflow that conflicted with tools releases ([#1800](https://github.com/5dlabs/cto/issues/1800)) ([e0dc37b](https://github.com/5dlabs/cto/commit/e0dc37ba5829af18e8d141fb74657f2efb6779e6))
+* **ci:** remove helm-publish workflow that conflicted with tools releases ([#1801](https://github.com/5dlabs/cto/issues/1801)) ([e6cdfa2](https://github.com/5dlabs/cto/commit/e6cdfa25ed75fb355e079eab1fe91d81f78b8061))
+* **ci:** respect wait_for_sync input and avoid redundant waits ([7b313ac](https://github.com/5dlabs/cto/commit/7b313ac9290d42279209323c67af5292c5bade52))
+* **ci:** verify ConfigMap content not just existence ([#1538](https://github.com/5dlabs/cto/issues/1538)) ([565964a](https://github.com/5dlabs/cto/commit/565964a68eadb318311fa9df7994ec96d54677b8))
+* clippy lint and add trailing newlines ([5a4cbea](https://github.com/5dlabs/cto/commit/5a4cbea8bcd44d10f8976e79966dea129acfcd1b))
+* **clippy:** use map_or and direct method reference in health check ([39fa18b](https://github.com/5dlabs/cto/commit/39fa18b2243d617d5ce28394ed1adf4ca9bf40b4))
+* **clippy:** use map_or and direct method reference in health check ([0044b9a](https://github.com/5dlabs/cto/commit/0044b9a29cef228881d36d9761489c5a8c6ce6a6))
+* **cloudflare:** add leader election namespace patch ([#1769](https://github.com/5dlabs/cto/issues/1769)) ([6671da6](https://github.com/5dlabs/cto/commit/6671da6468bf7f0e3858e6db7e331853dae84802))
+* comprehensive Cipher completion marker implementation across all CLIs ([3b0b097](https://github.com/5dlabs/cto/commit/3b0b09744c53c6ae17ea7c1da524b0745f933d6e))
+* comprehensive completion markers for ALL agents (Rex, Cleo, Tess, Cipher) ([7775d17](https://github.com/5dlabs/cto/commit/7775d17b725c15e565aaf8bb16f06f4b585ca640))
+* concurrent execution check failing on self-reference ([#1609](https://github.com/5dlabs/cto/issues/1609)) ([912a7ab](https://github.com/5dlabs/cto/commit/912a7abb603b404c43fe41a6be789f7cdbce4079))
+* **configmaps:** add ServerSideApply to avoid annotation size limit ([06011f5](https://github.com/5dlabs/cto/commit/06011f5b8947c8dfb639c9f552c806bb6cf60f96))
+* **configmaps:** use ServerSideApply to avoid 262KB annotation limit ([964e431](https://github.com/5dlabs/cto/commit/964e43162a8f0f26f7cfa02d32a8bc149a5ecafa))
+* configure aggressive event retention cleanup for EventBus ([#1650](https://github.com/5dlabs/cto/issues/1650)) ([95d3b6a](https://github.com/5dlabs/cto/commit/95d3b6aa497538c821e0c97ed3db80f9db2d0fd6))
+* **controller:** add env var fallback for PR number in job names ([#1668](https://github.com/5dlabs/cto/issues/1668)) ([916dfed](https://github.com/5dlabs/cto/commit/916dfed8c0ee2e0986f970f3eae439ab6b17c785))
+* **controller:** add PR number to job names and fix session cleanup pattern ([#1663](https://github.com/5dlabs/cto/issues/1663)) ([9c247da](https://github.com/5dlabs/cto/commit/9c247dad51016df4b00f01d02df0876088b83c6b))
+* **controller:** add watch templates to ConfigMap and mount for watch workflows ([#1785](https://github.com/5dlabs/cto/issues/1785)) ([455c9f0](https://github.com/5dlabs/cto/commit/455c9f0f0f204d98faaf59b1b9cb7d42962310be))
+* **controller:** align Claude ConfigMap naming with generated templates ([#1710](https://github.com/5dlabs/cto/issues/1710)) ([04f3be3](https://github.com/5dlabs/cto/commit/04f3be34dd2679607ebff2c3aef804db7f888c07))
+* **controller:** check both data and binaryData fields in ConfigMap health check ([ea4237f](https://github.com/5dlabs/cto/commit/ea4237f720e8ef5ffcf4c2d550af5e8e72958afc))
+* **controller:** check both data and binaryData in ConfigMap health check ([e1337fb](https://github.com/5dlabs/cto/commit/e1337fb4a43e923e3a43fa60f1192fa1c7aeb752))
+* **controller:** handle empty string in CLIType deserialization ([#1832](https://github.com/5dlabs/cto/issues/1832)) ([4ad3067](https://github.com/5dlabs/cto/commit/4ad30670783fc1d2f2bfa7d6a6f7d2bd680c42b3))
+* **controller:** properly detect watch CodeRuns for template and naming ([#1840](https://github.com/5dlabs/cto/issues/1840)) ([c48ecac](https://github.com/5dlabs/cto/commit/c48ecac1e8c9ce2e393427bce71520ee5442979a))
+* **controller:** resolve clippy boolean assertion warning ([5a6cd63](https://github.com/5dlabs/cto/commit/5a6cd634073bb774ee6078089e43c3f7fd7af819))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1844](https://github.com/5dlabs/cto/issues/1844)) ([f42988d](https://github.com/5dlabs/cto/commit/f42988dfedce7b327982eb8646b6d05466f8bf14))
+* **controller:** use watchRole for BOTH container and memory template selection ([#1845](https://github.com/5dlabs/cto/issues/1845)) ([04f2eb4](https://github.com/5dlabs/cto/commit/04f2eb47d767ed66883a32ac49bc8ec5ddae84f5))
+* convert PrometheusRule to ConfigMap for VictoriaMetrics compatibility ([47c37bd](https://github.com/5dlabs/cto/commit/47c37bd2c298f54abb2b1b9330d5f5da2a3c647e))
+* Convert PrometheusRule to ConfigMap for VictoriaMetrics compatibility ([30f8106](https://github.com/5dlabs/cto/commit/30f81060f9c5d84a4f94da84c5f570ecda3ce235))
+* correct app.kubernetes.io/name label for database-instances ([#1682](https://github.com/5dlabs/cto/issues/1682)) ([ad1b441](https://github.com/5dlabs/cto/commit/ad1b441feb620dc7c0d2f3dab69cb3e882f7dd9d))
+* correct CodeRun format in Atlas sensors for merge conflict detection ([4355054](https://github.com/5dlabs/cto/commit/43550540c2f6fb68cdbfcbe09725c32b758929c5))
+* correct CodeRun format in Atlas sensors for merge conflict detection ([67aecc3](https://github.com/5dlabs/cto/commit/67aecc3eee6a652e1135dd7f7b103b6b672ac444))
+* Correct grep pattern for tool listing ([d37a80a](https://github.com/5dlabs/cto/commit/d37a80a1013a2498229f041ab9449a33797c71f6))
+* correct kubeconfig subPath in k8s-mcp deployment ([#1754](https://github.com/5dlabs/cto/issues/1754)) ([94be631](https://github.com/5dlabs/cto/commit/94be631f87dbbdc317c8986717a072c7d2ca7efb))
+* correct OCI Helm chart format for arc-controller ([6d406ab](https://github.com/5dlabs/cto/commit/6d406abf6a96239fba3477e881e22d6c9bce28cf))
+* correct OCI URL format for arc-controller ([#1735](https://github.com/5dlabs/cto/issues/1735)) ([5a81f11](https://github.com/5dlabs/cto/commit/5a81f1194c73d567db9d6d3fa0311f244d1e4424))
+* correct path for extracting remote tools in generate_mcp_config ([7f39f43](https://github.com/5dlabs/cto/commit/7f39f4378349dbcf666a65f4bdd62fce98a08ad9))
+* correct resource naming in agent-templates-sync workflow ([#1794](https://github.com/5dlabs/cto/issues/1794)) ([c20ef90](https://github.com/5dlabs/cto/commit/c20ef906484467bb18d2d192726df47693b93117))
+* Correctly render auth metadata and add router to UserProfile ([023607b](https://github.com/5dlabs/cto/commit/023607bf1321ab98241cfe94a01f9df23c41de0f))
+* critical Tess-Atlas handoff failure causing workflow deadlocks ([6167438](https://github.com/5dlabs/cto/commit/616743839f9ed94452e2d8de4c963be2667eafba))
+* Deploy OpenMemory by moving to correct ArgoCD directory ([f452926](https://github.com/5dlabs/cto/commit/f452926f98ad454e1cb78924046c67be9434fd06))
+* Disable Atlas PR monitor and remove Task 0 ([51f1c34](https://github.com/5dlabs/cto/commit/51f1c3414f4092e8ed206f16f25239a3152ad1a9))
+* enable Atlas Guardian CI failure monitoring ([#1635](https://github.com/5dlabs/cto/issues/1635)) ([12dba61](https://github.com/5dlabs/cto/commit/12dba61da1d512ab876de29904a99ffd060bef8d))
+* enable CodeRun creation in atlas-conflict-monitor webhook flow ([#1643](https://github.com/5dlabs/cto/issues/1643)) ([70f94d2](https://github.com/5dlabs/cto/commit/70f94d24967c41f63b8d4cac37446ffaf2e0eb81))
+* enable Context7 and GitHub MCP tools in Toolman ([b9f3387](https://github.com/5dlabs/cto/commit/b9f3387af89e20777af2261142b25128a44f9d37))
+* ensure cipher defers approvals to Tess ([5d4e54e](https://github.com/5dlabs/cto/commit/5d4e54e32941cab24c7bc14fc1c7c0b2e7b572cd))
+* ensure cipher defers approvals to Tess ([b6a4701](https://github.com/5dlabs/cto/commit/b6a4701bd0e529bc3adbbd5599c3a95d8d538ed4))
+* ensure only Cipher agents create completion marker ([5566d7c](https://github.com/5dlabs/cto/commit/5566d7cad7adc84a943b967d4eb8782b30a99645))
+* escape Helm template syntax in bash pattern matching ([#1689](https://github.com/5dlabs/cto/issues/1689)) ([93c77eb](https://github.com/5dlabs/cto/commit/93c77eb06b0233b0c45c7b44d1f47810fdb6c909))
+* eventbus maxAge quoting and platform-runners namespace ([ec3b205](https://github.com/5dlabs/cto/commit/ec3b2050abd900e420b78e4852ceb93803369a20))
+* **factory:** prevent script exit on Tools MCP server DNS failure ([#1837](https://github.com/5dlabs/cto/issues/1837)) ([8467866](https://github.com/5dlabs/cto/commit/8467866e9e1b5170863c3d6fbd503b3abcde8d9f))
+* **factory:** set default WORKFLOW_STAGE for standalone runs ([#1838](https://github.com/5dlabs/cto/issues/1838)) ([13e58f2](https://github.com/5dlabs/cto/commit/13e58f2db76ce0c38f538e21c4e2bfeab47ff529))
+* Fix Argo CD submodule authentication issues ([9a9dce0](https://github.com/5dlabs/cto/commit/9a9dce05e430cf400892b79a28cbf67ab3478f36))
+* Generate client-config.json from cto-config.json for all agents ([#1627](https://github.com/5dlabs/cto/issues/1627)) ([755d9e3](https://github.com/5dlabs/cto/commit/755d9e36a45b51c05560bf0a98c00a5b4d02b94e))
+* GitHub API propagation delay causing label detection to fail ([1f227fa](https://github.com/5dlabs/cto/commit/1f227faacbbce99b688f506b59c0de223aed2a3b))
+* **gitops:** add ServerSideApply to cto app-of-apps for ownership transfer ([#1727](https://github.com/5dlabs/cto/issues/1727)) ([55f5658](https://github.com/5dlabs/cto/commit/55f5658d690f8530f91ade4a2a616f797c284923))
+* **gitops:** disable recurse in platform-apps to resolve SharedResourceWarning ([#1726](https://github.com/5dlabs/cto/issues/1726)) ([e3b7083](https://github.com/5dlabs/cto/commit/e3b70830e2bd8d36acc683e3ddbe98c65391d1ad))
+* **gitops:** remove allowEmpty: false from openmemory ([#1717](https://github.com/5dlabs/cto/issues/1717)) ([7bd97ca](https://github.com/5dlabs/cto/commit/7bd97cadbac9a7e99b756341486434593829128d))
+* **gitops:** remove app.kubernetes.io/component overrides from podLabels ([#1808](https://github.com/5dlabs/cto/issues/1808)) ([620a958](https://github.com/5dlabs/cto/commit/620a95891c5928ce85ee3690c0be9af607b9b158))
+* **gitops:** remove invalid serviceAccountName field from Application specs ([#1713](https://github.com/5dlabs/cto/issues/1713)) ([8e93187](https://github.com/5dlabs/cto/commit/8e93187cf9b8b1d5291aa102f69948e07fbb4402))
+* **gitops:** remove references to deleted ExternalSecret files in kustomization ([#1712](https://github.com/5dlabs/cto/issues/1712)) ([d7edcfd](https://github.com/5dlabs/cto/commit/d7edcfd8ecc07aecf64f3da2eff0361fbfa462f6))
+* **gitops:** resolve ArgoCD sync issues for Grafana and Cloudflare Tunnel ([#1813](https://github.com/5dlabs/cto/issues/1813)) ([5a58d0a](https://github.com/5dlabs/cto/commit/5a58d0a2fecd0366f5d41131e803fc78329554e8))
+* **gitops:** restore missing Argo CD applications and resolve sync issues ([#1636](https://github.com/5dlabs/cto/issues/1636)) ([107b718](https://github.com/5dlabs/cto/commit/107b718a55b0fd781431fe22f4d94afb5bc2f8bd))
+* handle markdown in cursor completion probe ([#1550](https://github.com/5dlabs/cto/issues/1550)) ([0b5c66a](https://github.com/5dlabs/cto/commit/0b5c66ab804dbf2f1691b22100b3f2c22c3b4d9a))
+* **heal:** add filebrowser-service to kustomization ([#1884](https://github.com/5dlabs/cto/issues/1884)) ([2e1bdcb](https://github.com/5dlabs/cto/commit/2e1bdcbbbda0375ab19284d375450b922d9acc5e))
+* **heal:** fix CI test command and Dockerfile lint warnings ([#1894](https://github.com/5dlabs/cto/issues/1894)) ([13430fd](https://github.com/5dlabs/cto/commit/13430fd8111c6fd0c45372a0c2f22cc9a98197d0))
+* **heal:** resolve clippy pedantic warnings ([1efd652](https://github.com/5dlabs/cto/commit/1efd652eaeee07e7afbaf725197ed1750735b8bf))
+* **heal:** use heal-config.json path and custom Claude template ([#1890](https://github.com/5dlabs/cto/issues/1890)) ([c598ad8](https://github.com/5dlabs/cto/commit/c598ad896fffde3013ddf49accbe910a1750c01c))
+* **heal:** wrap CodeRun in backticks for clippy doc_markdown ([#1880](https://github.com/5dlabs/cto/issues/1880)) ([d9d7d58](https://github.com/5dlabs/cto/commit/d9d7d580a4cb2b67fb55f1257285cd0c7deb56b8))
+* **helm:** add watch templates ConfigMap to controller projected volume ([#1833](https://github.com/5dlabs/cto/issues/1833)) ([08567e1](https://github.com/5dlabs/cto/commit/08567e1d92d7a6bf74f959e54fb1b00a1c762b8a))
+* **infra:** add configSecret and project settings for MinIO ([#1820](https://github.com/5dlabs/cto/issues/1820)) ([c8818b6](https://github.com/5dlabs/cto/commit/c8818b69fd90543ec343d72ed2fd5ecaee86cfde))
+* **infra:** add ignoreDifferences for operator-managed fields ([#1818](https://github.com/5dlabs/cto/issues/1818)) ([0108dc4](https://github.com/5dlabs/cto/commit/0108dc447e1e606875c0758bebdce5810ecb5abb))
+* **infra:** add ignoreDifferences for operator-managed fields ([#1823](https://github.com/5dlabs/cto/issues/1823)) ([adda169](https://github.com/5dlabs/cto/commit/adda16944091e5033822d1ff67e5e1661ddd7252))
+* ingress-nginx sync conflicts with existing deployment ([#1736](https://github.com/5dlabs/cto/issues/1736)) ([c56257a](https://github.com/5dlabs/cto/commit/c56257a89624c22a6da5420271be1cc75826da74))
+* keep review agents on existing PRs ([#1542](https://github.com/5dlabs/cto/issues/1542)) ([1c9319f](https://github.com/5dlabs/cto/commit/1c9319fbd6ef887bc4fa2d64647b0b5648eb3eb0))
+* **lint:** remove trailing spaces and add newline at EOF ([5bbe9df](https://github.com/5dlabs/cto/commit/5bbe9df5333942365540c99d7f2b63837a158970))
+* make probes optional in universal-app chart ([#1872](https://github.com/5dlabs/cto/issues/1872)) ([311b763](https://github.com/5dlabs/cto/commit/311b7630d2f3c748ef0ae9eeadb8fd2fe012c266))
+* **mcp:** use docsProjectDirectory for tasks.json lookup ([#1591](https://github.com/5dlabs/cto/issues/1591)) ([0820f79](https://github.com/5dlabs/cto/commit/0820f792345dabcb60eff0a1a4f6892574a1de38))
+* **metrics-server:** increase kubelet scrape timeout to 30s ([#1697](https://github.com/5dlabs/cto/issues/1697)) ([a6d6c49](https://github.com/5dlabs/cto/commit/a6d6c49d939d4259ea25b0754e1c05723a6d17f5))
+* **monitor:** extract org/repo from URL before passing to workflow ([#1851](https://github.com/5dlabs/cto/issues/1851)) ([70ac563](https://github.com/5dlabs/cto/commit/70ac5637d4e9fc92f82f3cd62388bfd9b8913753))
+* **monitor:** pass docs-repository and docs-project-directory to workflow ([#1852](https://github.com/5dlabs/cto/issues/1852)) ([47070bb](https://github.com/5dlabs/cto/commit/47070bbe0b4f0c213d634b75cdd037f46ba235f7))
+* **monitor:** pass play config as CLI args instead of config file ([#1847](https://github.com/5dlabs/cto/issues/1847)) ([a8bc8ca](https://github.com/5dlabs/cto/commit/a8bc8ca25765ab3188f887c70fc6f28528c0cac5))
+* **monitor:** use env vars for GitHub auth like factory base ([#1850](https://github.com/5dlabs/cto/issues/1850)) ([8f7b41c](https://github.com/5dlabs/cto/commit/8f7b41ccde1976fe13c4a717cdc4ab68c74c5f7a))
+* **monitor:** use monitor/cto-config.json as default config path ([#1849](https://github.com/5dlabs/cto/issues/1849)) ([dee3320](https://github.com/5dlabs/cto/commit/dee332051520efda018e979a99f316e5ddd2d8b1))
+* Morgan status update regression - align TaskMaster mapping with GitHub Project field options ([14b8a52](https://github.com/5dlabs/cto/commit/14b8a52ef996c31dc78ad205498af0b364d7d5d2))
+* Morgan status update regression - align TaskMaster mapping with GitHub Project field options ([26c9bad](https://github.com/5dlabs/cto/commit/26c9bad6edcab18f18fa32dd6fc2d91262b4d9ef))
+* **morgan:** detect running agents by pod name pattern ([e3b3d0e](https://github.com/5dlabs/cto/commit/e3b3d0eb760e3ced75de19d38a2edd14b1138a1d))
+* **morgan:** detect running agents by pod name pattern ([5022118](https://github.com/5dlabs/cto/commit/5022118f5124c9c638c0eda8cf91204cbc040833))
+* **morgan:** fix syntax errors in pod detection logic ([cff427a](https://github.com/5dlabs/cto/commit/cff427a313a626984e6c573b4e639b17efcaea6a))
+* **morgan:** fix syntax errors in pod detection logic ([a7c3354](https://github.com/5dlabs/cto/commit/a7c33547b592c30799498d63ee9db76a5176928c))
+* **morgan:** mirror status into legacy stage ([c47ede3](https://github.com/5dlabs/cto/commit/c47ede35def8996114a80b483c136e5005b31a96))
+* **morgan:** sync status and stage fields ([be6e0ae](https://github.com/5dlabs/cto/commit/be6e0aeeb60171f3a4ce3350185733a557894690))
+* mount Context7 and GitHub secrets as environment variables in Toolman ([0906777](https://github.com/5dlabs/cto/commit/09067770bd364f0751fa9d602a9bcdcbc5a8e67b))
+* move cloudflare-operator to cloudflare-operator-system namespace ([#1777](https://github.com/5dlabs/cto/issues/1777)) ([9858cf3](https://github.com/5dlabs/cto/commit/9858cf3469380272ee868c49bbb36b6940a643da))
+* Move OpenMemory application to correct ArgoCD applications directory ([a1ac6fa](https://github.com/5dlabs/cto/commit/a1ac6fa1f1c7846643003ebd33687c723688f26f))
+* nullify httpGet in heal probes to prevent merge conflict ([#1871](https://github.com/5dlabs/cto/issues/1871)) ([ed9e601](https://github.com/5dlabs/cto/commit/ed9e601790fb12fbc834ba66012a728ff62d0aad))
+* OpenMemory image build and toolman URL ([#1671](https://github.com/5dlabs/cto/issues/1671)) ([1b4abd9](https://github.com/5dlabs/cto/commit/1b4abd9bc103b0b9321e93687b2fb0bae5f16035)), closes [#1670](https://github.com/5dlabs/cto/issues/1670)
+* **otel:** add VL-Msg-Field header for Victoria Logs ([#1834](https://github.com/5dlabs/cto/issues/1834)) ([2166ac6](https://github.com/5dlabs/cto/commit/2166ac6684371a7058ead1f5a64c123fb621822e))
+* **postgres:** remove readOnlyRootFilesystem incompatible with Spilo ([#1533](https://github.com/5dlabs/cto/issues/1533)) ([3212feb](https://github.com/5dlabs/cto/commit/3212feb96cbde63266baa3d4f4efcefd22fd67a7))
+* prevent ArgoCD from overwriting CNPG webhook CA bundles ([#1782](https://github.com/5dlabs/cto/issues/1782)) ([07f2a50](https://github.com/5dlabs/cto/commit/07f2a5021a0912e6d60bb79871384d26ca35d76d))
+* prevent ArgoCD from overwriting CNPG webhook CA bundles ([#1784](https://github.com/5dlabs/cto/issues/1784)) ([e880d24](https://github.com/5dlabs/cto/commit/e880d246069f6a19fe68b92a5953fefd20ba19e3))
+* prevent Cipher from posting duplicate reviews ([#1546](https://github.com/5dlabs/cto/issues/1546)) ([7d0cb6a](https://github.com/5dlabs/cto/commit/7d0cb6adc65191cdc7b3b0cfb4cb4115fe94aafb))
+* prevent infinite Cipher security agent iterations ([a381d80](https://github.com/5dlabs/cto/commit/a381d80a53689d45324ded01d9ce41d96de255ff))
+* prevent infinite Cipher security agent iterations ([83808d5](https://github.com/5dlabs/cto/commit/83808d53167f7ae184df4fc1e1dcd9a5e6e97103))
+* prevent infinite iterations for ALL agents (Rex, Cleo, Tess, Cipher) ([f277f55](https://github.com/5dlabs/cto/commit/f277f5571bbc00216edaaa8e3296a008e65e0a83))
+* **rbac:** add delete permission for ConfigMaps to arc-runner ([#1541](https://github.com/5dlabs/cto/issues/1541)) ([ee5fc91](https://github.com/5dlabs/cto/commit/ee5fc915e1645fffe3d514d914cf968910692d68))
+* **release:** add tools-client to binary releases and fix Windows lint ([#1805](https://github.com/5dlabs/cto/issues/1805)) ([dcbcae8](https://github.com/5dlabs/cto/commit/dcbcae82feefe5e1f5b9ced26fda9209937bdd49))
+* remediate tools MCP server warnings and failures ([#1755](https://github.com/5dlabs/cto/issues/1755)) ([0438fbd](https://github.com/5dlabs/cto/commit/0438fbdd7ad66e92eecf3627142afb2f802c7062))
+* remediation CodeRun schema to match CRD ([#1853](https://github.com/5dlabs/cto/issues/1853)) ([dae81ff](https://github.com/5dlabs/cto/commit/dae81ff327dca649ef6cf2983b6fc448c491ae9b))
+* Remove broken submodule blocking ArgoCD ([4204122](https://github.com/5dlabs/cto/commit/4204122d3ef8ac7d3e173f4829481c58c32bac8f))
+* Remove broken submodule docs/tasks-reference blocking ArgoCD ([34d97a4](https://github.com/5dlabs/cto/commit/34d97a4f196254ce78dea27bcc3fea3f34b3985f))
+* Remove broken submodule reference for docs/tasks-reference ([f73c532](https://github.com/5dlabs/cto/commit/f73c532af3af5f486d71f7704c8d59d2221b1bc6))
+* Remove cto-parallel-test submodule (not needed for deployments) ([a8eb4ed](https://github.com/5dlabs/cto/commit/a8eb4ed13ac4021b99380e18bb0e068021099d48))
+* remove duplicate Atlas sensors and add template version tracking ([9255199](https://github.com/5dlabs/cto/commit/92551994e969c50ce70926f5b3d1354b11469a41))
+* remove duplicate cto app-of-apps causing SharedResourceWarning ([#1744](https://github.com/5dlabs/cto/issues/1744)) ([efc85bd](https://github.com/5dlabs/cto/commit/efc85bd007ffc3365c93e31405030a85cf0a9d65))
+* remove duplicate VaultStaticSecret definitions ([#1766](https://github.com/5dlabs/cto/issues/1766)) ([70252e1](https://github.com/5dlabs/cto/commit/70252e12fff4c9f1047a8dd2565bbff4882d885b))
+* remove empty env overrides for Context7 and GitHub in Toolman config ([4777d19](https://github.com/5dlabs/cto/commit/4777d1903da120e194658b8e02bd36296aa030a2))
+* remove empty env overrides for Context7 and GitHub in Toolman config ([#1589](https://github.com/5dlabs/cto/issues/1589)) ([32145f9](https://github.com/5dlabs/cto/commit/32145f98e68a523425757076ccef8df1de42ad5b))
+* remove filesystem server and update to OpenMemory tools ([#1674](https://github.com/5dlabs/cto/issues/1674)) ([8f45de2](https://github.com/5dlabs/cto/commit/8f45de2b5b7aec36e6b01a04501cc0bcc7000dc2))
+* remove maxAge config from eventbus to fix NATS type error ([#1742](https://github.com/5dlabs/cto/issues/1742)) ([10a4247](https://github.com/5dlabs/cto/commit/10a4247cd269764c74cd5b81ad4a646963886b5a))
+* Remove the broken submodule entry completely. ([34d97a4](https://github.com/5dlabs/cto/commit/34d97a4f196254ce78dea27bcc3fea3f34b3985f))
+* remove trader namespace and duplicate entries from ghcr.yaml ([#1743](https://github.com/5dlabs/cto/issues/1743)) ([f9cdf74](https://github.com/5dlabs/cto/commit/f9cdf741884c760be4430f2136a45926a6bbdca1))
+* remove trailing spaces from tess-label-fallback-sensor.yaml ([39d9422](https://github.com/5dlabs/cto/commit/39d9422716a42fd3b60b80bea0352fa63010cd1c))
+* remove unused MCP servers (postgres, redis, reddit) ([#1762](https://github.com/5dlabs/cto/issues/1762)) ([f6da3ce](https://github.com/5dlabs/cto/commit/f6da3ce1a13ea907b7cfae5edae038d69a919996))
+* Remove unused submodule causing Argo CD failures ([8abf966](https://github.com/5dlabs/cto/commit/8abf96635cdf5377f1a3fe9504f2d9a5ffe6348f))
+* replace hardcoded agent-platform namespace references ([#1745](https://github.com/5dlabs/cto/issues/1745)) ([a693182](https://github.com/5dlabs/cto/commit/a693182d7c0c01d466510164301add592ad0a710))
+* replace undefined FACTORY_WORK_DIR with CLAUDE_WORK_DIR in Claude container templates ([#1640](https://github.com/5dlabs/cto/issues/1640)) ([c4b0756](https://github.com/5dlabs/cto/commit/c4b07564508165684af11f15d225d99c82b6ce6c))
+* resolve agent stability issues causing crashes and workflow failures ([#1688](https://github.com/5dlabs/cto/issues/1688)) ([dcbbbd3](https://github.com/5dlabs/cto/commit/dcbbbd31e8fa013f98c6b974bca1e2b53f03950c))
+* resolve Atlas Guardian documentation cascade and sensor syntax error ([#1658](https://github.com/5dlabs/cto/issues/1658)) ([eeb09f2](https://github.com/5dlabs/cto/commit/eeb09f2419bcdd13da0eb69f5aaaca807e4bea68))
+* resolve MCP tools configuration regressions (3 critical issues) ([#1599](https://github.com/5dlabs/cto/issues/1599)) ([c19f44a](https://github.com/5dlabs/cto/commit/c19f44a28fd143f49d77079f5310124c1aff7110))
+* resolve merge conflict markers in atlas-conflict-monitor-sensor ([#1647](https://github.com/5dlabs/cto/issues/1647)) ([073429a](https://github.com/5dlabs/cto/commit/073429a5b9a15ce454567108421108171fb057db))
+* resolve merge conflict markers in factory container script ([cf69a36](https://github.com/5dlabs/cto/commit/cf69a36f5c159ede854e59c77d79702e910be2d8))
+* Resolve merge conflicts and Clippy warning in container scripts ([2e4c9f5](https://github.com/5dlabs/cto/commit/2e4c9f5dc8976c224cc514c437a747e7c3971ce2))
+* resolve metrics-server panic and remove vault setup ([#1700](https://github.com/5dlabs/cto/issues/1700)) ([2fe62e2](https://github.com/5dlabs/cto/commit/2fe62e276e76bab00f33dc744a1b1b0905d4bf2d))
+* resolve OpenTelemetry collector YAML syntax error in ArgoCD appl… ([#1638](https://github.com/5dlabs/cto/issues/1638)) ([229e4a5](https://github.com/5dlabs/cto/commit/229e4a5b1a1cab4d54ca1bc45e33b9f7ae2abf78))
+* resolve three bugs in Cleo container script ([#1634](https://github.com/5dlabs/cto/issues/1634)) ([feb16ce](https://github.com/5dlabs/cto/commit/feb16cea3a6046f3c3f51244bb802a6e5599da1f))
+* resolve tools Docker CI failures ([#1756](https://github.com/5dlabs/cto/issues/1756)) ([dc51e3a](https://github.com/5dlabs/cto/commit/dc51e3ae4702a4e69997f236fbca2dfa194ce6d3))
+* resolve YAML line-length warnings in GitOps files ([44f05a2](https://github.com/5dlabs/cto/commit/44f05a207d18e4ec557fcb362400f02e1d16a6cc))
+* resolve YAML line-length warnings in GitOps files ([81d63d9](https://github.com/5dlabs/cto/commit/81d63d9b04f46fac4f7ee05730771d0ad93a8777))
+* Resolve YAML linting and Helm validation errors ([d572d2e](https://github.com/5dlabs/cto/commit/d572d2ea03616014ddba61aa1afbcd2c7c4d4a41))
+* resolve YAML parsing error in otel-collector ArgoCD application ([#1661](https://github.com/5dlabs/cto/issues/1661)) ([7c58080](https://github.com/5dlabs/cto/commit/7c580806041bb44a20f3fd644ff65fb8772598ca))
+* restore .github/workflows/ directory ([#1891](https://github.com/5dlabs/cto/issues/1891)) ([260c687](https://github.com/5dlabs/cto/commit/260c6874448bb6094fd8fc5102f1feb2b729d9b0))
+* restore missing httproute.yaml to github-webhooks kustomization ([#1630](https://github.com/5dlabs/cto/issues/1630)) ([cd72d49](https://github.com/5dlabs/cto/commit/cd72d4960b92809d344b304137453e246955f541))
+* restore Morgan PM ConfigMap that was incorrectly deleted ([#1686](https://github.com/5dlabs/cto/issues/1686)) ([3658656](https://github.com/5dlabs/cto/commit/36586560201a2b69da2abe29b780695b587fa5fe))
+* **secrets:** revert ExternalSecrets to use secret-store instead of vault-secret-store ([#1699](https://github.com/5dlabs/cto/issues/1699)) ([35cd489](https://github.com/5dlabs/cto/commit/35cd489806960993111fed062e839ab422c73707))
+* **sensors:** enable Atlas Guardian CI and conflict monitoring ([#1642](https://github.com/5dlabs/cto/issues/1642)) ([0e48ebc](https://github.com/5dlabs/cto/commit/0e48ebccb7a223494398756de110d9a487e99610))
+* **sensors:** remove invalid cli field from Atlas conflict monitor ([#1669](https://github.com/5dlabs/cto/issues/1669)) ([f386595](https://github.com/5dlabs/cto/commit/f3865953f10f753b1c7a0216df116f3851c23e47))
+* **sensors:** switch CI/bug remediation to Atlas and remove orphaned sensors ([#1770](https://github.com/5dlabs/cto/issues/1770)) ([1d03e66](https://github.com/5dlabs/cto/commit/1d03e66a5425e1f9885190755dcd51a1f359ded6))
+* separate workingDirectory and docsProjectDirectory in play workflow ([e4650ae](https://github.com/5dlabs/cto/commit/e4650aeaf775ff4d20ff76cb7a0ef6eaa2bf734a))
+* Separate workingDirectory and docsProjectDirectory in play workflow ([0f2b94d](https://github.com/5dlabs/cto/commit/0f2b94dbe31784170dc77006ffc85bc8ca10c3ae))
+* stabilize agent template configmap sync ([#1543](https://github.com/5dlabs/cto/issues/1543)) ([ea04680](https://github.com/5dlabs/cto/commit/ea04680dc38811f93e310f43baac14319a1c5240))
+* stale completion markers preventing agent work ([#1605](https://github.com/5dlabs/cto/issues/1605)) ([831bc23](https://github.com/5dlabs/cto/commit/831bc235d14085f37ede21642479ea374a2bba55))
+* switch ARC controller from OCI to Git repo source ([#1749](https://github.com/5dlabs/cto/issues/1749)) ([3023050](https://github.com/5dlabs/cto/commit/3023050ce643f063e18492670093af8ff99be89b))
+* **telemetry:** disable PrometheusRule CRD that requires Prometheus Operator ([#1676](https://github.com/5dlabs/cto/issues/1676)) ([c4c77c0](https://github.com/5dlabs/cto/commit/c4c77c0d2c4e748b78a7a9f78193d6af77fc90c3))
+* **templates:** remove orphaned duplicate code in container-rex.sh.hbs ([#1829](https://github.com/5dlabs/cto/issues/1829)) ([0df7ff3](https://github.com/5dlabs/cto/commit/0df7ff31aba13910b5f4f5868734aa8b2182c912))
+* **tess:** create Claude template to prevent container exit hang ([#1534](https://github.com/5dlabs/cto/issues/1534)) ([f02bf7f](https://github.com/5dlabs/cto/commit/f02bf7fe8faa5a28f41b2e5c74f0d3e369829c76))
+* **toolman:** correct pg-aiguide MCP server URL ([#1706](https://github.com/5dlabs/cto/issues/1706)) ([7affba0](https://github.com/5dlabs/cto/commit/7affba063e5213244312974b823c9b90278bb72b))
+* **toolman:** correct pg-aiguide MCP server URL ([#1707](https://github.com/5dlabs/cto/issues/1707)) ([6ce3ab1](https://github.com/5dlabs/cto/commit/6ce3ab1676e59e633559b9c4946d419ef47a5121))
+* **tools:** add command directive for vault-mcp-server binary ([#1793](https://github.com/5dlabs/cto/issues/1793)) ([f5f99f2](https://github.com/5dlabs/cto/commit/f5f99f27cb1315c7f3cdfb0c00dc211105615648))
+* **tools:** clean up Clippy pedantic lint exclusions ([#1790](https://github.com/5dlabs/cto/issues/1790)) ([e454b3e](https://github.com/5dlabs/cto/commit/e454b3ed58e502c2d507f42d1ff2cfe9fff4eb64))
+* **tools:** configure cargo-dist for proper tools release ([#1796](https://github.com/5dlabs/cto/issues/1796)) ([1ff0e8f](https://github.com/5dlabs/cto/commit/1ff0e8f3a9023932b6a51aea38e37fc9d9d33ab8))
+* **tools:** correct vault-mcp-server binary path to /bin/vault-mcp-server ([#1799](https://github.com/5dlabs/cto/issues/1799)) ([0059b5a](https://github.com/5dlabs/cto/commit/0059b5a9a75b2293056920bc32a230968d4d43bb))
+* **tools:** increase vault-mcp-server probe timeout to 5 seconds ([#1802](https://github.com/5dlabs/cto/issues/1802)) ([57ae358](https://github.com/5dlabs/cto/commit/57ae358682da52cba95d6d436544890e9ae44163))
+* **tools:** initialize tracing subscriber for server logging ([#1787](https://github.com/5dlabs/cto/issues/1787)) ([1adc2ed](https://github.com/5dlabs/cto/commit/1adc2edbee907ac38d34b7afbbd4c6180bc5a421))
+* **tools:** lint fixes and remove unnecessary secretRefs from HTTP MCP servers ([#1803](https://github.com/5dlabs/cto/issues/1803)) ([a36cd66](https://github.com/5dlabs/cto/commit/a36cd669a5e868d450cca2461c95585307c925b1))
+* **tools:** remove OAuth Cloudflare servers, fix Firecrawl to use stdio ([#1809](https://github.com/5dlabs/cto/issues/1809)) ([564009a](https://github.com/5dlabs/cto/commit/564009a6896fd95201cd7552ce943c7f87a5fd6b))
+* **tools:** use /health endpoint for vault-mcp-server probes ([#1804](https://github.com/5dlabs/cto/issues/1804)) ([8102f31](https://github.com/5dlabs/cto/commit/8102f313450d709ff26f77e16aa557a662dd0923))
+* **tools:** use Docker for grafana and victoriametrics MCP servers ([#1807](https://github.com/5dlabs/cto/issues/1807)) ([bb70273](https://github.com/5dlabs/cto/commit/bb70273699d1ee8265208fd087215a8351592f92))
+* **tools:** use HTTP for internal ArgoCD URL ([#1815](https://github.com/5dlabs/cto/issues/1815)) ([ab9728e](https://github.com/5dlabs/cto/commit/ab9728e8dad35c4dbdc8c422b861aa1a8f35a3b3))
+* **tools:** wait for Docker socket in entrypoint ([#1781](https://github.com/5dlabs/cto/issues/1781)) ([9dc4aa7](https://github.com/5dlabs/cto/commit/9dc4aa7fd863d0254375b6c8d0023612fd271a83))
+* transform github-pat secret key for ARC controller ([#1731](https://github.com/5dlabs/cto/issues/1731)) ([f93d486](https://github.com/5dlabs/cto/commit/f93d48680fa348d66dca593f6e2e28901ca36313))
+* update CI workflows for cto namespace refactor ([#1750](https://github.com/5dlabs/cto/issues/1750)) ([284b66e](https://github.com/5dlabs/cto/commit/284b66e3f0fe7fa50a5789a030203171269d6df8))
+* update ClusterTunnel to v1alpha2 API version ([#1759](https://github.com/5dlabs/cto/issues/1759)) ([d64519d](https://github.com/5dlabs/cto/commit/d64519d2900b3a56be8ec404df39135ccbab923c))
+* update OpenCode test for new exec-based config format ([d201b72](https://github.com/5dlabs/cto/commit/d201b7299dd1cf6c61fcb8d37c43fefa085180a2))
+* update tools install URL to CTO monorepo ([#1751](https://github.com/5dlabs/cto/issues/1751)) ([57e9987](https://github.com/5dlabs/cto/commit/57e9987230ae659ddf2e349dac987b3f51910c5f))
+* use CONFIGMAP_PREFIX env var for ConfigMap names ([#1725](https://github.com/5dlabs/cto/issues/1725)) ([6b965c4](https://github.com/5dlabs/cto/commit/6b965c4c86bb4c5660635c99fcdf8976cbe1aea4))
+* use correct hostname and target format for Cloudflare TunnelBinding ([#1764](https://github.com/5dlabs/cto/issues/1764)) ([55ed44b](https://github.com/5dlabs/cto/commit/55ed44b016411127d74de3659bd7d7b544a12de9))
+* use correct Redis image tag v7.4.6 ([#1680](https://github.com/5dlabs/cto/issues/1680)) ([2572762](https://github.com/5dlabs/cto/commit/25727623e02e3ae2abeb56db002ebcc01623114a))
+* use cto namespace for Argo workflow URLs and CLI commands ([#1747](https://github.com/5dlabs/cto/issues/1747)) ([ad24e1e](https://github.com/5dlabs/cto/commit/ad24e1e0e3a224bb384328842138adeabd3f9315))
+* use exec probes for heal instead of HTTP ([#1870](https://github.com/5dlabs/cto/issues/1870)) ([391934c](https://github.com/5dlabs/cto/commit/391934cc937558194ef5282a00a297b99be09378))
+* use global cto-mcp binary in test template MCP config ([#1696](https://github.com/5dlabs/cto/issues/1696)) ([ca62733](https://github.com/5dlabs/cto/commit/ca627331ac82de5e5518f9b89977f1429f0128ec))
+* Use HTTPS for submodule to match Argo CD authentication ([ae2f1e7](https://github.com/5dlabs/cto/commit/ae2f1e77153f630cdaa2f7f4d95d3f68dd03f724))
+* Use HTTPS for submodule to match main repo authentication ([51757e5](https://github.com/5dlabs/cto/commit/51757e5479628ccefba79a9818a3a27a71b05f54))
+* use infra namespace, correct API versions and schemas for Cloudflare Tunnel ([#1761](https://github.com/5dlabs/cto/issues/1761)) ([0a634d7](https://github.com/5dlabs/cto/commit/0a634d7325ea8555b4c34ad74bd9e5f2961846fd))
+* Use local-path storage class for OpenMemory PVC ([4339f2d](https://github.com/5dlabs/cto/commit/4339f2d38e01e4b3e0862dab615b474feb240e11))
+* Use local-path storage class for OpenMemory PVC ([b46717e](https://github.com/5dlabs/cto/commit/b46717e9034a0fe85b1b7d459d1b2d0693a10cd0))
+* Use npx for GitHub MCP instead of Docker ([c5a1299](https://github.com/5dlabs/cto/commit/c5a1299aa479c2fc993bd6619444392977435771))
+* Use npx for GitHub MCP instead of Docker ([8f1aa60](https://github.com/5dlabs/cto/commit/8f1aa6078ee87d0d43ae13f32de116d7f6cd70f7))
+* use projected volume to mount integration templates and add PR labels ([#1651](https://github.com/5dlabs/cto/issues/1651)) ([609d399](https://github.com/5dlabs/cto/commit/609d3996758899ef657b367e181b65997c264181))
+* use Replace sync strategy for CloudNativePG CRDs ([#1678](https://github.com/5dlabs/cto/issues/1678)) ([178cd61](https://github.com/5dlabs/cto/commit/178cd61f5b21f748ab11663f2a1b83e60405fda9))
+* use Talos kubeconfig-in-cluster ConfigMap for Kilo ([#1711](https://github.com/5dlabs/cto/issues/1711)) ([37a4374](https://github.com/5dlabs/cto/commit/37a4374619654f51a1f08810052bc25de4c8e8e5))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1867](https://github.com/5dlabs/cto/issues/1867)) ([3dae21f](https://github.com/5dlabs/cto/commit/3dae21f19bbe47f6a36ab84958ef4c33020efa87))
+* use tools-github-secrets for heal GITHUB_TOKEN ([#1868](https://github.com/5dlabs/cto/issues/1868)) ([c715c3a](https://github.com/5dlabs/cto/commit/c715c3aff0deff830bf005bcdd0feccd041a0ed7))
+* use unified release URLs for tools and play-monitor ([#1858](https://github.com/5dlabs/cto/issues/1858)) ([be9eb9a](https://github.com/5dlabs/cto/commit/be9eb9acd28b5d6866dcbd0bfeaf3fab4405eda4))
+* **vault:** ignore StatefulSet volumeClaimTemplates diff ([#1705](https://github.com/5dlabs/cto/issues/1705)) ([be71fd1](https://github.com/5dlabs/cto/commit/be71fd19531c2f6f68519bbc10cc539070fde6bd))
+* **vault:** use default service account for cross-namespace auth ([#1704](https://github.com/5dlabs/cto/issues/1704)) ([ce95bc7](https://github.com/5dlabs/cto/commit/ce95bc7a9e3acaa18d6bcf43c85ad0a3402c17f4))
+* **watch:** create dedicated monitor container script ([#1841](https://github.com/5dlabs/cto/issues/1841)) ([b933170](https://github.com/5dlabs/cto/commit/b9331708b4dd44f741808694303e854e2472f0f8))
+* **workflow:** correct wait-for-job-creation success condition ([1664fe7](https://github.com/5dlabs/cto/commit/1664fe7db870d686eff8778783ce3fca15298a00))
+* **workflow:** correct wait-for-job-creation success condition syntax ([5c76200](https://github.com/5dlabs/cto/commit/5c7620040034cb115da3735e85459d3ab2bdc6bf))
+* **workflow:** fast-forward stage label when resuming from later stages ([#1685](https://github.com/5dlabs/cto/issues/1685)) ([5313b7f](https://github.com/5dlabs/cto/commit/5313b7f13e49a7be409b87573c69a2253b61b3d0))
+* **workflow:** resolve Cleo resume pipeline issues ([#1598](https://github.com/5dlabs/cto/issues/1598)) ([f86b63b](https://github.com/5dlabs/cto/commit/f86b63bc9e1ec531f05653bb29eea1a7d64633a1))
+* **workflow:** use variable to escape template pattern in is_valid_param ([#1690](https://github.com/5dlabs/cto/issues/1690)) ([a8c38ba](https://github.com/5dlabs/cto/commit/a8c38ba65ff8649cc77013f28ae815274344a980))
+
+
+### ♻️ Refactoring
+
+* comprehensive namespace consolidation ([#1738](https://github.com/5dlabs/cto/issues/1738)) ([4a5259c](https://github.com/5dlabs/cto/commit/4a5259cc0123de83bdda108b3386b62d2f7b32d9))
+* consolidate and clean up Kubernetes namespaces ([#1728](https://github.com/5dlabs/cto/issues/1728)) ([4a24d3c](https://github.com/5dlabs/cto/commit/4a24d3c19c2850dcc9ab7c9cb9d4877264109def))
+* consolidate heal build into infrastructure-build workflow ([839723d](https://github.com/5dlabs/cto/commit/839723d6d55edb890481de00d1df6aef32297a36))
+* consolidate namespaces - operators + move Atlas alerts to CTO ([#1733](https://github.com/5dlabs/cto/issues/1733)) ([862ea80](https://github.com/5dlabs/cto/commit/862ea80f1354edec582c192db8e9e6669b5ff210))
+* move heal image to infra/images and remove obsolete watch files ([8abacf7](https://github.com/5dlabs/cto/commit/8abacf707b1b4234b1705bcd89ae0ff0712401ab))
+* remove cto-config and talos-kubeconfig mounts from heal CodeRuns ([969a79c](https://github.com/5dlabs/cto/commit/969a79c66d6e0646e3f2b4343325c088fd2c0778))
+* rename agent-platform namespace to cto ([#1723](https://github.com/5dlabs/cto/issues/1723)) ([32828df](https://github.com/5dlabs/cto/commit/32828dfb3589439190535b9eb02a1f8e418429c6))
+
+
+### 📚 Documentation
+
+* Add OpenMemory deployment validation and status documentation ([5490503](https://github.com/5dlabs/cto/commit/5490503e52c2a91808aed38c518b87a89a1728a4))
+* add PR description for Toolman Context7 and GitHub fix ([de82ad3](https://github.com/5dlabs/cto/commit/de82ad32199e5b680f37d7967a0773c1867d54a0))
+* add security remediation completion summary ([#1530](https://github.com/5dlabs/cto/issues/1530)) ([deea6f7](https://github.com/5dlabs/cto/commit/deea6f7095985f62733ae97a85d6076df9cf346a))
+* **e2e:** improve quick-e2e-reset script with permission requirements ([#1632](https://github.com/5dlabs/cto/issues/1632)) ([7191da4](https://github.com/5dlabs/cto/commit/7191da4e2114e6168b79bdfc690334075d68d2b3))
+* improve cloudflare-operator configuration documentation ([#1774](https://github.com/5dlabs/cto/issues/1774)) ([2d1b892](https://github.com/5dlabs/cto/commit/2d1b8928814e82b9a0cdfdbca9abe5ae2cba29a5))
+* improve Kilo DNS setup instructions ([#1714](https://github.com/5dlabs/cto/issues/1714)) ([b7e4848](https://github.com/5dlabs/cto/commit/b7e4848d48dc5e1416d5f217ebc92a0dd1cb2505))
+* **task-0:** Atlas Guardian conflict resolution verification for PR [#1640](https://github.com/5dlabs/cto/issues/1640) ([f615042](https://github.com/5dlabs/cto/commit/f615042796960ed174078971a998ce9ecc90a02b))
+* **task-0:** Atlas Guardian session completion for PR [#1662](https://github.com/5dlabs/cto/issues/1662) merge ([#1664](https://github.com/5dlabs/cto/issues/1664)) ([1a7982c](https://github.com/5dlabs/cto/commit/1a7982c3cad5f24207368fe91ee4458a0edbbf6a))
+* **task-0:** Atlas Guardian session documentation for PRs [#1637](https://github.com/5dlabs/cto/issues/1637) and [#1638](https://github.com/5dlabs/cto/issues/1638) ([#1654](https://github.com/5dlabs/cto/issues/1654)) ([366a9a4](https://github.com/5dlabs/cto/commit/366a9a4bd468a808efe54e6b6d719dafd6a474a1))
+* **task-0:** Atlas Guardian session for PR [#1627](https://github.com/5dlabs/cto/issues/1627) merge ([d1e6629](https://github.com/5dlabs/cto/commit/d1e66290c9e8254fa77a08caf87368e5d1189140))
+* **task-0:** Atlas Guardian session for PR [#1627](https://github.com/5dlabs/cto/issues/1627) merge ([1e9ad74](https://github.com/5dlabs/cto/commit/1e9ad745ee8624db9fe45eaf2ba27abce9a1cae3))
+* **task-0:** Atlas Guardian session for PR [#1654](https://github.com/5dlabs/cto/issues/1654) and [#1651](https://github.com/5dlabs/cto/issues/1651) merges ([#1655](https://github.com/5dlabs/cto/issues/1655)) ([db4a27a](https://github.com/5dlabs/cto/commit/db4a27af0002a555b3672ee6a260b7633d56c7e4))
+* **task-0:** Atlas Guardian session for PR [#1655](https://github.com/5dlabs/cto/issues/1655) merge ([#1656](https://github.com/5dlabs/cto/issues/1656)) ([a7cf802](https://github.com/5dlabs/cto/commit/a7cf802eaec5aef52f416e53aa13be8b9938046a))
+* **task-0:** Atlas Guardian session for PR [#1656](https://github.com/5dlabs/cto/issues/1656) merge ([#1657](https://github.com/5dlabs/cto/issues/1657)) ([33a05f7](https://github.com/5dlabs/cto/commit/33a05f75a4f453afe55f32819747d63996823940))
+* **task-0:** Atlas Guardian session for PR [#1657](https://github.com/5dlabs/cto/issues/1657) merge ([#1659](https://github.com/5dlabs/cto/issues/1659)) ([0a62883](https://github.com/5dlabs/cto/commit/0a6288360b37e153dced2077ee234ce9d96be7f8))
+* **task-0:** Atlas Guardian session for PR [#1659](https://github.com/5dlabs/cto/issues/1659) merge ([#1660](https://github.com/5dlabs/cto/issues/1660)) ([8b9f0a3](https://github.com/5dlabs/cto/commit/8b9f0a3c0a4f2a2f0092e2cd871920bfa5c2856c))
+* **task-0:** Atlas Guardian session for PR [#1660](https://github.com/5dlabs/cto/issues/1660) merge ([#1662](https://github.com/5dlabs/cto/issues/1662)) ([9525c2f](https://github.com/5dlabs/cto/commit/9525c2ff4d635c0d2a2ce82fd9d42ab6a9779cf2))
+
+
+### 🔧 Maintenance
+
+* Add deployment instructions to .gitignore ([2d50304](https://github.com/5dlabs/cto/commit/2d5030465ae377288d20e006ca6b1a563af20485))
+* auto-update agent-templates ConfigMap ([d4fffea](https://github.com/5dlabs/cto/commit/d4fffea7f7d72a374ab3026a3179432687a0b404))
+* auto-update agent-templates ConfigMap ([b91799f](https://github.com/5dlabs/cto/commit/b91799f18f46bc7d19aea4b2972b6d01762e2e97))
+* auto-update agent-templates ConfigMap ([4582310](https://github.com/5dlabs/cto/commit/4582310d8a0ad2fcc6442c4c7bca8772e873d37c))
+* auto-update agent-templates ConfigMap ([451cb37](https://github.com/5dlabs/cto/commit/451cb3744f11760f2baab7b3a519182475a79dd6))
+* auto-update agent-templates ConfigMap ([32a35ff](https://github.com/5dlabs/cto/commit/32a35ffd35b066d7f513299bd33cc8ed29a8d8a4))
+* auto-update agent-templates ConfigMap ([8776790](https://github.com/5dlabs/cto/commit/8776790e61fa99509b6cc1efa54bfa30fb92f6a6))
+* auto-update agent-templates ConfigMap ([cc22f69](https://github.com/5dlabs/cto/commit/cc22f691945bdc3a0c957d65eafd4c49005b49d8))
+* auto-update agent-templates ConfigMap ([cc50a87](https://github.com/5dlabs/cto/commit/cc50a8731ef8bb077b10f9fdea4f147bfdc8c51d))
+* auto-update agent-templates ConfigMap ([6365505](https://github.com/5dlabs/cto/commit/6365505b15bc7ba9db0f5c33d16b2e46b4634a3b))
+* auto-update agent-templates ConfigMap ([11b095b](https://github.com/5dlabs/cto/commit/11b095b8396be5ec9849ac36431bb936621344d2))
+* auto-update agent-templates ConfigMap ([0749860](https://github.com/5dlabs/cto/commit/0749860a575613d20a046aa9409b95eb500732d0))
+* auto-update agent-templates ConfigMap ([b502769](https://github.com/5dlabs/cto/commit/b502769067af1d5e4d11f2d959ede2c65165e9b6))
+* auto-update agent-templates ConfigMap ([9cdbdd8](https://github.com/5dlabs/cto/commit/9cdbdd8ef7012545aa86c838aabfd37603899a3f))
+* auto-update agent-templates ConfigMap ([8ccdae1](https://github.com/5dlabs/cto/commit/8ccdae14a7ada4822cd5c3183a50e5634a6db029))
+* auto-update agent-templates ConfigMap ([ebd6476](https://github.com/5dlabs/cto/commit/ebd64761a7d8f068d2a2cfbd278a4422260bc00c))
+* auto-update agent-templates ConfigMap ([a83cb65](https://github.com/5dlabs/cto/commit/a83cb65351e8a5ac76d0568dc2e56f0ce9c564ae))
+* auto-update agent-templates ConfigMap ([6b37c80](https://github.com/5dlabs/cto/commit/6b37c80e09f89641888a19791066df31a8707852))
+* auto-update agent-templates ConfigMap ([fbe66f0](https://github.com/5dlabs/cto/commit/fbe66f0a97b8bfd238277fe9f48a1a6a572711ef))
+* auto-update agent-templates ConfigMap ([6ce0e77](https://github.com/5dlabs/cto/commit/6ce0e77e75b8e33c96437cecde85c803cab6c13b))
+* auto-update agent-templates ConfigMap ([7c6ae01](https://github.com/5dlabs/cto/commit/7c6ae01817cc864a5abd4643078f168172f69fbf))
+* auto-update agent-templates ConfigMap ([a4d0885](https://github.com/5dlabs/cto/commit/a4d0885d9d329e14bc4a74baf98bf00edd5937a8))
+* **chart:** regenerate agent templates ConfigMaps ([e0cb7ad](https://github.com/5dlabs/cto/commit/e0cb7ad586f3635ec4c7666db2feecc428283dd2))
+* **chart:** regenerate agent templates ConfigMaps ([77a5b58](https://github.com/5dlabs/cto/commit/77a5b583b430e7e56e84354ccff6687b930506d2))
+* **chart:** regenerate agent templates ConfigMaps ([4e16217](https://github.com/5dlabs/cto/commit/4e16217b62fe19ef9924627096107da59c5f2e09))
+* **chart:** regenerate agent templates ConfigMaps ([881d06e](https://github.com/5dlabs/cto/commit/881d06ec552549d2730cec4b125f9f93c9ba449c))
+* **chart:** regenerate agent templates ConfigMaps ([71da44a](https://github.com/5dlabs/cto/commit/71da44a36671428e8498aa513dd37746b10caf39))
+* **chart:** regenerate agent templates ConfigMaps ([1171f11](https://github.com/5dlabs/cto/commit/1171f11d6da0d109557af6666ac69db757e23207))
+* **chart:** regenerate agent templates ConfigMaps ([726575b](https://github.com/5dlabs/cto/commit/726575b791c3f2384d249f090574fb6cf60900f3))
+* **chart:** regenerate agent templates ConfigMaps ([7057e21](https://github.com/5dlabs/cto/commit/7057e2150f5b524e21873ff216de39e92edb6bca))
+* **chart:** regenerate agent templates ConfigMaps ([6b0995a](https://github.com/5dlabs/cto/commit/6b0995a8107781e6304cdcfd8f0c5dd926d6a294))
+* **chart:** regenerate agent templates ConfigMaps ([#1549](https://github.com/5dlabs/cto/issues/1549)) ([b29aa6c](https://github.com/5dlabs/cto/commit/b29aa6c5ddbe62f5ccbe26c2b2f33619d0ca0815))
+* **chart:** regenerate agent templates ConfigMaps ([#1594](https://github.com/5dlabs/cto/issues/1594)) ([50fbe0a](https://github.com/5dlabs/cto/commit/50fbe0a3ff65f23c3ed89a0d7db868c45194aad5))
+* **chart:** regenerate agent templates ConfigMaps ([#1684](https://github.com/5dlabs/cto/issues/1684)) ([757bf06](https://github.com/5dlabs/cto/commit/757bf06aaab6449cca554a4cf7c0fe0bfee9f52c))
+* **chart:** regenerate agent templates ConfigMaps ([#1825](https://github.com/5dlabs/cto/issues/1825)) ([4304a34](https://github.com/5dlabs/cto/commit/4304a3473014030a5dc5b34c001f5479aba6956f))
+* **chart:** regenerate agent templates ConfigMaps ([#1848](https://github.com/5dlabs/cto/issues/1848)) ([98be1ca](https://github.com/5dlabs/cto/commit/98be1ca67830aee560cf387b60d378f2cc0383cc))
+* **infra:** remove doc-server and associated database infrastructure ([#1720](https://github.com/5dlabs/cto/issues/1720)) ([553dbd7](https://github.com/5dlabs/cto/commit/553dbd70b3a2c38f612c959727b6fd0f846731a5))
+* Merge main to resolve conflicts ([6605981](https://github.com/5dlabs/cto/commit/660598177fddb28e34cd99ece0163ef543eddcfa))
+* remove Better Auth integration ([#1672](https://github.com/5dlabs/cto/issues/1672)) ([8cda329](https://github.com/5dlabs/cto/commit/8cda329c93c9567f310c4290688154f87fad5d54))
+* remove doc-server references and docs_ingest tool ([#1730](https://github.com/5dlabs/cto/issues/1730)) ([3e4d16c](https://github.com/5dlabs/cto/commit/3e4d16ca652c2ddc270058db700159b676ef026c))
+* remove NGrok in favor of Cloudflare Tunnel ([#1758](https://github.com/5dlabs/cto/issues/1758)) ([8b88f7a](https://github.com/5dlabs/cto/commit/8b88f7a6dc64f2ee41ff76f7b0fb12d59f4f8f96))
+* remove Rust docs MCP server ([#1760](https://github.com/5dlabs/cto/issues/1760)) ([11bff96](https://github.com/5dlabs/cto/commit/11bff9647073770fd9656cd4db25f5cf06324b2a))
+* remove temporary task and session files from root ([#1675](https://github.com/5dlabs/cto/issues/1675)) ([00dac75](https://github.com/5dlabs/cto/commit/00dac7543fbb18615682ffe6b74e60fe25ea0333))
+* remove unused testing and toolman-client directories ([#1719](https://github.com/5dlabs/cto/issues/1719)) ([62c27c3](https://github.com/5dlabs/cto/commit/62c27c3abe959868fe36d7945b5a493f53c6e386))
+* resolve merge conflicts from main ([9b654a5](https://github.com/5dlabs/cto/commit/9b654a557baaa78771a97071006f8318eb3ce25c))
+* **task-0:** OpenMemory integration cleanup and configuration standardization ([#1652](https://github.com/5dlabs/cto/issues/1652)) ([5261efa](https://github.com/5dlabs/cto/commit/5261efa76e59363090e152f819664b0f25e4cc9e))
+* **tools:** disable standalone k8s-mcp deployment ([#1780](https://github.com/5dlabs/cto/issues/1780)) ([f6c96a7](https://github.com/5dlabs/cto/commit/f6c96a7f91f57fac0591020f51b67f9daf0892a9))
+* trigger security scan to validate RBAC fixes ([#1528](https://github.com/5dlabs/cto/issues/1528)) ([8b11af0](https://github.com/5dlabs/cto/commit/8b11af0fed4ec8983d7b71d9c47eb7d5ec909a7e))
+* update agent templates ConfigMaps ([74e0b8e](https://github.com/5dlabs/cto/commit/74e0b8e521d6d00b0d25c7ff7d23c078049534ca))
+* update agent templates ConfigMaps ([026dcf7](https://github.com/5dlabs/cto/commit/026dcf710b28b601853656e51a43c57e60024b64))
+* update agent templates ConfigMaps ([6a37ffe](https://github.com/5dlabs/cto/commit/6a37ffede3637ea41407d1b51d62a35660f49abe))

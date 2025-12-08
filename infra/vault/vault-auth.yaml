@@ -1,0 +1,30 @@
+---
+# VaultAuth - Kubernetes authentication for VSO
+# Allows VSO to authenticate to Vault using Kubernetes service accounts
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: vault-auth
+  namespace: infra
+  labels:
+    app.kubernetes.io/name: vault-auth
+    app.kubernetes.io/part-of: platform
+spec:
+  # Reference to the VaultConnection resource
+  vaultConnectionRef: vault-connection
+
+  # Authentication method
+  method: kubernetes
+  mount: kubernetes
+
+  # Kubernetes auth configuration
+  kubernetes:
+    # Role created in Vault that grants access to secrets
+    role: vault-secrets-operator
+    # Use default service account which exists in all namespaces
+    serviceAccount: default
+
+  # Allow this auth to be used across namespaces
+  allowedNamespaces:
+    - "*"
+

@@ -1,0 +1,22 @@
+---
+# Service for healer filebrowser sidecar
+# Exposes the filebrowser UI on port 8081
+apiVersion: v1
+kind: Service
+metadata:
+  name: healer-filebrowser
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer-filebrowser
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/component: filebrowser
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/instance: cto-healer
+    app.kubernetes.io/name: universal-app

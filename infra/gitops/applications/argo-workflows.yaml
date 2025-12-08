@@ -1,0 +1,144 @@
+---
+# Argo CD Application for Argo Workflows
+# This manages the Argo Workflows installation via GitOps
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-workflows
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project configuration
+  project: platform
+
+  # Source configuration
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    targetRevision: 0.45.21
+    chart: argo-workflows
+
+    # Helm configuration
+    helm:
+      valueFiles: []
+      values: |
+        # Pod labels for log collection
+        commonLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        # Use v3.7.1 stable release
+        # Note: Don't override app.kubernetes.io/component in podLabels - it's part of the
+        # selector and can't be changed on existing Deployments
+        controller:
+          image:
+            tag: v3.7.1
+
+          # Cluster-scoped: watch all namespaces for workflows and templates
+          # Note: --managed-namespace only supports single value, so we use cluster-scope instead
+
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: argo-workflow-controller
+
+          # Hard limits on workflow retention (regardless of TTL)
+          # Once limit is reached, oldest workflows are deleted
+          retentionPolicy:
+            completed: 100    # Keep max 100 completed workflows
+            failed: 50        # Keep max 50 failed workflows
+            errored: 50       # Keep max 50 errored workflows
+
+          # Increase TTL processing parallelism (default is 4)
+          workflowTTLWorkers: 8
+
+          # Configure workflow garbage collector period
+          # The GC runs automatically; this sets how frequently it runs
+          extraEnv:
+            - name: WORKFLOW_GC_PERIOD
+              value: "5m"
+
+          workflowDefaults:
+            spec:
+              parallelism: 10
+              # Global TTL for automatic cleanup of completed workflows
+              # More aggressive than before to prevent accumulation
+              ttlStrategy:
+                secondsAfterCompletion: 1800   # Clean up after 30 minutes
+                secondsAfterSuccess: 1800      # Clean up successful after 30 minutes
+                secondsAfterFailure: 7200      # Keep failed workflows for 2 hours
+              # Pod garbage collection - give heal time to capture logs before cleanup
+              podGC:
+                strategy: OnPodCompletion
+                deleteDelayDuration: 300s      # 5 minutes - allows heal to capture logs
+        server:
+          image:
+            tag: v3.7.1
+          authModes:
+            - server
+          secure: false
+          env:
+            - name: ARGO_SERVER_SECURE
+              value: "false"
+          extraArgs:
+            - --secure=false
+          serviceType: NodePort
+          servicePort: 2746
+          serviceNodePort: 30081
+          servicePortName: http
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: argo-workflow-server
+        executor:
+          image:
+            tag: v3.7.1
+
+        # Use values from our local configuration file
+        artifactRepository:
+          archiveLogs: true
+          filesystem:
+            archivePath: /tmp/artifacts
+        persistence: {}
+
+        workflow:
+          serviceAccount:
+            # Create the argo-workflow SA that sensors and RBAC reference
+            create: true
+            name: "argo-workflow"
+            annotations: {}
+          rbac:
+            create: true
+
+  # Destination configuration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: automation
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+
+  # Revision history
+  revisionHistoryLimit: 5

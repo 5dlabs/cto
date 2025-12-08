@@ -1,0 +1,40 @@
+# RBAC for PM (Project Management) service
+# Allows the service to:
+# - Create ConfigMaps for intake workflows
+# - Create and manage workflows
+# - Access workflow templates
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "pm.fullname" . }}
+  labels:
+    {{- include "pm.labels" . | nindent 4 }}
+rules:
+  # ConfigMap management for intake workflows
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  # Workflow creation and management
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch", "update"]
+  # Access to workflow templates
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtemplates", "clusterworkflowtemplates"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "pm.fullname" . }}
+  labels:
+    {{- include "pm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "pm.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "pm.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

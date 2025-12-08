@@ -1,0 +1,10 @@
+### Step 6: Spawn Remediation Agent
+
+```bash
+heal spawn-remediation \
+  --alert {{alert_id}} \
+  --task-id {{task_id}} \
+  --target-pod "{{pod_name}}" \
+  --issue-number ${ISSUE_NUMBER}
+```
+

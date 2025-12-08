@@ -1,0 +1,60 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Build artifacts
+target/
+dist/
+build/
+
+# Node.js (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python (if any)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Rust specific
+Cargo.lock
+.cargo/
+
+# Test files
+test/
+tests/
+*_test.go
+*_test.rs
