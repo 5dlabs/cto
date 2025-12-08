@@ -463,7 +463,7 @@ persistence:
   size: 10Gi
   annotations: {}
 
-# Secret store integration (Vault Secrets Operator syncs these)
+# Secret store integration (synced from OpenBao)
 secretRefs:
   - name: tools-brave-search-secrets
   - name: tools-context7-secrets
@@ -473,7 +473,6 @@ secretRefs:
   - name: tools-argocd-secrets
   - name: tools-gemini-secrets
   - name: tools-minio-secrets
-  # Note: tools-vault-secrets is used by vault-mcp-server deployment, not tools server
   # Note: tools-cloudflare-secrets removed - HTTP MCP servers auth at remote endpoint
 
 # Network policy
@@ -531,7 +530,7 @@ mcpServers:
       requests:
         cpu: 100m
         memory: 128Mi
-    # Use kubeconfig secret from Vault
+    # Use kubeconfig secret from OpenBao
     kubeconfigSecret:
       enabled: true
       name: "tools-kubernetes-secrets"
