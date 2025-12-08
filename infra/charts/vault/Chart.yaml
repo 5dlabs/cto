@@ -1,8 +1,0 @@
----
-apiVersion: v2
-name: vault-config
-description: Configuration values for HashiCorp Vault Helm chart deployment
-type: application
-version: 1.0.0
-appVersion: "1.21.0"
-

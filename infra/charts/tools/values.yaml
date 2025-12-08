@@ -406,17 +406,6 @@ config:
       # LLMs.txt for additional context
       llmsTxt: "https://better-auth.com/llms.txt"
 
-    # --- Secrets Management ---
-    # NOTE: Vault MCP server requires its own deployment - see infra/charts/tools/templates/vault-mcp-server.yaml
-    # It runs in HTTP mode and tools server proxies to it
-    vault:
-      name: "HashiCorp Vault"
-      description: "Vault secrets management - read/write secrets, manage mounts, PKI certificates"
-      transport: "http"
-      # In-cluster Vault MCP server URL (deployed separately)
-      url: "http://vault-mcp-server.cto.svc.cluster.local:8080/mcp"
-      workingDirectory: "/tmp"
-
 # =============================================================================
 # LLMs.txt Registry - AI-Readable Documentation
 # =============================================================================
