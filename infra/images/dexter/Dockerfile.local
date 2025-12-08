@@ -43,15 +43,22 @@ RUN mkdir -p /workspace /home/node/.cache/pip /home/node/.dexter && \
 
 WORKDIR /workspace
 
-# Install Dexter and dependencies as root
-# Pin langchain<1.0 for backward-compatible import paths (langchain.prompts)
+# Install uv (fast Python package manager from Astral)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Clone and install Dexter using uv (required for uv-managed projects)
 ARG DEXTER_VERSION=latest
-RUN pip install --break-system-packages --no-cache-dir \
-    "langchain>=0.3.27,<1.0" \
-    git+https://github.com/virattt/dexter.git
+RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
+    cd /opt/dexter && \
+    if [ "$DEXTER_VERSION" != "latest" ]; then \
+      git checkout "v${DEXTER_VERSION}"; \
+    fi && \
+    uv sync && \
+    ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
 
 # Verify installation
-RUN python3 -c "from dexter.agent import Agent; print('Dexter installed successfully')"
+RUN cd /opt/dexter && uv run python -c "from dexter.agent import Agent; print('Dexter installed successfully')"
 
 # Switch to node user for git config
 USER node
