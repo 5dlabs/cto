@@ -23,7 +23,7 @@ env:
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
   changes:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     outputs:
       healer: ${{ steps.filter.outputs.healer }}
       docker: ${{ steps.filter.outputs.docker }}
@@ -109,9 +109,6 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust (k8s-runner)
-        uses: ./.github/actions/setup-rust-k8s
 
       - name: Run security audit
         run: |
