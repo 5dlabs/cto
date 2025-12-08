@@ -15,7 +15,7 @@ env:
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
   changes:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     outputs:
       controller: ${{ steps.filter.outputs.controller }}
     steps:
@@ -83,11 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Helm
-        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
-        with:
-          version: 'latest'
-
       - name: Test Helm Chart Structure
         run: |
           helm version
@@ -124,9 +119,6 @@ jobs:
         with:
           name: trivy-results
           path: trivy-results.sarif
-
-      - name: Setup Rust (k8s-runner)
-        uses: ./.github/actions/setup-rust-k8s
 
       - name: Rust security audit
         run: |
