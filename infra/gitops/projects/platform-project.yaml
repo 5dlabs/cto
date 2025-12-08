@@ -48,6 +48,8 @@ spec:
     - 'https://github.com/questdb/questdb-operator'
     # HashiCorp Vault Helm chart repository
     - 'https://helm.releases.hashicorp.com'
+    # OpenBao (open source Vault fork) Helm chart repository
+    - 'https://openbao.github.io/openbao-helm'
     # Ingress-NGINX Helm chart repository
     - 'https://kubernetes.github.io/ingress-nginx'
     # Cert-Manager Helm chart repository
@@ -87,6 +89,8 @@ spec:
       server: https://kubernetes.default.svc
     # Security - secrets management
     - namespace: vault
+      server: https://kubernetes.default.svc
+    - namespace: openbao
       server: https://kubernetes.default.svc
     # Infrastructure - operators, ingress, DNS, certs
     - namespace: infra
