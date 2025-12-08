@@ -124,7 +124,7 @@ spec:
                 dependencyName: workflow-failure
                 dataKey: body
               dest: ""
-          timeout: 30s
+          timeout: 30
         retryStrategy:
           steps: 3
           duration: "10s"
@@ -145,7 +145,7 @@ spec:
                 dependencyName: job-failure
                 dataKey: body
               dest: ""
-          timeout: 30s
+          timeout: 30
         retryStrategy:
           steps: 3
           duration: "10s"
@@ -166,7 +166,7 @@ spec:
                 dependencyName: security-alert
                 dataKey: body
               dest: ""
-          timeout: 30s
+          timeout: 30
         retryStrategy:
           steps: 3
           duration: "10s"
