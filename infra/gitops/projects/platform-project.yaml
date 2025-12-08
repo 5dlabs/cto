@@ -148,6 +148,9 @@ spec:
       kind: '*'
     - group: 'job.min.io'
       kind: '*'
+    # Cloudflare Tunnel Operator CRDs (ClusterTunnel is cluster-scoped)
+    - group: 'networking.cfargotunnel.com'
+      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
