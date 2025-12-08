@@ -36,8 +36,16 @@ spec:
       kind: Deployment
       name: clickhouse-operator-altinity-clickhouse-operator
       namespace: kube-system
-      managedFieldsManagers:
-        - clickhouse-operator
+      jsonPointers:
+        # Ignore the clickhouse.altinity.com labels that the operator adds at runtime
+        - /metadata/labels/clickhouse.altinity.com~1app
+        - /metadata/labels/clickhouse.altinity.com~1chop
+        - /metadata/labels/clickhouse.altinity.com~1chop-commit
+        - /metadata/labels/clickhouse.altinity.com~1chop-date
+        - /spec/template/metadata/labels/clickhouse.altinity.com~1app
+        - /spec/template/metadata/labels/clickhouse.altinity.com~1chop
+        - /spec/template/metadata/labels/clickhouse.altinity.com~1chop-commit
+        - /spec/template/metadata/labels/clickhouse.altinity.com~1chop-date
 
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
@@ -45,14 +53,6 @@ spec:
     targetRevision: release-0.25.5
     helm:
       releaseName: clickhouse-operator
-      # Include the labels that the operator self-applies to prevent drift
-      # These labels are dynamically added by the operator after deployment
-      valuesObject:
-        commonLabels:
-          clickhouse.altinity.com/app: chop
-          clickhouse.altinity.com/chop: "0.25.5"
-          clickhouse.altinity.com/chop-commit: 9ab22d8
-          clickhouse.altinity.com/chop-date: "2025-10-24T08.40.12"
 
   destination:
     server: https://kubernetes.default.svc

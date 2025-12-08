@@ -63,12 +63,14 @@ spec:
         commonLabels:
           platform.5dlabs.io/log-collection: enabled
 
-        # Pod security context
+        # Pod security context (pod-level)
         podSecurityContext:
           runAsNonRoot: true
 
-        # Security context
-        securityContext:
+        # Container security context
+        # Note: capabilities must be under containerSecurityContext, not securityContext
+        # as the chart maps securityContext to pod level incorrectly
+        containerSecurityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
