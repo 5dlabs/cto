@@ -30,6 +30,8 @@ data:
         port: {{ .Values.agent.inputBridge.port | default 8080 }}
     job:
       namespace: {{ include "cto.namespace" . }}
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 600
       workflow:
         serviceAccountName: controller-workflow-submitter
       resources:
