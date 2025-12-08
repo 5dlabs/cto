@@ -50,6 +50,8 @@ spec:
           value: latest
         - name: image.pullPolicy
           value: Always
+        - name: imagePullSecrets[0].name
+          value: ghcr-secret
 
         # PM provider configuration
         - name: pm.provider
