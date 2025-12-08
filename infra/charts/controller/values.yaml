@@ -499,7 +499,7 @@ agents:
       - NEVER hardcode secrets, API keys, or passwords
       - Use environment variables for sensitive configuration
       - Exclude configuration files with secrets from version control (.gitignore)
-      - Use secret management tools (AWS Secrets Manager, HashiCorp Vault) in production
+      - Use secret management tools (AWS Secrets Manager, OpenBao) in production
       - Rotate secrets regularly and limit access to authorized personnel
 
       **3. Authentication & Authorization**
@@ -1201,7 +1201,7 @@ secrets:
   anthropicApiKey: "use-existing"
   # OPTIONAL: Set your OpenAI API key (used by Codex CLI)
   openaiApiKey: "use-existing"
-  # API key secret name (synced by Vault Secrets Operator)
+  # API key secret name (synced from OpenBao)
   apiKeySecretName: "cto-secrets"
   # CLI-specific secret key overrides (env var + secret key names)
   cliApiKeys:
@@ -1342,7 +1342,7 @@ notifications:
   # Discord webhook notifications
   discord:
     enabled: true
-    # Secret containing DISCORD_WEBHOOK_URL (synced from Vault)
+    # Secret containing DISCORD_WEBHOOK_URL (synced from OpenBao)
     secretName: "cto-notifications-secrets"
     secretKey: "DISCORD_WEBHOOK_URL"
 
@@ -1352,14 +1352,14 @@ linear:
   enabled: false
   # Webhook configuration
   webhook:
-    # Secret containing LINEAR_WEBHOOK_SECRET (synced from Vault)
+    # Secret containing LINEAR_WEBHOOK_SECRET (synced from OpenBao)
     secretName: "cto-linear-secrets"
     secretKey: "LINEAR_WEBHOOK_SECRET"
     # Maximum age for webhook timestamps in milliseconds (default: 60 seconds)
     maxTimestampAgeMs: 60000
   # OAuth configuration
   oauth:
-    # Secret containing LINEAR_ACCESS_TOKEN (synced from Vault)
+    # Secret containing LINEAR_ACCESS_TOKEN (synced from OpenBao)
     secretName: "cto-linear-secrets"
     accessTokenKey: "LINEAR_ACCESS_TOKEN"
   # Agent configuration
