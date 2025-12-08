@@ -31,6 +31,18 @@ spec:
               value: {{ .Values.pm.provider | quote }}
             - name: KUBERNETES_NAMESPACE
               value: {{ include "cto.namespace" . }}
+            - name: NAMESPACE
+              value: {{ include "cto.namespace" . }}
+            {{- if eq .Values.pm.provider "linear" }}
+            - name: LINEAR_ENABLED
+              value: {{ .Values.pm.linear.enabled | quote }}
+            - name: LINEAR_PORT
+              value: {{ .Values.pm.service.port | quote }}
+            {{- if .Values.pm.maxTimestampAgeMs }}
+            - name: LINEAR_MAX_TIMESTAMP_AGE_MS
+              value: {{ .Values.pm.maxTimestampAgeMs | quote }}
+            {{- end }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.pm.secrets.secretName }}
