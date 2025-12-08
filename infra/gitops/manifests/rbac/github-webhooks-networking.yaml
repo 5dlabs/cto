@@ -41,3 +41,4 @@ subjects:
   - kind: ServiceAccount
     name: github-webhooks-networking
     namespace: argocd
+
