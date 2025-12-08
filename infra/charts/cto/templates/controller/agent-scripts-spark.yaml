@@ -5,7 +5,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "cto.controller.fullname" . }}-agent-scripts-spark
+  name: controller-agent-scripts-spark
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "cto.controller.labels" . | nindent 4 }}

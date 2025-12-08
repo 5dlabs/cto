@@ -4,7 +4,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "cto.controller.fullname" . }}-templates-opencode
+  name: controller-templates-opencode
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "cto.controller.labels" . | nindent 4 }}

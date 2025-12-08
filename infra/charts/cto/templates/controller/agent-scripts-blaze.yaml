@@ -5,7 +5,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "cto.controller.fullname" . }}-agent-scripts-blaze
+  name: controller-agent-scripts-blaze
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "cto.controller.labels" . | nindent 4 }}
