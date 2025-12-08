@@ -57,6 +57,42 @@ controller:
     rustLog: "debug"
 
 # =============================================================================
+# Agent Configuration - CodeRun/Workflow Defaults
+# =============================================================================
+agent:
+  image:
+    repository: ghcr.io/5dlabs/agent
+    tag: latest
+  serviceAccountName: ""
+  cliImages:
+    claude:
+      repository: ghcr.io/5dlabs/claude-code
+      tag: latest
+    cursor:
+      repository: ghcr.io/5dlabs/cursor
+      tag: latest
+    codex:
+      repository: ghcr.io/5dlabs/codex
+      tag: latest
+    gemini:
+      repository: ghcr.io/5dlabs/gemini
+      tag: latest
+    factory:
+      repository: ghcr.io/5dlabs/factory
+      tag: latest
+    opencode:
+      repository: ghcr.io/5dlabs/opencode
+      tag: latest
+  cliProviders: {}
+  agentCliConfigs: {}
+  inputBridge:
+    enabled: false
+    image:
+      repository: ""
+      tag: ""
+    port: 8080
+
+# =============================================================================
 # PM Server - Project Management
 # =============================================================================
 pm:

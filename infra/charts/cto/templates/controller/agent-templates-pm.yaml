@@ -4,10 +4,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "controller.fullname" . }}-templates-pm
+  name: {{ include "cto.controller.fullname" . }}-templates-pm
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "controller.labels" . | nindent 4 }}
+    {{- include "cto.controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: templates
     template-type: pm
 data:
