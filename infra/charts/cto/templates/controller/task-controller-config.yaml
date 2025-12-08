@@ -1,0 +1,41 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-controller-config
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    agent:
+      image:
+        repository: {{ .Values.agent.image.repository | quote }}
+        tag: {{ .Values.agent.image.tag | quote }}
+      cliImages:
+        {{- toYaml .Values.agent.cliImages | nindent 8 }}
+      {{- if .Values.agent.cliProviders }}
+      cliProviders:
+        {{- toYaml .Values.agent.cliProviders | nindent 8 }}
+      {{- end }}
+      {{- if .Values.agent.agentCliConfigs }}
+      agentCliConfigs:
+        {{- toYaml .Values.agent.agentCliConfigs | nindent 8 }}
+      {{- end }}
+      inputBridge:
+        enabled: {{ .Values.agent.inputBridge.enabled | default false }}
+        image:
+          repository: {{ .Values.agent.inputBridge.image.repository | default "" | quote }}
+          tag: {{ .Values.agent.inputBridge.image.tag | default "" | quote }}
+        port: {{ .Values.agent.inputBridge.port | default 8080 }}
+    rbac:
+      create: true
+      submitter:
+        serviceAccount: controller-workflow-submitter
+        clusterAdminServiceAccount:
+          create: true
+          name: controller-cluster-admin
+    storage:
+      storageClassName: {{ .Values.global.storageClass | default "local-path" }}
+{{- end }}
+
