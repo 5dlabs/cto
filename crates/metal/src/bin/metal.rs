@@ -244,13 +244,13 @@ enum Commands {
         resume: bool,
 
         /// Deploy the platform stack after cluster bootstrap.
-        /// Installs: Cert-Manager, `ArgoCD`, Vault, Ingress-NGINX, Argo Workflows.
+        /// Installs: Cert-Manager, `ArgoCD`, OpenBao, Ingress-NGINX, Argo Workflows.
         #[arg(long, default_value = "false")]
         deploy_stack: bool,
 
-        /// Initialize and unseal Vault after deployment (requires --deploy-stack).
+        /// Initialize and unseal OpenBao after deployment (requires --deploy-stack).
         #[arg(long, default_value = "false")]
-        init_vault: bool,
+        init_openbao: bool,
     },
 
     /// Join a worker node to an existing Talos cluster.
@@ -301,7 +301,7 @@ enum Commands {
 
     /// Deploy the CTO platform stack to an existing cluster.
     ///
-    /// Deploys Argo CD, Cert-Manager, Vault, and Ingress to the cluster.
+    /// Deploys Argo CD, Cert-Manager, OpenBao, and Ingress to the cluster.
     Stack {
         /// Path to kubeconfig for the cluster.
         #[arg(long)]
@@ -315,34 +315,34 @@ enum Commands {
         #[arg(long, default_value = "false")]
         cert_manager_only: bool,
 
-        /// Deploy only Vault.
+        /// Deploy only OpenBao.
         #[arg(long, default_value = "false")]
-        vault_only: bool,
+        openbao_only: bool,
 
         /// Deploy only Ingress.
         #[arg(long, default_value = "false")]
         ingress_only: bool,
 
-        /// Initialize and unseal Vault after deployment.
+        /// Initialize and unseal OpenBao after deployment.
         #[arg(long, default_value = "false")]
-        init_vault: bool,
+        init_openbao: bool,
     },
 
-    /// Initialize and unseal Vault.
+    /// Initialize and unseal OpenBao.
     ///
-    /// Run this after deploying Vault for the first time.
-    VaultInit {
+    /// Run this after deploying OpenBao for the first time.
+    OpenbaoInit {
         /// Path to kubeconfig for the cluster.
         #[arg(long)]
         kubeconfig: PathBuf,
 
-        /// Output file for Vault credentials (JSON).
-        #[arg(long, default_value = "vault-init.json")]
+        /// Output file for OpenBao credentials (JSON).
+        #[arg(long, default_value = "openbao-init.json")]
         output: PathBuf,
     },
 
-    /// Unseal an existing Vault instance.
-    VaultUnseal {
+    /// Unseal an existing OpenBao instance.
+    OpenbaoUnseal {
         /// Path to kubeconfig for the cluster.
         #[arg(long)]
         kubeconfig: PathBuf,
@@ -702,7 +702,7 @@ async fn main() -> Result<()> {
             timeout,
             resume,
             deploy_stack,
-            init_vault,
+            init_openbao,
         } => {
             info!("Provisioning 2-node cluster: {name}");
 
@@ -1000,7 +1000,7 @@ async fn main() -> Result<()> {
             if deploy_stack {
                 println!("\n📦 Step 10/{total_steps}: Deploying platform stack...");
                 println!(
-                    "   This installs: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows"
+                    "   This installs: Cert-Manager, ArgoCD, OpenBao, Ingress-NGINX, Argo Workflows"
                 );
 
                 // Install local-path-provisioner for bare metal PVCs
@@ -1014,8 +1014,8 @@ async fn main() -> Result<()> {
                 println!("\n   Deploying ArgoCD...");
                 stack::deploy_argocd(&kubeconfig_path)?;
 
-                println!("\n   Deploying Vault...");
-                stack::deploy_vault(&kubeconfig_path)?;
+                println!("\n   Deploying OpenBao...");
+                stack::deploy_openbao(&kubeconfig_path)?;
 
                 println!("\n   Deploying Ingress-NGINX...");
                 if let Err(e) = stack::deploy_ingress_nginx(&kubeconfig_path) {
@@ -1029,27 +1029,27 @@ async fn main() -> Result<()> {
 
                 println!("\n   ✅ Platform stack deployed!");
 
-                // Initialize and unseal Vault if requested
-                if init_vault {
-                    println!("\n🔐 Initializing and unsealing Vault...");
-                    let vault_init = stack::init_vault(&kubeconfig_path)?;
+                // Initialize and unseal OpenBao if requested
+                if init_openbao {
+                    println!("\n🔐 Initializing and unsealing OpenBao...");
+                    let openbao_init = stack::init_openbao(&kubeconfig_path)?;
 
                     // Save keys to file
-                    let vault_keys_path = output_dir.join("vault-keys.json");
+                    let openbao_keys_path = output_dir.join("openbao-keys.json");
                     let keys_json = serde_json::json!({
-                        "unseal_keys": vault_init.unseal_keys,
-                        "root_token": vault_init.root_token,
+                        "unseal_keys": openbao_init.unseal_keys,
+                        "root_token": openbao_init.root_token,
                     });
-                    std::fs::write(&vault_keys_path, serde_json::to_string_pretty(&keys_json)?)?;
+                    std::fs::write(&openbao_keys_path, serde_json::to_string_pretty(&keys_json)?)?;
 
                     // Unseal with first key
-                    if let Some(key) = vault_init.unseal_keys.first() {
-                        stack::unseal_vault(&kubeconfig_path, key)?;
+                    if let Some(key) = openbao_init.unseal_keys.first() {
+                        stack::unseal_openbao(&kubeconfig_path, key)?;
                     }
 
-                    println!("   ✅ Vault initialized and unsealed!");
-                    println!("   Root token: {}", vault_init.root_token);
-                    println!("   Keys saved to: {}", vault_keys_path.display());
+                    println!("   ✅ OpenBao initialized and unsealed!");
+                    println!("   Root token: {}", openbao_init.root_token);
+                    println!("   Keys saved to: {}", openbao_keys_path.display());
                 }
 
                 // Get ArgoCD password
@@ -1168,9 +1168,9 @@ async fn main() -> Result<()> {
             kubeconfig,
             argocd_only,
             cert_manager_only,
-            vault_only,
+            openbao_only,
             ingress_only,
-            init_vault,
+            init_openbao,
         } => {
             info!("Deploying CTO platform stack...");
 
@@ -1186,9 +1186,9 @@ async fn main() -> Result<()> {
             } else if cert_manager_only {
                 println!("\n🔐 Deploying Cert-Manager...");
                 stack::deploy_cert_manager(&kubeconfig)?;
-            } else if vault_only {
-                println!("\n🔒 Deploying Vault...");
-                stack::deploy_vault(&kubeconfig)?;
+            } else if openbao_only {
+                println!("\n🔒 Deploying OpenBao...");
+                stack::deploy_openbao(&kubeconfig)?;
             } else if ingress_only {
                 println!("\n🌐 Deploying Ingress-NGINX...");
                 stack::deploy_ingress_nginx(&kubeconfig)?;
@@ -1196,7 +1196,7 @@ async fn main() -> Result<()> {
                 // Deploy full stack
                 println!("\n📦 Deploying full CTO platform stack...");
                 println!(
-                    "   Components: Cert-Manager, ArgoCD, Vault, Ingress-NGINX, Argo Workflows"
+                    "   Components: Cert-Manager, ArgoCD, OpenBao, Ingress-NGINX, Argo Workflows"
                 );
 
                 println!("\n🔐 Step 1/5: Deploying Cert-Manager...");
@@ -1205,8 +1205,8 @@ async fn main() -> Result<()> {
                 println!("\n🚀 Step 2/5: Deploying ArgoCD...");
                 stack::deploy_argocd(&kubeconfig)?;
 
-                println!("\n🔒 Step 3/5: Deploying Vault...");
-                stack::deploy_vault(&kubeconfig)?;
+                println!("\n🔒 Step 3/5: Deploying OpenBao...");
+                stack::deploy_openbao(&kubeconfig)?;
 
                 println!("\n🌐 Step 4/5: Deploying Ingress-NGINX...");
                 stack::deploy_ingress_nginx(&kubeconfig)?;
@@ -1216,7 +1216,7 @@ async fn main() -> Result<()> {
             }
 
             // Get ArgoCD password if ArgoCD was deployed
-            if !cert_manager_only && !vault_only && !ingress_only {
+            if !cert_manager_only && !openbao_only && !ingress_only {
                 println!("\n📊 Stack deployment complete!");
 
                 if let Ok(password) = stack::get_argocd_password(&kubeconfig) {
@@ -1225,96 +1225,96 @@ async fn main() -> Result<()> {
                     println!("   Password: {password}");
                 }
 
-                // Initialize Vault if requested
-                if init_vault {
-                    println!("\n🔐 Initializing Vault...");
-                    match stack::init_vault(&kubeconfig) {
-                        Ok(vault_creds) => {
-                            // Unseal Vault with the first key
-                            if let Some(key) = vault_creds.unseal_keys.first() {
-                                if let Err(e) = stack::unseal_vault(&kubeconfig, key) {
-                                    println!("   ⚠️  Vault unseal failed: {e}");
-                                    println!("   Run manually: metal vault-unseal --kubeconfig {} --unseal-key {key}", kubeconfig.display());
+                // Initialize OpenBao if requested
+                if init_openbao {
+                    println!("\n🔐 Initializing OpenBao...");
+                    match stack::init_openbao(&kubeconfig) {
+                        Ok(openbao_creds) => {
+                            // Unseal OpenBao with the first key
+                            if let Some(key) = openbao_creds.unseal_keys.first() {
+                                if let Err(e) = stack::unseal_openbao(&kubeconfig, key) {
+                                    println!("   ⚠️  OpenBao unseal failed: {e}");
+                                    println!("   Run manually: metal openbao-unseal --kubeconfig {} --unseal-key {key}", kubeconfig.display());
                                 } else {
-                                    println!("   ✅ Vault initialized and unsealed!");
+                                    println!("   ✅ OpenBao initialized and unsealed!");
                                 }
                             } else {
-                                println!("   ⚠️  No unseal keys returned from Vault init");
+                                println!("   ⚠️  No unseal keys returned from OpenBao init");
                             }
-                            println!("\n🔑 Vault Credentials (SAVE THESE!):");
+                            println!("\n🔑 OpenBao Credentials (SAVE THESE!):");
                             println!(
                                 "   Unseal Key: {}",
-                                vault_creds.unseal_keys.first().unwrap_or(&String::new())
+                                openbao_creds.unseal_keys.first().unwrap_or(&String::new())
                             );
-                            println!("   Root Token: {}", vault_creds.root_token);
+                            println!("   Root Token: {}", openbao_creds.root_token);
                         }
                         Err(e) => {
-                            println!("   ⚠️  Vault init: {e}");
+                            println!("   ⚠️  OpenBao init: {e}");
                         }
                     }
                 } else {
-                    println!("\n⚠️  Vault needs initialization. Run:");
-                    println!("   metal vault-init --kubeconfig {}", kubeconfig.display());
+                    println!("\n⚠️  OpenBao needs initialization. Run:");
+                    println!("   metal openbao-init --kubeconfig {}", kubeconfig.display());
                 }
 
                 println!("\n📋 Access services:");
                 println!("   ArgoCD:  kubectl port-forward svc/argocd-server -n argocd 8080:443");
-                println!("   Vault:   kubectl port-forward svc/vault -n vault 8200:8200");
+                println!("   OpenBao: kubectl port-forward svc/openbao -n openbao 8200:8200");
             }
 
             println!("\n🎉 Stack deployment successful!");
         }
 
-        Commands::VaultInit { kubeconfig, output } => {
-            info!("Initializing Vault...");
+        Commands::OpenbaoInit { kubeconfig, output } => {
+            info!("Initializing OpenBao...");
 
             if !kubeconfig.exists() {
                 anyhow::bail!("Kubeconfig not found: {}", kubeconfig.display());
             }
 
-            match stack::init_vault(&kubeconfig) {
-                Ok(vault_creds) => {
-                    // Unseal Vault with the first key
-                    if let Some(key) = vault_creds.unseal_keys.first() {
-                        stack::unseal_vault(&kubeconfig, key)?;
-                        println!("\n🔐 Vault initialized and unsealed!");
+            match stack::init_openbao(&kubeconfig) {
+                Ok(openbao_creds) => {
+                    // Unseal OpenBao with the first key
+                    if let Some(key) = openbao_creds.unseal_keys.first() {
+                        stack::unseal_openbao(&kubeconfig, key)?;
+                        println!("\n🔐 OpenBao initialized and unsealed!");
                     } else {
-                        println!("\n🔐 Vault initialized (no unseal keys returned)!");
+                        println!("\n🔐 OpenBao initialized (no unseal keys returned)!");
                     }
-                    println!("\n🔑 Vault Credentials:");
+                    println!("\n🔑 OpenBao Credentials:");
                     println!(
                         "   Unseal Key: {}",
-                        vault_creds.unseal_keys.first().unwrap_or(&String::new())
+                        openbao_creds.unseal_keys.first().unwrap_or(&String::new())
                     );
-                    println!("   Root Token: {}", vault_creds.root_token);
+                    println!("   Root Token: {}", openbao_creds.root_token);
 
                     // Save to file
                     let json = serde_json::json!({
-                        "unseal_keys_b64": vault_creds.unseal_keys,
-                        "root_token": vault_creds.root_token,
+                        "unseal_keys_b64": openbao_creds.unseal_keys,
+                        "root_token": openbao_creds.root_token,
                     });
                     std::fs::write(&output, serde_json::to_string_pretty(&json)?)?;
                     println!("\n💾 Credentials saved to: {}", output.display());
                 }
                 Err(e) => {
-                    println!("❌ Vault initialization failed: {e}");
+                    println!("❌ OpenBao initialization failed: {e}");
                     return Err(e);
                 }
             }
         }
 
-        Commands::VaultUnseal {
+        Commands::OpenbaoUnseal {
             kubeconfig,
             unseal_key,
         } => {
-            info!("Unsealing Vault...");
+            info!("Unsealing OpenBao...");
 
             if !kubeconfig.exists() {
                 anyhow::bail!("Kubeconfig not found: {}", kubeconfig.display());
             }
 
-            stack::unseal_vault(&kubeconfig, &unseal_key)?;
-            println!("\n🔓 Vault unsealed successfully!");
+            stack::unseal_openbao(&kubeconfig, &unseal_key)?;
+            println!("\n🔓 OpenBao unsealed successfully!");
         }
     }
 
