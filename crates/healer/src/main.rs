@@ -5862,8 +5862,8 @@ fn redact_secrets(text: &str) -> String {
             r#""PERPLEXITY_API_KEY":"[REDACTED]""#,
         ),
         (r#""XAI_API_KEY":"[^"]+""#, r#""XAI_API_KEY":"[REDACTED]""#),
-        // Vault raw output blocks (entire _raw JSON)
-        (r"_raw=\{[^}]+\}", "_raw={[REDACTED_VAULT_DATA]}"),
+        // OpenBao/secrets raw output blocks (entire _raw JSON)
+        (r"_raw=\{[^}]+\}", "_raw={[REDACTED_SECRETS_DATA]}"),
     ];
 
     for (pattern, replacement) in secret_patterns {
