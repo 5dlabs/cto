@@ -391,3 +391,4 @@ impl CliAdapter for FactoryAdapter {
         Ok(health)
     }
 }
+

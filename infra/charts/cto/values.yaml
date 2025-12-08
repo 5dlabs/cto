@@ -236,3 +236,26 @@ tweakcn:
     requests:
       cpu: 100m
       memory: 256Mi
+
+# =============================================================================
+# Cloudflare Tunnel - Ingress via Cloudflare
+# =============================================================================
+cloudflare:
+  enabled: true
+  # Cloudflare domain (must be a zone you own)
+  domain: 5dlabs.ai
+  # Cloudflare Account ID
+  accountId: b73ec19faa187789b3f9d1deb0e0d95f
+  # Secret name (in cloudflare-operator-system namespace)
+  secretName: cloudflare-api-credentials
+  
+  # Tunnel configuration
+  tunnel:
+    name: cto-main
+  
+  # Service bindings
+  bindings:
+    pm:
+      hostname: pm.5dlabs.ai
+    webhooks:
+      hostname: github-webhooks.5dlabs.ai

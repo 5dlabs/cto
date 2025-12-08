@@ -98,6 +98,9 @@ spec:
             repository: ghcr.io/5dlabs/tweakcn
             tag: latest
 
+        cloudflare:
+          enabled: true
+
   destination:
     server: https://kubernetes.default.svc
     namespace: cto
@@ -125,5 +128,16 @@ spec:
       kind: Secret
       jsonPointers:
         - /data
+    # Cloudflare operator adds default values
+    - group: networking.cfargotunnel.com
+      kind: ClusterTunnel
+      jsonPointers:
+        - /status
+    - group: networking.cfargotunnel.com
+      kind: TunnelBinding
+      jsonPointers:
+        - /status
+        - /tunnelRef/disableDNSUpdates
+        - /subjects
 
   revisionHistoryLimit: 5

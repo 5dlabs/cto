@@ -1,4 +1,4 @@
-{{- if .Values.githubWebhooks.enabled }}
+{{- if .Values.webhooks.enabled }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

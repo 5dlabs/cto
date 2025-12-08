@@ -263,3 +263,4 @@ pub trait CloudProvider: Send + Sync {
     /// List all instances.
     async fn list_instances(&self) -> Result<Vec<Instance>, CloudProviderError>;
 }
+
