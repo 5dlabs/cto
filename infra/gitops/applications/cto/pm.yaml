@@ -110,7 +110,7 @@ spec:
 
   # Ignore differences for better GitOps experience
   ignoreDifferences:
-    # Ignore secret data changes (managed by Vault)
+    # Ignore secret data changes (managed by OpenBao)
     - group: ""
       kind: Secret
       jsonPointers:
