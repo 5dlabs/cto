@@ -136,3 +136,6 @@ agent-templates/
 
 # Documentation archive (private/archived docs)
 .docs-archive/
+
+# Documentation - kept locally only
+/docs/
