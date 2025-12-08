@@ -7,7 +7,6 @@
 # Post-deployment steps:
 #   1. Initialize: kubectl exec -n openbao openbao-0 -- bao operator init
 #   2. Unseal: kubectl exec -n openbao openbao-0 -- bao operator unseal
-#   3. Apply RBAC: kubectl apply -f infra/charts/openbao/rbac-service-registration.yaml
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -33,91 +32,102 @@ spec:
       jsonPointers:
         - /spec/volumeClaimTemplates
 
-  source:
-    repoURL: https://openbao.github.io/openbao-helm
-    chart: openbao
-    targetRevision: 0.8.0
-    helm:
-      values: |
-        global:
-          enabled: true
-          tlsDisable: true
-
-        server:
-          enabled: true
-          image:
-            registry: "quay.io"
-            repository: "openbao/openbao"
-            tag: "2.4.4"
-            pullPolicy: IfNotPresent
-
-          # Pod labels for log collection
-          extraLabels:
-            platform.5dlabs.io/log-collection: enabled
-          annotations:
-            logs.platform.5dlabs.io/collect: "true"
-            logs.platform.5dlabs.io/service: openbao
-
-          standalone:
+  # Multiple sources: Helm chart + supplementary RBAC for service registration
+  sources:
+    # Source 1: OpenBao Helm chart
+    - repoURL: https://openbao.github.io/openbao-helm
+      chart: openbao
+      targetRevision: 0.8.0
+      helm:
+        values: |
+          global:
             enabled: true
-            config: |
-              ui = true
+            tlsDisable: true
 
-              listener "tcp" {
-                tls_disable = 1
-                address = "[::]:8200"
-                cluster_address = "[::]:8201"
-              }
-
-              storage "raft" {
-                path = "/openbao/data"
-              }
-
-              service_registration "kubernetes" {}
-
-          dataStorage:
+          server:
             enabled: true
-            size: 10Gi
-            storageClass: "local-path"
-            accessMode: ReadWriteOnce
+            image:
+              registry: "quay.io"
+              repository: "openbao/openbao"
+              tag: "2.4.4"
+              pullPolicy: IfNotPresent
 
-          resources:
-            requests:
-              memory: 256Mi
-              cpu: 250m
-            limits:
-              memory: 512Mi
-              cpu: 500m
+            # Pod labels for log collection
+            extraLabels:
+              platform.5dlabs.io/log-collection: enabled
+            annotations:
+              logs.platform.5dlabs.io/collect: "true"
+              logs.platform.5dlabs.io/service: openbao
 
-          authDelegator:
+            standalone:
+              enabled: true
+              config: |
+                ui = true
+
+                listener "tcp" {
+                  tls_disable = 1
+                  address = "[::]:8200"
+                  cluster_address = "[::]:8201"
+                }
+
+                storage "raft" {
+                  path = "/openbao/data"
+                }
+
+                service_registration "kubernetes" {}
+
+            dataStorage:
+              enabled: true
+              size: 10Gi
+              storageClass: "local-path"
+              accessMode: ReadWriteOnce
+
+            resources:
+              requests:
+                memory: 256Mi
+                cpu: 250m
+              limits:
+                memory: 512Mi
+                cpu: 500m
+
+            authDelegator:
+              enabled: true
+
+            serviceAccount:
+              create: true
+
+            # Readiness probe - allow sealed state during init
+            readinessProbe:
+              enabled: true
+              port: 8200
+              path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+
+            service:
+              enabled: true
+              port: 8200
+              targetPort: 8200
+
+            affinity: ""
+
+          ui:
             enabled: true
-
-          serviceAccount:
-            create: true
-
-          # Readiness probe - allow sealed state during init
-          readinessProbe:
-            enabled: true
-            path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
-
-          service:
-            enabled: true
-            port: 8200
+            serviceType: ClusterIP
+            externalPort: 8200
             targetPort: 8200
 
-          affinity: ""
+          injector:
+            enabled: false
 
-        ui:
-          enabled: true
-          serviceType: ClusterIP
-          externalPort: 8200
-          targetPort: 8200
+          csi:
+            enabled: false
 
-        injector:
-          enabled: false
-
-        csi:
-          enabled: false
+    # Source 2: Supplementary RBAC for Kubernetes service registration
+    # Required to avoid 403 errors when OpenBao updates pod labels
+    - repoURL: https://github.com/5dlabs/cto
+      targetRevision: main
+      path: infra/charts/openbao
+      directory:
+        include: "rbac-service-registration.yaml"
 
   destination:
     server: https://kubernetes.default.svc
@@ -144,4 +154,3 @@ spec:
         maxDuration: 3m
 
   revisionHistoryLimit: 10
-
