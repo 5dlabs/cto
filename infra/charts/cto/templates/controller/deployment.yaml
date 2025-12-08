@@ -40,6 +40,8 @@ spec:
               value: {{ .Values.controller.config.rustLog | quote }}
             - name: TEMPLATES_VERSION
               value: {{ .Values.controller.templatesVersion | quote }}
+            - name: AGENT_TEMPLATES_PATH
+              value: "/app/templates"
           envFrom:
             - secretRef:
                 name: cto-secrets

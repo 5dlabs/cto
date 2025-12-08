@@ -1,19 +1,24 @@
 //! Template paths for heal remediation agents.
 //!
-//! Heal templates are located in `/templates/heal/{cli}/`
-//! where {cli} is either "claude" or "factory".
+//! Heal/remediation templates use the agent template structure under `agents/{agent}/healer/`.
+//! Templates are accessed via AGENT_TEMPLATES_PATH env var (embedded in Docker image).
+//!
+//! Note: Most remediation template resolution uses `template_paths::REMEDIATE_*` constants.
+//! This module provides utilities for dynamic agent-based lookups.
 
-/// Template path constants for heal agents.
-pub const HEAL_CLAUDE_AGENTS_TEMPLATE: &str = "/templates/heal/claude/agents.md.hbs";
-pub const HEAL_CLAUDE_CONTAINER_TEMPLATE: &str = "/templates/heal/claude/container.sh.hbs";
-pub const HEAL_FACTORY_AGENTS_TEMPLATE: &str = "/templates/heal/factory/agents.md.hbs";
-pub const HEAL_FACTORY_CONTAINER_TEMPLATE: &str = "/templates/heal/factory/container.sh.hbs";
+/// Default remediation agent (rex) template paths.
+/// These are relative paths - the base path comes from AGENT_TEMPLATES_PATH env var.
+pub const HEAL_CLAUDE_AGENTS_TEMPLATE: &str = "agents/rex/healer/system-prompt.md.hbs";
+pub const HEAL_CLAUDE_CONTAINER_TEMPLATE: &str = "agents/rex/healer/container.sh.hbs";
+pub const HEAL_FACTORY_AGENTS_TEMPLATE: &str = "agents/rex/healer/system-prompt.md.hbs";
+pub const HEAL_FACTORY_CONTAINER_TEMPLATE: &str = "agents/rex/healer/container.sh.hbs";
 
 /// Template path utilities for heal remediation.
 pub struct HealTemplatePaths;
 
 impl HealTemplatePaths {
-    /// Get the agents.md template path for a given CLI type.
+    /// Get the system-prompt template path for a given CLI type.
+    /// Returns a relative path to be combined with AGENT_TEMPLATES_PATH.
     #[must_use]
     pub fn agents_template(cli_type: &str) -> &'static str {
         match cli_type.to_lowercase().as_str() {
@@ -23,6 +28,7 @@ impl HealTemplatePaths {
     }
 
     /// Get the container.sh template path for a given CLI type.
+    /// Returns a relative path to be combined with AGENT_TEMPLATES_PATH.
     #[must_use]
     pub fn container_template(cli_type: &str) -> &'static str {
         match cli_type.to_lowercase().as_str() {
@@ -31,14 +37,11 @@ impl HealTemplatePaths {
         }
     }
 
-    /// Get the base template directory for a given CLI type.
+    /// Get the template directory for a given agent's healer templates.
+    /// Returns a relative path to be combined with AGENT_TEMPLATES_PATH.
     #[must_use]
-    pub fn template_dir(cli_type: &str) -> String {
-        let cli = match cli_type.to_lowercase().as_str() {
-            "factory" => "factory",
-            _ => "claude",
-        };
-        format!("/templates/heal/{cli}")
+    pub fn template_dir(agent: &str) -> String {
+        format!("agents/{agent}/healer")
     }
 }
 
@@ -89,12 +92,12 @@ mod tests {
     #[test]
     fn test_template_dir() {
         assert_eq!(
-            HealTemplatePaths::template_dir("claude"),
-            "/templates/heal/claude"
+            HealTemplatePaths::template_dir("rex"),
+            "agents/rex/healer"
         );
         assert_eq!(
-            HealTemplatePaths::template_dir("factory"),
-            "/templates/heal/factory"
+            HealTemplatePaths::template_dir("blaze"),
+            "agents/blaze/healer"
         );
     }
 }
