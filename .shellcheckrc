@@ -1,0 +1,7 @@
+# ShellCheck configuration
+# https://www.shellcheck.net/wiki/Ignore
+
+# SC2129: Consider using { cmd1; cmd2; } >> file instead of individual redirects
+# This is a style preference; we prefer explicit redirects for clarity in CI scripts
+disable=SC2129
+

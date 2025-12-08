@@ -21,9 +21,9 @@ env:
   IMAGE_BASE: 5dlabs
 
 jobs:
-  # Change detection job
+  # Change detection job (lightweight - stays on ubuntu)
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       healer: ${{ steps.filter.outputs.healer }}
       docker: ${{ steps.filter.outputs.docker }}
@@ -39,112 +39,90 @@ jobs:
             docker:
               - 'infra/images/healer/**'
 
-  # Rust linting (format + clippy pedantic)
+  # Rust linting using composite action
   lint-rust:
     needs: changes
     if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     outputs:
-      format-needed: ${{ steps.format-check.outputs.format-needed }}
+      format-needed: ${{ steps.lint.outputs.format-needed }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
         with:
-          toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+          sccache-size: '50G'
+
+      - name: Lint healer
+        id: lint
+        uses: ./.github/actions/rust-lint
         with:
-          workspaces: ". -> target"
-          shared-key: "rust-cache-healer-ci"
+          package: healer
+          use-sccache: 'true'
 
-      - name: Check formatting
-        id: format-check
-        run: |
-          echo "🔧 Checking cargo fmt..."
-          if ! cargo fmt -p healer -- --check; then
-            echo "📝 Formatting issues detected"
-            echo "format-needed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "format-needed=false" >> "$GITHUB_OUTPUT"
-            echo "✅ Code formatting is correct"
-          fi
-
-      - name: Run Clippy (pedantic)
-        run: |
-          echo "🔍 Running clippy with pedantic warnings..."
-          cargo clippy -p healer --all-targets -- -D warnings -W clippy::pedantic
-
-  # Run tests
+  # Run tests using composite action
   test-rust:
     needs: changes
     if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
-        with:
-          workspaces: ". -> target"
-          shared-key: "rust-cache-healer-ci"
 
-      - name: Run all tests
-        run: |
-          echo "🧪 Running all healer tests..."
-          cargo test -p healer --all-targets
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
 
-  # Build check (ensure it compiles for release)
+      - name: Test healer
+        uses: ./.github/actions/rust-test
+        with:
+          package: healer
+          use-sccache: 'true'
+
+  # Build check using composite action
   build-check:
     needs: changes
     if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
-        with:
-          workspaces: ". -> target"
-          shared-key: "rust-cache-healer-ci"
 
-      - name: Build release binary
-        run: |
-          echo "🔨 Building healer binary..."
-          cargo build -p healer --release --bin healer
-          echo "✅ Release build successful"
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build healer
+        uses: ./.github/actions/rust-build
+        with:
+          package: healer
+          binary: healer
+          use-sccache: 'true'
 
   # Security audit (non-blocking)
   security-audit:
     needs: changes
     if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache cargo-audit
-        uses: actions/cache@v4
-        id: cargo-audit-cache
-        with:
-          path: ~/.cargo/bin/cargo-audit
-          key: cargo-audit-${{ runner.os }}-0.21.2
-
-      - name: Install cargo-audit
-        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-audit --version 0.21.2
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
 
       - name: Run security audit
         run: |
-          echo "🔒 Running cargo audit..."
+          cargo install cargo-audit --version 0.21.2 2>/dev/null || true
           cargo audit || true
 
   # Dockerfile validation
   docker-lint:
     needs: changes
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -154,7 +132,7 @@ jobs:
           dockerfile: infra/images/healer/Dockerfile
           failure-threshold: warning
 
-  # Build and push Docker image (only on push to main, not PRs)
+  # Build and push Docker image (only on push to main)
   build-docker:
     needs: [lint-rust, test-rust, build-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -165,69 +143,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup optimized Rust environment
-        run: |
-          echo "🚀 Setting up optimized Rust build environment..."
-          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
-          export PATH="/home/runner/.cargo/bin:$PATH"
-
-          # Check if both rustc and cargo are available and working
-          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
-            echo "✅ Rust toolchain ready: $(rustc --version)"
-          else
-            echo "🔧 Installing/repairing Rust toolchain..."
-            rustup toolchain uninstall stable 2>/dev/null || true
-            for _ in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup toolchain install stable && \
-              rustup default stable && break
-              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            done
-          fi
-
-          rustc --version
-          cargo --version
-          sccache --version || echo "⚠️ sccache not found"
-
-      - name: Setup sccache
-        run: |
-          export PATH="/home/runner/.cargo/bin:$PATH"
-          export SCCACHE_CACHE_SIZE="50G"
-          export SCCACHE_IDLE_TIMEOUT="0"
-          sccache --stop-server 2>/dev/null || true
-          sccache --start-server
-
-      - name: Build release binary
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: "sccache"
-          SCCACHE_CACHE_SIZE: "50G"
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-        run: |
-          echo "🔨 Building healer for linux/amd64..."
-          cargo build -p healer --release --bin healer
-
-          # Copy binary to Docker context root (Dockerfile expects 'healer' at root)
-          cp target/release/healer healer
-          chmod +x healer
-
-          # Copy prompts to Docker context root (Dockerfile expects 'prompts/' at root)
-          cp -r crates/healer/prompts prompts
-
-          echo "✅ Binary and prompts copied to Docker context"
-          echo "📊 Final sccache stats:"
-          sccache --show-stats
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          sccache-size: '50G'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+      - name: Build healer binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: healer
+          binary: healer
+          output-path: healer
+          use-sccache: 'true'
+
+      - name: Copy prompts to Docker context
+        run: cp -r crates/healer/prompts prompts
 
       - name: Get version info
         id: version
@@ -238,24 +168,11 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: ./.github/actions/docker-build-push
         with:
+          image-name: healer
           context: .
-          file: ./infra/images/healer/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}
-
-      - name: Summary
-        run: |
-          {
-            echo "## 🐳 Healer Docker Image Built"
-            echo ""
-            echo "**Tags:**"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ steps.version.outputs.version }}\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          dockerfile: ./infra/images/healer/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
