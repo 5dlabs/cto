@@ -17,6 +17,7 @@ spec:
         {{- include "cto.controller.selectorLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/controller/configmap.yaml") . | sha256sum }}
+        checksum/task-config: {{ include (print $.Template.BasePath "/controller/task-controller-config.yaml") . | sha256sum }}
     spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "cto.controller.fullname" . }}
