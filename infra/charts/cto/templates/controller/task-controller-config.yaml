@@ -28,6 +28,16 @@ data:
           repository: {{ .Values.agent.inputBridge.image.repository | default "" | quote }}
           tag: {{ .Values.agent.inputBridge.image.tag | default "" | quote }}
         port: {{ .Values.agent.inputBridge.port | default 8080 }}
+    job:
+      namespace: {{ include "cto.namespace" . }}
+      workflow:
+        serviceAccountName: controller-workflow-submitter
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          memory: "2Gi"
     rbac:
       create: true
       submitter:
