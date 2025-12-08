@@ -26,20 +26,19 @@ RUN --mount=type=cache,target=/root/.cache \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-# Install Dexter and dependencies
-# Uses pip with --break-system-packages since we're in a container
+# Clone and install Dexter using uv (required for uv-managed projects)
 ARG DEXTER_VERSION=latest
-RUN --mount=type=cache,target=/root/.cache/pip \
-    if [ "$DEXTER_VERSION" = "latest" ]; then \
-      pip install --break-system-packages \
-        git+https://github.com/virattt/dexter.git; \
-    else \
-      pip install --break-system-packages \
-        git+https://github.com/virattt/dexter.git@v${DEXTER_VERSION}; \
-    fi
+RUN --mount=type=cache,target=/root/.cache/uv \
+    git clone https://github.com/virattt/dexter.git /opt/dexter && \
+    cd /opt/dexter && \
+    if [ "$DEXTER_VERSION" != "latest" ]; then \
+      git checkout "v${DEXTER_VERSION}"; \
+    fi && \
+    uv sync && \
+    ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
 
 # Verify installation
-RUN python3 -c "from dexter.agent import Agent; print('✅ Dexter installed successfully')"
+RUN cd /opt/dexter && uv run python -c "from dexter.agent import Agent; print('✅ Dexter installed successfully')"
 
 # Configure git identity for agent operations
 USER node
