@@ -246,7 +246,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}
 
       - name: Summary
@@ -256,6 +256,6 @@ jobs:
             echo ""
             echo "**Tags:**"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ steps.version.outputs.version }}\`"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

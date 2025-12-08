@@ -400,7 +400,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}
 
       - name: Summary
@@ -410,6 +410,6 @@ jobs:
             echo ""
             echo "**Tags:**"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ steps.version.outputs.version }}\`"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

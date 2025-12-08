@@ -597,7 +597,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.short-sha }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
@@ -609,7 +609,7 @@ jobs:
             echo ""
             echo "**Tags:**"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ steps.version.outputs.version }}\`"
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.short-sha }}\`"
             echo ""
             echo "ArgoCD Image Updater will detect and deploy this image automatically."
