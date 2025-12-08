@@ -27,7 +27,7 @@ env:
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
   changes:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     outputs:
       tools: ${{ steps.filter.outputs.tools }}
       mcp: ${{ steps.filter.outputs.mcp }}
@@ -147,11 +147,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Helm
-        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
-        with:
-          version: 'latest'
-
       - name: Lint Helm chart
         run: |
           echo "🔍 Linting tools Helm chart..."
@@ -186,9 +181,6 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust (k8s-runner)
-        uses: ./.github/actions/setup-rust-k8s
 
       - name: Run security audit
         run: |
