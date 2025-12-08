@@ -15,7 +15,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: opensearch-operator
-  namespace: argo
+  namespace: argocd
   labels:
     app.kubernetes.io/name: opensearch-operator
     app.kubernetes.io/part-of: platform
