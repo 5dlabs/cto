@@ -60,6 +60,9 @@ jobs:
         uses: ./.github/actions/rust-lint
         with:
           package: research
+          # Research crate has its own [lints.clippy] config in Cargo.toml
+          # with pedantic deny + specific allows, so don't pass extra args
+          clippy-args: ''
           use-sccache: 'true'
 
   # Run tests using composite action
