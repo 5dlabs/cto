@@ -98,6 +98,7 @@ spec:
           # Readiness probe - allow sealed state during init
           readinessProbe:
             enabled: true
+            port: 8200
             path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
 
           service:
