@@ -24,12 +24,14 @@ metadata:
       pm=ghcr.io/5dlabs/pm-server,
       tools=ghcr.io/5dlabs/tools,
       openmemory=ghcr.io/5dlabs/openmemory,
-      healer=ghcr.io/5dlabs/healer
+      healer=ghcr.io/5dlabs/healer,
+      tweakcn=ghcr.io/5dlabs/tweakcn
     argocd-image-updater.argoproj.io/controller.update-strategy: latest
     argocd-image-updater.argoproj.io/pm.update-strategy: latest
     argocd-image-updater.argoproj.io/tools.update-strategy: latest
     argocd-image-updater.argoproj.io/openmemory.update-strategy: latest
     argocd-image-updater.argoproj.io/healer.update-strategy: latest
+    argocd-image-updater.argoproj.io/tweakcn.update-strategy: latest
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -89,6 +91,12 @@ spec:
 
         webhooks:
           enabled: true
+
+        tweakcn:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/tweakcn
+            tag: latest
 
   destination:
     server: https://kubernetes.default.svc

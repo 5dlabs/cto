@@ -1,0 +1,58 @@
+{{- if .Values.tweakcn.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tweakcn
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/name: tweakcn
+    app.kubernetes.io/component: theme-editor
+spec:
+  replicas: {{ .Values.tweakcn.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tweakcn
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tweakcn
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: tweakcn
+          image: "{{ .Values.tweakcn.image.repository }}:{{ .Values.tweakcn.image.tag }}"
+          imagePullPolicy: {{ .Values.tweakcn.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.tweakcn.service.port }}
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: {{ .Values.tweakcn.service.port | quote }}
+          resources:
+            {{- toYaml .Values.tweakcn.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1001
+{{- end }}
