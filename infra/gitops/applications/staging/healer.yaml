@@ -1,0 +1,208 @@
+---
+# ArgoCD Application for Healer - Staging Environment
+# Namespace: cto-staging
+# Branch: develop (auto-sync)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-healer-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/managed-by: app-of-apps-staging
+    environment: staging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: develop
+    path: infra/charts/universal-app
+
+    helm:
+      valuesObject:
+        replicaCount: 1
+        revisionHistoryLimit: 5
+
+        image:
+          repository: ghcr.io/5dlabs/healer
+          pullPolicy: Always
+          tag: develop
+
+        imagePullSecrets:
+          - name: ghcr-secret
+
+        fullnameOverride: healer
+
+        serviceAccount:
+          create: true
+          automount: true
+          name: healer-staging
+
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: healer-staging
+
+        podLabels:
+          app.kubernetes.io/component: monitor
+          platform.5dlabs.io/log-collection: enabled
+          environment: staging
+
+        podSecurityContext:
+          fsGroup: 65532
+
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - DAC_OVERRIDE
+          readOnlyRootFilesystem: false
+          runAsNonRoot: false
+          runAsUser: 0
+
+        service:
+          type: ClusterIP
+          port: 8080
+
+        ingress:
+          enabled: false
+
+        terminationGracePeriodSeconds: 30
+
+        # Staging resources (slightly less than prod)
+        resources:
+          limits:
+            cpu: 300m
+            memory: 512Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+
+        autoscaling:
+          enabled: false
+
+        volumes:
+          - name: healer-workspace
+            emptyDir: {}  # Use emptyDir for staging (no PVC needed)
+
+        volumeMounts:
+          - name: healer-workspace
+            mountPath: /workspace/watch
+
+        nodeSelector: {}
+        tolerations: []
+        affinity: {}
+        configureDefaultAffinity: false
+
+        updateStrategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+
+        env:
+          - name: LOG_LEVEL
+            value: debug
+          - name: RUST_LOG
+            value: healer=debug,info
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: cto-secrets
+                key: ANTHROPIC_API_KEY
+                optional: true
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: tools-github-secrets
+                key: GITHUB_PERSONAL_ACCESS_TOKEN
+                optional: true
+
+        envFrom: []
+
+        configMap:
+          enabled: false
+
+        persistence:
+          enabled: false
+
+        networkPolicy:
+          enabled: false
+
+        command:
+          - /usr/local/bin/healer
+
+        args:
+          - server
+          - --addr
+          - "0.0.0.0:8080"
+          - --dry-run  # Staging runs in dry-run mode
+
+        skipDefaultInitContainers: true
+
+        extraInitContainers:
+          - name: fix-pvc-permissions
+            image: busybox:latest
+            command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Setting up workspace directories..."
+                mkdir -p /workspace/watch/logs /workspace/watch/alerts /workspace/watch/completion /workspace/watch/locks
+                chmod -R 777 /workspace/watch
+                echo "Permissions set."
+            volumeMounts:
+              - name: healer-workspace
+                mountPath: /workspace/watch
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 1s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+
+  revisionHistoryLimit: 10
+
