@@ -61,6 +61,11 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: cto
       server: https://kubernetes.default.svc
+    # Multi-environment namespaces
+    - namespace: cto-dev         # Development environment
+      server: https://kubernetes.default.svc
+    - namespace: cto-staging     # Staging environment
+      server: https://kubernetes.default.svc
     - namespace: 'cto-preview-*'  # Preview deployments (Bolt)
       server: https://kubernetes.default.svc
     - namespace: 'cto-prod-*'     # Production deployments (Bolt)

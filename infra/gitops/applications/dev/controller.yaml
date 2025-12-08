@@ -1,0 +1,98 @@
+---
+# ArgoCD Application for Controller - Development Environment
+# Namespace: cto-dev
+# Branch: Feature branches (manual sync)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-controller-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: controller
+    app.kubernetes.io/part-of: cto
+    app.kubernetes.io/managed-by: app-of-apps-dev
+    environment: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: HEAD  # Tracks current branch
+    path: infra/charts/controller
+
+    helm:
+      valueFiles:
+        - values.yaml
+
+      parameters:
+        - name: image.repository
+          value: ghcr.io/5dlabs/controller
+        - name: image.tag
+          value: latest
+        - name: image.pullPolicy
+          value: Always
+
+        # Reduced resources for dev
+        - name: resources.limits.cpu
+          value: 500m
+        - name: resources.limits.memory
+          value: 1Gi
+        - name: resources.requests.cpu
+          value: 100m
+        - name: resources.requests.memory
+          value: 256Mi
+
+        # Faster cleanup in dev
+        - name: cleanup.completedJobDelayMinutes
+          value: "2"
+        - name: cleanup.failedJobDelayMinutes
+          value: "15"
+
+        # Dev monitoring
+        - name: metrics.enabled
+          value: "true"
+        - name: metrics.serviceMonitor.enabled
+          value: "false"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto-dev
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false  # Allow manual changes in dev
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+  revisionHistoryLimit: 5
+
