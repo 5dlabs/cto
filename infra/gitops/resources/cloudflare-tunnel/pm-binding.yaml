@@ -6,7 +6,7 @@
 # pm.5dlabs.ai/webhooks/{linear,github,asana,...}
 #   -> Cloudflare Edge
 #   -> cto-main tunnel
-#   -> pm-svc:8081
+#   -> cto-pm-svc:8081
 #
 # Supported integration paths:
 #   /webhooks/linear  - Linear OAuth app webhooks
@@ -32,10 +32,10 @@ tunnelRef:
   kind: ClusterTunnel
   name: cto-main
 subjects:
-  - name: pm-svc
+  - name: cto-pm-svc
     spec:
       # Public hostname for PM webhooks (production)
       fqdn: pm.5dlabs.ai
       # Path matching - all paths for webhook handling and health checks
       # Target service (must include protocol)
-      target: http://pm-svc.cto.svc:8081
+      target: http://cto-pm-svc.cto.svc:8081
