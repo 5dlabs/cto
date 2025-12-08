@@ -1,0 +1,21 @@
+{{- if .Values.tweakcn.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: tweakcn
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/name: tweakcn
+    app.kubernetes.io/component: theme-editor
+spec:
+  type: {{ .Values.tweakcn.service.type }}
+  ports:
+    - port: {{ .Values.tweakcn.service.port }}
+      targetPort: {{ .Values.tweakcn.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: tweakcn
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

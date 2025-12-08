@@ -1,0 +1,42 @@
+{{- if .Values.webhooks.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: github-demo-sensor
+  namespace: automation
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-any
+      eventSourceName: github
+      eventName: org
+  triggers:
+    - template:
+        name: log-event
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                generateName: github-event-
+                namespace: automation
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: echo
+                    image: busybox:1.36
+                    command: ["/bin/sh", "-c"]
+                    args: ["echo Received GitHub event: $PAYLOAD | head -c 2000; echo; sleep 5"]
+                    env:
+                      - name: PAYLOAD
+                        value: ""
+          parameters:
+            - src:
+                dependencyName: github-any
+                dataKey: body
+              dest: spec.containers.0.env.0.value
+{{- end }}

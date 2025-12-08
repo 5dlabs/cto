@@ -1,0 +1,44 @@
+{{- if .Values.openmemory.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.openmemory.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.openmemory.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.openmemory.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.openmemory.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cto.openmemory.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: openmemory
+          image: "{{ .Values.openmemory.image.repository }}:{{ .Values.openmemory.image.tag }}"
+          imagePullPolicy: {{ .Values.openmemory.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.openmemory.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.openmemory.service.port | quote }}
+          resources:
+            {{- toYaml .Values.openmemory.resources | nindent 12 }}
+          {{- if .Values.openmemory.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- end }}
+      {{- if .Values.openmemory.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "cto.openmemory.fullname" . }}
+      {{- end }}
+{{- end }}

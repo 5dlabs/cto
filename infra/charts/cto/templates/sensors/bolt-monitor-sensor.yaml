@@ -1,0 +1,130 @@
+{{- if .Values.sensors.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: bolt-monitor-daemon
+  namespace: automation
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  # Continuous monitoring - no specific event dependency
+  # This sensor runs on a schedule to check ALL ArgoCD applications
+  dependencies:
+    - name: monitor-trigger
+      eventSourceName: calendar
+      eventName: monitor-interval
+      filters:
+        # Trigger every 30 seconds
+        time:
+          start: "0 * * * * *"
+          stop: "30 * * * * *"
+
+  triggers:
+    - template:
+        name: bolt-monitor-check
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-bolt-monitor-
+                namespace: cto
+                labels:
+                  agent: bolt
+                  mode: monitor
+                  trigger: scheduled
+              spec:
+                githubApp: "5DLabs-Bolt"
+                cli: "Claude"
+                model: "claude-sonnet-4-5-20250929"
+                maxTokens: 4096
+                temperature: 0.3
+                repositoryUrl: "https://github.com/5dlabs/cto.git"
+                env:
+                  - name: BOLT_MODE
+                    value: "monitor"
+                  - name: CHECK_INTERVAL
+                    value: "30"
+                  - name: UPDATE_ON_CHANGE_ONLY
+                    value: "true"
+
+---
+# Calendar EventSource for scheduled monitoring
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: calendar
+  namespace: automation
+spec:
+  calendar:
+    monitor-interval:
+      # Check every 30 seconds
+      interval: 30s
+      exclusionDates: []
+      timezone: UTC
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bolt-monitor-strategy
+  namespace: automation
+data:
+  strategy.md: |
+    # Bolt Monitor Strategy
+
+    ## Purpose: Continuous Deployment Health Monitoring
+
+    Bolt-Monitor runs as a **daemon** (always on) to provide continuous visibility
+    into ALL deployments across the platform.
+
+    ### Monitoring Scope
+    - ALL ArgoCD applications in the cluster
+    - Both preview and production environments
+    - Health status (Healthy, Progressing, Degraded, Missing)
+    - Sync status (Synced, OutOfSync, Unknown)
+    - Pod health (Running, Pending, Failed, CrashLoopBackOff)
+    - Recent logs for errors/warnings
+
+    ### Check Interval
+    - Runs every 30 seconds
+    - Only posts PR updates on status changes (avoids spam)
+    - Maintains a state cache to detect changes
+
+    ### Correlation Logic
+    Applications are correlated to PRs via:
+    1. Task ID in app name: `task-{id}-preview` or `task-{id}-prod`
+    2. GitHub PR labels: `task-{id}`
+    3. ArgoCD app labels: `task-id: "{id}"`
+
+    ### Comment Format
+    Posts a single, continuously updated comment per PR:
+
+    ```markdown
+    ## 📊 Bolt Monitor: Deployment Health
+
+    ### Preview Deployments
+    - **task-5-preview** ✅ Healthy | Synced 2m ago
+      - Pods: 3/3 Running
+      - URL: https://task-5-preview.ngrok.io
+
+    ### Production Deployments
+    - **task-3-prod** ✅ Healthy | Synced 15m ago
+      - Pods: 2/2 Running
+      - URL: https://task-3-prod.ngrok.io
+
+    **Last Check:** 2025-11-05 10:45:00 UTC
+    ```
+
+    ### Integration with Other Modes
+    - **Bolt-Preview** creates preview deployments
+    - **Bolt-Monitor** tracks preview health (this mode)
+    - **Bolt-Production** creates production deployments
+    - **Bolt-Monitor** tracks production health (this mode)
+
+    Monitor mode provides **continuous visibility** across all deployment modes.
+{{- end }}
