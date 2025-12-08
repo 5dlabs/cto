@@ -28,20 +28,21 @@ RUN --mount=type=cache,target=/root/.cache \
     ln -sf /root/.local/bin/uv /usr/local/bin/uv
 ENV PATH="/root/.local/bin:$PATH"
 
-# Clone Dexter repository
+# Clone Dexter repository and install with uv in a single layer
+# This ensures the clone and install happen together, avoiding cache issues
+# where git metadata exists but files weren't fully checked out
 ARG DEXTER_VERSION=latest
 RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
+    cd /opt/dexter && \
     if [ "$DEXTER_VERSION" != "latest" ]; then \
-      cd /opt/dexter && git checkout "v${DEXTER_VERSION}"; \
-    fi
-
-# Install Dexter using uv (run from within the project directory)
-WORKDIR /opt/dexter
-RUN --mount=type=cache,target=/root/.cache/uv \
+      git checkout "v${DEXTER_VERSION}"; \
+    fi && \
+    ls -la && \
     uv sync && \
     ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
 
 # Verify installation
+WORKDIR /opt/dexter
 RUN uv run python -c "from dexter.agent import Agent; print('✅ Dexter installed successfully')"
 
 WORKDIR /workspace
@@ -59,4 +60,3 @@ ENV DEXTER_MODEL="claude-sonnet-4-20250514" \
     DEXTER_MAX_STEPS_PER_TASK="5"
 
 USER node
-

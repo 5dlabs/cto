@@ -28,10 +28,31 @@ metadata:
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
 spec:
   project: default
+
+  # Ignore fields that the ClickHouse operator adds to its own deployment
+  # The operator self-labels with version and build info which causes perpetual OutOfSync
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: clickhouse-operator-altinity-clickhouse-operator
+      namespace: kube-system
+      managedFieldsManagers:
+        - clickhouse-operator
+
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
-    path: deploy/operator
+    path: deploy/helm/clickhouse-operator
     targetRevision: release-0.25.5
+    helm:
+      releaseName: clickhouse-operator
+      # Include the labels that the operator self-applies to prevent drift
+      # These labels are dynamically added by the operator after deployment
+      valuesObject:
+        commonLabels:
+          clickhouse.altinity.com/app: chop
+          clickhouse.altinity.com/chop: "0.25.5"
+          clickhouse.altinity.com/chop-commit: 9ab22d8
+          clickhouse.altinity.com/chop-date: "2025-10-24T08.40.12"
 
   destination:
     server: https://kubernetes.default.svc
@@ -43,6 +64,7 @@ spec:
       selfHeal: true
     syncOptions:
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
