@@ -135,9 +135,8 @@ spec:
         - /status
     - group: networking.cfargotunnel.com
       kind: TunnelBinding
-      jsonPointers:
-        - /status
-        - /tunnelRef/disableDNSUpdates
-        - /subjects
+      jqPathExpressions:
+        - .subjects
+        - .tunnelRef
 
   revisionHistoryLimit: 5
