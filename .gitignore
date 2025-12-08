@@ -139,3 +139,6 @@ agent-templates/
 
 # Documentation - kept locally only
 /docs/
+
+# Local scripts (development utilities, not for version control)
+/.scripts/
