@@ -1,0 +1,49 @@
+---
+# Composite action for running Rust tests
+name: Rust Test
+description: |
+  Run cargo test on a Rust package with configurable options.
+
+inputs:
+  package:
+    description: 'Cargo package name to test'
+    required: true
+  working-directory:
+    description: 'Working directory for cargo commands'
+    required: false
+    default: '.'
+  features:
+    description: 'Features to enable (comma-separated or "all")'
+    required: false
+    default: ''
+  test-args:
+    description: 'Additional test arguments'
+    required: false
+    default: '--all-targets'
+  use-sccache:
+    description: 'Whether to use sccache (for k8s-runner)'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Run tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RUSTC_WRAPPER: ${{ inputs.use-sccache == 'true' && 'sccache' || '' }}
+        CARGO_INCREMENTAL: ${{ inputs.use-sccache == 'true' && '0' || '1' }}
+      run: |
+        echo "🧪 Running tests for ${{ inputs.package }}..."
+
+        FEATURES_ARG=""
+        if [ "${{ inputs.features }}" = "all" ]; then
+          FEATURES_ARG="--all-features"
+        elif [ -n "${{ inputs.features }}" ]; then
+          FEATURES_ARG="--features ${{ inputs.features }}"
+        fi
+
+        cargo test -p ${{ inputs.package }} $FEATURES_ARG ${{ inputs.test-args }}
+        echo "✅ All tests passed"
+
