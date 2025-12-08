@@ -6,13 +6,9 @@
 # and must NOT be passed to actionlint.
 #
 # Usage: actionlint .github/workflows/*.yaml
+# To suppress SC2129 style suggestions: actionlint -ignore 'SC2129' .github/workflows/*.yaml
 
 self-hosted-runner:
   # Our k8s-runner is a self-hosted runner
   labels:
     - k8s-runner
-
-# Ignore SC2129 style suggestions about grouped redirects
-# This is common in GitHub Actions scripts with conditional logic
-ignore:
-  - 'SC2129.*grouped redirects'
