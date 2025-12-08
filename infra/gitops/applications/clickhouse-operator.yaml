@@ -36,16 +36,16 @@ spec:
       kind: Deployment
       name: clickhouse-operator-altinity-clickhouse-operator
       namespace: kube-system
-      jsonPointers:
-        # Ignore the clickhouse.altinity.com labels that the operator adds at runtime
-        - /metadata/labels/clickhouse.altinity.com~1app
-        - /metadata/labels/clickhouse.altinity.com~1chop
-        - /metadata/labels/clickhouse.altinity.com~1chop-commit
-        - /metadata/labels/clickhouse.altinity.com~1chop-date
-        - /spec/template/metadata/labels/clickhouse.altinity.com~1app
-        - /spec/template/metadata/labels/clickhouse.altinity.com~1chop
-        - /spec/template/metadata/labels/clickhouse.altinity.com~1chop-commit
-        - /spec/template/metadata/labels/clickhouse.altinity.com~1chop-date
+      jqPathExpressions:
+        # Ignore all labels starting with clickhouse.altinity.com
+        - .metadata.labels["clickhouse.altinity.com/app"]
+        - .metadata.labels["clickhouse.altinity.com/chop"]
+        - .metadata.labels["clickhouse.altinity.com/chop-commit"]
+        - .metadata.labels["clickhouse.altinity.com/chop-date"]
+        - .spec.template.metadata.labels["clickhouse.altinity.com/app"]
+        - .spec.template.metadata.labels["clickhouse.altinity.com/chop"]
+        - .spec.template.metadata.labels["clickhouse.altinity.com/chop-commit"]
+        - .spec.template.metadata.labels["clickhouse.altinity.com/chop-date"]
 
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
