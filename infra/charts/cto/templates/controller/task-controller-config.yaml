@@ -8,46 +8,62 @@ metadata:
     {{- include "cto.controller.labels" . | nindent 4 }}
 data:
   config.yaml: |
+    job:
+      activeDeadlineSeconds: 7200
+    
     agent:
       image:
         repository: {{ .Values.agent.image.repository | quote }}
         tag: {{ .Values.agent.image.tag | quote }}
+      imagePullSecrets:
+        - ghcr-secret
       cliImages:
         {{- toYaml .Values.agent.cliImages | nindent 8 }}
-      {{- if .Values.agent.cliProviders }}
-      cliProviders:
-        {{- toYaml .Values.agent.cliProviders | nindent 8 }}
-      {{- end }}
-      {{- if .Values.agent.agentCliConfigs }}
-      agentCliConfigs:
-        {{- toYaml .Values.agent.agentCliConfigs | nindent 8 }}
-      {{- end }}
-      inputBridge:
-        enabled: {{ .Values.agent.inputBridge.enabled | default false }}
-        image:
-          repository: {{ .Values.agent.inputBridge.image.repository | default "" | quote }}
-          tag: {{ .Values.agent.inputBridge.image.tag | default "" | quote }}
-        port: {{ .Values.agent.inputBridge.port | default 8080 }}
-    job:
-      namespace: {{ include "cto.namespace" . }}
-      activeDeadlineSeconds: 3600
-      ttlSecondsAfterFinished: 600
-      workflow:
-        serviceAccountName: controller-workflow-submitter
-      resources:
-        requests:
-          cpu: "500m"
-          memory: "512Mi"
-        limits:
-          memory: "2Gi"
-    rbac:
-      create: true
-      submitter:
-        serviceAccount: controller-workflow-submitter
-        clusterAdminServiceAccount:
-          create: true
-          name: controller-cluster-admin
+    
+    secrets:
+      apiKeySecretName: cto-secrets
+      apiKeySecretKey: ANTHROPIC_API_KEY
+      cliApiKeys:
+        codex:
+          secretKey: OPENAI_API_KEY
+          envVar: OPENAI_API_KEY
+        gemini:
+          secretKey: GEMINI_API_KEY
+          envVar: GEMINI_API_KEY
+        factory:
+          secretKey: FACTORY_API_KEY
+          envVar: FACTORY_API_KEY
+    
+    permissions:
+      agentToolsOverride: false
+      allow:
+        - "Bash(*)"
+        - "Edit(*)"
+        - "Read(*)"
+        - "Write(*)"
+        - "MultiEdit(*)"
+        - "Glob(*)"
+        - "Grep(*)"
+        - "LS(*)"
+      deny:
+        - "Bash(npm:install*, yarn:install*, cargo:install*, docker:*, kubectl:*, rm:-rf*, git:*)"
+    
+    telemetry:
+      enabled: true
+      otlpEndpoint: "http://otel-collector.observability.svc.cluster.local:4317"
+      otlpProtocol: "grpc"
+      logsEndpoint: "http://otel-collector.observability.svc.cluster.local:4318"
+      logsProtocol: "http"
+    
     storage:
       storageClassName: {{ .Values.global.storageClass | default "local-path" }}
+      workspaceSize: "10Gi"
+    
+    cleanup:
+      enabled: true
+      successTTLSeconds: 3600
+      failureTTLSeconds: 7200
+      completedJobDelayMinutes: 5
+      failedJobDelayMinutes: 60
+      deleteConfigMap: true
 {{- end }}
-
