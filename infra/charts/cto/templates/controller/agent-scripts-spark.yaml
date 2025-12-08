@@ -5,10 +5,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "controller.fullname" . }}-agent-scripts-spark
+  name: {{ include "cto.controller.fullname" . }}-agent-scripts-spark
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "controller.labels" . | nindent 4 }}
+    {{- include "cto.controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent-scripts
     agent-scripts/type: spark
 binaryData:

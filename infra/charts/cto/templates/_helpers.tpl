@@ -138,3 +138,35 @@ app.kubernetes.io/component: memory
 app.kubernetes.io/name: openmemory
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/* ============================================================ */}}
+{{/* Platform/Agent helpers for workflow templates */}}
+{{/* ============================================================ */}}
+
+{{- define "platform.agentVolumeMounts" -}}
+- name: workspace
+  mountPath: /workspace
+- name: tmp
+  mountPath: /tmp
+{{- end }}
+
+{{- define "platform.agentTemplateVolumeMounts" -}}
+- name: templates
+  mountPath: /templates
+  readOnly: true
+{{- end }}
+
+{{- define "platform.agentVolumes" -}}
+- name: workspace
+  emptyDir: {}
+- name: tmp
+  emptyDir: {}
+{{- end }}
+
+{{- define "platform.agentTemplateProjectedVolume" -}}
+- name: templates
+  projected:
+    sources:
+      - configMap:
+          name: controller-templates-shared
+{{- end }}

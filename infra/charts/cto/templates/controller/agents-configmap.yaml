@@ -3,10 +3,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "controller.fullname" . }}-agents
+  name: {{ include "cto.controller.fullname" . }}-agents
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "controller.labels" . | nindent 4 }}
+    {{- include "cto.controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: agents-config
 data:
   agents.yaml: |
