@@ -20,7 +20,7 @@ env:
 jobs:
   yaml-lint:
     name: YAML Linting
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
   schema-validation:
     name: Schema Validation
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
           sudo mv yq /usr/local/bin/
 
           # Install kubeconform for standard K8s resource validation
-          curl -fsSL https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz -o kc.tgz
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" -o kc.tgz
           tar -xzf kc.tgz
           if [ -f kubeconform ]; then sudo mv kubeconform /usr/local/bin/kubeconform; \
           elif [ -f kubeconform-linux-amd64 ]; then sudo mv kubeconform-linux-amd64 /usr/local/bin/kubeconform; \
@@ -145,7 +145,7 @@ jobs:
 
   helm-validation:
     name: Helm Chart Validation
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
@@ -191,14 +191,14 @@ jobs:
 
   policy-validation:
     name: OPA Policy Validation
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup OPA
         run: |
-          curl -sL -o opa https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_linux_amd64_static
+          curl -sL -o opa "https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_linux_amd64_static"
           chmod +x opa
           sudo mv opa /usr/local/bin/
 
@@ -251,7 +251,7 @@ jobs:
 
   security-scan:
     name: Security Scanning
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -272,7 +272,7 @@ jobs:
 
   diff-preview:
     name: Generate Diff Preview
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout PR branch
@@ -367,17 +367,19 @@ jobs:
 
   test-summary:
     name: Test Summary
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     needs: [yaml-lint, schema-validation, policy-validation, security-scan]
     if: always()
     steps:
       - name: Summary
         run: |
-          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| YAML Linting | ${{ needs.yaml-lint.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Schema Validation | ${{ needs.schema-validation.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Policy Validation | ${{ needs.policy-validation.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Test Results Summary"
+            echo ""
+            echo "| Test | Status |"
+            echo "|------|--------|"
+            echo "| YAML Linting | ${{ needs.yaml-lint.result }} |"
+            echo "| Schema Validation | ${{ needs.schema-validation.result }} |"
+            echo "| Policy Validation | ${{ needs.policy-validation.result }} |"
+            echo "| Security Scan | ${{ needs.security-scan.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

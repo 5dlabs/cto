@@ -23,7 +23,7 @@ env:
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       research: ${{ steps.filter.outputs.research }}
       docker: ${{ steps.filter.outputs.docker }}
@@ -60,6 +60,9 @@ jobs:
         uses: ./.github/actions/rust-lint
         with:
           package: research
+          # Research crate has its own [lints.clippy] config in Cargo.toml
+          # with pedantic deny + specific allows, so don't pass extra args
+          clippy-args: ''
           use-sccache: 'true'
 
   # Run tests using composite action

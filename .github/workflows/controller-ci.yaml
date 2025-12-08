@@ -15,7 +15,7 @@ env:
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       controller: ${{ steps.filter.outputs.controller }}
     steps:
@@ -119,6 +119,9 @@ jobs:
         with:
           name: trivy-results
           path: trivy-results.sarif
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
 
       - name: Rust security audit
         run: |
