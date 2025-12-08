@@ -140,4 +140,3 @@ The `argocd-repo-creds` secret is critical for ArgoCD to function. It provides c
 kubectl delete externalsecret argocd-repo-creds -n argocd
 # ESO will immediately recreate and sync the secret
 ```
-
