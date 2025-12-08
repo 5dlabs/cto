@@ -396,3 +396,4 @@ pub mod images {
     pub const COS: &str = "projects/cos-cloud/global/images/family/cos-stable";
 }
 
+

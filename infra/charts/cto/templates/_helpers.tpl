@@ -42,14 +42,14 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 Namespace - uses global.namespace or Release.Namespace
 */}}
 {{- define "cto.namespace" -}}
-{{- .Values.global.namespace | default .Release.Namespace }}
+{{- ((.Values.global).namespace) | default .Release.Namespace }}
 {{- end }}
 
 {{/*
 Image pull secrets
 */}}
 {{- define "cto.imagePullSecrets" -}}
-{{- with .Values.global.imagePullSecrets }}
+{{- with ((.Values.global).imagePullSecrets) }}
 imagePullSecrets:
   {{- toYaml . | nindent 2 }}
 {{- end }}
