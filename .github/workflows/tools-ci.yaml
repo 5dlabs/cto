@@ -25,7 +25,7 @@ env:
   IMAGE_BASE: 5dlabs
 
 jobs:
-  # Change detection job
+  # Change detection job (lightweight - stays on ubuntu)
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -50,84 +50,37 @@ jobs:
             docker:
               - 'infra/images/tools/**'
 
-  # Rust linting (format + clippy pedantic) - uses k8s-runner for speed
+  # Rust linting using composite action
   lint-rust:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     outputs:
-      format-needed: ${{ steps.format-check.outputs.format-needed }}
+      format-needed: ${{ steps.lint-tools.outputs.format-needed || steps.lint-mcp.outputs.format-needed }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup optimized Rust environment
-        run: |
-          echo "🚀 Setting up optimized Rust build environment..."
-          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
-          export PATH="/home/runner/.cargo/bin:$PATH"
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          components: rustfmt, clippy
+          sccache-size: '50G'
 
-          # Check if both rustc and cargo are available and working
-          # If either is missing/broken, reinstall the toolchain
-          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
-            echo "✅ Rust toolchain ready: $(rustc --version)"
-          else
-            echo "🔧 Installing/repairing Rust toolchain..."
-            # Uninstall and reinstall to fix broken toolchains
-            rustup toolchain uninstall stable 2>/dev/null || true
-            for i in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup toolchain install stable && \
-              rustup default stable && break
-              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            done
-          fi
-          rustup component add rustfmt clippy 2>/dev/null || true
+      - name: Lint tools
+        id: lint-tools
+        uses: ./.github/actions/rust-lint
+        with:
+          package: tools
+          use-sccache: 'true'
 
-          # Verify tools
-          rustc --version
-          cargo --version
-          sccache --version || echo "⚠️ sccache not found"
+      - name: Lint cto-mcp
+        id: lint-mcp
+        uses: ./.github/actions/rust-lint
+        with:
+          package: cto-mcp
+          use-sccache: 'true'
 
-      - name: Setup sccache
-        run: |
-          export PATH="/home/runner/.cargo/bin:$PATH"
-          export SCCACHE_CACHE_SIZE="50G"
-          export SCCACHE_IDLE_TIMEOUT="0"
-          sccache --stop-server 2>/dev/null || true
-          sccache --start-server
-          echo "📊 sccache stats:"
-          sccache --show-stats
-
-      - name: Check formatting
-        id: format-check
-        env:
-          RUSTC_WRAPPER: "sccache"
-        run: |
-          echo "🔧 Checking cargo fmt..."
-          FMT_FAILED=false
-          cargo fmt -p tools -- --check || FMT_FAILED=true
-          cargo fmt -p cto-mcp -- --check || FMT_FAILED=true
-          if [ "$FMT_FAILED" = "true" ]; then
-            echo "📝 Formatting issues detected"
-            echo "format-needed=true" >> $GITHUB_OUTPUT
-          else
-            echo "format-needed=false" >> $GITHUB_OUTPUT
-            echo "✅ Code formatting is correct"
-          fi
-
-      - name: Run Clippy (pedantic)
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: "sccache"
-          SCCACHE_CACHE_SIZE: "50G"
-        run: |
-          echo "🔍 Running clippy with pedantic warnings..."
-          cargo clippy -p tools --all-targets -- -D warnings -W clippy::pedantic
-          cargo clippy -p cto-mcp --all-targets -- -D warnings -W clippy::pedantic
-          echo "📊 Final sccache stats:"
-          sccache --show-stats
-
-  # Run tests - uses k8s-runner for speed
+  # Run tests using composite action
   test-rust:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
@@ -135,52 +88,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup optimized Rust environment
-        run: |
-          echo "🚀 Setting up optimized Rust build environment..."
-          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
-          export PATH="/home/runner/.cargo/bin:$PATH"
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
 
-          # Check if both rustc and cargo are available and working
-          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
-            echo "✅ Rust toolchain ready: $(rustc --version)"
-          else
-            echo "🔧 Installing/repairing Rust toolchain..."
-            rustup toolchain uninstall stable 2>/dev/null || true
-            for _ in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup toolchain install stable && \
-              rustup default stable && break
-              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            done
-          fi
+      - name: Test tools
+        uses: ./.github/actions/rust-test
+        with:
+          package: tools
+          use-sccache: 'true'
 
-          rustc --version
-          cargo --version
-          sccache --version || echo "⚠️ sccache not found"
+      - name: Test cto-mcp
+        uses: ./.github/actions/rust-test
+        with:
+          package: cto-mcp
+          use-sccache: 'true'
 
-      - name: Setup sccache
-        run: |
-          export PATH="/home/runner/.cargo/bin:$PATH"
-          export SCCACHE_CACHE_SIZE="50G"
-          export SCCACHE_IDLE_TIMEOUT="0"
-          sccache --stop-server 2>/dev/null || true
-          sccache --start-server
-
-      - name: Run all tests
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: "sccache"
-          SCCACHE_CACHE_SIZE: "50G"
-        run: |
-          echo "🧪 Running all tools tests..."
-          cargo test -p tools --all-targets
-          echo "🧪 Running all cto-mcp tests..."
-          cargo test -p cto-mcp --all-targets
-          echo "📊 Final sccache stats:"
-          sccache --show-stats
-
-  # Build check (ensure it compiles for release) - uses k8s-runner for speed
+  # Build check using composite action
   build-check:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
@@ -188,71 +113,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup optimized Rust environment
-        run: |
-          echo "🚀 Setting up optimized Rust build environment..."
-          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
-          export PATH="/home/runner/.cargo/bin:$PATH"
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
 
-          # Check if both rustc and cargo are available and working
-          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
-            echo "✅ Rust toolchain ready: $(rustc --version)"
-          else
-            echo "🔧 Installing/repairing Rust toolchain..."
-            rustup toolchain uninstall stable 2>/dev/null || true
-            for _ in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup toolchain install stable && \
-              rustup default stable && break
-              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            done
-          fi
+      - name: Build tools-server
+        uses: ./.github/actions/rust-build
+        with:
+          package: tools
+          binary: tools-server
+          use-sccache: 'true'
 
-          rustc --version
-          cargo --version
-          sccache --version || echo "⚠️ sccache not found"
-          mold --version || echo "⚠️ mold not found"
+      - name: Build tools-client
+        uses: ./.github/actions/rust-build
+        with:
+          package: tools
+          binary: tools-client
+          use-sccache: 'true'
 
-      - name: Setup sccache
-        run: |
-          export PATH="/home/runner/.cargo/bin:$PATH"
-          export SCCACHE_CACHE_SIZE="50G"
-          export SCCACHE_IDLE_TIMEOUT="0"
-          sccache --stop-server 2>/dev/null || true
-          sccache --start-server
-          echo "📊 Initial sccache stats:"
-          sccache --show-stats
-
-      - name: Build release binaries
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: "sccache"
-          SCCACHE_CACHE_SIZE: "50G"
-          SCCACHE_IDLE_TIMEOUT: "0"
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-        run: |
-          echo "🔨 Building tools-server and tools-client..."
-          cargo build -p tools --release --bin tools-server
-          cargo build -p tools --release --bin tools-client
-          echo "🔨 Building cto-mcp..."
-          cargo build -p cto-mcp --release --bin cto-mcp
-          echo "✅ Release build successful"
-          echo "📊 Final sccache stats:"
-          sccache --show-stats
+      - name: Build cto-mcp
+        uses: ./.github/actions/rust-build
+        with:
+          package: cto-mcp
+          binary: cto-mcp
+          use-sccache: 'true'
 
   # Helm chart validation
   helm-lint:
     needs: changes
     if: needs.changes.outputs.helm == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: 'v3.13.0'
 
       - name: Lint Helm chart
         run: |
@@ -270,7 +163,7 @@ jobs:
   docker-lint:
     needs: changes
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -284,28 +177,17 @@ jobs:
   security-audit:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache cargo-audit
-        uses: actions/cache@v4
-        id: cargo-audit-cache
-        with:
-          path: ~/.cargo/bin/cargo-audit
-          key: cargo-audit-${{ runner.os }}-0.21.2
-
-      - name: Install cargo-audit
-        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-audit --version 0.21.2
-
       - name: Run security audit
         run: |
-          echo "🔒 Running cargo audit..."
+          cargo install cargo-audit --version 0.21.2 2>/dev/null || true
           cargo audit || true
 
-  # Build and push Docker image (only on push to main, not PRs)
+  # Build and push Docker image (only on push to main)
   build-docker:
     needs: [lint-rust, test-rust, build-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -316,72 +198,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup optimized Rust environment
-        run: |
-          echo "🚀 Setting up optimized Rust build environment..."
-          echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
-          export PATH="/home/runner/.cargo/bin:$PATH"
-
-          # Check if both rustc and cargo are available and working
-          if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
-            echo "✅ Rust toolchain ready: $(rustc --version)"
-          else
-            echo "🔧 Installing/repairing Rust toolchain..."
-            rustup toolchain uninstall stable 2>/dev/null || true
-            for attempt in 1 2 3; do
-              rustup toolchain install stable && \
-              rustup default stable && break
-              echo "⚠️ Rustup failed, retrying ($attempt/3)..."
-              sleep 5
-              rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            done
-          fi
-
-          rustc --version
-          cargo --version
-          sccache --version || echo "⚠️ sccache not found"
-
-      - name: Setup sccache
-        run: |
-          export PATH="/home/runner/.cargo/bin:$PATH"
-          export SCCACHE_CACHE_SIZE="50G"
-          export SCCACHE_IDLE_TIMEOUT="0"
-          sccache --stop-server 2>/dev/null || true
-          sccache --start-server
-
-      - name: Build release binaries
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: "sccache"
-          SCCACHE_CACHE_SIZE: "50G"
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-        run: |
-          echo "🔨 Building tools-server for linux/amd64..."
-          cargo build -p tools --release --bin tools-server
-
-          echo "🔨 Building cto-mcp for linux/amd64..."
-          cargo build -p cto-mcp --release --bin cto-mcp
-
-          # Copy binaries to Docker context (matches release workflow pattern)
-          cp target/release/tools-server infra/images/tools/tools-server-linux
-          chmod +x infra/images/tools/tools-server-linux
-          cp target/release/cto-mcp infra/images/tools/cto-mcp-linux
-          chmod +x infra/images/tools/cto-mcp-linux
-          echo "✅ Binaries copied to Docker context"
-          ls -lh infra/images/tools/*-linux
-          echo "📊 Final sccache stats:"
-          sccache --show-stats
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          sccache-size: '50G'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+      - name: Build tools-server
+        uses: ./.github/actions/rust-build
+        with:
+          package: tools
+          binary: tools-server
+          output-path: infra/images/tools/tools-server-linux
+          use-sccache: 'true'
+
+      - name: Build cto-mcp
+        uses: ./.github/actions/rust-build
+        with:
+          package: cto-mcp
+          binary: cto-mcp
+          output-path: infra/images/tools/cto-mcp-linux
+          use-sccache: 'true'
 
       - name: Get version info
         id: version
@@ -392,24 +228,11 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: ./.github/actions/docker-build-push
         with:
+          image-name: tools
           context: ./infra/images/tools
-          file: ./infra/images/tools/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}
-
-      - name: Summary
-        run: |
-          {
-            echo "## 🐳 Tools Docker Image Built"
-            echo ""
-            echo "**Tags:**"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ steps.version.outputs.version }}\`"
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          dockerfile: ./infra/images/tools/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
