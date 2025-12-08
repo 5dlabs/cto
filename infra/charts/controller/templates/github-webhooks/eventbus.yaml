@@ -1,0 +1,14 @@
+{{- if .Values.githubWebhooks.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: automation
+spec:
+  nats:
+    native:
+      replicas: 1
+      # Minimal config - NATS streaming has issues with maxAge parameter types
+      # Using defaults for now to ensure stability
+{{- end }}

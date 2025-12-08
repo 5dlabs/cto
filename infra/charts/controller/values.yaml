@@ -79,6 +79,14 @@ argo:
     # Namespace for the Sensor if enabled; typically keep Sensors in the argo ns
     namespace: "automation"
 
+# Argo Event Sensors (bolt, ci-failure, rex-remediation, stitch, morgan)
+sensors:
+  enabled: true
+
+# GitHub Webhooks (EventSource, EventBus, and sensors)
+githubWebhooks:
+  enabled: true
+
 # Cleanup configuration (controller-based event-driven cleanup)
 cleanup:
   # Whether to enable automatic cleanup of completed jobs

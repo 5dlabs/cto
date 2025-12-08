@@ -1,0 +1,56 @@
+# CTO Platform Umbrella Chart Values
+# Enable/disable and configure each component
+
+# Global settings
+global:
+  namespace: cto
+  imagePullSecrets:
+    - name: ghcr-secret
+
+# Controller - Agent orchestration, CodeRun management, sensors, and webhooks
+controller:
+  enabled: true
+  # Enable Argo workflow templates
+  argo:
+    enabled: true
+  # Enable Argo Event sensors (bolt, ci-failure, rex-remediation, stitch, morgan)
+  sensors:
+    enabled: true
+  # Enable GitHub webhooks (EventSource, EventBus, sensors)
+  githubWebhooks:
+    enabled: true
+  # Override controller values here as needed
+
+# PM Server - Project management integrations (Linear, etc.)
+pm:
+  enabled: true
+  # Override pm values here
+
+# Tools Server - MCP server proxy and tools management
+tools:
+  enabled: true
+  # Override tools values here
+
+# OpenMemory - Long-term memory for AI agents
+openmemory:
+  enabled: true
+  # Override openmemory values here
+
+# Healer - Self-healing platform monitor
+healer:
+  enabled: true
+  namespace: cto
+  config:
+    cli: "Factory"
+    model: "claude-opus-4-5-20250929"
+    maxAttempts: 3
+    timeWindowMins: 10
+    memoryUrl: "http://openmemory.cto.svc:3000"
+    memoryEnabled: true
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 10Gi
+  filebrowser:
+    enabled: true
+    port: 8081

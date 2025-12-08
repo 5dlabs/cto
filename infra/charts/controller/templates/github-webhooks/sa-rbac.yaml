@@ -1,0 +1,75 @@
+{{- if .Values.githubWebhooks.enabled }}
+---
+# ServiceAccount for Argo Events sensors
+# This SA is used by all sensors to execute triggers (workflows, k8s resources, etc.)
+# The argo-events helm chart only creates SAs for controller components, not for sensors.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-events-sa
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: argo-events-sa
+    app.kubernetes.io/part-of: platform
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-executor
+  namespace: automation
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-events-executor-binding
+  namespace: automation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-events-executor
+subjects:
+  - kind: ServiceAccount
+    name: argo-events-sa
+    namespace: automation
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-workflows-cto
+  namespace: cto
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns/status"]
+    verbs: ["get", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-events-workflows-binding
+  namespace: cto
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-events-workflows-cto
+subjects:
+  - kind: ServiceAccount
+    name: argo-events-sa
+    namespace: automation
+{{- end }}

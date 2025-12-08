@@ -1,0 +1,897 @@
+{{- if .Values.githubWebhooks.enabled }}
+---
+# Sensor for PR Merged to Main - Complete task and start next
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-pr-merged
+  namespace: automation
+spec:
+  replicas: 1
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-merged
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request closed events with merged=true
+          - path: body.X-GitHub-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["closed"]
+          - path: body.pull_request.merged
+            type: string
+            value: ["true"]
+          - path: body.pull_request.base.ref
+            type: string
+            value: ["main"]
+      # NOTE: Argo Events has built-in deduplication that caches event IDs
+      # for 5 minutes to prevent duplicate processing automatically
+  triggers:
+    - template:
+        name: task-completion-handler
+        conditions: "github-pr-merged"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: task-complete-
+                namespace: cto
+                labels:
+                  type: task-completion
+                  trigger: merge-to-main
+              spec:
+                entrypoint: handle-task-completion
+                serviceAccountName: argo-workflow
+                activeDeadlineSeconds: 7200  # 2 hour timeout for finding suspend node
+                # Auto-cleanup after completion
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - name: pr-title
+                      # Will be populated from event
+                    - name: pr-number
+                      # Will be populated from event
+                    - name: pr-url
+                      # Will be populated from event
+                    - name: merge-sha
+                      # Will be populated from event
+                    - name: merged-by
+                      # Will be populated from event
+                templates:
+                  - name: handle-task-completion
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      env:
+                        - name: GITHUB_APP_ID
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-app-5dlabs-morgan
+                              key: app-id
+                        - name: GITHUB_APP_PRIVATE_KEY
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-app-5dlabs-morgan
+                              key: private-key
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                                                # Install required tools if not present
+                        MISSING_TOOLS=""
+                        if ! command -v git >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS git"
+                        fi
+                        if ! command -v curl >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS curl"
+                        fi
+                        if ! command -v jq >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS jq"
+                        fi
+                        if ! command -v openssl >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS openssl"
+                        fi
+
+                        if [ -n "$MISSING_TOOLS" ]; then
+                          echo "Installing missing tools:$MISSING_TOOLS"
+                          apk add --no-cache $MISSING_TOOLS
+                        else
+                          echo "All required tools are already available"
+                        fi
+
+                        # =============================================================================
+                        # GITHUB APP AUTHENTICATION
+                        # =============================================================================
+                        echo "🔐 Authenticating with Morgan GitHub App..."
+
+                        if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+                            # Create temporary private key file
+                            TEMP_KEY_FILE="/tmp/github-app-key.pem"
+                            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+                            chmod 600 "$TEMP_KEY_FILE"
+
+                            # Generate JWT token for GitHub App
+                            JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | \
+                              base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            NOW=$(date +%s)
+                            EXP=$((NOW + 600))
+                            JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | \
+                              base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | \
+                              openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | \
+                              base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+                            # Get installation access token for organization
+                            INSTALLATIONS_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+                                -H "Accept: application/vnd.github.v3+json" \
+                                "https://api.github.com/app/installations")
+
+                            INSTALLATION_ID=$(echo "$INSTALLATIONS_RESPONSE" | jq -r '.[0].id')
+
+                            if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+                                echo "❌ Failed to get installation ID"
+                                echo "Response: $INSTALLATIONS_RESPONSE"
+                                rm -f "$TEMP_KEY_FILE"
+                                exit 1
+                            fi
+
+                            TOKEN_RESPONSE=$(curl -s -X POST \
+                                -H "Authorization: Bearer $JWT_TOKEN" \
+                                -H "Accept: application/vnd.github.v3+json" \
+                                "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+                            GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+                            if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+                                echo "❌ Failed to get installation access token"
+                                echo "Response: $TOKEN_RESPONSE"
+                                rm -f "$TEMP_KEY_FILE"
+                                exit 1
+                            fi
+
+                            # Clean up temporary key file
+                            rm -f "$TEMP_KEY_FILE"
+
+                            # Export the token for git to use
+                            export GITHUB_TOKEN
+
+                            # Configure git to use the token
+                            git config --global credential.helper store
+                            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+
+                            echo "✅ Morgan GitHub App authenticated successfully"
+
+                        else
+                            echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
+                            exit 1
+                        fi
+
+                        # Configure git
+                        git config --global user.name "Task Orchestrator (Morgan)"
+                        git config --global user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
+
+                        echo "════════════════════════════════════════════════════════════════"
+                        echo "║                 TASK COMPLETION HANDLER                      ║"
+                        echo "════════════════════════════════════════════════════════════════"
+                        echo "📋 PR Title: {{workflow.parameters.pr-title}}"
+                        echo "🔢 PR Number: {{workflow.parameters.pr-number}}"
+                        echo "🔗 PR URL: {{workflow.parameters.pr-url}}"
+                        echo "📦 Merge SHA: {{workflow.parameters.merge-sha}}"
+                        echo "👤 Merged by: {{workflow.parameters.merged-by}}"
+                        echo "════════════════════════════════════════════════════════════════"
+
+                        # DISTRIBUTED LOCK: Prevent duplicate processing using ConfigMap
+                        PR_NUMBER="{{workflow.parameters.pr-number}}"
+                        CURRENT_WORKFLOW_NAME="{{workflow.name}}"
+                        LOCK_NAME="pr-merge-lock-${PR_NUMBER}"
+
+                        echo "🔒 Attempting to acquire lock for PR #$PR_NUMBER..."
+
+                        # Try to create lock ConfigMap (atomic operation)
+                        if kubectl create configmap "$LOCK_NAME" \
+                          --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
+                          --from-literal=timestamp="$(date -u +%s)" \
+                          -n cto 2>/dev/null; then
+
+                          echo "✅ Lock acquired for PR #$PR_NUMBER by $CURRENT_WORKFLOW_NAME"
+                          # Set up cleanup on exit
+                          trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true" EXIT
+                        else
+                          # Lock already exists, check if it's stale (older than 1 hour)
+                          EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n cto \
+                            -o jsonpath='{.data.owner}' 2>/dev/null || echo "unknown")
+                          LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n cto \
+                            -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "")
+                          CURRENT_TIME=$(date -u +%s)
+
+                          # If lock time is invalid or missing, assume it's recent (don't delete it)
+                          if [ -z "$LOCK_TIME" ] || ! [[ "$LOCK_TIME" =~ ^[0-9]+$ ]]; then
+                            echo "⚠️ PR #$PR_NUMBER is already being processed by: $EXISTING_OWNER"
+                            echo "Lock exists but timestamp is invalid, treating as valid lock"
+                            exit 0
+                          fi
+
+                          LOCK_AGE=$((CURRENT_TIME - LOCK_TIME))
+
+                          if [ $LOCK_AGE -gt 3600 ]; then
+                            echo "⚠️ Stale lock detected (${LOCK_AGE}s old), attempting to claim..."
+                            kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true
+                            if kubectl create configmap "$LOCK_NAME" \
+                              --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
+                              --from-literal=timestamp="$(date -u +%s)" \
+                              -n cto 2>/dev/null; then
+                              echo "✅ Stale lock replaced, continuing..."
+                              trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true" EXIT
+                            else
+                              echo "❌ Failed to claim stale lock, another workflow got it first"
+                              exit 0
+                            fi
+                          else
+                            echo "⚠️ PR #$PR_NUMBER is already being processed by: $EXISTING_OWNER"
+                            echo "Lock age: ${LOCK_AGE}s (will expire after 3600s)"
+                            exit 0
+                          fi
+                        fi
+
+                        # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
+                        PR_TITLE="{{workflow.parameters.pr-title}}"
+                        TASK_ID=$(echo "$PR_TITLE" | grep -oE '[Tt]ask[- ]?([0-9]+)' | sed -E 's/[Tt]ask[- ]?//')
+
+                        # Fallback: Extract from PR labels if not in title
+                        if [ -z "$TASK_ID" ]; then
+                          echo "⚠️ No task ID found in PR title, checking labels..."
+                          PR_URL="{{workflow.parameters.pr-url}}"
+                          REPO_PATH=$(echo "$PR_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)/pull/.*|\1|')
+                          PR_NUMBER="{{workflow.parameters.pr-number}}"
+
+                          PR_JSON=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                            "https://api.github.com/repos/$REPO_PATH/issues/$PR_NUMBER")
+
+                          TASK_ID=$(echo "$PR_JSON" | jq -r '.labels[].name' | grep -oE '^task-([0-9]+)$' | sed 's/task-//' | head -1)
+
+                          if [ -n "$TASK_ID" ]; then
+                            echo "✅ Found task ID from labels: $TASK_ID"
+                          else
+                            echo "⚠️ No task ID found in PR title or labels"
+                            exit 0
+                          fi
+                        fi
+
+                        echo "✅ Task $TASK_ID completed via merge to main"
+
+                        # ============================================================
+                        # STEP 1: Move completed task to .completed folder
+                        # ============================================================
+                        echo ""
+                        echo "📝 Moving completed task to .completed folder..."
+
+                        # Extract repository from PR URL (e.g., "https://github.com/5dlabs/cto/pull/123" -> "5dlabs/cto")
+                        PR_URL="{{workflow.parameters.pr-url}}"
+                        REPO_PATH=$(echo "$PR_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)/pull/.*|\1|')
+
+                        if [ -z "$REPO_PATH" ]; then
+                          echo "⚠️ Could not extract repository from PR URL, skipping task move"
+                          exit 0
+                        fi
+
+                        echo "📚 Repository: $REPO_PATH"
+
+                        # Clone the repo to move the task file
+                        PROGRESS_REPO="/tmp/task-move-$$"
+                        CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_PATH}.git"
+                        if ! git clone --depth 1 "$CLONE_URL" "$PROGRESS_REPO" 2>/dev/null; then
+                          echo "⚠️ Failed to clone repo, continuing anyway..."
+                        else
+                          cd "$PROGRESS_REPO"
+
+                          # Try multiple possible task directory structures
+                          TASK_MOVED=false
+                          TASK_DIRS=(
+                            "docs/.tasks/docs/task-${TASK_ID}"
+                            "task-${TASK_ID}"
+                            ".tasks/docs/task-${TASK_ID}"
+                            "task/task-${TASK_ID}"
+                          )
+
+                          COMPLETED_DIRS=(
+                            "docs/.tasks/docs/.completed"
+                            ".tasks/docs/.completed"
+                            ".completed"
+                            "task/.completed"
+                          )
+
+                          for TASK_DIR in "${TASK_DIRS[@]}"; do
+                            if [ -d "$TASK_DIR" ]; then
+                              echo "📁 Found task directory: $TASK_DIR"
+
+                              # Determine corresponding completed directory
+                              if [[ "$TASK_DIR" == docs/.tasks/docs/* ]]; then
+                                COMPLETED_DIR="docs/.tasks/docs/.completed"
+                              elif [[ "$TASK_DIR" == .tasks/docs/* ]]; then
+                                COMPLETED_DIR=".tasks/docs/.completed"
+                              elif [[ "$TASK_DIR" == task/* ]]; then
+                                COMPLETED_DIR="task/.completed"
+                              else
+                                COMPLETED_DIR=".completed"
+                              fi
+
+                              # Create completed directory if it doesn't exist
+                              mkdir -p "$COMPLETED_DIR"
+
+                              # Move the task directory
+                              if mv "$TASK_DIR" "$COMPLETED_DIR/task-${TASK_ID}"; then
+                                echo "✅ Moved $TASK_DIR to $COMPLETED_DIR/"
+                                TASK_MOVED=true
+
+                                # Commit and push the change
+                                git config user.name "Task Orchestrator (Morgan)"
+                                git config user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
+                                git add -A
+
+                                if ! git commit \
+                                  -m "chore: complete task ${TASK_ID}" \
+                                  -m "- Task implementation merged to main" \
+                                  -m "- Moved task-${TASK_ID} to .completed/" \
+                                  -m "- Triggered by PR merge event" \
+                                  -m "- Ready for next task progression" \
+                                  -m "🤖 Auto-completed by merge-to-main sensor"; then
+                                  echo "No changes to commit"
+                                fi
+                                if ! git push origin main 2>/dev/null; then
+                                  echo "⚠️ Failed to push task move, continuing anyway..."
+                                else
+                                  echo "✅ Task $TASK_ID moved to .completed/ folder"
+                                fi
+                                break
+                              else
+                                echo "⚠️ Failed to move $TASK_DIR"
+                              fi
+                            fi
+                          done
+
+                          if [ "$TASK_MOVED" = false ]; then
+                            echo "ℹ️ No task directory found for task-${TASK_ID}, may already be moved"
+                          fi
+
+                          # Clean up
+                          cd /
+                          rm -rf "$PROGRESS_REPO"
+                        fi
+
+                        # ============================================================
+                        # STEP 2: Complete current orchestration workflow
+                        # ============================================================
+                        echo ""
+                        echo "🔍 Looking for orchestration workflow for task $TASK_ID..."
+
+                        # LESSON LEARNED: Race condition - workflow might still be transitioning
+                        # Try multiple times with delay
+                        MAX_ATTEMPTS=12  # 1 minute total
+                        ATTEMPT=1
+                        CURRENT_WORKFLOW=""
+
+                        while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ -z "$CURRENT_WORKFLOW" ]; do
+                          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Looking for workflow..."
+
+                          # Don't filter by Running status - workflow might be suspended
+                          CURRENT_WORKFLOW=$(kubectl get workflows -n cto \
+                            -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -z "$CURRENT_WORKFLOW" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                            echo "Workflow not found yet, waiting 5 seconds..."
+                            sleep 5
+                          fi
+                          ATTEMPT=$((ATTEMPT + 1))
+                        done
+
+                        if [ -n "$CURRENT_WORKFLOW" ]; then
+                          echo "Found workflow: $CURRENT_WORKFLOW"
+
+                          # LESSON LEARNED: Check workflow phase to understand state
+                          WORKFLOW_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n cto \
+                            -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                          echo "Workflow phase: $WORKFLOW_PHASE"
+
+                          # LESSON LEARNED: Webhook might arrive before suspend node is created
+                          # Wait up to 60 seconds for the suspend node to appear (Tess might still be running)
+                          MAX_WAIT=60
+                          WAIT_TIME=0
+                          NODE_ID=""
+
+                          echo "Looking for wait-merge-to-main suspend node..."
+                          while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
+                              jq -r '.status.nodes | to_entries | .[] |
+                              select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
+                              .key')
+
+                            if [ -n "$NODE_ID" ]; then
+                              echo "Found suspend node after ${WAIT_TIME}s: $NODE_ID"
+                              break
+                            fi
+
+                            if [ $WAIT_TIME -eq 0 ]; then
+                              echo "Suspend node not found yet, waiting for Tess to complete..."
+                            else
+                              echo "Still waiting... (${WAIT_TIME}s / ${MAX_WAIT}s)"
+                            fi
+
+                            sleep 5
+                            WAIT_TIME=$((WAIT_TIME + 5))
+                          done
+
+                          if [ -n "$NODE_ID" ]; then
+
+                            # LESSON LEARNED: Check node phase before trying to resume
+                            NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
+                              jq -r ".status.nodes.\"$NODE_ID\".phase")
+                            echo "Node phase: $NODE_PHASE"
+
+                            if [ "$NODE_PHASE" = "Running" ]; then
+                              echo "Resuming suspend node..."
+                              kubectl patch workflow $CURRENT_WORKFLOW -n cto \
+                                --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                              echo "✅ Task $TASK_ID workflow completed successfully"
+                            else
+                              echo "⚠️ Node already in phase: $NODE_PHASE"
+                            fi
+                          else
+                            echo "⚠️ No wait-merge-to-main suspend node found after waiting ${MAX_WAIT}s"
+                            echo "Tess might still be running or workflow might be in unexpected state"
+                            # Try legacy wait-pr-approved node
+                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
+                              jq -r '.status.nodes | to_entries | .[] |
+                              select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
+                              .key')
+                            if [ -n "$NODE_ID" ]; then
+                              NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n cto -o json | \
+                                jq -r ".status.nodes.\"$NODE_ID\".phase")
+                              if [ "$NODE_PHASE" = "Running" ]; then
+                                echo "Found legacy wait-pr-approved node, resuming..."
+                                kubectl patch workflow $CURRENT_WORKFLOW -n cto \
+                                  --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                                echo "✅ Task $TASK_ID workflow completed (legacy)"
+                              else
+                                echo "⚠️ Legacy node already in phase: $NODE_PHASE"
+                              fi
+                            fi
+                          fi
+                        else
+                          echo "ℹ️ No orchestration workflow found for task $TASK_ID"
+                        fi
+
+                        # ============================================================
+                        # STEP 3: Start next task in queue
+                        # ============================================================
+
+                        # Find the next sequential task
+                        echo "🔍 Looking for next sequential task..."
+
+                        # Calculate next task ID (simple increment)
+                        NEXT_TASK_ID=$((TASK_ID + 1))
+
+                        # Clone repo to verify the next task exists
+                        TASK_CHECK_REPO="/tmp/task-check-$$"
+                        if ! git clone --depth 1 "$CLONE_URL" "$TASK_CHECK_REPO" 2>/dev/null; then
+                          echo "⚠️ Failed to clone repo for task verification"
+                          echo "🚀 Proceeding with calculated next task: $NEXT_TASK_ID"
+                        else
+                          cd "$TASK_CHECK_REPO"
+
+                          # Check if the next sequential task exists and is not completed
+                          TASK_PATHS=(
+                            "docs/.tasks/docs/task-${NEXT_TASK_ID}"
+                            "task-${NEXT_TASK_ID}"
+                            ".tasks/docs/task-${NEXT_TASK_ID}"
+                            "task/task-${NEXT_TASK_ID}"
+                          )
+
+                          TASK_FOUND=false
+                          for TASK_PATH in "${TASK_PATHS[@]}"; do
+                            if [ -d "$TASK_PATH" ]; then
+                              echo "✅ Found next task at: $TASK_PATH"
+                              TASK_FOUND=true
+                              break
+                            fi
+                          done
+
+                          # Check if already completed
+                          COMPLETED_PATHS=(
+                            "docs/.tasks/docs/.completed/task-${NEXT_TASK_ID}"
+                            ".tasks/docs/.completed/task-${NEXT_TASK_ID}"
+                            ".completed/task-${NEXT_TASK_ID}"
+                          )
+
+                          for COMPLETED_PATH in "${COMPLETED_PATHS[@]}"; do
+                            if [ -d "$COMPLETED_PATH" ]; then
+                              echo "⚠️ Task $NEXT_TASK_ID already completed"
+                              TASK_FOUND=false
+                              break
+                            fi
+                          done
+
+                          cd /
+                          rm -rf "$TASK_CHECK_REPO"
+
+                          if [ "$TASK_FOUND" = false ]; then
+                            echo "🎉 No more tasks found or task $NEXT_TASK_ID already completed!"
+                            exit 0
+                          fi
+                        fi
+
+                        echo ""
+                        echo "🚀 Preparing to start Task $NEXT_TASK_ID..."
+
+                        # Check if we've reached the end of tasks
+                        MAX_TASKS=29  # Configure this based on your task set
+                        if [ $NEXT_TASK_ID -gt $MAX_TASKS ]; then
+                          echo "🎉 All tasks completed! No more tasks in queue."
+                          exit 0
+                        fi
+
+                        # Check if next task is already running or recently completed (avoid duplicates)
+                        EXISTING_NEXT=$(kubectl get workflows -n cto \
+                          -l task-id=$NEXT_TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"
+"}{end}' 2>/dev/null)
+
+                        if [ -n "$EXISTING_NEXT" ]; then
+                          echo "Existing workflows for Task $NEXT_TASK_ID:"
+                          echo "$EXISTING_NEXT"
+
+                          # Check if any are still running or succeeded recently
+                          SKIP_CREATION=false
+                          while IFS=' ' read -r workflow_name phase; do
+                            if [ -n "$workflow_name" ]; then
+                              if [ "$phase" = "Running" ] || [ "$phase" = "Pending" ]; then
+                                echo "⚠️ Task $NEXT_TASK_ID is already active: $workflow_name ($phase)"
+                                SKIP_CREATION=true
+                                break
+                              elif [ "$phase" = "Succeeded" ]; then
+                                # Check if completed within last 5 minutes
+                                COMPLETION_TIME=$(kubectl get workflow $workflow_name -n cto \
+                                  -o jsonpath='{.status.finishedAt}' 2>/dev/null || echo "")
+                                if [ -n "$COMPLETION_TIME" ]; then
+                                  COMPLETION_EPOCH=$(date -d "$COMPLETION_TIME" +%s 2>/dev/null || echo "0")
+                                  CURRENT_EPOCH=$(date +%s)
+                                  AGE_SECONDS=$((CURRENT_EPOCH - COMPLETION_EPOCH))
+                                  # Only skip if completed within 5 minutes (300 seconds)
+                                  # This prevents duplicate creation from webhook retries
+                                  # but allows legitimate restarts after a reasonable time
+                                  if [ $AGE_SECONDS -lt 300 ]; then
+                                    echo "⚠️ Task $NEXT_TASK_ID was recently completed: $workflow_name (${AGE_SECONDS}s ago)"
+                                    echo "Skipping to prevent duplicate from webhook retry"
+                                    SKIP_CREATION=true
+                                    break
+                                  else
+                                    echo "Task $NEXT_TASK_ID completed ${AGE_SECONDS}s ago, allowing restart"
+                                  fi
+                                fi
+                              fi
+                            fi
+                          done <<< "$EXISTING_NEXT"
+
+                          if [ "$SKIP_CREATION" = true ]; then
+                            exit 0
+                          fi
+                        fi
+
+                        echo "Creating orchestration workflow for Task $NEXT_TASK_ID..."
+
+                        # Parse owner and repo from REPO_PATH (e.g., "5dlabs/cto" -> owner: 5dlabs, repo: cto)
+                        GITHUB_OWNER=$(echo "$REPO_PATH" | cut -d'/' -f1)
+                        GITHUB_REPO=$(echo "$REPO_PATH" | cut -d'/' -f2)
+
+                        # Extract service name from repo name (e.g., "cto-play-test" -> "cto")
+                        # Handle edge cases where removal would result in empty string
+                        SERVICE_NAME=$(echo "$GITHUB_REPO" | sed 's/-play-test$//' | sed 's/-test$//')
+
+                        # Ensure SERVICE_NAME is not empty - fallback to repo name if needed
+                        if [ -z "$SERVICE_NAME" ]; then
+                          SERVICE_NAME="$GITHUB_REPO"
+                        fi
+
+                        # Ensure SERVICE_NAME is valid for Kubernetes (no leading/trailing hyphens)
+                        SERVICE_NAME=$(echo "$SERVICE_NAME" | sed 's/^[-]*//' | sed 's/[-]*$//')
+
+                        # Final fallback if still empty
+                        if [ -z "$SERVICE_NAME" ]; then
+                          SERVICE_NAME="service"
+                        fi
+
+                        # Retrieve parameters from the current task's workflow
+                        echo "🔍 Looking for current task workflow to retrieve parameters..."
+                        # Get the most recent workflow for this task (sorted by creation time, take last one)
+                        CURRENT_WORKFLOW=$(kubectl get workflows -n cto \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          --sort-by='.metadata.creationTimestamp' \
+                          -o jsonpath='{range .items[*]}{.metadata.name}{"
+"}{end}' 2>/dev/null | tail -n1)
+
+                        if [ -z "$CURRENT_WORKFLOW" ]; then
+                          echo "⚠️ Could not find workflow for task $TASK_ID, using defaults"
+                          # Default values if no workflow found
+                          MODEL="claude-sonnet-4-5-20250929"
+                          IMPL_AGENT="5DLabs-Rex"
+                          QUALITY_AGENT="5DLabs-Cleo"
+                          TESTING_AGENT="5DLabs-Tess"
+                          IMPL_CLI="codex"
+                          IMPL_MODEL="gpt-5-codex"
+                          QUALITY_CLI="claude"
+                          QUALITY_MODEL="claude-sonnet-4-20250514"
+                          TESTING_CLI="claude"
+                          TESTING_MODEL="claude-sonnet-4-20250514"
+                          DOCS_REPO="$REPO_PATH"  # Default to same as main repository
+                          DOCS_DIR="docs"
+                        else
+                          echo "✅ Found workflow: $CURRENT_WORKFLOW"
+
+                          # Retrieve stored parameters from annotation
+                          INITIAL_PARAMS=$(kubectl get workflow $CURRENT_WORKFLOW -n cto \
+                            -o jsonpath='{.metadata.annotations.platform\.agents/initial-params}' 2>/dev/null || echo "{}")
+
+                          if [ "$INITIAL_PARAMS" = "{}" ] || [ -z "$INITIAL_PARAMS" ]; then
+                            echo "⚠️ No parameters found in annotation, using defaults"
+                            MODEL="claude-sonnet-4-5-20250929"
+                            IMPL_AGENT="5DLabs-Rex"
+                            QUALITY_AGENT="5DLabs-Cleo"
+                            TESTING_AGENT="5DLabs-Tess"
+                            IMPL_CLI="codex"
+                            IMPL_MODEL="gpt-5-codex"
+                            QUALITY_CLI="claude"
+                            QUALITY_MODEL="claude-sonnet-4-20250514"
+                            TESTING_CLI="claude"
+                            TESTING_MODEL="claude-sonnet-4-20250514"
+                            DOCS_REPO="$REPO_PATH"  # Default to same as main repository
+                            DOCS_DIR="docs"
+                          else
+                            echo "📦 Retrieved parameters from workflow annotation"
+                            # Parse individual parameters with fallbacks
+                            MODEL=$(echo "$INITIAL_PARAMS" | jq -r '.model // "claude-sonnet-4-5-20250929"')
+                            IMPL_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-agent" // "5DLabs-Rex"')
+                            QUALITY_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."quality-agent" // "5DLabs-Cleo"')
+                            TESTING_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."testing-agent" // "5DLabs-Tess"')
+                            IMPL_CLI=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-cli" // ""')
+                            IMPL_MODEL=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-model" // ""')
+                            QUALITY_CLI=$(echo "$INITIAL_PARAMS" | jq -r '."quality-cli" // ""')
+                            QUALITY_MODEL=$(echo "$INITIAL_PARAMS" | jq -r '."quality-model" // ""')
+                            TESTING_CLI=$(echo "$INITIAL_PARAMS" | jq -r '."testing-cli" // ""')
+                            TESTING_MODEL=$(echo "$INITIAL_PARAMS" | jq -r '."testing-model" // ""')
+
+                            # Backward compatibility: fall back to historical model if CLI/model not stored yet
+                            if [ -z "$IMPL_CLI" ] || [ "$IMPL_CLI" = "null" ]; then
+                              IMPL_CLI="codex"
+                            fi
+                            if [ -z "$IMPL_MODEL" ] || [ "$IMPL_MODEL" = "null" ]; then
+                              if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+                                IMPL_MODEL="$MODEL"
+                              else
+                                IMPL_MODEL="gpt-5-codex"
+                              fi
+                            fi
+                            if [ -z "$QUALITY_CLI" ] || [ "$QUALITY_CLI" = "null" ]; then
+                              QUALITY_CLI="claude"
+                            fi
+                            if [ -z "$QUALITY_MODEL" ] || [ "$QUALITY_MODEL" = "null" ]; then
+                              if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+                                QUALITY_MODEL="$MODEL"
+                              else
+                                QUALITY_MODEL="claude-sonnet-4-20250514"
+                              fi
+                            fi
+                            if [ -z "$TESTING_CLI" ] || [ "$TESTING_CLI" = "null" ]; then
+                              TESTING_CLI="claude"
+                            fi
+                            if [ -z "$TESTING_MODEL" ] || [ "$TESTING_MODEL" = "null" ]; then
+                              if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+                                TESTING_MODEL="$MODEL"
+                              else
+                                TESTING_MODEL="claude-sonnet-4-20250514"
+                              fi
+                            fi
+
+                            # Update repository and service if they were stored
+                            STORED_REPO=$(echo "$INITIAL_PARAMS" | jq -r '.repository // ""')
+                            STORED_SERVICE=$(echo "$INITIAL_PARAMS" | jq -r '.service // ""')
+                            STORED_DOCS_REPO=$(echo "$INITIAL_PARAMS" | jq -r '."docs-repository" // ""')
+                            STORED_DOCS_DIR=$(echo "$INITIAL_PARAMS" | jq -r '."docs-project-directory" // "docs"')
+
+                            if [ -n "$STORED_REPO" ] && [ "$STORED_REPO" != "null" ]; then
+                              REPO_PATH="$STORED_REPO"
+                            fi
+                            if [ -n "$STORED_SERVICE" ] && [ "$STORED_SERVICE" != "null" ]; then
+                              SERVICE_NAME="$STORED_SERVICE"
+                            fi
+                            if [ -n "$STORED_DOCS_REPO" ] && [ "$STORED_DOCS_REPO" != "null" ]; then
+                              DOCS_REPO="$STORED_DOCS_REPO"
+                            else
+                              # Default to same as main repository if not specified
+                              DOCS_REPO="$REPO_PATH"
+                            fi
+                            if [ -n "$STORED_DOCS_DIR" ] && [ "$STORED_DOCS_DIR" != "null" ]; then
+                              DOCS_DIR="$STORED_DOCS_DIR"
+                            else
+                              DOCS_DIR="docs"
+                            fi
+                          fi
+                        fi
+
+                        # Extract retry configuration with proper defaults
+                        # Always set these variables, even if INITIAL_PARAMS is empty
+                        if [ -n "$INITIAL_PARAMS" ] && [ "$INITIAL_PARAMS" != "null" ]; then
+                          IMPL_MAX_RETRIES=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-max-retries" // "10"')
+                          QUALITY_MAX_RETRIES=$(echo "$INITIAL_PARAMS" | jq -r '."quality-max-retries" // "10"')
+                          TESTING_MAX_RETRIES=$(echo "$INITIAL_PARAMS" | jq -r '."testing-max-retries" // "10"')
+                        else
+                          IMPL_MAX_RETRIES="10"
+                          QUALITY_MAX_RETRIES="10"
+                          TESTING_MAX_RETRIES="10"
+                        fi
+
+                        # Final safeguard: ensure variables are never empty
+                        IMPL_MAX_RETRIES="${IMPL_MAX_RETRIES:-10}"
+                        QUALITY_MAX_RETRIES="${QUALITY_MAX_RETRIES:-10}"
+                        TESTING_MAX_RETRIES="${TESTING_MAX_RETRIES:-10}"
+
+                        echo "📝 Using parameters:"
+                        echo "  Implementation CLI: $IMPL_CLI"
+                        echo "  Implementation Model: $IMPL_MODEL"
+                        echo "  Implementation Agent: $IMPL_AGENT"
+                        echo "  Implementation Max Retries: $IMPL_MAX_RETRIES"
+                        echo "  Quality CLI: $QUALITY_CLI"
+                        echo "  Quality Model: $QUALITY_MODEL"
+                        echo "  Quality Agent: $QUALITY_AGENT"
+                        echo "  Quality Max Retries: $QUALITY_MAX_RETRIES"
+                        echo "  Testing CLI: $TESTING_CLI"
+                        echo "  Testing Model: $TESTING_MODEL"
+                        echo "  Testing Agent: $TESTING_AGENT"
+                        echo "  Testing Max Retries: $TESTING_MAX_RETRIES"
+                        echo "  Repository: $REPO_PATH"
+                        echo "  Service: $SERVICE_NAME"
+                        echo "  Docs Repository: $DOCS_REPO"
+                        echo "  Docs Project Directory: $DOCS_DIR"
+
+                        # Create the next task workflow using the WorkflowTemplate
+                        cat <<EOF | kubectl create -f -
+                        apiVersion: argoproj.io/v1alpha1
+                        kind: Workflow
+                        metadata:
+                          generateName: play-workflow-template-
+                          namespace: cto
+                          labels:
+                            task-id: "$NEXT_TASK_ID"
+                            workflow-type: play-orchestration
+                            triggered-by: task-completion
+                            previous-task: "$TASK_ID"
+                          annotations:
+                            # Forward parameters to next task
+                            platform.agents/initial-params: |
+                              {
+                                "implementation-agent": "$IMPL_AGENT",
+                                "implementation-cli": "$IMPL_CLI",
+                                "implementation-model": "$IMPL_MODEL",
+                                "quality-agent": "$QUALITY_AGENT",
+                                "quality-cli": "$QUALITY_CLI",
+                                "quality-model": "$QUALITY_MODEL",
+                                "testing-agent": "$TESTING_AGENT",
+                                "testing-cli": "$TESTING_CLI",
+                                "testing-model": "$TESTING_MODEL",
+                                "repository": "$REPO_PATH",
+                                "service": "$SERVICE_NAME",
+                                "docs-repository": "$DOCS_REPO",
+                                "docs-project-directory": "$DOCS_DIR",
+                                "implementation-max-retries": "$IMPL_MAX_RETRIES",
+                                "quality-max-retries": "$QUALITY_MAX_RETRIES",
+                                "testing-max-retries": "$TESTING_MAX_RETRIES"
+                              }
+                        spec:
+                          workflowTemplateRef:
+                            name: play-workflow-template
+                          arguments:
+                            parameters:
+                              - name: task-id
+                                value: "$NEXT_TASK_ID"
+                              - name: repository
+                                value: "$REPO_PATH"
+                              - name: service
+                                value: "$SERVICE_NAME"
+                              - name: implementation-agent
+                                value: "$IMPL_AGENT"
+                              - name: implementation-cli
+                                value: "$IMPL_CLI"
+                              - name: implementation-model
+                                value: "$IMPL_MODEL"
+                              - name: quality-agent
+                                value: "$QUALITY_AGENT"
+                              - name: quality-cli
+                                value: "$QUALITY_CLI"
+                              - name: quality-model
+                                value: "$QUALITY_MODEL"
+                              - name: testing-agent
+                                value: "$TESTING_AGENT"
+                              - name: testing-cli
+                                value: "$TESTING_CLI"
+                              - name: testing-model
+                                value: "$TESTING_MODEL"
+                              - name: docs-repository
+                                value: "$DOCS_REPO"
+                              - name: docs-project-directory
+                                value: "$DOCS_DIR"
+                              - name: implementation-max-retries
+                                value: "$IMPL_MAX_RETRIES"
+                              - name: quality-max-retries
+                                value: "$QUALITY_MAX_RETRIES"
+                              - name: testing-max-retries
+                                value: "$TESTING_MAX_RETRIES"
+                        EOF
+
+                        if [ $? -eq 0 ]; then
+                          echo "✅ Successfully started Task $NEXT_TASK_ID workflow"
+                          echo ""
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "║                    TASK PROGRESSION                          ║"
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "✅ Task $TASK_ID: COMPLETED"
+                          echo "🚀 Task $NEXT_TASK_ID: STARTED"
+                          echo "📊 Progress: $TASK_ID/$MAX_TASKS tasks completed"
+                          echo "════════════════════════════════════════════════════════════════"
+                        else
+                          echo "❌ Failed to start Task $NEXT_TASK_ID workflow"
+                          exit 1
+                        fi
+          parameters:
+            # Append PR number to generateName for easier identification
+            - src:
+                dependencyName: github-pr-merged
+                dataTemplate: "pr{{ .Input.body.pull_request.number }}-"
+              dest: metadata.generateName
+              operation: append
+            # Add PR number to workflow labels for tracking
+            - dest: metadata.labels.pr-number
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.number
+            # Workflow parameters
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.title
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.number
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.html_url
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.merge_commit_sha
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.merged_by.login
+      # Retry strategy removed to prevent duplicate workflow creation
+      # GitHub already provides webhook retry on failure
+      # Deduplication and idempotency checks handle any edge cases
+{{- end }}

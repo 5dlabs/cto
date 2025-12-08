@@ -1,0 +1,256 @@
+{{- if .Values.githubWebhooks.enabled }}
+---
+# Stage-Aware Workflow Resume Sensor - Cleo Approval
+# Resumes workflows after Cleo code quality approval
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: stage-aware-cleo-approval
+  namespace: automation
+  labels:
+    task: "7"
+    type: stage-management
+    component: atomic-transitions
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    # Cleo Approved PR - Resume workflows waiting for quality review complete
+    - name: cleo-approved-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: body.X-GitHub-Event
+            type: string
+            value: ["pull_request_review"]
+          - path: body.action
+            type: string
+            value: ["submitted"]
+          - path: body.review.state
+            type: string
+            value: ["approved"]
+          - path: body.review.user.login
+            type: string
+            value: ["5dlabs-cleo[bot]"]
+
+  triggers:
+    # Resume workflows after Cleo approval (waiting-quality-complete stage)
+    - template:
+        name: resume-after-cleo-approval
+        conditions: "cleo-approved-event"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: stage-resume-cleo-approved-
+                namespace: cto
+                labels:
+                  type: stage-resume
+                  target-stage: waiting-quality-complete
+              spec:
+                entrypoint: resume-workflow
+                serviceAccountName: argo-workflow
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
+                templates:
+                  - name: resume-workflow
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                        # Ensure jq is available
+                        if ! command -v jq >/dev/null 2>&1; then
+                          if command -v apk >/dev/null 2>&1; then
+                            apk add --no-cache jq
+                          elif command -v apt-get >/dev/null 2>&1; then
+                            apt-get update && apt-get install -y jq && rm -rf /var/lib/apt/lists/*
+                          elif command -v microdnf >/dev/null 2>&1; then
+                            microdnf -y install jq || true
+                          else
+                            echo "jq not found and no supported package manager available"
+                          fi
+                        fi
+
+                        ensure_argo_cli() {
+                          if command -v argo >/dev/null 2>&1; then
+                            ARGO_BIN=$(command -v argo)
+                            return 0
+                          fi
+
+                          ARGO_VERSION="${ARGO_VERSION:-v3.7.1}"
+                          ARGO_BIN="/tmp/argo"
+
+                          if [ ! -x "$ARGO_BIN" ]; then
+                            echo "Downloading argo CLI ($ARGO_VERSION)..."
+                            if command -v wget >/dev/null 2>&1; then
+                              wget -qO "$ARGO_BIN" "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-linux-amd64"
+                            elif command -v curl >/dev/null 2>&1; then
+                              curl -sSL -o "$ARGO_BIN" "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-linux-amd64"
+                            else
+                              echo "Neither wget nor curl is available"
+                              return 1
+                            fi
+                            chmod +x "$ARGO_BIN"
+                          fi
+                        }
+
+                        build_kubeconfig() {
+                          local kubeconfig_path="/tmp/argo-kubeconfig"
+                          if [ -f "$kubeconfig_path" ]; then
+                            echo "$kubeconfig_path"
+                            return 0
+                          fi
+
+                          local ca_cert="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                          local token_file="/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+                          if [ ! -f "$token_file" ]; then
+                            echo "Service account token not found"
+                            return 1
+                          fi
+
+                          local server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+                          local token
+                          token=$(cat "$token_file")
+
+                          {
+                            echo "apiVersion: v1"
+                            echo "kind: Config"
+                            echo "clusters:"
+                            echo "  - cluster:"
+                            printf '      certificate-authority: %s
+' "$ca_cert"
+                            printf '      server: %s
+' "$server"
+                            echo "    name: in-cluster"
+                            echo "contexts:"
+                            echo "  - context:"
+                            echo "      cluster: in-cluster"
+                            echo "      namespace: cto"
+                            echo "      user: sensor-sa"
+                            echo "    name: in-cluster"
+                            echo "current-context: in-cluster"
+                            echo "users:"
+                            echo "  - name: sensor-sa"
+                            echo "    user:"
+                            printf '      token: %s
+' "$token"
+                          } > "$kubeconfig_path"
+
+                          echo "$kubeconfig_path"
+                        }
+
+                        resume_workflow() {
+                          ensure_argo_cli || return 1
+                          local kubeconfig_path
+                          kubeconfig_path=$(build_kubeconfig) || return 1
+
+                          if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
+                            -n cto resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            echo "✅ Workflow resumed successfully"
+                            return 0
+                          fi
+
+                          echo "⚠️ Failed to resume via argo CLI; output:"
+                          cat /tmp/argo-resume.log
+                          return 1
+                        }
+
+                        echo "=== Stage-Aware Workflow Resume ==="
+                        echo "Target Stage: waiting-quality-complete"
+
+                        # Extract task ID from PR labels
+                        TASK_ID=""
+                        TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
+
+                        # Parse labels array to find task-* label
+                        if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
+                          # Extract task ID from labels using jq if available, otherwise use grep
+                          if command -v jq >/dev/null 2>&1; then
+                            TASK_ID=$(echo "$TASK_LABELS_JSON" \
+                              | jq -r '.[]? | select(.name) | .name | ascii_downcase
+                                | select(test("task-[0-9]+")) | capture("task-(?<id>[0-9]+)") | .id' \
+                              | head -1 2>/dev/null || echo "")
+                          fi
+                        fi
+
+                        # Fallback: extract from PR title or branch
+                        if [ -z "$TASK_ID" ]; then
+                          # Use jq to safely extract PR title (handles special chars)
+                          PR_BODY_JSON='{{ .Input.body | toJson }}'
+                          PR_TITLE=$(echo "$PR_BODY_JSON" | jq -r '.pull_request.title // ""' 2>/dev/null || echo "")
+                          TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' 2>/dev/null || echo "")
+                        fi
+
+                        if [ -z "$TASK_ID" ]; then
+                          # Use jq to safely extract branch name (handles special chars)
+                          PR_BODY_JSON='{{ .Input.body | toJson }}'
+                          PR_BRANCH=$(echo "$PR_BODY_JSON" | jq -r '.pull_request.head.ref // ""' 2>/dev/null || echo "")
+                          TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' 2>/dev/null || echo "")
+                        fi
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ℹ️ No task ID found in PR (not a play workflow PR)"
+                          echo "   Checked labels, title: $PR_TITLE, branch: $PR_BRANCH"
+                          exit 0
+                        fi
+
+                        echo "Task ID: $TASK_ID"
+                        echo "Reviewer: {{ .Input.body.review.user.login }}"
+                        echo "Review State: {{ .Input.body.review.state }}"
+
+                        # Extract repository for precise correlation (critical for parallel batch execution)
+                        REPO_FULL='{{ .Input.body.repository.full_name }}'
+                        REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
+                        echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
+
+                        # Find workflow by labels (include repository for precise matching in parallel scenarios)
+                        WORKFLOW_NAME=$(kubectl get workflows -n cto \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
+                          exit 0
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
+
+                        # Check if workflow is at correct stage and suspended
+                        WORKFLOW_JSON=$(kubectl get workflow $WORKFLOW_NAME -n cto -o json 2>/dev/null)
+                        CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"] // ""')
+                        SUSPEND_NODE=$(echo "$WORKFLOW_JSON" | \
+                          jq -r '(.status.nodes // {})
+                            | to_entries[]?
+                            | select(.value.displayName == "wait-for-cleo-approval")
+                            | .value.phase' 2>/dev/null || echo "")
+
+                        if [ "$CURRENT_STAGE" = "waiting-quality-complete" ] && [ "$SUSPEND_NODE" = "Running" ]; then
+                          echo "Found workflow at correct stage and suspended, resuming..."
+
+                          # Resume the workflow using argo CLI
+                          if ! resume_workflow; then
+                            echo "⚠️ Resume attempt failed"
+                            exit 0
+                          fi
+                        else
+                          echo "Workflow not ready for resume (stage: $CURRENT_STAGE, suspend: $SUSPEND_NODE)"
+                          echo "Skipping resume to prevent incorrect stage progression"
+                        fi
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+{{- end }}
