@@ -30,8 +30,10 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
-    path: deploy/operator
+    path: deploy/helm/clickhouse-operator
     targetRevision: release-0.25.5
+    helm:
+      releaseName: clickhouse-operator
 
   destination:
     server: https://kubernetes.default.svc
