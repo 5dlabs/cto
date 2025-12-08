@@ -1,0 +1,19 @@
+{{- if .Values.healer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cto.healer.fullname" . }}-config
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+data:
+  healer-config.json: |
+    {
+      "cli": {{ .Values.healer.config.cli | quote }},
+      "model": {{ .Values.healer.config.model | quote }},
+      "max_attempts": {{ .Values.healer.config.maxAttempts }},
+      "time_window_mins": {{ .Values.healer.config.timeWindowMins }},
+      "memory_url": {{ .Values.healer.config.memoryUrl | quote }},
+      "memory_enabled": {{ .Values.healer.config.memoryEnabled }}
+    }
+{{- end }}

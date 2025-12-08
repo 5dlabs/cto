@@ -1,0 +1,33 @@
+{{- if .Values.webhooks.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github
+  namespace: automation
+  labels:
+    app.kubernetes.io/component: webhooks
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  # Pod template for log collection labels
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: webhooks
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: github-webhooks
+  github:
+    org:
+      events:
+        - "*"
+      organizations:
+        - "5dlabs"
+      webhook:
+        endpoint: /github/webhook
+        port: "12000"
+      secret:
+        name: github-webhook-secret
+        key: secret
+{{- end }}

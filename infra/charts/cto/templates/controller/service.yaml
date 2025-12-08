@@ -1,0 +1,18 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto.controller.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.controller.service.type }}
+  ports:
+    - port: {{ .Values.controller.service.port }}
+      targetPort: {{ .Values.controller.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto.controller.selectorLabels" . | nindent 4 }}
+{{- end }}

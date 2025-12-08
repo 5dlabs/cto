@@ -2,29 +2,13 @@ apiVersion: v2
 name: cto
 description: CTO Platform - AI Development Orchestration
 type: application
-version: 0.1.0
+version: 1.0.0
 appVersion: "1.0.0"
-
-# Sub-charts are included directly in charts/ directory
-# Each can be enabled/disabled and configured via values.yaml
-dependencies:
-  - name: controller
-    version: "0.1.0"
-    repository: "file://../controller"
-    condition: controller.enabled
-  - name: pm
-    version: "0.1.0"
-    repository: "file://../pm"
-    condition: pm.enabled
-  - name: tools
-    version: "0.1.0"
-    repository: "file://../tools"
-    condition: tools.enabled
-  - name: openmemory
-    version: "0.1.0"
-    repository: "file://../openmemory"
-    condition: openmemory.enabled
-  - name: healer
-    version: "0.1.0"
-    repository: "file://../healer"
-    condition: healer.enabled
+keywords:
+  - ai
+  - agents
+  - orchestration
+  - kubernetes
+maintainers:
+  - name: 5D Labs
+    url: https://5dlabs.ai

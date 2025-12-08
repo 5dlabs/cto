@@ -1,0 +1,16 @@
+{{- if and .Values.tools.enabled .Values.tools.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cto.tools.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.tools.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.tools.persistence.size }}
+{{- end }}

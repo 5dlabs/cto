@@ -1,13 +1,13 @@
 ---
-# CTO Platform - Umbrella Application
-# Deploys all CTO platform components as a single release:
+# CTO Platform - Single Application Deployment
+# Deploys all CTO platform components from a single Helm chart:
 # - Controller: Agent orchestration and CodeRun management
-# - PM Server: Project management integrations (Linear, etc.)
-# - Tools Server: MCP server proxy and tools management
-# - OpenMemory: Long-term memory for AI agents
+# - PM Server: Project management integrations (Linear)
+# - Tools Server: MCP server proxy
 # - Healer: Self-healing platform monitor
-#
-# Each component can be enabled/disabled via values
+# - OpenMemory: Long-term AI agent memory
+# - Sensors: Argo Event automation
+# - Webhooks: GitHub event handling
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -20,11 +20,16 @@ metadata:
   annotations:
     # Image Updater for all CTO images
     argocd-image-updater.argoproj.io/image-list: |
-      controller=ghcr.io/5dlabs/cto-controller,
+      controller=ghcr.io/5dlabs/controller,
       pm=ghcr.io/5dlabs/pm-server,
       tools=ghcr.io/5dlabs/tools,
       openmemory=ghcr.io/5dlabs/openmemory,
       healer=ghcr.io/5dlabs/healer
+    argocd-image-updater.argoproj.io/controller.update-strategy: latest
+    argocd-image-updater.argoproj.io/pm.update-strategy: latest
+    argocd-image-updater.argoproj.io/tools.update-strategy: latest
+    argocd-image-updater.argoproj.io/openmemory.update-strategy: latest
+    argocd-image-updater.argoproj.io/healer.update-strategy: latest
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -40,60 +45,50 @@ spec:
         - values.yaml
       # Production overrides
       values: |
-        # Controller configuration
+        global:
+          namespace: cto
+          imagePullSecrets:
+            - name: ghcr-secret
+          storageClass: local-path
+
         controller:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/cto-controller
+            repository: ghcr.io/5dlabs/controller
             tag: latest
-          imagePullSecrets:
-            - name: ghcr-secret
 
-        # PM Server configuration
         pm:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/pm-server
             tag: latest
-          imagePullSecrets:
-            - name: ghcr-secret
-          pm:
-            provider: linear
-            namespace: cto
-          secrets:
-            secretName: linear-secrets
           github:
             defaultOrg: "5dlabs"
             webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
 
-        # Tools Server configuration
         tools:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/tools
             tag: latest
-          imagePullSecrets:
-            - name: ghcr-secret
 
-        # OpenMemory configuration
+        healer:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/healer
+            tag: latest
+
         openmemory:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/openmemory
             tag: latest
 
-        # Healer configuration (uses universal-app)
-        healer:
+        sensors:
           enabled: true
-          fullnameOverride: healer
-          image:
-            repository: ghcr.io/5dlabs/healer
-            tag: latest
-          imagePullSecrets:
-            - name: ghcr-secret
-          serviceAccount:
-            create: false
-            name: healer
+
+        webhooks:
+          enabled: true
 
   destination:
     server: https://kubernetes.default.svc
@@ -124,4 +119,3 @@ spec:
         - /data
 
   revisionHistoryLimit: 5
-
