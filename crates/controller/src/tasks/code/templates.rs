@@ -20,8 +20,8 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, warn};
 
-// Template base path (mounted from ConfigMap in production)
-// Can be overridden with AGENT_TEMPLATES_PATH env var for testing
+// Template base path (embedded in Docker image at /app/templates)
+// Set via AGENT_TEMPLATES_PATH env var in deployment
 const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/templates";
 
 /// Get the agent templates directory path.
