@@ -40,7 +40,7 @@ env:
 jobs:
   # Determine release parameters
   plan:
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -65,14 +65,18 @@ jobs:
             PUBLISHING="false"
           fi
 
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "publishing=$PUBLISHING" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "publishing=$PUBLISHING"
+          } >> "$GITHUB_OUTPUT"
 
-          echo "## Release Plan" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** $TAG" >> $GITHUB_STEP_SUMMARY
-          echo "- **Publishing:** $PUBLISHING" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Release Plan"
+            echo "- **Version:** $VERSION"
+            echo "- **Tag:** $TAG"
+            echo "- **Publishing:** $PUBLISHING"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install cargo-dist
         run: |
@@ -180,7 +184,7 @@ jobs:
       - name: Configure cross-compilation
         if: matrix.target.cross
         run: |
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
@@ -276,9 +280,11 @@ jobs:
 
       - name: Docker summary
         run: |
-          echo "## 🐳 Tools Docker Image" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🐳 Tools Docker Image"
+            echo ""
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Build controller Docker image
   build-docker-controller:
@@ -336,9 +342,11 @@ jobs:
 
       - name: Docker summary
         run: |
-          echo "## 🐳 Controller Docker Image" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🐳 Controller Docker Image"
+            echo ""
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Build healer Docker image
   build-docker-healer:
@@ -399,15 +407,17 @@ jobs:
 
       - name: Docker summary
         run: |
-          echo "## 🐳 Healer Docker Image" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🐳 Healer Docker Image"
+            echo ""
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Create GitHub Release with all artifacts
   release:
     needs: [plan, build-binaries, build-docker, build-docker-controller, build-docker-healer]
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' }}
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -428,7 +438,7 @@ jobs:
       - name: Create checksums
         working-directory: artifacts
         run: |
-          sha256sum * > SHA256SUMS.txt
+          sha256sum ./* > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Generate release notes
@@ -505,14 +515,16 @@ jobs:
 
       - name: Release summary
         run: |
-          echo "## 🎉 Release Created" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ needs.plan.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://github.com/${{ github.repository }}/releases/tag/${{ needs.plan.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Binaries" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          ls -1 artifacts/*.txt 2>/dev/null || true
-          ls -1 artifacts/ | grep -v '.txt' | while read f; do
-            echo "- \`$f\`" >> $GITHUB_STEP_SUMMARY
-          done
+          {
+            echo "## 🎉 Release Created"
+            echo ""
+            echo "**Tag:** ${{ needs.plan.outputs.tag }}"
+            echo "**URL:** https://github.com/${{ github.repository }}/releases/tag/${{ needs.plan.outputs.tag }}"
+            echo ""
+            echo "### Binaries"
+            echo ""
+            for f in artifacts/*; do
+              [[ "$f" == *.txt ]] && continue
+              echo "- \`$(basename "$f")\`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

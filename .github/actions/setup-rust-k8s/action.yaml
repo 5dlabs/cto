@@ -1,0 +1,95 @@
+---
+# Composite action for setting up Rust environment on k8s-runner
+# Includes sccache configuration for fast incremental builds
+name: Setup Rust (k8s-runner)
+description: |
+  Setup optimized Rust environment on k8s-runner with sccache.
+  This action configures the Rust toolchain, sccache, and optionally mold linker
+  for maximum build performance on self-hosted runners.
+
+inputs:
+  components:
+    description: 'Additional rustup components to install (comma-separated)'
+    required: false
+    default: ''
+  sccache-size:
+    description: 'sccache cache size'
+    required: false
+    default: '50G'
+
+outputs:
+  rustc-version:
+    description: 'Installed rustc version'
+    value: ${{ steps.version.outputs.rustc }}
+  cargo-version:
+    description: 'Installed cargo version'
+    value: ${{ steps.version.outputs.cargo }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Rust toolchain
+      shell: bash
+      run: |
+        echo "🚀 Setting up optimized Rust build environment..."
+        echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
+        export PATH="/home/runner/.cargo/bin:$PATH"
+
+        # Check if both rustc and cargo are available and working
+        if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+          echo "✅ Rust toolchain ready: $(rustc --version)"
+        else
+          echo "🔧 Installing/repairing Rust toolchain..."
+          rustup toolchain uninstall stable 2>/dev/null || true
+          for attempt in 1 2 3; do
+            rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+            if rustup toolchain install stable && rustup default stable; then
+              break
+            fi
+            echo "⚠️ Rustup attempt $attempt failed, retrying..."
+            sleep 5
+          done
+        fi
+
+        # Install additional components if specified
+        COMPONENTS="${{ inputs.components }}"
+        if [ -n "$COMPONENTS" ]; then
+          echo "📦 Installing components: $COMPONENTS"
+          IFS=',' read -ra COMP_ARRAY <<< "$COMPONENTS"
+          for comp in "${COMP_ARRAY[@]}"; do
+            rustup component add "$(echo "$comp" | xargs)" 2>/dev/null || true
+          done
+        fi
+
+    - name: Setup sccache
+      shell: bash
+      env:
+        SCCACHE_CACHE_SIZE: ${{ inputs.sccache-size }}
+        SCCACHE_IDLE_TIMEOUT: '0'
+      run: |
+        export PATH="/home/runner/.cargo/bin:$PATH"
+
+        # Stop any existing sccache server
+        sccache --stop-server 2>/dev/null || true
+
+        # Start fresh sccache server
+        sccache --start-server
+
+        echo "📊 sccache stats:"
+        sccache --show-stats
+
+    - name: Get version info
+      id: version
+      shell: bash
+      run: |
+        export PATH="/home/runner/.cargo/bin:$PATH"
+        echo "rustc=$(rustc --version)" >> "$GITHUB_OUTPUT"
+        echo "cargo=$(cargo --version)" >> "$GITHUB_OUTPUT"
+
+        # Log available tools
+        echo "🔧 Build tools:"
+        rustc --version
+        cargo --version
+        sccache --version || echo "⚠️ sccache not found"
+        mold --version 2>/dev/null || echo "ℹ️ mold linker not available"
+
