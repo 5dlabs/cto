@@ -294,8 +294,8 @@ enum Commands {
         /// Namespace to watch for pods
         #[arg(long, default_value = "agent-platform")]
         namespace: String,
-        /// Path to prompts directory
-        #[arg(long, default_value = "monitor/prompts")]
+        /// Path to prompts directory (defaults to HEALER_PROMPTS_DIR env var or /app/prompts)
+        #[arg(long, env = "HEALER_PROMPTS_DIR", default_value = "/app/prompts")]
         prompts_dir: String,
         /// Dry run - detect but don't spawn Factory
         #[arg(long)]
@@ -315,8 +315,8 @@ enum Commands {
         /// Agent name for context
         #[arg(long, default_value = "rex")]
         agent: String,
-        /// Path to prompts directory
-        #[arg(long, default_value = "monitor/prompts")]
+        /// Path to prompts directory (defaults to HEALER_PROMPTS_DIR env var or /app/prompts)
+        #[arg(long, env = "HEALER_PROMPTS_DIR", default_value = "/app/prompts")]
         prompts_dir: String,
         /// Dry run - show prompt but don't spawn Factory
         #[arg(long)]

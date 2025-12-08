@@ -1,10 +1,10 @@
 //! Shared Handlebars template path constants used across the controller.
 //!
-//! All templates are located in `/templates/` (mounted from ConfigMap).
+//! Templates are embedded in the Docker image and accessed via AGENT_TEMPLATES_PATH env var.
 //! Structure:
 //!   - `_shared/` - Shared partials and container base
 //!   - `clis/{cli}/` - CLI-specific config templates
-//!   - `{agent}/{job}/` - Agent + job type templates
+//!   - `agents/{agent}/{job}/` - Agent + job type templates
 
 // ============================================================================
 // Shared partials (CLI-agnostic building blocks)
