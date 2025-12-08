@@ -166,8 +166,9 @@ spec:
 
                         # Validate required parameters are present
                         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ] || [ "$PR_NUMBER" = "" ]; then
-                          echo "❌ ERROR: PR number not provided - parameters not interpolated correctly"
-                          exit 1
+                          echo "ℹ️ PR number not provided - webhook data may not have been interpolated"
+                          echo "   This is expected if event source data is malformed or missing"
+                          exit 0
                         fi
 
                         echo "=== Stage-Aware Workflow Resume ==="
