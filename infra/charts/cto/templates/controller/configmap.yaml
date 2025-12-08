@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "cto.controller.fullname" . }}-config
+  name: controller-config
   labels:
     {{- include "cto.controller.labels" . | nindent 4 }}
 data:
