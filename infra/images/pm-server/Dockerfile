@@ -1,12 +1,21 @@
-# Runtime stage - expects pre-built binaries
+# PM Server Dockerfile
+#
+# The CI workflow builds the binary and copies it to repo root.
+# Docker build context is the repo root (.).
+#
+# To build locally:
+#   cargo build --release --package pm --bin pm-server
+#   cp target/release/pm-server pm-server
+#   docker build -f infra/images/pm-server/Dockerfile -t pm-server .
+
 FROM debian:bookworm-slim
 
 # Install only essential runtime dependencies
-RUN apt-get update && apt-get install -y \
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     wget \
-    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -17,8 +26,7 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 WORKDIR /app
 
 # Copy pre-built binary (placed by CI workflow into build context)
-# The binary is built as 'linear' but deployed as 'pm-server'
-COPY linear /app/pm-server
+COPY pm-server /app/pm-server
 
 # Make binary executable and change ownership to app user  
 RUN chmod +x /app/pm-server && \

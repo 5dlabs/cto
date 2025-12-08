@@ -11,10 +11,12 @@ This folder contains Helm values files for deploying CTO services to a local Kin
    docker build -t ghcr.io/5dlabs/tools:kind-local -f infra/images/tools/Dockerfile.kind .
    docker build -t ghcr.io/5dlabs/healer:kind-local -f infra/images/healer/Dockerfile.kind .
    docker build -t ghcr.io/5dlabs/openmemory:kind-local -f infra/images/openmemory/Dockerfile .
+   docker build -t ghcr.io/5dlabs/pm-server:kind-local -f infra/images/pm-server/Dockerfile.build .
    
    kind load docker-image ghcr.io/5dlabs/tools:kind-local
    kind load docker-image ghcr.io/5dlabs/healer:kind-local
    kind load docker-image ghcr.io/5dlabs/openmemory:kind-local
+   kind load docker-image ghcr.io/5dlabs/pm-server:kind-local
    ```
 
 ## Deployment
@@ -43,6 +45,11 @@ helm upgrade --install healer ../../infra/charts/universal-app \
 helm upgrade --install openmemory ../../infra/charts/openmemory \
   -f openmemory-values.yaml \
   -n cto
+
+# PM server
+helm upgrade --install pm ../../infra/charts/pm \
+  -f pm-values.yaml \
+  -n cto
 ```
 
 ## Uninstall
@@ -58,6 +65,7 @@ helm upgrade --install openmemory ../../infra/charts/openmemory \
 | tools | MCP server aggregator/proxy | 3000 |
 | healer | Self-healing platform monitor | 8080 |
 | openmemory | Long-term memory for AI agents | 8080 |
+| pm | Project management webhooks (Linear) | 8081 |
 
 ## Port Forwarding
 
@@ -70,6 +78,9 @@ kubectl port-forward svc/healer -n cto 8080:8080
 
 # OpenMemory server
 kubectl port-forward svc/openmemory -n cto 8081:8080
+
+# PM server
+kubectl port-forward svc/pm-svc -n cto 8082:8081
 ```
 
 
