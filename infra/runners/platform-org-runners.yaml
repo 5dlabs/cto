@@ -126,7 +126,7 @@ spec:
         - name: RUNNER_FEATURE_FLAG_EPHEMERAL
           value: "false"
         - name: PATH
-          value: "/home/runner/.cargo/bin:/shared/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          value: "/cache/cargo/bin:/home/runner/.cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
         # Rust optimizations
         - name: CARGO_HOME
           value: "/cache/cargo"
