@@ -194,19 +194,17 @@ jobs:
 
       - name: Validate Handlebars templates
         run: |
-          echo "🔍 Validating CLI configuration templates..."
+          echo "🔍 Validating CLI invoke templates..."
           echo ""
           
           TEMPLATES=(
-            "templates/code/claude/config.json.hbs"
-            "templates/code/codex/config.toml.hbs"
-            "templates/code/codex/agents.md.hbs"
-            "templates/code/gemini/config.json.hbs"
-            "templates/code/gemini/memory.md.hbs"
-            "templates/code/opencode/config.json.hbs"
-            "templates/code/opencode/memory.md.hbs"
-            "templates/code/factory/factory-cli-config.json.hbs"
-            "templates/code/cursor/cursor-cli-config.json.hbs"
+            "templates/clis/claude/invoke.sh.hbs"
+            "templates/clis/codex/invoke.sh.hbs"
+            "templates/clis/cursor/invoke.sh.hbs"
+            "templates/clis/dexter/invoke.sh.hbs"
+            "templates/clis/factory/invoke.sh.hbs"
+            "templates/clis/gemini/invoke.sh.hbs"
+            "templates/clis/opencode/invoke.sh.hbs"
           )
           
           ERRORS=0
@@ -246,9 +244,9 @@ jobs:
           echo "🔍 Checking template directory structure..."
           echo ""
           
-          # List all templates
-          echo "📁 CLI Configuration Templates:"
-          find templates/code -type f -name "*.hbs" | sort | while read -r file; do
+          # List all CLI templates
+          echo "📁 CLI Invoke Templates:"
+          find templates/clis -type f -name "*.hbs" | sort | while read -r file; do
             SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file")
             echo "  - $file ($SIZE bytes)"
           done
