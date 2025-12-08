@@ -40,7 +40,7 @@ env:
 jobs:
   # Determine release parameters
   plan:
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -407,7 +407,7 @@ jobs:
   release:
     needs: [plan, build-binaries, build-docker, build-docker-controller, build-docker-healer]
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && needs.build-binaries.result == 'success' }}
-    runs-on: ubuntu-22.04
+    runs-on: [k8s-runner]
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

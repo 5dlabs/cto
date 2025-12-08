@@ -20,7 +20,7 @@ env:
 jobs:
   yaml-lint:
     name: YAML Linting
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
   schema-validation:
     name: Schema Validation
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
 
   helm-validation:
     name: Helm Chart Validation
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
@@ -191,7 +191,7 @@ jobs:
 
   policy-validation:
     name: OPA Policy Validation
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -251,7 +251,7 @@ jobs:
 
   security-scan:
     name: Security Scanning
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -272,7 +272,7 @@ jobs:
 
   diff-preview:
     name: Generate Diff Preview
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout PR branch
@@ -367,7 +367,7 @@ jobs:
 
   test-summary:
     name: Test Summary
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     needs: [yaml-lint, schema-validation, policy-validation, security-scan]
     if: always()
     steps:

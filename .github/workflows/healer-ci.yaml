@@ -21,9 +21,9 @@ env:
   IMAGE_BASE: 5dlabs
 
 jobs:
-  # Change detection job (lightweight - stays on ubuntu)
+  # Change detection job
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       healer: ${{ steps.filter.outputs.healer }}
       docker: ${{ steps.filter.outputs.docker }}

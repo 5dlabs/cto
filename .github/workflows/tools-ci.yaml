@@ -25,9 +25,9 @@ env:
   IMAGE_BASE: 5dlabs
 
 jobs:
-  # Change detection job (lightweight - stays on ubuntu)
+  # Change detection job
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       tools: ${{ steps.filter.outputs.tools }}
       mcp: ${{ steps.filter.outputs.mcp }}
