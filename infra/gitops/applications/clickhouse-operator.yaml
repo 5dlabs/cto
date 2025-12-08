@@ -27,7 +27,19 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
 spec:
-  project: default
+  project: platform
+
+  # Ignore labels that the ClickHouse operator adds to its own deployment
+  # The operator self-labels with version and build info which causes perpetual OutOfSync
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .metadata.labels["clickhouse.altinity.com/app"]
+        - .metadata.labels["clickhouse.altinity.com/chop"]
+        - .metadata.labels["clickhouse.altinity.com/chop-commit"]
+        - .metadata.labels["clickhouse.altinity.com/chop-date"]
+
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
     path: deploy/helm/clickhouse-operator
@@ -45,6 +57,7 @@ spec:
       selfHeal: true
     syncOptions:
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
