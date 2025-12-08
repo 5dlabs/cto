@@ -7,9 +7,9 @@ use anyhow::{Context, Result};
 use std::path::Path;
 use std::process::Command;
 
-/// Vault initialization response containing unseal keys and root token.
+/// `OpenBao` initialization response containing unseal keys and root token.
 #[derive(Debug, Clone)]
-pub struct VaultInit {
+pub struct OpenBaoInit {
     pub unseal_keys: Vec<String>,
     pub root_token: String,
 }
@@ -155,44 +155,44 @@ pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Deploy `HashiCorp` Vault for secrets management.
+/// Deploy `OpenBao` for secrets management.
 ///
 /// # Errors
 ///
 /// Returns an error if helm commands fail.
-pub fn deploy_vault(kubeconfig: &Path) -> Result<()> {
-    println!("   Deploying Vault...");
+pub fn deploy_openbao(kubeconfig: &Path) -> Result<()> {
+    println!("   Deploying OpenBao...");
 
-    // Add hashicorp repo
+    // Add openbao repo
     let _ = helm(
         kubeconfig,
         &[
             "repo",
             "add",
-            "hashicorp",
-            "https://helm.releases.hashicorp.com",
+            "openbao",
+            "https://openbao.github.io/openbao-helm",
         ],
     );
     helm(kubeconfig, &["repo", "update"])?;
 
-    // Install Vault
+    // Install OpenBao
     helm(
         kubeconfig,
         &[
             "upgrade",
             "--install",
-            "vault",
-            "hashicorp/vault",
+            "openbao",
+            "openbao/openbao",
             "--namespace",
-            "vault",
+            "openbao",
             "--create-namespace",
             "--set",
-            "server.dev.enabled=false",
+            "server.standalone.enabled=true",
             "--wait",
         ],
     )?;
 
-    println!("   ✅ Vault deployed");
+    println!("   ✅ OpenBao deployed");
     Ok(())
 }
 
@@ -274,23 +274,23 @@ pub fn deploy_argo_workflows(kubeconfig: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Initialize Vault and return unseal keys and root token.
+/// Initialize `OpenBao` and return unseal keys and root token.
 ///
 /// # Errors
 ///
 /// Returns an error if kubectl commands fail or JSON parsing fails.
-pub fn init_vault(kubeconfig: &Path) -> Result<VaultInit> {
-    println!("   Initializing Vault...");
+pub fn init_openbao(kubeconfig: &Path) -> Result<OpenBaoInit> {
+    println!("   Initializing OpenBao...");
 
     let output = kubectl(
         kubeconfig,
         &[
             "exec",
             "-n",
-            "vault",
-            "vault-0",
+            "openbao",
+            "openbao-0",
             "--",
-            "vault",
+            "bao",
             "operator",
             "init",
             "-key-shares=1",
@@ -301,7 +301,7 @@ pub fn init_vault(kubeconfig: &Path) -> Result<VaultInit> {
 
     // Parse JSON output
     let init: serde_json::Value =
-        serde_json::from_str(&output).context("Failed to parse vault init output")?;
+        serde_json::from_str(&output).context("Failed to parse OpenBao init output")?;
 
     let unseal_keys = init["unseal_keys_b64"]
         .as_array()
@@ -315,29 +315,29 @@ pub fn init_vault(kubeconfig: &Path) -> Result<VaultInit> {
         .context("Missing root_token")?
         .to_string();
 
-    println!("   ✅ Vault initialized");
-    Ok(VaultInit {
+    println!("   ✅ OpenBao initialized");
+    Ok(OpenBaoInit {
         unseal_keys,
         root_token,
     })
 }
 
-/// Unseal Vault with the given key.
+/// Unseal `OpenBao` with the given key.
 ///
 /// # Errors
 ///
 /// Returns an error if kubectl commands fail.
-pub fn unseal_vault(kubeconfig: &Path, unseal_key: &str) -> Result<()> {
-    println!("   Unsealing Vault...");
+pub fn unseal_openbao(kubeconfig: &Path, unseal_key: &str) -> Result<()> {
+    println!("   Unsealing OpenBao...");
 
     kubectl(
         kubeconfig,
         &[
-            "exec", "-n", "vault", "vault-0", "--", "vault", "operator", "unseal", unseal_key,
+            "exec", "-n", "openbao", "openbao-0", "--", "bao", "operator", "unseal", unseal_key,
         ],
     )?;
 
-    println!("   ✅ Vault unsealed");
+    println!("   ✅ OpenBao unsealed");
     Ok(())
 }
 
