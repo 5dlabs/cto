@@ -59,6 +59,10 @@ spec:
         - name: pm.namespace
           value: cto
 
+        # Secrets - use existing linear-secrets
+        - name: secrets.secretName
+          value: linear-secrets
+
         # Linear integration
         - name: linear.enabled
           value: "true"
