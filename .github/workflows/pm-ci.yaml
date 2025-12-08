@@ -23,7 +23,7 @@ env:
   IMAGE_BASE: 5dlabs
 
 jobs:
-  # Change detection job
+  # Change detection job (lightweight - stays on ubuntu)
   changes:
     runs-on: [k8s-runner]
     outputs:
