@@ -6,7 +6,7 @@
 # - CronJob: Polls bookmarks every 5 minutes
 # - PVC: Stores research entries
 #
-# Note: Secrets (research-twitter-secrets) are managed by vault-config app
+# Note: Secrets (research-twitter-secrets) are managed by OpenBao
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -27,7 +27,7 @@ metadata:
 spec:
   project: platform
 
-  # Note: Vault secrets (research-twitter-secrets) managed by vault-config app
+  # Note: Secrets (research-twitter-secrets) managed by OpenBao
   source:
     repoURL: https://github.com/5dlabs/cto
     targetRevision: main

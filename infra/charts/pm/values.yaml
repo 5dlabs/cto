@@ -63,7 +63,7 @@ linear:
   enabled: true
 
 # Secrets configuration
-# These should be provided via Vault or external secrets
+# These should be provided via OpenBao or external secrets
 secrets:
   # Name of the Kubernetes secret containing credentials
   secretName: pm-secrets
