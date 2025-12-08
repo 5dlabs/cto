@@ -29,16 +29,15 @@ metadata:
 spec:
   project: platform
 
-  # Ignore labels that the ClickHouse operator adds to its own deployment
+  # Ignore fields that the ClickHouse operator adds to its own deployment
   # The operator self-labels with version and build info which causes perpetual OutOfSync
   ignoreDifferences:
     - group: apps
       kind: Deployment
-      jqPathExpressions:
-        - .metadata.labels["clickhouse.altinity.com/app"]
-        - .metadata.labels["clickhouse.altinity.com/chop"]
-        - .metadata.labels["clickhouse.altinity.com/chop-commit"]
-        - .metadata.labels["clickhouse.altinity.com/chop-date"]
+      name: clickhouse-operator-altinity-clickhouse-operator
+      namespace: kube-system
+      managedFieldsManagers:
+        - clickhouse-operator
 
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
