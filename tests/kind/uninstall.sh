@@ -27,3 +27,4 @@ kubectl get pods -n cto 2>/dev/null || echo "  (none or namespace doesn't exist)
 
 
 
+

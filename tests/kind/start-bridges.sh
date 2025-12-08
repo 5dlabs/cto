@@ -55,3 +55,4 @@ echo "To stop all bridges: docker rm -f \$(docker ps -q --filter 'name=.*-bridge
 
 
 
+
