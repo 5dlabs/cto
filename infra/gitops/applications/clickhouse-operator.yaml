@@ -27,7 +27,18 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
 spec:
-  project: default
+  project: platform
+
+  # Ignore fields that the ClickHouse operator adds to its own deployment
+  # The operator self-labels with version and build info which causes perpetual OutOfSync
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: clickhouse-operator-altinity-clickhouse-operator
+      namespace: kube-system
+      managedFieldsManagers:
+        - clickhouse-operator
+
   source:
     repoURL: https://github.com/Altinity/clickhouse-operator
     path: deploy/helm/clickhouse-operator
@@ -45,6 +56,7 @@ spec:
       selfHeal: true
     syncOptions:
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:

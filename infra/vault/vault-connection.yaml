@@ -10,8 +10,9 @@ metadata:
     app.kubernetes.io/name: vault-connection
     app.kubernetes.io/part-of: platform
 spec:
-  # Address of the Vault server running in the vault namespace
-  address: http://vault.vault.svc.cluster.local:8200
+  # Address of the OpenBao server running in the openbao namespace
+  # Migrated from Vault: http://vault.vault.svc.cluster.local:8200
+  address: http://openbao.openbao.svc.cluster.local:8200
 
   # TLS is disabled for internal cluster communication
   # In production, consider enabling TLS

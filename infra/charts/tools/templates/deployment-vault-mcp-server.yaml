@@ -41,8 +41,9 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            # Migrated to OpenBao from Vault
             - name: VAULT_ADDR
-              value: "http://vault.vault.svc.cluster.local:8200"
+              value: "http://openbao.openbao.svc.cluster.local:8200"
             - name: VAULT_TOKEN
               valueFrom:
                 secretKeyRef:

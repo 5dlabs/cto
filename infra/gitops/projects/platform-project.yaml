@@ -56,6 +56,8 @@ spec:
     - 'https://charts.jetstack.io'
     # MinIO Operator Helm chart repository
     - 'https://operator.min.io'
+    # ClickHouse Operator (Altinity)
+    - 'https://github.com/Altinity/clickhouse-operator'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -151,6 +153,11 @@ spec:
     # Cloudflare Tunnel Operator CRDs (ClusterTunnel is cluster-scoped)
     - group: 'networking.cfargotunnel.com'
       kind: '*'
+    # ClickHouse Operator CRDs (Altinity)
+    - group: 'clickhouse.altinity.com'
+      kind: '*'
+    - group: 'clickhouse-keeper.altinity.com'
+      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
@@ -209,6 +216,11 @@ spec:
     - group: 'sts.min.io'
       kind: '*'
     - group: 'job.min.io'
+      kind: '*'
+    # ClickHouse Operator CRDs (Altinity)
+    - group: 'clickhouse.altinity.com'
+      kind: '*'
+    - group: 'clickhouse-keeper.altinity.com'
       kind: '*'
 
   # Roles for access control
