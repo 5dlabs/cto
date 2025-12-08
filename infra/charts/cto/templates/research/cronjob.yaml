@@ -1,20 +1,11 @@
----
-# =============================================================================
-# Research Pipeline CronJob
-# =============================================================================
-# Monitors Twitter/X bookmarks, analyzes relevance with AI, enriches links
-# with Firecrawl, and stores research entries as markdown.
-#
-# Schedule: Every 5 minutes
-# =============================================================================
-
+{{- if .Values.research.enabled }}
 ---
 # PersistentVolumeClaim for research data storage
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: research-data
-  namespace: cto
+  namespace: {{ include "cto.namespace" . }}
   labels:
     app.kubernetes.io/name: research-data
     app.kubernetes.io/part-of: research
@@ -23,8 +14,8 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
-  storageClassName: local-path
+      storage: {{ .Values.research.persistence.size | default "5Gi" }}
+  storageClassName: {{ .Values.research.persistence.storageClass | default .Values.storageClass | default "local-path" }}
 
 ---
 # ServiceAccount for research CronJob
@@ -32,7 +23,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: research
-  namespace: cto
+  namespace: {{ include "cto.namespace" . }}
   labels:
     app.kubernetes.io/name: research
     app.kubernetes.io/part-of: research
@@ -43,13 +34,12 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: research-poller
-  namespace: cto
+  namespace: {{ include "cto.namespace" . }}
   labels:
     app.kubernetes.io/name: research-poller
     app.kubernetes.io/part-of: research
 spec:
-  # Run every 5 minutes
-  schedule: "*/5 * * * *"
+  schedule: {{ .Values.research.schedule | default "*/5 * * * *" | quote }}
   concurrencyPolicy: Forbid
   failedJobsHistoryLimit: 3
   successfulJobsHistoryLimit: 1
@@ -72,9 +62,7 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           restartPolicy: OnFailure
-          imagePullSecrets:
-            - name: ghcr-secret
-          # Ensure jobs run on worker nodes, not control plane
+          {{- include "cto.imagePullSecrets" . | nindent 10 }}
           affinity:
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
@@ -88,8 +76,8 @@ spec:
                 claimName: research-data
           containers:
             - name: research
-              image: ghcr.io/5dlabs/research:latest
-              imagePullPolicy: Always
+              image: "{{ .Values.research.image.repository }}:{{ .Values.research.image.tag }}"
+              imagePullPolicy: {{ .Values.research.image.pullPolicy | default "Always" }}
               securityContext:
                 allowPrivilegeEscalation: false
                 capabilities:
@@ -100,37 +88,32 @@ spec:
                 - poll
                 - --output=/data/research
                 - --state=/data/state.json
-                - --min-relevance=0.5
-                - --batch-size=10
-                - --model=claude-sonnet-4-20250514
+                - --min-relevance={{ .Values.research.minRelevance | default "0.5" }}
+                - --batch-size={{ .Values.research.batchSize | default "10" }}
+                - --model={{ .Values.research.model | default "claude-sonnet-4-20250514" }}
+                {{- if .Values.research.createPR }}
                 - --create-pr
-                - --repo=5dlabs/cto
-                - --base-branch=main
-                - --research-dir=docs/research
+                - --repo={{ .Values.research.repo | default "5dlabs/cto" }}
+                - --base-branch={{ .Values.research.baseBranch | default "main" }}
+                - --research-dir={{ .Values.research.researchDir | default "docs/research" }}
+                {{- end }}
               volumeMounts:
                 - name: data
                   mountPath: /data
               env:
-                # Map GitHub PAT to GITHUB_TOKEN
                 - name: GITHUB_TOKEN
                   valueFrom:
                     secretKeyRef:
                       name: tools-github-secrets
                       key: GITHUB_PERSONAL_ACCESS_TOKEN
               envFrom:
-                # Twitter cookies (new secret)
                 - secretRef:
                     name: research-twitter-secrets
-                # Reuse existing API keys from platform
                 - secretRef:
                     name: cto-secrets
                 - secretRef:
                     name: tools-firecrawl-secrets
               resources:
-                requests:
-                  cpu: 100m
-                  memory: 512Mi
-                limits:
-                  cpu: 1000m
-                  memory: 2Gi
+                {{- toYaml .Values.research.resources | nindent 16 }}
+{{- end }}
 

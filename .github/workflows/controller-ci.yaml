@@ -26,6 +26,7 @@ jobs:
           filters: |
             controller:
               - 'crates/controller/**'
+              - 'templates/**'
               - '!crates/controller/**/*.md'
 
   # Rust linting using composite action

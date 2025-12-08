@@ -2,48 +2,84 @@
 
 This guide explains how to iterate quickly on the Talos cluster without waiting for CI.
 
-## Quick Start
+## Two Options
+
+| Script | Network | Speed | Best For |
+|--------|---------|-------|----------|
+| `dev-load.sh` | Local only | ⚡ Fastest | Day-to-day iteration |
+| `dev-push.sh` | Internet (GHCR) | Fast | Sharing with team |
+
+## Option 1: Local Registry (Recommended)
+
+Build and push to an in-cluster registry. No internet required!
+
+### One-Time Setup
 
 ```bash
-# Build, push, and deploy controller in ~2-3 minutes
-./scripts/dev-push.sh controller
+# Deploy a local registry to your Talos cluster
+./scripts/dev-load.sh --setup
 
-# Build and push tools without deploying
-./scripts/dev-push.sh --no-deploy tools
+# Configure Docker to trust the insecure registry
+# Add to Docker Desktop → Settings → Docker Engine:
+# {"insecure-registries": ["192.168.1.77:30500"]}
+# Then restart Docker
+```
+
+### Usage
+
+```bash
+# Build and deploy controller (~2 min after first build)
+./scripts/dev-load.sh controller
+
+# Build and push without deploying
+./scripts/dev-load.sh --no-deploy tools
+
+# See all available images
+./scripts/dev-load.sh --list
+```
+
+### How It Works
+
+1. **Build**: Compiles locally for linux/amd64
+2. **Push**: To in-cluster registry at `<node-ip>:30500` (fast local network)
+3. **Deploy**: Patches deployment and triggers rollout
+
+---
+
+## Option 2: GHCR Push
+
+Build locally and push to GitHub Container Registry. Useful when sharing with team.
+
+### Prerequisites
+
+```bash
+# Login to GHCR
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+```
+
+### Usage
+
+```bash
+# Build and deploy
+./scripts/dev-push.sh controller
 
 # Use a feature branch tag
 ./scripts/dev-push.sh --tag feature-auth healer
-
-# See all available images
-./scripts/dev-push.sh --list
 ```
 
-## Prerequisites
+### How It Works
 
-1. **Docker logged into GHCR**:
-   ```bash
-   echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
-   ```
+1. **Build**: Compiles locally for linux/amd64
+2. **Push**: To GHCR with `dev-$USER` tag
+3. **Deploy**: Patches deployment and triggers rollout
 
-2. **kubectl configured for Talos cluster**:
-   ```bash
-   # Should show your Talos nodes
-   kubectl get nodes
-   ```
-
-3. **Sufficient disk space** for building (~5-10GB per image)
-
-## How It Works
-
-1. **Build**: Uses `Dockerfile.kind` or local Dockerfiles that do full builds inside the container (cross-compiles for linux/amd64)
-2. **Push**: Pushes to GHCR with a `dev-$USER` tag (e.g., `ghcr.io/5dlabs/controller:dev-jonathon`)
-3. **Deploy**: Patches the deployment to use your dev image and triggers a rollout
+---
 
 ## Available Images
 
 | Image | Description | Build Time |
 |-------|-------------|------------|
-| `controller` | Agent orchestration | ~3-5 min |
+| `controller` | Agent orchestration | ~3-5 min (first), ~1-2 min (cached) |
 | `tools` | MCP server proxy | ~2-3 min |
 | `healer` | Self-healing monitor | ~3-5 min |
 | `pm` | Project management | ~2-3 min |
@@ -54,19 +90,22 @@ This guide explains how to iterate quickly on the Talos cluster without waiting 
 | `opencode` | OpenCode CLI image | ~3-5 min |
 | `dexter` | Dexter CLI image | ~3-5 min |
 
-## Workflow Tips
-
-### Watch Logs During Development
+## Quick Iteration Loop
 
 ```bash
-# In one terminal, watch the deployment
-./scripts/dev-push.sh controller
+# 1. Make code changes
+vim crates/controller/src/main.rs
 
-# In another terminal, stream logs
+# 2. Build and deploy (~1-2 min with cache)
+./scripts/dev-load.sh controller
+
+# 3. Watch logs
 kubectl logs -f deployment/controller -n cto
+
+# 4. Repeat!
 ```
 
-### Port Forward for Testing
+## Port Forward for Testing
 
 ```bash
 # Controller API
@@ -79,48 +118,35 @@ kubectl port-forward deployment/tools -n cto 3000:3000
 kubectl port-forward deployment/healer -n cto 8081:8080
 ```
 
-### Quick Iteration Loop
+## Revert to Production
+
+When you're done testing:
 
 ```bash
-# 1. Make code changes
-vim crates/controller/src/main.rs
-
-# 2. Build, push, deploy
-./scripts/dev-push.sh controller
-
-# 3. Test your changes
-curl http://localhost:8080/health
-
-# 4. Check logs if something's wrong
-kubectl logs deployment/controller -n cto --tail=50
-```
-
-### Revert to Production
-
-When you're done testing, revert to the production image:
-
-```bash
-# Option 1: Force ArgoCD sync (recommended)
+# Force ArgoCD sync (recommended)
 argocd app sync cto --force
 
-# Option 2: Manual patch back to latest
+# Or manual patch
 kubectl set image deployment/controller controller=ghcr.io/5dlabs/controller:latest -n cto
 ```
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REGISTRY` | `ghcr.io` | Container registry |
-| `ORG` | `5dlabs` | Registry organization |
-| `NAMESPACE` | `cto` | Kubernetes namespace |
-| `DEV_TAG` | `dev-$USER` | Default image tag |
-
 ## Troubleshooting
 
-### Build Fails with Cargo Errors
+### "insecure registry" Error
 
-The multi-stage Dockerfiles compile Rust inside the container. If you hit dependency issues:
+Docker doesn't trust the in-cluster registry by default:
+
+```bash
+# Get your node IP
+kubectl get nodes -o wide
+
+# Add to Docker Desktop → Settings → Docker Engine:
+{"insecure-registries": ["<NODE_IP>:30500"]}
+
+# Restart Docker
+```
+
+### Build Fails with Cargo Errors
 
 ```bash
 # Clear Docker build cache
@@ -128,13 +154,6 @@ docker builder prune -f
 
 # Rebuild without cache
 docker build --no-cache --platform linux/amd64 ...
-```
-
-### Push Fails with Auth Errors
-
-```bash
-# Re-authenticate to GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u $(git config user.name) --password-stdin
 ```
 
 ### Deployment Doesn't Update
@@ -147,38 +166,24 @@ kubectl rollout restart deployment/controller -n cto
 kubectl describe pod -l app.kubernetes.io/name=controller -n cto | grep Image
 ```
 
-### Image Pull Errors on Talos
-
-If the cluster can't pull your dev image:
-
-1. Verify the image exists: `docker manifest inspect ghcr.io/5dlabs/controller:dev-yourname`
-2. Check image pull secrets: `kubectl get secrets ghcr-secret -n cto -o yaml`
-3. Ensure the secret has access to the tag you pushed
-
-## Comparison: CI vs Dev Push
-
-| Aspect | CI Pipeline | Dev Push |
-|--------|-------------|----------|
-| Build time | 5-15 min (queue + build) | 2-5 min |
-| Trigger | Git push | Manual |
-| Testing | Full test suite | Your local tests |
-| Image tag | `latest`, `v1.2.3` | `dev-$USER` |
-| Deployment | Automatic via ArgoCD | Immediate patch |
-| Rollback | Previous version | `argocd sync --force` |
-
-## Advanced: Multiple Dev Images
-
-If multiple developers are testing simultaneously:
+### Registry Not Reachable
 
 ```bash
-# Each developer uses their own tag
-DEV_TAG="dev-alice" ./scripts/dev-push.sh controller  # Alice
-DEV_TAG="dev-bob" ./scripts/dev-push.sh controller    # Bob
+# Check registry is running
+kubectl get pods -n registry
 
-# Or use feature names
-./scripts/dev-push.sh --tag feature-auth controller
-./scripts/dev-push.sh --tag bugfix-123 controller
+# Test connectivity from your machine
+curl http://<NODE_IP>:30500/v2/_catalog
 ```
+
+## Comparison
+
+| Aspect | CI Pipeline | dev-load.sh | dev-push.sh |
+|--------|-------------|-------------|-------------|
+| Network | Internet | Local only | Internet |
+| Time | 5-15 min | 1-3 min | 2-5 min |
+| Sharing | Everyone | Just you | Team |
+| Best for | Production | Fast iteration | Team testing |
 
 ## See Also
 

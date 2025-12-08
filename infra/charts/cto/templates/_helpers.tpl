@@ -162,11 +162,3 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: tmp
   emptyDir: {}
 {{- end }}
-
-{{- define "platform.agentTemplateProjectedVolume" -}}
-- name: templates
-  projected:
-    sources:
-      - configMap:
-          name: controller-templates-shared
-{{- end }}
