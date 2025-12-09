@@ -70,10 +70,5 @@ tempfile = "3.8"
 tokio-test = "0.4"
 env_logger = "0.11.8"
 log = "0.4"
-
-# Integration test configuration
-[[test]]
-name = "integration"
-path = "tests/integration/mod.rs"
-harness = true
+# Note: tests/integration.rs auto-discovered by Cargo - no explicit [[test]] needed
 

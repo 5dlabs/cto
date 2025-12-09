@@ -143,7 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     info!(
-        "Starting 5D Labs Controller Service v{}",
+        "🚀 Starting 5D Labs Controller Service v{} (dev build)",
         env!("CARGO_PKG_VERSION")
     );
 

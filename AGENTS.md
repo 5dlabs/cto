@@ -50,6 +50,68 @@ Always consult Context7 when:
 - GitOps validation: `make -C infra/gitops validate` (or `lint`, `test`).
 - Pre-commit checks: `pre-commit install && pre-commit run --all-files`.
 
+## Local Development with Tilt + ArgoCD
+
+**Tilt** provides continuous development with **ArgoCD** managing deployments. Changes are built locally, pushed to an in-cluster registry, and deployed via ArgoCD.
+
+### Quick Start
+
+```bash
+# One-time setup:
+# 1. Install Tilt
+curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
+
+# 2. Deploy local registry (if not already deployed)
+./scripts/dev-load.sh --setup
+
+# 3. Enable dev registry in ArgoCD
+./scripts/argocd-dev-mode.sh enable
+
+# Start developing (watches files, builds, deploys)
+tilt up
+
+# Open the Tilt UI: http://localhost:10350
+```
+
+### How It Works
+
+1. **Tilt watches** your `crates/` directory for changes
+2. **Builds images** with BuildKit caching (first build ~5-10min, subsequent ~1-2min)
+3. **Pushes to local registry** at `192.168.1.72:30500`
+4. **Restarts deployments** so pods pull the new images
+5. **ArgoCD stays synced** because it's configured to use the same registry
+
+### BuildKit Caching
+
+All Dockerfiles use BuildKit cache mounts:
+- **Shared cargo registry**: Downloaded crates cached and shared across all images
+- **Per-image target cache**: Compiled artifacts cached per service
+- **First build**: ~5-10 minutes (downloads all dependencies)
+- **Subsequent builds**: ~1-2 minutes (uses cache)
+
+### ArgoCD Integration
+
+```bash
+# Check dev registry status
+./scripts/argocd-dev-mode.sh status
+
+# Enable dev registry (use local images)
+./scripts/argocd-dev-mode.sh enable
+
+# Disable dev registry (revert to GHCR)
+./scripts/argocd-dev-mode.sh disable
+```
+
+### Cleanup
+
+```bash
+# Stop Tilt
+tilt down
+
+# Disable dev registry (ArgoCD reverts to GHCR images)
+./scripts/argocd-dev-mode.sh disable
+```
+
 ## Coding Style & Naming Conventions
 - Rust: rustfmt (Edition 2021, `max_width=100`); prefer `tracing::*` over `println!` (enforced by Clippy). Binary names kebab-case (e.g., `agent-controller`); files/modules snake_case (e.g., `src/bin/agent_controller.rs`).
 - YAML: 2-space indent; begin docs with `---`; follow `.yamllint.yaml`.
