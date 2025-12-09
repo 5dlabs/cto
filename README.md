@@ -108,7 +108,10 @@ The platform is in beta and being refined based on production usage.
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
 ✅ Infrastructure operators (PostgreSQL, Kafka, Redis, MinIO, OpenSearch, ClickHouse, QuestDB)  
+✅ Long-term memory with OpenMemory  
+✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
+🔄 Automatic agent provisioning (including GitHub App creation)  
 
 </div>
 
@@ -1104,10 +1107,13 @@ play({
 
 **What the team does:**
 ✅ **Phase 1 - Intake**: Morgan documents requirements and architecture  
-✅ **Phase 2 - Implementation**: Rex/Blaze builds the feature  
+✅ **Phase 2 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark) builds the feature  
 ✅ **Phase 3 - Quality**: Cleo reviews, Tess tests, Cipher secures  
 ✅ **Phase 4 - Integration**: Stitch code-reviews, Atlas merges and rebases  
 ✅ **Phase 5 - Deployment**: Bolt deploys and distributes  
+✅ **Parallel Task Batching**: Run multiple tasks simultaneously for faster development  
+✅ **Automatic Integration & Testing**: CI runs automatically, agents fix failures  
+✅ **Long-Term Memory**: OpenMemory persists context across sessions and agents  
 ✅ **Event-Driven**: Automatic phase transitions  
 ✅ **Auto-Resume**: Continues from where you left off
 
@@ -1291,28 +1297,7 @@ The play workflow template controls:
 - Event triggers between phases
 - Parameter passing between phases
 
-#### 4. Adding Custom Hooks
-
-Hooks are shell scripts that run during agent execution. Add new hook files beneath the CLI you are extending:
-
-```bash
-# Create new hook script (docs/Claude Code example)
-vim infra/charts/controller/agent-templates/docs/claude/hooks/my-custom-hook.sh.hbs
-
-# Create new hook script (play/Codex example)
-vim infra/charts/controller/agent-templates/play/codex/hooks/my-custom-hook.sh.hbs
-
-# Create new hook script (play/Factory example)
-vim infra/charts/controller/agent-templates/play/factory/hooks/my-custom-hook.sh.hbs
-```
-
-Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
-
-Refer to your CLI's documentation for hook configuration:
-- [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide)
-- Other CLIs: Refer to their respective documentation for hook/script support
-
-#### 5. Deploying Template Changes
+#### 4. Deploying Template Changes
 
 After editing any template files, redeploy the cto:
 
@@ -1334,7 +1319,7 @@ Common variables available in templates:
 - `{{github_user}}` - GitHub username
 - `{{repository_url}}` - Target repository URL
 - `{{working_directory}}` - Working directory path
-- `{{model}}` - Claude model name
+- `{{model}}` - Model name
 - `{{docs_repository_url}}` - Documentation repository URL
 
 ---
