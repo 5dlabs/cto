@@ -383,31 +383,40 @@ The platform is in beta and being refined based on production usage.
 
 <table>
 <tr>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 **📚 Phase 1**  
 **Morgan** documents  
 requirements & architecture
 
-*via `intake()` MCP call*
+*via `intake()`*
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 **⚡ Phase 2**  
-**Rex & Blaze** build in parallel  
-*(backend, frontend, or both)*
+**Rex & Blaze** build  
+backend + frontend
 
-*via `play()` multi-agent workflows*
+*via `play()`*
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 **🛡️ Phase 3**  
-**Cleo, Tess & Cipher** ensure  
-quality, testing & security
+**Cleo, Tess, Cipher, Stitch**  
+quality, testing, security, review
 
-*via `play()` multi-agent orchestration*
+*via `play()`*
+
+</td>
+<td align="center" width="25%">
+
+**🚀 Phase 4**  
+**Bolt** deploys  
+and distributes
+
+*via `play()`*
 
 </td>
 </tr>
@@ -469,7 +478,8 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 - **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)
 - **Phase 2 - Quality Assurance**: Cleo reviews and refactors
 - **Phase 3 - Testing & Security**: Tess validates, Cipher secures
-- **Phase 4 - Code Review**: Stitch provides automated PR review (like Bugbot)
+- **Phase 4 - Code Review**: Stitch provides automated PR review
+- **Phase 5 - Deployment**: Bolt handles deployment and distribution
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
 
@@ -938,6 +948,7 @@ play({
 ✅ **Phase 2 - Quality**: Cleo reviews and refactors  
 ✅ **Phase 3 - Testing**: Tess validates, Cipher secures  
 ✅ **Phase 4 - Review**: Stitch provides automated PR review  
+✅ **Phase 5 - Deployment**: Bolt deploys and distributes  
 ✅ **Event-Driven**: Automatic phase transitions  
 ✅ **GitHub Integration**: PRs from each phase
 
