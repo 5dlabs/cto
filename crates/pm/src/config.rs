@@ -355,5 +355,3 @@ mod tests {
         assert_eq!(config.model, Some("gpt-4.1".to_string()));
     }
 }
-
-

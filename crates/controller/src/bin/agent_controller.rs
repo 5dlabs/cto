@@ -86,7 +86,7 @@ fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
         error!("  1. Rebuild the controller image");
         error!("  2. Verify AGENT_TEMPLATES_PATH env var is correct");
         error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        return Err(format!("Templates directory not found: {}", templates_path).into());
+        return Err(format!("Templates directory not found: {templates_path}").into());
     }
 
     // Check for expected subdirectories

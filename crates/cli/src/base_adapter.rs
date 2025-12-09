@@ -623,6 +623,3 @@ mod tests {
         assert!(result.contains("CLI: claude"));
     }
 }
-
-
-

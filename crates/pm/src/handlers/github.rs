@@ -515,5 +515,3 @@ pub async fn create_issues_from_tasks(
 
     Ok(created_issues)
 }
-
-

@@ -294,5 +294,3 @@ mod tests {
         assert_eq!(extract_task_id_from_title("Task: No number"), None);
     }
 }
-
-

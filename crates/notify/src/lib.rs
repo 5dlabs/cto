@@ -1,7 +1,7 @@
 //! Notification system for CTO platform events.
 //!
 //! This crate provides a fire-and-forget notification system for sending
-//! alerts to Discord, Slack, PagerDuty, and other messaging platforms when
+//! alerts to Discord, Slack, `PagerDuty`, and other messaging platforms when
 //! events occur in the CTO platform.
 //!
 //! # Usage
@@ -27,7 +27,7 @@
 //!
 //! - `DISCORD_WEBHOOK_URL`: Discord webhook URL (enables Discord channel)
 //! - `SLACK_WEBHOOK_URL`: Slack webhook URL (enables Slack channel)
-//! - `PAGERDUTY_ROUTING_KEY`: PagerDuty routing key (enables PagerDuty alerts)
+//! - `PAGERDUTY_ROUTING_KEY`: `PagerDuty` routing key (enables `PagerDuty` alerts)
 //! - `NOTIFY_DISABLED`: Set to "true" to disable all notifications
 //!
 //! # Architecture
@@ -39,9 +39,9 @@
 //! - [`SlackChannel`] implements Slack webhook notifications
 //! - [`Notifier`] dispatches events to all enabled channels
 //!
-//! For incident management, use the PagerDuty client directly:
+//! For incident management, use the `PagerDuty` client directly:
 //!
-//! - [`pagerduty::PagerDutyClient`] for triggering/resolving PagerDuty incidents
+//! - [`pagerduty::PagerDutyClient`] for triggering/resolving `PagerDuty` incidents
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
@@ -50,9 +50,9 @@ pub mod channels;
 pub mod error;
 pub mod events;
 
-// Re-export PagerDuty module for direct incident management
+// Re-export `PagerDuty` module for direct incident management
 pub mod pagerduty {
-    //! PagerDuty incident management.
+    //! `PagerDuty` incident management.
     pub use crate::channels::pagerduty::*;
 }
 

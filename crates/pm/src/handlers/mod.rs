@@ -14,5 +14,3 @@ pub use callbacks::{handle_intake_complete, handle_tasks_json_callback, Callback
 pub use github::{handle_github_webhook, IntakeMetadata, PullRequestEvent};
 pub use intake::{IntakeRequest, IntakeResult, IntakeTask, TasksJson};
 pub use play::{PlayRequest, PlayResult};
-
-

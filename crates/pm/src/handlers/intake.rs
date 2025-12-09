@@ -453,7 +453,13 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
 fn sanitize_for_repo_name(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .to_string()

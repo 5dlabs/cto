@@ -1040,7 +1040,10 @@ async fn main() -> Result<()> {
                         "unseal_keys": openbao_init.unseal_keys,
                         "root_token": openbao_init.root_token,
                     });
-                    std::fs::write(&openbao_keys_path, serde_json::to_string_pretty(&keys_json)?)?;
+                    std::fs::write(
+                        &openbao_keys_path,
+                        serde_json::to_string_pretty(&keys_json)?,
+                    )?;
 
                     // Unseal with first key
                     if let Some(key) = openbao_init.unseal_keys.first() {
@@ -1254,7 +1257,10 @@ async fn main() -> Result<()> {
                     }
                 } else {
                     println!("\n⚠️  OpenBao needs initialization. Run:");
-                    println!("   metal openbao-init --kubeconfig {}", kubeconfig.display());
+                    println!(
+                        "   metal openbao-init --kubeconfig {}",
+                        kubeconfig.display()
+                    );
                 }
 
                 println!("\n📋 Access services:");

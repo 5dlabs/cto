@@ -24,6 +24,3 @@ mod models;
 
 pub use client::Aws;
 pub use models::*;
-
-
-

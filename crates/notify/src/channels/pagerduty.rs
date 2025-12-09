@@ -1,6 +1,6 @@
-//! PagerDuty integration for incident management.
+//! `PagerDuty` integration for incident management.
 //!
-//! This module provides integration with PagerDuty Events API v2 for triggering
+//! This module provides integration with `PagerDuty` Events API v2 for triggering
 //! and resolving incidents.
 //!
 //! # Usage
@@ -24,20 +24,20 @@
 //!
 //! # Configuration
 //!
-//! - `PAGERDUTY_ROUTING_KEY`: Integration key from your PagerDuty service
+//! - `PAGERDUTY_ROUTING_KEY`: Integration key from your `PagerDuty` service
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 use crate::error::ChannelError;
 
-/// Environment variable for PagerDuty routing key.
+/// Environment variable for `PagerDuty` routing key.
 const ENV_PAGERDUTY_ROUTING_KEY: &str = "PAGERDUTY_ROUTING_KEY";
 
-/// PagerDuty Events API v2 endpoint.
+/// `PagerDuty` Events API v2 endpoint.
 const EVENTS_API_URL: &str = "https://events.pagerduty.com/v2/enqueue";
 
-/// PagerDuty client for Events API v2.
+/// `PagerDuty` client for Events API v2.
 #[derive(Debug, Clone)]
 pub struct PagerDutyClient {
     routing_key: String,
@@ -45,7 +45,7 @@ pub struct PagerDutyClient {
 }
 
 impl PagerDutyClient {
-    /// Create a new PagerDuty client from environment variables.
+    /// Create a new `PagerDuty` client from environment variables.
     ///
     /// # Errors
     /// Returns error if `PAGERDUTY_ROUTING_KEY` is not set.
@@ -61,7 +61,7 @@ impl PagerDutyClient {
         })
     }
 
-    /// Create a new PagerDuty client with a specific routing key.
+    /// Create a new `PagerDuty` client with a specific routing key.
     #[must_use]
     pub fn new(routing_key: String) -> Self {
         Self {
@@ -70,13 +70,13 @@ impl PagerDutyClient {
         }
     }
 
-    /// Check if PagerDuty is configured via environment.
+    /// Check if `PagerDuty` is configured via environment.
     #[must_use]
     pub fn is_configured() -> bool {
         std::env::var(ENV_PAGERDUTY_ROUTING_KEY).is_ok()
     }
 
-    /// Send an event to PagerDuty.
+    /// Send an event to `PagerDuty`.
     ///
     /// Returns the `dedup_key` for the event (useful for acknowledging/resolving).
     ///
@@ -175,7 +175,7 @@ impl PagerDutyClient {
     }
 }
 
-/// PagerDuty event for Events API v2.
+/// `PagerDuty` event for Events API v2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PagerDutyEvent {
     /// Event action (trigger, acknowledge, resolve)
@@ -187,7 +187,7 @@ pub struct PagerDutyEvent {
     pub payload: EventPayload,
 }
 
-/// PagerDuty event action.
+/// `PagerDuty` event action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EventAction {
@@ -199,7 +199,7 @@ pub enum EventAction {
     Resolve,
 }
 
-/// PagerDuty event payload.
+/// `PagerDuty` event payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventPayload {
     /// Brief summary of the event
@@ -225,7 +225,7 @@ pub struct EventPayload {
     pub custom_details: Option<serde_json::Value>,
 }
 
-/// PagerDuty event severity.
+/// `PagerDuty` event severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSeverity {
@@ -342,4 +342,3 @@ mod tests {
         assert!(json.contains("\"severity\":\"error\""));
     }
 }
-

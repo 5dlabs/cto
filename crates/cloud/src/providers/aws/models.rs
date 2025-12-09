@@ -336,6 +336,3 @@ pub mod amis {
     /// Ubuntu 22.04 LTS (us-east-1).
     pub const UBUNTU_22_04_US_EAST_1: &str = "ami-0557a15b87f6559cf";
 }
-
-
-

@@ -488,5 +488,3 @@ pub struct ProjectCreateInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_date: Option<String>,
 }
-
-

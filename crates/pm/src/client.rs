@@ -1244,5 +1244,3 @@ mod tests {
         assert!(json.contains("test-id"));
     }
 }
-
-
