@@ -320,7 +320,7 @@ research:
   # PR creation
   createPR: true
   repo: "5dlabs/cto"
-  baseBranch: "main"
+  baseBranch: "develop"
   researchDir: "docs/research"
 
   persistence:
