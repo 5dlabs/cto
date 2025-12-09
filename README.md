@@ -1199,11 +1199,13 @@ The platform uses a template system to customize agent behavior, settings, and p
 
 All templates live under `infra/charts/controller/agent-templates/` with CLI-specific subdirectories:
 
-**Docs Templates (Multi-CLI Support)**
+**Intake Templates (Multi-CLI Support)**
 
-- **Prompts**: Rendered from `docs/{cli}/prompt.md.hbs` into the ConfigMap
-- **Settings**: `docs/{cli}/settings.json.hbs` controls model, permissions, tools
-- **Container Script**: `docs/{cli}/container.sh.hbs` handles Git workflow and CLI execution
+`intake()` handles all project onboarding and documentation generation. Templates are CLI-specific:
+
+- **Prompts**: Rendered from `intake/{cli}/prompt.md.hbs` into the ConfigMap
+- **Settings**: `intake/{cli}/settings.json.hbs` controls model, permissions, tools
+- **Container Script**: `intake/{cli}/container.sh.hbs` handles Git workflow and CLI execution
 
 **Play Templates (Multi-CLI)**
 
@@ -1235,8 +1237,8 @@ All templates live under `infra/charts/controller/agent-templates/` with CLI-spe
 Edit the settings template files for your chosen CLI:
 
 ```bash
-# For docs agents (Claude Code example)
-vim infra/charts/controller/agent-templates/docs/claude/settings.json.hbs
+# For intake agents (Claude Code example)
+vim infra/charts/controller/agent-templates/intake/claude/settings.json.hbs
 
 # For play agents (Claude Code example)
 vim infra/charts/controller/agent-templates/play/claude/settings.json.hbs
@@ -1255,24 +1257,27 @@ Settings control:
 - CLI-specific settings (permissions, hooks, etc.)
 
 Refer to your CLI's documentation for complete configuration options:
-- [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settings)
-- [Factory CLI Documentation](https://docs.factory.ai)
-- Other CLIs: Refer to their respective documentation
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/settings)
+- [Cursor](https://docs.cursor.com)
+- [Codex (OpenAI)](https://platform.openai.com/docs/guides/code)
+- [Factory](https://docs.factory.ai)
+- [Gemini CLI](https://ai.google.dev/gemini-api/docs)
+- [OpenCode](https://github.com/opencode-ai/opencode)
 
 #### 2. Updating Prompts
 
-**For docs tasks** (affects documentation generation via `intake()`):
+**For intake templates** (affects project onboarding — `intake()` handles all documentation):
 
 ```bash
-# Edit the docs prompt template for your CLI
-vim infra/charts/controller/agent-templates/docs/{cli}/prompt.md.hbs
+# Edit the intake prompt template for your CLI
+vim infra/charts/controller/agent-templates/intake/{cli}/prompt.md.hbs
 
 # Examples:
-vim infra/charts/controller/agent-templates/docs/claude/prompt.md.hbs
-vim infra/charts/controller/agent-templates/docs/cursor/prompt.md.hbs
+vim infra/charts/controller/agent-templates/intake/claude/prompt.md.hbs
+vim infra/charts/controller/agent-templates/intake/cursor/prompt.md.hbs
 ```
 
-**For play tasks** (affects specific task implementation via `play()`):
+**For play templates** (affects task implementation via `play()`):
 
 ```bash
 # Edit task-specific files in your docs repository
