@@ -30,7 +30,7 @@ spec:
   # Source configuration - Using 5dlabs fork with fixes
   source:
     repoURL: https://github.com/5dlabs/questdb-operator
-    targetRevision: develop
+    targetRevision: main
     path: config/default
     kustomize:
       # Override namespace for the operator deployment
