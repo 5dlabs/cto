@@ -61,6 +61,39 @@ Auto-detects failures, stuck workflows, and CI issues—spawns healing agents au
 | 24/7 on-call rotation costs | **Automated** self-healing |
 | Weeks to onboard new team members | **Instant** agent deployment |
 
+### **🔐 Bring Your Own Keys (BYOK)**
+
+- **Your API keys** — Anthropic, OpenAI, Google, etc. stored securely in your infrastructure
+- **Your cloud credentials** — AWS, GCP, Azure keys never leave your cluster
+- **Secret management with OpenBao** — Open-source HashiCorp Vault fork for enterprise-grade secrets
+- **Zero vendor lock-in** — Switch providers anytime, no data hostage situations
+
+### **🌐 Zero-Trust Networking**
+
+| Feature | Technology | What It Does |
+|---------|------------|--------------|
+| **Cloudflare Tunnels** | `cloudflared` | Expose services publicly without opening firewall ports — no public IPs needed, automatic TLS, global edge CDN |
+| **Kilo VPN** | WireGuard | Secure mesh VPN for remote cluster access — connect from anywhere with encrypted tunnels |
+| **OpenBao** | Vault fork | Centralized secrets management with dynamic credentials and audit logging |
+
+**Cloudflare Tunnels** is a game-changer: your entire platform can run on air-gapped infrastructure while still being accessible from anywhere. No ingress controllers, no load balancers, no exposed ports—just secure outbound tunnels through Cloudflare's network.
+
+### **🏭 Infrastructure Operators (Managed by Bolt)**
+
+Replace expensive managed cloud services with open-source Kubernetes operators:
+
+| Operator | Replaces | Savings |
+|----------|----------|---------|
+| **CloudNative-PG** | AWS RDS, Cloud SQL, Azure PostgreSQL | ~70-80% |
+| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% |
+| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% |
+| **Redis Operator** | ElastiCache, Memorystore | ~70-80% |
+| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% |
+| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% |
+| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% |
+
+**Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
+
 </div>
 
 ---
@@ -77,7 +110,7 @@ Auto-detects failures, stuck workflows, and CI issues—spawns healing agents au
 ✅ Kubernetes controllers with self-healing  
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
-✅ CloudFront tunneling for public access without exposed interfaces  
+✅ Cloudflare Tunnels for public access without exposed interfaces  
 🔄 Documentation and user experience improvements  
 
 </div>
@@ -437,13 +470,13 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
 
-### **🔧 Workflow Management**
-Control and monitor your AI development workflows:
+### **🔧 Three Core MCP Tools**
 
-- **`jobs()`** - List all running workflows with status
-- **`stop_job()`** - Stop any running workflow gracefully
-- **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
-- **`register_tool()`** - Dynamically register new MCP tools at runtime
+| Tool | Purpose |
+|------|---------|
+| **`addTool()`** | Dynamically add any MCP server by GitHub URL — agents instantly gain access to new capabilities |
+| **`intake()`** | Project onboarding — initializes new projects with proper structure and configuration |
+| **`play()`** | Full orchestration — coordinates the entire team through build/test/deploy phases |
 
 ### **🔄 Self-Healing Infrastructure (Healer)**
 The platform includes comprehensive self-healing for both CTO and your deployed applications:
@@ -529,16 +562,18 @@ Dynamic MCP tool registration with **57+ pre-configured tools**:
 - **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
 - **Agent Workspaces**: Isolated persistent volumes for each service with session continuity
 - **GitHub Apps + PM Integration**: Linear (MVP), with Jira, Asana, Notion, Monday.com planned
-- **CloudFront Tunneling**: Expose services publicly without opening firewall ports
+- **Cloudflare Tunnels**: Expose services publicly without opening firewall ports
+- **Kilo VPN**: WireGuard-based secure remote cluster access
 
-### **🌐 CloudFront Tunneling**
+### **🌐 Cloudflare Tunnels**
 
 Access your services from anywhere without exposing your infrastructure:
 
-- **Zero External Interface**: No public IPs or open firewall ports required
-- **Automatic TLS**: End-to-end encryption via CloudFront
-- **Global Edge**: Low-latency access from anywhere in the world
-- **Secure by Default**: Traffic routes through AWS infrastructure
+- **Zero External Interface**: No public IPs, no open firewall ports, no ingress controllers
+- **Automatic TLS**: End-to-end encryption via Cloudflare's edge network
+- **Global Edge CDN**: Low-latency access from anywhere in the world
+- **Air-Gapped Ready**: Run on isolated networks while remaining publicly accessible
+- **Secure by Default**: Only outbound connections — nothing to attack
 
 **Data Flow:**
 1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
@@ -623,7 +658,7 @@ chmod +x setup-agent-secrets.sh
 - Agent workspace management and isolation with persistent volumes
 - Automatic resource cleanup and job lifecycle management
 - MCP tools with dynamic registration
-- CloudFront tunneling for secure public access
+- Cloudflare Tunnels for secure public access
 
 ### Remote Cluster Access with Kilo VPN
 
@@ -843,10 +878,34 @@ After creating your configuration file, configure your CLI to use the MCP server
 
 ## **🔧 MCP Tools Reference**
 
-The platform exposes powerful MCP tools for AI-driven development:
+The platform exposes three powerful MCP tools:
 
-### 1. **`intake()` - Unified Project Intake** ⭐ NEW
-Process PRDs, generate tasks, and create comprehensive documentation in one operation.
+### 1. **`addTool()` - Dynamic Tool Registration**
+Instantly extend agent capabilities by adding any MCP server from GitHub.
+
+```javascript
+// Add a new MCP server by GitHub URL
+addTool({
+  github_url: "https://github.com/anthropics/mcp-server-memory",
+  name: "memory"
+});
+
+// Add with custom configuration
+addTool({
+  github_url: "https://github.com/org/custom-mcp-server",
+  name: "custom-tool",
+  config: { api_key: "..." }
+});
+```
+
+**What addTool does:**
+✅ Clones and installs MCP server from GitHub  
+✅ Registers tools with all active agents  
+✅ Agents immediately gain access to new capabilities  
+✅ No restart required — hot-reload of tools
+
+### 2. **`intake()` - Project Onboarding**
+Initialize new projects with proper structure, tasks, and configuration.
 
 ```javascript
 // Minimal call - handles everything
@@ -858,21 +917,20 @@ intake({
 intake({
   project_name: "my-awesome-app",
   enrich_context: true,        // Auto-scrape URLs via Firecrawl
-  include_codebase: false,     // Include existing code context
-  model: "claude-opus-4-5-20250929"  // Opus 4.5 by default
+  include_codebase: false      // Include existing code context
 });
 ```
 
-**What unified intake does:**
-✅ Parses PRD and generates task breakdown via built-in task engine  
-✅ Enriches context by scraping URLs found in PRD (via Firecrawl)  
-✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)  
-✅ Adds agent routing hints for frontend/backend task assignment  
-✅ Submits single PR with complete project structure  
-✅ **Powered by Claude Opus 4.5** for superior task analysis
+**What intake does:**
+✅ Parses PRD and generates task breakdown  
+✅ Enriches context by scraping URLs found in PRD  
+✅ Creates documentation (task.md, prompt.md, acceptance-criteria.md)  
+✅ Adds agent routing hints for frontend/backend tasks  
+✅ Syncs with Linear (MVP) for project management  
+✅ Submits PR with complete project structure
 
-### 2. **`play()` - Multi-Agent Orchestration**
-Executes complex multi-agent workflows with event-driven coordination.
+### 3. **`play()` - Full Team Orchestration**
+Coordinates the entire AI engineering team through build/test/deploy phases.
 
 ```javascript
 // Minimal call - the whole team collaborates!
@@ -891,65 +949,16 @@ play({
 ```
 
 **What the team does:**
-✅ **Phase 1 - Implementation**: Rex/Blaze builds the feature  
+✅ **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)  
 ✅ **Phase 2 - Quality**: Cleo reviews and refactors  
-✅ **Phase 3 - Testing**: Tess validates and tests  
+✅ **Phase 3 - Testing**: Tess validates, Cipher secures  
+✅ **Phase 4 - Review**: Stitch provides automated PR review  
 ✅ **Event-Driven**: Automatic phase transitions  
 ✅ **GitHub Integration**: PRs from each phase
 
-### 3. **`jobs()` - Workflow Status**
-List all running Argo workflows with simplified status info.
-
-```javascript
-// List all workflows
-jobs();
-
-// Filter by type
-jobs({
-  include: ["play", "intake"]
-});
-
-// Specify namespace
-jobs({
-  namespace: "cto"
-});
-```
-
-**Returns:** List of active workflows with type, name, phase, and status
-
-### 4. **`stop_job()` - Workflow Control**
-Stop any running Argo workflow gracefully.
-
-```javascript
-// Stop a specific workflow
-stop_job({
-  job_type: "play",
-  name: "play-workflow-abc123"
-});
-
-// Stop with explicit namespace
-stop_job({
-  job_type: "intake",
-  name: "intake-workflow-xyz789",
-  namespace: "cto"
-});
-```
-
-**Workflow types:** `intake`, `play`, `workflow`
-
-### 5. **`docs_ingest()` - Documentation Analysis**
-Intelligently analyze GitHub repos and ingest documentation.
-
-```javascript
-// Ingest repository documentation
-docs_ingest({
-  repository_url: "https://github.com/cilium/cilium",
-  doc_type: "cilium"
-});
-
 ---
 
-## **📋 Complete MCP Tool Parameters**
+## **📋 MCP Tool Parameters**
 
 ### `docs` Tool Parameters
 
@@ -1104,9 +1113,9 @@ Common variables available in templates:
 1. **Configure `cto-config.json` first** to set up your agents, models, tool profiles, and repository defaults
 2. **Use `intake()` for new projects** to parse PRD, generate tasks, and create documentation in one operation
 3. **Choose the right tool for the job**:
-   - Use `intake()` for new project setup from PRDs (handles docs automatically)
-   - Use `play()` for full-cycle development (implementation → QA → testing)
-   - Use `jobs()` / `stop_job()` for workflow management
+   - Use `addTool()` to extend agent capabilities with new MCP servers
+   - Use `intake()` for new project setup from PRDs
+   - Use `play()` for full-cycle development (implementation → QA → testing → review)
 4. **Mix and match CLIs** - assign the best CLI to each agent based on task requirements
 5. **Customize tool access** - use the `tools` configuration to control agent capabilities
 6. **Use minimal MCP calls** - let configuration defaults handle most parameters
