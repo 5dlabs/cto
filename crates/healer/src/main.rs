@@ -4811,7 +4811,7 @@ fn verify_templates_directory(templates_dir: &str) -> Result<()> {
     }
 
     // Check for expected subdirectories
-    let expected_dirs = ["alerts", "partials", "expected"];
+    let expected_dirs = ["alerts", "partials", "expected", "ci"];
     let mut missing_dirs = Vec::new();
 
     for dir in &expected_dirs {

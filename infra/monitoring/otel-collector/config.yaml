@@ -1,3 +1,4 @@
+---
 exporters:
   debug:
     verbosity: detailed
