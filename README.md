@@ -1384,9 +1384,25 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ---
 
-## **🔗 Related Projects**
+## **🛠️ Tech Stack**
 
-- **[5D Labs](https://5dlabs.io)** - Building the future of AI-powered software development.
+| Category | Technologies |
+|----------|-------------|
+| **Platform** | Kubernetes, Helm, ArgoCD, Argo Workflows |
+| **Language** | Rust (Tokio, Axum, Serde) |
+| **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM |
+| **MCP Tools** | Context7, OpenMemory, Brave Search, Hexstrike |
+| **Frontend** | React, Next.js, shadcn/ui, Tailwind CSS, Expo, Electron |
+| **Backend** | Rust, Go, Node.js, TypeScript |
+| **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
+| **Messaging** | Kafka (Strimzi) |
+| **Storage** | MinIO (S3-compatible) |
+| **Secrets** | OpenBao (Vault fork) |
+| **Networking** | Cloudflare Tunnels, Kilo VPN (WireGuard) |
+| **CI/CD** | GitHub Actions, ArgoCD Image Updater |
+| **Observability** | Prometheus, Grafana, Loki |
+| **Security** | Trivy, Kube-bench, Gitleaks, Falco |
+| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr |
 
 ---
 
