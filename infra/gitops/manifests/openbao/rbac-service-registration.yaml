@@ -43,4 +43,3 @@ subjects:
   - kind: ServiceAccount
     name: openbao
     namespace: openbao
-
