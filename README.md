@@ -461,7 +461,7 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
 - Agent routing: automatically assigns frontend/backend/mobile tasks
-- **Configurable AI models** — use any supported provider (Anthropic, OpenAI, Google, etc.)
+- **Configurable AI models** — use any supported provider and model
 
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
@@ -530,7 +530,7 @@ CTO works with your favorite AI coding assistant:
 
 | CLI | Description | Status |
 |-----|-------------|--------|
-| **Claude Code** | Anthropic's official CLI | ✅ Full support |
+| **Claude Code** | Anthropic CLI | ✅ Full support |
 | **Cursor** | AI-first code editor | ✅ Full support |
 | **Codex** | OpenAI's coding assistant | ✅ Full support |
 | **Factory** | Code Factory CLI | ✅ Full support |
@@ -564,7 +564,7 @@ Dynamic MCP tool registration with **57+ pre-configured tools** across GitHub, K
 - ⚡ **Faster responses** — fewer tools = faster tool selection
 - 🧠 **Better focus** — agents stay on-task with curated capabilities
 
-**Categories:** GitHub (28) • Kubernetes (18) • OpenMemory (5) • ArgoCD (4) • Context7 (2) • Filesystem • Brave Search • Firecrawl
+**Categories:** GitHub (28) • Kubernetes (18) • shadcn/ui (8) • OpenMemory (5) • ArgoCD (4) • Context7 (2) • Filesystem • Brave Search • Firecrawl
 
 **Frontend Stack**: shadcn/ui components, Tailwind CSS, React patterns built-in
 
@@ -662,7 +662,7 @@ chmod +x setup-agent-secrets.sh
 - Kubernetes 1.19+
 - Helm 3.2.0+
 - GitHub Personal Access Token (or GitHub App)
-- Anthropic API Key
+- API key for your chosen provider (Anthropic, OpenAI, Google, etc.)
 
 **What you get:**
 - Complete cto platform deployed to Kubernetes
@@ -734,13 +734,13 @@ Create a `cto-config.json` file in your project root. See the [full example conf
   "version": "1.0",
   "defaults": {
     "docs": {
-      "model": "claude-opus-4-5-20251101",
+      "model": "your-preferred-model",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
     },
     "play": {
-      "model": "claude-opus-4-5-20251101",
+      "model": "your-preferred-model",
       "cli": "factory",
       "implementationAgent": "5DLabs-Rex",
       "frontendAgent": "5DLabs-Blaze",
@@ -755,21 +755,21 @@ Create a `cto-config.json` file in your project root. See the [full example conf
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "primary": { "model": "opus", "cli": "claude" },
-      "research": { "model": "sonnet", "cli": "cursor" },
-      "fallback": { "model": "gpt-4o", "cli": "codex" }
+      "research": { "model": "gpt-4o", "cli": "codex" },
+      "fallback": { "model": "gemini-pro", "cli": "gemini" }
     }
   },
   "agents": {
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "factory",
-      "model": "claude-opus-4-5-20251101",
+      "model": "your-preferred-model",
       "maxTokens": 64000,
       "temperature": 0.7,
       "reasoningEffort": "high",
       "modelRotation": {
         "enabled": true,
-        "models": ["claude-sonnet-4-5", "claude-opus-4-5", "gpt-5.1", "gemini-3-pro"]
+        "models": ["model-a", "model-b", "model-c"]
       },
       "tools": {
         "remote": ["github_create_pull_request", "github_push_files", "context7_get_library_docs"]
@@ -958,9 +958,9 @@ play({
 
 ## **🎨 Template Customization**
 
-The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. Multi-CLI support lives alongside these templates so Claude, Codex, and future CLIs follow the same structure.
+The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. All supported CLIs follow the same template structure.
 
-**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). We ship presets for Claude (`claude-sonnet-4-20250514`), Codex (`gpt-5-codex`), and Factory (`gpt-5-factory-high`), but any supported model for a CLI can be supplied via configuration.
+**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). Any model supported by your chosen CLI can be specified via configuration.
 
 ### Template Architecture
 
@@ -1071,7 +1071,7 @@ Common variables available in templates:
 - `{{github_user}}` - GitHub username
 - `{{repository_url}}` - Target repository URL
 - `{{working_directory}}` - Working directory path
-- `{{model}}` - Claude model name
+- `{{model}}` - Model name for the configured CLI
 - `{{docs_repository_url}}` - Documentation repository URL
 
 ---
