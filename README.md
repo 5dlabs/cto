@@ -58,7 +58,7 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 ### **🔐 Bring Your Own Keys (BYOK)**
 
 - **Your API keys** — Anthropic, OpenAI, Google, etc. stored securely in your infrastructure
-- **Your cloud credentials** — AWS, GCP, Azure keys never leave your cluster
+- **Your infrastructure credentials** — Cloud (AWS, GCP, Azure) or bare-metal (Latitude, Hetzner) keys never leave your cluster
 - **Secret management with OpenBao** — Open-source HashiCorp Vault fork for enterprise-grade secrets
 - **Zero vendor lock-in** — Switch providers anytime, no data hostage situations
 
@@ -70,7 +70,7 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 | **Kilo VPN** | WireGuard | Secure mesh VPN for remote cluster access — connect from anywhere with encrypted tunnels |
 | **OpenBao** | Vault fork | Centralized secrets management with dynamic credentials and audit logging |
 
-**Cloudflare Tunnels** is a game-changer: your entire platform can run on air-gapped infrastructure while still being accessible from anywhere. No ingress controllers, no load balancers, no exposed ports—just secure outbound tunnels through Cloudflare's network.
+Your entire platform can run on air-gapped infrastructure while still being accessible from anywhere. No ingress controllers, no load balancers, no exposed ports—just secure outbound tunnels.
 
 ### **🏭 Infrastructure Operators (Managed by Bolt)**
 
@@ -494,8 +494,7 @@ Control and monitor your AI development workflows:
 
 - **`jobs()`** - List all running workflows with status
 - **`stop_job()`** - Stop any running workflow gracefully
-- **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
-- **`register_tool()`** - Dynamically register new MCP tools at runtime
+- **`addTool()`** - Dynamically register new MCP tools at runtime
 
 ### **🔄 Self-Healing Infrastructure**
 The platform includes comprehensive self-healing capabilities:
@@ -570,7 +569,7 @@ Access your services from anywhere without exposing your infrastructure:
 
 **Data Flow:**
 1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
-2. MCP server loads configuration from `cto-config.json` and applies defaults
+2. MCP server loads configuration from your MCP config and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
@@ -704,38 +703,44 @@ cto-mcp --help   # MCP server for any CLI
 
 ## **⚙️ Configuration**
 
-### Configure Project Settings
+### Unified MCP Configuration
 
-Create a `cto-config.json` file in your project root to configure agents, models, tool access, and workflow defaults:
+Configure everything in a single MCP config file. For Cursor, create `.cursor/mcp.json`:
 
 ```json
 {
-  "version": "1.0",
-  "defaults": {
-    "docs": {
-      "model": "claude-opus-4-1-20250805",
-      "githubApp": "5DLabs-Morgan",
-      "includeCodebase": false,
-      "sourceBranch": "main"
-    },
-    "play": {
-      "model": "claude-sonnet-4-20250514",
-      "cli": "claude",
-      "implementationAgent": "5DLabs-Rex",
-      "qualityAgent": "5DLabs-Cleo",
-      "testingAgent": "5DLabs-Tess",
-      "repository": "your-org/your-repo",
-      "service": "your-service",
-      "docsRepository": "your-org/your-docs-repo",
-      "docsProjectDirectory": "docs"
-    },
-    "intake": {
-      "githubApp": "5DLabs-Morgan",
-      "primary": { "model": "opus", "cli": "claude" },
-      "research": { "model": "gpt-4o", "cli": "codex" },
-      "fallback": { "model": "gemini-pro", "cli": "gemini" }
-    }
-  },
+  "mcpServers": {
+    "cto-mcp": {
+      "command": "cto-mcp",
+      "args": [],
+      "env": {},
+      "config": {
+        "version": "1.0",
+        "defaults": {
+          "docs": {
+            "model": "your-docs-model",
+            "githubApp": "5DLabs-Morgan",
+            "includeCodebase": false,
+            "sourceBranch": "main"
+          },
+          "play": {
+            "model": "your-play-model",
+            "cli": "claude",
+            "implementationAgent": "5DLabs-Rex",
+            "qualityAgent": "5DLabs-Cleo",
+            "testingAgent": "5DLabs-Tess",
+            "repository": "your-org/your-repo",
+            "service": "your-service",
+            "docsRepository": "your-org/your-docs-repo",
+            "docsProjectDirectory": "docs"
+          },
+          "intake": {
+            "githubApp": "5DLabs-Morgan",
+            "primary": { "model": "opus", "cli": "claude" },
+            "research": { "model": "gpt-4o", "cli": "codex" },
+            "fallback": { "model": "gemini-pro", "cli": "gemini" }
+          }
+        },
   "agents": {
     "morgan": {
       "githubApp": "5DLabs-Morgan",
@@ -792,15 +797,17 @@ Create a `cto-config.json` file in your project root to configure agents, models
         }
       }
     },
-    "tess": {
-      "githubApp": "5DLabs-Tess",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations"],
-        "localServers": {
-          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
-          "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
+        "tess": {
+          "githubApp": "5DLabs-Tess",
+          "cli": "claude",
+          "model": "your-tess-model",
+          "tools": {
+            "remote": ["memory_create_entities", "memory_add_observations"],
+            "localServers": {
+              "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
+              "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
+            }
+          }
         }
       }
     }
@@ -808,63 +815,27 @@ Create a `cto-config.json` file in your project root to configure agents, models
 }
 ```
 
+**For Claude Code**, use the same structure in `~/.config/claude/mcp.json`.
+
+**Key Features:**
+- **CLI & Model Rotation**: Configure different CLIs and models per agent—rotate between providers for cost optimization or capability matching
+- **Automatic ArgoCD Management**: Platform manages ArgoCD applications and GitOps deployments automatically
+- **Tool Profiles**: Fine-grained control over which tools each agent can access
+- **Zero Config Startup**: Sensible defaults let you start immediately, customize later
+
 **Agent Configuration Fields:**
 - **`githubApp`**: GitHub App name for authentication
 - **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`)
 - **`model`**: Model identifier for the CLI
 - **`tools`** (optional): Fine-grained tool access control
-  - **`remote`**: Array of remote tool names from Tools
+  - **`remote`**: Array of remote tool names
   - **`localServers`**: Local MCP server configurations
-    - Each server specifies `enabled` and which `tools` the agent can access
-
-**Benefits:**
-- **CLI Flexibility**: Different agents can use different CLIs
-- **Model Selection**: Each agent can use its optimal model
-- **Tool Profiles**: Customize tool access per agent
-- **Security**: Restrict agent capabilities as needed
-
-### Configure MCP Integration
-
-After creating your configuration file, configure your CLI to use the MCP server.
-
-**For Cursor**, create a `.cursor/mcp.json` file in your project directory:
-
-```json
-{
-  "mcpServers": {
-    "cto-mcp": {
-      "command": "cto-mcp",
-      "args": [],
-      "env": {}
-    }
-  }
-}
-```
-
-**For Claude Code**, add to your MCP configuration (typically in `~/.config/claude/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "cto-mcp": {
-      "command": "cto-mcp",
-      "args": []
-    }
-  }
-}
-```
 
 **Usage:**
-1. Create the `cto-config.json` file in your project root with your specific settings
-2. Configure your CLI's MCP integration as shown above
+1. Create your MCP config file (`.cursor/mcp.json` or equivalent)
+2. Add the CTO configuration inside the `config` field
 3. Restart your CLI to load the MCP server
 4. All MCP tools will be available with your configured defaults
-
-**Benefits of Configuration-Driven Approach:**
-- **Simplified MCP Calls**: Most parameters have sensible defaults from your config
-- **Dynamic Agent Lists**: Tool descriptions show available agents from your config
-- **Consistent Settings**: All team members use the same model/agent assignments
-- **Easy Customization**: Change defaults without modifying MCP server setup
 
 ---
 
@@ -923,7 +894,7 @@ Autonomous AI CLI
 </table>
 
 **How It Works:**
-- Each agent in `cto-config.json` specifies its `cli` and `model`
+- Each agent in your MCP config specifies its `cli` and `model`
 - Controllers automatically use the correct CLI for each agent
 - All CLIs follow the same template structure
 - Seamless switching between CLIs per-agent
@@ -1089,16 +1060,6 @@ stop_job({
 
 **Workflow types:** `intake`, `play`, `workflow`
 
-### 5. **`docs_ingest()` - Documentation Analysis**
-Intelligently analyze GitHub repos and ingest documentation.
-
-```javascript
-// Ingest repository documentation
-docs_ingest({
-  repository_url: "https://github.com/cilium/cilium",
-  doc_type: "cilium"
-});
-
 ---
 
 ## **📋 Complete MCP Tool Parameters**
@@ -1136,7 +1097,7 @@ docs_ingest({
 
 The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. Multi-CLI support lives alongside these templates so Claude, Codex, and future CLIs follow the same structure.
 
-**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). We ship presets for Claude (`claude-sonnet-4-20250514`), Codex (`gpt-5-codex`), and Factory (`gpt-5-factory-high`), but any supported model for a CLI can be supplied via configuration.
+**Model Defaults**: Models are configured through your MCP config defaults (and can be overridden via MCP parameters). Any supported model for a CLI can be supplied via configuration.
 
 ### Template Architecture
 
@@ -1287,7 +1248,7 @@ Common variables available in templates:
 
 ## **💡 Best Practices**
 
-1. **Configure `cto-config.json` first** to set up your agents, models, tool profiles, and repository defaults
+1. **Configure your MCP config first** to set up your agents, models, tool profiles, and repository defaults
 2. **Use `intake()` for new projects** to parse PRD, generate tasks, and create documentation in one operation
 3. **Choose the right tool for the job**:
    - Use `intake()` for new project setup from PRDs (handles docs automatically)
@@ -1323,7 +1284,7 @@ cp target/release/cto-mcp /usr/local/bin/
 ## **🆘 Support**
 
 - Check GitHub PRs for detailed agent logs and explanations
-- Verify `cto-config.json` configuration and GitHub Apps authentication setup
+- Verify MCP configuration and GitHub Apps authentication setup
 - Ensure Argo Workflows are properly deployed and accessible
 
 ---
