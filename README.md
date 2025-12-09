@@ -102,7 +102,9 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 
 ## **🚧 Development Status**
 
-**This project is under active development.** The platform is in beta and being refined based on production usage.
+**Public launch: January 1st, 2025** 🚀
+
+The platform is in beta and being refined based on production usage.
 
 **Current Status:**
 ✅ Core platform architecture implemented  
@@ -111,7 +113,8 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-🔄 Documentation and user experience improvements  
+✅ Infrastructure operators (PostgreSQL, Kafka, Redis, MinIO, OpenSearch, ClickHouse, QuestDB)  
+🔄 Documentation and onboarding improvements  
 
 </div>
 
