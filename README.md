@@ -3,15 +3,46 @@
 <img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/5dlabs-logo-dark.svg" alt="5D Labs Logo" width="400px">
 
 # **Cognitive Task Orchestrator**
-## **GitOps for AI Agents - Where Code Ships Itself** ⚡
+## **Your AI Engineering Team in a Box** 🚀
 
 [![GitHub Stars](https://img.shields.io/github/stars/5dlabs/cto?style=for-the-badge&logo=github&logoColor=white&labelColor=24292e&color=0969da)](https://github.com/5dlabs/cto)
 [![Discord](https://img.shields.io/badge/Discord-5dlabs.ai-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/A6yydvjZKY)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge&logo=gnu&logoColor=white)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 
-### **💎 Production-Ready AI Development Platform - MCP Protocol Native 💎**
-*Deploy autonomous AI agents with your choice of CLI that ship production code via GitHub PRs*
+### **💎 Self-Hosted AI Development Platform • Bare-Metal Ready • MCP Native 💎**
+*Deploy an autonomous engineering team on your infrastructure—ship production code while slashing cloud & staffing costs*
+
+</div>
+
+---
+
+<div align="center">
+
+## **💰 Why CTO?**
+
+<table>
+<tr>
+<td align="center" width="33%">
+
+### **🏗️ Full Engineering Team**
+13 specialized AI agents covering backend, frontend, QA, security, and DevOps—working 24/7
+
+</td>
+<td align="center" width="33%">
+
+### **🔧 Self-Hosted & Bare-Metal**
+Deploy on your own infrastructure: bare-metal servers, on-prem, or any cloud—no vendor lock-in
+
+</td>
+<td align="center" width="33%">
+
+### **💸 Massive Cost Savings**
+Cut cloud bills with bare-metal deployment + reduce engineering headcount for routine tasks
+
+</td>
+</tr>
+</table>
 
 </div>
 
@@ -21,15 +52,16 @@
 
 ## **🚧 Development Status**
 
-**This project is under active development.** We're working towards a public release that will be available for general use by the end of Q3 2024 (September 2024). The platform is currently in beta and being refined based on internal usage and feedback.
+**This project is under active development.** The platform is in beta and being refined based on production usage.
 
 **Current Status:**
-✅ Core platform architecture implemented
-✅ MCP server integration working
-✅ Kubernetes controllers operational
-✅ GitHub Apps authentication system
-🔄 Documentation and user experience improvements
-🔄 Public release preparation
+✅ Core platform architecture implemented  
+✅ MCP server with dynamic tool registration  
+✅ Kubernetes controllers with self-healing  
+✅ GitHub Apps + Linear integration  
+✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
+✅ CloudFront tunneling for public access without exposed interfaces  
+🔄 Documentation and user experience improvements  
 
 </div>
 
@@ -37,9 +69,9 @@
 
 <div align="center">
 
-## **Meet Your AI Development Dream Team**
+## **Meet Your AI Engineering Team**
 
-*Eight specialized agents with distinct personalities working together 24/7*
+*Thirteen specialized agents with distinct personalities working together 24/7—your full-stack engineering department in a box*
 
 <div align="center">
 
@@ -50,58 +82,136 @@
 <td align="center" width="100%">
 
 ### **Morgan**
-#### *The Overseer*
+#### *The Technical Program Manager*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/morgan-avatar.png" width="180" height="180" alt="Morgan Avatar">
+<img src="assets/morgan-avatar-512.png" width="180" height="180" alt="Morgan Avatar">
 </div>
 
-✍️ **Personality:** Articulate & organized  
-📖 **Superpower:** Explains complex things simply  
-💬 **Motto:** *"Knowledge shared is knowledge squared!"*
+🐕 **Personality:** Articulate & organized  
+📋 **Superpower:** Turns chaos into actionable roadmaps  
+💬 **Motto:** *"A plan without tasks is just a wish."*
 
-**Morgan oversees project architecture, generates comprehensive documentation, and manages GitHub projects via `intake()` MCP calls, creating the foundation for all development work.**
+**Morgan orchestrates project lifecycles—syncing GitHub Issues with Linear roadmaps, decomposing PRDs into sprint-ready tasks, and keeping stakeholders aligned through `intake()` MCP calls.**
 
 </td>
 </tr>
 </table>
 
-### **💻 Implementation Squad**
+### **🦀 Backend Engineering Squad**
 
 <table>
 <tr>
 <td align="center" valign="top" width="33%">
 
 ### **Rex**
-#### *The Backend Powerhouse*
+#### *The Rust Architect*
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/rex-avatar.png" width="180" height="180" alt="Rex Avatar">
 </div>
 
-🦀 **Personality:** Hardcore backend engineer  
-⚡ **Superpower:** Lightning-fast Rust implementation  
-💬 **Motto:** *"Zero-cost abstractions, max performance!"*
+🦀 **Stack:** Rust, Tokio, Axum  
+⚡ **Superpower:** Zero-cost abstractions at scale  
+💬 **Motto:** *"If it compiles, it ships."*
 
-**Rex builds APIs, services, and backend infrastructure through `play()` workflows, specializing in Rust and high-performance systems.**
+**Rex builds high-performance APIs, real-time services, and systems-level infrastructure. When microseconds matter, Rex delivers.**
 
 </td>
 <td align="center" valign="top" width="33%">
 
+### **Grizz**
+#### *The Go Specialist*
+
+<div align="center">
+<img src="assets/grizz-avatar-512.png" width="180" height="180" alt="Grizz Avatar">
+</div>
+
+🐻 **Stack:** Go, gRPC, Kubernetes operators  
+🛠️ **Superpower:** Ships bulletproof services under pressure  
+💬 **Motto:** *"Simple scales."*
+
+**Grizz crafts cloud-native microservices, CLI tools, and Kubernetes controllers. Battle-tested reliability is his signature.**
+
+</td>
+<td align="center" valign="top" width="33%">
+
+### **Nova**
+#### *The Node.js Engineer*
+
+<div align="center">
+<img src="assets/nova-avatar-512.png" width="180" height="180" alt="Nova Avatar">
+</div>
+
+✨ **Stack:** Node.js, TypeScript, Fastify  
+🌌 **Superpower:** Rapid API development & integrations  
+💬 **Motto:** *"Move fast, type safe."*
+
+**Nova builds REST/GraphQL APIs, serverless functions, and third-party integrations. Speed-to-market is her specialty.**
+
+</td>
+</tr>
+</table>
+
+### **🎨 Frontend Engineering Squad**
+
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
+
 ### **Blaze**
-#### *The Interface Maestro*
+#### *The Web App Developer*
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/blaze-avatar.png" width="180" height="180" alt="Blaze Avatar">
 </div>
 
-🎨 **Personality:** Creative & UX obsessed  
-✨ **Superpower:** Beautiful, responsive interfaces  
-💬 **Motto:** *"Great UX makes complex simple!"*
+🎨 **Stack:** React, Next.js, shadcn/ui  
+✨ **Superpower:** Pixel-perfect responsive interfaces  
+💬 **Motto:** *"Great UX is invisible."*
 
-**Blaze creates stunning frontends and user experiences, working alongside Rex for full-stack projects.**
+**Blaze creates stunning web applications with modern component libraries. From dashboards to marketing sites, she delivers polished experiences.**
 
 </td>
+<td align="center" valign="top" width="33%">
+
+### **Tap**
+#### *The Mobile Developer*
+
+<div align="center">
+<img src="assets/tap-avatar-512.png" width="180" height="180" alt="Tap Avatar">
+</div>
+
+📱 **Stack:** Expo, React Native, NativeWind  
+🎯 **Superpower:** Cross-platform mobile excellence  
+💬 **Motto:** *"One codebase, every pocket."*
+
+**Tap builds native-quality iOS and Android apps from a single TypeScript codebase. App Store ready, always.**
+
+</td>
+<td align="center" valign="top" width="33%">
+
+### **Spark**
+#### *The Desktop Developer*
+
+<div align="center">
+<img src="assets/spark-avatar-512.png" width="180" height="180" alt="Spark Avatar">
+</div>
+
+⚡ **Stack:** Electron, Tauri, React  
+🖥️ **Superpower:** Native desktop apps that feel right  
+💬 **Motto:** *"Desktop isn't dead—it's evolved."*
+
+**Spark crafts cross-platform desktop applications with native integrations, system tray support, and offline-first architectures.**
+
+</td>
+</tr>
+</table>
+
+### **🛡️ Quality & Security Squad**
+
+<table>
+<tr>
 <td align="center" valign="top" width="33%">
 
 ### **Cleo**
@@ -112,20 +222,13 @@
 </div>
 
 🔍 **Personality:** Meticulous & wise  
-✨ **Superpower:** Spots improvements instantly  
-💬 **Motto:** *"Excellence isn't negotiable!"*
+✨ **Superpower:** Spots code smells instantly  
+💬 **Motto:** *"Excellence isn't negotiable."*
 
-**Cleo reviews code, refactors for quality, and ensures enterprise-grade standards in the quality phase of `play()` workflows.**
+**Cleo refactors for maintainability, enforces patterns, and ensures enterprise-grade code quality across every PR.**
 
 </td>
-</tr>
-</table>
-
-### **🛡️ Quality Assurance Squad**
-
-<table>
-<tr>
-<td align="center" width="50%">
+<td align="center" valign="top" width="33%">
 
 ### **Cipher**
 #### *The Security Sentinel*
@@ -135,13 +238,13 @@
 </div>
 
 🛡️ **Personality:** Vigilant & protective  
-🔒 **Superpower:** Spots vulnerabilities early  
-💬 **Motto:** *"Trust, but verify everything twice!"*
+🔒 **Superpower:** Finds vulnerabilities before attackers  
+💬 **Motto:** *"Trust nothing, verify everything."*
 
-**Cipher handles security reviews, vulnerability scanning, and ensures enterprise-grade security across all workflows.**
+**Cipher runs security audits, dependency scans, and ensures OWASP compliance across all workflows.**
 
 </td>
-<td align="center" width="50%">
+<td align="center" valign="top" width="33%">
 
 ### **Tess**
 #### *The Testing Genius*
@@ -154,7 +257,30 @@
 🎪 **Superpower:** Finds edge cases others miss  
 💬 **Motto:** *"If it can break, I'll find it first!"*
 
-**Tess creates comprehensive tests, validates functionality, and ensures reliability in the testing phase of `play()` workflows.**
+**Tess creates comprehensive test suites—unit, integration, and e2e—ensuring reliability before every merge.**
+
+</td>
+</tr>
+</table>
+
+### **🔬 Code Review Squad**
+
+<table>
+<tr>
+<td align="center" width="100%">
+
+### **Stitch**
+#### *The Automated Code Reviewer*
+
+<div align="center">
+<img src="assets/stitch-avatar-512.png" width="180" height="180" alt="Stitch Avatar">
+</div>
+
+🧵 **Personality:** Meticulous & tireless  
+🔎 **Superpower:** Reviews every PR with surgical precision  
+💬 **Motto:** *"No loose threads."*
+
+**Stitch provides automated code review on every pull request—like Cursor's Bugbot, but integrated into your workflow. Catches bugs, suggests improvements, and ensures consistency across your entire codebase.**
 
 </td>
 </tr>
@@ -174,10 +300,10 @@
 </div>
 
 🔗 **Personality:** Systematic & reliable  
-🌉 **Superpower:** Resolves conflicts seamlessly  
-💬 **Motto:** *"Every branch finds its way home!"*
+🌉 **Superpower:** Resolves merge conflicts automatically  
+💬 **Motto:** *"Every branch finds its way home."*
 
-**Atlas manages PR merges, resolves conflicts automatically, and ensures clean integration with the main branch.**
+**Atlas manages PR merges, rebases stale branches, and ensures clean integration with trunk-based development.**
 
 </td>
 <td align="center" width="50%">
@@ -190,10 +316,10 @@
 </div>
 
 ⚡ **Personality:** Fast & action-oriented  
-🚀 **Superpower:** Lightning-speed deployments  
+🚀 **Superpower:** Zero-downtime deployments  
 💬 **Motto:** *"Ship it fast, ship it right!"*
 
-**Bolt handles infrastructure operations, monitors deployments, and ensures applications are accessible and healthy in production.**
+**Bolt handles GitOps deployments, monitors rollouts, and ensures production health with automated rollbacks.**
 
 </td>
 </tr>
@@ -249,21 +375,21 @@ quality, testing & security
 <tr>
 <td align="center" width="50%">
 **🦀 Backend Projects**<br/>
-Rex builds APIs, services, databases
+Rex (Rust) • Grizz (Go) • Nova (Node.js)
 </td>
 <td align="center" width="50%">
-**✨ Frontend Projects**<br/>
-Blaze creates UIs, dashboards, apps
+**🎨 Frontend Projects**<br/>
+Blaze (Web/shadcn) • Tap (Mobile/Expo) • Spark (Desktop/Electron)
 </td>
 </tr>
 <tr>
 <td align="center" width="50%">
 **🚀 Full-Stack Projects**<br/>
-Rex & Blaze work together seamlessly
+Mix backend + frontend agents seamlessly
 </td>
 <td align="center" width="50%">
 **🛡️ Quality Always**<br/>
-Cleo reviews, Tess tests, Cipher secures
+Cleo reviews • Tess tests • Cipher secures • Stitch code-reviews
 </td>
 </tr>
 </table>
@@ -279,24 +405,26 @@ Cleo reviews, Tess tests, Cipher secures
 
 ## **⚡ What CTO Does**
 
-The Cognitive Task Orchestrator provides powerful tools for AI-driven development:
+The Cognitive Task Orchestrator provides a complete AI engineering platform:
 
 ### **🚀 Unified Project Intake (`intake()`)**
-**Morgan** processes PRDs, generates tasks, and creates comprehensive documentation in a single operation.
+**Morgan** processes PRDs, generates tasks, and syncs with your project management tools.
 
 - Parses PRD and generates TaskMaster task breakdown
+- **Linear Integration**: Two-way sync with Linear roadmaps and sprints
+- **GitHub Projects**: Auto-creates issues and project boards
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
-- Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)
-- Adds agent routing hints for frontend/backend tasks
-- Submits single PR with complete project structure
+- Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
+- Agent routing: automatically assigns frontend/backend/mobile tasks
 - **Powered by Claude Opus 4.5** for superior task analysis
 
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
 
-- **Phase 1 - Implementation**: Rex/Blaze build the core functionality
+- **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)
 - **Phase 2 - Quality Assurance**: Cleo reviews and refactors
 - **Phase 3 - Testing & Security**: Tess validates, Cipher secures
+- **Phase 4 - Code Review**: Stitch provides automated PR review (like Bugbot)
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
 
@@ -306,6 +434,15 @@ Control and monitor your AI development workflows:
 - **`jobs()`** - List all running workflows with status
 - **`stop_job()`** - Stop any running workflow gracefully
 - **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
+- **`register_tool()`** - Dynamically register new MCP tools at runtime
+
+### **🔄 Self-Healing Infrastructure**
+The platform includes comprehensive self-healing capabilities:
+
+- **Platform Self-Healing**: Monitors CTO's own health—detects stuck workflows, pod failures, step timeouts, and auto-remediates
+- **Application Self-Healing**: Extends healing to your deployed apps—CI failures, silent errors, stale progress alerts
+- **Alert Types**: Comment order issues, silent failures, approval loops, post-Tess CI failures, pod failures, step timeouts, stuck CodeRuns
+- **Automated Remediation**: Spawns healing agents to diagnose and fix issues automatically
 
 All operations run as **Kubernetes jobs** with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup.
 
@@ -324,13 +461,52 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 
 This is an integrated platform with crystal-clear data flow:
 
+### **🖥️ Supported AI CLIs**
+
+CTO works with your favorite AI coding assistant:
+
+| CLI | Description | Status |
+|-----|-------------|--------|
+| **Claude Code** | Anthropic's official CLI | ✅ Full support |
+| **Cursor** | AI-first code editor | ✅ Full support |
+| **Codex** | OpenAI's coding assistant | ✅ Full support |
+| **Factory** | Code Factory CLI | ✅ Full support |
+| **Gemini** | Google's AI assistant | ✅ Full support |
+| **OpenCode** | Open-source alternative | ✅ Full support |
+| **Dexter** | Lightweight AI CLI | ✅ Full support |
+
+### **🔧 Integrated Tools Library**
+
+Dynamic MCP tool registration with 60+ pre-configured tools:
+
+| Category | Tools |
+|----------|-------|
+| **Kubernetes** | Pod logs, exec, resource CRUD, events, metrics, Helm operations |
+| **ArgoCD** | Application sync, logs, events, GitOps management |
+| **GitHub** | PRs, issues, code scanning, secret scanning, repository management |
+| **Context7** | Library documentation lookup and code examples |
+| **OpenMemory** | Persistent memory across agent sessions |
+
+**Frontend Stack**: shadcn/ui components, Tailwind CSS, React patterns built-in
+
 **Component Architecture:**
-- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with configuration-driven defaults
+- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with dynamic tool registration
 - **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
+- **Healer Service**: Self-healing daemon monitoring platform and application health
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
 - **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
 - **Agent Workspaces**: Isolated persistent volumes for each service with session continuity
-- **GitHub Apps**: Secure authentication system replacing personal tokens
+- **GitHub Apps + Linear**: Secure authentication and project management integration
+- **CloudFront Tunneling**: Expose services publicly without opening firewall ports
+
+### **🌐 CloudFront Tunneling**
+
+Access your services from anywhere without exposing your infrastructure:
+
+- **Zero External Interface**: No public IPs or open firewall ports required
+- **Automatic TLS**: End-to-end encryption via CloudFront
+- **Global Edge**: Low-latency access from anywhere in the world
+- **Secure by Default**: Traffic routes through AWS infrastructure
 
 **Data Flow:**
 1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
@@ -338,15 +514,51 @@ This is an integrated platform with crystal-clear data flow:
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
-6. Controllers deploy configured CLI agents (Claude Code, Cursor, Factory, Codex, OpenCode, etc.) as Jobs with workspace isolation
+6. Controllers deploy configured CLI agents as Jobs with workspace isolation
 7. Agents authenticate via GitHub Apps and complete work
 8. Agents submit GitHub PRs with automatic cleanup
+9. Healer monitors for issues and auto-remediates failures
 
 ---
 
 ## **📦 Installation**
 
-### Deploy the Complete Platform
+### **🔧 Deployment Options**
+
+CTO runs anywhere you have Kubernetes—from bare-metal servers to managed cloud:
+
+| Deployment Type | Providers | Best For |
+|-----------------|-----------|----------|
+| **Bare-Metal** | Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean | Maximum cost savings, data sovereignty |
+| **On-Premises** | Any server with Talos Linux | Air-gapped environments, full control |
+| **Cloud** | AWS, Azure, GCP | Existing cloud infrastructure |
+
+### Deploy on Bare-Metal (Recommended)
+
+Save 60-80% vs cloud by running on dedicated servers:
+
+```bash
+# Bootstrap a Talos cluster on bare-metal (Latitude example)
+cto-metal init --provider latitude --region MIA --plan c3-large-x86 --nodes 3
+
+# Or use your own hardware
+cto-metal init --provider onprem --config ./my-servers.yaml
+
+# Deploy CTO platform
+helm repo add 5dlabs https://5dlabs.github.io/cto
+helm install cto 5dlabs/cto --namespace cto --create-namespace
+```
+
+**Supported Bare-Metal Providers:**
+- **Latitude.sh** - Global bare-metal cloud
+- **Hetzner** - European dedicated servers
+- **OVH** - European cloud & bare-metal
+- **Vultr** - Global bare-metal & cloud
+- **Scaleway** - European cloud provider
+- **Cherry Servers** - European bare-metal
+- **DigitalOcean** - Droplets & bare-metal
+
+### Deploy on Existing Kubernetes
 
 ```bash
 # Add the 5dlabs Helm repository
@@ -368,16 +580,18 @@ chmod +x setup-agent-secrets.sh
 **Requirements:**
 - Kubernetes 1.19+
 - Helm 3.2.0+
-- GitHub Personal Access Token
+- GitHub Personal Access Token (or GitHub App)
 - Anthropic API Key
 
 **What you get:**
 - Complete cto platform deployed to Kubernetes
+- Self-healing infrastructure monitoring
 - REST API for task management
 - Separate Kubernetes controllers for CodeRun/DocsRun resources with TTL-safe reconciliation
 - Agent workspace management and isolation with persistent volumes
 - Automatic resource cleanup and job lifecycle management
-- MCP tools that connect to your deployment
+- MCP tools with dynamic registration
+- CloudFront tunneling for secure public access
 
 ### Remote Cluster Access with Kilo VPN
 
