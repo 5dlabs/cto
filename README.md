@@ -570,10 +570,10 @@ Dynamic MCP tool registration with **57+ pre-configured tools** across GitHub, K
 
 **Component Architecture:**
 - **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with dynamic tool registration
-- **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
+- **Controller Service**: Kubernetes REST API that manages CodeRun CRDs via Argo Workflows
 - **Healer Service**: Self-healing daemon monitoring platform and application health
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
-- **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
+- **Kubernetes Controllers**: CodeRun controller with TTL-safe reconciliation
 - **Agent Workspaces**: Isolated persistent volumes for each service with session continuity
 - **GitHub Apps + PM Integration**: Linear (MVP), with Jira, Asana, Notion, Monday.com planned
 - **Cloudflare Tunnels**: Expose services publicly without opening firewall ports
@@ -593,7 +593,7 @@ Access your services from anywhere without exposing your infrastructure:
 1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
-4. Argo Workflows creates CodeRun/DocsRun custom resources
+4. Argo Workflows creates CodeRun custom resources
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
 6. Controllers deploy configured CLI agents as Jobs with workspace isolation
 7. Agents authenticate via GitHub Apps and complete work
@@ -668,7 +668,7 @@ chmod +x setup-agent-secrets.sh
 - Complete cto platform deployed to Kubernetes
 - Self-healing infrastructure monitoring
 - REST API for task management
-- Separate Kubernetes controllers for CodeRun/DocsRun resources with TTL-safe reconciliation
+- Kubernetes controller for CodeRun resources with TTL-safe reconciliation
 - Agent workspace management and isolation with persistent volumes
 - Automatic resource cleanup and job lifecycle management
 - MCP tools with dynamic registration
