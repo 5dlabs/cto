@@ -56,10 +56,12 @@ Auto-detects failures, stuck workflows, and CI issues—spawns healing agents au
 
 | Traditional Approach | With CTO |
 |---------------------|----------|
-| $150k-250k/yr per engineer × 5-10 engineers | **$0** — AI agents included |
+| $150k-250k/yr per engineer × 5-10 engineers | **Model API costs only** — or run local models for near-zero cost |
 | $5k-50k/mo cloud infrastructure | **60-80% savings** on bare-metal |
 | 24/7 on-call rotation costs | **Automated** self-healing |
 | Weeks to onboard new team members | **Instant** agent deployment |
+
+**Local Model Support**: Run Ollama, vLLM, or other local inference servers for dramatically reduced costs — bring your own GPU cluster and pay only for electricity.
 
 ### **🔐 Bring Your Own Keys (BYOK)**
 
