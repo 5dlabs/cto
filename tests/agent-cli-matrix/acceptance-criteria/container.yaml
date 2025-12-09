@@ -1,3 +1,4 @@
+---
 # Container Script Acceptance Criteria
 # Defines what makes a valid container.sh output
 
@@ -92,6 +93,3 @@ criteria:
       - id: opencode_cli_present
         description: "Contains OpenCode CLI invocation"
         check: "contains_any(['opencode', 'OPENCODE_CMD'])"
-
-
-

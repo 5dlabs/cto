@@ -25,9 +25,9 @@ database:
     size: 10Gi
     storageClassName: "standard"
     accessMode: ReadWriteOnce
-  
+
   path: /data/openmemory.db
-  
+
   backup:
     enabled: false  # Disabled for local development
 
@@ -64,31 +64,31 @@ agents:
     namespace: "agent/rex"
     queryLimit: 20
     reinforcementMultiplier: 1.5
-  
+
   blaze:
     enabled: true
     namespace: "agent/blaze"
     queryLimit: 20
     reinforcementMultiplier: 1.5
-  
+
   cleo:
     enabled: true
     namespace: "agent/cleo"
     queryLimit: 15
     reinforcementMultiplier: 1.2
-  
+
   tess:
     enabled: true
     namespace: "agent/tess"
     queryLimit: 25
     reinforcementMultiplier: 2.0
-  
+
   morgan:
     enabled: true
     namespace: "agent/morgan"
     queryLimit: 10
     reinforcementMultiplier: 1.0
-  
+
   healer:
     enabled: true
     namespace: "agent/healer"
@@ -157,7 +157,7 @@ podSecurityContext:
 securityContext:
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: false  # SQLite needs write access
   allowPrivilegeEscalation: false
 

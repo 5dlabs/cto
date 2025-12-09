@@ -22,10 +22,10 @@ use tracing::{debug, warn};
 
 // Template base path (embedded in Docker image at /app/templates)
 // Set via AGENT_TEMPLATES_PATH env var in deployment
-const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/templates";
+const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/app/templates";
 
 /// Get the agent templates directory path.
-/// Uses `AGENT_TEMPLATES_PATH` env var if set, otherwise defaults to `/templates`.
+/// Uses `AGENT_TEMPLATES_PATH` env var if set, otherwise defaults to `/app/templates`.
 fn get_templates_path() -> String {
     std::env::var("AGENT_TEMPLATES_PATH")
         .unwrap_or_else(|_| DEFAULT_AGENT_TEMPLATES_PATH.to_string())

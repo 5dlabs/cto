@@ -1,9 +1,9 @@
-//! Configuration for the Linear service.
+//! Configuration for the PM service.
 
 use serde::{Deserialize, Serialize};
 use std::env;
 
-/// Linear webhook handler configuration.
+/// PM webhook handler configuration.
 #[derive(Clone)]
 pub struct Config {
     /// HTTP server port.

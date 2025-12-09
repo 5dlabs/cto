@@ -1,3 +1,4 @@
+---
 # Markdown linting configuration - Very lenient for technical documentation
 # Only enable the most critical rules for content quality
 
@@ -23,10 +24,6 @@ MD037: true  # Spaces inside emphasis markers
 MD038: true  # Spaces inside code span elements
 MD039: true  # Spaces inside link text
 MD042: true  # No empty links
-MD046: true  # Code block style
-MD048: true  # Code fence style
-MD049: true  # Emphasis style should be consistent
-MD050: true  # Strong style should be consistent
 
 # Explicitly disable problematic rules that are too strict for technical docs
 MD012: false  # Multiple consecutive blank lines

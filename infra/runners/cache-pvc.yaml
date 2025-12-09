@@ -20,6 +20,3 @@ spec:
     requests:
       storage: 200Gi  # Large cache for Rust builds and dependencies
   storageClassName: local-path  # Adjust based on your storage class
-
-
-

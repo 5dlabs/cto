@@ -275,3 +275,4 @@ spec:
                   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Event cleanup finished (deleted ${DELETE_COUNT} old events)"
 {{- end }}
 
+

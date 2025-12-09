@@ -55,6 +55,48 @@ imagePullSecrets:
 {{- end }}
 {{- end }}
 
+{{/*
+Image reference - returns full image:tag based on devRegistry toggle
+Usage: {{ include "cto.imageRef" (dict "component" "controller" "image" .Values.controller.image "global" .Values.global) }}
+
+When global.devRegistry.enabled is true:
+  - Uses local registry URL from global.devRegistry.url
+  - Uses tag from global.devRegistry.componentTags[component] or global.devRegistry.tag
+When global.devRegistry.enabled is false:
+  - Uses the component's configured image.repository and image.tag
+*/}}
+{{- define "cto.imageRef" -}}
+{{- $component := .component -}}
+{{- $image := .image -}}
+{{- $global := .global -}}
+{{- $devRegistry := ($global).devRegistry | default dict -}}
+{{- $enabled := ($devRegistry).enabled | default false -}}
+{{- if $enabled -}}
+{{- $url := ($devRegistry).url | default "localhost:30500" -}}
+{{- $componentTags := ($devRegistry).componentTags | default dict -}}
+{{- $tag := index $componentTags $component | default ($devRegistry).tag | default "dev-local" -}}
+{{- printf "%s/%s:%s" $url $component $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $image.repository $image.tag -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Image pull policy - returns pullPolicy based on devRegistry toggle
+Usage: {{ include "cto.imagePullPolicy" (dict "image" .Values.controller.image "global" .Values.global) }}
+*/}}
+{{- define "cto.imagePullPolicy" -}}
+{{- $image := .image -}}
+{{- $global := .global -}}
+{{- $devRegistry := ($global).devRegistry | default dict -}}
+{{- $enabled := ($devRegistry).enabled | default false -}}
+{{- if $enabled -}}
+{{- ($devRegistry).pullPolicy | default "Always" -}}
+{{- else -}}
+{{- $image.pullPolicy | default "IfNotPresent" -}}
+{{- end -}}
+{{- end }}
+
 {{/* ============================================================ */}}
 {{/* Component-specific helpers */}}
 {{/* ============================================================ */}}

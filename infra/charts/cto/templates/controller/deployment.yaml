@@ -23,8 +23,8 @@ spec:
       serviceAccountName: {{ include "cto.controller.fullname" . }}
       containers:
         - name: controller
-          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
-          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          image: "{{ include "cto.imageRef" (dict "component" "controller" "image" .Values.controller.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.controller.image "global" .Values.global) }}
           ports:
             - name: http
               containerPort: 8080

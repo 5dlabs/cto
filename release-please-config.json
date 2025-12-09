@@ -18,12 +18,7 @@
         },
         {
           "type": "yaml",
-          "path": "infra/charts/controller/Chart.yaml",
-          "jsonpath": "$.appVersion"
-        },
-        {
-          "type": "yaml",
-          "path": "infra/charts/tools/Chart.yaml",
+          "path": "infra/charts/cto/Chart.yaml",
           "jsonpath": "$.appVersion"
         }
       ]

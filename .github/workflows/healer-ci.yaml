@@ -153,8 +153,11 @@ jobs:
           output-path: healer
           use-sccache: 'true'
 
-      - name: Copy prompts to Docker context
-        run: cp -r crates/healer/prompts prompts
+      - name: Verify templates directory
+        run: |
+          # Templates are in the unified templates/ directory (same pattern as controller)
+          echo "Verifying templates directory structure..."
+          ls -la templates/
 
       - name: Get version info
         id: version

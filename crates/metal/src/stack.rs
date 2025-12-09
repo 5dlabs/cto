@@ -333,7 +333,15 @@ pub fn unseal_openbao(kubeconfig: &Path, unseal_key: &str) -> Result<()> {
     kubectl(
         kubeconfig,
         &[
-            "exec", "-n", "openbao", "openbao-0", "--", "bao", "operator", "unseal", unseal_key,
+            "exec",
+            "-n",
+            "openbao",
+            "openbao-0",
+            "--",
+            "bao",
+            "operator",
+            "unseal",
+            unseal_key,
         ],
     )?;
 

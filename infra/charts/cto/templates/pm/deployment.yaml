@@ -20,8 +20,8 @@ spec:
       serviceAccountName: {{ include "cto.pm.fullname" . }}
       containers:
         - name: pm
-          image: "{{ .Values.pm.image.repository }}:{{ .Values.pm.image.tag }}"
-          imagePullPolicy: {{ .Values.pm.image.pullPolicy }}
+          image: "{{ include "cto.imageRef" (dict "component" "pm" "image" .Values.pm.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.pm.image "global" .Values.global) }}
           ports:
             - name: http
               containerPort: {{ .Values.pm.service.port }}

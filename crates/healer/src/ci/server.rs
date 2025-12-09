@@ -54,8 +54,15 @@ impl ServerState {
         let mut spawner = CodeRunSpawner::new(config.clone(), namespace, repository)?;
 
         // Load CI prompt templates from standard locations
-        // Try /app/prompts/ci first (production), then crates/healer/prompts/ci (dev)
-        let template_dirs = ["/app/prompts/ci", "crates/healer/prompts/ci", "prompts/ci"];
+        // Use HEALER_TEMPLATES_DIR env var, falling back to standard paths
+        let base_dir = std::env::var("HEALER_TEMPLATES_DIR")
+            .unwrap_or_else(|_| "/app/templates/healer".to_string());
+        let template_dirs = [
+            format!("{base_dir}/ci"),
+            "/app/templates/healer/ci".to_string(),
+            "templates/healer/ci".to_string(),
+            "crates/healer/prompts/ci".to_string(), // Legacy dev path
+        ];
         let mut loaded = false;
         for dir in &template_dirs {
             if std::path::Path::new(dir).exists() {

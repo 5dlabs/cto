@@ -113,11 +113,11 @@ pub async fn handle_intake_complete(
             .workflow_name
             .clone()
             .unwrap_or_else(|| "Intake Project".to_string()),
-        project_name: None,           // Not needed for issue creation
-        prd_content: String::new(),   // Not needed for issue creation
+        project_name: None,
+        prd_content: String::new(), // Not needed for issue creation
         architecture_content: None,
         repository_url: None,
-        github_visibility: "private".to_string(), // Default to private
+        github_visibility: "private".to_string(),
         source_branch: None,
         tech_stack: TechStack::default(), // Not needed for issue creation
         cto_config: CtoConfig::default(), // Not needed for issue creation

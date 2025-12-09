@@ -395,5 +395,3 @@ pub mod images {
     /// Container-Optimized OS.
     pub const COS: &str = "projects/cos-cloud/global/images/family/cos-stable";
 }
-
-

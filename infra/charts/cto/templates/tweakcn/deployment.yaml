@@ -23,8 +23,8 @@ spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: tweakcn
-          image: "{{ .Values.tweakcn.image.repository }}:{{ .Values.tweakcn.image.tag }}"
-          imagePullPolicy: {{ .Values.tweakcn.image.pullPolicy }}
+          image: "{{ include "cto.imageRef" (dict "component" "tweakcn" "image" .Values.tweakcn.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.tweakcn.image "global" .Values.global) }}
           ports:
             - name: http
               containerPort: {{ .Values.tweakcn.service.port }}
