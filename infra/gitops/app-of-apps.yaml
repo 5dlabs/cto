@@ -19,7 +19,7 @@ spec:
   # Source configuration
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: main
+    targetRevision: develop
     path: infra/gitops
 
     # Directory configuration

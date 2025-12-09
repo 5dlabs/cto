@@ -16,7 +16,7 @@ spec:
   project: platform
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: main
+    targetRevision: develop
     path: infra/cluster-config
     directory:
       recurse: false
