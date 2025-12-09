@@ -58,6 +58,10 @@ WORKDIR /app
 
 # Copy built binary to PATH location (Helm chart uses 'command: healer')
 COPY --from=builder /tmp/healer /usr/local/bin/healer
+
+# Copy healer templates (required at runtime)
+COPY templates/healer /app/templates/healer
+
 RUN chmod +x /usr/local/bin/healer && chown -R app:app /app
 
 USER 1000
