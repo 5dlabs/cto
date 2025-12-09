@@ -17,13 +17,9 @@ pub mod activities;
 pub mod client;
 pub mod config;
 pub mod handlers;
-pub mod integrations;
 pub mod models;
 pub mod server;
 pub mod webhooks;
-
-// VCS module disabled - GitHub client implementation pending
-// pub mod vcs;
 
 pub use activities::{ActivityContent, ActivitySignal};
 pub use client::LinearClient;

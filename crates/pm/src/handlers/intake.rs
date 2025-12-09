@@ -453,7 +453,13 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
 fn sanitize_for_repo_name(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .to_string()
@@ -1144,7 +1150,7 @@ Content here";
 
         let config = extract_config_from_labels(&labels);
         assert_eq!(config.cli, Some("cursor".to_string()));
-        assert_eq!(config.model, Some("claude-opus-4-20250514".to_string()));
+        assert_eq!(config.model, Some("claude-opus-4-5-20251101".to_string()));
     }
 
     #[test]
@@ -1164,11 +1170,12 @@ Content here";
 
         let config = extract_config_from_labels(&labels);
         assert_eq!(config.cli, Some("claude".to_string()));
-        assert_eq!(config.model, Some("claude-sonnet-4-20250514".to_string()));
+        assert_eq!(config.model, Some("claude-sonnet-4-5-20250929".to_string()));
     }
 
     #[test]
     fn test_extract_config_from_labels_mixed() {
+        // Mixed: grouped CLI label + arbitrary model label (not in known shortcuts)
         let labels = vec![
             Label {
                 id: "1".to_string(),
@@ -1177,7 +1184,7 @@ Content here";
             },
             Label {
                 id: "2".to_string(),
-                name: "gpt-4.1".to_string(), // flat model label
+                name: "CTO Model/gpt-4.1".to_string(), // Full model name in group label
                 color: None,
             },
         ];

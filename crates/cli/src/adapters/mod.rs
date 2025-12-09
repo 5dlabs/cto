@@ -16,5 +16,3 @@ pub use cursor::CursorAdapter;
 pub use factory::FactoryAdapter;
 pub use gemini::GeminiAdapter;
 pub use opencode::OpenCodeAdapter;
-
-

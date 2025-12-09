@@ -1,12 +1,11 @@
 # Healer Monitor Dockerfile
 #
-# The CI workflow builds the binary and copies it + prompts to repo root.
+# The CI workflow builds the binary and copies templates to repo root.
 # Docker build context is the repo root (.).
 #
 # To build locally:
 #   cargo build --release --package healer
 #   cp target/release/healer healer
-#   cp -r crates/healer/prompts prompts
 #   docker build -f infra/images/healer/Dockerfile -t healer .
 
 # hadolint ignore=DL3029,DL3007
@@ -39,8 +38,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 COPY healer /usr/local/bin/healer
 RUN chmod +x /usr/local/bin/healer
 
-# Copy prompts (placed by CI workflow into build context)
-COPY prompts /app/prompts
+# Copy templates directory (embedded in image for direct filesystem access)
+COPY templates/ /app/templates/
 
 WORKDIR /app
 

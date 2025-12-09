@@ -300,35 +300,10 @@ async fn handle_session_created(
         StatusCode::BAD_REQUEST
     })?;
 
-    let webhook_issue = payload.get_issue().ok_or_else(|| {
+    let issue = payload.get_issue().ok_or_else(|| {
         warn!("Missing issue in webhook payload");
         StatusCode::BAD_REQUEST
     })?;
-
-    // Fetch the full issue from Linear API to get current labels
-    // The webhook payload's issue object may not include all labels
-    let issue = if let Some(client) = &state.linear_client {
-        match client.get_issue(&webhook_issue.id).await {
-            Ok(fetched_issue) => {
-                info!(
-                    issue_id = %fetched_issue.id,
-                    label_count = fetched_issue.labels.len(),
-                    "Fetched issue from Linear API with labels"
-                );
-                fetched_issue
-            }
-            Err(e) => {
-                warn!(
-                    issue_id = %webhook_issue.id,
-                    error = %e,
-                    "Failed to fetch issue from Linear API, using webhook data"
-                );
-                webhook_issue.clone()
-            }
-        }
-    } else {
-        webhook_issue.clone()
-    };
 
     // Get current state name for workflow detection
     let state_name = issue.state.as_ref().map_or("unknown", |s| s.name.as_str());
@@ -369,7 +344,7 @@ async fn handle_session_created(
         }
 
         // Extract intake request from issue
-        let intake_request = match extract_intake_request(session_id, &issue) {
+        let intake_request = match extract_intake_request(session_id, issue) {
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract intake request");
@@ -457,7 +432,7 @@ async fn handle_session_created(
         }
 
         // Extract play request from issue
-        let play_request = match extract_play_request(session_id, &issue) {
+        let play_request = match extract_play_request(session_id, issue) {
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract play request");

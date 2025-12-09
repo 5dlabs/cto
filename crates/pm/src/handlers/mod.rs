@@ -1,4 +1,4 @@
-//! Webhook handlers for Linear integration.
+//! Webhook handlers for PM integration.
 
 pub mod agent_comms;
 pub mod callbacks;

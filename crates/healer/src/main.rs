@@ -294,8 +294,12 @@ enum Commands {
         /// Namespace to watch for pods
         #[arg(long, default_value = "agent-platform")]
         namespace: String,
-        /// Path to prompts directory (defaults to HEALER_PROMPTS_DIR env var or /app/prompts)
-        #[arg(long, env = "HEALER_PROMPTS_DIR", default_value = "/app/prompts")]
+        /// Path to templates directory (defaults to HEALER_TEMPLATES_DIR env var or /app/templates/healer)
+        #[arg(
+            long,
+            env = "HEALER_TEMPLATES_DIR",
+            default_value = "/app/templates/healer"
+        )]
         prompts_dir: String,
         /// Dry run - detect but don't spawn Factory
         #[arg(long)]
@@ -315,8 +319,12 @@ enum Commands {
         /// Agent name for context
         #[arg(long, default_value = "rex")]
         agent: String,
-        /// Path to prompts directory (defaults to HEALER_PROMPTS_DIR env var or /app/prompts)
-        #[arg(long, env = "HEALER_PROMPTS_DIR", default_value = "/app/prompts")]
+        /// Path to templates directory (defaults to HEALER_TEMPLATES_DIR env var or /app/templates/healer)
+        #[arg(
+            long,
+            env = "HEALER_TEMPLATES_DIR",
+            default_value = "/app/templates/healer"
+        )]
         prompts_dir: String,
         /// Dry run - show prompt but don't spawn Factory
         #[arg(long)]
@@ -4777,6 +4785,76 @@ enum AlertWatchEvent {
     CodeRunEvent(serde_json::Value),
 }
 
+/// Verify that the healer templates directory exists and contains expected structure.
+///
+/// Returns an error if the templates directory is missing or incomplete.
+fn verify_templates_directory(templates_dir: &str) -> Result<()> {
+    use std::path::Path;
+
+    let templates_path = Path::new(templates_dir);
+
+    if !templates_path.exists() {
+        eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        eprintln!("❌ CRITICAL: Templates directory not found");
+        eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        eprintln!("Expected path: {templates_dir}");
+        eprintln!();
+        eprintln!("Templates are embedded in the Docker image at build time.");
+        eprintln!("For local development, ensure HEALER_TEMPLATES_DIR points to");
+        eprintln!("the templates/healer directory in the repo.");
+        eprintln!();
+        eprintln!("To fix:");
+        eprintln!("  1. Set HEALER_TEMPLATES_DIR=templates/healer for local dev");
+        eprintln!("  2. Or rebuild the healer image for production");
+        eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        anyhow::bail!("Templates directory not found: {templates_dir}");
+    }
+
+    // Check for expected subdirectories
+    let expected_dirs = ["alerts", "partials", "expected", "ci"];
+    let mut missing_dirs = Vec::new();
+
+    for dir in &expected_dirs {
+        let dir_path = templates_path.join(dir);
+        if !dir_path.exists() {
+            missing_dirs.push(*dir);
+        }
+    }
+
+    if !missing_dirs.is_empty() {
+        eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        eprintln!("❌ CRITICAL: Templates directory structure incomplete");
+        eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        eprintln!("Templates path: {templates_dir}");
+        eprintln!("Missing directories:");
+        for dir in &missing_dirs {
+            eprintln!("  - {dir}");
+        }
+        eprintln!();
+        eprintln!("Expected structure:");
+        eprintln!("  {templates_dir}/");
+        eprintln!("  ├── alerts/      (alert-specific templates)");
+        eprintln!("  ├── partials/    (shared template partials)");
+        eprintln!("  ├── expected/    (agent expected behavior docs)");
+        eprintln!("  └── ci/          (CI remediation templates)");
+        eprintln!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        anyhow::bail!(
+            "Templates directory missing subdirectories: {}",
+            missing_dirs.join(", ")
+        );
+    }
+
+    println!(
+        "{}",
+        format!("  ✓ Templates directory: {templates_dir}").green()
+    );
+    for dir in &expected_dirs {
+        println!("    ✓ {dir}/");
+    }
+
+    Ok(())
+}
+
 /// Watch for alerts and spawn Factory when detected.
 #[allow(clippy::too_many_lines)]
 async fn run_alert_watch(
@@ -4789,11 +4867,16 @@ async fn run_alert_watch(
     use tokio::process::Command as AsyncCommand;
     use tokio::sync::mpsc;
 
+    // Verify templates directory exists before starting
+    println!("{}", "Verifying healer templates are available...".cyan());
+    verify_templates_directory(prompts_dir)?;
+    println!("{}", "✅ Healer templates verified".green());
+
     println!(
         "{}",
         format!("Starting alert watch in namespace: {namespace}").cyan()
     );
-    println!("{}", format!("Prompts directory: {prompts_dir}").dimmed());
+    println!("{}", format!("Templates directory: {prompts_dir}").dimmed());
     if dry_run {
         println!(
             "{}",

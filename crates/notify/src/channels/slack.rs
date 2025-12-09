@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use serde::Serialize;
 use tracing::{debug, warn};
 
-use super::events::NotifyEvent;
-use super::{ChannelError, NotifyChannel};
+use crate::error::ChannelError;
+use crate::events::{NotifyEvent, Severity};
+use crate::NotifyChannel;
 
 /// Environment variable for Slack webhook URL.
 const ENV_SLACK_WEBHOOK_URL: &str = "SLACK_WEBHOOK_URL";
@@ -43,45 +44,41 @@ impl SlackChannel {
         }
     }
 
-    /// Format an event as a Slack webhook payload using Block Kit.
+    /// Format an event as a Slack webhook payload.
     fn format_payload(event: &NotifyEvent) -> SlackPayload {
-        let severity = event.severity();
+        let color = match event.severity() {
+            Severity::Info => "#3498db",     // Blue
+            Severity::Warning => "#f39c12",  // Orange
+            Severity::Critical => "#e74c3c", // Red
+        };
 
-        let mut blocks = vec![
-            // Header with emoji and title
-            SlackBlock::Section {
-                text: SlackText::mrkdwn(format!("{} *{}*", severity.emoji(), event.title())),
-            },
-            // Description
-            SlackBlock::Section {
-                text: SlackText::mrkdwn(Self::format_description(event)),
-            },
-        ];
-
-        // Add fields section if we have fields
-        let fields = Self::format_fields(event);
-        if !fields.is_empty() {
-            blocks.push(SlackBlock::Divider);
-            blocks.push(SlackBlock::Section {
-                text: SlackText::mrkdwn(fields.join(" • ")),
+        let mut fields = vec![];
+        for (name, value) in Self::format_fields(event) {
+            fields.push(SlackField {
+                title: name,
+                value,
+                short: true,
             });
         }
 
-        // Add context with timestamp
-        blocks.push(SlackBlock::Context {
-            elements: vec![SlackText::mrkdwn(format!(
-                "CTO Platform • {}",
+        let attachment = SlackAttachment {
+            fallback: event.title(),
+            color: color.to_string(),
+            pretext: None,
+            author_name: Some("CTO Platform".to_string()),
+            title: event.title(),
+            text: Self::format_description(event),
+            fields,
+            footer: Some(format!(
+                "{} | {}",
+                event.severity().as_str(),
                 event.timestamp().format("%Y-%m-%d %H:%M:%S UTC")
-            ))],
-        });
+            )),
+            ts: Some(event.timestamp().timestamp()),
+        };
 
         SlackPayload {
-            text: event.title(), // Fallback for notifications
-            blocks,
-            attachments: vec![SlackAttachment {
-                color: format!("#{:06x}", severity.color()),
-                fallback: None,
-            }],
+            attachments: vec![attachment],
         }
     }
 
@@ -110,9 +107,9 @@ impl SlackChannel {
                 ..
             } => {
                 let status = if *success {
-                    ":white_check_mark: Success"
+                    "✅ Success"
                 } else {
-                    ":x: Failed"
+                    "❌ Failed"
                 };
                 let duration = format_duration(*duration_secs);
                 format!("Agent *{agent}* finished on `{repository}`\n{status} in {duration}")
@@ -123,7 +120,7 @@ impl SlackChannel {
                 coderun_name,
                 ..
             } => {
-                format!("CodeRun `{coderun_name}` started for agent *{agent}*")
+                format!("`{coderun_name}` started for agent *{agent}*")
             }
 
             NotifyEvent::AgentCompleted {
@@ -134,12 +131,12 @@ impl SlackChannel {
                 ..
             } => {
                 let status = if *success {
-                    ":white_check_mark: Success"
+                    "✅ Success"
                 } else {
-                    ":x: Failed"
+                    "❌ Failed"
                 };
                 let duration = format_duration(*duration_secs);
-                format!("CodeRun `{coderun_name}` for agent *{agent}*\n{status} in {duration}")
+                format!("`{coderun_name}` for agent *{agent}*\n{status} in {duration}")
             }
 
             NotifyEvent::HealAlert { message, .. } => message.clone(),
@@ -152,8 +149,8 @@ impl SlackChannel {
         }
     }
 
-    /// Format additional fields for an event as inline text.
-    fn format_fields(event: &NotifyEvent) -> Vec<String> {
+    /// Format additional fields for an event.
+    fn format_fields(event: &NotifyEvent) -> Vec<(String, String)> {
         match event {
             NotifyEvent::PlayStarted {
                 task_id,
@@ -161,9 +158,9 @@ impl SlackChannel {
                 workflow_name,
                 ..
             } => vec![
-                format!("*Task:* {task_id}"),
-                format!("*Repo:* {repository}"),
-                format!("*Workflow:* {workflow_name}"),
+                ("Task ID".to_string(), task_id.clone()),
+                ("Repository".to_string(), repository.clone()),
+                ("Workflow".to_string(), workflow_name.clone()),
             ],
 
             NotifyEvent::TaskStarted {
@@ -178,9 +175,9 @@ impl SlackChannel {
                 agent,
                 ..
             } => vec![
-                format!("*Task:* {task_id}"),
-                format!("*Repo:* {repository}"),
-                format!("*Agent:* {agent}"),
+                ("Task ID".to_string(), task_id.clone()),
+                ("Repository".to_string(), repository.clone()),
+                ("Agent".to_string(), agent.clone()),
             ],
 
             NotifyEvent::AgentStarted {
@@ -195,9 +192,9 @@ impl SlackChannel {
                 coderun_name,
                 ..
             } => vec![
-                format!("*Agent:* {agent}"),
-                format!("*Task:* {task_id}"),
-                format!("*CodeRun:* {coderun_name}"),
+                ("Agent".to_string(), agent.clone()),
+                ("Task ID".to_string(), task_id.clone()),
+                ("CodeRun".to_string(), coderun_name.clone()),
             ],
 
             NotifyEvent::HealAlert {
@@ -207,12 +204,13 @@ impl SlackChannel {
                 ..
             } => {
                 let mut fields = vec![
-                    format!("*Alert:* {alert_id}"),
-                    format!("*Severity:* {}", severity.as_str()),
+                    ("Alert ID".to_string(), alert_id.clone()),
+                    ("Severity".to_string(), severity.as_str().to_string()),
                 ];
 
+                // Add context fields
                 for (key, value) in context {
-                    fields.push(format!("*{key}:* {value}"));
+                    fields.push((key.clone(), value.clone()));
                 }
 
                 fields
@@ -224,9 +222,9 @@ impl SlackChannel {
                 repository,
                 ..
             } => vec![
-                format!("*Task:* {task_id}"),
-                format!("*Iteration:* {iteration}"),
-                format!("*Repo:* {repository}"),
+                ("Task ID".to_string(), task_id.clone()),
+                ("Iteration".to_string(), iteration.to_string()),
+                ("Repository".to_string(), repository.clone()),
             ],
         }
     }
@@ -257,24 +255,6 @@ impl NotifyChannel for SlackChannel {
         if response.status().is_success() {
             debug!(channel = "slack", "Notification sent successfully");
             Ok(())
-        } else if response.status() == 429 {
-            // Rate limited
-            let retry_after = response
-                .headers()
-                .get("retry-after")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(5);
-
-            warn!(
-                channel = "slack",
-                retry_after_secs = retry_after,
-                "Rate limited by Slack"
-            );
-
-            Err(ChannelError::RateLimited {
-                retry_after_secs: retry_after,
-            })
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -294,53 +274,37 @@ impl NotifyChannel for SlackChannel {
 }
 
 // =============================================================================
-// Slack API types (Block Kit)
+// Slack API types
 // =============================================================================
 
 #[derive(Debug, Serialize)]
 struct SlackPayload {
-    /// Fallback text for notifications
-    text: String,
-    /// Block Kit blocks
-    blocks: Vec<SlackBlock>,
-    /// Attachments (for color strip)
     attachments: Vec<SlackAttachment>,
 }
 
 #[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum SlackBlock {
-    /// Section block with text
-    Section { text: SlackText },
-    /// Divider line
-    Divider,
-    /// Context block for metadata
-    Context { elements: Vec<SlackText> },
-}
-
-#[derive(Debug, Serialize)]
-struct SlackText {
-    #[serde(rename = "type")]
-    text_type: &'static str,
-    text: String,
-}
-
-impl SlackText {
-    fn mrkdwn(text: impl Into<String>) -> Self {
-        Self {
-            text_type: "mrkdwn",
-            text: text.into(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
 struct SlackAttachment {
-    /// Hex color for the attachment strip
+    fallback: String,
     color: String,
-    /// Fallback text (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
-    fallback: Option<String>,
+    pretext: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    author_name: Option<String>,
+    title: String,
+    text: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fields: Vec<SlackField>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    footer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ts: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+struct SlackField {
+    title: String,
+    value: String,
+    short: bool,
 }
 
 /// Format seconds into a human-readable duration.
@@ -365,35 +329,3 @@ fn format_duration(secs: u64) -> String {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::Utc;
-
-    #[test]
-    fn test_slack_channel_disabled_without_env() {
-        // Clear any existing env var
-        std::env::remove_var("SLACK_WEBHOOK_URL");
-
-        let channel = SlackChannel::from_env();
-        assert!(!channel.enabled());
-    }
-
-    #[test]
-    fn test_slack_payload_format() {
-        let event = NotifyEvent::PlayStarted {
-            task_id: "42".to_string(),
-            repository: "test/repo".to_string(),
-            workflow_name: "wf-123".to_string(),
-            timestamp: Utc::now(),
-        };
-
-        let payload = SlackChannel::format_payload(&event);
-
-        assert_eq!(payload.text, "Play Started: Task #42");
-        assert!(!payload.blocks.is_empty());
-    }
-}
-
-

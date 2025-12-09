@@ -1,3 +1,4 @@
+---
 # Realistic Test Scenarios for Each Agent
 # These scenarios represent typical tasks each agent would handle
 
@@ -11,26 +12,26 @@ rex:
   scenario:
     title: "Add async retry logic to HTTP client"
     description: |
-      Implement exponential backoff retry logic for the HTTP client in the 
+      Implement exponential backoff retry logic for the HTTP client in the
       controller crate. The retry should handle transient network failures
       and rate limiting (429) responses.
     repository: "5dlabs/cto"
     working_directory: "crates/controller"
     task_prompt: |
       ## Task: Implement Retry Logic for HTTP Client
-      
+
       Add exponential backoff retry logic to `src/http/client.rs`.
-      
+
       ### Requirements
       - Retry on connection errors and 429/503 status codes
       - Exponential backoff: 100ms, 200ms, 400ms, 800ms, max 5 retries
       - Use tokio for async delays
       - Add jitter to prevent thundering herd
       - Log retry attempts with tracing
-      
+
       ### Acceptance Criteria
       - [ ] New `RetryConfig` struct with configurable parameters
-      - [ ] `with_retry()` wrapper function for reqwest requests  
+      - [ ] `with_retry()` wrapper function for reqwest requests
       - [ ] Unit tests for retry logic
       - [ ] Integration test with mock server
     expected_tools:
@@ -48,15 +49,15 @@ blaze:
   scenario:
     title: "Create responsive data table component"
     description: |
-      Build a reusable DataTable component with sorting, filtering, 
+      Build a reusable DataTable component with sorting, filtering,
       pagination, and responsive design for the admin dashboard.
     repository: "5dlabs/console"
     working_directory: "src/components"
     task_prompt: |
       ## Task: Create DataTable Component
-      
+
       Build a responsive data table for `src/components/DataTable/`.
-      
+
       ### Requirements
       - Column sorting (click headers)
       - Text search filtering
@@ -64,12 +65,12 @@ blaze:
       - Responsive: stack on mobile, scroll on tablet, full on desktop
       - Keyboard navigation support
       - Loading and empty states
-      
+
       ### Tech Stack
       - React 18 with TypeScript
       - TailwindCSS for styling
       - React Table v8 for table logic
-      
+
       ### Acceptance Criteria
       - [ ] DataTable component with TypeScript generics
       - [ ] Storybook stories for all states
@@ -96,21 +97,21 @@ grizz:
     working_directory: "internal/middleware"
     task_prompt: |
       ## Task: Rate Limiter Middleware
-      
+
       Implement rate limiting in `internal/middleware/ratelimit.go`.
-      
+
       ### Requirements
       - Token bucket algorithm
       - Per-client rate limiting (by API key or IP)
       - Redis backend for distributed rate limit state
       - Configurable limits per route
       - Return proper 429 responses with Retry-After header
-      
+
       ### Tech Stack
       - Go 1.21+
       - go-redis/redis for Redis client
       - chi router middleware interface
-      
+
       ### Acceptance Criteria
       - [ ] RateLimiter struct with token bucket implementation
       - [ ] Redis storage adapter
@@ -132,27 +133,27 @@ nova:
   scenario:
     title: "Add WebSocket real-time notifications"
     description: |
-      Implement WebSocket support for real-time notifications in the 
+      Implement WebSocket support for real-time notifications in the
       NestJS backend, with Redis pub/sub for horizontal scaling.
     repository: "5dlabs/api"
     working_directory: "src/notifications"
     task_prompt: |
       ## Task: WebSocket Notifications
-      
+
       Add real-time notifications via WebSocket in `src/notifications/`.
-      
+
       ### Requirements
       - NestJS WebSocket gateway with Socket.io
       - Redis adapter for multi-instance support
       - JWT authentication for WebSocket connections
       - Typed events with TypeScript
       - Reconnection handling on client disconnect
-      
+
       ### Tech Stack
       - NestJS with @nestjs/websockets
       - Socket.io with Redis adapter
       - TypeScript strict mode
-      
+
       ### Acceptance Criteria
       - [ ] NotificationsGateway with handleConnection/handleDisconnect
       - [ ] Redis pub/sub adapter configuration
@@ -180,22 +181,22 @@ tap:
     working_directory: "src/features/auth"
     task_prompt: |
       ## Task: Biometric Authentication
-      
+
       Add biometric auth in `src/features/auth/biometric/`.
-      
+
       ### Requirements
       - Face ID / Touch ID support via expo-local-authentication
       - Secure storage of auth tokens with expo-secure-store
       - Fallback to PIN/password if biometrics unavailable
       - Settings screen to enable/disable biometric login
       - Works on both iOS and Android
-      
+
       ### Tech Stack
       - Expo SDK 50
       - expo-local-authentication
       - expo-secure-store
       - React Native with TypeScript
-      
+
       ### Acceptance Criteria
       - [ ] useBiometricAuth hook
       - [ ] BiometricPrompt component
@@ -223,21 +224,21 @@ spark:
     working_directory: "src/main"
     task_prompt: |
       ## Task: System Tray Integration
-      
+
       Add system tray support in `src/main/tray.ts`.
-      
+
       ### Requirements
       - System tray icon with dynamic status indicator
       - Context menu with: Start/Stop, Settings, About, Quit
       - Click to show/hide main window
       - Native notifications for status changes
       - Platform-specific icons (macOS template, Windows ICO)
-      
+
       ### Tech Stack
       - Electron 28
       - TypeScript
       - electron-builder for packaging
-      
+
       ### Acceptance Criteria
       - [ ] TrayManager class with lifecycle management
       - [ ] Dynamic icon updates based on app state
@@ -269,16 +270,16 @@ bolt:
     working_directory: "k8s/deployments"
     task_prompt: |
       ## Task: Blue-Green Deployment
-      
+
       Implement blue-green deployment in `k8s/deployments/`.
-      
+
       ### Requirements
       - Blue and green deployment manifests
       - Service switching via label selectors
       - Health check validation before switch
       - Automated rollback on failure
       - ArgoCD integration for GitOps
-      
+
       ### Acceptance Criteria
       - [ ] Blue/green deployment templates
       - [ ] Switch script with health validation
@@ -305,22 +306,22 @@ cipher:
     working_directory: "src/users"
     task_prompt: |
       ## Task: Fix SQL Injection (CVE-2024-XXXX)
-      
+
       Remediate SQL injection in `src/users/search.ts`.
-      
+
       ### Vulnerability
       The user search endpoint concatenates user input directly into SQL:
       ```
       const query = `SELECT * FROM users WHERE name LIKE '%${search}%'`;
       ```
-      
+
       ### Requirements
       - Use parameterized queries with prepared statements
       - Add input validation and sanitization
       - Implement query builder pattern
       - Add SQL injection test cases
       - Update security documentation
-      
+
       ### Acceptance Criteria
       - [ ] Parameterized query implementation
       - [ ] Input validation middleware
@@ -348,21 +349,21 @@ cleo:
     working_directory: "crates"
     task_prompt: |
       ## Task: Standardize Error Handling
-      
+
       Implement consistent error handling across all crates.
-      
+
       ### Current Issues
       - Mix of anyhow::Error and custom error types
       - Inconsistent error context/messages
       - Missing error codes for API responses
       - Logs don't include error chain
-      
+
       ### Requirements
       - Define error hierarchy with thiserror
       - Consistent error context pattern
       - Error codes enum for API
       - Structured logging with tracing
-      
+
       ### Acceptance Criteria
       - [ ] Error types defined in each crate
       - [ ] All functions use Result with proper types
@@ -390,23 +391,23 @@ tess:
     working_directory: "tests/integration"
     task_prompt: |
       ## Task: API Integration Tests
-      
+
       Build integration test suite in `tests/integration/`.
-      
+
       ### Requirements
       - Testcontainers for PostgreSQL and Redis
       - Test fixtures with factory pattern
       - API client wrapper for typed requests
       - Coverage for all CRUD endpoints
       - CI pipeline integration
-      
+
       ### Test Categories
       - Authentication flows
       - User management
       - Resource CRUD operations
       - Error scenarios
       - Rate limiting behavior
-      
+
       ### Acceptance Criteria
       - [ ] Test setup with testcontainers
       - [ ] Factory functions for test data
@@ -433,22 +434,22 @@ stitch:
     working_directory: "."
     task_prompt: |
       ## Task: Review PR #1234 - Auth Refactor
-      
+
       Perform thorough code review of the authentication refactor.
-      
+
       ### Review Checklist
       - [ ] Security: No credentials in code, proper token handling
       - [ ] Performance: No N+1 queries, efficient caching
       - [ ] Testing: Adequate coverage, edge cases handled
       - [ ] Documentation: API changes documented
       - [ ] Breaking changes: Migration path clear
-      
+
       ### Focus Areas
       - JWT token validation logic
       - Session management changes
       - Database schema migrations
       - API contract changes
-      
+
       ### Deliverables
       - Line-by-line review comments
       - Security findings (if any)
@@ -474,9 +475,9 @@ morgan:
     working_directory: "api"
     task_prompt: |
       ## Task: API Documentation
-      
+
       Create developer documentation in `api/`.
-      
+
       ### Requirements
       - Parse OpenAPI 3.0 spec
       - Generate endpoint documentation
@@ -484,14 +485,14 @@ morgan:
       - Document error codes and handling
       - Create quickstart guide
       - Add authentication section
-      
+
       ### Output Files
       - `getting-started.md`
       - `authentication.md`
       - `endpoints/` directory with per-resource docs
       - `errors.md`
       - `examples/` with code samples
-      
+
       ### Acceptance Criteria
       - [ ] All endpoints documented
       - [ ] Working code examples
@@ -518,21 +519,21 @@ atlas:
     working_directory: "."
     task_prompt: |
       ## Task: Merge Feature Branch
-      
+
       Integrate `feature/new-scheduler` into `main`.
-      
+
       ### Conflict Areas
       - `src/scheduler/mod.rs` - Both branches modified
       - `Cargo.toml` - Dependency version conflicts
       - `tests/scheduler_tests.rs` - New tests on both sides
-      
+
       ### Requirements
       - Preserve all functionality from both branches
       - Resolve Cargo.toml to latest compatible versions
       - Merge test files keeping all test cases
       - Ensure CI passes after merge
       - No loss of commit history
-      
+
       ### Acceptance Criteria
       - [ ] All conflicts resolved
       - [ ] Both feature sets working

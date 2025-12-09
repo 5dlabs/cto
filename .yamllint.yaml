@@ -58,8 +58,11 @@ ignore: |
   # Ignore Talos configuration files (they have their own formatting)
   infra/talos/config/simple/*.yaml
 
-  # Ignore some Helm chart files that have intentional formatting
-  infra/charts/*/templates/*.yaml
+  # Ignore all Helm chart template files (they contain {{ }} syntax)
+  infra/charts/*/templates/**
+
+  # Ignore fluent-bit config (INI format, not YAML despite extension)
+  infra/monitoring/fluent-bit/config.yaml
 
   # Ignore some workflow files that have long lines intentionally
   .github/workflows/*.yaml

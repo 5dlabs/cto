@@ -34,7 +34,7 @@ spec:
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
         minRunners: 2
-        maxRunners: 8  # Restored to 8 after pod limit increase (reduced to 4 during capacity issues)
+        maxRunners: 4  # Reduced from 8 to prevent OOM - each runner can use up to 12Gi
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds
@@ -81,6 +81,14 @@ spec:
               image: ghcr.io/5dlabs/rust-builder:latest
               imagePullPolicy: Always
               command: ["/home/runner/run.sh"]
+              # Resource limits to prevent OOM on the node
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "2Gi"
+                limits:
+                  cpu: "4"
+                  memory: "12Gi"
               env:
               - name: ACTIONS_RUNNER_EPHEMERAL
                 value: "false"

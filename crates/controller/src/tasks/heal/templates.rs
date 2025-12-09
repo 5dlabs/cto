@@ -91,10 +91,7 @@ mod tests {
 
     #[test]
     fn test_template_dir() {
-        assert_eq!(
-            HealTemplatePaths::template_dir("rex"),
-            "agents/rex/healer"
-        );
+        assert_eq!(HealTemplatePaths::template_dir("rex"), "agents/rex/healer");
         assert_eq!(
             HealTemplatePaths::template_dir("blaze"),
             "agents/blaze/healer"

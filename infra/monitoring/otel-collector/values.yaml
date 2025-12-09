@@ -1,3 +1,4 @@
+---
 # OpenTelemetry Collector Configuration for Victoria Logs Integration
 mode: deployment
 
@@ -10,7 +11,7 @@ config:
   exporters:
     debug:
       verbosity: detailed
-    
+
     # Victoria Logs OTLP HTTP exporter
     otlphttp/victorialogs:
       endpoint: http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/insert/opentelemetry/v1/logs
@@ -27,7 +28,7 @@ config:
       check_interval: 5s
       limit_percentage: 80
       spike_limit_percentage: 25
-    
+
     # Add resource attributes for better log organization
     resource:
       attributes:
@@ -45,7 +46,7 @@ config:
           endpoint: ${env:MY_POD_IP}:4317
         http:
           endpoint: ${env:MY_POD_IP}:4318
-    
+
     jaeger:
       protocols:
         grpc:
@@ -54,10 +55,10 @@ config:
           endpoint: ${env:MY_POD_IP}:6831
         thrift_http:
           endpoint: ${env:MY_POD_IP}:14268
-    
+
     zipkin:
       endpoint: ${env:MY_POD_IP}:9411
-    
+
     prometheus:
       config:
         scrape_configs:
@@ -70,7 +71,7 @@ config:
   service:
     extensions:
       - health_check
-    
+
     pipelines:
       # Logs pipeline - send to Victoria Logs
       logs:
@@ -83,7 +84,7 @@ config:
         exporters:
           - otlphttp/victorialogs
           - debug
-      
+
       # Metrics pipeline
       metrics:
         receivers:
@@ -94,7 +95,7 @@ config:
           - batch
         exporters:
           - debug
-      
+
       # Traces pipeline
       traces:
         receivers:
@@ -106,7 +107,7 @@ config:
           - batch
         exporters:
           - debug
-    
+
     telemetry:
       metrics:
         readers:

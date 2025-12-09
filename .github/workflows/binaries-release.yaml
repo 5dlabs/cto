@@ -307,11 +307,14 @@ jobs:
           name: binary-agent-controller-linux-x86_64
           path: artifacts/
 
-      - name: Prepare binary for Docker
+      - name: Prepare binary and templates for Docker
         run: |
           cp artifacts/agent-controller-linux-x86_64 infra/images/controller/agent-controller
           chmod +x infra/images/controller/agent-controller
           ls -lh infra/images/controller/agent-controller
+          # Copy templates to build context for Docker
+          cp -r templates infra/images/controller/templates
+          ls -la infra/images/controller/templates/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
@@ -369,14 +372,14 @@ jobs:
           name: binary-healer-linux-x86_64
           path: artifacts/
 
-      - name: Prepare binary and prompts for Docker
+      - name: Prepare binary and templates for Docker
         run: |
           cp artifacts/healer-linux-x86_64 infra/images/healer/healer
           chmod +x infra/images/healer/healer
           ls -lh infra/images/healer/healer
-          # Copy prompts to build context
-          cp -r crates/healer/prompts infra/images/healer/prompts
-          ls -lh infra/images/healer/prompts/
+          # Copy templates to build context for Docker (same pattern as controller)
+          cp -r templates infra/images/healer/templates
+          ls -la infra/images/healer/templates/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3

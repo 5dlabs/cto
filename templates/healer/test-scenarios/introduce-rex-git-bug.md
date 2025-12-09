@@ -41,16 +41,16 @@ git push nonexistent-remote main 2>&1 || {
 
 5. Create a PR to `main` with:
    - Title: `[TEST] Deliberate Rex Git Failure for Alert Monitoring`
-   - Body: 
+   - Body:
      ```
      ## Purpose
      This PR introduces a deliberate failure in Rex's startup to test the alert monitoring system.
-     
+
      ## Expected Behavior
      - Rex pod will fail with exit code 1
      - Alert A7 (Pod Failure) should trigger
      - Factory should analyze the logs and identify the bad git remote as the cause
-     
+
      ## After Testing
      This PR should be CLOSED (not merged) after validating the alert system works.
      ```

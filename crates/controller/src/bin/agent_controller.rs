@@ -38,8 +38,6 @@ use controller::tasks::{
     label::{override_detector::OverrideDetector, schema::WorkflowState, LabelOrchestrator},
     run_task_controller,
 };
-use k8s_openapi::api::core::v1::ConfigMap;
-use kube::Api;
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Arc;
@@ -62,123 +60,72 @@ struct AppState {
     config: Arc<ControllerConfig>,
 }
 
-/// Verify that all required agent template `ConfigMaps` exist and are healthy
+/// Default path for agent templates (embedded in Docker image)
+const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/app/templates";
+
+/// Verify that the agent templates directory exists and contains expected structure
 ///
-/// This health check runs at controller startup to fail-fast if `ConfigMaps` are missing.
-/// Prevents 8-hour silent retry loops when template generation cannot succeed.
-async fn verify_required_configmaps(
-    client: &kube::Client,
-    namespace: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
+/// Templates are now embedded in the Docker image rather than loaded from ConfigMaps.
+/// This check verifies the templates directory is accessible at startup.
+fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
+    let templates_path = std::env::var("AGENT_TEMPLATES_PATH")
+        .unwrap_or_else(|_| DEFAULT_AGENT_TEMPLATES_PATH.to_string());
 
-    // Get the ConfigMap prefix from environment (set by Helm based on release name)
-    // Defaults to "controller" for backward compatibility
-    let cm_prefix = std::env::var("CONFIGMAP_PREFIX").unwrap_or_else(|_| "controller".to_string());
+    let templates_dir = Path::new(&templates_path);
 
-    let required_configmaps = vec![
-        (
-            format!("{cm_prefix}-templates-claude-code"),
-            "Claude code templates",
-        ),
-        (
-            format!("{cm_prefix}-templates-claude-docs"),
-            "Claude docs templates",
-        ),
-        (
-            format!("{cm_prefix}-templates-codex"),
-            "Codex agent templates",
-        ),
-        (
-            format!("{cm_prefix}-templates-cursor"),
-            "Cursor agent templates",
-        ),
-        (
-            format!("{cm_prefix}-templates-factory"),
-            "Factory agent templates",
-        ),
-        (
-            format!("{cm_prefix}-templates-integration"),
-            "Integration agent templates",
-        ),
-        (
-            format!("{cm_prefix}-templates-shared"),
-            "Shared agent utilities",
-        ),
-        (
-            format!("{cm_prefix}-templates-watch"),
-            "E2E Watch agent templates",
-        ),
-    ];
+    if !templates_dir.exists() {
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        error!("❌ CRITICAL: Templates directory not found");
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        error!("Expected path: {}", templates_path);
+        error!("");
+        error!("Templates are embedded in the Docker image at build time.");
+        error!("This error indicates the image may be incomplete or corrupted.");
+        error!("");
+        error!("To fix:");
+        error!("  1. Rebuild the controller image");
+        error!("  2. Verify AGENT_TEMPLATES_PATH env var is correct");
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        return Err(format!("Templates directory not found: {templates_path}").into());
+    }
 
-    let mut missing = Vec::new();
-    let mut empty = Vec::new();
+    // Check for expected subdirectories
+    let expected_dirs = ["_shared", "clis", "agents"];
+    let mut missing_dirs = Vec::new();
 
-    for (cm_name, description) in &required_configmaps {
-        match configmaps.get(cm_name).await {
-            Ok(cm) => {
-                // Check if ConfigMap has data (could be in .data or .binaryData fields)
-                let data_count = cm.data.as_ref().map_or(0, std::collections::BTreeMap::len);
-                let binary_count = cm
-                    .binary_data
-                    .as_ref()
-                    .map_or(0, std::collections::BTreeMap::len);
-                let total_files = data_count + binary_count;
-
-                if total_files == 0 {
-                    empty.push(format!("{cm_name} ({description})"));
-                    error!("❌ ConfigMap {} exists but is EMPTY", cm_name);
-                } else {
-                    info!("  ✓ {} - {} files", description, total_files);
-                }
-            }
-            Err(e) => {
-                missing.push(format!("{cm_name} ({description})"));
-                error!("❌ ConfigMap {} NOT FOUND: {}", cm_name, e);
-            }
+    for dir in &expected_dirs {
+        let dir_path = templates_dir.join(dir);
+        if !dir_path.exists() {
+            missing_dirs.push(*dir);
         }
     }
 
-    if !missing.is_empty() || !empty.is_empty() {
+    if !missing_dirs.is_empty() {
         error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        error!("❌ CRITICAL: Required ConfigMaps are unavailable");
+        error!("❌ CRITICAL: Templates directory structure incomplete");
         error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-        if !missing.is_empty() {
-            error!("Missing ConfigMaps:");
-            for cm in &missing {
-                error!("  - {}", cm);
-            }
+        error!("Templates path: {}", templates_path);
+        error!("Missing directories:");
+        for dir in &missing_dirs {
+            error!("  - {}", dir);
         }
-
-        if !empty.is_empty() {
-            error!("Empty ConfigMaps:");
-            for cm in &empty {
-                error!("  - {}", cm);
-            }
-        }
-
         error!("");
-        error!("Controller cannot start without these ConfigMaps.");
-        error!("They contain agent templates required for job creation.");
-        error!("");
-        error!("Possible causes:");
-        error!("  1. ArgoCD hasn't synced yet (check: kubectl get app controller -n argocd)");
-        error!("  2. Helm chart not deployed properly");
-        error!("  3. ConfigMaps were manually deleted");
-        error!("");
-        error!("To fix:");
-        error!("  1. Check ArgoCD sync status");
-        error!("  2. Verify Helm values.yaml has agent templates enabled");
-        error!("  3. Re-run: helm upgrade controller ./charts/controller");
+        error!("Expected structure:");
+        error!("  {}/", templates_path);
+        error!("  ├── _shared/     (shared partials and container base)");
+        error!("  ├── clis/        (CLI-specific config templates)");
+        error!("  └── agents/      (agent + job type templates)");
         error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
         return Err(format!(
-            "Missing {} ConfigMaps, {} empty ConfigMaps",
-            missing.len(),
-            empty.len()
+            "Templates directory missing subdirectories: {}",
+            missing_dirs.join(", ")
         )
         .into());
+    }
+
+    info!("  ✓ Templates directory: {}", templates_path);
+    for dir in &expected_dirs {
+        info!("    ✓ {}/", dir);
     }
 
     Ok(())
@@ -207,11 +154,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = "cto".to_string();
     let controller_config = Arc::new(load_controller_config());
 
-    // Verify required ConfigMaps exist before starting controller
-    // This prevents 8-hour silent retry loops when ConfigMaps are broken
-    info!("Verifying required ConfigMaps are available...");
-    verify_required_configmaps(&client, &namespace).await?;
-    info!("✅ All required ConfigMaps verified");
+    // Verify templates directory exists before starting controller
+    // Templates are now embedded in the Docker image (not loaded from ConfigMaps)
+    info!("Verifying agent templates are available...");
+    verify_templates_directory()?;
+    info!("✅ Agent templates verified");
 
     let state = AppState {
         client: client.clone(),

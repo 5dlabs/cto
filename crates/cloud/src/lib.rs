@@ -26,5 +26,3 @@ pub use providers::{
     aws, azure, gcp, CloudProvider, CloudProviderError, CreateClusterRequest,
     CreateInstanceRequest, Instance, InstanceStatus, KubernetesCluster, KubernetesClusterStatus,
 };
-
-
