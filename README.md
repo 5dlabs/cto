@@ -982,9 +982,16 @@ Each agent independently configured with its own CLI, model, and tool access.
 
 ---
 
-## **🔧 MCP Tools Reference**
+## **🔧 MCP Tools (Model Context Protocol)**
 
-The platform exposes powerful MCP tools for AI-driven development:
+The platform includes built-in MCP tools, but you can add ANY external MCP servers or custom tools you need:
+
+- **`addTool()`** — Dynamically add any MCP server by GitHub URL — agents instantly gain access to new capabilities
+- **`intake()`** — Project onboarding — initializes new projects with proper structure and configuration
+- **`docs()`** — Documentation generation — Morgan analyzes projects and creates comprehensive docs
+- **`play()`** — Full orchestration — coordinates the entire team through build/test/deploy phases
+
+### Detailed Tool Reference
 
 ### 1. **`intake()` - Unified Project Intake** ⭐ NEW
 Process PRDs, generate tasks, and create comprehensive documentation in one operation.
