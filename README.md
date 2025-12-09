@@ -727,125 +727,79 @@ cto-mcp --help   # MCP server for any CLI
 
 ### Configure Project Settings
 
-Create a `cto-config.json` file in your project root to configure agents, models, tool access, and workflow defaults:
+Create a `cto-config.json` file in your project root. See the [full example config](https://github.com/5dlabs/cto/blob/main/cto-config.template.json) for all options.
 
 ```json
 {
   "version": "1.0",
   "defaults": {
     "docs": {
-      "model": "claude-opus-4-1-20250805",
+      "model": "claude-opus-4-5-20251101",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
     },
     "play": {
-      "model": "claude-sonnet-4-20250514",
-      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "cli": "factory",
       "implementationAgent": "5DLabs-Rex",
+      "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
       "repository": "your-org/your-repo",
-      "service": "your-service",
-      "docsRepository": "your-org/your-docs-repo",
-      "docsProjectDirectory": "docs"
+      "maxRetries": 10,
+      "autoMerge": true,
+      "parallelExecution": true
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
-      "primary": {
-        "model": "opus",
-        "cli": "claude"
-      },
-      "research": {
-        "model": "sonnet",
-        "cli": "cursor"
-      },
-      "fallback": {
-        "model": "gpt-4o",
-        "cli": "codex"
-      }
+      "primary": { "model": "opus", "cli": "claude" },
+      "research": { "model": "sonnet", "cli": "cursor" },
+      "fallback": { "model": "gpt-4o", "cli": "codex" }
     }
   },
   "agents": {
-    "morgan": {
-      "githubApp": "5DLabs-Morgan",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": [
-          "memory_create_entities",
-          "memory_add_observations",
-          "brave_search_brave_web_search"
-        ],
-        "localServers": {
-          "filesystem": {
-            "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
-          },
-          "git": {
-            "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
-          }
-        }
-      }
-    },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "codex",
-      "model": "gpt-5-codex",
+      "cli": "factory",
+      "model": "claude-opus-4-5-20251101",
+      "maxTokens": 64000,
+      "temperature": 0.7,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": ["claude-sonnet-4-5", "claude-opus-4-5", "gpt-5.1", "gemini-3-pro"]
+      },
       "tools": {
-        "remote": [
-          "memory_create_entities",
-          "memory_add_observations"
-        ],
-        "localServers": {
-          "filesystem": {
-            "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
-          },
-          "git": {
-            "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
-          }
-        }
-      }
-    },
-    "cleo": {
-      "githubApp": "5DLabs-Cleo",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations"],
-        "localServers": {
-          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
-          "git": {"enabled": true, "tools": ["git_status", "git_diff", "git_log", "git_show"]}
-        }
-      }
-    },
-    "tess": {
-      "githubApp": "5DLabs-Tess",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations"],
-        "localServers": {
-          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
-          "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
-        }
+        "remote": ["github_create_pull_request", "github_push_files", "context7_get_library_docs"]
       }
     }
   }
 }
 ```
 
+### Key Configuration Features
+
+| Feature | Description |
+|---------|-------------|
+| **Model Rotation** | Automatically cycle through models on retries — improves success rate |
+| **Parallel Execution** | Run implementation agents concurrently for faster builds |
+| **Auto-Merge** | Automatically merge PRs that pass all checks |
+| **Max Retries** | Per-phase retry limits with exponential backoff |
+| **Reasoning Effort** | Control thinking depth (`low`, `medium`, `high`) |
+| **Temperature** | Adjust creativity vs. determinism per agent |
+| **Tool Filtering** | Restrict tools per agent to reduce context and improve focus |
+
 **Agent Configuration Fields:**
 - **`githubApp`**: GitHub App name for authentication
-- **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`)
+- **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`, `gemini`, `dexter`)
 - **`model`**: Model identifier for the CLI
-- **`tools`** (optional): Fine-grained tool access control
-  - **`remote`**: Array of remote tool names from Tools
-  - **`localServers`**: Local MCP server configurations
-    - Each server specifies `enabled` and which `tools` the agent can access
+- **`maxTokens`**: Maximum tokens for responses
+- **`temperature`**: Creativity level (0.0-1.0)
+- **`reasoningEffort`**: Thinking depth for supported models
+- **`modelRotation`**: Automatic model cycling on failures
+- **`tools`**: Fine-grained tool access control
 
 **Benefits:**
 - **CLI Flexibility**: Different agents can use different CLIs
