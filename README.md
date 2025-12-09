@@ -475,7 +475,7 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
 - **XML Prompts**: Structured prompts optimized for AI agent consumption
 - Agent routing: automatically assigns frontend/backend/mobile tasks
-- **Powered by Claude Opus 4.5** for superior task analysis
+- Works with any supported model (Claude, GPT, Gemini, local models)
 
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
@@ -641,7 +641,7 @@ chmod +x setup-agent-secrets.sh
 - Kubernetes 1.19+
 - Helm 3.2.0+
 - GitHub Personal Access Token (or GitHub App)
-- Anthropic API Key
+- API key for your preferred model provider (Anthropic, OpenAI, Google, or local)
 
 **What you get:**
 - Complete cto platform deployed to Kubernetes
@@ -1007,7 +1007,7 @@ intake({
   project_name: "my-awesome-app",
   enrich_context: true,        // Auto-scrape URLs via Firecrawl
   include_codebase: false,     // Include existing code context
-  model: "claude-opus-4-5-20250929"  // Opus 4.5 by default
+  model: "your-preferred-model" // Any supported model
 });
 ```
 
@@ -1018,7 +1018,7 @@ intake({
 ✅ **XML Prompts**: Generates task.xml with structured prompts optimized for AI agents  
 ✅ Adds agent routing hints for frontend/backend task assignment  
 ✅ Submits single PR with complete project structure  
-✅ **Powered by Claude Opus 4.5** for superior task analysis
+✅ Works with any supported model provider
 
 ### 2. **`play()` - Multi-Agent Orchestration**
 Executes complex multi-agent workflows with event-driven coordination.
