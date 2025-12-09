@@ -96,9 +96,9 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 
 ## **🚧 Development Status**
 
-**Public launch: January 1st, 2025** 🚀
+**Stay tuned for the official release!** 🚀
 
-The platform is in beta and being refined based on production usage.
+The platform is under active development.
 
 **Current Status:**
 ✅ Core platform architecture implemented  
