@@ -63,7 +63,7 @@ pub enum Commands {
         repo: String,
 
         /// Base branch for PR
-        #[arg(long, default_value = "main")]
+        #[arg(long, default_value = "develop")]
         base_branch: String,
 
         /// Directory in repo for research files
