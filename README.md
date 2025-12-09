@@ -727,9 +727,11 @@ cto-mcp --help   # MCP server for any CLI
 
 ## **⚙️ Configuration**
 
-### Configure Project Settings
+### One File to Rule Them All
 
-Create a `cto-config.json` file in your project root. See the [full example config](https://github.com/5dlabs/cto/blob/main/cto-config.template.json) for all options.
+**`cto-config.json` is the only file you need to configure.** Everything else is handled by the platform.
+
+Create a `cto-config.json` in your project root and you're done. See the [full example config](https://github.com/5dlabs/cto/blob/main/cto-config.template.json) for all options.
 
 ```json
 {
@@ -832,17 +834,16 @@ After creating your configuration file, configure your CLI to use the MCP server
 | Claude | `~/.config/claude/mcp.json` |
 | Other CLIs | Refer to CLI documentation |
 
-**Usage:**
-1. Create the `cto-config.json` file in your project root with your specific settings
-2. Configure your CLI's MCP integration as shown above
-3. Restart your CLI to load the MCP server
-4. All MCP tools will be available with your configured defaults
+**That's it.** The platform reads your `cto-config.json` and handles everything else:
+- Agent deployment and orchestration
+- Tool registration and filtering
+- Model selection and rotation
+- GitHub App authentication
+- Workflow coordination
 
-**Benefits of Configuration-Driven Approach:**
-- **Simplified MCP Calls**: Most parameters have sensible defaults from your config
-- **Dynamic Agent Lists**: Tool descriptions show available agents from your config
-- **Consistent Settings**: All team members use the same model/agent assignments
-- **Easy Customization**: Change defaults without modifying MCP server setup
+**No Helm values to tweak. No environment variables to set. No YAML to write.**
+
+Just `cto-config.json` → done.
 
 ---
 
