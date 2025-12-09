@@ -1399,10 +1399,11 @@ For more details, see the [LICENSE](LICENSE) file.
 | **Storage** | MinIO (S3-compatible) |
 | **Secrets** | OpenBao (Vault fork) |
 | **Networking** | Cloudflare Tunnels, Kilo VPN (WireGuard) |
-| **CI/CD** | GitHub Actions, ArgoCD Image Updater |
+| **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
 | **Observability** | Prometheus, Grafana, Loki |
 | **Security** | Trivy, Kube-bench, Gitleaks, Falco |
 | **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr |
+| **Agent Runtime** | Custom container image with multi-CLI support, Git, and development tooling |
 
 ---
 
