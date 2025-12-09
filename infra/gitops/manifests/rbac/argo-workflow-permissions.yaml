@@ -49,4 +49,3 @@ roleRef:
   name: argo-events-workflows-cto
   apiGroup: rbac.authorization.k8s.io
 
-

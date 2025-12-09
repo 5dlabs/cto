@@ -76,8 +76,8 @@ spec:
                 claimName: research-data
           containers:
             - name: research
-              image: "{{ .Values.research.image.repository }}:{{ .Values.research.image.tag }}"
-              imagePullPolicy: {{ .Values.research.image.pullPolicy | default "Always" }}
+              image: "{{ include "cto.imageRef" (dict "component" "research" "image" .Values.research.image "global" .Values.global) }}"
+              imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.research.image "global" .Values.global) }}
               securityContext:
                 allowPrivilegeEscalation: false
                 capabilities:

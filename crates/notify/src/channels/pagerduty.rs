@@ -1,14 +1,15 @@
-//! `PagerDuty` integration for incident management.
+//! PagerDuty integration for incident management.
 //!
-//! This module provides integration with `PagerDuty` Events API v2 for triggering
+//! This module provides integration with PagerDuty Events API v2 for triggering
 //! and resolving incidents.
 //!
 //! # Usage
 //!
 //! ```no_run
-//! use integrations::alerts::incidents::pagerduty::{PagerDutyClient, PagerDutyEvent, EventSeverity};
+//! use notify::pagerduty::{PagerDutyClient, PagerDutyEvent, EventSeverity};
+//! use notify::ChannelError;
 //!
-//! # async fn example() -> anyhow::Result<()> {
+//! # async fn example() -> Result<(), ChannelError> {
 //! let client = PagerDutyClient::from_env()?;
 //!
 //! // Trigger an incident
@@ -23,18 +24,20 @@
 //!
 //! # Configuration
 //!
-//! - `PAGERDUTY_ROUTING_KEY`: Integration key from your `PagerDuty` service
+//! - `PAGERDUTY_ROUTING_KEY`: Integration key from your PagerDuty service
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
-/// Environment variable for `PagerDuty` routing key.
+use crate::error::ChannelError;
+
+/// Environment variable for PagerDuty routing key.
 const ENV_PAGERDUTY_ROUTING_KEY: &str = "PAGERDUTY_ROUTING_KEY";
 
-/// `PagerDuty` Events API v2 endpoint.
+/// PagerDuty Events API v2 endpoint.
 const EVENTS_API_URL: &str = "https://events.pagerduty.com/v2/enqueue";
 
-/// `PagerDuty` client for Events API v2.
+/// PagerDuty client for Events API v2.
 #[derive(Debug, Clone)]
 pub struct PagerDutyClient {
     routing_key: String,
@@ -42,13 +45,13 @@ pub struct PagerDutyClient {
 }
 
 impl PagerDutyClient {
-    /// Create a new `PagerDuty` client from environment variables.
+    /// Create a new PagerDuty client from environment variables.
     ///
     /// # Errors
     /// Returns error if `PAGERDUTY_ROUTING_KEY` is not set.
-    pub fn from_env() -> anyhow::Result<Self> {
+    pub fn from_env() -> Result<Self, ChannelError> {
         let routing_key = std::env::var(ENV_PAGERDUTY_ROUTING_KEY)
-            .map_err(|_| anyhow::anyhow!("PAGERDUTY_ROUTING_KEY not set"))?;
+            .map_err(|_| ChannelError::NotConfigured("PAGERDUTY_ROUTING_KEY".to_string()))?;
 
         debug!("PagerDuty client initialized");
 
@@ -58,7 +61,7 @@ impl PagerDutyClient {
         })
     }
 
-    /// Create a new `PagerDuty` client with a specific routing key.
+    /// Create a new PagerDuty client with a specific routing key.
     #[must_use]
     pub fn new(routing_key: String) -> Self {
         Self {
@@ -67,13 +70,19 @@ impl PagerDutyClient {
         }
     }
 
-    /// Send an event to `PagerDuty`.
+    /// Check if PagerDuty is configured via environment.
+    #[must_use]
+    pub fn is_configured() -> bool {
+        std::env::var(ENV_PAGERDUTY_ROUTING_KEY).is_ok()
+    }
+
+    /// Send an event to PagerDuty.
     ///
     /// Returns the `dedup_key` for the event (useful for acknowledging/resolving).
     ///
     /// # Errors
     /// Returns error if the API request fails.
-    pub async fn send_event(&self, event: &PagerDutyEvent) -> anyhow::Result<String> {
+    pub async fn send_event(&self, event: &PagerDutyEvent) -> Result<String, ChannelError> {
         let payload = ApiPayload {
             routing_key: &self.routing_key,
             event_action: event.event_action,
@@ -95,7 +104,10 @@ impl PagerDutyClient {
             .await?;
 
         if response.status().is_success() {
-            let result: ApiResponse = response.json().await?;
+            let result: ApiResponse = response
+                .json()
+                .await
+                .map_err(|e| ChannelError::Other(format!("Failed to parse response: {e}")))?;
             debug!(dedup_key = %result.dedup_key, "PagerDuty event sent successfully");
             Ok(result.dedup_key)
         } else {
@@ -108,7 +120,9 @@ impl PagerDutyClient {
                 "PagerDuty API request failed"
             );
 
-            Err(anyhow::anyhow!("PagerDuty returned {status}: {body}"))
+            Err(ChannelError::Other(format!(
+                "PagerDuty returned {status}: {body}"
+            )))
         }
     }
 
@@ -116,7 +130,7 @@ impl PagerDutyClient {
     ///
     /// # Errors
     /// Returns error if the API request fails.
-    pub async fn acknowledge(&self, dedup_key: &str) -> anyhow::Result<()> {
+    pub async fn acknowledge(&self, dedup_key: &str) -> Result<(), ChannelError> {
         let event = PagerDutyEvent {
             event_action: EventAction::Acknowledge,
             dedup_key: Some(dedup_key.to_string()),
@@ -140,7 +154,7 @@ impl PagerDutyClient {
     ///
     /// # Errors
     /// Returns error if the API request fails.
-    pub async fn resolve(&self, dedup_key: &str) -> anyhow::Result<()> {
+    pub async fn resolve(&self, dedup_key: &str) -> Result<(), ChannelError> {
         let event = PagerDutyEvent {
             event_action: EventAction::Resolve,
             dedup_key: Some(dedup_key.to_string()),
@@ -161,7 +175,7 @@ impl PagerDutyClient {
     }
 }
 
-/// `PagerDuty` event for Events API v2.
+/// PagerDuty event for Events API v2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PagerDutyEvent {
     /// Event action (trigger, acknowledge, resolve)
@@ -173,7 +187,7 @@ pub struct PagerDutyEvent {
     pub payload: EventPayload,
 }
 
-/// `PagerDuty` event action.
+/// PagerDuty event action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EventAction {
@@ -185,7 +199,7 @@ pub enum EventAction {
     Resolve,
 }
 
-/// `PagerDuty` event payload.
+/// PagerDuty event payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventPayload {
     /// Brief summary of the event
@@ -211,7 +225,7 @@ pub struct EventPayload {
     pub custom_details: Option<serde_json::Value>,
 }
 
-/// `PagerDuty` event severity.
+/// PagerDuty event severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSeverity {
@@ -300,22 +314,6 @@ struct ApiResponse {
     status: String,
     message: String,
     dedup_key: String,
-}
-
-/// `PagerDuty` webhook payload placeholder.
-#[derive(Debug, Clone, Deserialize)]
-pub struct PagerDutyWebhookPayload {
-    /// Event type
-    pub event: PagerDutyWebhookEvent,
-}
-
-/// `PagerDuty` webhook event.
-#[derive(Debug, Clone, Deserialize)]
-pub struct PagerDutyWebhookEvent {
-    /// Event type (incident.triggered, incident.resolved, etc.)
-    pub event_type: String,
-    /// Resource type
-    pub resource_type: String,
 }
 
 #[cfg(test)]

@@ -42,4 +42,3 @@ subjects:
     name: github-webhooks-networking
     namespace: argocd
 
-

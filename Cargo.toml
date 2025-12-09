@@ -5,10 +5,10 @@ members = [
     "crates/controller",
     "crates/healer",
     "crates/installer",
-    "crates/integrations",
     "crates/mcp",
     "crates/metal",
     "crates/notify",
+    "crates/pm",
     "crates/research",
     "crates/tasks",
     "crates/tools",
@@ -16,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.13.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"

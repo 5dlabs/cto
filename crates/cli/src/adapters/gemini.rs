@@ -310,3 +310,4 @@ impl CliAdapter for GeminiAdapter {
 }
 
 
+

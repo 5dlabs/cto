@@ -1,6 +1,8 @@
 //! Notification channel implementations.
 
 pub mod discord;
+pub mod pagerduty;
+pub mod slack;
 
 use async_trait::async_trait;
 

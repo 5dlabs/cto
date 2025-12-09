@@ -122,3 +122,4 @@ impl CliAdapter for CursorAdapter {
 }
 
 
+

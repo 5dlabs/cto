@@ -1,27 +1,16 @@
-//! Linear API client and webhook service for CTO platform integration.
+//! Integrations for alerting, messaging, and incident management.
 //!
-//! This crate provides:
-//! - GraphQL client for Linear API
-//! - Webhook payload parsing and signature verification
-//! - Agent Activity emission for Linear's agent system
-//! - Type definitions for Linear entities
-//! - HTTP server for webhook handling (standalone service)
-//! - Handlers for intake and play workflows
+//! This crate provides integrations with third-party services for
+//! notifications, alerting, and incident management:
+//!
+//! - **Alerts**: Discord, Slack, PagerDuty, and other notification/incident systems
+//!
+//! Note: Linear and PM integrations have been moved to the `pm` crate.
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
-#![allow(clippy::missing_errors_doc)] // Many async API methods can fail
+#![allow(clippy::missing_errors_doc)]
 
-pub mod activities;
-pub mod client;
-pub mod config;
-pub mod handlers;
-pub mod models;
-pub mod server;
-pub mod webhooks;
+pub mod alerts;
 
-pub use activities::{ActivityContent, ActivitySignal};
-pub use client::LinearClient;
-pub use config::Config;
-pub use models::*;
-pub use webhooks::{verify_webhook_signature, WebhookPayload};
+pub use alerts::{ChannelError, NotifyChannel, NotifyEvent, Notifier, Severity};

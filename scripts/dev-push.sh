@@ -241,3 +241,4 @@ echo -e "  ${YELLOW}To revert to production image:${NC}"
 echo "    argocd app sync cto --force"
 echo ""
 
+

@@ -17,6 +17,30 @@ global:
     - name: ghcr-secret
   # Storage class for PVCs
   storageClass: local-path
+  
+  # ==========================================================================
+  # Dev Registry - Toggle between GHCR and local in-cluster registry
+  # ==========================================================================
+  # Enable this to use images from a local registry instead of GHCR.
+  # Useful for fast iteration during development without pushing to GHCR.
+  #
+  # Setup: ./scripts/dev-load.sh --setup
+  # Build: ./scripts/dev-load.sh controller
+  # Toggle: helm upgrade cto ./infra/charts/cto --set global.devRegistry.enabled=true
+  #
+  devRegistry:
+    # Set to true to use local in-cluster registry images
+    enabled: false
+    # URL of the local registry (node-ip:nodeport)
+    # Get this from: kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+    url: "192.168.1.77:30500"
+    # Tag for dev images (default: dev-local)
+    tag: "dev-local"
+    # Pull policy for dev images (use Always to get latest pushes)
+    pullPolicy: Always
+    # Override specific components (leave empty to use defaults)
+    # Example: { controller: "my-custom-tag", tools: "feature-branch" }
+    componentTags: {}
 
 # =============================================================================
 # Controller - Agent Orchestration

@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
 use subtle::ConstantTimeEq;
-use tracing::warn;
 
 use crate::models::{AgentSession, Comment, Issue};
 
@@ -22,58 +21,20 @@ type HmacSha256 = Hmac<Sha256>;
 /// `true` if signature is valid, `false` otherwise
 #[must_use]
 pub fn verify_webhook_signature(body: &[u8], signature: &str, secret: &str) -> bool {
-    // Log signature verification attempt
-    warn!(
-        signature_len = signature.len(),
-        body_len = body.len(),
-        secret_len = secret.len(),
-        signature_preview = %&signature[..signature.len().min(16)],
-        "Verifying webhook signature (DEBUG)"
-    );
-
     // Decode the hex signature
     let Ok(signature_bytes) = hex::decode(signature) else {
-        warn!(
-            signature = %signature,
-            "Failed to decode hex signature - not valid hex"
-        );
         return false;
     };
 
-    warn!(
-        signature_bytes_len = signature_bytes.len(),
-        "Decoded signature bytes"
-    );
-
     // Compute HMAC-SHA256
     let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else {
-        warn!("Failed to create HMAC from secret - invalid key");
         return false;
     };
     mac.update(body);
     let computed = mac.finalize().into_bytes();
 
-    let computed_hex = hex::encode(computed);
-    warn!(
-        computed_signature = %computed_hex,
-        provided_signature = %signature,
-        match_status = computed_hex == signature,
-        "Comparing signatures"
-    );
-
     // Constant-time comparison to prevent timing attacks
-    let is_valid: bool = computed.as_slice().ct_eq(&signature_bytes).into();
-
-    if !is_valid {
-        warn!(
-            computed = %computed_hex,
-            provided = %signature,
-            body_preview = %String::from_utf8_lossy(&body[..body.len().min(200)]),
-            "Signature mismatch - computed vs provided"
-        );
-    }
-
-    is_valid
+    computed.as_slice().ct_eq(&signature_bytes).into()
 }
 
 /// Validate webhook timestamp is within acceptable range.

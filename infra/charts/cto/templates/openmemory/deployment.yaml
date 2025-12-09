@@ -19,8 +19,8 @@ spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: openmemory
-          image: "{{ .Values.openmemory.image.repository }}:{{ .Values.openmemory.image.tag }}"
-          imagePullPolicy: {{ .Values.openmemory.image.pullPolicy }}
+          image: "{{ include "cto.imageRef" (dict "component" "openmemory" "image" .Values.openmemory.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.openmemory.image "global" .Values.global) }}
           ports:
             - name: http
               containerPort: {{ .Values.openmemory.service.port }}

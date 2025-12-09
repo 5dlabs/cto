@@ -1,9 +1,9 @@
-//! Configuration for the Linear service.
+//! Configuration for the PM service.
 
 use serde::{Deserialize, Serialize};
 use std::env;
 
-/// Linear webhook handler configuration.
+/// PM webhook handler configuration.
 #[derive(Clone)]
 pub struct Config {
     /// HTTP server port.
@@ -355,3 +355,5 @@ mod tests {
         assert_eq!(config.model, Some("gpt-4.1".to_string()));
     }
 }
+
+
