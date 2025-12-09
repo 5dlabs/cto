@@ -263,34 +263,11 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 </tr>
 </table>
 
-### **🔬 Code Review Squad**
-
-<table>
-<tr>
-<td align="center" width="100%">
-
-### **Stitch**
-#### *The Automated Code Reviewer*
-
-<div align="center">
-<img src="assets/stitch-avatar-512.png" width="180" height="180" alt="Stitch Avatar">
-</div>
-
-🧵 **Personality:** Meticulous & tireless  
-🔎 **Superpower:** Reviews every PR with surgical precision  
-💬 **Motto:** *"No loose threads."*
-
-**Stitch provides automated code review on every pull request—like Cursor's Bugbot, but integrated into your workflow. Catches bugs, suggests improvements, and ensures consistency across your entire codebase.**
-
-</td>
-</tr>
-</table>
-
 ### **🚀 Operations Squad**
 
 <table>
 <tr>
-<td align="center" width="50%">
+<td align="center" valign="top" width="33%">
 
 ### **Atlas**
 #### *The Integration Master*
@@ -306,7 +283,7 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 **Atlas manages PR merges, rebases stale branches, and ensures clean integration with trunk-based development.**
 
 </td>
-<td align="center" width="50%">
+<td align="center" valign="top" width="33%">
 
 ### **Bolt**
 #### *The Deployment Specialist*
@@ -322,14 +299,28 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 **Bolt handles GitOps deployments, monitors rollouts, and ensures production health with automated rollbacks.**
 
 </td>
+<td align="center" valign="top" width="33%">
+
+### **Stitch**
+#### *The Automated Code Reviewer*
+
+<div align="center">
+<img src="assets/stitch-avatar-512.png" width="180" height="180" alt="Stitch Avatar">
+</div>
+
+🧵 **Personality:** Meticulous & tireless  
+🔎 **Superpower:** Reviews every PR with surgical precision  
+💬 **Motto:** *"No loose threads."*
+
+**Stitch provides automated code review on every pull request—like Cursor's Bugbot, but integrated into your workflow. Catches bugs, suggests improvements, and ensures consistency.**
+
+</td>
 </tr>
 </table>
 
 </div>
 
 ---
-
-</div>
 
 ### 🌟 **The Magic: How Your AI Team Collaborates**
 
@@ -410,7 +401,7 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 ### **🚀 Unified Project Intake (`intake()`)**
 **Morgan** processes PRDs, generates tasks, and syncs with your project management tools.
 
-- Parses PRD and generates TaskMaster task breakdown
+- Parses PRD and generates task breakdown via built-in task engine
 - **Linear Integration**: Two-way sync with Linear roadmaps and sprints
 - **GitHub Projects**: Auto-creates issues and project boards
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
@@ -452,7 +443,6 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 
 ### Prerequisites
 - Access to any AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
-- A project with Task Master initialized (`.taskmaster/` directory)
 - GitHub repository for your project
 
 ---
@@ -954,9 +944,9 @@ intake({
 ```
 
 **What unified intake does:**
-✅ Parses PRD and generates TaskMaster task breakdown  
+✅ Parses PRD and generates task breakdown via built-in task engine  
 ✅ Enriches context by scraping URLs found in PRD (via Firecrawl)  
-✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)  
+✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)  
 ✅ Adds agent routing hints for frontend/backend task assignment  
 ✅ Submits single PR with complete project structure  
 ✅ **Powered by Claude Opus 4.5** for superior task analysis
@@ -1044,7 +1034,7 @@ docs_ingest({
 ### `docs` Tool Parameters
 
 **Required:**
-- `working_directory` - Working directory containing .taskmaster folder (e.g., `"projects/simple-api"`)
+- `working_directory` - Working directory containing `.tasks/` folder (e.g., `"projects/simple-api"`)
 
 **Optional (with config defaults):**
 - `agent` - Agent name to use (defaults to `defaults.docs.githubApp` mapping)
@@ -1154,9 +1144,9 @@ vim infra/charts/controller/agent-templates/docs/cursor/prompt.md.hbs
 
 ```bash
 # Edit task-specific files in your docs repository
-vim {docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md
-vim {docs_project_directory}/.taskmaster/docs/task-{id}/task.md
-vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
+vim {docs_project_directory}/.tasks/docs/task-{id}/prompt.md
+vim {docs_project_directory}/.tasks/docs/task-{id}/task.md
+vim {docs_project_directory}/.tasks/docs/task-{id}/acceptance-criteria.md
 ```
 
 #### 3. Customizing Play Workflows
@@ -1260,7 +1250,7 @@ cp target/release/cto-mcp /usr/local/bin/
 ## **🆘 Support**
 
 - Check GitHub PRs for detailed agent logs and explanations
-- Review Task Master project structure in `.taskmaster/` directory
+- Review task structure in `.tasks/` directory
 - Verify `cto-config.json` configuration and GitHub Apps authentication setup
 - Ensure Argo Workflows are properly deployed and accessible
 
