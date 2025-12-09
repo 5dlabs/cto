@@ -144,11 +144,11 @@ Auto-detects failures, stuck workflows, and CI issues—spawns healing agents au
 <img src="assets/grizz-avatar-512.png" width="180" height="180" alt="Grizz Avatar">
 </div>
 
-🐻 **Stack:** Go, gRPC, Kubernetes operators  
+🐻 **Stack:** Go, gRPC, PostgreSQL  
 🛠️ **Superpower:** Ships bulletproof services under pressure  
 💬 **Motto:** *"Simple scales."*
 
-**Grizz crafts cloud-native microservices, CLI tools, and Kubernetes controllers. Battle-tested reliability is his signature.**
+**Grizz builds backend services, REST/gRPC APIs, CLI tools, and Kubernetes operators. From simple CRUD to distributed systems—battle-tested reliability is his signature.**
 
 </td>
 <td align="center" valign="top" width="33%">
@@ -699,15 +699,15 @@ Create a `cto-config.json` file in your project root to configure agents, models
       "githubApp": "5DLabs-Morgan",
       "primary": {
         "model": "opus",
-        "provider": "claude-code"
+        "cli": "claude"
       },
       "research": {
-        "model": "opus",
-        "provider": "claude-code"
+        "model": "sonnet",
+        "cli": "cursor"
       },
       "fallback": {
-        "model": "gpt-5",
-        "provider": "openai"
+        "model": "gpt-4o",
+        "cli": "codex"
       }
     }
   },
