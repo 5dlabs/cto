@@ -55,6 +55,39 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 
 **Local Model Support**: Run Ollama, vLLM, or other local inference—bring your own GPUs and pay only for electricity.
 
+### **🔐 Bring Your Own Keys (BYOK)**
+
+- **Your API keys** — Anthropic, OpenAI, Google, etc. stored securely in your infrastructure
+- **Your cloud credentials** — AWS, GCP, Azure keys never leave your cluster
+- **Secret management with OpenBao** — Open-source HashiCorp Vault fork for enterprise-grade secrets
+- **Zero vendor lock-in** — Switch providers anytime, no data hostage situations
+
+### **🌐 Zero-Trust Networking**
+
+| Feature | Technology | What It Does |
+|---------|------------|--------------|
+| **Cloudflare Tunnels** | `cloudflared` | Expose services publicly without opening firewall ports — no public IPs needed, automatic TLS, global edge CDN |
+| **Kilo VPN** | WireGuard | Secure mesh VPN for remote cluster access — connect from anywhere with encrypted tunnels |
+| **OpenBao** | Vault fork | Centralized secrets management with dynamic credentials and audit logging |
+
+**Cloudflare Tunnels** is a game-changer: your entire platform can run on air-gapped infrastructure while still being accessible from anywhere. No ingress controllers, no load balancers, no exposed ports—just secure outbound tunnels through Cloudflare's network.
+
+### **🏭 Infrastructure Operators (Managed by Bolt)**
+
+Replace expensive managed cloud services with open-source Kubernetes operators:
+
+| Operator | Replaces | Savings |
+|----------|----------|---------|
+| **CloudNative-PG** | AWS RDS, Cloud SQL, Azure PostgreSQL | ~70-80% |
+| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% |
+| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% |
+| **Redis Operator** | ElastiCache, Memorystore | ~70-80% |
+| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% |
+| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% |
+| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% |
+
+**Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
+
 </div>
 
 ---
@@ -63,7 +96,9 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 
 ## **🚧 Development Status**
 
-**This project is under active development.** The platform is in beta and being refined based on production usage.
+**Public launch: January 1st, 2025** 🚀
+
+The platform is in beta and being refined based on production usage.
 
 **Current Status:**
 ✅ Core platform architecture implemented  
@@ -71,8 +106,9 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 ✅ Kubernetes controllers with self-healing  
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
-✅ CloudFront tunneling for public access without exposed interfaces  
-🔄 Documentation and user experience improvements  
+✅ Cloudflare Tunnels for public access without exposed interfaces  
+✅ Infrastructure operators (PostgreSQL, Kafka, Redis, MinIO, OpenSearch, ClickHouse, QuestDB)  
+🔄 Documentation and onboarding improvements  
 
 </div>
 
@@ -138,11 +174,11 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 <img src="assets/grizz-avatar-512.png" width="180" height="180" alt="Grizz Avatar">
 </div>
 
-🐻 **Stack:** Go, gRPC, Kubernetes operators  
+🐻 **Stack:** Go, gRPC, PostgreSQL  
 🛠️ **Superpower:** Ships bulletproof services under pressure  
 💬 **Motto:** *"Simple scales."*
 
-**Grizz crafts cloud-native microservices, CLI tools, and Kubernetes controllers. Battle-tested reliability is his signature.**
+**Grizz builds backend services, REST/gRPC APIs, CLI tools, and Kubernetes operators. From simple CRUD to distributed systems—battle-tested reliability is his signature.**
 
 </td>
 <td align="center" valign="top" width="33%">
@@ -701,18 +737,9 @@ Create a `cto-config.json` file in your project root to configure agents, models
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
-      "primary": {
-        "model": "opus",
-        "provider": "claude-code"
-      },
-      "research": {
-        "model": "opus",
-        "provider": "claude-code"
-      },
-      "fallback": {
-        "model": "gpt-5",
-        "provider": "openai"
-      }
+      "primary": { "model": "opus", "cli": "claude" },
+      "research": { "model": "gpt-4o", "cli": "codex" },
+      "fallback": { "model": "gemini-pro", "cli": "gemini" }
     }
   },
   "agents": {
