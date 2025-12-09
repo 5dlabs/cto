@@ -553,30 +553,30 @@ Dynamic MCP tool registration with 60+ pre-configured tools:
 
 **Component Architecture:**
 - **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with dynamic tool registration
-- **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
+- **Controller Service**: Kubernetes controller that manages CodeRun CRDs via Argo Workflows
 - **Healer Service**: Self-healing daemon monitoring platform and application health
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
-- **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
+- **CodeRun Controller**: Reconciles CodeRun resources with TTL-safe job management
 - **Agent Workspaces**: Isolated persistent volumes for each service with session continuity
 - **GitHub Apps + Linear**: Secure authentication and project management integration
-- **CloudFront Tunneling**: Expose services publicly without opening firewall ports
+- **Cloudflare Tunnels**: Expose services publicly without opening firewall ports
 
-### **🌐 CloudFront Tunneling**
+### **🌐 Cloudflare Tunnels**
 
 Access your services from anywhere without exposing your infrastructure:
 
 - **Zero External Interface**: No public IPs or open firewall ports required
-- **Automatic TLS**: End-to-end encryption via CloudFront
+- **Automatic TLS**: End-to-end encryption via Cloudflare
 - **Global Edge**: Low-latency access from anywhere in the world
-- **Secure by Default**: Traffic routes through AWS infrastructure
+- **Secure by Default**: Traffic routes through Cloudflare's network
 
 **Data Flow:**
 1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
 2. MCP server loads configuration from your MCP config and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
-4. Argo Workflows creates CodeRun/DocsRun custom resources
-5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
-6. Controllers deploy configured CLI agents as Jobs with workspace isolation
+4. Argo Workflows creates CodeRun custom resources
+5. CodeRun controller reconciles CRDs with idempotent job management
+6. Controller deploys configured CLI agents as Jobs with workspace isolation
 7. Agents authenticate via GitHub Apps and complete work
 8. Agents submit GitHub PRs with automatic cleanup
 9. Healer monitors for issues and auto-remediates failures
@@ -646,14 +646,13 @@ chmod +x setup-agent-secrets.sh
 - API key for your preferred model provider (Anthropic, OpenAI, Google, or local)
 
 **What you get:**
-- Complete cto platform deployed to Kubernetes
+- Complete CTO platform deployed to Kubernetes
 - Self-healing infrastructure monitoring
-- REST API for task management
-- Separate Kubernetes controllers for CodeRun/DocsRun resources with TTL-safe reconciliation
+- CodeRun controller with TTL-safe reconciliation
 - Agent workspace management and isolation with persistent volumes
 - Automatic resource cleanup and job lifecycle management
 - MCP tools with dynamic registration
-- CloudFront tunneling for secure public access
+- Cloudflare Tunnels for secure public access
 
 ### Remote Cluster Access with Kilo VPN
 
