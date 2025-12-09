@@ -1,10 +1,9 @@
----
 apiVersion: v2
 name: cto
 description: CTO Platform - AI Development Orchestration
 type: application
 version: 0.0.1
-appVersion: "0.0.1"
+appVersion: 0.0.2
 keywords:
   - ai
   - agents
