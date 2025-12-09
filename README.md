@@ -21,28 +21,45 @@
 
 ## **💰 Why CTO?**
 
+### **Not Just a Team—An Entire Engineering Infrastructure**
+
 <table>
 <tr>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 ### **🏗️ Full Engineering Team**
-13 specialized AI agents covering backend, frontend, QA, security, and DevOps—working 24/7
+13 specialized AI agents: backend, frontend, QA, security, DevOps—working 24/7
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 ### **🔧 Self-Hosted & Bare-Metal**
-Deploy on your own infrastructure: bare-metal servers, on-prem, or any cloud—no vendor lock-in
+Deploy anywhere: bare-metal, on-prem, or cloud—complete data sovereignty
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
-### **💸 Massive Cost Savings**
-Cut cloud bills with bare-metal deployment + reduce engineering headcount for routine tasks
+### **📊 Production Observability**
+Prometheus, Grafana, Loki, AlertManager—full metrics, logs, and alerting out of the box
+
+</td>
+<td align="center" width="25%">
+
+### **🔄 Self-Healing Platform**
+Auto-detects failures, stuck workflows, and CI issues—spawns healing agents automatically
 
 </td>
 </tr>
 </table>
+
+### **💸 Slash Your Engineering Costs**
+
+| Traditional Approach | With CTO |
+|---------------------|----------|
+| $150k-250k/yr per engineer × 5-10 engineers | **$0** — AI agents included |
+| $5k-50k/mo cloud infrastructure | **60-80% savings** on bare-metal |
+| 24/7 on-call rotation costs | **Automated** self-healing |
+| Weeks to onboard new team members | **Instant** agent deployment |
 
 </div>
 
@@ -407,7 +424,7 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
 - Agent routing: automatically assigns frontend/backend/mobile tasks
-- **Powered by Claude Opus 4.5** for superior task analysis
+- **Configurable AI models** — use any supported provider (Anthropic, OpenAI, Google, etc.)
 
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
@@ -427,13 +444,32 @@ Control and monitor your AI development workflows:
 - **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
 - **`register_tool()`** - Dynamically register new MCP tools at runtime
 
-### **🔄 Self-Healing Infrastructure**
-The platform includes comprehensive self-healing capabilities:
+### **🔄 Self-Healing Infrastructure (Healer)**
+The platform includes comprehensive self-healing for both CTO and your deployed applications:
 
-- **Platform Self-Healing**: Monitors CTO's own health—detects stuck workflows, pod failures, step timeouts, and auto-remediates
-- **Application Self-Healing**: Extends healing to your deployed apps—CI failures, silent errors, stale progress alerts
-- **Alert Types**: Comment order issues, silent failures, approval loops, post-Tess CI failures, pod failures, step timeouts, stuck CodeRuns
-- **Automated Remediation**: Spawns healing agents to diagnose and fix issues automatically
+- **Platform Self-Healing**: Monitors CTO's own health—detects stuck workflows, pod failures, step timeouts
+- **Application Self-Healing**: Extends to your deployed apps—CI failures, silent errors, stale progress
+- **Intelligent Alert Routing**: 9 alert types with context-aware remediation strategies
+- **Automated Remediation**: Spawns healing agents to diagnose and fix issues without human intervention
+- **Continuous Learning**: Tracks remediation success and adapts strategies
+
+### **📊 Production Observability Stack**
+Full observability out of the box—no additional setup required:
+
+| Component | Purpose |
+|-----------|---------|
+| **Prometheus** | Metrics collection, alerting rules, service discovery |
+| **Grafana** | Dashboards, visualization, alert management |
+| **Loki** | Log aggregation and querying |
+| **AlertManager** | Alert routing, deduplication, notification channels |
+| **Blackbox Exporter** | External endpoint monitoring and probing |
+
+**Included Dashboards:**
+- Agent performance and task completion rates
+- Workflow execution times and success rates
+- Resource utilization across all agents
+- GitHub PR metrics and merge times
+- Self-healing remediation statistics
 
 All operations run as **Kubernetes jobs** with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup.
 
@@ -442,7 +478,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 ## **🚀 Getting Started**
 
 ### Prerequisites
-- Access to any AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
+- Access to any supported AI CLI (see [Supported CLIs](#supported-ai-clis))
 - GitHub repository for your project
 
 ---
@@ -615,7 +651,7 @@ See `docs/vpn/kilo-client-setup.md` for full setup instructions.
 
 ### Install MCP Server
 
-For CLI integration (Cursor, Claude Code, etc.), install the MCP server:
+For CLI integration, install the MCP server:
 
 ```bash
 # One-liner installer (Linux/macOS)
@@ -764,9 +800,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
 
 ### Configure MCP Integration
 
-After creating your configuration file, configure your CLI to use the MCP server.
-
-**For Cursor**, create a `.cursor/mcp.json` file in your project directory:
+After creating your configuration file, configure your CLI to use the MCP server. Add to your CLI's MCP configuration:
 
 ```json
 {
@@ -780,18 +814,12 @@ After creating your configuration file, configure your CLI to use the MCP server
 }
 ```
 
-**For Claude Code**, add to your MCP configuration (typically in `~/.config/claude/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "cto-mcp": {
-      "command": "cto-mcp",
-      "args": []
-    }
-  }
-}
-```
+**Configuration Locations by CLI:**
+| CLI | Config Path |
+|-----|-------------|
+| Cursor | `.cursor/mcp.json` in project directory |
+| Claude | `~/.config/claude/mcp.json` |
+| Other CLIs | Refer to CLI documentation |
 
 **Usage:**
 1. Create the `cto-config.json` file in your project root with your specific settings
@@ -989,29 +1017,17 @@ All templates now live under `infra/charts/controller/agent-templates/` with CLI
 Edit the settings template files for your chosen CLI:
 
 ```bash
-# For docs agents (Claude Code example)
-vim infra/charts/controller/agent-templates/docs/claude/settings.json.hbs
-
-# For code agents (Claude Code example)
-vim infra/charts/controller/agent-templates/code/claude/settings.json.hbs
-
-# For code agents (Codex example)
-vim infra/charts/controller/agent-templates/code/codex/config.toml.hbs
-
-# For code agents (Factory example)
-vim infra/charts/controller/agent-templates/code/factory/factory-cli-config.json.hbs
+# Edit settings for any CLI (claude, codex, cursor, factory, opencode, gemini, dexter)
+vim infra/charts/controller/agent-templates/code/{cli}/settings.json.hbs
+vim infra/charts/controller/agent-templates/docs/{cli}/settings.json.hbs
 ```
 
 Settings control:
 - Model selection (CLI-specific model identifiers)
 - Tool permissions and access
 - MCP tool configuration
-- CLI-specific settings (permissions, hooks, etc.)
 
-Refer to your CLI's documentation for complete configuration options:
-- [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settings)
-- [Factory CLI Documentation](https://docs.factory.ai)
-- Other CLIs: Refer to their respective documentation
+Refer to your CLI's documentation for complete configuration options.
 
 #### 2. Updating Prompts
 
@@ -1050,28 +1066,7 @@ The play workflow template controls:
 - Event triggers between phases
 - Parameter passing between phases
 
-#### 4. Adding Custom Hooks
-
-Hooks are shell scripts that run during agent execution. Add new hook files beneath the CLI you are extending:
-
-```bash
-# Create new hook script (docs/Claude Code example)
-vim infra/charts/controller/agent-templates/docs/claude/hooks/my-custom-hook.sh.hbs
-
-# Create new hook script (code/Codex example)
-vim infra/charts/controller/agent-templates/code/codex/hooks/my-custom-hook.sh.hbs
-
-# Create new hook script (code/Factory example)
-vim infra/charts/controller/agent-templates/code/factory/hooks/my-custom-hook.sh.hbs
-```
-
-Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
-
-Refer to your CLI's documentation for hook configuration:
-- [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide)
-- Other CLIs: Refer to their respective documentation for hook/script support
-
-#### 5. Deploying Template Changes
+#### 4. Deploying Template Changes
 
 After editing any template files, redeploy the cto:
 
