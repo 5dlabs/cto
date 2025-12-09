@@ -40,7 +40,7 @@ spec:
 
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: main
+    targetRevision: develop
     path: infra/charts/cto
     helm:
       valueFiles:

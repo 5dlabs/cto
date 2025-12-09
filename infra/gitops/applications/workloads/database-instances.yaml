@@ -22,7 +22,7 @@ spec:
   source:
     repoURL: https://github.com/5dlabs/cto
     path: infra/gitops/manifests/test-databases
-    targetRevision: main
+    targetRevision: develop
 
   # Destination configuration
   destination:
