@@ -310,11 +310,11 @@ The platform is in beta and being refined based on production usage.
 </tr>
 </table>
 
-### **🔬 Code Review Squad**
+### **🚀 Operations Squad**
 
 <table>
 <tr>
-<td align="center" width="100%">
+<td align="center" valign="top" width="33%">
 
 ### **Stitch**
 #### *The Automated Code Reviewer*
@@ -327,17 +327,10 @@ The platform is in beta and being refined based on production usage.
 🔎 **Superpower:** Reviews every PR with surgical precision  
 💬 **Motto:** *"No loose threads."*
 
-**Stitch provides automated code review on every pull request—like Cursor's Bugbot, but integrated into your workflow. Catches bugs, suggests improvements, and ensures consistency across your entire codebase.**
+**Stitch provides automated code review on every pull request—catches bugs, suggests improvements, and ensures consistency across your entire codebase.**
 
 </td>
-</tr>
-</table>
-
-### **🚀 Operations Squad**
-
-<table>
-<tr>
-<td align="center" width="50%">
+<td align="center" valign="top" width="33%">
 
 ### **Atlas**
 #### *The Integration Master*
@@ -353,7 +346,7 @@ The platform is in beta and being refined based on production usage.
 **Atlas manages PR merges, rebases stale branches, and ensures clean integration with trunk-based development.**
 
 </td>
-<td align="center" width="50%">
+<td align="center" valign="top" width="33%">
 
 ### **Bolt**
 #### *The Deployment Specialist*
@@ -388,7 +381,7 @@ The platform is in beta and being refined based on production usage.
 <tr>
 <td align="center" width="20%">
 
-**📚 Intake**  
+**📚 Phase 1**  
 **Morgan** documents  
 requirements & architecture
 
@@ -397,7 +390,7 @@ requirements & architecture
 </td>
 <td align="center" width="20%">
 
-**⚡ Phase 1**  
+**⚡ Phase 2**  
 **Rex & Blaze** build  
 backend + frontend
 
@@ -406,25 +399,25 @@ backend + frontend
 </td>
 <td align="center" width="20%">
 
-**🛡️ Phase 2**  
-**Cleo, Tess, Cipher, Stitch**  
-quality, testing, security, review
+**🛡️ Phase 3**  
+**Cleo, Tess, Cipher**  
+quality, testing, security
 
 *via `play()`*
 
 </td>
 <td align="center" width="20%">
 
-**🔗 Phase 3**  
-**Atlas** integrates  
-merges & rebases
+**🔗 Phase 4**  
+**Stitch & Atlas**  
+review, merge & integrate
 
 *via `play()`*
 
 </td>
 <td align="center" width="20%">
 
-**🚀 Phase 4**  
+**🚀 Phase 5**  
 **Bolt** deploys  
 and distributes
 
@@ -487,10 +480,11 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
 
-- **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)
-- **Phase 2 - Quality**: Cleo reviews, Tess tests, Cipher secures, Stitch code-reviews
-- **Phase 3 - Integration**: Atlas merges, rebases, and resolves conflicts
-- **Phase 4 - Deployment**: Bolt deploys and distributes
+- **Phase 1 - Intake**: Morgan documents requirements and architecture
+- **Phase 2 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)
+- **Phase 3 - Quality**: Cleo reviews, Tess tests, Cipher secures
+- **Phase 4 - Integration**: Stitch code-reviews, Atlas merges and rebases
+- **Phase 5 - Deployment**: Bolt deploys and distributes
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
 - **Auto-Resume**: Continues from where you left off (task_id optional)
@@ -1040,10 +1034,11 @@ play({
 ```
 
 **What the team does:**
-✅ **Phase 1 - Implementation**: Rex/Blaze builds the feature  
-✅ **Phase 2 - Quality**: Cleo reviews, Tess tests, Cipher secures, Stitch code-reviews  
-✅ **Phase 3 - Integration**: Atlas merges, rebases, and resolves conflicts  
-✅ **Phase 4 - Deployment**: Bolt deploys and distributes  
+✅ **Phase 1 - Intake**: Morgan documents requirements and architecture  
+✅ **Phase 2 - Implementation**: Rex/Blaze builds the feature  
+✅ **Phase 3 - Quality**: Cleo reviews, Tess tests, Cipher secures  
+✅ **Phase 4 - Integration**: Stitch code-reviews, Atlas merges and rebases  
+✅ **Phase 5 - Deployment**: Bolt deploys and distributes  
 ✅ **Event-Driven**: Automatic phase transitions  
 ✅ **Auto-Resume**: Continues from where you left off
 
