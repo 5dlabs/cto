@@ -723,89 +723,176 @@ Configure everything in a single MCP config file. For Cursor, create `.cursor/mc
             "includeCodebase": false,
             "sourceBranch": "main"
           },
+          "intake": {
+            "githubApp": "5DLabs-Morgan",
+            "primary": { "model": "opus", "provider": "claude-code" },
+            "research": { "model": "opus", "provider": "claude-code" },
+            "fallback": { "model": "gpt-5", "provider": "openai" }
+          },
           "play": {
             "model": "your-play-model",
-            "cli": "claude",
+            "cli": "factory",
             "implementationAgent": "5DLabs-Rex",
+            "frontendAgent": "5DLabs-Blaze",
             "qualityAgent": "5DLabs-Cleo",
+            "securityAgent": "5DLabs-Cipher",
             "testingAgent": "5DLabs-Tess",
             "repository": "your-org/your-repo",
             "service": "your-service",
             "docsRepository": "your-org/your-docs-repo",
-            "docsProjectDirectory": "docs"
-          },
-          "intake": {
-            "githubApp": "5DLabs-Morgan",
-            "primary": { "model": "opus", "cli": "claude" },
-            "research": { "model": "gpt-4o", "cli": "codex" },
-            "fallback": { "model": "gemini-pro", "cli": "gemini" }
+            "docsProjectDirectory": "docs",
+            "workingDirectory": ".",
+            "maxRetries": 10,
+            "autoMerge": true,
+            "parallelExecution": true
           }
         },
-  "agents": {
-    "morgan": {
-      "githubApp": "5DLabs-Morgan",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": [
-          "memory_create_entities",
-          "memory_add_observations",
-          "brave_search_brave_web_search"
-        ],
-        "localServers": {
-          "filesystem": {
-            "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+        "agents": {
+          "morgan": {
+            "githubApp": "5DLabs-Morgan",
+            "cli": "claude",
+            "model": "your-model",
+            "maxTokens": 8192,
+            "temperature": 0.8,
+            "modelRotation": {
+              "enabled": true,
+              "models": ["model-a", "model-b"]
+            },
+            "tools": {
+              "remote": [
+                "brave_search_brave_web_search",
+                "openmemory_openmemory_query",
+                "openmemory_openmemory_store",
+                "github_search_issues",
+                "github_create_issue"
+              ],
+              "localServers": {}
+            }
           },
-          "git": {
-            "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
-          }
-        }
-      }
-    },
-    "rex": {
-      "githubApp": "5DLabs-Rex",
-      "cli": "codex",
-      "model": "gpt-5-codex",
-      "tools": {
-        "remote": [
-          "memory_create_entities",
-          "memory_add_observations"
-        ],
-        "localServers": {
-          "filesystem": {
-            "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          "rex": {
+            "githubApp": "5DLabs-Rex",
+            "cli": "factory",
+            "model": "your-model",
+            "maxTokens": 64000,
+            "temperature": 0.7,
+            "reasoningEffort": "high",
+            "modelRotation": {
+              "enabled": true,
+              "models": ["model-a", "model-b", "model-c"]
+            },
+            "tools": {
+              "remote": [
+                "brave_search_brave_web_search",
+                "context7_resolve_library_id",
+                "context7_get_library_docs",
+                "github_create_pull_request",
+                "github_push_files",
+                "openmemory_openmemory_query"
+              ],
+              "localServers": {}
+            }
           },
-          "git": {
-            "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
-          }
-        }
-      }
-    },
-    "cleo": {
-      "githubApp": "5DLabs-Cleo",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
-      "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations"],
-        "localServers": {
-          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
-          "git": {"enabled": true, "tools": ["git_status", "git_diff", "git_log", "git_show"]}
-        }
-      }
-    },
-        "tess": {
-          "githubApp": "5DLabs-Tess",
-          "cli": "claude",
-          "model": "your-tess-model",
-          "tools": {
-            "remote": ["memory_create_entities", "memory_add_observations"],
-            "localServers": {
-              "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
-              "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
+          "blaze": {
+            "githubApp": "5DLabs-Blaze",
+            "cli": "factory",
+            "model": "your-model",
+            "maxTokens": 64000,
+            "temperature": 0.6,
+            "reasoningEffort": "high",
+            "modelRotation": {
+              "enabled": true,
+              "models": ["model-a", "model-b"]
+            },
+            "tools": {
+              "remote": [
+                "context7_resolve_library_id",
+                "context7_get_library_docs",
+                "shadcn_list_components",
+                "shadcn_get_component",
+                "ai_elements_get_ai_elements_components",
+                "github_create_pull_request"
+              ],
+              "localServers": {}
+            }
+          },
+          "cleo": {
+            "githubApp": "5DLabs-Cleo",
+            "cli": "claude",
+            "model": "your-model",
+            "maxTokens": 2048,
+            "temperature": 0.3,
+            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+            "tools": {
+              "remote": [
+                "github_get_pull_request",
+                "github_get_pull_request_files",
+                "github_create_pull_request_review"
+              ],
+              "localServers": {}
+            }
+          },
+          "cipher": {
+            "githubApp": "5DLabs-Cipher",
+            "cli": "cursor",
+            "model": "your-model",
+            "maxTokens": 200000,
+            "reasoningEffort": "high",
+            "role": "Security Agent",
+            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+            "tools": {
+              "remote": [
+                "github_list_code_scanning_alerts",
+                "github_list_secret_scanning_alerts",
+                "hexstrike_trivy_scan",
+                "hexstrike_kube_bench_check",
+                "hexstrike_gitleaks_scan"
+              ],
+              "localServers": {}
+            }
+          },
+          "tess": {
+            "githubApp": "5DLabs-Tess",
+            "cli": "claude",
+            "model": "your-model",
+            "maxTokens": 4096,
+            "temperature": 0.7,
+            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+            "tools": {
+              "remote": [
+                "kubernetes_listResources",
+                "kubernetes_getPodsLogs",
+                "github_get_pull_request_status"
+              ],
+              "localServers": {}
+            }
+          },
+          "atlas": {
+            "githubApp": "5DLabs-Atlas",
+            "cli": "claude",
+            "model": "your-model",
+            "modelRotation": { "enabled": false, "models": [] },
+            "tools": {
+              "remote": [
+                "github_create_pull_request",
+                "github_push_files",
+                "github_create_branch"
+              ],
+              "localServers": {}
+            }
+          },
+          "bolt": {
+            "githubApp": "5DLabs-Bolt",
+            "cli": "claude",
+            "model": "your-model",
+            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+            "tools": {
+              "remote": [
+                "kubernetes_listResources",
+                "kubernetes_helmInstall",
+                "kubernetes_helmUpgrade",
+                "github_merge_pull_request"
+              ],
+              "localServers": {}
             }
           }
         }
@@ -820,16 +907,20 @@ Configure everything in a single MCP config file. For Cursor, create `.cursor/mc
 **Key Features:**
 - **CLI & Model Rotation**: Configure different CLIs and models per agent—rotate between providers for cost optimization or capability matching
 - **Automatic ArgoCD Management**: Platform manages ArgoCD applications and GitOps deployments automatically
+- **Parallel Execution**: Run multiple agents simultaneously for faster development cycles
 - **Tool Profiles**: Fine-grained control over which tools each agent can access
-- **Zero Config Startup**: Sensible defaults let you start immediately, customize later
+- **Security Scanning**: Integrated Hexstrike tools for vulnerability scanning, secret detection, and compliance checks
 
 **Agent Configuration Fields:**
 - **`githubApp`**: GitHub App name for authentication
 - **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`)
 - **`model`**: Model identifier for the CLI
-- **`tools`** (optional): Fine-grained tool access control
-  - **`remote`**: Array of remote tool names
-  - **`localServers`**: Local MCP server configurations
+- **`maxTokens`**: Maximum tokens for agent responses
+- **`temperature`**: Model temperature (creativity vs determinism)
+- **`reasoningEffort`**: Reasoning effort level (`low`, `medium`, `high`)
+- **`modelRotation`**: Enable automatic model rotation for resilience and cost optimization
+- **`tools.remote`**: Array of remote MCP tool names
+- **`tools.localServers`**: Local MCP server configurations
 
 **Usage:**
 1. Create your MCP config file (`.cursor/mcp.json` or equivalent)
