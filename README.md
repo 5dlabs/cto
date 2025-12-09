@@ -600,6 +600,22 @@ Access your services from anywhere without exposing your infrastructure:
 8. Agents submit GitHub PRs with automatic cleanup
 9. Healer monitors for issues and auto-remediates failures
 
+### **🛠️ Tech Stack**
+
+Everything is deployed via **GitOps** using the App of Apps pattern:
+
+| Category | Technologies |
+|----------|--------------|
+| **GitOps & Orchestration** | ArgoCD, Argo Workflows, Argo Events, ArgoCD Image Updater |
+| **Observability** | Prometheus, Grafana, Loki, AlertManager, Blackbox Exporter, OpenTelemetry, Fluent-bit |
+| **Data Infrastructure** | CloudNative-PG (Postgres), Strimzi (Kafka), Redis, MinIO (S3), OpenSearch, ClickHouse, QuestDB |
+| **Secrets & Security** | OpenBao (Vault fork), External Secrets Operator, Cert-Manager |
+| **Networking** | Cloudflare Tunnels, Kilo (WireGuard VPN), Gateway API, Ingress NGINX, External DNS |
+| **CI/CD** | GitHub Actions Runner Controller (ARC), Platform Runners |
+| **Core Platform** | Kubernetes (Talos Linux), Helm, Kustomize |
+
+**All managed declaratively** — changes to `infra/gitops/` automatically sync to the cluster.
+
 ---
 
 ## **📦 Installation**
