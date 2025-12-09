@@ -128,8 +128,6 @@ The platform is in beta and being refined based on production usage.
 
 *Thirteen specialized agents with distinct personalities working together 24/7—your full-stack engineering department in a box*
 
-<div align="center">
-
 ### **🎯 Project Management & Architecture**
 
 <table>
