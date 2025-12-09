@@ -1273,12 +1273,6 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ---
 
-## **🔗 Related Projects**
-
-- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `play()` and `intake()` MCP tools.
-
----
-
 ## **🚀 Roadmap**
 
 See our [ROADMAP.md](ROADMAP.md) for upcoming features and planned enhancements to the platform.
