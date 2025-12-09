@@ -1,17 +1,28 @@
-# Tools Server - Multi-stage build for Kind (ARM64)
+# Tools Server - Multi-stage build with cargo-chef
 #
-# Builds tools-server and cto-mcp from source for local development.
+# Uses cargo-chef for optimal dependency caching
 #
 # Build from repo root:
 #   docker build -f infra/images/tools/Dockerfile.kind -t ghcr.io/5dlabs/tools:kind-local .
 
 # =============================================================================
-# Stage 1: Build Rust binaries
+# Stage 1: Chef - Prepare recipe
 # =============================================================================
-# Use latest stable Rust
-FROM rust:latest AS builder
-
+FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
 WORKDIR /build
+
+# =============================================================================
+# Stage 2: Planner - Analyze dependencies
+# =============================================================================
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN cargo chef prepare --recipe-path recipe.json
+
+# =============================================================================
+# Stage 3: Builder - Build dependencies then application
+# =============================================================================
+FROM chef AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -19,16 +30,22 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace files
+# Build dependencies - THIS IS THE CACHED LAYER!
+COPY --from=planner /build/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo chef cook --release --recipe-path recipe.json
+
+# Now copy source and build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
-
-# Build the tools-server and cto-mcp binaries
-RUN cargo build --release --package tools --bin tools-server && \
-    cargo build --release --package cto-mcp --bin cto-mcp
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo build --release --package tools --bin tools-server && \
+    cargo build --release --package cto-mcp --bin cto-mcp && \
+    cp /build/target/release/tools-server /tmp/tools-server && \
+    cp /build/target/release/cto-mcp /tmp/cto-mcp
 
 # =============================================================================
-# Stage 2: Runtime image
+# Stage 4: Runtime image
 # =============================================================================
 FROM ubuntu:24.04
 
@@ -62,8 +79,8 @@ RUN useradd -r -u 1001 -m -s /bin/bash app && \
     chown -R app:app /home/app
 
 # Copy binaries from builder
-COPY --from=builder /build/target/release/tools-server /usr/local/bin/tools-server
-COPY --from=builder /build/target/release/cto-mcp /usr/local/bin/cto-mcp
+COPY --from=builder /tmp/tools-server /usr/local/bin/tools-server
+COPY --from=builder /tmp/cto-mcp /usr/local/bin/cto-mcp
 RUN chmod +x /usr/local/bin/tools-server /usr/local/bin/cto-mcp
 
 WORKDIR /app
@@ -88,4 +105,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Default command
 CMD ["tools-server"]
-

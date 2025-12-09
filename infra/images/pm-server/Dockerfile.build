@@ -1,24 +1,46 @@
-# PM Server Multi-stage Dockerfile
+# PM Server Multi-stage Dockerfile with cargo-chef
 #
-# This Dockerfile builds the pm-server binary from source.
-# Use this for local development or when CI pre-built binaries aren't available.
+# Uses cargo-chef for optimal dependency caching
+# Note: Uses Rust nightly for edition 2024 support
 #
 # Build from repo root:
 #   docker build -f infra/images/pm-server/Dockerfile.build -t ghcr.io/5dlabs/pm-server:dev .
 
-# Build stage for Linux target using Rust nightly (for edition 2024 support)
-FROM rustlang/rust:nightly-bookworm AS builder
-
+# =============================================================================
+# Stage 1: Chef - Install cargo-chef on nightly
+# =============================================================================
+FROM rustlang/rust:nightly-bookworm AS chef
+RUN cargo install cargo-chef
 WORKDIR /build
 
-# Copy workspace files
+# =============================================================================
+# Stage 2: Planner - Analyze dependencies
+# =============================================================================
+FROM chef AS planner
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Build the Linear binary (deployed as pm-server)
-RUN cargo build --release -p integrations --bin linear
+# =============================================================================
+# Stage 3: Builder - Build dependencies then application
+# =============================================================================
+FROM chef AS builder
 
-# Runtime stage
+# Build dependencies - THIS IS THE CACHED LAYER!
+COPY --from=planner /build/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo chef cook --release --recipe-path recipe.json
+
+# Now copy source and build
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo build --release -p pm --bin pm-server && \
+    cp /build/target/release/pm-server /tmp/pm-server
+
+# =============================================================================
+# Stage 4: Runtime
+# =============================================================================
 FROM debian:bookworm-slim
 
 # Install runtime dependencies and argo CLI
@@ -43,8 +65,8 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 
 WORKDIR /app
 
-# Copy the linear binary as pm-server
-COPY --from=builder /build/target/release/linear /app/pm-server
+# Copy the pm-server binary
+COPY --from=builder /tmp/pm-server /app/pm-server
 
 RUN chmod +x /app/pm-server && chown -R app:app /app
 
