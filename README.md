@@ -540,20 +540,31 @@ CTO works with your favorite AI coding assistant:
 
 ### **🔧 Integrated Tools Library**
 
-Dynamic MCP tool registration with **57+ pre-configured tools**:
+Dynamic MCP tool registration with **57+ pre-configured tools** across GitHub, Kubernetes, ArgoCD, OpenMemory, Context7, and more.
 
-| Category | Count | Capabilities |
-|----------|-------|--------------|
-| **GitHub** | 28 | File ops, PRs (create/merge/review/comment), issues (CRUD/search), code scanning, secret scanning, repository management, branch operations |
-| **Kubernetes** | 18 | Pod logs/exec/list, resource CRUD, events, pod/node metrics, API resources, Helm (install/upgrade/rollback/uninstall/repos) |
-| **OpenMemory** | 5 | Query, store, list, reinforce, get — persistent memory across agent sessions |
-| **ArgoCD** | 4 | Get/sync applications, workload logs, application events |
-| **Context7** | 2 | Resolve library IDs, get library documentation and code examples |
+👉 **[View full tools list](https://github.com/5dlabs/cto/blob/main/tools-config.json)**
 
-**Plus local server tools:**
-- **Filesystem** — read/write/search files with configurable access
-- **Brave Search** — web search integration
-- **Firecrawl** — intelligent web scraping for context enrichment
+**Tool Filtering** — Only expose the tools each agent needs:
+```json
+{
+  "agents": {
+    "rex": {
+      "tools": {
+        "remote": ["github_create_pull_request", "github_push_files"],
+        "localServers": { "filesystem": { "enabled": true } }
+      }
+    }
+  }
+}
+```
+
+**Why tool filtering matters:**
+- 🎯 **Smaller context** — agents don't waste tokens on irrelevant tool descriptions
+- 🔒 **Security** — restrict sensitive operations to specific agents
+- ⚡ **Faster responses** — fewer tools = faster tool selection
+- 🧠 **Better focus** — agents stay on-task with curated capabilities
+
+**Categories:** GitHub (28) • Kubernetes (18) • OpenMemory (5) • ArgoCD (4) • Context7 (2) • Filesystem • Brave Search • Firecrawl
 
 **Frontend Stack**: shadcn/ui components, Tailwind CSS, React patterns built-in
 
