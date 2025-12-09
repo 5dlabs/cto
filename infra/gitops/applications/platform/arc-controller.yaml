@@ -86,12 +86,11 @@ spec:
 
     syncOptions:
       - CreateNamespace=true
+      # ServerSideApply uses managed fields instead of last-applied-configuration
+      # annotation, avoiding Kubernetes' 262144 byte limit for large CRDs like ARC's
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
-      # Replace=true avoids kubectl apply's last-applied-configuration annotation
-      # which can exceed Kubernetes' 262144 byte limit for large CRDs like ARC's
-      - Replace=true
 
     retry:
       limit: 5
