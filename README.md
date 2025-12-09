@@ -1192,34 +1192,36 @@ The platform uses a template system to customize agent behavior, settings, and p
 
 ### Template Architecture
 
-All templates now live under `infra/charts/controller/agent-templates/` with CLI-specific subdirectories:
+All templates live under `infra/charts/controller/agent-templates/` with CLI-specific subdirectories:
 
-**Docs Tasks (Multi-CLI Support)**
+**Docs Templates (Multi-CLI Support)**
 
 - **Prompts**: Rendered from `docs/{cli}/prompt.md.hbs` into the ConfigMap
 - **Settings**: `docs/{cli}/settings.json.hbs` controls model, permissions, tools
 - **Container Script**: `docs/{cli}/container.sh.hbs` handles Git workflow and CLI execution
 
-**Code Tasks (multi-CLI)**
+**Play Templates (Multi-CLI)**
 
-- **Claude**: `code/claude/**`
-  - Settings: `code/claude/settings.json.hbs`
-  - Container: `code/claude/container.sh.hbs`
-- **Codex**: `code/codex/**`
-  - Agents memory: `code/codex/agents.md.hbs`
-  - Config: `code/codex/config.toml.hbs`
-  - Container scripts: `code/codex/container*.sh.hbs`
-- **Factory**: `code/factory/**`
-  - Agents memory: `code/factory/agents*.md.hbs`
-  - Config: `code/factory/factory-cli-config.json.hbs`
-  - Container scripts: `code/factory/container*.sh.hbs`
-- **Shared assets**: `code/mcp.json.hbs`, `code/coding-guidelines.md.hbs`, and `code/github-guidelines.md.hbs`
+`play()` orchestrates a series of agent runs through multiple phases. Each phase uses CLI-specific templates:
 
-**Play Workflows**: Multi-agent orchestration with event-driven coordination
+- **Claude**: `play/claude/**`
+  - Settings: `play/claude/settings.json.hbs`
+  - Container: `play/claude/container.sh.hbs`
+- **Codex**: `play/codex/**`
+  - Agents memory: `play/codex/agents.md.hbs`
+  - Config: `play/codex/config.toml.hbs`
+  - Container scripts: `play/codex/container*.sh.hbs`
+- **Factory**: `play/factory/**`
+  - Agents memory: `play/factory/agents*.md.hbs`
+  - Config: `play/factory/factory-cli-config.json.hbs`
+  - Container scripts: `play/factory/container*.sh.hbs`
+- **Shared assets**: `play/mcp.json.hbs`, `play/coding-guidelines.md.hbs`, and `play/github-guidelines.md.hbs`
+
+**Play Workflow Orchestration**
 
 - **Workflow Template**: `play-workflow-template.yaml` defines the multi-phase workflow
 - **Phase Coordination**: Each phase triggers the next phase automatically
-- **Agent Handoffs**: Seamless transitions between implementation → QA → testing phases
+- **Agent Handoffs**: Seamless transitions between implementation → QA → security → testing → integration → deployment
 
 ### How to Customize
 
@@ -1231,14 +1233,14 @@ Edit the settings template files for your chosen CLI:
 # For docs agents (Claude Code example)
 vim infra/charts/controller/agent-templates/docs/claude/settings.json.hbs
 
-# For code agents (Claude Code example)
-vim infra/charts/controller/agent-templates/code/claude/settings.json.hbs
+# For play agents (Claude Code example)
+vim infra/charts/controller/agent-templates/play/claude/settings.json.hbs
 
-# For code agents (Codex example)
-vim infra/charts/controller/agent-templates/code/codex/config.toml.hbs
+# For play agents (Codex example)
+vim infra/charts/controller/agent-templates/play/codex/config.toml.hbs
 
-# For code agents (Factory example)
-vim infra/charts/controller/agent-templates/code/factory/factory-cli-config.json.hbs
+# For play agents (Factory example)
+vim infra/charts/controller/agent-templates/play/factory/factory-cli-config.json.hbs
 ```
 
 Settings control:
@@ -1254,7 +1256,7 @@ Refer to your CLI's documentation for complete configuration options:
 
 #### 2. Updating Prompts
 
-**For docs tasks** (affects all documentation generation):
+**For docs tasks** (affects documentation generation via `intake()`):
 
 ```bash
 # Edit the docs prompt template for your CLI
@@ -1265,7 +1267,7 @@ vim infra/charts/controller/agent-templates/docs/claude/prompt.md.hbs
 vim infra/charts/controller/agent-templates/docs/cursor/prompt.md.hbs
 ```
 
-**For code tasks** (affects specific task implementation):
+**For play tasks** (affects specific task implementation via `play()`):
 
 ```bash
 # Edit task-specific files in your docs repository
@@ -1276,7 +1278,7 @@ vim {docs_project_directory}/tasks/task-{id}/acceptance-criteria.md
 
 #### 3. Customizing Play Workflows
 
-**For play workflows** (affects multi-agent orchestration):
+**For play workflow orchestration** (affects multi-agent coordination):
 
 ```bash
 # Edit the play workflow template
@@ -1297,11 +1299,11 @@ Hooks are shell scripts that run during agent execution. Add new hook files bene
 # Create new hook script (docs/Claude Code example)
 vim infra/charts/controller/agent-templates/docs/claude/hooks/my-custom-hook.sh.hbs
 
-# Create new hook script (code/Codex example)
-vim infra/charts/controller/agent-templates/code/codex/hooks/my-custom-hook.sh.hbs
+# Create new hook script (play/Codex example)
+vim infra/charts/controller/agent-templates/play/codex/hooks/my-custom-hook.sh.hbs
 
-# Create new hook script (code/Factory example)
-vim infra/charts/controller/agent-templates/code/factory/hooks/my-custom-hook.sh.hbs
+# Create new hook script (play/Factory example)
+vim infra/charts/controller/agent-templates/play/factory/hooks/my-custom-hook.sh.hbs
 ```
 
 Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
