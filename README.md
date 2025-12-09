@@ -21,80 +21,28 @@
 
 ## **💰 Why CTO?**
 
-### **Not Just a Team—An Entire Engineering Infrastructure**
-
 <table>
 <tr>
-<td align="center" width="25%">
+<td align="center" width="33%">
 
 ### **🏗️ Full Engineering Team**
-13 specialized AI agents: backend, frontend, QA, security, DevOps—working 24/7
+13 specialized AI agents covering backend, frontend, QA, security, and DevOps—working 24/7
 
 </td>
-<td align="center" width="25%">
+<td align="center" width="33%">
 
 ### **🔧 Self-Hosted & Bare-Metal**
-Deploy anywhere: bare-metal, on-prem, or cloud—complete data sovereignty
+Deploy on your own infrastructure: bare-metal servers, on-prem, or any cloud—no vendor lock-in
 
 </td>
-<td align="center" width="25%">
+<td align="center" width="33%">
 
-### **📊 Production Observability**
-Prometheus, Grafana, Loki, AlertManager—full metrics, logs, and alerting out of the box
-
-</td>
-<td align="center" width="25%">
-
-### **🔄 Self-Healing Platform**
-Auto-detects failures, stuck workflows, and CI issues—spawns healing agents automatically
+### **💸 Massive Cost Savings**
+Cut cloud bills with bare-metal deployment + reduce engineering headcount for routine tasks
 
 </td>
 </tr>
 </table>
-
-### **💸 Slash Your Engineering Costs**
-
-| Traditional Approach | With CTO |
-|---------------------|----------|
-| $150k-250k/yr per engineer × 5-10 engineers | **Model API costs only** — or run local models for near-zero cost |
-| $5k-50k/mo cloud infrastructure | **60-80% savings** on bare-metal |
-| 24/7 on-call rotation costs | **Automated** self-healing |
-| Weeks to onboard new team members | **Instant** agent deployment |
-
-**Local Model Support**: Run Ollama, vLLM, or other local inference servers for dramatically reduced costs — bring your own GPU cluster and pay only for electricity.
-
-### **🔐 Bring Your Own Keys (BYOK)**
-
-- **Your API keys** — Anthropic, OpenAI, Google, etc. stored securely in your infrastructure
-- **Your cloud credentials** — AWS, GCP, Azure keys never leave your cluster
-- **Secret management with OpenBao** — Open-source HashiCorp Vault fork for enterprise-grade secrets
-- **Zero vendor lock-in** — Switch providers anytime, no data hostage situations
-
-### **🌐 Zero-Trust Networking**
-
-| Feature | Technology | What It Does |
-|---------|------------|--------------|
-| **Cloudflare Tunnels** | `cloudflared` | Expose services publicly without opening firewall ports — no public IPs needed, automatic TLS, global edge CDN |
-| **Kilo VPN** | WireGuard | Secure mesh VPN for remote cluster access — connect from anywhere with encrypted tunnels |
-| **OpenBao** | Vault fork | Centralized secrets management with dynamic credentials and audit logging |
-
-**Cloudflare Tunnels** is a game-changer: your entire platform can run on air-gapped infrastructure while still being accessible from anywhere. No ingress controllers, no load balancers, no exposed ports—just secure outbound tunnels through Cloudflare's network.
-
-### **🏭 Infrastructure Operators (Managed by Bolt)**
-
-Replace expensive managed cloud services with open-source Kubernetes operators:
-
-| Operator | Replaces | Savings |
-|----------|----------|---------|
-| **CloudNative-PG** | AWS RDS, Cloud SQL, Azure PostgreSQL | ~70-80% |
-| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% |
-| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% |
-| **Redis Operator** | ElastiCache, Memorystore | ~70-80% |
-| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% |
-| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% |
-| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% |
-
-**Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
 
 </div>
 
@@ -104,9 +52,7 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 
 ## **🚧 Development Status**
 
-**Public launch: January 1st, 2025** 🚀
-
-The platform is in beta and being refined based on production usage.
+**This project is under active development.** The platform is in beta and being refined based on production usage.
 
 **Current Status:**
 ✅ Core platform architecture implemented  
@@ -114,9 +60,8 @@ The platform is in beta and being refined based on production usage.
 ✅ Kubernetes controllers with self-healing  
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
-✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, Kafka, Redis, MinIO, OpenSearch, ClickHouse, QuestDB)  
-🔄 Documentation and onboarding improvements  
+✅ CloudFront tunneling for public access without exposed interfaces  
+🔄 Documentation and user experience improvements  
 
 </div>
 
@@ -127,6 +72,8 @@ The platform is in beta and being refined based on production usage.
 ## **Meet Your AI Engineering Team**
 
 *Thirteen specialized agents with distinct personalities working together 24/7—your full-stack engineering department in a box*
+
+<div align="center">
 
 ### **🎯 Project Management & Architecture**
 
@@ -180,11 +127,11 @@ The platform is in beta and being refined based on production usage.
 <img src="assets/grizz-avatar-512.png" width="180" height="180" alt="Grizz Avatar">
 </div>
 
-🐻 **Stack:** Go, gRPC, PostgreSQL  
+🐻 **Stack:** Go, gRPC, Kubernetes operators  
 🛠️ **Superpower:** Ships bulletproof services under pressure  
 💬 **Motto:** *"Simple scales."*
 
-**Grizz builds backend services, REST/gRPC APIs, CLI tools, and Kubernetes operators. From simple CRUD to distributed systems—battle-tested reliability is his signature.**
+**Grizz crafts cloud-native microservices, CLI tools, and Kubernetes controllers. Battle-tested reliability is his signature.**
 
 </td>
 <td align="center" valign="top" width="33%">
@@ -316,11 +263,34 @@ The platform is in beta and being refined based on production usage.
 </tr>
 </table>
 
+### **🔬 Code Review Squad**
+
+<table>
+<tr>
+<td align="center" width="100%">
+
+### **Stitch**
+#### *The Automated Code Reviewer*
+
+<div align="center">
+<img src="assets/stitch-avatar-512.png" width="180" height="180" alt="Stitch Avatar">
+</div>
+
+🧵 **Personality:** Meticulous & tireless  
+🔎 **Superpower:** Reviews every PR with surgical precision  
+💬 **Motto:** *"No loose threads."*
+
+**Stitch provides automated code review on every pull request—like Cursor's Bugbot, but integrated into your workflow. Catches bugs, suggests improvements, and ensures consistency across your entire codebase.**
+
+</td>
+</tr>
+</table>
+
 ### **🚀 Operations Squad**
 
 <table>
 <tr>
-<td align="center" valign="top" width="33%">
+<td align="center" width="50%">
 
 ### **Atlas**
 #### *The Integration Master*
@@ -336,7 +306,7 @@ The platform is in beta and being refined based on production usage.
 **Atlas manages PR merges, rebases stale branches, and ensures clean integration with trunk-based development.**
 
 </td>
-<td align="center" valign="top" width="33%">
+<td align="center" width="50%">
 
 ### **Bolt**
 #### *The Deployment Specialist*
@@ -352,28 +322,14 @@ The platform is in beta and being refined based on production usage.
 **Bolt handles GitOps deployments, monitors rollouts, and ensures production health with automated rollbacks.**
 
 </td>
-<td align="center" valign="top" width="33%">
-
-### **Stitch**
-#### *The Automated Code Reviewer*
-
-<div align="center">
-<img src="assets/stitch-avatar-512.png" width="180" height="180" alt="Stitch Avatar">
-</div>
-
-🧵 **Personality:** Meticulous & tireless  
-🔎 **Superpower:** Reviews every PR with surgical precision  
-💬 **Motto:** *"No loose threads."*
-
-**Stitch provides automated code review on every pull request—like Cursor's Bugbot, but integrated into your workflow. Catches bugs, suggests improvements, and ensures consistency.**
-
-</td>
 </tr>
 </table>
 
 </div>
 
 ---
+
+</div>
 
 ### 🌟 **The Magic: How Your AI Team Collaborates**
 
@@ -385,7 +341,7 @@ The platform is in beta and being refined based on production usage.
 <tr>
 <td align="center" width="25%">
 
-**📚 Phase 1**  
+**📚 Intake**  
 **Morgan** documents  
 requirements & architecture
 
@@ -394,7 +350,7 @@ requirements & architecture
 </td>
 <td align="center" width="25%">
 
-**⚡ Phase 2**  
+**⚡ Phase 1**  
 **Rex & Blaze** build  
 backend + frontend
 
@@ -403,7 +359,7 @@ backend + frontend
 </td>
 <td align="center" width="25%">
 
-**🛡️ Phase 3**  
+**🛡️ Phase 2**  
 **Cleo, Tess, Cipher, Stitch**  
 quality, testing, security, review
 
@@ -412,7 +368,7 @@ quality, testing, security, review
 </td>
 <td align="center" width="25%">
 
-**🚀 Phase 4**  
+**🚀 Phase 3**  
 **Bolt** deploys  
 and distributes
 
@@ -463,60 +419,39 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 ### **🚀 Unified Project Intake (`intake()`)**
 **Morgan** processes PRDs, generates tasks, and syncs with your project management tools.
 
-- Parses PRD and generates task breakdown via built-in task engine
-- **Linear Integration** (MVP): Two-way sync with Linear roadmaps and sprints
+- Parses PRD and generates TaskMaster task breakdown
+- **Linear Integration**: Two-way sync with Linear roadmaps and sprints
 - **GitHub Projects**: Auto-creates issues and project boards
-- **More PM tools coming**: Jira, Asana, Notion, Monday.com
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
 - Agent routing: automatically assigns frontend/backend/mobile tasks
-- **Configurable AI models** — use any supported provider and model
+- **Powered by Claude Opus 4.5** for superior task analysis
 
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
 
 - **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)
-- **Phase 2 - Quality Assurance**: Cleo reviews and refactors
-- **Phase 3 - Testing & Security**: Tess validates, Cipher secures
-- **Phase 4 - Code Review**: Stitch provides automated PR review
-- **Phase 5 - Deployment**: Bolt handles deployment and distribution
+- **Phase 2 - Quality**: Cleo reviews, Tess tests, Cipher secures, Stitch code-reviews
+- **Phase 3 - Deployment**: Bolt deploys and distributes
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
+- **Auto-Resume**: Continues from where you left off (task_id optional)
 
-### **🔧 Three Core MCP Tools**
+### **🔧 Workflow Management**
+Control and monitor your AI development workflows:
 
-| Tool | Purpose |
-|------|---------|
-| **`addTool()`** | Dynamically add any MCP server by GitHub URL — agents instantly gain access to new capabilities |
-| **`intake()`** | Project onboarding — initializes new projects with proper structure and configuration |
-| **`play()`** | Full orchestration — coordinates the entire team through build/test/deploy phases |
+- **`jobs()`** - List all running workflows with status
+- **`stop_job()`** - Stop any running workflow gracefully
+- **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
+- **`register_tool()`** - Dynamically register new MCP tools at runtime
 
-### **🔄 Self-Healing Infrastructure (Healer)**
-The platform includes comprehensive self-healing for both CTO and your deployed applications:
+### **🔄 Self-Healing Infrastructure**
+The platform includes comprehensive self-healing capabilities:
 
-- **Platform Self-Healing**: Monitors CTO's own health—detects stuck workflows, pod failures, step timeouts
-- **Application Self-Healing**: Extends to your deployed apps—CI failures, silent errors, stale progress
-- **Intelligent Alert Routing**: 9 alert types with context-aware remediation strategies
-- **Automated Remediation**: Spawns healing agents to diagnose and fix issues without human intervention
-- **Continuous Learning**: Tracks remediation success and adapts strategies
-
-### **📊 Production Observability Stack**
-Full observability out of the box—no additional setup required:
-
-| Component | Purpose |
-|-----------|---------|
-| **Prometheus** | Metrics collection, alerting rules, service discovery |
-| **Grafana** | Dashboards, visualization, alert management |
-| **Loki** | Log aggregation and querying |
-| **AlertManager** | Alert routing, deduplication, notification channels |
-| **Blackbox Exporter** | External endpoint monitoring and probing |
-
-**Included Dashboards:**
-- Agent performance and task completion rates
-- Workflow execution times and success rates
-- Resource utilization across all agents
-- GitHub PR metrics and merge times
-- Self-healing remediation statistics
+- **Platform Self-Healing**: Monitors CTO's own health—detects stuck workflows, pod failures, step timeouts, and auto-remediates
+- **Application Self-Healing**: Extends healing to your deployed apps—CI failures, silent errors, stale progress alerts
+- **Alert Types**: Comment order issues, silent failures, approval loops, post-Tess CI failures, pod failures, step timeouts, stuck CodeRuns
+- **Automated Remediation**: Spawns healing agents to diagnose and fix issues automatically
 
 All operations run as **Kubernetes jobs** with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup.
 
@@ -525,7 +460,8 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 ## **🚀 Getting Started**
 
 ### Prerequisites
-- Access to any supported AI CLI (see [Supported CLIs](#supported-ai-clis))
+- Access to any AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
+- A project with Task Master initialized (`.taskmaster/` directory)
 - GitHub repository for your project
 
 ---
@@ -540,7 +476,7 @@ CTO works with your favorite AI coding assistant:
 
 | CLI | Description | Status |
 |-----|-------------|--------|
-| **Claude Code** | Anthropic CLI | ✅ Full support |
+| **Claude Code** | Anthropic's official CLI | ✅ Full support |
 | **Cursor** | AI-first code editor | ✅ Full support |
 | **Codex** | OpenAI's coding assistant | ✅ Full support |
 | **Factory** | Code Factory CLI | ✅ Full support |
@@ -550,81 +486,47 @@ CTO works with your favorite AI coding assistant:
 
 ### **🔧 Integrated Tools Library**
 
-Dynamic MCP tool registration with **57+ pre-configured tools** across GitHub, Kubernetes, ArgoCD, OpenMemory, Context7, and more.
+Dynamic MCP tool registration with 60+ pre-configured tools:
 
-👉 **[View full tools list](https://github.com/5dlabs/cto/blob/main/tools-config.json)**
-
-**Tool Filtering** — Only expose the tools each agent needs:
-```json
-{
-  "agents": {
-    "rex": {
-      "tools": {
-        "remote": ["github_create_pull_request", "github_push_files"],
-        "localServers": { "filesystem": { "enabled": true } }
-      }
-    }
-  }
-}
-```
-
-**Why tool filtering matters:**
-- 🎯 **Smaller context** — agents don't waste tokens on irrelevant tool descriptions
-- 🔒 **Security** — restrict sensitive operations to specific agents
-- ⚡ **Faster responses** — fewer tools = faster tool selection
-- 🧠 **Better focus** — agents stay on-task with curated capabilities
-
-**Categories:** GitHub (28) • Kubernetes (18) • shadcn/ui (8) • OpenMemory (5) • ArgoCD (4) • Context7 (2) • Filesystem • Brave Search • Firecrawl
+| Category | Tools |
+|----------|-------|
+| **Kubernetes** | Pod logs, exec, resource CRUD, events, metrics, Helm operations |
+| **ArgoCD** | Application sync, logs, events, GitOps management |
+| **GitHub** | PRs, issues, code scanning, secret scanning, repository management |
+| **Context7** | Library documentation lookup and code examples |
+| **OpenMemory** | Persistent memory across agent sessions |
 
 **Frontend Stack**: shadcn/ui components, Tailwind CSS, React patterns built-in
 
 **Component Architecture:**
 - **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with dynamic tool registration
-- **Controller Service**: Manages CodeRun CRDs via Argo Workflows
+- **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
 - **Healer Service**: Self-healing daemon monitoring platform and application health
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
-- **Kubernetes Controllers**: CodeRun controller with TTL-safe reconciliation
+- **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
 - **Agent Workspaces**: Isolated persistent volumes for each service with session continuity
-- **GitHub Apps + PM Integration**: Linear (MVP), with Jira, Asana, Notion, Monday.com planned
-- **Cloudflare Tunnels**: Expose services publicly without opening firewall ports
-- **Kilo VPN**: WireGuard-based secure remote cluster access
+- **GitHub Apps + Linear**: Secure authentication and project management integration
+- **CloudFront Tunneling**: Expose services publicly without opening firewall ports
 
-### **🌐 Cloudflare Tunnels**
+### **🌐 CloudFront Tunneling**
 
 Access your services from anywhere without exposing your infrastructure:
 
-- **Zero External Interface**: No public IPs, no open firewall ports, no ingress controllers
-- **Automatic TLS**: End-to-end encryption via Cloudflare's edge network
-- **Global Edge CDN**: Low-latency access from anywhere in the world
-- **Air-Gapped Ready**: Run on isolated networks while remaining publicly accessible
-- **Secure by Default**: Only outbound connections — nothing to attack
+- **Zero External Interface**: No public IPs or open firewall ports required
+- **Automatic TLS**: End-to-end encryption via CloudFront
+- **Global Edge**: Low-latency access from anywhere in the world
+- **Secure by Default**: Traffic routes through AWS infrastructure
 
 **Data Flow:**
 1. Any CLI calls MCP tools (`intake()`, `play()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
-4. Argo Workflows creates CodeRun custom resources
+4. Argo Workflows creates CodeRun/DocsRun custom resources
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
 6. Controllers deploy configured CLI agents as Jobs with workspace isolation
 7. Agents authenticate via GitHub Apps and complete work
 8. Agents submit GitHub PRs with automatic cleanup
 9. Healer monitors for issues and auto-remediates failures
-
-### **🛠️ Tech Stack**
-
-Everything is deployed via **GitOps** using the App of Apps pattern:
-
-| Category | Technologies |
-|----------|--------------|
-| **GitOps & Orchestration** | ArgoCD, Argo Workflows, Argo Events, ArgoCD Image Updater |
-| **Observability** | Prometheus, Grafana, Loki, AlertManager, Blackbox Exporter, OpenTelemetry, Fluent-bit |
-| **Data Infrastructure** | CloudNative-PG (Postgres), Strimzi (Kafka), Redis, MinIO (S3), OpenSearch, ClickHouse, QuestDB |
-| **Secrets & Security** | OpenBao (Vault fork), External Secrets Operator, Cert-Manager |
-| **Networking** | Cloudflare Tunnels, Kilo (WireGuard VPN), Gateway API, Ingress NGINX, External DNS |
-| **CI/CD** | GitHub Actions Runner Controller (ARC), Platform Runners |
-| **Core Platform** | Kubernetes (Talos Linux), Helm, Kustomize |
-
-**All managed declaratively** — changes to `infra/gitops/` automatically sync to the cluster.
 
 ---
 
@@ -688,19 +590,17 @@ chmod +x setup-agent-secrets.sh
 - Kubernetes 1.19+
 - Helm 3.2.0+
 - GitHub Personal Access Token (or GitHub App)
-- API key for your chosen provider (Anthropic, OpenAI, Google, etc.)
+- Anthropic API Key
 
 **What you get:**
 - Complete cto platform deployed to Kubernetes
 - Self-healing infrastructure monitoring
-- **Two ways to interact:**
-  - **MCP Protocol** — call tools directly from any supported CLI
-  - **Project Management** — trigger workflows from Linear (and soon Jira, Asana, Notion, Monday.com)
-- Kubernetes controller for CodeRun resources with TTL-safe reconciliation
+- REST API for task management
+- Separate Kubernetes controllers for CodeRun/DocsRun resources with TTL-safe reconciliation
 - Agent workspace management and isolation with persistent volumes
 - Automatic resource cleanup and job lifecycle management
 - MCP tools with dynamic registration
-- Cloudflare Tunnels for secure public access
+- CloudFront tunneling for secure public access
 
 ### Remote Cluster Access with Kilo VPN
 
@@ -734,7 +634,7 @@ See `docs/vpn/kilo-client-setup.md` for full setup instructions.
 
 ### Install MCP Server
 
-For CLI integration, install the MCP server:
+For CLI integration (Cursor, Claude Code, etc.), install the MCP server:
 
 ```bash
 # One-liner installer (Linux/macOS)
@@ -753,83 +653,127 @@ cto-mcp --help   # MCP server for any CLI
 
 ## **⚙️ Configuration**
 
-### One File to Rule Them All
+### Configure Project Settings
 
-**`cto-config.json` is the only file you need to configure.** Everything else is handled by the platform.
-
-Create a `cto-config.json` in your project root and you're done. See the [full example config](https://github.com/5dlabs/cto/blob/main/cto-config.template.json) for all options.
+Create a `cto-config.json` file in your project root to configure agents, models, tool access, and workflow defaults:
 
 ```json
 {
   "version": "1.0",
   "defaults": {
     "docs": {
-      "model": "your-preferred-model",
+      "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
     },
     "play": {
-      "model": "your-preferred-model",
-      "cli": "factory",
+      "model": "claude-sonnet-4-20250514",
+      "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
-      "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
-      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
       "repository": "your-org/your-repo",
-      "maxRetries": 10,
-      "autoMerge": true,
-      "parallelExecution": true
+      "service": "your-service",
+      "docsRepository": "your-org/your-docs-repo",
+      "docsProjectDirectory": "docs"
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
-      "primary": { "model": "opus", "cli": "claude" },
-      "research": { "model": "gpt-4o", "cli": "codex" },
-      "fallback": { "model": "gemini-pro", "cli": "gemini" }
+      "primary": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "research": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "fallback": {
+        "model": "gpt-5",
+        "provider": "openai"
+      }
     }
   },
   "agents": {
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "brave_search_brave_web_search"
+        ],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "factory",
-      "model": "your-preferred-model",
-      "maxTokens": 64000,
-      "temperature": 0.7,
-      "reasoningEffort": "high",
-      "modelRotation": {
-        "enabled": true,
-        "models": ["model-a", "model-b", "model-c"]
-      },
+      "cli": "codex",
+      "model": "gpt-5-codex",
       "tools": {
-        "remote": ["github_create_pull_request", "github_push_files", "context7_get_library_docs"]
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations"
+        ],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations"],
+        "localServers": {
+          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
+          "git": {"enabled": true, "tools": ["git_status", "git_diff", "git_log", "git_show"]}
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations"],
+        "localServers": {
+          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
+          "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
+        }
       }
     }
   }
 }
 ```
 
-### Key Configuration Features
-
-| Feature | Description |
-|---------|-------------|
-| **Model Rotation** | Automatically cycle through models on retries — improves success rate |
-| **Parallel Execution** | Run implementation agents concurrently for faster builds |
-| **Auto-Merge** | Automatically merge PRs that pass all checks |
-| **Max Retries** | Per-phase retry limits with exponential backoff |
-| **Reasoning Effort** | Control thinking depth (`low`, `medium`, `high`) |
-| **Temperature** | Adjust creativity vs. determinism per agent |
-| **Tool Filtering** | Restrict tools per agent to reduce context and improve focus |
-
 **Agent Configuration Fields:**
 - **`githubApp`**: GitHub App name for authentication
-- **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`, `gemini`, `dexter`)
+- **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`)
 - **`model`**: Model identifier for the CLI
-- **`maxTokens`**: Maximum tokens for responses
-- **`temperature`**: Creativity level (0.0-1.0)
-- **`reasoningEffort`**: Thinking depth for supported models
-- **`modelRotation`**: Automatic model cycling on failures
-- **`tools`**: Fine-grained tool access control
+- **`tools`** (optional): Fine-grained tool access control
+  - **`remote`**: Array of remote tool names from Tools
+  - **`localServers`**: Local MCP server configurations
+    - Each server specifies `enabled` and which `tools` the agent can access
 
 **Benefits:**
 - **CLI Flexibility**: Different agents can use different CLIs
@@ -839,7 +783,9 @@ Create a `cto-config.json` in your project root and you're done. See the [full e
 
 ### Configure MCP Integration
 
-After creating your configuration file, configure your CLI to use the MCP server. Add to your CLI's MCP configuration:
+After creating your configuration file, configure your CLI to use the MCP server.
+
+**For Cursor**, create a `.cursor/mcp.json` file in your project directory:
 
 ```json
 {
@@ -853,56 +799,153 @@ After creating your configuration file, configure your CLI to use the MCP server
 }
 ```
 
-**Configuration Locations by CLI:**
-| CLI | Config Path |
-|-----|-------------|
-| Cursor | `.cursor/mcp.json` in project directory |
-| Claude | `~/.config/claude/mcp.json` |
-| Other CLIs | Refer to CLI documentation |
+**For Claude Code**, add to your MCP configuration (typically in `~/.config/claude/mcp.json`):
 
-**That's it.** The platform reads your `cto-config.json` and handles everything else:
-- Agent deployment and orchestration
-- Tool registration and filtering
-- Model selection and rotation
-- GitHub App authentication
-- Workflow coordination
+```json
+{
+  "mcpServers": {
+    "cto-mcp": {
+      "command": "cto-mcp",
+      "args": []
+    }
+  }
+}
+```
 
-**No Helm values to tweak. No environment variables to set. No YAML to write.**
+**Usage:**
+1. Create the `cto-config.json` file in your project root with your specific settings
+2. Configure your CLI's MCP integration as shown above
+3. Restart your CLI to load the MCP server
+4. All MCP tools will be available with your configured defaults
 
-Just `cto-config.json` → done.
+**Benefits of Configuration-Driven Approach:**
+- **Simplified MCP Calls**: Most parameters have sensible defaults from your config
+- **Dynamic Agent Lists**: Tool descriptions show available agents from your config
+- **Consistent Settings**: All team members use the same model/agent assignments
+- **Easy Customization**: Change defaults without modifying MCP server setup
+
+---
+
+## **🎨 Multi-CLI Support**
+
+The platform supports multiple AI coding assistants with the same unified architecture. Choose the CLI that best fits your workflow:
+
+<table>
+<tr>
+<td align="center" width="20%">
+
+### **Claude Code**
+Official Anthropic CLI
+- **Native Integration**
+- Best for Claude models
+- Enterprise-ready
+
+</td>
+<td align="center" width="20%">
+
+### **Cursor**
+Popular AI editor
+- **VS Code-based**
+- Rich IDE features
+- Excellent UX
+
+</td>
+<td align="center" width="20%">
+
+### **Codex**
+Multi-model support
+- **Provider Agnostic**
+- Flexible configuration
+- OpenAI, Anthropic, more
+
+</td>
+<td align="center" width="20%">
+
+### **OpenCode**
+Open-source CLI
+- **Community Driven**
+- Extensible architecture
+- Full transparency
+
+</td>
+<td align="center" width="20%">
+
+### **Factory**
+Autonomous AI CLI
+- **Auto-Run Mode**
+- Unattended execution
+- CI/CD optimized
+
+</td>
+</tr>
+</table>
+
+**How It Works:**
+- Each agent in `cto-config.json` specifies its `cli` and `model`
+- Controllers automatically use the correct CLI for each agent
+- All CLIs follow the same template structure
+- Seamless switching between CLIs per-agent
+
+**Example Multi-CLI Configuration:**
+```json
+{
+  "agents": {
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-opus-4-20250514",
+      "tools": {
+        "remote": ["brave_search_brave_web_search"]
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "gpt-5-factory-high",
+      "tools": {
+        "remote": ["memory_create_entities"]
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "cli": "opencode",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["brave_search_brave_web_search"]
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "cursor",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "localServers": {
+          "filesystem": {"enabled": true, "tools": ["read_file", "write_file"]}
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "codex",
+      "model": "gpt-4o",
+      "tools": {
+        "remote": ["memory_add_observations"]
+      }
+    }
+  }
+}
+```
+
+Each agent independently configured with its own CLI, model, and tool access.
 
 ---
 
 ## **🔧 MCP Tools Reference**
 
-The platform exposes three powerful MCP tools:
+The platform exposes powerful MCP tools for AI-driven development:
 
-### 1. **`addTool()` - Dynamic Tool Registration**
-Instantly extend agent capabilities by adding any MCP server from GitHub.
-
-```javascript
-// Add a new MCP server by GitHub URL
-addTool({
-  github_url: "https://github.com/anthropics/mcp-server-memory",
-  name: "memory"
-});
-
-// Add with custom configuration
-addTool({
-  github_url: "https://github.com/org/custom-mcp-server",
-  name: "custom-tool",
-  config: { api_key: "..." }
-});
-```
-
-**What addTool does:**
-✅ Clones and installs MCP server from GitHub  
-✅ Registers tools with all active agents  
-✅ Agents immediately gain access to new capabilities  
-✅ No restart required — hot-reload of tools
-
-### 2. **`intake()` - Project Onboarding**
-Initialize new projects with proper structure, tasks, and configuration.
+### 1. **`intake()` - Unified Project Intake** ⭐ NEW
+Process PRDs, generate tasks, and create comprehensive documentation in one operation.
 
 ```javascript
 // Minimal call - handles everything
@@ -914,54 +957,104 @@ intake({
 intake({
   project_name: "my-awesome-app",
   enrich_context: true,        // Auto-scrape URLs via Firecrawl
-  include_codebase: false      // Include existing code context
+  include_codebase: false,     // Include existing code context
+  model: "claude-opus-4-5-20250929"  // Opus 4.5 by default
 });
 ```
 
-**What intake does:**
-✅ Parses PRD and generates task breakdown  
-✅ Enriches context by scraping URLs found in PRD  
-✅ Creates documentation (task.md, prompt.md, acceptance-criteria.md)  
-✅ Adds agent routing hints for frontend/backend tasks  
-✅ Syncs with Linear (MVP) for project management  
-✅ Submits PR with complete project structure
+**What unified intake does:**
+✅ Parses PRD and generates TaskMaster task breakdown  
+✅ Enriches context by scraping URLs found in PRD (via Firecrawl)  
+✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)  
+✅ Adds agent routing hints for frontend/backend task assignment  
+✅ Submits single PR with complete project structure  
+✅ **Powered by Claude Opus 4.5** for superior task analysis
 
-### 3. **`play()` - Full Team Orchestration**
-Coordinates the entire AI engineering team through build/test/deploy phases.
+### 2. **`play()` - Multi-Agent Orchestration**
+Executes complex multi-agent workflows with event-driven coordination.
 
 ```javascript
-// Minimal call - the whole team collaborates!
+// Minimal call - auto-resumes from where you left off
+play();
+
+// Or specify a task
 play({
-  task_id: 1
+  task_id: 1  // optional - auto-detects if omitted
 });
 
 // Customize agent assignments
 play({
-  task_id: 1,
   implementation_agent: "rex",
   quality_agent: "cleo",
-  testing_agent: "tess",
   repository: "myorg/my-project"
 });
 ```
 
 **What the team does:**
-✅ **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)  
-✅ **Phase 2 - Quality**: Cleo reviews and refactors  
-✅ **Phase 3 - Testing**: Tess validates, Cipher secures  
-✅ **Phase 4 - Review**: Stitch provides automated PR review  
-✅ **Phase 5 - Deployment**: Bolt deploys and distributes  
+✅ **Phase 1 - Implementation**: Rex/Blaze builds the feature  
+✅ **Phase 2 - Quality**: Cleo reviews, Tess tests, Cipher secures, Stitch code-reviews  
+✅ **Phase 3 - Deployment**: Bolt deploys and distributes  
 ✅ **Event-Driven**: Automatic phase transitions  
-✅ **GitHub Integration**: PRs from each phase
+✅ **Auto-Resume**: Continues from where you left off
+
+### 3. **`jobs()` - Workflow Status**
+List all running Argo workflows with simplified status info.
+
+```javascript
+// List all workflows
+jobs();
+
+// Filter by type
+jobs({
+  include: ["play", "intake"]
+});
+
+// Specify namespace
+jobs({
+  namespace: "cto"
+});
+```
+
+**Returns:** List of active workflows with type, name, phase, and status
+
+### 4. **`stop_job()` - Workflow Control**
+Stop any running Argo workflow gracefully.
+
+```javascript
+// Stop a specific workflow
+stop_job({
+  job_type: "play",
+  name: "play-workflow-abc123"
+});
+
+// Stop with explicit namespace
+stop_job({
+  job_type: "intake",
+  name: "intake-workflow-xyz789",
+  namespace: "cto"
+});
+```
+
+**Workflow types:** `intake`, `play`, `workflow`
+
+### 5. **`docs_ingest()` - Documentation Analysis**
+Intelligently analyze GitHub repos and ingest documentation.
+
+```javascript
+// Ingest repository documentation
+docs_ingest({
+  repository_url: "https://github.com/cilium/cilium",
+  doc_type: "cilium"
+});
 
 ---
 
-## **📋 MCP Tool Parameters**
+## **📋 Complete MCP Tool Parameters**
 
 ### `docs` Tool Parameters
 
 **Required:**
-- `working_directory` - Working directory containing `.tasks/` folder (e.g., `"projects/simple-api"`)
+- `working_directory` - Working directory containing .taskmaster folder (e.g., `"projects/simple-api"`)
 
 **Optional (with config defaults):**
 - `agent` - Agent name to use (defaults to `defaults.docs.githubApp` mapping)
@@ -971,8 +1064,9 @@ play({
 
 ### `play` Tool Parameters
 
-**Required:**
-- `task_id` - Task ID to implement from task files (integer, minimum 1)
+**All parameters are optional** — the platform auto-resumes from where you left off:
+
+- `task_id` - Task ID to implement (auto-detected if omitted)
 
 **Optional (with config defaults):**
 - `repository` - Target repository URL (e.g., `"5dlabs/cto"`) (defaults to `defaults.play.repository`)
@@ -988,9 +1082,9 @@ play({
 
 ## **🎨 Template Customization**
 
-The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. All supported CLIs follow the same template structure.
+The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. Multi-CLI support lives alongside these templates so Claude, Codex, and future CLIs follow the same structure.
 
-**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). Any model supported by your chosen CLI can be specified via configuration.
+**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). We ship presets for Claude (`claude-sonnet-4-20250514`), Codex (`gpt-5-codex`), and Factory (`gpt-5-factory-high`), but any supported model for a CLI can be supplied via configuration.
 
 ### Template Architecture
 
@@ -1030,17 +1124,29 @@ All templates now live under `infra/charts/controller/agent-templates/` with CLI
 Edit the settings template files for your chosen CLI:
 
 ```bash
-# Edit settings for any CLI (claude, codex, cursor, factory, opencode, gemini, dexter)
-vim infra/charts/controller/agent-templates/code/{cli}/settings.json.hbs
-vim infra/charts/controller/agent-templates/docs/{cli}/settings.json.hbs
+# For docs agents (Claude Code example)
+vim infra/charts/controller/agent-templates/docs/claude/settings.json.hbs
+
+# For code agents (Claude Code example)
+vim infra/charts/controller/agent-templates/code/claude/settings.json.hbs
+
+# For code agents (Codex example)
+vim infra/charts/controller/agent-templates/code/codex/config.toml.hbs
+
+# For code agents (Factory example)
+vim infra/charts/controller/agent-templates/code/factory/factory-cli-config.json.hbs
 ```
 
 Settings control:
 - Model selection (CLI-specific model identifiers)
 - Tool permissions and access
 - MCP tool configuration
+- CLI-specific settings (permissions, hooks, etc.)
 
-Refer to your CLI's documentation for complete configuration options.
+Refer to your CLI's documentation for complete configuration options:
+- [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settings)
+- [Factory CLI Documentation](https://docs.factory.ai)
+- Other CLIs: Refer to their respective documentation
 
 #### 2. Updating Prompts
 
@@ -1059,9 +1165,9 @@ vim infra/charts/controller/agent-templates/docs/cursor/prompt.md.hbs
 
 ```bash
 # Edit task-specific files in your docs repository
-vim {docs_project_directory}/.tasks/docs/task-{id}/prompt.md
-vim {docs_project_directory}/.tasks/docs/task-{id}/task.md
-vim {docs_project_directory}/.tasks/docs/task-{id}/acceptance-criteria.md
+vim {docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md
+vim {docs_project_directory}/.taskmaster/docs/task-{id}/task.md
+vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
 ```
 
 #### 3. Customizing Play Workflows
@@ -1079,7 +1185,28 @@ The play workflow template controls:
 - Event triggers between phases
 - Parameter passing between phases
 
-#### 4. Deploying Template Changes
+#### 4. Adding Custom Hooks
+
+Hooks are shell scripts that run during agent execution. Add new hook files beneath the CLI you are extending:
+
+```bash
+# Create new hook script (docs/Claude Code example)
+vim infra/charts/controller/agent-templates/docs/claude/hooks/my-custom-hook.sh.hbs
+
+# Create new hook script (code/Codex example)
+vim infra/charts/controller/agent-templates/code/codex/hooks/my-custom-hook.sh.hbs
+
+# Create new hook script (code/Factory example)
+vim infra/charts/controller/agent-templates/code/factory/hooks/my-custom-hook.sh.hbs
+```
+
+Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
+
+Refer to your CLI's documentation for hook configuration:
+- [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide)
+- Other CLIs: Refer to their respective documentation for hook/script support
+
+#### 5. Deploying Template Changes
 
 After editing any template files, redeploy the cto:
 
@@ -1101,7 +1228,7 @@ Common variables available in templates:
 - `{{github_user}}` - GitHub username
 - `{{repository_url}}` - Target repository URL
 - `{{working_directory}}` - Working directory path
-- `{{model}}` - Model name for the configured CLI
+- `{{model}}` - Claude model name
 - `{{docs_repository_url}}` - Documentation repository URL
 
 ---
@@ -1111,9 +1238,9 @@ Common variables available in templates:
 1. **Configure `cto-config.json` first** to set up your agents, models, tool profiles, and repository defaults
 2. **Use `intake()` for new projects** to parse PRD, generate tasks, and create documentation in one operation
 3. **Choose the right tool for the job**:
-   - Use `addTool()` to extend agent capabilities with new MCP servers
-   - Use `intake()` for new project setup from PRDs
-   - Use `play()` for full-cycle development (implementation → QA → testing → review)
+   - Use `intake()` for new project setup from PRDs (handles docs automatically)
+   - Use `play()` for full-cycle development (implementation → QA → testing)
+   - Use `jobs()` / `stop_job()` for workflow management
 4. **Mix and match CLIs** - assign the best CLI to each agent based on task requirements
 5. **Customize tool access** - use the `tools` configuration to control agent capabilities
 6. **Use minimal MCP calls** - let configuration defaults handle most parameters
@@ -1144,7 +1271,7 @@ cp target/release/cto-mcp /usr/local/bin/
 ## **🆘 Support**
 
 - Check GitHub PRs for detailed agent logs and explanations
-- Review task structure in `.tasks/` directory
+- Review Task Master project structure in `.taskmaster/` directory
 - Verify `cto-config.json` configuration and GitHub Apps authentication setup
 - Ensure Argo Workflows are properly deployed and accessible
 
@@ -1167,22 +1294,15 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ---
 
+## **🔗 Related Projects**
+
+- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `play()` and `intake()` MCP tools.
+
+---
+
 ## **🚀 Roadmap**
 
-### **Project Management Integrations**
-| Tool | Status |
-|------|--------|
-| **Linear** | ✅ Available (MVP) |
-| **Jira** | 🔜 Planned |
-| **Asana** | 🔜 Planned |
-| **Notion** | 🔜 Planned |
-| **Monday.com** | 🔜 Planned |
-
-### **Coming Soon**
-- Additional bare-metal provider integrations
-- Enhanced self-healing remediation strategies
-- Multi-cluster deployment support
-- Advanced workflow templates
+See our [ROADMAP.md](ROADMAP.md) for upcoming features and planned enhancements to the platform.
 
 ---
 
@@ -1202,4 +1322,3 @@ For more details, see the [LICENSE](LICENSE) file.
 *The platform runs on Kubernetes and automatically manages multi-CLI agent deployments, workspace isolation, and GitHub integration. All you need to do is call the MCP tools and review the resulting PRs.*
 
 </div>
-
