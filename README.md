@@ -44,6 +44,17 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 </tr>
 </table>
 
+### **💵 Cost Comparison**
+
+| Traditional Approach | With CTO |
+|---------------------|----------|
+| $150k-250k/yr per engineer × 5-10 | **~$500-2k/mo** model usage (or self-host for near-zero) |
+| $5k-50k/mo managed cloud services | **60-80% savings** on bare-metal |
+| 24/7 on-call rotation costs | **Automated** self-healing |
+| Weeks to onboard new team members | **Instant** agent deployment |
+
+**Local Model Support**: Run Ollama, vLLM, or other local inference—bring your own GPUs and pay only for electricity.
+
 </div>
 
 ---
