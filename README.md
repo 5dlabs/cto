@@ -419,8 +419,9 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 **Morgan** processes PRDs, generates tasks, and syncs with your project management tools.
 
 - Parses PRD and generates task breakdown via built-in task engine
-- **Linear Integration**: Two-way sync with Linear roadmaps and sprints
+- **Linear Integration** (MVP): Two-way sync with Linear roadmaps and sprints
 - **GitHub Projects**: Auto-creates issues and project boards
+- **More PM tools coming**: Jira, Asana, Notion, Monday.com
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
 - Agent routing: automatically assigns frontend/backend/mobile tasks
@@ -527,7 +528,7 @@ Dynamic MCP tool registration with **57+ pre-configured tools**:
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
 - **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
 - **Agent Workspaces**: Isolated persistent volumes for each service with session continuity
-- **GitHub Apps + Linear**: Secure authentication and project management integration
+- **GitHub Apps + PM Integration**: Linear (MVP), with Jira, Asana, Notion, Monday.com planned
 - **CloudFront Tunneling**: Expose services publicly without opening firewall ports
 
 ### **🌐 CloudFront Tunneling**
@@ -1161,7 +1162,20 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ## **🚀 Roadmap**
 
-See our [ROADMAP.md](ROADMAP.md) for upcoming features and planned enhancements to the platform.
+### **Project Management Integrations**
+| Tool | Status |
+|------|--------|
+| **Linear** | ✅ Available (MVP) |
+| **Jira** | 🔜 Planned |
+| **Asana** | 🔜 Planned |
+| **Notion** | 🔜 Planned |
+| **Monday.com** | 🔜 Planned |
+
+### **Coming Soon**
+- Additional bare-metal provider integrations
+- Enhanced self-healing remediation strategies
+- Multi-cluster deployment support
+- Advanced workflow templates
 
 ---
 
