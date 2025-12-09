@@ -86,6 +86,9 @@ spec:
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
+      # Replace=true avoids kubectl apply's last-applied-configuration annotation
+      # which can exceed Kubernetes' 262144 byte limit for large CRDs like ARC's
+      - Replace=true
 
     retry:
       limit: 5
