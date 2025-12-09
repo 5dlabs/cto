@@ -12,6 +12,9 @@ metadata:
     app.kubernetes.io/name: arc-controller
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: ci-cd
+  annotations:
+    # Deploy before platform-runners which depends on ARC CRDs
+    argocd.argoproj.io/sync-wave: "-1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

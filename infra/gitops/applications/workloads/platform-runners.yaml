@@ -10,6 +10,9 @@ metadata:
   labels:
     app.kubernetes.io/name: k8s-runner
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy after arc-controller which installs required CRDs
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
