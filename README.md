@@ -350,7 +350,7 @@ Cut cloud bills with bare-metal deployment + reduce engineering headcount for ro
 
 <table>
 <tr>
-<td align="center" width="25%">
+<td align="center" width="20%">
 
 **📚 Intake**  
 **Morgan** documents  
@@ -359,7 +359,7 @@ requirements & architecture
 *via `intake()`*
 
 </td>
-<td align="center" width="25%">
+<td align="center" width="20%">
 
 **⚡ Phase 1**  
 **Rex & Blaze** build  
@@ -368,7 +368,7 @@ backend + frontend
 *via `play()`*
 
 </td>
-<td align="center" width="25%">
+<td align="center" width="20%">
 
 **🛡️ Phase 2**  
 **Cleo, Tess, Cipher, Stitch**  
@@ -377,9 +377,18 @@ quality, testing, security, review
 *via `play()`*
 
 </td>
-<td align="center" width="25%">
+<td align="center" width="20%">
 
-**🚀 Phase 3**  
+**🔗 Phase 3**  
+**Atlas** integrates  
+merges & rebases
+
+*via `play()`*
+
+</td>
+<td align="center" width="20%">
+
+**🚀 Phase 4**  
 **Bolt** deploys  
 and distributes
 
@@ -430,11 +439,12 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 ### **🚀 Unified Project Intake (`intake()`)**
 **Morgan** processes PRDs, generates tasks, and syncs with your project management tools.
 
-- Parses PRD and generates TaskMaster task breakdown
+- Parses PRD and generates structured task breakdown
 - **Linear Integration**: Two-way sync with Linear roadmaps and sprints
 - **GitHub Projects**: Auto-creates issues and project boards
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
+- **XML Prompts**: Structured prompts optimized for AI agent consumption
 - Agent routing: automatically assigns frontend/backend/mobile tasks
 - **Powered by Claude Opus 4.5** for superior task analysis
 
@@ -443,7 +453,8 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 
 - **Phase 1 - Implementation**: Backend (Rex/Grizz/Nova) or Frontend (Blaze/Tap/Spark)
 - **Phase 2 - Quality**: Cleo reviews, Tess tests, Cipher secures, Stitch code-reviews
-- **Phase 3 - Deployment**: Bolt deploys and distributes
+- **Phase 3 - Integration**: Atlas merges, rebases, and resolves conflicts
+- **Phase 4 - Deployment**: Bolt deploys and distributes
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
 - **Auto-Resume**: Continues from where you left off (task_id optional)
@@ -472,7 +483,6 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 
 ### Prerequisites
 - Access to any AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
-- A project with Task Master initialized (`.taskmaster/` directory)
 - GitHub repository for your project
 
 ---
@@ -974,9 +984,10 @@ intake({
 ```
 
 **What unified intake does:**
-✅ Parses PRD and generates TaskMaster task breakdown  
+✅ Parses PRD and generates structured task breakdown  
 ✅ Enriches context by scraping URLs found in PRD (via Firecrawl)  
-✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)  
+✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)  
+✅ **XML Prompts**: Generates task.xml with structured prompts optimized for AI agents  
 ✅ Adds agent routing hints for frontend/backend task assignment  
 ✅ Submits single PR with complete project structure  
 ✅ **Powered by Claude Opus 4.5** for superior task analysis
@@ -1004,7 +1015,8 @@ play({
 **What the team does:**
 ✅ **Phase 1 - Implementation**: Rex/Blaze builds the feature  
 ✅ **Phase 2 - Quality**: Cleo reviews, Tess tests, Cipher secures, Stitch code-reviews  
-✅ **Phase 3 - Deployment**: Bolt deploys and distributes  
+✅ **Phase 3 - Integration**: Atlas merges, rebases, and resolves conflicts  
+✅ **Phase 4 - Deployment**: Bolt deploys and distributes  
 ✅ **Event-Driven**: Automatic phase transitions  
 ✅ **Auto-Resume**: Continues from where you left off
 
@@ -1065,7 +1077,7 @@ docs_ingest({
 ### `docs` Tool Parameters
 
 **Required:**
-- `working_directory` - Working directory containing .taskmaster folder (e.g., `"projects/simple-api"`)
+- `working_directory` - Working directory for the project (e.g., `"projects/simple-api"`)
 
 **Optional (with config defaults):**
 - `agent` - Agent name to use (defaults to `defaults.docs.githubApp` mapping)
@@ -1176,9 +1188,9 @@ vim infra/charts/controller/agent-templates/docs/cursor/prompt.md.hbs
 
 ```bash
 # Edit task-specific files in your docs repository
-vim {docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md
-vim {docs_project_directory}/.taskmaster/docs/task-{id}/task.md
-vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
+vim {docs_project_directory}/tasks/task-{id}/prompt.md
+vim {docs_project_directory}/tasks/task-{id}/task.md
+vim {docs_project_directory}/tasks/task-{id}/acceptance-criteria.md
 ```
 
 #### 3. Customizing Play Workflows
@@ -1282,7 +1294,6 @@ cp target/release/cto-mcp /usr/local/bin/
 ## **🆘 Support**
 
 - Check GitHub PRs for detailed agent logs and explanations
-- Review Task Master project structure in `.taskmaster/` directory
 - Verify `cto-config.json` configuration and GitHub Apps authentication setup
 - Ensure Argo Workflows are properly deployed and accessible
 
@@ -1307,13 +1318,7 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ## **🔗 Related Projects**
 
-- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `play()` and `intake()` MCP tools.
-
----
-
-## **🚀 Roadmap**
-
-See our [ROADMAP.md](ROADMAP.md) for upcoming features and planned enhancements to the platform.
+- **[5D Labs](https://5dlabs.io)** - Building the future of AI-powered software development.
 
 ---
 
