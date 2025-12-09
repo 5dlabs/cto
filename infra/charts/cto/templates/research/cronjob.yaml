@@ -94,7 +94,7 @@ spec:
                 {{- if .Values.research.createPR }}
                 - --create-pr
                 - --repo={{ .Values.research.repo | default "5dlabs/cto" }}
-                - --base-branch={{ .Values.research.baseBranch | default "main" }}
+                - --base-branch={{ .Values.research.baseBranch | default "develop" }}
                 - --research-dir={{ .Values.research.researchDir | default "docs/research" }}
                 {{- end }}
               volumeMounts:

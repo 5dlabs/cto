@@ -16,7 +16,7 @@ use std::path::Path;
 pub struct PublishConfig {
     /// GitHub repository (owner/repo format).
     pub repo: String,
-    /// Target branch for the PR (usually "main").
+    /// Target branch for the PR (defaults to "develop").
     pub base_branch: String,
     /// Directory in the repo where research files go.
     pub research_dir: String,
@@ -29,7 +29,7 @@ impl PublishConfig {
     pub fn from_env() -> Result<Self> {
         let repo = std::env::var("RESEARCH_REPO").unwrap_or_else(|_| "5dlabs/cto".to_string());
         let base_branch =
-            std::env::var("RESEARCH_BASE_BRANCH").unwrap_or_else(|_| "main".to_string());
+            std::env::var("RESEARCH_BASE_BRANCH").unwrap_or_else(|_| "develop".to_string());
         let research_dir =
             std::env::var("RESEARCH_DIR").unwrap_or_else(|_| "docs/research".to_string());
         let github_token = std::env::var("GITHUB_TOKEN")
