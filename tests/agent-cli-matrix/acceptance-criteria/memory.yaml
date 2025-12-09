@@ -1,3 +1,4 @@
+---
 # Memory/System Prompt Acceptance Criteria
 # Defines what makes a valid system prompt output
 
@@ -112,6 +113,3 @@ criteria:
       description: "System prompt is less than 50KB"
       check: "size_bytes <= 50000"
       severity: low
-
-
-

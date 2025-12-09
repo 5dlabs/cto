@@ -1,0 +1,85 @@
+{{> _preamble}}
+
+# Alert A5: Post-Tess CI/Merge Failure
+
+## Detected Condition
+
+CI checks are failing OR there's a merge conflict AFTER Tess approved the PR.
+
+{{> _merge-conflict-resolution}}
+
+- **Pod Name**: {{pod_name}}
+- **Namespace**: {{namespace}}
+- **Task ID**: {{task_id}}
+- **PR Number**: {{pr_number}}
+- **Tess Approval Time**: {{tess_approval_time}}
+- **Issue Type**: {{issue_type}} (ci_failure | merge_conflict)
+- **Failing Checks**: {{failing_checks}}
+- **Mergeable**: {{mergeable}}
+
+## Container Logs
+
+```
+{{logs}}
+```
+
+## Your Task
+
+{{> _issue-create alert_id="A5" issue_title=(concat "Post-Tess Failure: " issue_type " on PR #" pr_number) issue_placeholder="Analyzing post-Tess failure"}}
+
+{{> _issue-folder}}
+
+### Step 3: Write prompt.md
+
+```bash
+cat > "${ISSUE_DIR}/prompt.md" << PROMPT
+# Post-Tess Failure: {{pod_name}}
+
+## Summary
+[CI failing or merge conflict after Tess approval]
+
+## Issue Type
+{{issue_type}}
+
+## Timeline
+- **Tess Approved**: {{tess_approval_time}}
+- **Failure Detected**: [now]
+- **Commits After Approval**: [check if any new commits]
+
+## Failing Checks
+{{failing_checks}}
+
+## Mergeable State
+{{mergeable}}
+
+## Root Cause
+[Did Tess approve prematurely? New commits broke CI? Main branch updated causing conflicts?]
+
+## Remediation Steps
+1. [Fix failing tests if CI failure]
+2. [Resolve merge conflicts if conflict]
+3. [Re-run Tess validation if needed]
+PROMPT
+```
+
+### Step 4: Write acceptance-criteria.md
+
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+- [ ] Root cause identified
+- [ ] If CI failure: Tests fixed and passing
+- [ ] If merge conflict: Conflicts resolved
+- [ ] PR {{pr_number}} is mergeable
+- [ ] All CI checks pass
+- [ ] No new A5 alerts for this PR
+CRITERIA
+```
+
+{{> _issue-update alert_id="A5" alert_title="Post-Tess CI/Merge Failure" issue_body_title=(concat "Post-Tess Failure Analysis: " pod_name)}}
+
+{{> _spawn-remediation alert_id="a5"}}
+

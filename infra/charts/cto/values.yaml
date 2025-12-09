@@ -1,3 +1,4 @@
+---
 # =============================================================================
 # CTO Platform - Unified Configuration
 # =============================================================================
@@ -17,7 +18,7 @@ global:
     - name: ghcr-secret
   # Storage class for PVCs
   storageClass: local-path
-  
+
   # ==========================================================================
   # Dev Registry - Toggle between GHCR and local in-cluster registry
   # ==========================================================================
@@ -48,17 +49,17 @@ global:
 controller:
   enabled: true
   replicaCount: 1
-  
+
   image:
     repository: ghcr.io/5dlabs/controller
     pullPolicy: Always
     tag: "latest"
-  
+
   service:
     type: ClusterIP
     port: 80
     targetPort: 8080
-  
+
   resources:
     limits:
       cpu: 1000m
@@ -66,14 +67,14 @@ controller:
     requests:
       cpu: 500m
       memory: 1Gi
-  
+
   # Argo workflow templates
   argo:
     enabled: true
-  
+
   # Template version - bump to force pod restart
   templatesVersion: "v1.1.0"
-  
+
   config:
     kubernetesNamespace: "cto"
     serverHost: "0.0.0.0"
@@ -122,16 +123,16 @@ agent:
 pm:
   enabled: true
   replicaCount: 1
-  
+
   image:
     repository: ghcr.io/5dlabs/pm-server
     pullPolicy: IfNotPresent
     tag: "latest"
-  
+
   service:
     type: ClusterIP
     port: 8081
-  
+
   resources:
     limits:
       cpu: 500m
@@ -139,20 +140,20 @@ pm:
     requests:
       cpu: 100m
       memory: 128Mi
-  
+
   # PM provider configuration
   provider: linear
   maxTimestampAgeMs: 60000
-  
+
   # Linear integration
   linear:
     enabled: true
-  
+
   # GitHub configuration
   github:
     defaultOrg: "5dlabs"
     webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
-  
+
   # Secrets
   secrets:
     secretName: linear-secrets
@@ -163,16 +164,16 @@ pm:
 tools:
   enabled: true
   replicaCount: 1
-  
+
   image:
     repository: ghcr.io/5dlabs/tools
     pullPolicy: Always
     tag: "latest"
-  
+
   service:
     type: ClusterIP
     port: 3000
-  
+
   resources:
     limits:
       cpu: 1000m
@@ -180,11 +181,11 @@ tools:
     requests:
       cpu: 200m
       memory: 512Mi
-  
+
   persistence:
     enabled: true
     size: 10Gi
-  
+
   rbac:
     create: true
     clusterWide: true
@@ -195,16 +196,16 @@ tools:
 healer:
   enabled: true
   replicaCount: 1
-  
+
   image:
     repository: ghcr.io/5dlabs/healer
     pullPolicy: Always
     tag: "latest"
-  
+
   service:
     type: ClusterIP
     port: 80
-  
+
   resources:
     limits:
       cpu: 1000m
@@ -212,7 +213,7 @@ healer:
     requests:
       cpu: 100m
       memory: 256Mi
-  
+
   config:
     cli: "Factory"
     model: "claude-opus-4-5-20250929"
@@ -220,11 +221,11 @@ healer:
     timeWindowMins: 10
     memoryUrl: "http://openmemory.cto.svc:3000"
     memoryEnabled: true
-  
+
   persistence:
     enabled: true
     size: 10Gi
-  
+
   filebrowser:
     enabled: true
     port: 8081
@@ -235,16 +236,16 @@ healer:
 openmemory:
   enabled: true
   replicaCount: 1
-  
+
   image:
     repository: ghcr.io/5dlabs/openmemory
     pullPolicy: Always
     tag: "latest"
-  
+
   service:
     type: ClusterIP
     port: 3000
-  
+
   resources:
     limits:
       cpu: 500m
@@ -252,7 +253,7 @@ openmemory:
     requests:
       cpu: 100m
       memory: 128Mi
-  
+
   persistence:
     enabled: true
     size: 5Gi
@@ -279,16 +280,16 @@ webhooks:
 tweakcn:
   enabled: true
   replicaCount: 1
-  
+
   image:
     repository: ghcr.io/5dlabs/tweakcn
     pullPolicy: Always
     tag: "latest"
-  
+
   service:
     type: ClusterIP
     port: 3000
-  
+
   resources:
     limits:
       cpu: 1000m
@@ -302,30 +303,30 @@ tweakcn:
 # =============================================================================
 research:
   enabled: true
-  
+
   image:
     repository: ghcr.io/5dlabs/research
     pullPolicy: Always
     tag: "latest"
-  
+
   # CronJob schedule (every 5 minutes)
   schedule: "*/5 * * * *"
-  
+
   # Research configuration
   minRelevance: "0.5"
   batchSize: "10"
   model: "claude-sonnet-4-20250514"
-  
+
   # PR creation
   createPR: true
   repo: "5dlabs/cto"
   baseBranch: "main"
   researchDir: "docs/research"
-  
+
   persistence:
     size: 5Gi
     storageClass: ""  # Uses global.storageClass if empty
-  
+
   resources:
     requests:
       cpu: 100m
@@ -339,16 +340,16 @@ research:
 # =============================================================================
 maintenance:
   enabled: true
-  
+
   # Kubectl image for cleanup jobs
   image: bitnami/kubectl:latest
-  
+
   # Workspace PVC cleaner
   pvcCleaner:
     schedule: "15 * * * *"  # Every hour at :15
     retentionHours: "12"
     maxDeletions: "15"
-  
+
   # Event cleaner
   eventCleaner:
     schedule: "*/30 * * * *"  # Every 30 minutes
@@ -365,11 +366,11 @@ cloudflare:
   accountId: b73ec19faa187789b3f9d1deb0e0d95f
   # Secret name (in cloudflare-operator-system namespace)
   secretName: cloudflare-api-credentials
-  
+
   # Tunnel configuration
   tunnel:
     name: cto-main
-  
+
   # Service bindings
   bindings:
     pm:

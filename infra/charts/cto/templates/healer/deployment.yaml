@@ -31,8 +31,8 @@ spec:
           env:
             - name: HEALER_CONFIG_PATH
               value: /config/healer-config.json
-            - name: HEALER_PROMPTS_DIR
-              value: "/app/prompts"
+            - name: HEALER_TEMPLATES_DIR
+              value: "/app/templates/healer"
             - name: RUST_LOG
               value: "info"
           envFrom:
