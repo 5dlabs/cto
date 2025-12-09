@@ -444,6 +444,7 @@ The Cognitive Task Orchestrator provides a complete AI engineering platform:
 - **GitHub Projects**: Auto-creates issues and project boards
 - Enriches context via Firecrawl (auto-scrapes referenced URLs)
 - Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)
+- **XML Prompts**: Structured prompts optimized for AI agent consumption
 - Agent routing: automatically assigns frontend/backend/mobile tasks
 - **Powered by Claude Opus 4.5** for superior task analysis
 
@@ -985,7 +986,8 @@ intake({
 **What unified intake does:**
 ✅ Parses PRD and generates structured task breakdown  
 ✅ Enriches context by scraping URLs found in PRD (via Firecrawl)  
-✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md, task.xml)  
+✅ Creates comprehensive documentation (task.md, prompt.md, acceptance-criteria.md)  
+✅ **XML Prompts**: Generates task.xml with structured prompts optimized for AI agents  
 ✅ Adds agent routing hints for frontend/backend task assignment  
 ✅ Submits single PR with complete project structure  
 ✅ **Powered by Claude Opus 4.5** for superior task analysis
