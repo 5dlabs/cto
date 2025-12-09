@@ -53,48 +53,79 @@ spec:
           runAsGroup: 65534
           runAsNonRoot: true
 
+        # Extra secret mounts for Discord webhook URL
+        extraSecretMounts:
+          - name: discord-webhook
+            secretName: alertmanager-discord-secret
+            mountPath: /etc/alertmanager/secrets/discord
+            readOnly: true
+
         # Alertmanager configuration
+        # Uses native Discord integration (no sidecar needed)
         config:
           global:
             resolve_timeout: 5m
           route:
-            group_by: ['alertname', 'severity']
+            group_by: ['alertname', 'severity', 'service']
             group_wait: 30s
             group_interval: 5m
             repeat_interval: 4h
-            receiver: 'default-receiver'
+            receiver: 'discord-default'
             routes:
-              # Critical alerts
-              - match:
-                  severity: critical
-                receiver: 'critical-receiver'
+              # Critical alerts - immediate notification
+              - matchers:
+                  - severity="critical"
+                receiver: 'discord-critical'
+                group_wait: 10s
                 continue: true
               # Warning alerts
-              - match:
-                  severity: warning
-                receiver: 'warning-receiver'
+              - matchers:
+                  - severity="warning"
+                receiver: 'discord-warning'
                 continue: true
+              # Webhook/external monitoring alerts
+              - matchers:
+                  - job=~"blackbox-.*"
+                receiver: 'discord-webhooks'
+                group_by: ['alertname', 'instance']
           receivers:
-            - name: 'default-receiver'
-              # Placeholder - configure with actual notification channels
-              # webhook_configs:
-              #   - url: 'http://example.com/webhook'
-            - name: 'critical-receiver'
-              # Placeholder for critical alert notifications
-              # slack_configs:
-              #   - api_url: 'https://hooks.slack.com/services/...'
-              #     channel: '#alerts-critical'
-            - name: 'warning-receiver'
-              # Placeholder for warning alert notifications
-              # slack_configs:
-              #   - api_url: 'https://hooks.slack.com/services/...'
-              #     channel: '#alerts-warning'
+            # Default receiver - all alerts go to Discord
+            - name: 'discord-default'
+              discord_configs:
+                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                  send_resolved: true
+                  title: '{{ template "discord.default.title" . }}'
+                  message: '{{ template "discord.default.message" . }}'
+            # Critical alerts - same Discord channel but could be different
+            - name: 'discord-critical'
+              discord_configs:
+                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                  send_resolved: true
+                  title: '🚨 CRITICAL: {{ template "discord.default.title" . }}'
+                  message: '{{ template "discord.default.message" . }}'
+            # Warning alerts
+            - name: 'discord-warning'
+              discord_configs:
+                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                  send_resolved: true
+                  title: '⚠️ Warning: {{ template "discord.default.title" . }}'
+                  message: '{{ template "discord.default.message" . }}'
+            # Webhook monitoring alerts
+            - name: 'discord-webhooks'
+              discord_configs:
+                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                  send_resolved: true
+                  title: '🔗 Webhook Alert: {{ template "discord.default.title" . }}'
+                  message: |
+                    {{ template "discord.default.message" . }}
+                    **Endpoint:** {{ .CommonLabels.instance }}
+                    **Service:** {{ .CommonLabels.service }}
           inhibit_rules:
             # Inhibit warning alerts when critical alerts are firing
-            - source_match:
-                severity: 'critical'
-              target_match:
-                severity: 'warning'
+            - source_matchers:
+                - severity="critical"
+              target_matchers:
+                - severity="warning"
               equal: ['alertname', 'namespace']
 
   destination:
