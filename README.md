@@ -3,7 +3,7 @@
 <img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/5dlabs-logo-dark.svg" alt="5D Labs Logo" width="400px">
 
 # **Cognitive Task Orchestrator**
-## **Your AI Engineering Team in a Box** 🚀
+## **AI Engineering Team + Open Source Bare Metal Infrastructure** 🚀
 
 [![GitHub Stars](https://img.shields.io/github/stars/5dlabs/cto?style=for-the-badge&logo=github&logoColor=white&labelColor=24292e&color=0969da)](https://github.com/5dlabs/cto)
 [![Discord](https://img.shields.io/badge/Discord-5dlabs.ai-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/A6yydvjZKY)
@@ -11,7 +11,7 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 
 ### **💎 Self-Hosted AI Development Platform • Bare-Metal Ready • MCP Native 💎**
-*Deploy an autonomous engineering team on your infrastructure—ship production code while slashing cloud & staffing costs*
+*Deploy an autonomous engineering team on your own infrastructure—ship production code while slashing cloud & staffing costs*
 
 </div>
 
