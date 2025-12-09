@@ -580,7 +580,7 @@ Dynamic MCP tool registration with **57+ pre-configured tools** across GitHub, K
 
 **Component Architecture:**
 - **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with dynamic tool registration
-- **Controller Service**: Kubernetes REST API that manages CodeRun CRDs via Argo Workflows
+- **Controller Service**: Manages CodeRun CRDs via Argo Workflows
 - **Healer Service**: Self-healing daemon monitoring platform and application health
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
 - **Kubernetes Controllers**: CodeRun controller with TTL-safe reconciliation
@@ -693,7 +693,9 @@ chmod +x setup-agent-secrets.sh
 **What you get:**
 - Complete cto platform deployed to Kubernetes
 - Self-healing infrastructure monitoring
-- REST API for task management
+- **Two ways to interact:**
+  - **MCP Protocol** — call tools directly from any supported CLI
+  - **Project Management** — trigger workflows from Linear (and soon Jira, Asana, Notion, Monday.com)
 - Kubernetes controller for CodeRun resources with TTL-safe reconciliation
 - Agent workspace management and isolation with persistent volumes
 - Automatic resource cleanup and job lifecycle management
