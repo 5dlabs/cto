@@ -18,7 +18,7 @@ spec:
   # Source configuration - deploy raw YAML files from rbac directory
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: HEAD
+    targetRevision: develop
     path: infra/gitops/manifests/rbac
 
   # Destination configuration
