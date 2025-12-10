@@ -300,10 +300,35 @@ async fn handle_session_created(
         StatusCode::BAD_REQUEST
     })?;
 
-    let issue = payload.get_issue().ok_or_else(|| {
+    let webhook_issue = payload.get_issue().ok_or_else(|| {
         warn!("Missing issue in webhook payload");
         StatusCode::BAD_REQUEST
     })?;
+
+    // Linear webhooks often don't include labels in the embedded issue.
+    // If labels are empty, fetch the full issue from the API.
+    let issue = if webhook_issue.labels.is_empty() {
+        if let Some(client) = &state.linear_client {
+            match client.get_issue(&webhook_issue.id).await {
+                Ok(full_issue) => {
+                    debug!(
+                        issue_id = %webhook_issue.id,
+                        label_count = full_issue.labels.len(),
+                        "Fetched full issue with labels"
+                    );
+                    full_issue
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch full issue, using webhook data");
+                    webhook_issue.clone()
+                }
+            }
+        } else {
+            webhook_issue.clone()
+        }
+    } else {
+        webhook_issue.clone()
+    };
 
     // Get current state name for workflow detection
     let state_name = issue.state.as_ref().map_or("unknown", |s| s.name.as_str());
@@ -314,6 +339,7 @@ async fn handle_session_created(
         issue_identifier = %issue.identifier,
         title = %issue.title,
         state = %state_name,
+        label_count = issue.labels.len(),
         "Processing new agent session"
     );
 
@@ -344,7 +370,7 @@ async fn handle_session_created(
         }
 
         // Extract intake request from issue
-        let intake_request = match extract_intake_request(session_id, issue) {
+        let intake_request = match extract_intake_request(session_id, &issue) {
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract intake request");
@@ -432,7 +458,7 @@ async fn handle_session_created(
         }
 
         // Extract play request from issue
-        let play_request = match extract_play_request(session_id, issue) {
+        let play_request = match extract_play_request(session_id, &issue) {
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract play request");
