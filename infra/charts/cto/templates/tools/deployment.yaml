@@ -6,22 +6,65 @@ metadata:
   namespace: {{ include "cto.namespace" . }}
   labels:
     {{- include "cto.tools.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools
+    platform.5dlabs.io/log-collection: enabled
 spec:
   replicas: {{ .Values.tools.replicaCount }}
   selector:
     matchLabels:
       {{- include "cto.tools.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: tools
   template:
     metadata:
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: "tools-mcp"
       labels:
         {{- include "cto.tools.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: tools
+        platform.5dlabs.io/log-collection: enabled
     spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "cto.tools.fullname" . }}
+      securityContext:
+        fsGroup: 1001
+        supplementalGroups: [2375]  # Docker group for Docker socket access
+      initContainers:
+        - name: setup-directories
+          image: alpine:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Setting up npm cache and docker data directories..."
+              # Setup npm cache in home directory
+              mkdir -p /home/mcp/.npm
+              mkdir -p /home/mcp/.npm/_logs
+              chown -R 1001:2375 /home/mcp
+              chmod 755 /home/mcp/.npm
+              
+              # Setup docker data directory for persistent image storage
+              mkdir -p /data/docker-data
+              chown -R root:root /data/docker-data
+              
+              echo "Setup complete"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: home-mcp
+              mountPath: /home/mcp
       containers:
         - name: tools
           image: "{{ include "cto.imageRef" (dict "component" "tools" "image" .Values.tools.image "global" .Values.global) }}"
           imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.tools.image "global" .Values.global) }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 2375
           ports:
             - name: http
               containerPort: {{ .Values.tools.service.port }}
@@ -29,11 +72,41 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.tools.service.port | quote }}
+            - name: RUST_LOG
+              value: "info,kube=debug,tools=trace"
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: home-mcp
+              mountPath: /home/mcp
+            - name: docker-sock-dir
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+        # Docker-in-Docker sidecar for Docker-based MCP servers
+        - name: docker-daemon
+          image: docker:dind
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          volumeMounts:
+            - name: docker-sock-dir
+              mountPath: /var/run
+            - name: docker-data
+              mountPath: /var/lib/docker
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
       volumes:
         - name: data
           {{- if .Values.tools.persistence.enabled }}
@@ -42,4 +115,12 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: home-mcp
+          emptyDir: {}
+        - name: docker-sock-dir
+          emptyDir: {}
+        - name: docker-data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 {{- end }}
