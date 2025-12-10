@@ -460,9 +460,9 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
 /// Extract GitHub repository URL from issue description.
 ///
 /// Looks for patterns like:
-/// - **Repository:** https://github.com/org/repo
-/// - Repository: https://github.com/org/repo
-/// - https://github.com/org/repo (standalone URL on its own line)
+/// - `**Repository:** https://github.com/org/repo`
+/// - `Repository: https://github.com/org/repo`
+/// - `https://github.com/org/repo` (standalone URL on its own line)
 #[must_use]
 fn extract_repository_url(description: &str) -> Option<String> {
     use regex::Regex;
@@ -624,90 +624,95 @@ pub async fn submit_intake_workflow(
 
     info!(configmap_name = %configmap_name, "Created intake ConfigMap");
 
-    // Submit Argo workflow.
-    let output = tokio::process::Command::new("argo")
-        .args([
-            "submit",
-            "--from",
-            "workflowtemplate/project-intake",
-            "-n",
-            namespace,
-            "--name",
-            &workflow_name,
-            "-p",
-            &format!("configmap-name={configmap_name}"),
-            "-p",
-            &format!("project-name={project_name_for_repo}"),
-            "-p",
-            &format!("repository-url={repository_url}"),
-            "-p",
-            &format!("source-branch={source_branch}"),
-            "-p",
-            &format!("github-app={}", config.github_app),
-            "-p",
-            &format!("primary-model={primary_model}"),
-            "-p",
-            &format!("research-model={}", config.research_model),
-            "-p",
-            &format!("fallback-model={}", config.fallback_model),
-            "-p",
-            &format!("primary-provider={}", config.primary_provider),
-            "-p",
-            &format!("research-provider={}", config.research_provider),
-            "-p",
-            &format!("fallback-provider={}", config.fallback_provider),
-            "-p",
-            &format!("num-tasks={}", config.num_tasks),
-            "-p",
-            &format!("expand-tasks={}", config.expand_tasks),
-            "-p",
-            &format!("analyze-complexity={}", config.analyze_complexity),
-            "-p",
-            &format!("docs-model={}", config.docs_model),
-            "-p",
-            &format!("enrich-context={}", config.enrich_context),
-            "-p",
-            &format!("include-codebase={}", config.include_codebase),
-            "-p",
-            &format!("cli={cli}"),
-            // GitHub repo creation parameters (for creating new repos when no URL provided)
-            "-p",
-            &format!(
-                "webhook-callback-url={}",
-                config.webhook_callback_url.as_deref().unwrap_or("")
-            ),
-            "-p",
-            &format!(
-                "github-default-org={}",
-                config.github_default_org.as_deref().unwrap_or("")
-            ),
-            "-p",
-            &format!("github-visibility={}", request.github_visibility),
-            // Linear callback parameters
-            "-p",
-            &format!("linear-session-id={}", request.session_id),
-            "-p",
-            &format!("linear-issue-id={}", request.prd_issue_id),
-            "-p",
-            &format!("linear-issue-identifier={}", request.prd_identifier),
-            "-p",
-            &format!("linear-team-id={}", request.team_id),
-            // Labels for pod discovery (used for two-way communication)
-            "-l",
-            &format!("linear-session={}", request.session_id),
-            "-l",
-            &format!("cto.5dlabs.io/linear-issue={}", request.prd_identifier),
-            "-l",
-            "cto.5dlabs.io/agent-type=intake",
-            "--wait=false",
-        ])
-        .output()
-        .await
-        .context("Failed to execute argo submit command")?;
+    // Build Workflow manifest that references the WorkflowTemplate.
+    // We use direct K8s API calls instead of argo submit or kubectl because:
+    // 1. argo CLI crashes with nil pointer dereference when using --from workflowtemplate
+    // 2. kubectl isn't available in the PM container
+    let workflow_json = serde_json::json!({
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "Workflow",
+        "metadata": {
+            "name": workflow_name,
+            "namespace": namespace,
+            "labels": {
+                "linear-session": request.session_id,
+                "cto.5dlabs.io/linear-issue": request.prd_identifier,
+                "cto.5dlabs.io/agent-type": "intake"
+            }
+        },
+        "spec": {
+            "workflowTemplateRef": {
+                "name": "project-intake"
+            },
+            "arguments": {
+                "parameters": [
+                    {"name": "configmap-name", "value": configmap_name},
+                    {"name": "project-name", "value": project_name_for_repo},
+                    {"name": "repository-url", "value": repository_url},
+                    {"name": "source-branch", "value": source_branch},
+                    {"name": "github-app", "value": config.github_app},
+                    {"name": "github-default-org", "value": config.github_default_org.as_deref().unwrap_or("5dlabs")},
+                    {"name": "github-visibility", "value": request.github_visibility},
+                    {"name": "webhook-callback-url", "value": config.webhook_callback_url.as_deref().unwrap_or("")},
+                    {"name": "primary-model", "value": primary_model},
+                    {"name": "research-model", "value": config.research_model},
+                    {"name": "fallback-model", "value": config.fallback_model},
+                    {"name": "primary-provider", "value": config.primary_provider},
+                    {"name": "research-provider", "value": config.research_provider},
+                    {"name": "fallback-provider", "value": config.fallback_provider},
+                    {"name": "num-tasks", "value": config.num_tasks.to_string()},
+                    {"name": "expand-tasks", "value": config.expand_tasks.to_string()},
+                    {"name": "analyze-complexity", "value": config.analyze_complexity.to_string()},
+                    {"name": "docs-model", "value": config.docs_model},
+                    {"name": "enrich-context", "value": config.enrich_context.to_string()},
+                    {"name": "include-codebase", "value": config.include_codebase.to_string()},
+                    {"name": "cli", "value": cli},
+                    {"name": "linear-session-id", "value": request.session_id},
+                    {"name": "linear-issue-id", "value": request.prd_issue_id},
+                    {"name": "linear-issue-identifier", "value": request.prd_identifier},
+                    {"name": "linear-team-id", "value": request.team_id},
+                    {"name": "runtime-image", "value": "ghcr.io/5dlabs/runtime:latest"}
+                ]
+            }
+        }
+    });
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow!("Failed to submit Argo workflow: {stderr}"));
+    // Submit via Kubernetes API directly (no kubectl/argo CLI needed in container)
+    let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
+        .context("Failed to read service account token")?;
+
+    let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        .context("Failed to read CA certificate")?;
+
+    let cert =
+        reqwest::Certificate::from_pem(&ca_cert).context("Failed to parse CA certificate")?;
+
+    let http_client = reqwest::Client::builder()
+        .add_root_certificate(cert)
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    let api_server = "https://kubernetes.default.svc";
+    let create_url = format!(
+        "{api_server}/apis/argoproj.io/v1alpha1/namespaces/{namespace}/workflows"
+    );
+
+    let response = http_client
+        .post(&create_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Content-Type", "application/json")
+        .json(&workflow_json)
+        .send()
+        .await
+        .context("Failed to send workflow create request")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(anyhow!("Failed to create Argo workflow: HTTP {status} - {error_text}"));
     }
 
     info!(workflow_name = %workflow_name, "Submitted intake workflow");
@@ -739,10 +744,13 @@ pub async fn create_task_issues_with_project(
     let mut task_issue_map = HashMap::new();
 
     // Get workflow states for the team.
+    // Prefer "Ready" state (created by ensure_play_workflow_states) for new tasks,
+    // falling back to any "unstarted" state if "Ready" doesn't exist.
     let states = client.get_team_workflow_states(&request.team_id).await?;
     let initial_state = states
         .iter()
-        .find(|s| s.state_type == "unstarted")
+        .find(|s| s.name == "Ready")
+        .or_else(|| states.iter().find(|s| s.state_type == "unstarted"))
         .ok_or_else(|| anyhow!("No unstarted state found for team"))?;
 
     // Get or create labels.
@@ -850,15 +858,77 @@ pub async fn create_task_issues_with_project(
     Ok(task_issue_map)
 }
 
+/// Play workflow phase states configuration.
+///
+/// These states map to the play workflow phases:
+/// - Phase 2: Implementation (Rex/Blaze)
+/// - Phase 3: Quality (Cleo/Tess/Cipher)
+/// - Phase 4: Integration (Stitch/Atlas)
+/// - Phase 5: Deployment (Bolt)
+pub const PLAY_WORKFLOW_STATES: &[(&str, &str, &str)] = &[
+    // (name, type, color)
+    ("Ready", "unstarted", "#6B7280"),
+    ("🔧 Implementation", "started", "#3B82F6"),
+    ("🔍 Quality", "started", "#8B5CF6"),
+    ("🔗 Integration", "started", "#F59E0B"),
+    ("🚀 Deployment", "started", "#10B981"),
+];
+
+/// Ensure play workflow states exist for a team.
+///
+/// Creates the phase-based workflow states if they don't already exist.
+/// This enables a board view with columns for each play phase:
+///
+/// ```text
+/// Backlog → Ready → 🔧 Implementation → 🔍 Quality → 🔗 Integration → 🚀 Deployment → Done
+/// ```
+pub async fn ensure_play_workflow_states(client: &LinearClient, team_id: &str) -> Result<()> {
+    info!(team_id = %team_id, "Ensuring play workflow states exist");
+
+    for (name, state_type, color) in PLAY_WORKFLOW_STATES {
+        match client
+            .get_or_create_workflow_state(team_id, name, state_type, color)
+            .await
+        {
+            Ok(state) => {
+                info!(
+                    state_id = %state.id,
+                    state_name = %state.name,
+                    "Workflow state ready"
+                );
+            }
+            Err(e) => {
+                // Log but don't fail - state might already exist with different casing
+                warn!(
+                    state_name = %name,
+                    error = %e,
+                    "Failed to create workflow state (may already exist)"
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Create a Linear project for an intake request.
 ///
 /// Creates a project linked to the PRD issue's team, with appropriate
-/// description and metadata.
+/// description and metadata. Also ensures the play workflow states exist
+/// for the board view.
 pub async fn create_intake_project(
     client: &LinearClient,
     request: &IntakeRequest,
     task_count: usize,
 ) -> Result<Project> {
+    // Ensure play workflow states exist for the team
+    if let Err(e) = ensure_play_workflow_states(client, &request.team_id).await {
+        warn!(
+            error = %e,
+            "Failed to ensure play workflow states (continuing with project creation)"
+        );
+    }
+
     // Determine project name from PRD title
     let project_name = derive_project_name(&request.title);
 
@@ -866,6 +936,16 @@ pub async fn create_intake_project(
         "## Project Overview\n\n\
          Generated from PRD: **{}** ({})\n\n\
          This project contains {} tasks for implementation.\n\n\
+         ## Board View\n\n\
+         Switch to **Board view** to see tasks organized by play phase:\n\n\
+         ```\n\
+         Backlog → Ready → 🔧 Implementation → 🔍 Quality → 🔗 Integration → 🚀 Deployment → Done\n\
+         ```\n\n\
+         ### Play Phases\n\
+         - **🔧 Implementation**: Rex/Blaze building backend/frontend\n\
+         - **🔍 Quality**: Cleo reviews, Tess tests, Cipher secures\n\
+         - **🔗 Integration**: Stitch reviews, Atlas merges\n\
+         - **🚀 Deployment**: Bolt deploys to production\n\n\
          ---\n\n\
          *Created by CTO Agent intake workflow*",
         request.title, request.prd_identifier, task_count
