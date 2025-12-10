@@ -190,6 +190,90 @@ tools:
     create: true
     clusterWide: true
 
+  # MCP Server Configuration
+  config:
+    # Secret references for API keys
+    secrets:
+      context7: "tools-context7-secrets"
+      github: "tools-github-secrets"
+    
+    # MCP Servers - proxied through tools service
+    servers:
+      # --- Search & Web ---
+      brave-search:
+        name: "Brave Search"
+        description: "Web search using Brave Search API"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@modelcontextprotocol/server-brave-search"]
+        workingDirectory: "/tmp"
+
+      # --- Memory & Context ---
+      openmemory:
+        name: "OpenMemory"
+        description: "Long-term memory system for AI agents"
+        transport: "http"
+        url: "http://cto-openmemory.cto.svc.cluster.local:3000/mcp"
+
+      context7:
+        name: "Context7"
+        description: "Up-to-date library documentation and code examples"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@upstash/context7-mcp"]
+        workingDirectory: "/tmp"
+
+      # --- Infrastructure ---
+      docker:
+        name: "Docker"
+        description: "Docker container management"
+        transport: "stdio"
+        command: "docker"
+        args: ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "mcp/docker"]
+        workingDirectory: "/tmp"
+
+      kubernetes:
+        name: "Kubernetes"
+        description: "Kubernetes cluster management"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@manusa/mcp-server-kubernetes"]
+        workingDirectory: "/tmp"
+
+      # --- Development Tools ---
+      github:
+        name: "GitHub"
+        description: "GitHub API operations for repositories, issues, and pull requests"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@modelcontextprotocol/server-github"]
+        workingDirectory: "/tmp"
+
+      # --- UI Components ---
+      shadcn:
+        name: "shadcn/ui"
+        description: "shadcn/ui component library with source code and demos"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
+        workingDirectory: "/tmp"
+
+      ai-elements:
+        name: "AI Elements"
+        description: "AI-native UI component library"
+        transport: "http"
+        url: "https://registry.ai-sdk.dev/api/mcp"
+
+      # --- Local Servers (run in agent containers, not proxied) ---
+      rust-tools:
+        name: "Rust Development Tools"
+        description: "Rust analyzer integration"
+        transport: "stdio"
+        command: "/home/node/.cargo/bin/cursor-rust-tools"
+        args: ["--no-ui"]
+        workingDirectory: "/workspace"
+        local: true
+
 # =============================================================================
 # Healer - Self-Healing Monitor
 # =============================================================================
