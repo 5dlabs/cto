@@ -64,12 +64,12 @@ spec:
     - 'https://charts.bitnami.com/bitnami'
     # NATS Helm charts
     - 'https://nats-io.github.io/k8s/helm/charts/'
-    # Keycloak Operator (raw GitHub manifests)
-    - 'https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/refs/heads/main/kubernetes'
-    # Temporal Operator (OCI)
-    - 'ghcr.io/alexandrevilain/temporal-operator'
+    # Keycloak Operator (GitHub repo)
+    - 'https://github.com/keycloak/keycloak-k8s-resources'
+    # Temporal Operator (GitHub repo)
+    - 'https://github.com/alexandrevilain/temporal-operator'
     # ScyllaDB Operator
-    - 'https://scylla-operator-charts.storage.googleapis.com'
+    - 'https://scylla-operator-charts.storage.googleapis.com/stable'
     # Strimzi Kafka Operator
     - 'https://strimzi.io/charts/'
 
