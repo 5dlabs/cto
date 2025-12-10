@@ -32,7 +32,7 @@ spec:
   source:
     repoURL: https://charts.bitnami.com/bitnami
     chart: rabbitmq-cluster-operator
-    targetRevision: "4.3.26"
+    targetRevision: "4.4.34"
     helm:
       values: |
         # Cluster Operator configuration
