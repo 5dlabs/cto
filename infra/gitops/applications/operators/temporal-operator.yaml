@@ -1,0 +1,90 @@
+---
+# Temporal Operator - Durable Workflow Execution
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/alexandrevilain/temporal-operator
+#
+# Features:
+# - Durable workflow execution
+# - Automatic retries and timeouts
+# - Workflow versioning
+# - Multi-language SDKs (Go, Java, Python, TypeScript, .NET)
+# - Visibility and search
+# - Multi-cluster replication
+# - Archival support
+#
+# Note: Temporal server itself is MIT licensed
+#
+# AWS Replacement: Step Functions, SWF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: temporal-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: temporal-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: workflow-operator
+    app.kubernetes.io/type: workflow
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: platform
+  source:
+    repoURL: ghcr.io/alexandrevilain/temporal-operator
+    chart: temporal-operator
+    targetRevision: "0.22.1"
+    helm:
+      values: |
+        # Controller configuration
+        controller:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: temporal-operator
+
+        # Install CRDs
+        installCRDs: true
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: temporal-operator
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: temporal-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion

@@ -90,6 +90,8 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 | **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
 | **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% | Apache 2.0 |
 | **Keycloak** | AWS Cognito, Auth0, Okta | ~90%+ | Apache 2.0 |
+| **Temporal** | AWS Step Functions, Azure Logic Apps | ~80-90% | Apache 2.0 |
+| **ScyllaDB** | AWS DynamoDB, Cassandra Managed | ~70-80% | Apache 2.0 |
 
 **Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
 
@@ -112,7 +114,7 @@ The platform is under active development.
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, MinIO, OpenSearch, ClickHouse, QuestDB, Keycloak)  
+✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, MinIO, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
 ✅ Long-term memory with OpenMemory  
 ✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
