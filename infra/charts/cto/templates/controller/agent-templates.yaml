@@ -41,7 +41,208 @@ metadata:
     {{- include "cto.controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: agent-templates
 data:
+  # GitHub preparation script - creates/clones repository and sets up webhooks
+  # This step runs BEFORE the main intake and handles:
+  # 1. Creating new repos if no repository_url is provided
+  # 2. Cloning existing repos and setting up webhooks
+  # 3. Outputting the final repository URL for the intake step
+  github_prep.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # =========================================================================
+    # GitHub Repository Preparation Script
+    # Runs before intake to ensure repository exists and is configured
+    # =========================================================================
+
+    echo "🔧 GitHub Repository Preparation"
+    echo "================================="
+    echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo ""
+
+    # =========================================================================
+    # Configuration
+    # =========================================================================
+
+    CONFIG_FILE="/intake-files/config.json"
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "❌ Configuration file not found at $CONFIG_FILE"
+        exit 1
+    fi
+
+    PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
+    REPOSITORY_URL=$(jq -r '.repository_url // ""' "$CONFIG_FILE")
+    GITHUB_DEFAULT_ORG=$(jq -r '.github_default_org // "5dlabs"' "$CONFIG_FILE")
+    GITHUB_VISIBILITY=$(jq -r '.github_visibility // "private"' "$CONFIG_FILE")
+    WEBHOOK_CALLBACK_URL=$(jq -r '.webhook_callback_url // ""' "$CONFIG_FILE")
+
+    echo "📋 Configuration:"
+    echo "  → Project: $PROJECT_NAME"
+    echo "  → Repository URL: ${REPOSITORY_URL:-<not provided>}"
+    echo "  → Default Org: $GITHUB_DEFAULT_ORG"
+    echo "  → Visibility: $GITHUB_VISIBILITY"
+    echo ""
+
+    # =========================================================================
+    # GitHub Authentication
+    # =========================================================================
+
+    echo "🔐 Setting up GitHub App authentication..."
+
+    if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+        # Create JWT
+        NOW=$(date +%s)
+        IAT=$((NOW - 60))
+        EXP=$((NOW + 600))
+        
+        HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        
+        SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+        
+        # Get installation token
+        INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+        INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
+        
+        if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+            TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+            GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+            
+            if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
+                export GITHUB_TOKEN
+                export GH_TOKEN="$GITHUB_TOKEN"
+                git config --global credential.helper "!f() { echo \"password=$GITHUB_TOKEN\"; }; f"
+                git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+                echo "✅ GitHub authentication configured"
+            else
+                echo "❌ Could not get installation token"
+                exit 1
+            fi
+        else
+            echo "❌ Could not get installation ID"
+            exit 1
+        fi
+    else
+        echo "❌ GitHub App credentials not provided"
+        exit 1
+    fi
+    echo ""
+
+    # =========================================================================
+    # Repository Setup
+    # =========================================================================
+
+    # Normalize repo name from project name
+    REPO_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
+
+    if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
+        # =====================================================================
+        # Create New Repository
+        # =====================================================================
+        echo "🆕 No repository provided - creating new repository"
+        
+        FULL_REPO_NAME="${GITHUB_DEFAULT_ORG}/${REPO_NAME}"
+        
+        # Check if repo already exists
+        if gh repo view "$FULL_REPO_NAME" &>/dev/null; then
+            echo "  ⚠️ Repository $FULL_REPO_NAME already exists"
+            REPOSITORY_URL="https://github.com/${FULL_REPO_NAME}"
+        else
+            echo "  → Creating $GITHUB_VISIBILITY repository: $FULL_REPO_NAME"
+            gh repo create "$FULL_REPO_NAME" \
+                --"$GITHUB_VISIBILITY" \
+                --description "Generated from Linear intake: $PROJECT_NAME" \
+                || { echo "❌ Failed to create repository"; exit 1; }
+            
+            REPOSITORY_URL="https://github.com/${FULL_REPO_NAME}"
+            echo "  ✅ Created repository: $REPOSITORY_URL"
+            
+            # Initialize with README
+            CLONE_DIR="/tmp/repo-init-$(date +%s)"
+            git clone "$REPOSITORY_URL" "$CLONE_DIR" 2>/dev/null || {
+                # New repo may be empty, init manually
+                mkdir -p "$CLONE_DIR"
+                cd "$CLONE_DIR"
+                git init
+                git remote add origin "$REPOSITORY_URL"
+            }
+            cd "$CLONE_DIR"
+            git config user.name "Morgan Intake"
+            git config user.email "morgan@5dlabs.com"
+            
+            if [ ! -f README.md ]; then
+                echo "# $PROJECT_NAME" > README.md
+                echo "" >> README.md
+                echo "Generated by CTO Agent intake workflow." >> README.md
+                git add README.md
+                git commit -m "chore: initial commit"
+                git branch -M main
+                git push -u origin main
+                echo "  ✅ Initialized repository with README"
+            fi
+        fi
+    else
+        # =====================================================================
+        # Use Existing Repository
+        # =====================================================================
+        echo "📂 Using existing repository: $REPOSITORY_URL"
+        
+        # Verify repo is accessible
+        REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+        if ! gh repo view "$REPO_PATH" &>/dev/null; then
+            echo "❌ Cannot access repository: $REPOSITORY_URL"
+            exit 1
+        fi
+        echo "  ✅ Repository accessible"
+    fi
+
+    # =========================================================================
+    # Webhook Setup (Optional)
+    # =========================================================================
+
+    if [ -n "$WEBHOOK_CALLBACK_URL" ] && [ "$WEBHOOK_CALLBACK_URL" != "null" ]; then
+        echo ""
+        echo "🔗 Setting up GitHub webhook..."
+        
+        REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+        
+        # Check if webhook already exists
+        EXISTING_WEBHOOK=$(gh api "repos/${REPO_PATH}/hooks" 2>/dev/null | jq -r ".[] | select(.config.url == \"${WEBHOOK_CALLBACK_URL}\") | .id" || echo "")
+        
+        if [ -n "$EXISTING_WEBHOOK" ]; then
+            echo "  ⚠️ Webhook already exists (ID: $EXISTING_WEBHOOK)"
+        else
+            # Create webhook
+            gh api "repos/${REPO_PATH}/hooks" \
+                -f name=web \
+                -f "config[url]=$WEBHOOK_CALLBACK_URL" \
+                -f "config[content_type]=json" \
+                -f "events[]=push" \
+                -f "events[]=pull_request" \
+                -f "events[]=check_run" \
+                -f "events[]=check_suite" \
+                -f active=true \
+                &>/dev/null && echo "  ✅ Webhook created" || echo "  ⚠️ Could not create webhook (may lack permissions)"
+        fi
+    fi
+
+    # =========================================================================
+    # Output
+    # =========================================================================
+
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "✅ GitHub preparation complete"
+    echo "  Repository URL: $REPOSITORY_URL"
+    echo "════════════════════════════════════════════════════════════════"
+
+    # Write output for next step
+    echo "$REPOSITORY_URL" > /tmp/repository-url
+
   # Intake workflow script - parses PRD and generates tasks
+  # NOTE: This script expects REPOSITORY_URL to be valid (set by github_prep step)
   intake_intake.sh: |
     #!/bin/bash
     set -euo pipefail
@@ -49,11 +250,12 @@ data:
     # =========================================================================
     # Unified Intake Script
     # This script runs the tasks CLI to parse PRD and generate documentation
+    # NOTE: Repository must already exist (created by github_prep step)
     # =========================================================================
 
     echo "🚀 Starting Unified Intake Process"
     echo "================================="
-    echo "📍 Script version: unified-intake v2.0.0 (tasks CLI)"
+    echo "📍 Script version: unified-intake v2.1.0 (tasks CLI)"
     echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "📦 Pod: ${HOSTNAME:-unknown}"
     echo ""
@@ -85,7 +287,16 @@ data:
 
     echo "📄 Loading configuration..."
     PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
-    REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
+    
+    # Get repository URL from:
+    # 1. REPOSITORY_URL env var (set by workflow from github-prep output)
+    # 2. Fallback to config file
+    if [ -n "${REPOSITORY_URL:-}" ] && [ "$REPOSITORY_URL" != "null" ]; then
+        echo "  → Using repository URL from workflow parameter"
+    else
+        REPOSITORY_URL=$(jq -r '.repository_url // ""' "$CONFIG_FILE")
+    fi
+    
     GITHUB_APP=$(jq -r '.github_app // "5DLabs-Morgan"' "$CONFIG_FILE")
     PRIMARY_MODEL=$(jq -r '.primary_model // "claude-sonnet-4-5-20250929"' "$CONFIG_FILE")
     NUM_TASKS=$(jq -r '.num_tasks // 15' "$CONFIG_FILE")
@@ -98,6 +309,12 @@ data:
     echo "  ✓ Model: $PRIMARY_MODEL"
     echo "  ✓ Tasks: ~$NUM_TASKS"
     echo ""
+
+    # Validate repository URL
+    if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
+        echo "❌ Repository URL not set. Did github_prep step run?"
+        exit 1
+    fi
 
     # =========================================================================
     # Phase 2: GitHub Authentication
@@ -129,6 +346,7 @@ data:
             
             if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
                 export GITHUB_TOKEN
+                export GH_TOKEN="$GITHUB_TOKEN"
                 git config --global credential.helper "!f() { echo \"password=$GITHUB_TOKEN\"; }; f"
                 git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
                 echo "✅ GitHub authentication configured"
@@ -275,3 +493,4 @@ data:
     echo "║ ✅ Intake completed successfully!"
     echo "════════════════════════════════════════════════════════════════"
 {{- end }}
+
