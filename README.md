@@ -705,206 +705,234 @@ cto-mcp --help   # MCP server for any CLI
 
 ## **⚙️ Configuration**
 
-### Unified MCP Configuration
+CTO uses a **two-file configuration approach** for maximum compatibility across all AI coding assistants:
 
-Configure everything in a single MCP config file. For Cursor, create `.cursor/mcp.json`:
+1. **MCP Server Registration** (`.cursor/mcp.json`) — Minimal config to register the MCP server with your CLI
+2. **CTO Configuration** (`cto-config.json`) — Full platform configuration auto-detected from your project
+
+### Step 1: Register the MCP Server
+
+Create `.cursor/mcp.json` (or equivalent for your CLI) with the minimal MCP server registration:
 
 ```json
 {
   "mcpServers": {
     "cto-mcp": {
       "command": "cto-mcp",
-      "args": [],
-      "env": {},
-      "config": {
-        "version": "1.0",
-        "defaults": {
-          "docs": {
-            "model": "your-docs-model",
-            "githubApp": "5DLabs-Morgan",
-            "includeCodebase": false,
-            "sourceBranch": "main"
-          },
-          "intake": {
-            "githubApp": "5DLabs-Morgan",
-            "primary": { "model": "opus", "provider": "claude-code" },
-            "research": { "model": "opus", "provider": "claude-code" },
-            "fallback": { "model": "gpt-5", "provider": "openai" }
-          },
-          "play": {
-            "model": "your-play-model",
-            "cli": "factory",
-            "implementationAgent": "5DLabs-Rex",
-            "frontendAgent": "5DLabs-Blaze",
-            "qualityAgent": "5DLabs-Cleo",
-            "securityAgent": "5DLabs-Cipher",
-            "testingAgent": "5DLabs-Tess",
-            "repository": "your-org/your-repo",
-            "service": "your-service",
-            "docsRepository": "your-org/your-docs-repo",
-            "docsProjectDirectory": "docs",
-            "workingDirectory": ".",
-            "maxRetries": 10,
-            "autoMerge": true,
-            "parallelExecution": true
-          }
-        },
-        "agents": {
-          "morgan": {
-            "githubApp": "5DLabs-Morgan",
-            "cli": "claude",
-            "model": "your-model",
-            "maxTokens": 8192,
-            "temperature": 0.8,
-            "modelRotation": {
-              "enabled": true,
-              "models": ["model-a", "model-b"]
-            },
-            "tools": {
-              "remote": [
-                "brave_search_brave_web_search",
-                "openmemory_openmemory_query",
-                "openmemory_openmemory_store",
-                "github_search_issues",
-                "github_create_issue"
-              ],
-              "localServers": {}
-            }
-          },
-          "rex": {
-            "githubApp": "5DLabs-Rex",
-            "cli": "factory",
-            "model": "your-model",
-            "maxTokens": 64000,
-            "temperature": 0.7,
-            "reasoningEffort": "high",
-            "modelRotation": {
-              "enabled": true,
-              "models": ["model-a", "model-b", "model-c"]
-            },
-            "tools": {
-              "remote": [
-                "brave_search_brave_web_search",
-                "context7_resolve_library_id",
-                "context7_get_library_docs",
-                "github_create_pull_request",
-                "github_push_files",
-                "openmemory_openmemory_query"
-              ],
-              "localServers": {}
-            }
-          },
-          "blaze": {
-            "githubApp": "5DLabs-Blaze",
-            "cli": "factory",
-            "model": "your-model",
-            "maxTokens": 64000,
-            "temperature": 0.6,
-            "reasoningEffort": "high",
-            "modelRotation": {
-              "enabled": true,
-              "models": ["model-a", "model-b"]
-            },
-            "tools": {
-              "remote": [
-                "context7_resolve_library_id",
-                "context7_get_library_docs",
-                "shadcn_list_components",
-                "shadcn_get_component",
-                "ai_elements_get_ai_elements_components",
-                "github_create_pull_request"
-              ],
-              "localServers": {}
-            }
-          },
-          "cleo": {
-            "githubApp": "5DLabs-Cleo",
-            "cli": "claude",
-            "model": "your-model",
-            "maxTokens": 2048,
-            "temperature": 0.3,
-            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
-            "tools": {
-              "remote": [
-                "github_get_pull_request",
-                "github_get_pull_request_files",
-                "github_create_pull_request_review"
-              ],
-              "localServers": {}
-            }
-          },
-          "cipher": {
-            "githubApp": "5DLabs-Cipher",
-            "cli": "cursor",
-            "model": "your-model",
-            "maxTokens": 200000,
-            "reasoningEffort": "high",
-            "role": "Security Agent",
-            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
-            "tools": {
-              "remote": [
-                "github_list_code_scanning_alerts",
-                "github_list_secret_scanning_alerts",
-                "hexstrike_trivy_scan",
-                "hexstrike_kube_bench_check",
-                "hexstrike_gitleaks_scan"
-              ],
-              "localServers": {}
-            }
-          },
-          "tess": {
-            "githubApp": "5DLabs-Tess",
-            "cli": "claude",
-            "model": "your-model",
-            "maxTokens": 4096,
-            "temperature": 0.7,
-            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
-            "tools": {
-              "remote": [
-                "kubernetes_listResources",
-                "kubernetes_getPodsLogs",
-                "github_get_pull_request_status"
-              ],
-              "localServers": {}
-            }
-          },
-          "atlas": {
-            "githubApp": "5DLabs-Atlas",
-            "cli": "claude",
-            "model": "your-model",
-            "modelRotation": { "enabled": false, "models": [] },
-            "tools": {
-              "remote": [
-                "github_create_pull_request",
-                "github_push_files",
-                "github_create_branch"
-              ],
-              "localServers": {}
-            }
-          },
-          "bolt": {
-            "githubApp": "5DLabs-Bolt",
-            "cli": "claude",
-            "model": "your-model",
-            "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
-            "tools": {
-              "remote": [
-                "kubernetes_listResources",
-                "kubernetes_helmInstall",
-                "kubernetes_helmUpgrade",
-                "github_merge_pull_request"
-              ],
-              "localServers": {}
-            }
-          }
-        }
+      "args": []
+    }
+  }
+}
+```
+
+That's it! The MCP server will **auto-detect** your `cto-config.json` from the current working directory.
+
+> **Note**: Cursor's MCP protocol only supports `command`, `args`, `env`, and `envFile` fields. The `cto-mcp` server handles all CTO-specific configuration via a separate config file for maximum compatibility.
+
+### Step 2: Create Your CTO Configuration
+
+Create `cto-config.json` in your project root (or `~/.config/cto/config.json` for global defaults):
+
+```json
+{
+  "version": "1.0",
+  "defaults": {
+    "docs": {
+      "model": "your-docs-model",
+      "githubApp": "5DLabs-Morgan",
+      "includeCodebase": false,
+      "sourceBranch": "main"
+    },
+    "intake": {
+      "githubApp": "5DLabs-Morgan",
+      "primary": { "model": "opus", "provider": "claude-code" },
+      "research": { "model": "opus", "provider": "claude-code" },
+      "fallback": { "model": "gpt-5", "provider": "openai" }
+    },
+    "play": {
+      "model": "your-play-model",
+      "cli": "factory",
+      "implementationAgent": "5DLabs-Rex",
+      "frontendAgent": "5DLabs-Blaze",
+      "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
+      "testingAgent": "5DLabs-Tess",
+      "repository": "your-org/your-repo",
+      "service": "your-service",
+      "docsRepository": "your-org/your-docs-repo",
+      "docsProjectDirectory": "docs",
+      "workingDirectory": ".",
+      "maxRetries": 10,
+      "autoMerge": true,
+      "parallelExecution": true
+    }
+  },
+  "agents": {
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "your-model",
+      "maxTokens": 8192,
+      "temperature": 0.8,
+      "modelRotation": {
+        "enabled": true,
+        "models": ["model-a", "model-b"]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "github_search_issues",
+          "github_create_issue"
+        ],
+        "localServers": {}
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "your-model",
+      "maxTokens": 64000,
+      "temperature": 0.7,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": ["model-a", "model-b", "model-c"]
+      },
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "github_create_pull_request",
+          "github_push_files",
+          "openmemory_openmemory_query"
+        ],
+        "localServers": {}
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "cli": "factory",
+      "model": "your-model",
+      "maxTokens": 64000,
+      "temperature": 0.6,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": ["model-a", "model-b"]
+      },
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "shadcn_list_components",
+          "shadcn_get_component",
+          "ai_elements_get_ai_elements_components",
+          "github_create_pull_request"
+        ],
+        "localServers": {}
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "your-model",
+      "maxTokens": 2048,
+      "temperature": 0.3,
+      "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+      "tools": {
+        "remote": [
+          "github_get_pull_request",
+          "github_get_pull_request_files",
+          "github_create_pull_request_review"
+        ],
+        "localServers": {}
+      }
+    },
+    "cipher": {
+      "githubApp": "5DLabs-Cipher",
+      "cli": "cursor",
+      "model": "your-model",
+      "maxTokens": 200000,
+      "reasoningEffort": "high",
+      "role": "Security Agent",
+      "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+      "tools": {
+        "remote": [
+          "github_list_code_scanning_alerts",
+          "github_list_secret_scanning_alerts",
+          "hexstrike_trivy_scan",
+          "hexstrike_kube_bench_check",
+          "hexstrike_gitleaks_scan"
+        ],
+        "localServers": {}
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "your-model",
+      "maxTokens": 4096,
+      "temperature": 0.7,
+      "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+      "tools": {
+        "remote": [
+          "kubernetes_listResources",
+          "kubernetes_getPodsLogs",
+          "github_get_pull_request_status"
+        ],
+        "localServers": {}
+      }
+    },
+    "atlas": {
+      "githubApp": "5DLabs-Atlas",
+      "cli": "claude",
+      "model": "your-model",
+      "modelRotation": { "enabled": false, "models": [] },
+      "tools": {
+        "remote": [
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch"
+        ],
+        "localServers": {}
+      }
+    },
+    "bolt": {
+      "githubApp": "5DLabs-Bolt",
+      "cli": "claude",
+      "model": "your-model",
+      "modelRotation": { "enabled": true, "models": ["model-a", "model-b"] },
+      "tools": {
+        "remote": [
+          "kubernetes_listResources",
+          "kubernetes_helmInstall",
+          "kubernetes_helmUpgrade",
+          "github_merge_pull_request"
+        ],
+        "localServers": {}
       }
     }
   }
 }
 ```
 
-**For Claude Code**, use the same structure in `~/.config/claude/mcp.json`.
+### Config File Auto-Detection
+
+The `cto-mcp` server automatically searches for configuration in this order:
+
+1. `./cto-config.json` — Current working directory (project-specific)
+2. `./.cursor/cto-config.json` — Cursor config directory
+3. `~/.config/cto/config.json` — User global config (fallback)
+
+This allows you to:
+- **Per-project configs**: Different settings for different repositories
+- **Global defaults**: Fall back to user-wide defaults when no project config exists
+- **Override hierarchy**: Project configs override global configs
+
+### Configuration Reference
 
 **Key Features:**
 - **CLI & Model Rotation**: Configure different CLIs and models per agent—rotate between providers for cost optimization or capability matching
@@ -925,8 +953,8 @@ Configure everything in a single MCP config file. For Cursor, create `.cursor/mc
 - **`tools.localServers`**: Local MCP server configurations
 
 **Usage:**
-1. Create your MCP config file (`.cursor/mcp.json` or equivalent)
-2. Add the CTO configuration inside the `config` field
+1. Register `cto-mcp` in your CLI's MCP config (`.cursor/mcp.json`)
+2. Create `cto-config.json` in your project root with your settings
 3. Restart your CLI to load the MCP server
 4. All MCP tools will be available with your configured defaults
 
