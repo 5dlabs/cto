@@ -8,6 +8,7 @@ use tasks::ai::AIProvider;
 
 use crate::analysis::RelevanceAnalyzer;
 use crate::auth::Session;
+use crate::digest::DigestState;
 use crate::enrichment::{EnrichedLink, LinkEnricher};
 use crate::storage::{IndexEntry, MarkdownWriter, ResearchEntry, ResearchIndex};
 use crate::twitter::{BookmarkPoller, PollConfig, PollState};
@@ -27,6 +28,8 @@ pub struct PipelineConfig {
     pub batch_size: usize,
     /// AI model to use for analysis.
     pub model: String,
+    /// Optional digest state path (for tracking entries pending email digest).
+    pub digest_state_path: Option<PathBuf>,
 }
 
 impl Default for PipelineConfig {
@@ -38,6 +41,7 @@ impl Default for PipelineConfig {
             min_relevance: 0.5,
             batch_size: 10,
             model: "claude-sonnet-4-20250514".to_string(),
+            digest_state_path: Some(PathBuf::from("/data/digest-state.json")),
         }
     }
 }
@@ -89,6 +93,13 @@ impl Pipeline {
 
         // Load index
         let mut index = ResearchIndex::load(&self.config.index_path)?;
+
+        // Load digest state if configured
+        let mut digest_state = if let Some(ref path) = self.config.digest_state_path {
+            Some(DigestState::load(path)?)
+        } else {
+            None
+        };
 
         // Set up components
         let poll_config = PollConfig {
@@ -204,6 +215,11 @@ impl Pipeline {
             result.saved += 1;
             result.saved_ids.push(bookmark.id.clone());
 
+            // Track entry for digest
+            if let Some(ref mut ds) = digest_state {
+                ds.add_entry(bookmark.id.clone());
+            }
+
             tracing::info!(
                 id = %bookmark.id,
                 score = entry.relevance.score,
@@ -215,6 +231,12 @@ impl Pipeline {
         // Save state and index
         state.save(&self.config.state_path)?;
         index.save(&self.config.index_path)?;
+
+        // Save digest state if configured
+        if let (Some(ref ds), Some(ref path)) = (&digest_state, &self.config.digest_state_path) {
+            ds.save(path)?;
+            tracing::debug!(pending = ds.pending_count(), "Updated digest state");
+        }
 
         tracing::info!(
             fetched = result.fetched,
