@@ -34,7 +34,7 @@ spec:
   source:
     repoURL: https://github.com/alexandrevilain/temporal-operator
     path: charts/temporal-operator
-    targetRevision: v0.22.1
+    targetRevision: v0.22.0
     helm:
       values: |
         # Controller configuration
