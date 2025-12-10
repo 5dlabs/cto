@@ -300,25 +300,14 @@ impl ServerConnectionPool {
         }
     }
 
-    /// Check if Docker is available and ready
-    async fn is_docker_ready(&self) -> bool {
+    /// Check if Docker daemon is responding (silent version for polling)
+    async fn is_docker_daemon_ready(&self) -> bool {
         use tokio::process::Command;
 
         // Try to run docker version command
         match Command::new("docker").arg("version").output().await {
-            Ok(output) => {
-                if output.status.success() {
-                    tracing::info!("✅ Docker is available and ready");
-                    true
-                } else {
-                    tracing::info!("❌ Docker command failed with status: {}", output.status);
-                    false
-                }
-            }
-            Err(e) => {
-                tracing::info!("❌ Docker command error: {}", e);
-                false
-            }
+            Ok(output) => output.status.success(),
+            Err(_) => false,
         }
     }
 
@@ -331,14 +320,28 @@ impl ServerConnectionPool {
         let retry_interval = Duration::from_secs(2);
 
         tracing::info!(
-            "🐳 Waiting for Docker to be ready (timeout: {}s)...",
+            "🐳 Waiting for Docker daemon to initialize (timeout: {}s)...",
             timeout_secs
         );
 
+        let mut attempt = 0;
         loop {
-            if self.is_docker_ready().await {
-                tracing::info!("✅ Docker is ready (elapsed: {:?})", start_time.elapsed());
-                return Ok(());
+            attempt += 1;
+            
+            if self.is_docker_daemon_ready().await {
+                let elapsed = start_time.elapsed();
+                tracing::info!(
+                    "✅ Docker daemon is responding (took {:.1}s after {} attempts)",
+                    elapsed.as_secs_f64(),
+                    attempt
+                );
+                
+                // Verify Docker is actually functional by running a simple container
+                if self.verify_docker_functional().await {
+                    tracing::info!("✅ Docker verified functional - container operations working");
+                    return Ok(());
+                }
+                tracing::warn!("⚠️ Docker daemon responded but container operations failed, continuing to wait...");
             }
 
             if start_time.elapsed() >= timeout {
@@ -347,11 +350,42 @@ impl ServerConnectionPool {
                 ));
             }
 
+            let elapsed_secs = start_time.elapsed().as_secs();
             tracing::info!(
-                "⏳ Docker not ready yet, retrying in {}s...",
-                retry_interval.as_secs()
+                "🐳 Docker daemon starting up... ({}s elapsed, attempt {})",
+                elapsed_secs,
+                attempt
             );
             sleep(retry_interval).await;
+        }
+    }
+
+    /// Verify Docker is actually functional by running a simple container
+    async fn verify_docker_functional(&self) -> bool {
+        use tokio::process::Command;
+
+        // Run a minimal container to verify Docker is fully operational
+        match Command::new("docker")
+            .args(["run", "--rm", "hello-world"])
+            .output()
+            .await
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    tracing::debug!("Docker hello-world container ran successfully");
+                    true
+                } else {
+                    tracing::debug!(
+                        "Docker hello-world failed: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                    false
+                }
+            }
+            Err(e) => {
+                tracing::debug!("Failed to run Docker hello-world: {}", e);
+                false
+            }
         }
     }
 
@@ -954,15 +988,17 @@ impl BridgeState {
         let init_start = std::time::Instant::now();
 
         // Wait for Docker to be ready BEFORE initializing any servers
-        tracing::info!("🐳 Ensuring Docker daemon is ready before starting any servers...");
+        // This is needed for Docker-in-Docker (DinD) environments where the daemon takes time to start
+        tracing::info!("🐳 Checking Docker daemon availability...");
         let docker_start = std::time::Instant::now();
-        if let Err(e) = self.connection_pool.wait_for_docker(60).await {
-            tracing::debug!("⚠️ Docker readiness check failed: {}", e);
-            tracing::debug!("⚠️ Continuing anyway, but Docker-based servers may fail");
+        if let Err(e) = self.connection_pool.wait_for_docker(120).await {
+            tracing::warn!("⚠️ Docker daemon not available after timeout: {}", e);
+            tracing::warn!("⚠️ Docker-based MCP servers (like docker, kubernetes) will not be available");
+            tracing::info!("📋 Other MCP servers will continue to initialize normally");
         } else {
             let docker_elapsed = docker_start.elapsed();
             tracing::info!(
-                "✅ Docker is ready (took {:.2}s)",
+                "✅ Docker daemon ready and verified (initialization took {:.1}s)",
                 docker_elapsed.as_secs_f64()
             );
         }
@@ -1776,12 +1812,12 @@ impl BridgeState {
 
         // Check if this is a Docker-based server and ensure Docker is ready
         if config.command == "docker" {
-            tracing::info!(
-                "🐳 [{}] Detected Docker-based server, checking Docker readiness...",
+            tracing::debug!(
+                "🐳 [{}] Docker-based server, verifying Docker availability...",
                 server_name
             );
             if let Err(e) = self.connection_pool.wait_for_docker(30).await {
-                tracing::info!("⚠️ [{}] Docker readiness check failed: {}", server_name, e);
+                tracing::warn!("⚠️ [{}] Docker not available: {}", server_name, e);
                 // Continue anyway, but warn that it might not work
             }
         }
