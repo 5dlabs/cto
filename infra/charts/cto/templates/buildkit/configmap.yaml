@@ -20,7 +20,7 @@ data:
     {{- end }}
     
     # Garbage collection settings
-    [worker.oci.gcpolicy]
+    [[worker.oci.gcpolicy]]
       keepDuration = "{{ .Values.buildkit.config.gcKeepDuration }}"
-      keepBytes = {{ .Values.buildkit.config.gcKeepBytes }}
+      keepBytes = {{ int64 .Values.buildkit.config.gcKeepBytes }}
 {{- end }}
