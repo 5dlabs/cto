@@ -18,9 +18,9 @@ inputs:
     required: false
     default: ''
   test-args:
-    description: 'Additional test arguments'
+    description: 'Additional test arguments (--all-targets included by default)'
     required: false
-    default: ''
+    default: '--all-targets'
   use-sccache:
     description: 'Whether to use sccache (for k8s-runner)'
     required: false
@@ -68,7 +68,7 @@ runs:
           cargo nextest run -p ${{ inputs.package }} $FEATURES_ARG ${{ inputs.test-args }}
         else
           echo "📋 Using cargo test"
-          cargo test -p ${{ inputs.package }} $FEATURES_ARG --all-targets ${{ inputs.test-args }}
+          cargo test -p ${{ inputs.package }} $FEATURES_ARG ${{ inputs.test-args }}
         fi
 
         echo "✅ All tests passed"
