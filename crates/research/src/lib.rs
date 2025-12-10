@@ -20,6 +20,7 @@
 
 pub mod analysis;
 pub mod auth;
+pub mod digest;
 pub mod enrichment;
 pub mod pipeline;
 pub mod publish;
@@ -29,6 +30,7 @@ pub mod twitter;
 // Re-export main types
 pub use analysis::{Category, RelevanceResult};
 pub use auth::Session;
+pub use digest::{ActionItem, DigestAnalysis, DigestAnalyzer, DigestConfig, DigestGenerator, DigestState, EmailSender};
 pub use enrichment::EnrichedLink;
 pub use pipeline::{Pipeline, PipelineConfig, PollCycleResult};
 pub use publish::{PublishConfig, Publisher};
