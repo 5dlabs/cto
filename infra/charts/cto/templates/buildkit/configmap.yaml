@@ -1,0 +1,26 @@
+{{- if and .Values.buildkit.enabled .Values.buildkit.config.insecureRegistries }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkit-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  buildkitd.toml: |
+    # BuildKit daemon configuration
+    
+    [worker.oci]
+      max-parallelism = {{ .Values.buildkit.config.maxParallelism }}
+    
+    # Allow pushing to insecure (HTTP) registries
+    {{- range .Values.buildkit.config.insecureRegistries }}
+    [registry."{{ . }}"]
+      http = true
+      insecure = true
+    {{- end }}
+    
+    # Garbage collection settings
+    [[worker.oci.gcpolicy]]
+      keepDuration = "{{ .Values.buildkit.config.gcKeepDuration }}"
+      keepBytes = {{ int64 .Values.buildkit.config.gcKeepBytes }}
+{{- end }}

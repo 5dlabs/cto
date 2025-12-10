@@ -153,6 +153,9 @@ spec:
       kind: '*'
     - group: 'clickhouse-keeper.altinity.com'
       kind: '*'
+    # External Secrets Operator CRDs (ClusterSecretStore is cluster-scoped)
+    - group: 'external-secrets.io'
+      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
@@ -214,6 +217,9 @@ spec:
       kind: '*'
     - group: 'clickhouse-keeper.altinity.com'
       kind: '*'
+    # External Secrets Operator CRDs
+    - group: 'external-secrets.io'
+      kind: '*'
 
   # Roles for access control
   roles:
@@ -258,3 +264,6 @@ spec:
         - '*'
       namespaces:
         - '*'
+
+
+
