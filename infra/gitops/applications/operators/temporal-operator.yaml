@@ -32,9 +32,9 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: ghcr.io/alexandrevilain/temporal-operator
-    chart: temporal-operator
-    targetRevision: "0.22.1"
+    repoURL: https://github.com/alexandrevilain/temporal-operator
+    path: charts/temporal-operator
+    targetRevision: v0.22.1
     helm:
       values: |
         # Controller configuration
