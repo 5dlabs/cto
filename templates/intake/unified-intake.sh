@@ -40,15 +40,21 @@ fi
 
 echo "📄 Loading configuration..."
 PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
-REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
+REPOSITORY_URL=$(jq -r '.repository_url // ""' "$CONFIG_FILE")
 GITHUB_APP=$(jq -r '.github_app // "5DLabs-Morgan"' "$CONFIG_FILE")
 PRIMARY_MODEL=$(jq -r '.primary_model // "claude-sonnet-4-5-20250929"' "$CONFIG_FILE")
 NUM_TASKS=$(jq -r '.num_tasks // 15' "$CONFIG_FILE")
 EXPAND_TASKS=$(jq -r '.expand_tasks // true' "$CONFIG_FILE")
 ANALYZE_COMPLEXITY=$(jq -r '.analyze_complexity // true' "$CONFIG_FILE")
+GITHUB_DEFAULT_ORG=$(jq -r '.github_default_org // "5dlabs"' "$CONFIG_FILE")
+GITHUB_VISIBILITY=$(jq -r '.github_visibility // "private"' "$CONFIG_FILE")
 
 echo "  ✓ Project: $PROJECT_NAME"
-echo "  ✓ Repository: $REPOSITORY_URL"
+if [ -n "$REPOSITORY_URL" ] && [ "$REPOSITORY_URL" != "null" ]; then
+    echo "  ✓ Repository: $REPOSITORY_URL (existing)"
+else
+    echo "  ✓ Repository: Will create new repo in $GITHUB_DEFAULT_ORG"
+fi
 echo "  ✓ GitHub App: $GITHUB_APP"
 echo "  ✓ Model: $PRIMARY_MODEL"
 echo "  ✓ Tasks: ~$NUM_TASKS"
@@ -99,25 +105,66 @@ fi
 echo ""
 
 # =========================================================================
-# Phase 3: Repository Clone
+# Phase 3: Repository Setup (Clone existing or Create new)
 # =========================================================================
-echo "📦 Phase 2: Repository Clone and Setup"
-echo "======================================="
+echo "📦 Phase 2: Repository Setup"
+echo "============================="
 
 CLONE_DIR="/tmp/repo-$(date +%s)"
-echo "📂 Cloning repository to: $CLONE_DIR"
 
-git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+# Normalize project/repo name from the project title
+REPO_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
+
+if [ -n "$REPOSITORY_URL" ] && [ "$REPOSITORY_URL" != "null" ]; then
+    # Use existing repository
+    echo "📂 Cloning existing repository: $REPOSITORY_URL"
+    git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+    
+    # For existing repos, create a subdirectory for the project
+    PROJECT_DIR_NAME="$REPO_NAME"
+    PROJECT_DIR="$CLONE_DIR/$PROJECT_DIR_NAME"
+    mkdir -p "$PROJECT_DIR"
+    CREATED_NEW_REPO=false
+else
+    # Create new repository
+    FULL_REPO_NAME="${GITHUB_DEFAULT_ORG}/${REPO_NAME}"
+    echo "🆕 Creating new repository: $FULL_REPO_NAME"
+    
+    # Check if repo already exists
+    if gh repo view "$FULL_REPO_NAME" &>/dev/null; then
+        echo "  ⚠️ Repository already exists, cloning..."
+        REPOSITORY_URL="https://github.com/${FULL_REPO_NAME}"
+        git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+        CREATED_NEW_REPO=false
+    else
+        # Create new repo with visibility setting
+        echo "  → Creating $GITHUB_VISIBILITY repository..."
+        gh repo create "$FULL_REPO_NAME" --"$GITHUB_VISIBILITY" --clone --description "Generated from Linear intake: $PROJECT_NAME" "$CLONE_DIR" || {
+            echo "❌ Failed to create repository"
+            exit 1
+        }
+        REPOSITORY_URL="https://github.com/${FULL_REPO_NAME}"
+        echo "  ✅ Created repository: $REPOSITORY_URL"
+        CREATED_NEW_REPO=true
+    fi
+    
+    # For new repos, work directly in the root
+    PROJECT_DIR_NAME=""
+    PROJECT_DIR="$CLONE_DIR"
+fi
+
 cd "$CLONE_DIR" || exit 1
 
 git config user.name "Morgan Intake"
 git config user.email "morgan@5dlabs.com"
 
-# Normalize project directory name
-PROJECT_DIR_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
-PROJECT_DIR="$CLONE_DIR/$PROJECT_DIR_NAME"
-mkdir -p "$PROJECT_DIR"
+# Create project directory if needed
+if [ -n "$PROJECT_DIR_NAME" ]; then
+    mkdir -p "$PROJECT_DIR"
+fi
 cd "$PROJECT_DIR" || exit 1
+
+echo "  ✓ Working directory: $PROJECT_DIR"
 
 # =========================================================================
 # Phase 4: Prepare Input Files
@@ -136,38 +183,76 @@ echo ""
 echo "🚀 Phase 3: Running tasks CLI intake"
 echo "====================================="
 
-# Verify tasks CLI is available
-if ! command -v tasks &> /dev/null; then
-    echo "❌ tasks CLI not found in PATH"
-    exit 1
-fi
-echo "✓ tasks CLI found: $(which tasks)"
-tasks --version 2>&1 || true
-
-# Build intake command
-INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
-
-# Add architecture if present
-[ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
-
-# Add model if specified
-[ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
-
-# Optionally skip expansion/analysis
-[ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
-[ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
-
-echo "  → Running: $INTAKE_CMD"
-eval "$INTAKE_CMD" || exit 1
-
-# Verify tasks were generated
-TASKS_FILE=".tasks/tasks/tasks.json"
-if [ ! -f "$TASKS_FILE" ]; then
-    echo "❌ tasks.json not found at $TASKS_FILE"
-    exit 1
+# Check if tasks CLI is available
+TASKS_AVAILABLE=false
+if command -v tasks &> /dev/null; then
+    echo "✓ tasks CLI found: $(which tasks)"
+    tasks --version 2>&1 || true
+    TASKS_AVAILABLE=true
+else
+    echo "⚠️ tasks CLI not available, using fallback mode"
+    echo "  Note: For full functionality, ensure tasks binary is in the image"
 fi
 
-TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
+if [ "$TASKS_AVAILABLE" = "true" ]; then
+    # Build intake command
+    INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
+    
+    # Add architecture if present
+    [ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
+    
+    # Add model if specified
+    [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
+    
+    # Optionally skip expansion/analysis
+    [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
+    [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
+    
+    echo "  → Running: $INTAKE_CMD"
+    eval "$INTAKE_CMD" || exit 1
+    
+    # Verify tasks were generated
+    TASKS_FILE=".tasks/tasks/tasks.json"
+    if [ ! -f "$TASKS_FILE" ]; then
+        echo "❌ tasks.json not found at $TASKS_FILE"
+        exit 1
+    fi
+    
+    TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
+else
+    # Fallback mode: Create basic structure without tasks CLI
+    echo "📝 Creating basic intake structure (fallback mode)..."
+    
+    mkdir -p .tasks/tasks .tasks/reports
+    
+    # Create a placeholder tasks.json
+    cat > .tasks/tasks/tasks.json << 'TASKS_JSON'
+{
+  "tasks": [
+    {
+      "id": 1,
+      "title": "PRD Review Required",
+      "description": "The tasks CLI is not available. Please use the PRD in .tasks/docs/prd.txt to manually create tasks or run tasks CLI locally.",
+      "status": "pending",
+      "priority": "high"
+    }
+  ],
+  "metadata": {
+    "generated_at": "TIMESTAMP_PLACEHOLDER",
+    "fallback_mode": true,
+    "message": "Generated in fallback mode - tasks CLI not available"
+  }
+}
+TASKS_JSON
+    
+    # Replace timestamp placeholder
+    sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +%Y-%m-%dT%H:%M:%SZ)/" .tasks/tasks/tasks.json 2>/dev/null || \
+    sed -i '' "s/TIMESTAMP_PLACEHOLDER/$(date -u +%Y-%m-%dT%H:%M:%SZ)/" .tasks/tasks/tasks.json
+    
+    TASK_COUNT=1
+    echo "⚠️ Created placeholder tasks.json (fallback mode)"
+    echo "  Note: Run 'tasks intake' locally for full task generation"
+fi
 echo "✅ Generated $TASK_COUNT tasks with documentation"
 
 # =========================================================================

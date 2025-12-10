@@ -128,6 +128,15 @@ local_resource(
     trigger_mode=TRIGGER_MODE_MANUAL,
 )
 
+# Runtime with Tasks CLI (for intake workflow)
+local_resource(
+    'build-runtime-tasks',
+    cmd=build_cmd('runtime', 'infra/images/runtime/Dockerfile.kind-tasks'),
+    deps=['crates/tasks/', 'Cargo.toml', 'Cargo.lock'],
+    ignore=['**/target/'],
+    labels=['build'],
+)
+
 # =============================================================================
 # Deploys (After Builds)
 # =============================================================================

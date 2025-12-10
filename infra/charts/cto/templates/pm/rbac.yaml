@@ -1,0 +1,71 @@
+{{- if .Values.pm.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cto.pm.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.pm.labels" . | nindent 4 }}
+rules:
+  # ConfigMap access for intake workflow data
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Pod access for status checking
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # Events for debugging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cto.pm.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.pm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cto.pm.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cto.pm.fullname" . }}
+    namespace: {{ include "cto.namespace" . }}
+---
+# Cluster-wide permissions for Argo Workflows
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cto.pm.fullname" . }}
+  labels:
+    {{- include "cto.pm.labels" . | nindent 4 }}
+rules:
+  # Argo Workflows - submit intake and play workflows
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Namespaces (for multi-namespace operations)
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cto.pm.fullname" . }}
+  labels:
+    {{- include "cto.pm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cto.pm.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cto.pm.fullname" . }}
+    namespace: {{ include "cto.namespace" . }}
+{{- end }}

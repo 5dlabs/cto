@@ -1,0 +1,63 @@
+{{- if .Values.controller.argo.enabled }}
+# =============================================================================
+# Argo Workflow Service Account and RBAC
+# =============================================================================
+# These resources are used by Argo Workflows running intake and play workflows
+# in the CTO namespace.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workflow
+{{- if .Values.global.imagePullSecrets }}
+imagePullSecrets:
+  {{- toYaml .Values.global.imagePullSecrets | nindent 2 }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workflow
+rules:
+  # Pod management for workflow steps
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  # ConfigMap and Secret access for workflow data
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  # Events for debugging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create"]
+  # Argo Workflow resources
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates", "workflowtaskresults", "workflowtasksets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workflow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow
+    namespace: {{ include "cto.namespace" . }}
+{{- end }}

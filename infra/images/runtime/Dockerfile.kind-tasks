@@ -14,7 +14,7 @@ COPY crates crates
 RUN cargo build --release --package tasks --bin tasks
 
 # ===== RUNTIME STAGE =====
-FROM ghcr.io/5dlabs/runtime:kind-local
+FROM ghcr.io/5dlabs/runtime:latest
 
 # Copy tasks binary from builder
 COPY --from=builder /build/target/release/tasks /usr/local/bin/tasks

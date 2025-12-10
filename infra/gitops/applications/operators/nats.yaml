@@ -1,0 +1,139 @@
+---
+# NATS - High-performance messaging system
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/nats-io/k8s
+#
+# Features:
+# - Core NATS pub/sub messaging
+# - JetStream for persistence and streaming
+# - Clustering and super-clusters
+# - Leaf nodes for edge deployments
+# - Subject-based routing
+# - Request/reply patterns
+# - Queue groups for load balancing
+#
+# Note: NATS doesn't need an operator - the Helm chart is sufficient
+# for most use cases. JetStream provides persistence.
+#
+# AWS Replacement: SNS, SQS, EventBridge
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nats
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/type: message-queue
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: platform
+  source:
+    repoURL: https://nats-io.github.io/k8s/helm/charts/
+    chart: nats
+    targetRevision: "1.2.6"
+    helm:
+      values: |
+        # NATS configuration
+        config:
+          cluster:
+            enabled: true
+            replicas: 3
+
+          # Enable JetStream for persistence
+          jetstream:
+            enabled: true
+
+            # Memory storage (fast, limited)
+            memoryStore:
+              enabled: true
+              maxSize: 1Gi
+
+            # File storage (persistent)
+            fileStore:
+              enabled: true
+              pvc:
+                enabled: true
+                size: 10Gi
+                storageClassName: ""  # Use default storage class
+
+          # Monitoring
+          monitor:
+            enabled: true
+            port: 8222
+
+          # Enable metrics for Prometheus
+          resolver:
+            enabled: false
+
+        # Container configuration
+        container:
+          image:
+            repository: nats
+            tag: "2.10.24-alpine"
+            pullPolicy: IfNotPresent
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Pod configuration
+        podTemplate:
+          topologySpreadConstraints:
+            kubernetes.io/hostname:
+              maxSkew: 1
+              whenUnsatisfiable: ScheduleAnyway
+
+        # Service configuration
+        service:
+          enabled: true
+          ports:
+            nats:
+              enabled: true
+              port: 4222
+            monitor:
+              enabled: true
+              port: 8222
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: nats
+
+        # NATS Box (CLI tools for debugging)
+        natsBox:
+          enabled: true
+          container:
+            image:
+              repository: natsio/nats-box
+              tag: "0.14.5"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nats
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

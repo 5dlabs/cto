@@ -1,0 +1,277 @@
+{{- if .Values.controller.enabled }}
+# =============================================================================
+# Agent Templates ConfigMaps
+# =============================================================================
+# These ConfigMaps contain shell scripts used by Argo Workflows to run
+# intake and play workflows with different CLI tools.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-agents
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agents
+data:
+  # Agent configuration for intake and play workflows
+  agents.json: |
+    {
+      "version": "1.0.0",
+      "agents": {
+        "intake": {
+          "name": "intake",
+          "type": "intake",
+          "description": "PRD analysis and task generation"
+        },
+        "play": {
+          "name": "play",
+          "type": "play",
+          "description": "Task implementation"
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-agent-templates-intake
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent-templates
+data:
+  # Intake workflow script - parses PRD and generates tasks
+  intake_intake.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # =========================================================================
+    # Unified Intake Script
+    # This script runs the tasks CLI to parse PRD and generate documentation
+    # =========================================================================
+
+    echo "🚀 Starting Unified Intake Process"
+    echo "================================="
+    echo "📍 Script version: unified-intake v2.0.0 (tasks CLI)"
+    echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "📦 Pod: ${HOSTNAME:-unknown}"
+    echo ""
+
+    # =========================================================================
+    # Phase 1: Configuration and Environment Setup
+    # =========================================================================
+    echo "📋 Phase 1: Configuration and Environment Setup"
+    echo "================================================"
+
+    CONFIG_FILE="/intake-files/config.json"
+
+    # Support both .txt and .md PRD files
+    if [ -f "/intake-files/prd.txt" ]; then
+        PRD_FILE="/intake-files/prd.txt"
+    elif [ -f "/intake-files/prd.md" ]; then
+        PRD_FILE="/intake-files/prd.md"
+    else
+        echo "❌ No PRD file found (tried prd.txt, prd.md)"
+        exit 1
+    fi
+
+    ARCH_FILE="/intake-files/architecture.md"
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "❌ Configuration file not found at $CONFIG_FILE"
+        exit 1
+    fi
+
+    echo "📄 Loading configuration..."
+    PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
+    REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
+    GITHUB_APP=$(jq -r '.github_app // "5DLabs-Morgan"' "$CONFIG_FILE")
+    PRIMARY_MODEL=$(jq -r '.primary_model // "claude-sonnet-4-5-20250929"' "$CONFIG_FILE")
+    NUM_TASKS=$(jq -r '.num_tasks // 15' "$CONFIG_FILE")
+    EXPAND_TASKS=$(jq -r '.expand_tasks // true' "$CONFIG_FILE")
+    ANALYZE_COMPLEXITY=$(jq -r '.analyze_complexity // true' "$CONFIG_FILE")
+
+    echo "  ✓ Project: $PROJECT_NAME"
+    echo "  ✓ Repository: $REPOSITORY_URL"
+    echo "  ✓ GitHub App: $GITHUB_APP"
+    echo "  ✓ Model: $PRIMARY_MODEL"
+    echo "  ✓ Tasks: ~$NUM_TASKS"
+    echo ""
+
+    # =========================================================================
+    # Phase 2: GitHub Authentication
+    # =========================================================================
+    echo "🔐 Setting up GitHub App authentication..."
+
+    # Generate GitHub token from app credentials
+    if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+        echo "Generating fresh GitHub App token..."
+        
+        # Create JWT
+        NOW=$(date +%s)
+        IAT=$((NOW - 60))
+        EXP=$((NOW + 600))
+        
+        HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        
+        SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+        
+        # Get installation token
+        INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+        INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
+        
+        if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+            TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+            GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+            
+            if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
+                export GITHUB_TOKEN
+                git config --global credential.helper "!f() { echo \"password=$GITHUB_TOKEN\"; }; f"
+                git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+                echo "✅ GitHub authentication configured"
+            else
+                echo "⚠️ Could not get installation token, using default auth"
+            fi
+        else
+            echo "⚠️ Could not get installation ID, using default auth"
+        fi
+    else
+        echo "⚠️ GitHub App credentials not provided, using default auth"
+    fi
+    echo ""
+
+    # =========================================================================
+    # Phase 3: Repository Clone
+    # =========================================================================
+    echo "📦 Phase 2: Repository Clone and Setup"
+    echo "======================================="
+
+    CLONE_DIR="/tmp/repo-$(date +%s)"
+    echo "📂 Cloning repository to: $CLONE_DIR"
+
+    git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+    cd "$CLONE_DIR" || exit 1
+
+    git config user.name "Morgan Intake"
+    git config user.email "morgan@5dlabs.com"
+
+    # Normalize project directory name
+    PROJECT_DIR_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
+    PROJECT_DIR="$CLONE_DIR/$PROJECT_DIR_NAME"
+    mkdir -p "$PROJECT_DIR"
+    cd "$PROJECT_DIR" || exit 1
+
+    # =========================================================================
+    # Phase 4: Prepare Input Files
+    # =========================================================================
+    echo ""
+    echo "📝 Setting up input files..."
+
+    mkdir -p .tasks/docs
+    cp "$PRD_FILE" ".tasks/docs/prd.txt"
+    [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && cp "$ARCH_FILE" ".tasks/docs/architecture.md"
+
+    # =========================================================================
+    # Phase 5: Run Tasks CLI Intake
+    # =========================================================================
+    echo ""
+    echo "🚀 Phase 3: Running tasks CLI intake"
+    echo "====================================="
+
+    # Verify tasks CLI is available
+    if ! command -v tasks &> /dev/null; then
+        echo "❌ tasks CLI not found in PATH"
+        exit 1
+    fi
+    echo "✓ tasks CLI found: $(which tasks)"
+    tasks --version 2>&1 || true
+
+    # Build intake command
+    INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
+
+    # Add architecture if present
+    [ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
+
+    # Add model if specified
+    [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
+
+    # Optionally skip expansion/analysis
+    [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
+    [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
+
+    echo "  → Running: $INTAKE_CMD"
+    eval "$INTAKE_CMD" || exit 1
+
+    # Verify tasks were generated
+    TASKS_FILE=".tasks/tasks/tasks.json"
+    if [ ! -f "$TASKS_FILE" ]; then
+        echo "❌ tasks.json not found at $TASKS_FILE"
+        exit 1
+    fi
+
+    TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
+    echo "✅ Generated $TASK_COUNT tasks with documentation"
+
+    # =========================================================================
+    # Phase 6: Create Pull Request
+    # =========================================================================
+    echo ""
+    echo "🔀 Phase 4: Creating Pull Request"
+    echo "=================================="
+
+    cd "$CLONE_DIR" || exit 1
+
+    BRANCH_NAME="intake-${PROJECT_DIR_NAME}-$(date +%Y%m%d-%H%M%S)"
+    git checkout -b "$BRANCH_NAME"
+    git add -A
+    git commit -m "feat: intake for $PROJECT_NAME
+
+    - $TASK_COUNT tasks generated
+    - XML + Markdown documentation per task
+    - Agent routing hints added
+    - Complexity analysis: $ANALYZE_COMPLEXITY
+    - Task expansion: $EXPAND_TASKS
+
+    🤖 Generated by Morgan (tasks CLI v2)"
+
+    git push -u origin "$BRANCH_NAME"
+
+    gh pr create \
+        --title "🚀 Intake: $PROJECT_NAME" \
+        --body "## Intake: $PROJECT_NAME
+
+    ### Generated Structure
+    \`\`\`
+    $PROJECT_DIR_NAME/
+    ├── .tasks/
+    │   ├── docs/
+    │   │   ├── prd.txt
+    │   │   ├── architecture.md (if provided)
+    │   │   └── task-*/
+    │   │       ├── prompt.xml
+    │   │       ├── prompt.md
+    │   │       └── acceptance.md
+    │   ├── tasks/
+    │   │   └── tasks.json
+    │   └── reports/
+    │       └── complexity-report.json
+    \`\`\`
+
+    ### Stats
+    - **Tasks**: $TASK_COUNT
+    - **Model**: $PRIMARY_MODEL
+    - **Expansion**: $EXPAND_TASKS
+    - **Complexity**: $ANALYZE_COMPLEXITY
+
+    🤖 Generated by Morgan (tasks CLI v2)" \
+        --head "$BRANCH_NAME" \
+        --base main || echo "⚠️ PR creation failed, branch pushed: $BRANCH_NAME"
+
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ ✅ Intake completed successfully!"
+    echo "════════════════════════════════════════════════════════════════"
+{{- end }}

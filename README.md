@@ -76,15 +76,20 @@ Your entire platform can run on air-gapped infrastructure while still being acce
 
 Replace expensive managed cloud services with open-source Kubernetes operators:
 
-| Operator | Replaces | Savings |
-|----------|----------|---------|
-| **CloudNative-PG** | AWS RDS, Cloud SQL, Azure PostgreSQL | ~70-80% |
-| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% |
-| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% |
-| **Redis Operator** | ElastiCache, Memorystore | ~70-80% |
-| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% |
-| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% |
-| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% |
+| Operator | Replaces | Savings | License |
+|----------|----------|---------|---------|
+| **CloudNative-PG** | AWS RDS PostgreSQL, Cloud SQL, Azure PostgreSQL | ~70-80% | Apache 2.0 |
+| **Percona MySQL** | AWS RDS MySQL, Aurora, Cloud SQL MySQL | ~70-80% | Apache 2.0 |
+| **Percona MongoDB** | MongoDB Atlas, DocumentDB | ~60-70% | Apache 2.0 |
+| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% | Apache 2.0 |
+| **RabbitMQ** | Amazon MQ, CloudAMQP | ~70-80% | MPL 2.0 |
+| **NATS** | AWS SNS/SQS, GCP Pub/Sub | ~80-90% | Apache 2.0 |
+| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% | AGPL 3.0 |
+| **Redis Operator** | ElastiCache, Memorystore | ~70-80% | Apache 2.0 |
+| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% | Apache 2.0 |
+| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
+| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% | Apache 2.0 |
+| **Keycloak** | AWS Cognito, Auth0, Okta | ~90%+ | Apache 2.0 |
 
 **Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
 
