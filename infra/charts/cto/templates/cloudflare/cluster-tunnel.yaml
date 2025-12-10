@@ -15,6 +15,9 @@ spec:
     domain: {{ .Values.cloudflare.domain }}
     secret: {{ .Values.cloudflare.secretName }}
     accountId: {{ .Values.cloudflare.accountId }}
+    {{- if .Values.cloudflare.email }}
+    email: {{ .Values.cloudflare.email }}
+    {{- end }}
   fallbackTarget: http_status:404
 {{- end }}
 

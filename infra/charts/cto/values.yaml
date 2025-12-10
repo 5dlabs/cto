@@ -448,6 +448,8 @@ cloudflare:
   domain: 5dlabs.ai
   # Cloudflare Account ID
   accountId: b73ec19faa187789b3f9d1deb0e0d95f
+  # Email for API Key authentication
+  email: j@jonathonfritz.com
   # Secret name (in cloudflare-operator-system namespace)
   secretName: cloudflare-api-credentials
 
