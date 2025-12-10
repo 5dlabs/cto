@@ -56,6 +56,8 @@ spec:
     - 'https://operator.min.io'
     # ClickHouse Operator (Altinity)
     - 'https://github.com/Altinity/clickhouse-operator'
+    # External Secrets Operator Helm chart repository
+    - 'https://charts.external-secrets.io'
 
   # Destinations that applications in this project can deploy to
   destinations:
