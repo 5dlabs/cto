@@ -112,7 +112,7 @@ The platform is under active development.
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, Kafka, Redis, MinIO, OpenSearch, ClickHouse, QuestDB)  
+✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, MinIO, OpenSearch, ClickHouse, QuestDB, Keycloak)  
 ✅ Long-term memory with OpenMemory  
 ✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
