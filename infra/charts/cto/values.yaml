@@ -483,7 +483,7 @@ buildkit:
 
   service:
     # NodePort for remote access from build machines
-    nodePort: 30501
+    nodePort: 30502
 
   # Schedule on worker node (more resources - 16 cores, 128GB RAM)
   nodeSelector:
