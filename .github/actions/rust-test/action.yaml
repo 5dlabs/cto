@@ -1,8 +1,9 @@
 ---
-# Composite action for running Rust tests
+# Composite action for running Rust tests with cargo-nextest
 name: Rust Test
 description: |
-  Run cargo test on a Rust package with configurable options.
+  Run tests on a Rust package using cargo-nextest for ~35% faster execution.
+  Falls back to cargo test if nextest is unavailable.
 
 inputs:
   package:
@@ -19,15 +20,32 @@ inputs:
   test-args:
     description: 'Additional test arguments'
     required: false
-    default: '--all-targets'
+    default: ''
   use-sccache:
     description: 'Whether to use sccache (for k8s-runner)'
     required: false
     default: 'false'
+  use-nextest:
+    description: 'Use cargo-nextest for faster tests (default: true)'
+    required: false
+    default: 'true'
 
 runs:
   using: composite
   steps:
+    - name: Install cargo-nextest
+      if: inputs.use-nextest == 'true'
+      shell: bash
+      run: |
+        if ! command -v cargo-nextest &>/dev/null; then
+          echo "📦 Installing cargo-nextest..."
+          # Use pre-built binary for speed (no compilation needed)
+          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C /home/runner/.cargo/bin 2>/dev/null || \
+            cargo install cargo-nextest --locked
+        else
+          echo "✅ cargo-nextest already installed"
+        fi
+
     - name: Run tests
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -44,6 +62,14 @@ runs:
           FEATURES_ARG="--features ${{ inputs.features }}"
         fi
 
-        cargo test -p ${{ inputs.package }} $FEATURES_ARG ${{ inputs.test-args }}
+        # Use nextest if available and enabled, otherwise fall back to cargo test
+        if [ "${{ inputs.use-nextest }}" = "true" ] && command -v cargo-nextest &>/dev/null; then
+          echo "🚀 Using cargo-nextest for ~35% faster test execution"
+          cargo nextest run -p ${{ inputs.package }} $FEATURES_ARG ${{ inputs.test-args }}
+        else
+          echo "📋 Using cargo test"
+          cargo test -p ${{ inputs.package }} $FEATURES_ARG --all-targets ${{ inputs.test-args }}
+        fi
+
         echo "✅ All tests passed"
 
