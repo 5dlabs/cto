@@ -79,15 +79,36 @@ spec:
               value: {{ .Values.tools.service.port | quote }}
             - name: RUST_LOG
               value: "info,kube=debug,tools=trace"
+            - name: SYSTEM_CONFIG_PATH
+              value: "/config"
             # Set HOME to match the Dockerfile's app user home directory
             - name: HOME
               value: "/home/app"
             # Docker host points to the dind sidecar via shared socket
             - name: DOCKER_HOST
               value: "unix:///var/run/docker.sock"
+            {{- if .Values.tools.config.secrets.context7 }}
+            - name: CONTEXT7_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.tools.config.secrets.context7 }}
+                  key: CONTEXT7_API_KEY
+                  optional: true
+            {{- end }}
+            {{- if .Values.tools.config.secrets.github }}
+            - name: GITHUB_PERSONAL_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.tools.config.secrets.github }}
+                  key: GITHUB_PERSONAL_ACCESS_TOKEN
+                  optional: true
+            {{- end }}
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
             - name: data
               mountPath: /data
             - name: home-app
@@ -119,6 +140,9 @@ spec:
               cpu: 500m
               memory: 512Mi
       volumes:
+        - name: config
+          configMap:
+            name: {{ include "cto.tools.fullname" . }}-config
         - name: data
           {{- if .Values.tools.persistence.enabled }}
           persistentVolumeClaim:
