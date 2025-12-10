@@ -1,0 +1,228 @@
+---
+# POC: Controller CI with Depot.dev for faster Docker builds
+#
+# This workflow is a proof of concept for using Depot.dev to accelerate
+# Docker image builds. It mirrors controller-ci.yaml but uses Depot for
+# the build-and-push step.
+#
+# Benefits of Depot:
+#   - Persistent build cache across CI runs (no more cold builds)
+#   - 16 CPU / 32GB RAM builders (vs GitHub's 2 CPU runners)
+#   - Native multi-platform builds without QEMU emulation
+#   - Direct push to registries from Depot infrastructure
+#
+# Setup required:
+#   1. Create a Depot account: https://depot.dev/sign-up
+#   2. Create a project in Depot for this repo
+#   3. Configure OIDC trust relationship:
+#      - Go to Project Settings > Trust Relationships
+#      - Add GitHub Actions OIDC with repo: 5dlabs/cto
+#   4. Update DEPOT_PROJECT_ID secret or depot.json with your project ID
+#
+name: Controller CI (Depot POC)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/controller-ci-depot.yaml'
+      - 'crates/controller/**'
+      - 'templates/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/controller-ci-depot.yaml'
+      - 'crates/controller/**'
+      - 'templates/**'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force Docker build even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Rust build (same as main workflow - using k8s-runner with sccache)
+  build-rust:
+    runs-on: [k8s-runner]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short-sha: ${{ steps.version.outputs.short-sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build controller binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: controller
+          binary: agent-controller
+          working-directory: ./crates/controller
+          output-path: ../../agent-controller
+          use-sccache: 'true'
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/controller/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "controller") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "📦 Version: $VERSION"
+          echo "🔖 SHA: $SHORT_SHA"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: controller-binary
+          path: agent-controller
+          retention-days: 1
+
+  # Docker build with Depot - the interesting part!
+  build-docker-depot:
+    needs: [build-rust]
+    if: github.event_name == 'push' || github.event.inputs.force_build == 'true'
+    runs-on: ubuntu-latest  # Depot builds remotely, so we just need a runner to orchestrate
+    permissions:
+      contents: read
+      packages: write
+      id-token: write  # Required for OIDC authentication with Depot
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: controller-binary
+          path: .
+
+      - name: Make binary executable
+        run: chmod +x agent-controller
+
+      # Setup Depot CLI
+      - name: Setup Depot CLI
+        uses: depot/setup-action@v1
+
+      # Login to GHCR (Depot will use these credentials to push)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate tags
+      - name: Generate image metadata
+        id: meta
+        run: |
+          VERSION="${{ needs.build-rust.outputs.version }}"
+          SHA="${{ needs.build-rust.outputs.short-sha }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller"
+
+          TAGS="${IMAGE}:latest"
+          TAGS+=$'\n'"${IMAGE}:v${VERSION}"
+          TAGS+=$'\n'"${IMAGE}:${SHA}"
+          TAGS+=$'\n'"${IMAGE}:depot-poc"
+
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$TAGS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "📦 Image tags:"
+          echo "$TAGS"
+
+      # Build and push with Depot
+      # Using OIDC authentication (recommended - no secrets needed!)
+      - name: Build and push with Depot
+        uses: depot/build-push-action@v1
+        with:
+          # Project ID from depot.json in repo root (w9np5s6src)
+          # Can also use: project: ${{ secrets.DEPOT_PROJECT_ID }}
+          context: .
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          # Depot handles caching automatically - no need to configure!
+
+      - name: Build summary
+        run: |
+          {
+            echo "## 🚀 Docker Image Built with Depot"
+            echo ""
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller\`"
+            echo ""
+            echo "**Tags:**"
+            echo "${{ steps.meta.outputs.tags }}" | while read -r tag; do
+              [ -n "$tag" ] && echo "- \`$tag\`"
+            done
+            echo ""
+            echo "### Depot Benefits"
+            echo "- ✅ Persistent layer cache (survives between CI runs)"
+            echo "- ✅ 16 CPU / 32GB RAM remote builder"
+            echo "- ✅ Direct push to GHCR from Depot infrastructure"
+            echo "- ✅ OIDC authentication (no static tokens)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Comparison job - build with standard docker/build-push-action for timing comparison
+  build-docker-standard:
+    needs: [build-rust]
+    if: github.event_name == 'push' || github.event.inputs.force_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: controller-binary
+          path: .
+
+      - name: Make binary executable
+        run: chmod +x agent-controller
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (standard)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:standard-poc
+          # GitHub Actions cache (for comparison)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build summary
+        run: |
+          {
+            echo "## 🐳 Docker Image Built (Standard)"
+            echo ""
+            echo "**Tag:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:standard-poc\`"
+            echo ""
+            echo "This build uses standard docker/build-push-action with GitHub Actions cache."
+            echo "Compare timing with the Depot build to see the difference!"
+          } >> "$GITHUB_STEP_SUMMARY"
