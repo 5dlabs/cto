@@ -33,7 +33,7 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://scylla-operator-charts.storage.googleapis.com
+    repoURL: https://scylla-operator-charts.storage.googleapis.com/stable
     chart: scylla-operator
     targetRevision: "1.14.0"
     helm:
