@@ -1,0 +1,115 @@
+---
+# RabbitMQ Cluster Operator
+# License: MPL 2.0 - Safe to distribute (file-level copyleft only)
+# Source: https://github.com/rabbitmq/cluster-operator
+#
+# Features:
+# - RabbitMQ cluster lifecycle management
+# - Automatic peer discovery
+# - TLS support
+# - Prometheus metrics
+# - Topology Operator for declarative queues/exchanges
+# - Messaging Topology Operator for policies
+#
+# AWS Replacement: Amazon MQ, SQS (different paradigm)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rabbitmq-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: rabbitmq-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: messaging-operator
+    app.kubernetes.io/type: message-queue
+    platform.5dlabs.io/license: mpl-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: platform
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: rabbitmq-cluster-operator
+    targetRevision: "4.3.26"
+    helm:
+      values: |
+        # Cluster Operator configuration
+        clusterOperator:
+          replicaCount: 1
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # Watch all namespaces
+          watchAllNamespaces: true
+
+          # Pod labels for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: rabbitmq-operator
+
+        # Messaging Topology Operator (for declarative queue/exchange management)
+        msgTopologyOperator:
+          replicaCount: 1
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+
+        # Install CRDs
+        installCRDs: true
+
+        # Use cert-manager for webhook certificates
+        useCertManager: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD and webhook differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle

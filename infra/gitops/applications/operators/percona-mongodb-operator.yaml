@@ -1,0 +1,85 @@
+---
+# Percona Operator for MongoDB (Percona Server for MongoDB)
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/percona/percona-server-mongodb-operator
+#
+# Features:
+# - Replica sets with automatic failover
+# - Sharded clusters
+# - Automated backups (physical & logical) to S3/GCS/Azure
+# - Point-in-time recovery
+# - PMM monitoring integration
+# - Encryption at rest
+#
+# AWS Replacement: DocumentDB, MongoDB Atlas
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: percona-mongodb-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: percona-mongodb-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/type: document
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: platform
+  source:
+    repoURL: https://percona.github.io/percona-helm-charts
+    chart: psmdb-operator
+    targetRevision: "1.18.0"
+    helm:
+      values: |
+        # Watch all namespaces for PerconaServerMongoDB resources
+        watchAllNamespaces: true
+
+        # Operator resources
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Disable telemetry
+        disableTelemetry: true
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: percona-mongodb-operator
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD annotation differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion
