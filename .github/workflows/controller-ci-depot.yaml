@@ -23,7 +23,7 @@ name: Controller CI (Depot POC)
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/research-email-digest']
     paths:
       - '.github/workflows/controller-ci-depot.yaml'
       - 'crates/controller/**'
