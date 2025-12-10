@@ -27,31 +27,36 @@ spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "cto.tools.fullname" . }}
       securityContext:
+        # Match the 'app' user/group from the container image (UID/GID 1001)
         fsGroup: 1001
-        supplementalGroups: [2375]  # Docker group for Docker socket access
       initContainers:
         - name: setup-directories
           image: alpine:latest
           command: ["/bin/sh", "-c"]
           args:
             - |
-              echo "Setting up npm cache and docker data directories..."
-              # Setup npm cache in home directory
-              mkdir -p /home/mcp/.npm
-              mkdir -p /home/mcp/.npm/_logs
-              chown -R 1001:2375 /home/mcp
-              chmod 755 /home/mcp/.npm
+              echo "Setting up directories..."
+              # Setup npm cache in home directory (matches Dockerfile /home/app)
+              mkdir -p /home/app/.npm
+              mkdir -p /home/app/.npm/_logs
+              chown -R 1001:1001 /home/app
+              chmod 755 /home/app/.npm
               
-              # Setup docker data directory for persistent image storage
-              mkdir -p /data/docker-data
-              chown -R root:root /data/docker-data
+              # Setup data directory with correct ownership for app user
+              mkdir -p /data/workspace
+              chown -R 1001:1001 /data
+              
+              # Docker data directory is managed by the dind sidecar (runs as root)
+              mkdir -p /docker-data
               
               echo "Setup complete"
           volumeMounts:
             - name: data
               mountPath: /data
-            - name: home-mcp
-              mountPath: /home/mcp
+            - name: home-app
+              mountPath: /home/app
+            - name: docker-data
+              mountPath: /docker-data
       containers:
         - name: tools
           image: "{{ include "cto.imageRef" (dict "component" "tools" "image" .Values.tools.image "global" .Values.global) }}"
@@ -64,7 +69,7 @@ spec:
             readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: 1001
-            runAsGroup: 2375
+            runAsGroup: 1001
           ports:
             - name: http
               containerPort: {{ .Values.tools.service.port }}
@@ -74,13 +79,19 @@ spec:
               value: {{ .Values.tools.service.port | quote }}
             - name: RUST_LOG
               value: "info,kube=debug,tools=trace"
+            # Set HOME to match the Dockerfile's app user home directory
+            - name: HOME
+              value: "/home/app"
+            # Docker host points to the dind sidecar via shared socket
+            - name: DOCKER_HOST
+              value: "unix:///var/run/docker.sock"
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           volumeMounts:
             - name: data
               mountPath: /data
-            - name: home-mcp
-              mountPath: /home/mcp
+            - name: home-app
+              mountPath: /home/app
             - name: docker-sock-dir
               mountPath: /var/run
             - name: tmp
@@ -115,7 +126,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
-        - name: home-mcp
+        - name: home-app
           emptyDir: {}
         - name: docker-sock-dir
           emptyDir: {}
