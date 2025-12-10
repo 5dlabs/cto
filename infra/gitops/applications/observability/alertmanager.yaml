@@ -58,17 +58,17 @@ spec:
           - secretRef:
               name: alertmanager-discord-secret
 
-        # Extra secret mounts for Discord webhook URL (kept for backwards compatibility)
+        # Extra secret mounts for Discord webhook URL
+        # Mount at /secrets/discord to avoid conflict with ConfigMap at /etc/alertmanager
         extraSecretMounts:
           - name: discord-webhook
             secretName: alertmanager-discord-secret
-            mountPath: /etc/alertmanager/secrets/discord
+            mountPath: /secrets/discord
             readOnly: true
 
         # Alertmanager configuration
         # Uses native Discord integration (no sidecar needed)
-        # Note: Using webhook_url with file path workaround - the secret is mounted
-        # and read via the file system since env var substitution isn't supported
+        # Note: webhook_url_file reads the URL from a file at runtime
         config:
           global:
             resolve_timeout: 5m
@@ -99,28 +99,28 @@ spec:
             # Default receiver - all alerts go to Discord
             - name: 'discord-default'
               discord_configs:
-                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                - webhook_url_file: /secrets/discord/DISCORD_WEBHOOK_URL
                   send_resolved: true
                   title: '{{ template "discord.default.title" . }}'
                   message: '{{ template "discord.default.message" . }}'
             # Critical alerts - same Discord channel but could be different
             - name: 'discord-critical'
               discord_configs:
-                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                - webhook_url_file: /secrets/discord/DISCORD_WEBHOOK_URL
                   send_resolved: true
                   title: '🚨 CRITICAL: {{ template "discord.default.title" . }}'
                   message: '{{ template "discord.default.message" . }}'
             # Warning alerts
             - name: 'discord-warning'
               discord_configs:
-                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                - webhook_url_file: /secrets/discord/DISCORD_WEBHOOK_URL
                   send_resolved: true
                   title: '⚠️ Warning: {{ template "discord.default.title" . }}'
                   message: '{{ template "discord.default.message" . }}'
             # Webhook monitoring alerts
             - name: 'discord-webhooks'
               discord_configs:
-                - webhook_url_file: /etc/alertmanager/secrets/discord/DISCORD_WEBHOOK_URL
+                - webhook_url_file: /secrets/discord/DISCORD_WEBHOOK_URL
                   send_resolved: true
                   title: '🔗 Webhook Alert: {{ template "discord.default.title" . }}'
                   message: |
