@@ -431,6 +431,15 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
     // TODO: Parse document links from description (e.g., Linear document URLs).
     let architecture_content = None;
 
+    // Extract repository URL from description (if present)
+    // If not found, the workflow will create a new repo based on the project name
+    let repository_url = extract_repository_url(&raw_description);
+    if let Some(ref url) = repository_url {
+        info!(url = %url, "Extracted repository URL from description");
+    } else {
+        info!(project_name = %project_name, "No repository URL found - will create new repo");
+    }
+
     Ok(IntakeRequest {
         session_id: session_id.to_string(),
         prd_issue_id: issue.id.clone(),
@@ -440,12 +449,52 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         project_name: Some(project_name),
         prd_content,
         architecture_content,
-        repository_url: None, // Not extracted from attachments in this version
+        repository_url,
         github_visibility,
         source_branch: None, // Default to main
         tech_stack,
         cto_config,
     })
+}
+
+/// Extract GitHub repository URL from issue description.
+///
+/// Looks for patterns like:
+/// - **Repository:** https://github.com/org/repo
+/// - Repository: https://github.com/org/repo
+/// - https://github.com/org/repo (standalone URL on its own line)
+#[must_use]
+fn extract_repository_url(description: &str) -> Option<String> {
+    use regex::Regex;
+
+    // Pattern to match GitHub URLs (with optional .git suffix)
+    let github_url_pattern =
+        Regex::new(r"https://github\.com/[\w.-]+/[\w.-]+(?:\.git)?").ok()?;
+
+    // First, look for explicit "Repository:" label (highest priority)
+    for line in description.lines() {
+        let line_lower = line.to_lowercase();
+        if line_lower.contains("repository:") || line_lower.contains("repo:") {
+            if let Some(captures) = github_url_pattern.find(line) {
+                let url = captures.as_str().trim_end_matches(".git");
+                return Some(url.to_string());
+            }
+        }
+    }
+
+    // Fallback: find GitHub URL that appears on its own line (not inline in prose)
+    for line in description.lines() {
+        let trimmed = line.trim();
+        // Only match if the line is primarily just a URL (possibly with markdown formatting)
+        if trimmed.starts_with("http") || trimmed.starts_with("**http") || trimmed.starts_with("[http") {
+            if let Some(captures) = github_url_pattern.find(trimmed) {
+                let url = captures.as_str().trim_end_matches(".git");
+                return Some(url.to_string());
+            }
+        }
+    }
+
+    None
 }
 
 /// Sanitize a string for use as a GitHub repository name.
