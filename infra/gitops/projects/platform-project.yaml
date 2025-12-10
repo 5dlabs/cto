@@ -129,6 +129,9 @@ spec:
     # NATS Messaging
     - namespace: nats
       server: https://kubernetes.default.svc
+    # RabbitMQ Operator
+    - namespace: rabbitmq-system
+      server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
   clusterResourceWhitelist:

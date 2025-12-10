@@ -11,6 +11,9 @@
 # - Topology Operator for declarative queues/exchanges
 # - Messaging Topology Operator for policies
 #
+# Note: Using official RabbitMQ operator manifest instead of Bitnami Helm chart
+# due to Bitnami image availability issues.
+#
 # AWS Replacement: Amazon MQ, SQS (different paradigm)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -30,58 +33,16 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://charts.bitnami.com/bitnami
-    chart: rabbitmq-cluster-operator
-    targetRevision: "4.4.34"
-    helm:
-      values: |
-        # Cluster Operator configuration
-        clusterOperator:
-          replicaCount: 1
-
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-
-          # Watch all namespaces
-          watchAllNamespaces: true
-
-          # Pod labels for log collection
-          podLabels:
-            platform.5dlabs.io/log-collection: enabled
-
-          podAnnotations:
-            logs.platform.5dlabs.io/collect: "true"
-            logs.platform.5dlabs.io/service: rabbitmq-operator
-
-        # Messaging Topology Operator (for declarative queue/exchange management)
-        msgTopologyOperator:
-          replicaCount: 1
-
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 200m
-              memory: 256Mi
-
-          podLabels:
-            platform.5dlabs.io/log-collection: enabled
-
-        # Install CRDs
-        installCRDs: true
-
-        # Use cert-manager for webhook certificates
-        useCertManager: true
+    repoURL: https://github.com/rabbitmq/cluster-operator
+    path: .
+    targetRevision: v2.11.0
+    directory:
+      recurse: false
+      include: "cluster-operator.yml"
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra
+    namespace: rabbitmq-system
 
   syncPolicy:
     automated:
