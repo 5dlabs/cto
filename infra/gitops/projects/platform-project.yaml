@@ -58,6 +58,20 @@ spec:
     - 'https://github.com/Altinity/clickhouse-operator'
     # External Secrets Operator Helm chart repository
     - 'https://charts.external-secrets.io'
+    # Percona Operators (MySQL/MongoDB)
+    - 'https://percona.github.io/percona-helm-charts'
+    # RabbitMQ Operator
+    - 'https://charts.bitnami.com/bitnami'
+    # NATS Helm charts
+    - 'https://nats-io.github.io/k8s/helm/charts/'
+    # Keycloak Operator (raw GitHub manifests)
+    - 'https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/refs/heads/main/kubernetes'
+    # Temporal Operator (OCI)
+    - 'ghcr.io/alexandrevilain/temporal-operator'
+    # ScyllaDB Operator
+    - 'https://scylla-operator-charts.storage.googleapis.com'
+    # Strimzi Kafka Operator
+    - 'https://strimzi.io/charts/'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -102,6 +116,18 @@ spec:
     - namespace: minio-operator
       server: https://kubernetes.default.svc
     - namespace: minio-screenshots
+      server: https://kubernetes.default.svc
+    # Keycloak Identity
+    - namespace: keycloak
+      server: https://kubernetes.default.svc
+    # Temporal Workflow Engine
+    - namespace: temporal-system
+      server: https://kubernetes.default.svc
+    # ScyllaDB Operator
+    - namespace: scylla-operator
+      server: https://kubernetes.default.svc
+    # NATS Messaging
+    - namespace: nats
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
@@ -155,6 +181,27 @@ spec:
       kind: '*'
     # External Secrets Operator CRDs (ClusterSecretStore is cluster-scoped)
     - group: 'external-secrets.io'
+      kind: '*'
+    # Percona MySQL (PXC) CRDs
+    - group: 'pxc.percona.com'
+      kind: '*'
+    # Percona MongoDB (PSMDB) CRDs
+    - group: 'psmdb.percona.com'
+      kind: '*'
+    # RabbitMQ CRDs
+    - group: 'rabbitmq.com'
+      kind: '*'
+    # Keycloak CRDs
+    - group: 'k8s.keycloak.org'
+      kind: '*'
+    # Temporal CRDs
+    - group: 'temporal.io'
+      kind: '*'
+    # ScyllaDB CRDs
+    - group: 'scylla.scylladb.com'
+      kind: '*'
+    # Strimzi Kafka CRDs
+    - group: 'kafka.strimzi.io'
       kind: '*'
 
   # Namespace resource whitelist
@@ -220,6 +267,27 @@ spec:
     # External Secrets Operator CRDs
     - group: 'external-secrets.io'
       kind: '*'
+    # Percona MySQL (PXC) CRDs
+    - group: 'pxc.percona.com'
+      kind: '*'
+    # Percona MongoDB (PSMDB) CRDs
+    - group: 'psmdb.percona.com'
+      kind: '*'
+    # RabbitMQ CRDs
+    - group: 'rabbitmq.com'
+      kind: '*'
+    # Keycloak CRDs
+    - group: 'k8s.keycloak.org'
+      kind: '*'
+    # Temporal CRDs
+    - group: 'temporal.io'
+      kind: '*'
+    # ScyllaDB CRDs
+    - group: 'scylla.scylladb.com'
+      kind: '*'
+    # Strimzi Kafka CRDs
+    - group: 'kafka.strimzi.io'
+      kind: '*'
 
   # Roles for access control
   roles:
@@ -264,6 +332,3 @@ spec:
         - '*'
       namespaces:
         - '*'
-
-
-
