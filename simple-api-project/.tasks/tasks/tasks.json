@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "title": "PRD Review Required",
+      "description": "The tasks CLI is not available. Please use the PRD in .tasks/docs/prd.txt to manually create tasks or run tasks CLI locally.",
+      "status": "pending",
+      "priority": "high"
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-10T13:07:32Z",
+    "fallback_mode": true,
+    "message": "Generated in fallback mode - tasks CLI not available"
+  }
+}
