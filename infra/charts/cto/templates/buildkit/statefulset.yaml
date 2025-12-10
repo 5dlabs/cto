@@ -1,0 +1,86 @@
+{{- if .Values.buildkit.enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: buildkit
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: buildkit
+    app.kubernetes.io/name: buildkit
+    app.kubernetes.io/component: build-infrastructure
+spec:
+  serviceName: buildkit
+  replicas: 1
+  selector:
+    matchLabels:
+      app: buildkit
+  template:
+    metadata:
+      labels:
+        app: buildkit
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/buildkitd: unconfined
+    spec:
+      {{- if .Values.buildkit.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.buildkit.nodeSelector | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: buildkitd
+          image: {{ .Values.buildkit.image.repository }}:{{ .Values.buildkit.image.tag }}
+          args:
+            - --addr
+            - unix:///run/buildkit/buildkitd.sock
+            - --addr
+            - tcp://0.0.0.0:1234
+            {{- if .Values.buildkit.config.insecureRegistries }}
+            - --config
+            - /etc/buildkit/buildkitd.toml
+            {{- end }}
+          ports:
+            - name: buildkit
+              containerPort: 1234
+              protocol: TCP
+          securityContext:
+            privileged: true
+          resources:
+            {{- toYaml .Values.buildkit.resources | nindent 12 }}
+          volumeMounts:
+            - name: buildkit-cache
+              mountPath: /var/lib/buildkit
+            - name: cargo-cache
+              mountPath: /cargo-cache
+            {{- if .Values.buildkit.config.insecureRegistries }}
+            - name: buildkit-config
+              mountPath: /etc/buildkit
+            {{- end }}
+          env:
+            - name: BUILDKIT_STEP_LOG_MAX_SIZE
+              value: "{{ .Values.buildkit.config.maxLogSize }}"
+            - name: BUILDKIT_STEP_LOG_MAX_SPEED
+              value: "{{ .Values.buildkit.config.maxLogSpeed }}"
+      volumes:
+        {{- if .Values.buildkit.config.insecureRegistries }}
+        - name: buildkit-config
+          configMap:
+            name: buildkit-config
+        {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: buildkit-cache
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.global.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.buildkit.cache.buildkitSize }}
+    - metadata:
+        name: cargo-cache
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.global.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.buildkit.cache.cargoSize }}
+{{- end }}

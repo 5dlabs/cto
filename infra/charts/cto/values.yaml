@@ -461,3 +461,59 @@ cloudflare:
       hostname: pm.5dlabs.ai
     webhooks:
       hostname: github-webhooks.5dlabs.ai
+
+# =============================================================================
+# BuildKit - Remote Build Infrastructure
+# =============================================================================
+# High-performance build server running on the cluster.
+# Enables remote builds from development machines with massive cache storage.
+#
+# Setup on build machine:
+#   docker buildx create --name cluster-builder \
+#     --driver remote \
+#     tcp://<node-ip>:30501
+#   docker buildx use cluster-builder
+#
+buildkit:
+  enabled: true
+
+  image:
+    repository: moby/buildkit
+    tag: latest
+
+  service:
+    # NodePort for remote access from build machines
+    nodePort: 30501
+
+  # Schedule on worker node (more resources - 16 cores, 128GB RAM)
+  nodeSelector:
+    kubernetes.io/hostname: talos-a43-ee1
+
+  resources:
+    limits:
+      cpu: 8000m
+      memory: 32Gi
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+
+  # Persistent cache storage
+  cache:
+    # BuildKit layer cache (Docker layers, intermediate builds)
+    buildkitSize: 100Gi
+    # Cargo registry cache (Rust dependencies)
+    cargoSize: 50Gi
+
+  config:
+    # Max parallel build operations
+    maxParallelism: 8
+    # Log settings
+    maxLogSize: "10000000"
+    maxLogSpeed: "10000000"
+    # Garbage collection - keep cache for 7 days, up to 80GB
+    gcKeepDuration: "168h"
+    gcKeepBytes: 85899345920
+    # Allow pushing to local registry (HTTP)
+    insecureRegistries:
+      - "192.168.1.72:30500"
+      - "192.168.1.77:30500"
