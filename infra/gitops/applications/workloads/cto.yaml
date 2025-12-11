@@ -142,8 +142,11 @@ spec:
     # StatefulSet field defaulting by API server
     - group: apps
       kind: StatefulSet
+      name: buildkit
       jsonPointers:
         - /spec/persistentVolumeClaimRetentionPolicy
         - /spec/volumeClaimTemplates/0/status
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
 
   revisionHistoryLimit: 5
