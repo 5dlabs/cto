@@ -34,11 +34,9 @@ spec:
   project: platform
   source:
     repoURL: https://github.com/rabbitmq/cluster-operator
-    path: .
+    path: config/default
     targetRevision: v2.11.0
-    directory:
-      recurse: false
-      include: "cluster-operator.yml"
+    # Uses Kustomize to deploy from config/default directory
 
   destination:
     server: https://kubernetes.default.svc

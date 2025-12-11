@@ -67,7 +67,7 @@ spec:
   # Destination configuration
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra
+    namespace: operators
 
   # Sync policy
   syncPolicy:
