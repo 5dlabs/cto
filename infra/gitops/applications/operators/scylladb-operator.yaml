@@ -71,7 +71,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: scylla-operator
+    namespace: operators
 
   syncPolicy:
     automated:

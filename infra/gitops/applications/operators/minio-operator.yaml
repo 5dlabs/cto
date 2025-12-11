@@ -52,7 +52,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: minio-operator
+    namespace: operators
 
   syncPolicy:
     automated:
