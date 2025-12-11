@@ -15,7 +15,16 @@ path = "src/bin/pm-server.rs"
 name = "status-sync"
 path = "src/bin/status-sync.rs"
 
+[[bin]]
+name = "pm-activity"
+path = "src/bin/pm-activity.rs"
+
 [dependencies]
+# CLI
+clap.workspace = true
+
+# Async trait for emitter abstraction
+async-trait.workspace = true
 # Workspace dependencies
 tokio.workspace = true
 serde.workspace = true
