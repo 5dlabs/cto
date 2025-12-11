@@ -39,6 +39,31 @@ spec:
     kustomize:
       # Override the namespace from rabbitmq-system to operators
       namespace: operators
+      # Add security context patches to comply with PodSecurity restricted policy
+      patches:
+        - target:
+            kind: Deployment
+            name: rabbitmq-cluster-operator
+          patch: |-
+            - op: add
+              path: /spec/template/spec/securityContext
+              value:
+                runAsNonRoot: true
+                fsGroup: 1001
+                seccompProfile:
+                  type: RuntimeDefault
+            - op: add
+              path: /spec/template/spec/containers/0/securityContext
+              value:
+                runAsUser: 1001
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
 
   destination:
     server: https://kubernetes.default.svc
