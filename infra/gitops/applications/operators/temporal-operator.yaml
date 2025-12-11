@@ -63,6 +63,16 @@ spec:
           create: true
           name: temporal-operator
 
+        # Webhook certificate - use questdb-operator's issuer to avoid secret conflict
+        # Both operators use the same hardcoded secret name "webhook-server-cert"
+        webhook:
+          certManager:
+            certificate:
+              useCustomIssuer: true
+              issuerRef:
+                kind: Issuer
+                name: questdb-operator-selfsigned-issuer
+
   destination:
     server: https://kubernetes.default.svc
     namespace: operators
