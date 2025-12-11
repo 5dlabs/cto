@@ -376,7 +376,7 @@ async fn handle_session_created(
             }
 
             // Set initial plan
-            let _ = emitter
+            match emitter
                 .update_plan(&[
                     PlanStep {
                         content: "Extract PRD content".to_string(),
@@ -387,7 +387,15 @@ async fn handle_session_created(
                     PlanStep::pending("Generate tasks"),
                     PlanStep::pending("Create Linear issues"),
                 ])
-                .await;
+                .await
+            {
+                Ok(success) => {
+                    info!(success, "Updated initial plan");
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to update initial plan");
+                }
+            }
         }
 
         // Extract intake request from issue
@@ -410,7 +418,7 @@ async fn handle_session_created(
 
         // Update plan - extraction complete
         if let Some(ref emitter) = emitter {
-            let _ = emitter
+            if let Err(e) = emitter
                 .update_plan(&[
                     PlanStep::completed("Extract PRD content"),
                     PlanStep {
@@ -421,7 +429,10 @@ async fn handle_session_created(
                     PlanStep::pending("Generate tasks"),
                     PlanStep::pending("Create Linear issues"),
                 ])
-                .await;
+                .await
+            {
+                warn!(error = %e, "Failed to update plan after extraction");
+            }
         }
 
         // Submit intake workflow
@@ -442,11 +453,15 @@ async fn handle_session_created(
 
                 // Emit action activity and update plan
                 if let Some(ref emitter) = emitter {
-                    let _ = emitter
+                    match emitter
                         .emit_action("Submitted workflow", &result.workflow_name)
-                        .await;
+                        .await
+                    {
+                        Ok(id) => info!(activity_id = %id, "Emitted action activity"),
+                        Err(e) => warn!(error = %e, "Failed to emit action activity"),
+                    }
 
-                    let _ = emitter
+                    if let Err(e) = emitter
                         .update_plan(&[
                             PlanStep::completed("Extract PRD content"),
                             PlanStep::completed("Submit intake workflow"),
@@ -457,7 +472,10 @@ async fn handle_session_created(
                             PlanStep::pending("Generate tasks"),
                             PlanStep::pending("Create Linear issues"),
                         ])
-                        .await;
+                        .await
+                    {
+                        warn!(error = %e, "Failed to update plan after workflow submission");
+                    }
                 }
 
                 Ok(Json(json!({
@@ -508,7 +526,7 @@ async fn handle_session_created(
             }
 
             // Set initial plan for play workflow
-            let _ = emitter
+            if let Err(e) = emitter
                 .update_plan(&[
                     PlanStep {
                         content: "Extract task details".to_string(),
@@ -519,7 +537,10 @@ async fn handle_session_created(
                     PlanStep::pending("Quality review (Cleo/Tess)"),
                     PlanStep::pending("Create PR"),
                 ])
-                .await;
+                .await
+            {
+                warn!(error = %e, "Failed to set initial play plan");
+            }
         }
 
         // Extract play request from issue
@@ -542,7 +563,7 @@ async fn handle_session_created(
 
         // Update plan - extraction complete
         if let Some(ref emitter) = emitter {
-            let _ = emitter
+            if let Err(e) = emitter
                 .update_plan(&[
                     PlanStep::completed("Extract task details"),
                     PlanStep {
@@ -553,7 +574,10 @@ async fn handle_session_created(
                     PlanStep::pending("Quality review (Cleo/Tess)"),
                     PlanStep::pending("Create PR"),
                 ])
-                .await;
+                .await
+            {
+                warn!(error = %e, "Failed to update play plan after extraction");
+            }
         }
 
         // Submit play workflow
@@ -568,11 +592,15 @@ async fn handle_session_created(
 
                 // Emit action activity and update plan
                 if let Some(ref emitter) = emitter {
-                    let _ = emitter
+                    match emitter
                         .emit_action("Started play workflow", &result.workflow_name)
-                        .await;
+                        .await
+                    {
+                        Ok(id) => info!(activity_id = %id, "Emitted play action activity"),
+                        Err(e) => warn!(error = %e, "Failed to emit play action activity"),
+                    }
 
-                    let _ = emitter
+                    if let Err(e) = emitter
                         .update_plan(&[
                             PlanStep::completed("Extract task details"),
                             PlanStep::completed("Submit play workflow"),
@@ -583,7 +611,10 @@ async fn handle_session_created(
                             PlanStep::pending("Quality review (Cleo/Tess)"),
                             PlanStep::pending("Create PR"),
                         ])
-                        .await;
+                        .await
+                    {
+                        warn!(error = %e, "Failed to update play plan after submission");
+                    }
                 }
 
                 Ok(Json(json!({
