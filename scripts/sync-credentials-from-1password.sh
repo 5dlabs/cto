@@ -167,3 +167,7 @@ else
     echo "Next steps if you updated Cloudflare credentials:"
     echo "  kubectl rollout restart deployment/cloudflare-operator-controller-manager -n cloudflare-operator-system"
 fi
+
+
+
+
