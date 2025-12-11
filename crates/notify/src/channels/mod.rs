@@ -21,7 +21,3 @@ pub trait NotifyChannel: Send + Sync {
     /// Send a notification event to this channel.
     async fn send(&self, event: &NotifyEvent) -> Result<(), ChannelError>;
 }
-
-
-
-

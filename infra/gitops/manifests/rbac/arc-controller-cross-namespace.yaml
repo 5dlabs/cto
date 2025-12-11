@@ -48,10 +48,5 @@ roleRef:
   name: arc-controller-cross-namespace
 subjects:
   - kind: ServiceAccount
-    name: arc-controller-gha-rs-controller
-    namespace: infra
-
-
-
-
-
+    name: arc-gha-rs-controller
+    namespace: arc-systems

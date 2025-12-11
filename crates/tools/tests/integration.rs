@@ -69,15 +69,12 @@ async fn test_runtime_availability() -> Result<()> {
     let runtimes = vec!["npx", "uvx", "docker"];
 
     for runtime in runtimes {
-        match integration::common::check_runtime_available(runtime).await {
-            true => {
-                println!("✅ {} runtime is available", runtime);
-                results.add_passed(format!("{}_runtime_check", runtime));
-            }
-            false => {
-                println!("❌ {} runtime is not available", runtime);
-                results.add_skipped(format!("{}_runtime_check", runtime));
-            }
+        if integration::common::check_runtime_available(runtime).await {
+            println!("✅ {} runtime is available", runtime);
+            results.add_passed(format!("{}_runtime_check", runtime));
+        } else {
+            println!("❌ {} runtime is not available", runtime);
+            results.add_skipped(format!("{}_runtime_check", runtime));
         }
     }
 

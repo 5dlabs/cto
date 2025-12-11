@@ -85,7 +85,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra
+    namespace: cert-manager
 
   ignoreDifferences:
     - group: admissionregistration.k8s.io
