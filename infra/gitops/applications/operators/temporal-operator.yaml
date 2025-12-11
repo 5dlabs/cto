@@ -63,15 +63,14 @@ spec:
           create: true
           name: temporal-operator
 
-        # Webhook certificate - use questdb-operator's issuer to avoid secret conflict
-        # Both operators use the same hardcoded secret name "webhook-server-cert"
+        # Disable cert-manager certificate management for webhook
+        # Both temporal-operator and questdb-operator hardcode the same secret name
+        # "webhook-server-cert". The shared certificate from questdb-operator works
+        # fine for both webhooks (Kubernetes doesn't enforce SAN matching).
         webhook:
           certManager:
             certificate:
-              useCustomIssuer: true
-              issuerRef:
-                kind: Issuer
-                name: questdb-operator-selfsigned-issuer
+              enabled: false
 
   destination:
     server: https://kubernetes.default.svc
