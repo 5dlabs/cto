@@ -138,5 +138,11 @@ spec:
       jqPathExpressions:
         - .subjects
         - .tunnelRef
+    # StatefulSet field defaulting by API server
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/volumeClaimTemplates/0/status
 
   revisionHistoryLimit: 5

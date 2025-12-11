@@ -137,3 +137,11 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
+
+  # Ignore StatefulSet field defaulting by API server
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/volumeClaimTemplates/0/status
