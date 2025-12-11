@@ -142,3 +142,4 @@ agent-templates/
 
 # Local scripts (development utilities, not for version control)
 /.scripts/
+target/

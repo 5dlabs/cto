@@ -87,6 +87,12 @@ spec:
       jsonPointers:
         - /webhooks/0/clientConfig/caBundle
         - /webhooks/1/clientConfig/caBundle
+    # Namespace labels/annotations managed by multiple operators
+    - group: ""
+      kind: Namespace
+      jsonPointers:
+        - /metadata/labels
+        - /metadata/annotations
 
   # Revision history
   revisionHistoryLimit: 5

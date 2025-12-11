@@ -81,10 +81,15 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # Ignore CRD differences
+  # Ignore CRD and certificate differences
   ignoreDifferences:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       jsonPointers:
         - /metadata/annotations
         - /spec/conversion
+    # Certificate shares secret with questdb-operator, ignore issuer conflicts
+    - group: cert-manager.io
+      kind: Certificate
+      jsonPointers:
+        - /status
