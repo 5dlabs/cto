@@ -491,10 +491,9 @@ buildkit:
   nodeSelector:
     kubernetes.io/hostname: talos-a43-ee1
 
+  # No limits - let BuildKit consume what it needs from the node
+  # Node has 16 cores and 128GB RAM available
   resources:
-    limits:
-      cpu: 8000m
-      memory: 32Gi
     requests:
       cpu: 2000m
       memory: 8Gi
