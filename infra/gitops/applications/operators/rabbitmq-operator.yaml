@@ -34,7 +34,7 @@ spec:
   project: platform
   source:
     repoURL: https://github.com/rabbitmq/cluster-operator
-    path: config/default/base
+    path: config/installation
     targetRevision: v2.11.0
     kustomize:
       # Override the namespace from rabbitmq-system to operators
