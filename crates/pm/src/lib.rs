@@ -16,13 +16,15 @@
 pub mod activities;
 pub mod client;
 pub mod config;
+pub mod emitter;
 pub mod handlers;
 pub mod models;
 pub mod server;
 pub mod webhooks;
 
-pub use activities::{ActivityContent, ActivitySignal};
+pub use activities::{ActivityContent, ActivitySignal, PlanStep, PlanStepStatus};
 pub use client::LinearClient;
 pub use config::Config;
+pub use emitter::{AgentActivityEmitter, LinearAgentEmitter};
 pub use models::*;
 pub use webhooks::{verify_webhook_signature, WebhookPayload};

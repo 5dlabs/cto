@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
+use crate::activities::{PlanStep, PlanStepStatus};
 use crate::config::Config;
+use crate::emitter::{AgentActivityEmitter, LinearAgentEmitter};
 use crate::handlers::callbacks::{
     handle_intake_complete, handle_play_complete, handle_status_sync, handle_tasks_json_callback,
     CallbackState,
@@ -359,14 +361,33 @@ async fn handle_session_created(
             "Detected PRD issue - triggering intake workflow"
         );
 
-        // Emit initial thought to Linear
-        if let Some(client) = &state.linear_client {
-            if let Err(e) = client
-                .emit_thought(session_id, "Processing PRD and generating tasks...")
+        // Create emitter for activity emission
+        let emitter = state.linear_client.as_ref().map(|client| {
+            LinearAgentEmitter::new(client.clone(), session_id)
+        });
+
+        // Emit initial thought and plan
+        if let Some(ref emitter) = emitter {
+            if let Err(e) = emitter
+                .emit_thought("Processing PRD and generating tasks...", false)
                 .await
             {
                 warn!(error = %e, "Failed to emit thought activity");
             }
+
+            // Set initial plan
+            let _ = emitter
+                .update_plan(&[
+                    PlanStep {
+                        content: "Extract PRD content".to_string(),
+                        status: PlanStepStatus::InProgress,
+                    },
+                    PlanStep::pending("Submit intake workflow"),
+                    PlanStep::pending("Parse PRD with AI"),
+                    PlanStep::pending("Generate tasks"),
+                    PlanStep::pending("Create Linear issues"),
+                ])
+                .await;
         }
 
         // Extract intake request from issue
@@ -374,18 +395,34 @@ async fn handle_session_created(
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract intake request");
-                if let Some(client) = &state.linear_client {
-                    let _ = client
-                        .emit_error(session_id, format!("Failed to extract PRD: {e}"))
+                if let Some(ref emitter) = emitter {
+                    let _ = emitter
+                        .emit_error(&format!("Failed to extract PRD: {e}"))
                         .await;
                 }
                 return Ok(Json(json!({
                     "status": "error",
-                    "error": format!("Failed to extract intake request: {}", e),
+                    "error": format!("Failed to extract intake request: {e}"),
                     "session_id": session_id
                 })));
             }
         };
+
+        // Update plan - extraction complete
+        if let Some(ref emitter) = emitter {
+            let _ = emitter
+                .update_plan(&[
+                    PlanStep::completed("Extract PRD content"),
+                    PlanStep {
+                        content: "Submit intake workflow".to_string(),
+                        status: PlanStepStatus::InProgress,
+                    },
+                    PlanStep::pending("Parse PRD with AI"),
+                    PlanStep::pending("Generate tasks"),
+                    PlanStep::pending("Create Linear issues"),
+                ])
+                .await;
+        }
 
         // Submit intake workflow
         match submit_intake_workflow(
@@ -403,14 +440,23 @@ async fn handle_session_created(
                     "Intake workflow submitted"
                 );
 
-                // Emit action activity
-                if let Some(client) = &state.linear_client {
-                    let _ = client
-                        .emit_action(
-                            session_id,
-                            "Submitted intake workflow",
-                            &result.workflow_name,
-                        )
+                // Emit action activity and update plan
+                if let Some(ref emitter) = emitter {
+                    let _ = emitter
+                        .emit_action("Submitted workflow", &result.workflow_name)
+                        .await;
+
+                    let _ = emitter
+                        .update_plan(&[
+                            PlanStep::completed("Extract PRD content"),
+                            PlanStep::completed("Submit intake workflow"),
+                            PlanStep {
+                                content: "Parse PRD with AI".to_string(),
+                                status: PlanStepStatus::InProgress,
+                            },
+                            PlanStep::pending("Generate tasks"),
+                            PlanStep::pending("Create Linear issues"),
+                        ])
                         .await;
                 }
 
@@ -429,14 +475,14 @@ async fn handle_session_created(
             }
             Err(e) => {
                 error!(error = %e, "Failed to submit intake workflow");
-                if let Some(client) = &state.linear_client {
-                    let _ = client
-                        .emit_error(session_id, format!("Failed to start intake: {e}"))
+                if let Some(ref emitter) = emitter {
+                    let _ = emitter
+                        .emit_error(&format!("Failed to start intake: {e}"))
                         .await;
                 }
                 Ok(Json(json!({
                     "status": "error",
-                    "error": format!("Failed to submit intake workflow: {}", e),
+                    "error": format!("Failed to submit intake workflow: {e}"),
                     "session_id": session_id
                 })))
             }
@@ -447,14 +493,33 @@ async fn handle_session_created(
             "Detected task issue - triggering play workflow"
         );
 
-        // Emit initial thought
-        if let Some(client) = &state.linear_client {
-            if let Err(e) = client
-                .emit_thought(session_id, "Starting task implementation...")
+        // Create emitter for activity emission
+        let emitter = state.linear_client.as_ref().map(|client| {
+            LinearAgentEmitter::new(client.clone(), session_id)
+        });
+
+        // Emit initial thought and plan
+        if let Some(ref emitter) = emitter {
+            if let Err(e) = emitter
+                .emit_thought("Starting task implementation...", false)
                 .await
             {
                 warn!(error = %e, "Failed to emit thought activity");
             }
+
+            // Set initial plan for play workflow
+            let _ = emitter
+                .update_plan(&[
+                    PlanStep {
+                        content: "Extract task details".to_string(),
+                        status: PlanStepStatus::InProgress,
+                    },
+                    PlanStep::pending("Submit play workflow"),
+                    PlanStep::pending("Implementation (Rex/Blaze)"),
+                    PlanStep::pending("Quality review (Cleo/Tess)"),
+                    PlanStep::pending("Create PR"),
+                ])
+                .await;
         }
 
         // Extract play request from issue
@@ -462,18 +527,34 @@ async fn handle_session_created(
             Ok(req) => req,
             Err(e) => {
                 error!(error = %e, "Failed to extract play request");
-                if let Some(client) = &state.linear_client {
-                    let _ = client
-                        .emit_error(session_id, format!("Failed to start play: {e}"))
+                if let Some(ref emitter) = emitter {
+                    let _ = emitter
+                        .emit_error(&format!("Failed to start play: {e}"))
                         .await;
                 }
                 return Ok(Json(json!({
                     "status": "error",
-                    "error": format!("Failed to extract play request: {}", e),
+                    "error": format!("Failed to extract play request: {e}"),
                     "session_id": session_id
                 })));
             }
         };
+
+        // Update plan - extraction complete
+        if let Some(ref emitter) = emitter {
+            let _ = emitter
+                .update_plan(&[
+                    PlanStep::completed("Extract task details"),
+                    PlanStep {
+                        content: "Submit play workflow".to_string(),
+                        status: PlanStepStatus::InProgress,
+                    },
+                    PlanStep::pending("Implementation (Rex/Blaze)"),
+                    PlanStep::pending("Quality review (Cleo/Tess)"),
+                    PlanStep::pending("Create PR"),
+                ])
+                .await;
+        }
 
         // Submit play workflow
         match submit_play_workflow(&state.config.namespace, &play_request, &state.config.play).await
@@ -485,10 +566,23 @@ async fn handle_session_created(
                     "Play workflow submitted"
                 );
 
-                // Emit action activity
-                if let Some(client) = &state.linear_client {
-                    let _ = client
-                        .emit_action(session_id, "Started play workflow", &result.workflow_name)
+                // Emit action activity and update plan
+                if let Some(ref emitter) = emitter {
+                    let _ = emitter
+                        .emit_action("Started play workflow", &result.workflow_name)
+                        .await;
+
+                    let _ = emitter
+                        .update_plan(&[
+                            PlanStep::completed("Extract task details"),
+                            PlanStep::completed("Submit play workflow"),
+                            PlanStep {
+                                content: "Implementation (Rex/Blaze)".to_string(),
+                                status: PlanStepStatus::InProgress,
+                            },
+                            PlanStep::pending("Quality review (Cleo/Tess)"),
+                            PlanStep::pending("Create PR"),
+                        ])
                         .await;
                 }
 
@@ -507,14 +601,14 @@ async fn handle_session_created(
             }
             Err(e) => {
                 error!(error = %e, "Failed to submit play workflow");
-                if let Some(client) = &state.linear_client {
-                    let _ = client
-                        .emit_error(session_id, format!("Failed to start play: {e}"))
+                if let Some(ref emitter) = emitter {
+                    let _ = emitter
+                        .emit_error(&format!("Failed to start play: {e}"))
                         .await;
                 }
                 Ok(Json(json!({
                     "status": "error",
-                    "error": format!("Failed to submit play workflow: {}", e),
+                    "error": format!("Failed to submit play workflow: {e}"),
                     "session_id": session_id
                 })))
             }
