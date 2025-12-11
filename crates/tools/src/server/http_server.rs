@@ -327,7 +327,7 @@ impl ServerConnectionPool {
         let mut attempt = 0;
         loop {
             attempt += 1;
-            
+
             if self.is_docker_daemon_ready().await {
                 let elapsed = start_time.elapsed();
                 tracing::info!(
@@ -335,7 +335,7 @@ impl ServerConnectionPool {
                     elapsed.as_secs_f64(),
                     attempt
                 );
-                
+
                 // Verify Docker is actually functional by running a simple container
                 if self.verify_docker_functional().await {
                     tracing::info!("✅ Docker verified functional - container operations working");
@@ -993,7 +993,9 @@ impl BridgeState {
         let docker_start = std::time::Instant::now();
         if let Err(e) = self.connection_pool.wait_for_docker(120).await {
             tracing::warn!("⚠️ Docker daemon not available after timeout: {}", e);
-            tracing::warn!("⚠️ Docker-based MCP servers (like docker, kubernetes) will not be available");
+            tracing::warn!(
+                "⚠️ Docker-based MCP servers (like docker, kubernetes) will not be available"
+            );
             tracing::info!("📋 Other MCP servers will continue to initialize normally");
         } else {
             let docker_elapsed = docker_start.elapsed();

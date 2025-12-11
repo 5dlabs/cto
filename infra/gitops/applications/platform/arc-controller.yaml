@@ -68,7 +68,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra
+    namespace: arc-systems
 
   # Ignore CRD differences that cause sync issues
   ignoreDifferences:

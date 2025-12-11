@@ -468,8 +468,7 @@ fn extract_repository_url(description: &str) -> Option<String> {
     use regex::Regex;
 
     // Pattern to match GitHub URLs (with optional .git suffix)
-    let github_url_pattern =
-        Regex::new(r"https://github\.com/[\w.-]+/[\w.-]+(?:\.git)?").ok()?;
+    let github_url_pattern = Regex::new(r"https://github\.com/[\w.-]+/[\w.-]+(?:\.git)?").ok()?;
 
     // First, look for explicit "Repository:" label (highest priority)
     for line in description.lines() {
@@ -486,7 +485,10 @@ fn extract_repository_url(description: &str) -> Option<String> {
     for line in description.lines() {
         let trimmed = line.trim();
         // Only match if the line is primarily just a URL (possibly with markdown formatting)
-        if trimmed.starts_with("http") || trimmed.starts_with("**http") || trimmed.starts_with("[http") {
+        if trimmed.starts_with("http")
+            || trimmed.starts_with("**http")
+            || trimmed.starts_with("[http")
+        {
             if let Some(captures) = github_url_pattern.find(trimmed) {
                 let url = captures.as_str().trim_end_matches(".git");
                 return Some(url.to_string());
@@ -693,9 +695,8 @@ pub async fn submit_intake_workflow(
         .context("Failed to create HTTP client")?;
 
     let api_server = "https://kubernetes.default.svc";
-    let create_url = format!(
-        "{api_server}/apis/argoproj.io/v1alpha1/namespaces/{namespace}/workflows"
-    );
+    let create_url =
+        format!("{api_server}/apis/argoproj.io/v1alpha1/namespaces/{namespace}/workflows");
 
     let response = http_client
         .post(&create_url)
@@ -712,7 +713,9 @@ pub async fn submit_intake_workflow(
             .text()
             .await
             .unwrap_or_else(|_| "Unknown error".to_string());
-        return Err(anyhow!("Failed to create Argo workflow: HTTP {status} - {error_text}"));
+        return Err(anyhow!(
+            "Failed to create Argo workflow: HTTP {status} - {error_text}"
+        ));
     }
 
     info!(workflow_name = %workflow_name, "Submitted intake workflow");

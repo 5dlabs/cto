@@ -246,7 +246,17 @@ async fn main() -> Result<()> {
                 skip_analysis,
                 "Running digest command"
             );
-            run_digest(dir, state, force, check_and_send, test, hours_between, model, skip_analysis).await
+            run_digest(
+                dir,
+                state,
+                force,
+                check_and_send,
+                test,
+                hours_between,
+                model,
+                skip_analysis,
+            )
+            .await
         }
     }
 }
@@ -508,10 +518,7 @@ async fn run_digest(
 
     // Load digest state
     let mut digest_state = DigestState::load(&state_path)?;
-    println!(
-        "   Pending entries: {}",
-        digest_state.pending_count()
-    );
+    println!("   Pending entries: {}", digest_state.pending_count());
     if let Some(last) = digest_state.last_digest_at {
         println!("   Last digest: {}", last.format("%Y-%m-%d %H:%M UTC"));
     } else {
@@ -527,11 +534,7 @@ async fn run_digest(
     // If no pending entries tracked, use recent entries from index
     let entry_ids: Vec<String> = if digest_state.entries_since_digest.is_empty() {
         // First run or state was cleared - grab recent entries
-        index
-            .recent(20)
-            .into_iter()
-            .map(|e| e.id.clone())
-            .collect()
+        index.recent(20).into_iter().map(|e| e.id.clone()).collect()
     } else {
         digest_state.entries_since_digest.clone()
     };
@@ -550,7 +553,10 @@ async fn run_digest(
         let has_enough = config.has_enough_for_digest(pending_count);
 
         if burst_triggered {
-            println!("   ✓ Burst threshold reached ({pending_count} >= {})", config.burst_threshold);
+            println!(
+                "   ✓ Burst threshold reached ({pending_count} >= {})",
+                config.burst_threshold
+            );
             true
         } else if scheduled_time && has_enough {
             println!("   ✓ Scheduled time reached and have enough entries");
@@ -602,13 +608,13 @@ async fn run_digest(
         None
     } else {
         println!("\n🤖 Running AI analysis with {model}...");
-        
+
         // Create AI provider
         let registry = ProviderRegistry::with_defaults();
         let provider = registry
             .get_for_model(&model)
             .ok_or_else(|| anyhow::anyhow!("No provider configured for model: {model}"))?;
-        
+
         let analyzer = DigestAnalyzer::new(provider, model.clone());
         match analyzer.analyze(&entries).await {
             Ok(a) => {
@@ -631,10 +637,7 @@ async fn run_digest(
     let now = chrono::Utc::now();
     let html = DigestGenerator::generate_html(&entries, analysis.as_ref(), now);
     let text = DigestGenerator::generate_text(&entries, analysis.as_ref(), now);
-    let subject = format!(
-        "CTO Research Digest - {} new entries",
-        entries.len()
-    );
+    let subject = format!("CTO Research Digest - {} new entries", entries.len());
 
     // Send email
     println!("\n📤 Sending digest email...");

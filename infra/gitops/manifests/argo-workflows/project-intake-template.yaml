@@ -338,7 +338,3 @@ spec:
             -n cto \
             --ignore-not-found=true
           echo "Cleanup complete"
-
-
-
-

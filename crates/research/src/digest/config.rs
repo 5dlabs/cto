@@ -56,7 +56,8 @@ impl DigestConfig {
         let smtp_password = std::env::var("GMAIL_APP_PASSWORD")
             .context("GMAIL_APP_PASSWORD environment variable not set")?;
 
-        let to_email = std::env::var("DIGEST_TO_EMAIL").unwrap_or_else(|_| DEFAULT_TO_EMAIL.to_string());
+        let to_email =
+            std::env::var("DIGEST_TO_EMAIL").unwrap_or_else(|_| DEFAULT_TO_EMAIL.to_string());
 
         let burst_threshold = std::env::var("DIGEST_BURST_THRESHOLD")
             .ok()
@@ -133,7 +134,3 @@ mod tests {
         assert!(config.has_enough_for_digest(10));
     }
 }
-
-
-
-
