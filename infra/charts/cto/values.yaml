@@ -196,7 +196,7 @@ tools:
     secrets:
       context7: "tools-context7-secrets"
       github: "tools-github-secrets"
-    
+
     # MCP Servers - proxied through tools service
     servers:
       # --- Search & Web ---

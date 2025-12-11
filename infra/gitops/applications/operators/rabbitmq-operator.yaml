@@ -36,7 +36,9 @@ spec:
     repoURL: https://github.com/rabbitmq/cluster-operator
     path: config/default
     targetRevision: v2.11.0
-    # Uses Kustomize to deploy from config/default directory
+    kustomize:
+      # Override the namespace from rabbitmq-system to operators
+      namespace: operators
 
   destination:
     server: https://kubernetes.default.svc

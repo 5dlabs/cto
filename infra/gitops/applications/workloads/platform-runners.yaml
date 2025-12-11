@@ -64,7 +64,7 @@ spec:
 
         controllerServiceAccount:
           name: "arc-gha-rs-controller"
-          namespace: "infra"
+          namespace: "arc-systems"
 
         # Force persistent runner behavior with explicit configuration
         # Note: Don't override app.kubernetes.io/component - it's part of the
