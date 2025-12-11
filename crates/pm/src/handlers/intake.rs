@@ -671,7 +671,7 @@ pub async fn submit_intake_workflow(
                     {"name": "linear-issue-id", "value": request.prd_issue_id},
                     {"name": "linear-issue-identifier", "value": request.prd_identifier},
                     {"name": "linear-team-id", "value": request.team_id},
-                    {"name": "runtime-image", "value": "ghcr.io/5dlabs/runtime:latest"}
+                    {"name": "runtime-image", "value": "192.168.1.72:30500/runtime:tilt-dev"}
                 ]
             }
         }
