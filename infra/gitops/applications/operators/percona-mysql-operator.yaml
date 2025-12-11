@@ -60,7 +60,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: infra
+    namespace: operators
 
   syncPolicy:
     automated:
