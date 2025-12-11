@@ -294,7 +294,7 @@ enum Commands {
         /// Namespace to watch for pods
         #[arg(long, default_value = "agent-platform")]
         namespace: String,
-        /// Path to templates directory (defaults to HEALER_TEMPLATES_DIR env var or /app/templates/healer)
+        /// Path to templates directory (defaults to `HEALER_TEMPLATES_DIR` env var or `/app/templates/healer`)
         #[arg(
             long,
             env = "HEALER_TEMPLATES_DIR",
@@ -319,7 +319,7 @@ enum Commands {
         /// Agent name for context
         #[arg(long, default_value = "rex")]
         agent: String,
-        /// Path to templates directory (defaults to HEALER_TEMPLATES_DIR env var or /app/templates/healer)
+        /// Path to templates directory (defaults to `HEALER_TEMPLATES_DIR` env var or `/app/templates/healer`)
         #[arg(
             long,
             env = "HEALER_TEMPLATES_DIR",
