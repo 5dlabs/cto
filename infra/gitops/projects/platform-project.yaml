@@ -60,7 +60,8 @@ spec:
     - 'https://charts.external-secrets.io'
     # Percona Operators (MySQL/MongoDB)
     - 'https://percona.github.io/percona-helm-charts'
-    # RabbitMQ Operator
+    # RabbitMQ Operator (official GitHub repo - Bitnami images no longer available on Docker Hub)
+    - 'https://github.com/rabbitmq/cluster-operator'
     - 'https://charts.bitnami.com/bitnami'
     # NATS Helm charts
     - 'https://nats-io.github.io/k8s/helm/charts/'
