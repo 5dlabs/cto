@@ -65,7 +65,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: temporal-system
+    namespace: operators
 
   syncPolicy:
     automated:

@@ -35,7 +35,7 @@ spec:
     - group: apps
       kind: Deployment
       name: clickhouse-operator-altinity-clickhouse-operator
-      namespace: kube-system
+      namespace: operators
       jqPathExpressions:
         # Ignore all labels starting with clickhouse.altinity.com
         - .metadata.labels["clickhouse.altinity.com/app"]
@@ -58,13 +58,14 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system  # ClickHouse operator deploys to kube-system by default
+    namespace: operators
 
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
     retry:

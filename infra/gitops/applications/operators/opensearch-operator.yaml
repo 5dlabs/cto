@@ -79,7 +79,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: opensearch-operator
+    namespace: operators
 
   syncPolicy:
     automated:

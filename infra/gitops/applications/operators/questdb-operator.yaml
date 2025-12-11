@@ -34,7 +34,7 @@ spec:
     path: config/default
     kustomize:
       # Override namespace for the operator deployment
-      namespace: infra
+      namespace: operators
       # Add labels for log collection
       commonLabels:
         platform.5dlabs.io/log-collection: enabled
