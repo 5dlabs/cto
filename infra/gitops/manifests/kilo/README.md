@@ -173,11 +173,38 @@ kgctl graph | dot -Tsvg > network.svg
 
 ### DNS Not Working
 
+**Option 1: WireGuard Config (Basic)**
+
 Add the cluster's CoreDNS IP to your WireGuard config:
 
 ```ini
 [Interface]
 DNS = 10.96.0.10
+```
+
+**Option 2: macOS Split DNS (Recommended for macOS)**
+
+On macOS, the WireGuard DNS setting may not work correctly because macOS doesn't always respect per-interface DNS. Create a resolver for `.cluster.local`:
+
+```bash
+# Create resolver directory if it doesn't exist
+sudo mkdir -p /etc/resolver
+
+# Create resolver for cluster.local domains
+echo -e "nameserver 10.96.0.10\nsearch_order 1" | sudo tee /etc/resolver/cluster.local
+
+# Flush DNS cache
+sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
+```
+
+This approach routes only `.cluster.local` queries to the cluster DNS while using your normal DNS for everything else.
+
+**Verify DNS is working:**
+
+```bash
+# Should return the service ClusterIP
+dscacheutil -q host -a name cto-tools.cto.svc.cluster.local
 ```
 
 ## References

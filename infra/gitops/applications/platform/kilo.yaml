@@ -18,6 +18,9 @@ spec:
     repoURL: https://github.com/5dlabs/cto
     targetRevision: develop
     path: infra/gitops/manifests/kilo
+    directory:
+      recurse: true
+      exclude: '{examples/*}'
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
