@@ -139,7 +139,7 @@ spec:
       jqPathExpressions:
         - .subjects
         - .tunnelRef
-    # StatefulSet field defaulting by API server
+    # StatefulSet field defaulting by API server (buildkit has 2 PVCs)
     - group: apps
       kind: StatefulSet
       name: buildkit
@@ -148,5 +148,8 @@ spec:
         - /spec/volumeClaimTemplates/0/status
         - /spec/volumeClaimTemplates/0/apiVersion
         - /spec/volumeClaimTemplates/0/kind
+        - /spec/volumeClaimTemplates/1/status
+        - /spec/volumeClaimTemplates/1/apiVersion
+        - /spec/volumeClaimTemplates/1/kind
 
   revisionHistoryLimit: 5
