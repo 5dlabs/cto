@@ -19,7 +19,6 @@ spec:
     targetRevision: develop
     path: infra/cluster-config
     directory:
-      recurse: false
       include: observability-namespace.yaml
   destination:
     server: https://kubernetes.default.svc
