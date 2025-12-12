@@ -87,6 +87,8 @@ spec:
     - 'https://helm.goharbor.io'
     # OpenSearch
     - 'https://opensearch-project.github.io/opensearch-k8s-operator/'
+    # Cilium CNI
+    - 'https://helm.cilium.io/'
 
   # Destinations that applications in this project can deploy to
   destinations:
