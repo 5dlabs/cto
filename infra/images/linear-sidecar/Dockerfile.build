@@ -8,7 +8,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
 # Build the status-sync binary (enhanced sidecar v2)
-RUN cargo build --release -p integrations --bin status-sync
+RUN cargo build --release -p pm --bin status-sync
 
 # Runtime stage - minimal image
 FROM debian:bookworm-slim
@@ -40,6 +40,10 @@ ENV STATUS_POLL_INTERVAL_MS=5000
 # Log streaming
 ENV LOG_FILE_PATH=/workspace/agent.log
 ENV LOG_POST_INTERVAL_MS=5000
+
+# Claude stream parsing (structured activities)
+ENV CLAUDE_STREAM_FILE=/workspace/claude-stream.jsonl
+ENV STREAM_POLL_INTERVAL_MS=500
 
 # Input polling (2-way comms)
 ENV INPUT_FIFO_PATH=/workspace/agent-input.jsonl
