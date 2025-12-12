@@ -221,6 +221,9 @@ spec:
       kind: '*'
     - group: 'kubeai.org'
       kind: '*'
+    # NVIDIA GPU Operator CRDs
+    - group: 'nvidia.com'
+      kind: '*'
     # Storage Operator CRDs
     - group: 'longhorn.io'
       kind: '*'
@@ -329,6 +332,9 @@ spec:
     - group: 'llamastack.io'
       kind: '*'
     - group: 'kubeai.org'
+      kind: '*'
+    # NVIDIA GPU Operator CRDs
+    - group: 'nvidia.com'
       kind: '*'
     # Storage Operator CRDs
     - group: 'longhorn.io'
