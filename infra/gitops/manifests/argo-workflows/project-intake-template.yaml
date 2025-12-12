@@ -156,6 +156,18 @@ spec:
         args: ["/agent-templates/github_prep.sh"]
         workingDir: /workspace
         env:
+          # Linear Agent Activity emission (pm-activity)
+          - name: LINEAR_SESSION_ID
+            value: "{{workflow.parameters.linear-session-id}}"
+          - name: LINEAR_ISSUE_ID
+            value: "{{workflow.parameters.linear-issue-id}}"
+          - name: LINEAR_ISSUE_IDENTIFIER
+            value: "{{workflow.parameters.linear-issue-identifier}}"
+          - name: LINEAR_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: linear-secrets
+                key: LINEAR_OAUTH_TOKEN
           - name: GITHUB_APP_ID
             valueFrom:
               secretKeyRef:
@@ -216,6 +228,18 @@ spec:
         args: ["/agent-templates/intake_intake.sh"]
         workingDir: /workspace
         env:
+          # Linear Agent Activity emission (pm-activity)
+          - name: LINEAR_SESSION_ID
+            value: "{{workflow.parameters.linear-session-id}}"
+          - name: LINEAR_ISSUE_ID
+            value: "{{workflow.parameters.linear-issue-id}}"
+          - name: LINEAR_ISSUE_IDENTIFIER
+            value: "{{workflow.parameters.linear-issue-identifier}}"
+          - name: LINEAR_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: linear-secrets
+                key: LINEAR_OAUTH_TOKEN
           - name: ANTHROPIC_API_KEY
             valueFrom:
               secretKeyRef:
