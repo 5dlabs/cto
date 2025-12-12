@@ -7,8 +7,9 @@ use reqwest::{Client, StatusCode};
 use tracing::{debug, info, warn};
 
 use super::models::{
-    ApiResponse, CreateServerAttributes, CreateServerBody, CreateServerData,
-    ReinstallServerAttributes, ReinstallServerBody, ReinstallServerData, ServerResource,
+    ApiResponse, CreateServerAttributes, CreateServerBody, CreateServerData, PlanResource,
+    ReinstallServerAttributes, ReinstallServerBody, ReinstallServerData, RegionResource,
+    ServerResource,
 };
 use crate::providers::traits::{
     CreateServerRequest, Provider, ProviderError, ReinstallIpxeRequest, Server, ServerStatus,
@@ -317,6 +318,30 @@ impl Provider for Latitude {
     async fn list_servers(&self) -> Result<Vec<Server>, ProviderError> {
         let response: ApiResponse<Vec<ServerResource>> = self.get("/servers").await?;
         Ok(response.data.iter().map(Self::to_server).collect())
+    }
+}
+
+impl Latitude {
+    /// List all available plans.
+    ///
+    /// Returns plans with their specs, pricing, and stock availability by region.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn list_plans(&self) -> Result<Vec<PlanResource>, ProviderError> {
+        let response: ApiResponse<Vec<PlanResource>> = self.get("/plans").await?;
+        Ok(response.data)
+    }
+
+    /// List all available regions.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn list_regions(&self) -> Result<Vec<RegionResource>, ProviderError> {
+        let response: ApiResponse<Vec<RegionResource>> = self.get("/regions").await?;
+        Ok(response.data)
     }
 }
 
