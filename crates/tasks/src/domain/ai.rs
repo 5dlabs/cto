@@ -114,10 +114,11 @@ impl AIDomain {
 
         // Scale max_tokens based on number of tasks (each detailed task needs ~1000-2000 tokens)
         // Minimum 16000, scale up for large task counts
+        // Note: Claude Opus max output is 64k tokens, Sonnet is 64k
         let task_count = num_tasks.unwrap_or(10);
         let scaled_max_tokens = if task_count > 20 {
-            // For large task counts, use 128k tokens (Claude's max)
-            128_000
+            // For large task counts, use 64k tokens (Claude's max output)
+            64_000
         } else if task_count > 10 {
             // Medium task counts need more room
             32_000
