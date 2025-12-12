@@ -94,7 +94,8 @@ chmod 666 "$STREAM_OUTPUT" || true
 echo "✓ Claude stream output: $STREAM_OUTPUT"
 
 # Start Claude (reader) in background, tee output to stream file
-$CLAUDE_CMD < "$FIFO_PATH" | tee "$STREAM_OUTPUT" &
+# Use tee -u for unbuffered output so sidecar can read events in real-time
+$CLAUDE_CMD < "$FIFO_PATH" | tee -u "$STREAM_OUTPUT" &
 CLAUDE_PID=$!
 
 # Determine prompt source

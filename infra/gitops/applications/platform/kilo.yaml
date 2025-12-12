@@ -1,4 +1,9 @@
 ---
+# DEPRECATED: Kilo has been superseded by Cilium ClusterMesh
+# This application is kept for backward compatibility with existing clusters.
+# New clusters should use Cilium instead.
+# See: docs/architecture/decisions/0001-cilium-clustermesh-networking.md
+#
 # Argo CD Application for Kilo WireGuard VPN
 # Kilo is an open-source Kubernetes-native WireGuard mesh network
 # Replaces Twingate for remote cluster access
@@ -10,6 +15,9 @@ metadata:
   labels:
     app.kubernetes.io/name: kilo
     app.kubernetes.io/part-of: platform
+    deprecation.kubernetes.io/deprecated: "true"
+  annotations:
+    deprecation.kubernetes.io/message: "Use Cilium ClusterMesh instead"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

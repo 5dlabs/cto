@@ -1,5 +1,5 @@
 [package]
-name = "cto-metal"
+name = "metal"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

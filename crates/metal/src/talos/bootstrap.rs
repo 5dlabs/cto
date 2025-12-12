@@ -88,6 +88,40 @@ impl BootstrapConfig {
         };
         self.with_config_patch(patch)
     }
+
+    /// Configure CNI for Cilium (disables default CNI and kube-proxy).
+    ///
+    /// This sets up Talos to not install any default CNI, allowing Cilium
+    /// to be installed separately via Helm after the cluster is bootstrapped.
+    #[must_use]
+    pub fn with_cilium_cni(self) -> Self {
+        let patch =
+            "cluster:\n  proxy:\n    disabled: true\n  network:\n    cni:\n      name: none\n"
+                .to_string();
+        self.with_config_patch(patch)
+    }
+
+    /// Enable `KubeSpan` for intra-cluster `WireGuard` mesh.
+    ///
+    /// `KubeSpan` provides encrypted node-to-node communication within a single
+    /// Talos cluster using `WireGuard`. This is complementary to Cilium `ClusterMesh`
+    /// which handles multi-cluster connectivity.
+    #[must_use]
+    pub fn with_kubespan(self) -> Self {
+        let patch = "machine:\n  network:\n    kubespan:\n      enabled: true\ncluster:\n  discovery:\n    enabled: true\n    registries:\n      kubernetes:\n        disabled: true\n".to_string();
+        self.with_config_patch(patch)
+    }
+
+    /// Configure custom Pod CIDR for `ClusterMesh` compatibility.
+    ///
+    /// Each cluster in a `ClusterMesh` must have non-overlapping Pod CIDRs.
+    /// Use this to set a unique Pod CIDR for each cluster (e.g., 10.1.0.0/16,
+    /// 10.2.0.0/16, etc.).
+    #[must_use]
+    pub fn with_pod_cidr(self, cidr: &str) -> Self {
+        let patch = format!("cluster:\n  network:\n    podSubnets:\n      - {cidr}\n");
+        self.with_config_patch(patch)
+    }
 }
 
 /// Wait for Talos to be reachable in maintenance mode.
@@ -563,5 +597,44 @@ mod tests {
         assert_eq!(config.node_ip, "192.168.1.100");
         assert_eq!(config.install_disk, "/dev/nvme0n1");
         assert_eq!(config.output_dir, PathBuf::from("/tmp/test"));
+    }
+
+    #[test]
+    fn test_cilium_cni_config() {
+        let config = BootstrapConfig::new("cilium-cluster", "10.0.0.1").with_cilium_cni();
+
+        assert_eq!(config.config_patches.len(), 1);
+        assert!(config.config_patches[0].contains("proxy:"));
+        assert!(config.config_patches[0].contains("disabled: true"));
+        assert!(config.config_patches[0].contains("cni:"));
+        assert!(config.config_patches[0].contains("name: none"));
+    }
+
+    #[test]
+    fn test_kubespan_config() {
+        let config = BootstrapConfig::new("kubespan-cluster", "10.0.0.1").with_kubespan();
+
+        assert_eq!(config.config_patches.len(), 1);
+        assert!(config.config_patches[0].contains("kubespan:"));
+        assert!(config.config_patches[0].contains("enabled: true"));
+        assert!(config.config_patches[0].contains("discovery:"));
+    }
+
+    #[test]
+    fn test_pod_cidr_config() {
+        let config = BootstrapConfig::new("mesh-cluster", "10.0.0.1").with_pod_cidr("10.1.0.0/16");
+
+        assert_eq!(config.config_patches.len(), 1);
+        assert!(config.config_patches[0].contains("podSubnets:"));
+        assert!(config.config_patches[0].contains("10.1.0.0/16"));
+    }
+
+    #[test]
+    fn test_combined_cilium_config() {
+        let config = BootstrapConfig::new("full-cluster", "10.0.0.1")
+            .with_cilium_cni()
+            .with_pod_cidr("10.2.0.0/16");
+
+        assert_eq!(config.config_patches.len(), 2);
     }
 }

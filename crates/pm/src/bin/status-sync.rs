@@ -537,6 +537,17 @@ async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiCli
 // Claude Stream Parsing
 // =============================================================================
 
+/// Truncate a string to a maximum number of characters (Unicode-safe).
+/// Avoids panics from byte-level slicing on multi-byte UTF-8 characters.
+fn truncate_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_chars).collect();
+        format!("{truncated}...")
+    }
+}
+
 /// Claude stream event types from stream-json output.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -705,17 +716,10 @@ async fn process_stream_event(
                 for content in msg.content.as_ref().unwrap_or(&vec![]) {
                     match content {
                         ContentBlock::ToolUse { name, input, .. } => {
-                            // Format tool input summary (truncate if long)
+                            // Format tool input summary (truncate if long, Unicode-safe)
                             let input_summary = input
                                 .as_ref()
-                                .map(|v| {
-                                    let s = v.to_string();
-                                    if s.len() > 100 {
-                                        format!("{}...", &s[..100])
-                                    } else {
-                                        s
-                                    }
-                                })
+                                .map(|v| truncate_chars(&v.to_string(), 100))
                                 .unwrap_or_else(|| "()".to_string());
 
                             let activity = format!("🔧 **{name}** → `{input_summary}`");
@@ -724,16 +728,12 @@ async fn process_stream_event(
                         }
                         ContentBlock::Text { text } => {
                             // Only emit significant text (not single words/confirmations)
-                            if text.len() > 50
+                            if text.chars().count() > 50
                                 && !text.starts_with("I'll")
                                 && !text.starts_with("Let me")
                             {
-                                // Truncate very long text
-                                let display_text = if text.len() > 500 {
-                                    format!("{}...", &text[..500])
-                                } else {
-                                    text.clone()
-                                };
+                                // Truncate very long text (Unicode-safe)
+                                let display_text = truncate_chars(text, 500);
                                 client.emit_thought(session_id, &display_text).await?;
                             }
                         }
@@ -754,12 +754,8 @@ async fn process_stream_event(
                 let is_error = result.contains("error") || result.contains("Error");
                 let status = if is_error { "❌" } else { "✅" };
 
-                // Truncate result
-                let result_preview = if result.len() > 200 {
-                    format!("{}...", &result[..200])
-                } else {
-                    result.clone()
-                };
+                // Truncate result (Unicode-safe)
+                let result_preview = truncate_chars(result, 200);
 
                 let activity = format!("{status} **{tool_name}** → {result_preview}");
                 client.emit_thought(session_id, &activity).await?;
@@ -778,12 +774,8 @@ async fn process_stream_event(
                         };
                         let result_text = content.as_deref().unwrap_or("completed");
 
-                        // Truncate result
-                        let result_preview = if result_text.len() > 200 {
-                            format!("{}...", &result_text[..200])
-                        } else {
-                            result_text.to_string()
-                        };
+                        // Truncate result (Unicode-safe)
+                        let result_preview = truncate_chars(result_text, 200);
 
                         let activity = format!("{status} **{tool_name}** → {result_preview}");
                         client.emit_thought(session_id, &activity).await?;
@@ -802,7 +794,6 @@ async fn process_stream_event(
             *total_cost += total_cost_usd.unwrap_or(0.0);
             let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
             let turns = num_turns.unwrap_or(0);
-            let cost = total_cost_usd.unwrap_or(0.0);
 
             let status = match subtype.as_deref() {
                 Some("success") => "✅",
@@ -810,8 +801,10 @@ async fn process_stream_event(
                 _ => "ℹ️",
             };
 
+            // Use accumulated total_cost, not just this result's cost
             let summary = format!(
-                "{status} **Completed** | {duration_secs:.1}s | ${cost:.4} | {turns} turns"
+                "{status} **Completed** | {duration_secs:.1}s | ${:.4} | {turns} turns",
+                *total_cost
             );
             client.emit_thought(session_id, &summary).await?;
         }

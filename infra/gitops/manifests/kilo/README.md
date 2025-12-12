@@ -1,5 +1,12 @@
 # Kilo - Kubernetes WireGuard VPN
 
+> **DEPRECATED**: Kilo has been superseded by Cilium ClusterMesh for multi-cluster
+> networking. This directory is kept for reference only. New clusters should use
+> Cilium for both CNI and mesh networking.
+>
+> See: `docs/architecture/decisions/0001-cilium-clustermesh-networking.md`
+> See: `infra/gitops/manifests/cilium/` for Cilium configuration
+
 Kilo is an open-source, Kubernetes-native WireGuard mesh network that provides secure VPN access to the cluster.
 
 ## Overview
