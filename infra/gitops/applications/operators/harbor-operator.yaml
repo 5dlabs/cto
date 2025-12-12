@@ -33,10 +33,12 @@ spec:
         expose:
           type: clusterIP
           tls:
+            # Use auto-generated self-signed certificates
             enabled: true
-            certSource: secret
-            secret:
-              secretName: harbor-tls
+            certSource: auto
+            auto:
+              # Duration for the auto-generated cert
+              commonName: "harbor.local"
           clusterIP:
             name: harbor
             annotations: {}
@@ -44,8 +46,8 @@ spec:
               httpPort: 80
               httpsPort: 443
 
-        # External URL for Harbor (update for your domain)
-        externalURL: https://harbor.example.com
+        # External URL for Harbor (internal ClusterIP access)
+        externalURL: https://harbor.harbor.svc.cluster.local
 
         # Persistence settings
         persistence:
