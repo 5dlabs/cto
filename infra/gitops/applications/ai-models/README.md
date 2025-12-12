@@ -1,15 +1,33 @@
-# AI Models for KubeAI
+# AI Models
 
-This directory contains ArgoCD applications for deploying AI/ML models via KubeAI.
+This directory contains ArgoCD applications for deploying AI/ML models on Kubernetes.
+
+## Three Options for Model Deployment
+
+| Feature | KubeAI | Ollama Operator | LlamaStack |
+|---------|--------|-----------------|------------|
+| **Backend** | vLLM (GPU optimized) | Ollama (easy setup) | Multi-backend (vLLM, Ollama, Bedrock, TGI) |
+| **Best for** | Production GPU inference | CPU/mixed workloads | Full AI stack with safety/tooling |
+| **Scale from zero** | ✅ Yes | ❌ No | ❌ No |
+| **OpenAI API** | ✅ Native | ✅ Compatible | ✅ Compatible |
+| **Model format** | HuggingFace, Ollama | Ollama library | Multiple providers |
+| **Safety/Guardrails** | ❌ No | ❌ No | ✅ Built-in |
+| **Tool calling** | Basic | Basic | ✅ Advanced |
+| **License** | Apache 2.0 | Apache 2.0 | MIT |
+| **Maintainer** | Substratusai | Community | Meta |
 
 ## Quick Start
 
-### 1. Ensure Prerequisites
+### Prerequisites
 
-- **KubeAI Operator** must be deployed (`operators/kubeai.yaml`)
-- **NVIDIA GPU Operator** should be deployed for GPU workloads (`operators/nvidia-gpu-operator.yaml`)
+Choose your operator(s):
 
-### 2. Enable Models
+- **KubeAI** (`operators/kubeai.yaml`) - For vLLM-based GPU inference with scale-from-zero
+- **Ollama Operator** (`operators/ollama-operator.yaml`) - For native Ollama models (simple CRD)
+- **LlamaStack Operator** (`operators/llamastack-operator.yaml`) - Meta's full AI stack with multi-backend support
+- **NVIDIA GPU Operator** (`operators/nvidia-gpu-operator.yaml`) - For GPU workloads
+
+### 2. Enable Models (for KubeAI)
 
 Edit `kubeai-models.yaml` and set `enabled: true` for the models you want:
 
@@ -20,7 +38,7 @@ catalog:
     minReplicas: 1  # Keep 1 replica always running (optional)
 ```
 
-### 3. Access Models
+### 3. Access KubeAI Models
 
 Models expose an **OpenAI-compatible API**:
 
@@ -40,21 +58,32 @@ curl http://localhost:8000/openai/v1/chat/completions \
   }'
 ```
 
-### 4. Use with OpenAI SDK
+### 4. Access Ollama Operator Models
 
-```python
-from openai import OpenAI
+```bash
+# Port-forward to Ollama model service
+kubectl port-forward svc/ollama-model-phi4 -n ollama-operator-system 11434:11434
 
-client = OpenAI(
-    api_key="ignored",  # KubeAI doesn't require auth by default
-    base_url="http://kubeai.kubeai.svc/openai/v1"  # In-cluster URL
-)
+# Use Ollama CLI
+ollama run phi4
 
-response = client.chat.completions.create(
-    model="llama-3.1-8b-instruct-fp8-l4",
-    messages=[{"role": "user", "content": "Explain Kubernetes in one sentence"}]
-)
-print(response.choices[0].message.content)
+# Or use OpenAI-compatible API
+curl http://localhost:11434/v1/chat/completions \
+  -d '{"model": "phi4", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
+
+### 5. Access LlamaStack
+
+```bash
+# Port-forward to LlamaStack service
+kubectl port-forward svc/llamastack-starter -n llama-stack 8321:8321
+
+# List models
+curl http://localhost:8321/v1/models
+
+# Chat with safety guardrails
+curl http://localhost:8321/v1/chat/completions \
+  -d '{"model": "llama3.2:3b", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
 ## Available Models
@@ -65,36 +94,46 @@ print(response.choices[0].message.content)
 |-------|-----|------|----------|
 | `llama-3.1-8b-instruct-fp8-l4` | L4 x1 | 24GB | General tasks, coding |
 | `llama-3.1-70b-instruct-fp8-h100` | H100 x2 | 160GB | Complex reasoning |
+| `glm-4.5-air-fp8-h100` | H100 x2 | 160GB | **Agentic tasks, tool calling** |
 | `deepseek-r1-1.5b-cpu` | CPU | 4GB | Light reasoning (always on) |
-| `deepseek-r1-distill-llama-8b-l4` | L4 x1 | 24GB | Reasoning tasks |
 | `qwen2.5-7b-instruct-l4` | L4 x1 | 24GB | Multilingual, coding |
-| `qwen2.5-coder-1.5b-cpu` | CPU | 4GB | Code assistance |
-| `mistral-small-24b-instruct-h100` | H100 x1 | 80GB | High quality output |
 
 ### Embeddings
 
 | Model | GPU | Best For |
 |-------|-----|----------|
 | `nomic-embed-text-cpu` | CPU | General text embeddings |
-| `bge-embed-text-cpu` | CPU | Fast embeddings |
 
-### Reranking (for RAG)
+## Model Licenses
 
-| Model | GPU | Best For |
-|-------|-----|----------|
-| `bge-rerank-base-cpu` | CPU | Search result reranking |
+⚠️ **Important**: While KubeAI is Apache 2.0, individual models have their own licenses:
 
-### Speech-to-Text
+| Model Family | License | Commercial Use |
+|--------------|---------|----------------|
+| Llama 3.x | Meta Llama License | ✅ Yes (with conditions) |
+| **GLM-4.5** | **MIT** | ✅ **Yes (fully permissive)** |
+| Qwen | Apache 2.0 | ✅ Yes |
+| Gemma | Gemma Terms | ✅ Yes (with conditions) |
+| Mistral | Apache 2.0 | ✅ Yes |
+| DeepSeek | MIT | ✅ Yes |
+| BGE | MIT | ✅ Yes |
+| Nomic | Apache 2.0 | ✅ Yes |
 
-| Model | GPU | Best For |
-|-------|-----|----------|
-| `faster-whisper-medium-en-cpu` | CPU | English transcription |
+### GLM-4.5 - Recommended for Agentic Tasks
 
-### Vision (Multimodal)
+[GLM-4.5](https://z.ai/blog/glm-4.5) by Zhipu AI is particularly noteworthy:
+- **MIT License** - Fully permissive, no restrictions
+- **Hybrid Reasoning** - Thinking mode for complex tasks, non-thinking for fast responses
+- **Top 3 on Agent Benchmarks** - Excellent for agentic/tool-calling use cases
+- **128K Context** - Large context window
 
-| Model | GPU | Best For |
-|-------|-----|----------|
-| `llama-3.2-11b-vision-instruct-l4` | L4 x1 | Image understanding |
+**Deployment Options:**
+
+| Method | Model | Hardware |
+|--------|-------|----------|
+| KubeAI (vLLM) | `glm-4.5-air-fp8-h100` | H100 x 2 |
+| Ollama Operator | `MichelRosselli/GLM-4.5-Air:Q4_K_M` | 80GB+ VRAM |
+| LlamaStack | `llamastack-glm45` | H100 x 2 |
 
 ## GPU Resource Profiles
 
@@ -134,30 +173,6 @@ catalog:
       - --max-model-len=8192
       - --gpu-memory-utilization=0.9
 ```
-
-## Model Licenses
-
-⚠️ **Important**: While KubeAI is Apache 2.0, individual models have their own licenses:
-
-| Model Family | License | Commercial Use |
-|--------------|---------|----------------|
-| Llama 3.x | Meta Llama License | ✅ Yes (with conditions) |
-| Qwen | Apache 2.0 | ✅ Yes |
-| Gemma | Gemma Terms | ✅ Yes (with conditions) |
-| Mistral | Apache 2.0 | ✅ Yes |
-| DeepSeek | MIT | ✅ Yes |
-| BGE | MIT | ✅ Yes |
-| Nomic | Apache 2.0 | ✅ Yes |
-
-Always verify the license for your specific use case at the model's Hugging Face page.
-
-## Monitoring
-
-KubeAI exposes Prometheus metrics. Models show up with labels for:
-- Request latency (TTFT, TBT)
-- Token throughput
-- Queue depth
-- Replica count
 
 ## Troubleshooting
 
