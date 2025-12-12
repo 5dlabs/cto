@@ -1,0 +1,38 @@
+---
+# LlamaStack Ingress
+# Exposes LlamaStack distributions via ingress
+#
+# Endpoints:
+#   /v1/models                  - List models
+#   /v1/chat/completions        - Chat API
+#   /v1/inference/completion    - LlamaStack native API
+#   /v1/safety/run_shield       - Safety guardrails
+#   /v1/tool_runtime/invoke     - Tool calling
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llamastack
+  namespace: llama-stack
+  labels:
+    app.kubernetes.io/name: llamastack-ingress
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ai.platform.local  # TODO: Update to your domain
+      http:
+        paths:
+          - path: /llamastack(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: llamastack-starter
+                port:
+                  number: 8321

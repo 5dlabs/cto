@@ -1,0 +1,17 @@
+---
+# Llama 3.2 3B - Compact but capable LLM
+# Good for general tasks on modest hardware
+# ~3GB download, runs well on CPU with 8GB+ RAM
+apiVersion: ollama.ayaka.io/v1
+kind: Model
+metadata:
+  name: llama3.2-3b
+  labels:
+    app.kubernetes.io/name: llama3.2-3b
+    app.kubernetes.io/component: llm
+spec:
+  image: llama3.2:3b
+  replicas: 1
+  imagePullPolicy: IfNotPresent
+  persistentVolume:
+    accessMode: ReadWriteOnce
