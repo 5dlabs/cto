@@ -1,0 +1,40 @@
+---
+# Ollama Operator Ingress
+# Exposes Ollama models via ingress
+#
+# Note: Each Ollama model gets its own service (ollama-model-<name>)
+# This ingress routes to a specific model - duplicate for each model
+#
+# Endpoints:
+#   /api/generate    - Generate text
+#   /api/chat        - Chat API
+#   /v1/chat/completions - OpenAI-compatible
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ollama-phi4
+  namespace: ollama-operator-system
+  labels:
+    app.kubernetes.io/name: ollama-ingress
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ai.platform.local  # TODO: Update to your domain
+      http:
+        paths:
+          # Route /ollama/* to the phi4 model (default)
+          - path: /ollama(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ollama-model-phi4
+                port:
+                  number: 11434

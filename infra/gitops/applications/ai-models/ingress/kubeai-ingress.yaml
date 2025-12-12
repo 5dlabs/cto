@@ -1,0 +1,41 @@
+---
+# KubeAI Ingress - OpenAI-compatible API
+# Exposes the KubeAI service via ingress
+#
+# Endpoints:
+#   /openai/v1/models           - List models
+#   /openai/v1/chat/completions - Chat API
+#   /openai/v1/completions      - Completions API
+#   /openai/v1/embeddings       - Embeddings API
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubeai
+  namespace: kubeai
+  labels:
+    app.kubernetes.io/name: kubeai-ingress
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    # NGINX specific
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # For streaming responses
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # Rewrite to service root
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    # Path-based routing: ai.example.com/kubeai/*
+    - host: ai.platform.local  # TODO: Update to your domain
+      http:
+        paths:
+          - path: /kubeai(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: kubeai
+                port:
+                  number: 80

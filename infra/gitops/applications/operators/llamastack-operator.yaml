@@ -1,0 +1,84 @@
+---
+# LlamaStack Kubernetes Operator - Meta's official AI deployment framework
+# Comprehensive framework for building AI applications with LLMs
+# License: MIT (safe for proprietary distribution)
+# Source: https://github.com/llamastack/llama-stack-k8s-operator
+# Docs: https://llama-stack-k8s-operator.pages.dev/
+#
+# Supported Distributions:
+# - starter     - Quick start distribution
+# - vllm        - High-performance vLLM backend (GPU)
+# - ollama      - Ollama backend
+# - bedrock     - AWS Bedrock integration
+# - tgi         - HuggingFace Text Generation Inference
+# - together    - Together AI integration
+#
+# Features:
+# - Multi-backend support (vLLM, Ollama, TGI, Bedrock, Together AI)
+# - Auto-scaling based on demand
+# - Persistent storage for models
+# - Built-in observability and health checks
+# - Network policies for security
+#
+# Example LlamaStackDistribution CRD:
+#   apiVersion: llamastack.io/v1alpha1
+#   kind: LlamaStackDistribution
+#   metadata:
+#     name: my-llamastack
+#   spec:
+#     replicas: 1
+#     server:
+#       distribution:
+#         name: "starter"
+#       containerSpec:
+#         port: 8321
+#         resources:
+#           requests:
+#             memory: "2Gi"
+#             cpu: "1"
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llamastack-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: llamastack-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/llamastack/llama-stack-k8s-operator
+    path: release
+    targetRevision: main
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llama-stack-k8s-operator-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

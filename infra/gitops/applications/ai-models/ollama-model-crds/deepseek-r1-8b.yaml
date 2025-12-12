@@ -1,0 +1,18 @@
+---
+# DeepSeek R1 8B - Reasoning-focused LLM
+# Strong chain-of-thought reasoning capabilities
+# ~4.7GB download, requires 16GB+ RAM for best performance
+apiVersion: ollama.ayaka.io/v1
+kind: Model
+metadata:
+  name: deepseek-r1-8b
+  labels:
+    app.kubernetes.io/name: deepseek-r1-8b
+    app.kubernetes.io/component: llm
+    app.kubernetes.io/use-case: reasoning
+spec:
+  image: deepseek-r1:8b
+  replicas: 1
+  imagePullPolicy: IfNotPresent
+  persistentVolume:
+    accessMode: ReadWriteOnce

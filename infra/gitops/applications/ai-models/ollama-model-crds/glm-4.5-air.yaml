@@ -1,0 +1,35 @@
+---
+# GLM-4.5-Air - Zhipu AI's Hybrid Reasoning Model (via Ollama)
+# License: MIT (safe for proprietary distribution)
+# Features:
+# - Thinking mode: Complex reasoning and tool use
+# - Non-thinking mode: Immediate responses
+# - 128K context window
+# - Agentic capabilities (tool calling, coding)
+#
+# Model sizes (pick based on your VRAM):
+#   - Q2_K:  ~45GB
+#   - Q4_K_M: ~73GB (recommended)
+#   - Q6_K:  ~99GB
+#   - Q8_0:  ~117GB
+#
+# Requires Ollama >= v0.11.5-rc2
+# Source: https://huggingface.co/zai-org/GLM-4.5-Air
+apiVersion: ollama.ayaka.io/v1
+kind: Model
+metadata:
+  name: glm-4.5-air
+  labels:
+    app.kubernetes.io/name: glm-4.5-air
+    app.kubernetes.io/component: llm
+    app.kubernetes.io/use-case: reasoning
+spec:
+  # Use Q4_K_M quantization (73GB) - good balance of quality/size
+  # Change to :Q2_K for smaller (~45GB) or :Q6_K for better quality (~99GB)
+  image: MichelRosselli/GLM-4.5-Air:Q4_K_M
+  replicas: 1
+  imagePullPolicy: IfNotPresent
+  persistentVolume:
+    accessMode: ReadWriteOnce
+  # Note: This model requires significant VRAM/RAM
+  # Ensure your nodes have adequate resources

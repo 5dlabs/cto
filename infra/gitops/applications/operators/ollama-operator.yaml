@@ -1,0 +1,68 @@
+---
+# Ollama Operator - Native Kubernetes CRDs for Ollama models
+# Provides simple Model CRD to deploy Ollama models on Kubernetes
+# License: Apache 2.0 (safe for proprietary distribution)
+# Source: https://github.com/nekomeowww/ollama-operator
+# Docs: https://ollama-operator.ayaka.io
+#
+# Features:
+# - Simple 6-line YAML to deploy any Ollama model
+# - OpenAI API compatible (/v1/chat/completions)
+# - Works on any Kubernetes cluster (K3s, kind, minikube, etc.)
+# - Automatic model storage via PersistentVolumes
+# - Multiple replicas for high availability
+# - kollama CLI for kubectl-style model management
+#
+# Example Model CRD:
+#   apiVersion: ollama.ayaka.io/v1
+#   kind: Model
+#   metadata:
+#     name: phi
+#   spec:
+#     image: phi
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ollama-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ollama-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/nekomeowww/ollama-operator
+    path: dist
+    targetRevision: v0.10.10
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ollama-operator-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

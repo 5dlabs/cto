@@ -1,0 +1,17 @@
+---
+# Phi-4 - Microsoft's small but powerful model
+# Excellent reasoning capabilities, compact size
+# ~2.7GB download, runs well on CPU with 8GB+ RAM
+apiVersion: ollama.ayaka.io/v1
+kind: Model
+metadata:
+  name: phi4
+  labels:
+    app.kubernetes.io/name: phi4
+    app.kubernetes.io/component: llm
+spec:
+  image: phi4
+  replicas: 1
+  imagePullPolicy: IfNotPresent
+  persistentVolume:
+    accessMode: ReadWriteOnce
