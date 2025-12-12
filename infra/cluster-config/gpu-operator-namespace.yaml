@@ -1,0 +1,15 @@
+---
+# Managed Namespace for gpu-operator with Pod Security labels
+# Required for NVIDIA GPU Operator's privileged components (driver containers, device plugins)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gpu-operator
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest
+
