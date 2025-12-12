@@ -419,6 +419,19 @@ research:
       cpu: 1000m
       memory: 2Gi
 
+  # Email digest (separate CronJob)
+  digest:
+    enabled: true
+    # Daily at 13:00 UTC by default
+    schedule: "0 13 * * *"
+    hoursBetween: "24"
+    # If true, don't do AI analysis; just send the list
+    skipAnalysis: false
+    # Optional override; defaults to research.model
+    model: ""
+    # Kubernetes Secret containing: GMAIL_USERNAME, GMAIL_APP_PASSWORD, optional DIGEST_* vars
+    secretName: "research-digest-secrets" # pragma: allowlist secret
+
 # =============================================================================
 # Maintenance - Workspace and Event Cleanup
 # =============================================================================

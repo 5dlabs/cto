@@ -489,6 +489,7 @@ async fn run_process(url: &str, output: PathBuf, force: bool) -> Result<()> {
 }
 
 #[allow(clippy::fn_params_excessive_bools)] // CLI flags are naturally bools
+#[allow(clippy::too_many_lines)] // CLI orchestration is intentionally linear
 async fn run_digest(
     dir: PathBuf,
     state_path: PathBuf,
@@ -636,13 +637,13 @@ async fn run_digest(
     // Generate email content
     let now = chrono::Utc::now();
     let html = DigestGenerator::generate_html(&entries, analysis.as_ref(), now);
-    let text = DigestGenerator::generate_text(&entries, analysis.as_ref(), now);
+    let plain_text = DigestGenerator::generate_text(&entries, analysis.as_ref(), now);
     let subject = format!("CTO Research Digest - {} new entries", entries.len());
 
     // Send email
     println!("\n📤 Sending digest email...");
     let sender = EmailSender::new(config);
-    sender.send(&subject, &html, &text).await?;
+    sender.send(&subject, &html, &plain_text).await?;
 
     // Update state
     digest_state.mark_digest_sent();

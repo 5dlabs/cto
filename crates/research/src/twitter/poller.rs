@@ -208,6 +208,13 @@ impl BookmarkPoller {
         // Wait for content to load (Twitter is JS-heavy)
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
+        // Nudge the timeline to render by scrolling once (helps when content is virtualized)
+        let _: serde_json::Value = page
+            .evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            .await?
+            .into_value()?;
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
         // Check if we got redirected to login
         let url = page.url().await?.unwrap_or_default();
         if url.contains("login") || url.contains("flow") {
