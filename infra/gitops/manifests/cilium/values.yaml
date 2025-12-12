@@ -53,7 +53,7 @@ hubble:
       - flow
       - port-distribution
       - icmp
-      - httpV2:context=source;sourceContext=pod-short
+      - httpV2:context=source;sourceContext=pod
 
 # Cilium Operator settings
 operator:
