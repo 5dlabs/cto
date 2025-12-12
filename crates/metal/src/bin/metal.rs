@@ -10,11 +10,11 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use cto_metal::providers::latitude::Latitude;
-use cto_metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
-use cto_metal::stack;
-use cto_metal::state::{with_retry_async, ClusterState, ProvisionStep, RetryConfig};
-use cto_metal::talos::{self, BootstrapConfig, TalosConfig};
+use metal::providers::latitude::Latitude;
+use metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
+use metal::stack;
+use metal::state::{with_retry_async, ClusterState, ProvisionStep, RetryConfig};
+use metal::talos::{self, BootstrapConfig, TalosConfig};
 use tokio::task::JoinSet;
 
 /// Metal CLI - Bare metal provisioning for CTO Platform.
@@ -468,11 +468,9 @@ async fn main() -> Result<()> {
 
             // Step 3: Reinstall with Talos iPXE
             info!("Step 3/3: Triggering Talos iPXE boot...");
-            let talos =
-                TalosConfig::new("cto-cluster").with_version(cto_metal::talos::TalosVersion::new(
-                    &talos_version,
-                    cto_metal::talos::DEFAULT_SCHEMATIC_ID,
-                ));
+            let talos = TalosConfig::new("cto-cluster").with_version(
+                metal::talos::TalosVersion::new(&talos_version, metal::talos::DEFAULT_SCHEMATIC_ID),
+            );
 
             provider
                 .reinstall_ipxe(
@@ -502,11 +500,9 @@ async fn main() -> Result<()> {
         } => {
             info!("Triggering Talos iPXE reinstall on server: {id}");
 
-            let talos =
-                TalosConfig::new("cto-cluster").with_version(cto_metal::talos::TalosVersion::new(
-                    &talos_version,
-                    cto_metal::talos::DEFAULT_SCHEMATIC_ID,
-                ));
+            let talos = TalosConfig::new("cto-cluster").with_version(
+                metal::talos::TalosVersion::new(&talos_version, metal::talos::DEFAULT_SCHEMATIC_ID),
+            );
 
             provider
                 .reinstall_ipxe(
@@ -618,11 +614,9 @@ async fn main() -> Result<()> {
 
             // Step 3: Reinstall with Talos iPXE
             println!("\n🔄 Step 3/10: Triggering Talos iPXE boot...");
-            let talos =
-                TalosConfig::new(&cluster_name).with_version(cto_metal::talos::TalosVersion::new(
-                    &talos_version,
-                    cto_metal::talos::DEFAULT_SCHEMATIC_ID,
-                ));
+            let talos = TalosConfig::new(&cluster_name).with_version(
+                metal::talos::TalosVersion::new(&talos_version, metal::talos::DEFAULT_SCHEMATIC_ID),
+            );
 
             provider
                 .reinstall_ipxe(
@@ -833,9 +827,9 @@ async fn main() -> Result<()> {
                 println!("\n🔄 Step 3/9: Triggering Talos iPXE boot on both...");
 
                 let talos_cfg =
-                    TalosConfig::new(&name).with_version(cto_metal::talos::TalosVersion::new(
+                    TalosConfig::new(&name).with_version(metal::talos::TalosVersion::new(
                         &talos_version,
-                        cto_metal::talos::DEFAULT_SCHEMATIC_ID,
+                        metal::talos::DEFAULT_SCHEMATIC_ID,
                     ));
                 let ipxe_url = talos_cfg.ipxe_url();
 
@@ -1125,11 +1119,10 @@ async fn main() -> Result<()> {
 
             // Step 3: Reinstall with Talos iPXE
             println!("\n🔄 Step 3/6: Triggering Talos iPXE boot...");
-            let talos =
-                TalosConfig::new("worker").with_version(cto_metal::talos::TalosVersion::new(
-                    &talos_version,
-                    cto_metal::talos::DEFAULT_SCHEMATIC_ID,
-                ));
+            let talos = TalosConfig::new("worker").with_version(metal::talos::TalosVersion::new(
+                &talos_version,
+                metal::talos::DEFAULT_SCHEMATIC_ID,
+            ));
 
             provider
                 .reinstall_ipxe(
