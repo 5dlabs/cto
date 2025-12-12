@@ -794,7 +794,6 @@ async fn process_stream_event(
             *total_cost += total_cost_usd.unwrap_or(0.0);
             let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
             let turns = num_turns.unwrap_or(0);
-            let cost = total_cost_usd.unwrap_or(0.0);
 
             let status = match subtype.as_deref() {
                 Some("success") => "✅",
@@ -802,8 +801,10 @@ async fn process_stream_event(
                 _ => "ℹ️",
             };
 
+            // Use accumulated total_cost, not just this result's cost
             let summary = format!(
-                "{status} **Completed** | {duration_secs:.1}s | ${cost:.4} | {turns} turns"
+                "{status} **Completed** | {duration_secs:.1}s | ${:.4} | {turns} turns",
+                *total_cost
             );
             client.emit_thought(session_id, &summary).await?;
         }
