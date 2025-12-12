@@ -34,6 +34,8 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod cilium;
+pub mod clustermesh;
 pub mod providers;
 pub mod stack;
 pub mod state;
@@ -41,3 +43,7 @@ pub mod talos;
 
 pub use providers::latitude::Latitude;
 pub use providers::{CreateServerRequest, Provider, ReinstallIpxeRequest, Server, ServerStatus};
+
+// Re-export Cilium types for convenience
+pub use cilium::CiliumConfig;
+pub use clustermesh::ClusterMeshStatus;

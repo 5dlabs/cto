@@ -371,3 +371,108 @@ pub fn get_argocd_password(kubeconfig: &Path) -> Result<String> {
 
     Ok(output.trim().to_string())
 }
+
+/// Deploy Cilium CNI with `ClusterMesh` support.
+///
+/// Cilium is installed with kube-proxy replacement, `WireGuard` encryption,
+/// and Hubble observability. Each cluster needs a unique `cluster_name` and
+/// `cluster_id` (1-255) for `ClusterMesh` connectivity.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `cluster_name` - Unique name for this cluster in `ClusterMesh`
+/// * `cluster_id` - Unique ID (1-255) for this cluster in `ClusterMesh`
+///
+/// # Errors
+///
+/// Returns an error if helm commands fail.
+pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> Result<()> {
+    println!("   Deploying Cilium CNI (cluster: {cluster_name}, id: {cluster_id})...");
+
+    // Add Cilium repo
+    let _ = helm(
+        kubeconfig,
+        &["repo", "add", "cilium", "https://helm.cilium.io/"],
+    );
+    helm(kubeconfig, &["repo", "update"])?;
+
+    // Install Cilium with ClusterMesh-ready configuration
+    let cluster_name_arg = format!("cluster.name={cluster_name}");
+    let cluster_id_arg = format!("cluster.id={cluster_id}");
+
+    helm(
+        kubeconfig,
+        &[
+            "upgrade",
+            "--install",
+            "cilium",
+            "cilium/cilium",
+            "--namespace",
+            "kube-system",
+            "--version",
+            "1.16.4",
+            // Kube-proxy replacement
+            "--set",
+            "kubeProxyReplacement=true",
+            "--set",
+            "k8sServiceHost=localhost",
+            "--set",
+            "k8sServicePort=7445", // KubePrism port for Talos
+            // Cluster identity for ClusterMesh
+            "--set",
+            &cluster_name_arg,
+            "--set",
+            &cluster_id_arg,
+            // WireGuard encryption
+            "--set",
+            "encryption.enabled=true",
+            "--set",
+            "encryption.type=wireguard",
+            // Hubble observability
+            "--set",
+            "hubble.enabled=true",
+            "--set",
+            "hubble.relay.enabled=true",
+            "--set",
+            "hubble.ui.enabled=true",
+            "--wait",
+        ],
+    )?;
+
+    println!("   Cilium deployed successfully");
+    Ok(())
+}
+
+/// Enable Cilium `ClusterMesh` for multi-cluster connectivity.
+///
+/// This deploys the clustermesh-apiserver and enables the cluster
+/// to participate in `ClusterMesh` connections. Requires Cilium CLI.
+///
+/// # Errors
+///
+/// Returns an error if the cilium CLI fails.
+pub fn enable_clustermesh(kubeconfig: &Path) -> Result<()> {
+    use std::process::Command;
+
+    println!("   Enabling Cilium ClusterMesh...");
+
+    let output = Command::new("cilium")
+        .env("KUBECONFIG", kubeconfig)
+        .args(["clustermesh", "enable"])
+        .output()
+        .context("Failed to run cilium clustermesh enable")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // Check if already enabled
+        if stderr.contains("already enabled") {
+            println!("   ClusterMesh is already enabled");
+            return Ok(());
+        }
+        anyhow::bail!("Failed to enable ClusterMesh: {stderr}");
+    }
+
+    println!("   ClusterMesh enabled successfully");
+    Ok(())
+}

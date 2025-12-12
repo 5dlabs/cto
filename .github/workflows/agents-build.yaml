@@ -15,6 +15,8 @@ on:
       - '**'
     paths:
       - 'infra/images/**'
+      - 'crates/pm/**'
+      - 'templates/**'
       - '.github/workflows/agents-build.yaml'
 
   workflow_dispatch:
@@ -200,6 +202,53 @@ jobs:
             echo "built=false" >> "$GITHUB_OUTPUT"
           fi
 
+  build-sidecar:
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+
+      - name: Calculate sidecar version
+        id: version
+        run: |
+          # Use git hash of relevant code for versioning
+          VERSION=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Sidecar version: $VERSION"
+
+      - name: Build and push linear-sidecar
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
+        with:
+          context: .
+          file: ./infra/images/linear-sidecar/Dockerfile.build
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### 🔌 Linear Sidecar"
+            echo ""
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:latest"
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-agents:
     needs: build-runtime
     runs-on: [k8s-runner]
@@ -383,7 +432,7 @@ jobs:
 
   # Summary job
   summary:
-    needs: [build-agents]
+    needs: [build-agents, build-sidecar]
     if: always()
     runs-on: [k8s-runner]
     steps:
