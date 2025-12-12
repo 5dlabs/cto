@@ -243,6 +243,9 @@ spec:
     # OpenSearch CRDs
     - group: 'opensearch.opster.io'
       kind: '*'
+    # Cilium CNI CRDs
+    - group: 'cilium.io'
+      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
@@ -354,6 +357,9 @@ spec:
       kind: '*'
     # OpenSearch CRDs
     - group: 'opensearch.opster.io'
+      kind: '*'
+    # Cilium CNI CRDs
+    - group: 'cilium.io'
       kind: '*'
 
   # Roles for access control
