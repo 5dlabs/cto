@@ -52,6 +52,11 @@ spec:
           # Feature gates for the operator
           featureGates: ""
 
+          # Service account for the manager
+          serviceAccount:
+            create: true
+            name: opentelemetry-operator
+
         # Kube-rbac-proxy configuration
         kubeRBACProxy:
           enabled: true
@@ -75,11 +80,6 @@ spec:
             issuerRef: {}  # Use default self-signed issuer
           # Webhook failure policy
           failurePolicy: Fail
-
-        # Service account
-        serviceAccount:
-          create: true
-          name: opentelemetry-operator
 
         # Role-based access control
         role:
