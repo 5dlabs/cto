@@ -51,6 +51,46 @@ data:
     set -euo pipefail
 
     # =========================================================================
+    # Linear Agent Activity helpers (optional)
+    # =========================================================================
+    activity_enabled() {
+        command -v pm-activity >/dev/null 2>&1 && \
+          [ -n "${LINEAR_SESSION_ID:-}" ] && \
+          [ -n "${LINEAR_API_TOKEN:-}" ]
+    }
+
+    activity_thought() {
+        local body="$1"
+        if activity_enabled; then
+            pm-activity thought --persistent "$body" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_action() {
+        local action="$1"
+        local parameter="$2"
+        if activity_enabled; then
+            pm-activity action "$action" "$parameter" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_action_complete() {
+        local action="$1"
+        local parameter="$2"
+        local result="$3"
+        if activity_enabled; then
+            pm-activity action-complete "$action" "$parameter" "$result" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_error() {
+        local body="$1"
+        if activity_enabled; then
+            pm-activity error "$body" >/dev/null 2>&1 || true
+        fi
+    }
+
+    # =========================================================================
     # GitHub Repository Preparation Script
     # Runs before intake to ensure repository exists and is configured
     # =========================================================================
@@ -59,6 +99,8 @@ data:
     echo "================================="
     echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo ""
+
+    activity_thought "GitHub prep started for ${LINEAR_ISSUE_IDENTIFIER:-unknown} (${HOSTNAME:-unknown})"
 
     # =========================================================================
     # Configuration
@@ -84,11 +126,14 @@ data:
     echo "  → Visibility: $GITHUB_VISIBILITY"
     echo ""
 
+    activity_action "GitHub prep: load config" "$PROJECT_NAME"
+
     # =========================================================================
     # GitHub Authentication
     # =========================================================================
 
     echo "🔐 Setting up GitHub App authentication..."
+    activity_action "GitHub auth" "${GITHUB_DEFAULT_ORG}/${REPO_NAME:-repo}"
 
     if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
         # Create JWT
@@ -142,6 +187,7 @@ data:
         # Create New Repository
         # =====================================================================
         echo "🆕 No repository provided - creating new repository"
+        activity_action "Create repository" "$GITHUB_DEFAULT_ORG/$REPO_NAME"
         
         FULL_REPO_NAME="${GITHUB_DEFAULT_ORG}/${REPO_NAME}"
         
@@ -188,6 +234,7 @@ data:
         # Use Existing Repository
         # =====================================================================
         echo "📂 Using existing repository: $REPOSITORY_URL"
+        activity_action "Use existing repository" "$REPOSITORY_URL"
         
         # Verify repo is accessible
         REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
@@ -205,6 +252,7 @@ data:
     if [ -n "$WEBHOOK_CALLBACK_URL" ] && [ "$WEBHOOK_CALLBACK_URL" != "null" ]; then
         echo ""
         echo "🔗 Setting up GitHub webhook..."
+        activity_action "Setup webhook" "$WEBHOOK_CALLBACK_URL"
         
         REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
         
@@ -238,6 +286,8 @@ data:
     echo "  Repository URL: $REPOSITORY_URL"
     echo "════════════════════════════════════════════════════════════════"
 
+    activity_action_complete "GitHub prep complete" "$REPOSITORY_URL" "Repository ready"
+
     # Write output for next step
     echo "$REPOSITORY_URL" > /tmp/repository-url
 
@@ -246,6 +296,53 @@ data:
   intake_intake.sh: |
     #!/bin/bash
     set -euo pipefail
+
+    # =========================================================================
+    # Linear Agent Activity helpers (optional)
+    # =========================================================================
+    activity_enabled() {
+        command -v pm-activity >/dev/null 2>&1 && \
+          [ -n "${LINEAR_SESSION_ID:-}" ] && \
+          [ -n "${LINEAR_API_TOKEN:-}" ]
+    }
+
+    activity_thought() {
+        local body="$1"
+        if activity_enabled; then
+            pm-activity thought --persistent "$body" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_thought_ephemeral() {
+        local body="$1"
+        if activity_enabled; then
+            pm-activity thought "$body" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_action() {
+        local action="$1"
+        local parameter="$2"
+        if activity_enabled; then
+            pm-activity action "$action" "$parameter" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_action_complete() {
+        local action="$1"
+        local parameter="$2"
+        local result="$3"
+        if activity_enabled; then
+            pm-activity action-complete "$action" "$parameter" "$result" >/dev/null 2>&1 || true
+        fi
+    }
+
+    activity_error() {
+        local body="$1"
+        if activity_enabled; then
+            pm-activity error "$body" >/dev/null 2>&1 || true
+        fi
+    }
 
     # =========================================================================
     # Unified Intake Script
@@ -259,6 +356,8 @@ data:
     echo "📅 Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "📦 Pod: ${HOSTNAME:-unknown}"
     echo ""
+
+    activity_thought "Intake started for ${LINEAR_ISSUE_IDENTIFIER:-unknown} (${HOSTNAME:-unknown})"
 
     # =========================================================================
     # Phase 1: Configuration and Environment Setup
@@ -309,6 +408,8 @@ data:
     echo "  ✓ Model: $PRIMARY_MODEL"
     echo "  ✓ Tasks: ~$NUM_TASKS"
     echo ""
+
+    activity_action "Intake: configure" "$PROJECT_NAME"
 
     # Validate repository URL
     if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
@@ -369,9 +470,11 @@ data:
 
     CLONE_DIR="/tmp/repo-$(date +%s)"
     echo "📂 Cloning repository to: $CLONE_DIR"
+    activity_action "Clone repository" "$REPOSITORY_URL"
 
     git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
     cd "$CLONE_DIR" || exit 1
+    activity_action_complete "Cloned repository" "$REPOSITORY_URL" "Clone complete"
 
     git config user.name "Morgan Intake"
     git config user.email "morgan@5dlabs.com"
@@ -420,8 +523,20 @@ data:
     [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
     [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
 
+    activity_action "Run tasks intake" "$INTAKE_CMD"
+
     echo "  → Running: $INTAKE_CMD"
-    eval "$INTAKE_CMD" || exit 1
+    OUTPUT_FILE="$(mktemp)"
+    set +e
+    eval "$INTAKE_CMD" 2>&1 | tee "$OUTPUT_FILE"
+    INTAKE_EXIT="${PIPESTATUS[0]}"
+    set -e
+    if [ "$INTAKE_EXIT" -ne 0 ]; then
+        SNIPPET="$(tail -n 80 "$OUTPUT_FILE" 2>/dev/null || true)"
+        activity_error "tasks intake failed (exit $INTAKE_EXIT)\n\nLast output:\n\n$SNIPPET"
+        exit "$INTAKE_EXIT"
+    fi
+    activity_thought_ephemeral "tasks intake completed successfully"
 
     # Verify tasks were generated
     TASKS_FILE=".tasks/tasks/tasks.json"
@@ -432,6 +547,8 @@ data:
 
     TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
     echo "✅ Generated $TASK_COUNT tasks with documentation"
+    SNIPPET="$(tail -n 60 "$OUTPUT_FILE" 2>/dev/null || true)"
+    activity_action_complete "Generated tasks" "$TASK_COUNT tasks" "tasks.json created.\n\nLast output:\n\n$SNIPPET"
 
     # =========================================================================
     # Phase 6: Create Pull Request

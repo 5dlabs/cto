@@ -183,7 +183,9 @@ impl LinearAgentEmitter {
 impl AgentActivityEmitter for LinearAgentEmitter {
     async fn emit_thought(&self, body: &str, ephemeral: bool) -> Result<String> {
         if ephemeral {
-            self.client.emit_ephemeral_thought(&self.session_id, body).await
+            self.client
+                .emit_ephemeral_thought(&self.session_id, body)
+                .await
         } else {
             self.client.emit_thought(&self.session_id, body).await
         }

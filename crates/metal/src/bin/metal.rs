@@ -244,11 +244,11 @@ enum Commands {
         resume: bool,
 
         /// Deploy the platform stack after cluster bootstrap.
-        /// Installs: Cert-Manager, `ArgoCD`, OpenBao, Ingress-NGINX, Argo Workflows.
+        /// Installs: Cert-Manager, `ArgoCD`, `OpenBao`, Ingress-NGINX, Argo Workflows.
         #[arg(long, default_value = "false")]
         deploy_stack: bool,
 
-        /// Initialize and unseal OpenBao after deployment (requires --deploy-stack).
+        /// Initialize and unseal `OpenBao` after deployment (requires --deploy-stack).
         #[arg(long, default_value = "false")]
         init_openbao: bool,
     },
@@ -301,7 +301,7 @@ enum Commands {
 
     /// Deploy the CTO platform stack to an existing cluster.
     ///
-    /// Deploys Argo CD, Cert-Manager, OpenBao, and Ingress to the cluster.
+    /// Deploys Argo CD, Cert-Manager, `OpenBao`, and Ingress to the cluster.
     Stack {
         /// Path to kubeconfig for the cluster.
         #[arg(long)]
@@ -315,7 +315,7 @@ enum Commands {
         #[arg(long, default_value = "false")]
         cert_manager_only: bool,
 
-        /// Deploy only OpenBao.
+        /// Deploy only `OpenBao`.
         #[arg(long, default_value = "false")]
         openbao_only: bool,
 
@@ -323,25 +323,25 @@ enum Commands {
         #[arg(long, default_value = "false")]
         ingress_only: bool,
 
-        /// Initialize and unseal OpenBao after deployment.
+        /// Initialize and unseal `OpenBao` after deployment.
         #[arg(long, default_value = "false")]
         init_openbao: bool,
     },
 
-    /// Initialize and unseal OpenBao.
+    /// Initialize and unseal `OpenBao`.
     ///
-    /// Run this after deploying OpenBao for the first time.
+    /// Run this after deploying `OpenBao` for the first time.
     OpenbaoInit {
         /// Path to kubeconfig for the cluster.
         #[arg(long)]
         kubeconfig: PathBuf,
 
-        /// Output file for OpenBao credentials (JSON).
+        /// Output file for `OpenBao` credentials (JSON).
         #[arg(long, default_value = "openbao-init.json")]
         output: PathBuf,
     },
 
-    /// Unseal an existing OpenBao instance.
+    /// Unseal an existing `OpenBao` instance.
     OpenbaoUnseal {
         /// Path to kubeconfig for the cluster.
         #[arg(long)]
