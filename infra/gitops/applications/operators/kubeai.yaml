@@ -1,0 +1,88 @@
+---
+# KubeAI - AI Inference Operator for Kubernetes
+# Supports LLMs, VLMs, embeddings, speech-to-text via vLLM, Ollama, FasterWhisper
+# License: Apache 2.0 (safe for proprietary distribution)
+# Source: https://github.com/kubeai-project/kubeai
+# Docs: https://www.kubeai.org
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeai
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: kubeai
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    # Deploy after GPU operator if present
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://www.kubeai.org
+    chart: kubeai
+    targetRevision: 0.23.1
+    helm:
+      values: |
+        # Resource configuration for the KubeAI controller
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        # Pod annotations for log collection
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: kubeai
+
+        # Service configuration - OpenAI-compatible API
+        service:
+          type: ClusterIP
+          port: 80
+
+        # Model catalog - enable models as needed
+        # Models are deployed via Model CRDs after operator installation
+        # Example model catalog entries (disabled by default):
+        # catalog:
+        #   llama-3.2-1b:
+        #     enabled: false
+        #     features: [TextGeneration]
+        #     url: 'ollama://llama3.2:1b'
+        #     engine: OLlama
+        #     resourceProfile: 'cpu:1'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubeai
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5
