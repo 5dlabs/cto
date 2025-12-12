@@ -73,6 +73,20 @@ spec:
     - 'https://scylla-operator-charts.storage.googleapis.com/stable'
     # Strimzi Kafka Operator
     - 'https://strimzi.io/charts/'
+    # AI/ML Operators
+    - 'https://github.com/nekomeowww/ollama-operator'
+    - 'https://github.com/llamastack/llama-stack-k8s-operator'
+    - 'https://www.kubeai.org'
+    - 'https://helm.ngc.nvidia.com/nvidia'
+    # Storage Operators
+    - 'https://charts.longhorn.io'
+    - 'https://seaweedfs.github.io/seaweedfs/helm'
+    # Observability Operators
+    - 'https://jaegertracing.github.io/helm-charts'
+    # Container Registry
+    - 'https://helm.goharbor.io'
+    # OpenSearch
+    - 'https://opensearch-project.github.io/opensearch-k8s-operator/'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -200,6 +214,30 @@ spec:
     # Strimzi Kafka CRDs
     - group: 'kafka.strimzi.io'
       kind: '*'
+    # AI/ML Operator CRDs
+    - group: 'ollama.ayaka.io'
+      kind: '*'
+    - group: 'llamastack.io'
+      kind: '*'
+    - group: 'kubeai.org'
+      kind: '*'
+    # Storage Operator CRDs
+    - group: 'longhorn.io'
+      kind: '*'
+    - group: 'seaweedfs.com'
+      kind: '*'
+    # Observability CRDs
+    - group: 'jaegertracing.io'
+      kind: '*'
+    # Harbor CRDs
+    - group: 'goharbor.io'
+      kind: '*'
+    # OpenTelemetry CRDs
+    - group: 'opentelemetry.io'
+      kind: '*'
+    # OpenSearch CRDs
+    - group: 'opensearch.opster.io'
+      kind: '*'
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
@@ -284,6 +322,30 @@ spec:
       kind: '*'
     # Strimzi Kafka CRDs
     - group: 'kafka.strimzi.io'
+      kind: '*'
+    # AI/ML Operator CRDs
+    - group: 'ollama.ayaka.io'
+      kind: '*'
+    - group: 'llamastack.io'
+      kind: '*'
+    - group: 'kubeai.org'
+      kind: '*'
+    # Storage Operator CRDs
+    - group: 'longhorn.io'
+      kind: '*'
+    - group: 'seaweedfs.com'
+      kind: '*'
+    # Observability CRDs
+    - group: 'jaegertracing.io'
+      kind: '*'
+    # Harbor CRDs
+    - group: 'goharbor.io'
+      kind: '*'
+    # OpenTelemetry CRDs
+    - group: 'opentelemetry.io'
+      kind: '*'
+    # OpenSearch CRDs
+    - group: 'opensearch.opster.io'
       kind: '*'
 
   # Roles for access control
