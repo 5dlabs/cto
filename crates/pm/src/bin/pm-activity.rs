@@ -39,9 +39,9 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use pm::activities::{PlanStep, PlanStepStatus};
 use pm::emitter::LinearAgentEmitter;
 use pm::AgentActivityEmitter;
-use pm::activities::{PlanStep, PlanStepStatus};
 
 /// CLI for emitting Linear Agent Activities from workflow containers.
 #[derive(Parser)]
@@ -49,11 +49,11 @@ use pm::activities::{PlanStep, PlanStepStatus};
 #[command(about = "Emit Linear Agent Activities from workflow containers")]
 #[command(version)]
 struct Cli {
-    /// Linear API token (or set LINEAR_API_TOKEN env var)
+    /// Linear API token (or set `LINEAR_API_TOKEN` env var)
     #[arg(long, env = "LINEAR_API_TOKEN", hide_env_values = true)]
     token: String,
 
-    /// Agent session ID (or set LINEAR_SESSION_ID env var)
+    /// Agent session ID (or set `LINEAR_SESSION_ID` env var)
     #[arg(long, env = "LINEAR_SESSION_ID")]
     session_id: String,
 
@@ -115,7 +115,7 @@ enum Commands {
     /// Update the session plan (visual checklist)
     ///
     /// Each step is specified as "content:status" where status is one of:
-    /// pending, in_progress, completed, canceled
+    /// pending, `in_progress`, completed, canceled
     Plan {
         /// Plan steps in format "Step description:status"
         #[arg(required = true)]

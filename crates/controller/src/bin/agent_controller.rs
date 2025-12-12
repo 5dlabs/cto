@@ -65,7 +65,7 @@ const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/app/templates";
 
 /// Verify that the agent templates directory exists and contains expected structure
 ///
-/// Templates are now embedded in the Docker image rather than loaded from ConfigMaps.
+/// Templates are now embedded in the Docker image rather than loaded from `ConfigMaps`.
 /// This check verifies the templates directory is accessible at startup.
 fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
     let templates_path = std::env::var("AGENT_TEMPLATES_PATH")
