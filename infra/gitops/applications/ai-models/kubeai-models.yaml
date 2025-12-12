@@ -43,12 +43,12 @@ spec:
         # =============================================================
         # Enable models by setting enabled: true
         # Models scale from zero by default (set minReplicas: 1 for always-on)
-        
+
         catalog:
           # ---------------------------------------------------------
           # LLAMA MODELS (Meta License - free for commercial use)
           # ---------------------------------------------------------
-          
+
           # Llama 3.1 8B - Great for general tasks on single L4 GPU
           llama-3.1-8b-instruct-fp8-l4:
             enabled: true
@@ -112,7 +112,7 @@ spec:
           # ---------------------------------------------------------
           # DEEPSEEK R1 MODELS (Reasoning-focused)
           # ---------------------------------------------------------
-          
+
           # DeepSeek R1 1.5B - Small reasoning model (CPU)
           deepseek-r1-1.5b-cpu:
             enabled: true
@@ -162,7 +162,7 @@ spec:
           # ---------------------------------------------------------
           # MISTRAL MODELS
           # ---------------------------------------------------------
-          
+
           # Mistral Small 24B - Excellent performance/cost ratio
           mistral-small-24b-instruct-h100:
             enabled: false
@@ -183,7 +183,7 @@ spec:
           # ---------------------------------------------------------
           # QWEN MODELS (Alibaba - Apache 2.0 License)
           # ---------------------------------------------------------
-          
+
           # Qwen 2.5 7B - Good multilingual model
           qwen2.5-7b-instruct-l4:
             enabled: true
@@ -214,7 +214,7 @@ spec:
           # ---------------------------------------------------------
           # GEMMA MODELS (Google - Permissive License)
           # ---------------------------------------------------------
-          
+
           # Gemma 2 9B - High quality, efficient
           gemma-2-9b-it-fp8-l4:
             enabled: false
@@ -235,7 +235,7 @@ spec:
           # ---------------------------------------------------------
           # EMBEDDING MODELS
           # ---------------------------------------------------------
-          
+
           # Nomic Embed - Popular text embeddings (CPU)
           nomic-embed-text-cpu:
             enabled: true
@@ -258,7 +258,7 @@ spec:
           # ---------------------------------------------------------
           # RERANKING MODELS
           # ---------------------------------------------------------
-          
+
           # BGE Reranker - For RAG pipelines
           bge-rerank-base-cpu:
             enabled: false
@@ -271,7 +271,7 @@ spec:
           # ---------------------------------------------------------
           # SPEECH TO TEXT
           # ---------------------------------------------------------
-          
+
           # Faster Whisper Medium - Audio transcription
           faster-whisper-medium-en-cpu:
             enabled: false
@@ -284,7 +284,7 @@ spec:
           # ---------------------------------------------------------
           # VISION MODELS
           # ---------------------------------------------------------
-          
+
           # Llama 3.2 11B Vision - Multimodal (image + text)
           llama-3.2-11b-vision-instruct-l4:
             enabled: false
