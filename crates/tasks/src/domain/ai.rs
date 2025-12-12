@@ -112,9 +112,23 @@ impl AIDomain {
 
         let messages = vec![AIMessage::system(system), AIMessage::user(user)];
 
+        // Scale max_tokens based on number of tasks (each detailed task needs ~1000-2000 tokens)
+        // Minimum 16000, scale up for large task counts
+        let task_count = num_tasks.unwrap_or(10);
+        let scaled_max_tokens = if task_count > 20 {
+            // For large task counts, use 128k tokens (Claude's max)
+            128_000
+        } else if task_count > 10 {
+            // Medium task counts need more room
+            32_000
+        } else {
+            // Small task counts use default
+            16_000
+        };
+
         let options = GenerateOptions {
             temperature: Some(0.7),
-            max_tokens: Some(16000),
+            max_tokens: Some(scaled_max_tokens),
             json_mode: true,
             ..Default::default()
         };
