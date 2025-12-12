@@ -1,0 +1,142 @@
+---
+# NVIDIA GPU Operator - GPU provisioning and management for Kubernetes
+# Manages NVIDIA drivers, CUDA toolkit, device plugins, and GPU monitoring
+# License: Apache 2.0 (safe for proprietary distribution)
+# Source: https://github.com/NVIDIA/gpu-operator
+# Docs: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-gpu-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: nvidia-gpu-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: gpu
+  annotations:
+    # Deploy early - other AI workloads depend on GPU support
+    argocd.argoproj.io/sync-wave: "-3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://helm.ngc.nvidia.com/nvidia
+    chart: gpu-operator
+    targetRevision: v24.9.1
+    helm:
+      values: |
+        # Operator configuration
+        operator:
+          defaultRuntime: containerd
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Driver configuration
+        # Set to false if drivers are pre-installed on nodes
+        driver:
+          enabled: true
+          # Use production driver branch
+          version: "550.127.08"
+          # Resources for driver container
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+
+        # CUDA toolkit configuration
+        toolkit:
+          enabled: true
+          version: v1.16.2-ubuntu20.04
+
+        # Device plugin configuration
+        devicePlugin:
+          enabled: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # DCGM (Data Center GPU Manager) for monitoring
+        dcgm:
+          enabled: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # DCGM Exporter for Prometheus metrics
+        dcgmExporter:
+          enabled: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # Node Feature Discovery
+        # Set to false if NFD is already installed
+        nfd:
+          enabled: true
+
+        # GFD (GPU Feature Discovery)
+        gfd:
+          enabled: true
+
+        # MIG (Multi-Instance GPU) Manager
+        migManager:
+          enabled: true
+
+        # Pod labels for log collection
+        operator:
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-operator
+
+  ignoreDifferences:
+    # Driver pods have dynamic fields
+    - group: apps
+      kind: DaemonSet
+      jsonPointers:
+        - /spec/template/metadata/annotations
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+
+  revisionHistoryLimit: 5

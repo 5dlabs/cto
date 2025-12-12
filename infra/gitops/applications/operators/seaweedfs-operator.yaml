@@ -1,0 +1,168 @@
+---
+# SeaweedFS - Fast distributed storage system with S3-compatible API
+# Alternative to MinIO with Apache 2.0 license (no AGPL concerns)
+# License: Apache 2.0 (safe for proprietary distribution)
+# Source: https://github.com/seaweedfs/seaweedfs
+# Operator: https://github.com/seaweedfs/seaweedfs-operator
+# Docs: https://github.com/seaweedfs/seaweedfs/wiki
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: seaweedfs
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: storage
+  annotations:
+    # Deploy after storage class is available
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://seaweedfs.github.io/seaweedfs/helm
+    chart: seaweedfs
+    targetRevision: 4.0.0
+    helm:
+      values: |
+        # Global settings
+        global:
+          # Registry configuration
+          registry: ""
+          # Image pull policy
+          imagePullPolicy: IfNotPresent
+          # Enable volume server encryption
+          enableSecurity: false
+
+        # Master server configuration
+        master:
+          enabled: true
+          replicas: 1
+          port: 9333
+          grpcPort: 19333
+          # Persistence for master metadata
+          data:
+            type: persistentVolumeClaim
+            size: 10Gi
+            storageClass: ""
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # Pod labels for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: seaweedfs-master
+          # Default replication strategy
+          # 000 = no replication
+          # 001 = replicate once on different rack
+          # 010 = replicate once on different node
+          # 100 = replicate once on different data center
+          defaultReplication: "001"
+
+        # Volume server configuration
+        volume:
+          enabled: true
+          replicas: 3
+          port: 8080
+          grpcPort: 18080
+          # Persistence for actual data storage
+          dataDirs:
+            - name: data
+              type: persistentVolumeClaim
+              size: 100Gi
+              storageClass: ""
+              maxVolumes: 100
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: seaweedfs-volume
+
+        # Filer server configuration (for S3 API and metadata)
+        filer:
+          enabled: true
+          replicas: 1
+          port: 8888
+          grpcPort: 18888
+          # Enable S3 API gateway
+          s3:
+            enabled: true
+            port: 8333
+            # Enable authentication
+            enableAuth: true
+            # Domain name for virtual-hosted-style requests
+            domainName: ""
+          # Persistence for filer metadata
+          data:
+            type: persistentVolumeClaim
+            size: 20Gi
+            storageClass: ""
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: seaweedfs-filer
+
+        # S3 API gateway (uses filer's S3 capability)
+        s3:
+          enabled: false  # Using filer's built-in S3 instead
+
+        # CSI driver for Kubernetes persistent volumes
+        csi:
+          enabled: false  # Enable if you want to use SeaweedFS as a CSI driver
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: seaweedfs
+
+  ignoreDifferences:
+    # StatefulSet replicas may be scaled
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/replicas
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+
+  revisionHistoryLimit: 5

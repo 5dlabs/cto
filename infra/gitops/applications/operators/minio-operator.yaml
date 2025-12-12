@@ -2,6 +2,12 @@
 # MinIO Operator - S3-compatible object storage for Kubernetes
 # Provides declarative management of MinIO Tenants
 # Used for screenshot storage in headless visual testing
+#
+# ⚠️  LICENSE WARNING: MinIO is licensed under GNU AGPL v3
+# AGPL requires that users accessing the service over a network can request
+# the complete source code. This may conflict with proprietary distribution.
+# Consider SeaweedFS (Apache 2.0) as an alternative for S3-compatible storage.
+# See: seaweedfs-operator.yaml
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
