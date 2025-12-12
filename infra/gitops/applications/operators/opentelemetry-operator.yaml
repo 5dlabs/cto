@@ -1,0 +1,143 @@
+---
+# OpenTelemetry Operator - Kubernetes Operator for OpenTelemetry
+# Manages OpenTelemetry Collector instances and auto-instrumentation
+# Source: https://opentelemetry.io/docs/platforms/kubernetes/operator/
+# Requires: cert-manager (already deployed)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opentelemetry-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: opentelemetry-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: observability
+  annotations:
+    # Deploy after cert-manager but before workloads that need auto-instrumentation
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project configuration
+  project: platform
+
+  # Source configuration - Using official OpenTelemetry Helm chart
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-operator
+    targetRevision: 0.76.0
+    helm:
+      values: |
+        # Manager (operator) configuration
+        manager:
+          # Resource limits for the operator
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # Pod labels for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+
+          # Pod annotations for log collection
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: opentelemetry-operator
+
+          # Feature gates for the operator
+          featureGates: ""
+
+        # Kube-rbac-proxy configuration
+        kubeRBACProxy:
+          enabled: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+        # Install CRDs
+        crds:
+          create: true
+
+        # Admission webhooks
+        admissionWebhooks:
+          # Use cert-manager for certificate management
+          certManager:
+            enabled: true
+            issuerRef: {}  # Use default self-signed issuer
+          # Webhook failure policy
+          failurePolicy: Fail
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: opentelemetry-operator
+
+        # Role-based access control
+        role:
+          create: true
+        clusterRole:
+          create: true
+
+        # Auto-instrumentation configuration
+        # The operator will manage Instrumentation CRs to inject auto-instrumentation
+        # into workloads with the appropriate annotations
+
+  # Destination configuration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: operators
+
+  # Ignore certain differences that are dynamically managed
+  ignoreDifferences:
+    # CRD conversion and annotations are managed by the operator
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/conversion
+        - /metadata/annotations
+    # Webhook CA bundles are managed by cert-manager
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+        - /webhooks/2/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+        - /webhooks/2/clientConfig/caBundle
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Revision history
+  revisionHistoryLimit: 5
+
