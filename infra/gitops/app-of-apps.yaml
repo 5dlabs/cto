@@ -23,11 +23,13 @@ spec:
     path: infra/gitops
 
     # Directory configuration
-    # Organized by category: platform, observability, operators, secrets, workloads
+    # Organized by category: platform, observability, operators, secrets, workloads, ai-models
     directory:
       recurse: true
-      include: "{applications,applications/platform,applications/observability,applications/operators,applications/secrets,applications/workloads,projects}/*.yaml"
-      exclude: "*.md"
+      include: "{applications,applications/platform,applications/observability,applications/operators,applications/secrets,applications/workloads,applications/ai-models,projects}/*.yaml"
+      # Exclude non-Application resources and documentation
+      # The subdirectories contain actual K8s resources managed by child apps, not ArgoCD Applications
+      exclude: "{*.md,applications/ai-models/ingress/*,applications/ai-models/ollama-model-crds/*,applications/ai-models/llamastack-distributions/*}"
 
   # Destination configuration
   destination:
