@@ -4,8 +4,10 @@
 //! using Helm charts and kubectl.
 
 use anyhow::{Context, Result};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// `OpenBao` initialization response containing unseal keys and root token.
 #[derive(Debug, Clone)]
@@ -47,6 +49,30 @@ fn helm(kubeconfig: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+fn write_temp_yaml(prefix: &str, yaml: &str) -> Result<std::path::PathBuf> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let filename = format!("{prefix}-{nanos}.yaml");
+    let path = std::env::temp_dir().join(filename);
+    fs::write(&path, yaml)
+        .with_context(|| format!("Failed to write temp YAML to {}", path.display()))?;
+    Ok(path)
+}
+
+fn kubectl_apply_yaml(kubeconfig: &Path, yaml: &str) -> Result<()> {
+    let path = write_temp_yaml("cto-metal", yaml)?;
+    let res = kubectl(
+        kubeconfig,
+        &["apply", "-f", path.to_string_lossy().as_ref()],
+    )
+    .map(|_| ());
+    // Best-effort cleanup.
+    let _ = fs::remove_file(&path);
+    res
+}
+
 /// Deploy local-path-provisioner for bare metal PVC support.
 ///
 /// # Errors
@@ -78,6 +104,205 @@ pub fn deploy_local_path_provisioner(kubeconfig: &Path) -> Result<()> {
 
     println!("   ✅ local-path-provisioner deployed");
     Ok(())
+}
+
+/// Deploy `OpenEBS` Replicated PV Mayastor via Helm.
+///
+/// Uses the Mayastor helm repository: `https://openebs.github.io/mayastor-extensions/`.
+///
+/// # Errors
+///
+/// Returns an error if helm commands fail.
+pub fn deploy_mayastor(kubeconfig: &Path, namespace: &str, chart_version: &str) -> Result<()> {
+    println!("   Deploying OpenEBS Mayastor...");
+
+    // Add Mayastor repo
+    let _ = helm(
+        kubeconfig,
+        &[
+            "repo",
+            "add",
+            "mayastor",
+            "https://openebs.github.io/mayastor-extensions/",
+        ],
+    );
+    helm(kubeconfig, &["repo", "update"])?;
+
+    // Install Mayastor
+    helm(
+        kubeconfig,
+        &[
+            "upgrade",
+            "--install",
+            "mayastor",
+            "mayastor/mayastor",
+            "--namespace",
+            namespace,
+            "--create-namespace",
+            "--version",
+            chart_version,
+            "--wait",
+        ],
+    )?;
+
+    println!("   ✅ Mayastor deployed");
+    Ok(())
+}
+
+/// Create a Mayastor `DiskPool` on a specific node.
+///
+/// `disk_uri` should be something like `aio:///dev/disk/by-id/<id>` or `aio:///dev/nvme0n1`.
+///
+/// # Errors
+///
+/// Returns an error if applying the CR fails.
+pub fn create_mayastor_diskpool(
+    kubeconfig: &Path,
+    namespace: &str,
+    pool_name: &str,
+    node_name: &str,
+    disk_uri: &str,
+) -> Result<()> {
+    let yaml = format!(
+        r#"apiVersion: "openebs.io/v1beta3"
+kind: DiskPool
+metadata:
+  name: {pool_name}
+  namespace: {namespace}
+spec:
+  node: {node_name}
+  disks: ["{disk_uri}"]
+"#
+    );
+
+    kubectl_apply_yaml(kubeconfig, &yaml)?;
+    Ok(())
+}
+
+/// Create a Mayastor `StorageClass`.
+///
+/// # Errors
+///
+/// Returns an error if applying the `StorageClass` fails.
+pub fn create_mayastor_storage_class(
+    kubeconfig: &Path,
+    name: &str,
+    repl: u8,
+    make_default: bool,
+) -> Result<()> {
+    let default_annotation = if make_default {
+        r#"
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true""#
+    } else {
+        ""
+    };
+
+    let yaml = format!(
+        r#"apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {name}{default_annotation}
+provisioner: io.openebs.csi-mayastor
+parameters:
+  protocol: nvmf
+  repl: "{repl}"
+"#
+    );
+
+    kubectl_apply_yaml(kubeconfig, &yaml)?;
+    Ok(())
+}
+
+/// Run an fio benchmark Job against a PVC created from the given `StorageClass`.
+///
+/// Writes fio output to logs for retrieval via `kubectl logs job/<job_name>`.
+///
+/// # Errors
+///
+/// Returns an error if kubectl commands fail.
+pub fn run_fio_benchmark_job(
+    kubeconfig: &Path,
+    namespace: &str,
+    job_name: &str,
+    storage_class: &str,
+    pvc_size: &str,
+    runtime_seconds: u32,
+) -> Result<String> {
+    // Namespace for the benchmark
+    let _ = kubectl(kubeconfig, &["create", "ns", namespace]);
+
+    let yaml = format!(
+        r#"apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {job_name}-pvc
+  namespace: {namespace}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {pvc_size}
+  storageClassName: {storage_class}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {job_name}
+  namespace: {namespace}
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: fio
+          image: alpine/fio
+          args:
+            - "--name=benchtest"
+            - "--filename=/volume/testfile"
+            - "--direct=1"
+            - "--rw=randrw"
+            - "--rwmixread=75"
+            - "--bs=4k"
+            - "--iodepth=64"
+            - "--numjobs=1"
+            - "--time_based"
+            - "--runtime={runtime_seconds}"
+            - "--group_reporting"
+          volumeMounts:
+            - name: vol
+              mountPath: /volume
+      volumes:
+        - name: vol
+          persistentVolumeClaim:
+            claimName: {job_name}-pvc
+"#
+    );
+
+    kubectl_apply_yaml(kubeconfig, &yaml)?;
+
+    // Wait for job completion (up to 30m by default)
+    let wait_timeout = "1800s";
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "wait",
+            "--for=condition=complete",
+            &format!("job/{job_name}"),
+            "-n",
+            namespace,
+            "--timeout",
+            wait_timeout,
+        ],
+    )?;
+
+    // Fetch logs
+    let logs = kubectl(
+        kubeconfig,
+        &["logs", &format!("job/{job_name}"), "-n", namespace],
+    )?;
+    Ok(logs)
 }
 
 /// Deploy cert-manager for TLS certificate management.

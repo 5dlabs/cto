@@ -216,3 +216,165 @@ pub struct CreateSshKeyAttributes {
     /// Public key content.
     pub public_key: String,
 }
+
+// ============================================================================
+// Plan types
+// ============================================================================
+
+/// Plan resource from API.
+#[derive(Debug, Deserialize)]
+pub struct PlanResource {
+    /// Plan ID.
+    pub id: String,
+    /// Resource type.
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    /// Plan attributes.
+    pub attributes: PlanAttributes,
+}
+
+/// Plan attributes.
+#[derive(Debug, Deserialize)]
+pub struct PlanAttributes {
+    /// Plan name.
+    pub name: Option<String>,
+    /// Plan slug (e.g., "m4-metal-small").
+    pub slug: Option<String>,
+    /// Plan features (list of feature strings like "ssh", "raid", "`user_data`").
+    pub features: Option<Vec<String>>,
+    /// Plan specs.
+    pub specs: Option<PlanSpecs>,
+    /// Available regions.
+    pub regions: Option<Vec<PlanRegion>>,
+}
+
+/// Plan hardware specs.
+#[derive(Debug, Deserialize)]
+pub struct PlanSpecs {
+    /// CPU info.
+    pub cpu: Option<PlanCpu>,
+    /// Memory info.
+    pub memory: Option<PlanMemory>,
+    /// Disk info.
+    pub drives: Option<Vec<PlanDrive>>,
+    /// Network info.
+    pub nics: Option<Vec<PlanNic>>,
+}
+
+/// Plan CPU specs.
+#[derive(Debug, Deserialize)]
+pub struct PlanCpu {
+    /// CPU type/model.
+    #[serde(rename = "type")]
+    pub cpu_type: Option<String>,
+    /// CPU description.
+    pub description: Option<String>,
+    /// Number of cores.
+    pub cores: Option<u32>,
+    /// Clock speed in GHz.
+    pub clock: Option<f32>,
+}
+
+/// Plan memory specs.
+#[derive(Debug, Deserialize)]
+pub struct PlanMemory {
+    /// Total RAM in GB.
+    pub total: Option<u32>,
+}
+
+/// Plan drive specs.
+#[derive(Debug, Deserialize)]
+pub struct PlanDrive {
+    /// Number of drives.
+    pub count: Option<u32>,
+    /// Drive size.
+    pub size: Option<String>,
+    /// Drive type (e.g., "`NVMe`").
+    #[serde(rename = "type")]
+    pub drive_type: Option<String>,
+}
+
+/// Plan NIC specs.
+#[derive(Debug, Deserialize)]
+pub struct PlanNic {
+    /// Number of NICs.
+    pub count: Option<u32>,
+    /// NIC type/description.
+    #[serde(rename = "type")]
+    pub nic_type: Option<String>,
+}
+
+/// Plan region availability.
+#[derive(Debug, Deserialize)]
+pub struct PlanRegion {
+    /// Region name (e.g., "United States", "Japan").
+    pub name: Option<String>,
+    /// Location availability info.
+    pub locations: Option<PlanLocations>,
+    /// Stock level (e.g., "high", "medium", "low", "unavailable").
+    pub stock_level: Option<String>,
+    /// Pricing info.
+    pub pricing: Option<PlanPricing>,
+}
+
+/// Plan location availability.
+#[derive(Debug, Deserialize)]
+pub struct PlanLocations {
+    /// Available site slugs (e.g., `["DAL", "LAX", "NYC"]`).
+    pub available: Option<Vec<String>>,
+    /// In-stock site slugs (e.g., `["DAL", "NYC"]`).
+    pub in_stock: Option<Vec<String>>,
+}
+
+/// Plan pricing by currency.
+#[derive(Debug, Deserialize)]
+pub struct PlanPricing {
+    /// USD pricing.
+    #[serde(rename = "USD")]
+    pub usd: Option<PlanPrice>,
+}
+
+/// Plan price details.
+#[derive(Debug, Deserialize)]
+pub struct PlanPrice {
+    /// Hourly price.
+    pub hour: Option<f64>,
+    /// Monthly price.
+    pub month: Option<f64>,
+}
+
+// ============================================================================
+// Region types
+// ============================================================================
+
+/// Region resource from API.
+#[derive(Debug, Deserialize)]
+pub struct RegionResource {
+    /// Region ID.
+    pub id: String,
+    /// Resource type.
+    #[serde(rename = "type")]
+    pub resource_type: Option<String>,
+    /// Region attributes.
+    pub attributes: RegionAttributes,
+}
+
+/// Region attributes.
+#[derive(Debug, Deserialize)]
+pub struct RegionAttributes {
+    /// Region name.
+    pub name: Option<String>,
+    /// Region slug.
+    pub slug: Option<String>,
+    /// Country info.
+    pub country: Option<RegionCountry>,
+}
+
+/// Region country info.
+#[derive(Debug, Deserialize)]
+pub struct RegionCountry {
+    /// Country name.
+    pub name: Option<String>,
+    /// Country slug.
+    pub slug: Option<String>,
+}

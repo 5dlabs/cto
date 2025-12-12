@@ -3,6 +3,7 @@
 #![allow(clippy::similar_names)]
 
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -23,12 +24,44 @@ use tokio::task::JoinSet;
 #[command(about = "Provision and manage bare metal servers")]
 struct Cli {
     /// Latitude.sh API key (or set `LATITUDE_API_KEY` env var).
-    #[arg(long, env = "LATITUDE_API_KEY")]
+    ///
+    /// If omitted, `metal` can optionally fetch this from 1Password via `op`.
+    #[arg(long, env = "LATITUDE_API_KEY", default_value = "")]
     api_key: String,
 
     /// Latitude.sh Project ID (or set `LATITUDE_PROJECT_ID` env var).
-    #[arg(long, env = "LATITUDE_PROJECT_ID")]
+    ///
+    /// If omitted, `metal` can optionally fetch this from 1Password via `op`.
+    #[arg(long, env = "LATITUDE_PROJECT_ID", default_value = "")]
     project_id: String,
+
+    /// Fetch missing Latitude credentials from 1Password via the `op` CLI.
+    ///
+    /// If `--api-key` or `--project-id` are not provided, we will also try 1Password automatically.
+    #[arg(long, default_value = "false")]
+    use_1password: bool,
+
+    /// 1Password vault name (optional). If empty, `op` will use your default.
+    #[arg(long, env = "OP_VAULT", default_value = "")]
+    op_vault: String,
+
+    /// 1Password item title containing Latitude credentials.
+    #[arg(long, env = "OP_LATITUDE_ITEM", default_value = "Latitude.sh API")]
+    op_latitude_item: String,
+
+    /// 1Password field label/key for Latitude API key.
+    ///
+    /// Common choices: `credential`, `api key`, etc.
+    #[arg(long, env = "OP_LATITUDE_API_KEY_FIELD", default_value = "credential")]
+    op_latitude_api_key_field: String,
+
+    /// 1Password field label/key for Latitude project ID.
+    #[arg(
+        long,
+        env = "OP_LATITUDE_PROJECT_ID_FIELD",
+        default_value = "Project ID"
+    )]
+    op_latitude_project_id_field: String,
 
     /// Enable verbose logging.
     #[arg(short, long, default_value = "false")]
@@ -42,6 +75,26 @@ struct Cli {
 enum Commands {
     /// List all servers in the project.
     List,
+
+    /// List available plans (hardware configurations).
+    ///
+    /// Shows plan specs, pricing, and stock availability by region.
+    Plans {
+        /// Filter by region slug (e.g., ASH, DAL, MIA2).
+        #[arg(long)]
+        region: Option<String>,
+
+        /// Show only plans in stock.
+        #[arg(long, default_value = "false")]
+        in_stock: bool,
+
+        /// Show only Gen 4 plans (10G+ networking).
+        #[arg(long, default_value = "false")]
+        gen4: bool,
+    },
+
+    /// List available regions.
+    Regions,
 
     /// Get details of a specific server.
     Get {
@@ -253,6 +306,79 @@ enum Commands {
         init_openbao: bool,
     },
 
+    /// Proof-of-concept: provision a 3-node cluster and validate Mayastor replicated storage.
+    ///
+    /// Provisions 1 control plane + 2 workers, installs `OpenEBS` Mayastor, creates one `DiskPool` per node,
+    /// creates a 3-replica `StorageClass`, and runs an fio Job to capture baseline performance.
+    ///
+    /// Note: for meaningful results, pick hardware/plans with **10GbE+** networking.
+    /// Gen 4 plans (`m4-metal-small`, `f4-metal-small`, etc.) have 2x10Gbps NICs.
+    MayastorPoc {
+        /// Cluster name (used as hostname prefix).
+        #[arg(long)]
+        name: String,
+
+        /// Region/site (e.g., ASH, DAL, LAX2).
+        #[arg(long, default_value = "ASH")]
+        region: String,
+
+        /// Control plane server plan (Gen 4 recommended for 10G networking).
+        #[arg(long, default_value = "m4-metal-small")]
+        cp_plan: String,
+
+        /// Worker server plan (Gen 4 recommended for 10G networking).
+        #[arg(long, default_value = "m4-metal-small")]
+        worker_plan: String,
+
+        /// SSH key IDs for initial Ubuntu boot (comma-separated).
+        #[arg(long, value_delimiter = ',')]
+        ssh_keys: Vec<String>,
+
+        /// Talos version (e.g., v1.9.0).
+        #[arg(long, default_value = "v1.9.0")]
+        talos_version: String,
+
+        /// Install disk (e.g., /dev/sda, /dev/nvme0n1).
+        #[arg(long, default_value = "/dev/sda")]
+        install_disk: String,
+
+        /// Output directory for generated configs and benchmark logs.
+        #[arg(long, default_value = "/tmp/cto-mayastor-poc")]
+        output_dir: PathBuf,
+
+        /// Timeout in seconds to wait for each provisioning step.
+        #[arg(long, default_value = "1800")]
+        timeout: u64,
+
+        /// Mayastor Helm chart version (e.g., 2.4.0).
+        #[arg(long, default_value = "2.4.0")]
+        mayastor_chart_version: String,
+
+        /// Namespace to install Mayastor into (defaults to `openebs`).
+        #[arg(long, default_value = "openebs")]
+        mayastor_namespace: String,
+
+        /// Disk URI to allocate to each `DiskPool` (example: `<aio:///dev/disk/by-id/DEVICE_ID>`).
+        ///
+        /// For Gen 4 hardware with 2x 960GB `NVMe`, use the second drive for Mayastor:
+        /// - `aio:///dev/nvme1n1` (second `NVMe` drive)
+        /// - Or use `by-id` path for stability: `aio:///dev/disk/by-id/nvme-*`
+        #[arg(long, default_value = "aio:///dev/nvme1n1")]
+        disk_uri: String,
+
+        /// `StorageClass` name to create for 3-replica Mayastor volumes.
+        #[arg(long, default_value = "mayastor-3")]
+        storage_class: String,
+
+        /// PVC size for the fio benchmark (e.g., 20Gi).
+        #[arg(long, default_value = "20Gi")]
+        bench_pvc_size: String,
+
+        /// fio runtime in seconds.
+        #[arg(long, default_value = "120")]
+        bench_runtime_seconds: u32,
+    },
+
     /// Join a worker node to an existing Talos cluster.
     ///
     /// This provisions a new server, boots Talos via iPXE, and joins it
@@ -366,9 +492,12 @@ async fn main() -> Result<()> {
     };
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
+    // Resolve Latitude credentials (optionally via 1Password)
+    let (api_key, project_id) = resolve_latitude_creds(&cli)?;
+
     // Create provider
-    let provider = Latitude::new(&cli.api_key, &cli.project_id)
-        .context("Failed to create Latitude provider")?;
+    let provider =
+        Latitude::new(&api_key, &project_id).context("Failed to create Latitude provider")?;
 
     match cli.command {
         Commands::List => {
@@ -386,6 +515,186 @@ async fn main() -> Result<()> {
                     server.status,
                     server.ipv4.unwrap_or_default()
                 );
+            }
+        }
+
+        Commands::Plans {
+            region,
+            in_stock,
+            gen4,
+        } => {
+            let plans = provider.list_plans().await?;
+
+            println!("\n📦 Available Plans");
+            println!("{}", "=".repeat(100));
+
+            for plan in plans {
+                let slug = plan.attributes.slug.as_deref().unwrap_or("unknown");
+
+                // Filter for Gen 4 plans (they start with m4, f4, rs4, etc.)
+                if gen4 && !slug.contains("4-metal") && !slug.starts_with("m4") && !slug.starts_with("f4") && !slug.starts_with("rs4") {
+                    continue;
+                }
+
+                let name = plan.attributes.name.as_deref().unwrap_or("Unknown");
+                let specs = plan.attributes.specs.as_ref();
+
+                // Format CPU
+                let cpu_desc = specs
+                    .and_then(|s| s.cpu.as_ref())
+                    .map_or_else(
+                        || "N/A".to_string(),
+                        |c| {
+                            let cores = c.cores.unwrap_or(0);
+                            let clock = c.clock.unwrap_or(0.0);
+                            let cpu_type = c.cpu_type.as_deref().unwrap_or("Unknown");
+                            format!("{cores} cores @ {clock:.1}GHz ({cpu_type})")
+                        },
+                    );
+
+                // Format RAM
+                let ram = specs
+                    .and_then(|s| s.memory.as_ref())
+                    .and_then(|m| m.total)
+                    .map_or_else(|| "N/A".to_string(), |gb| format!("{gb} GB"));
+
+                // Format Storage
+                let storage = specs.and_then(|s| s.drives.as_ref()).map_or_else(
+                    || "N/A".to_string(),
+                    |drives| {
+                        drives
+                            .iter()
+                            .map(|d| {
+                                let count = d.count.unwrap_or(1);
+                                let size = d.size.as_deref().unwrap_or("?");
+                                let dtype = d.drive_type.as_deref().unwrap_or("?");
+                                format!("{count}x {size} {dtype}")
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" + ")
+                    },
+                );
+
+                // Format NICs
+                let nics = specs.and_then(|s| s.nics.as_ref()).map_or_else(
+                    || "N/A".to_string(),
+                    |nics| {
+                        nics.iter()
+                            .map(|n| {
+                                let count = n.count.unwrap_or(1);
+                                let ntype = n.nic_type.as_deref().unwrap_or("?");
+                                format!("{count}x {ntype}")
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    },
+                );
+
+                println!("\n{name} ({slug})");
+                println!("  CPU:     {cpu_desc}");
+                println!("  RAM:     {ram}");
+                println!("  Storage: {storage}");
+                println!("  Network: {nics}");
+
+                // Show regions with stock
+                if let Some(regions) = &plan.attributes.regions {
+                    let mut in_stock_regions = Vec::new();
+                    let mut out_of_stock_regions = Vec::new();
+
+                    for r in regions {
+                        let region_name = r.name.as_deref().unwrap_or("?");
+                        let stock_level = r.stock_level.as_deref().unwrap_or("unknown");
+                        let in_stock_sites = r
+                            .locations
+                            .as_ref()
+                            .and_then(|l| l.in_stock.as_ref())
+                            .map(|v| v.join(", "))
+                            .unwrap_or_default();
+
+                        // Check if any sites are in stock
+                        let is_in_stock = r
+                            .locations
+                            .as_ref()
+                            .and_then(|l| l.in_stock.as_ref())
+                            .is_some_and(|sites| !sites.is_empty());
+
+                        // Apply region filter (check if any site slug matches)
+                        if let Some(ref filter_region) = region {
+                            let matches = r
+                                .locations
+                                .as_ref()
+                                .and_then(|l| l.available.as_ref())
+                                .is_some_and(|sites| {
+                                    sites.iter().any(|s| s.eq_ignore_ascii_case(filter_region))
+                                });
+                            if !matches {
+                                continue;
+                            }
+                        }
+
+                        // Apply in_stock filter
+                        if in_stock && !is_in_stock {
+                            continue;
+                        }
+
+                        let price_hr = r
+                            .pricing
+                            .as_ref()
+                            .and_then(|p| p.usd.as_ref())
+                            .and_then(|u| u.hour)
+                            .map_or_else(|| "N/A".to_string(), |h| format!("${h:.2}/hr"));
+
+                        let entry = if is_in_stock {
+                            format!("{region_name} [{in_stock_sites}] {price_hr} ({stock_level})")
+                        } else {
+                            format!("{region_name} {price_hr}")
+                        };
+
+                        if is_in_stock {
+                            in_stock_regions.push(entry);
+                        } else {
+                            out_of_stock_regions.push(entry);
+                        }
+                    }
+
+                    if !in_stock_regions.is_empty() {
+                        println!("  ✅ In Stock:");
+                        for r in in_stock_regions {
+                            println!("     - {r}");
+                        }
+                    }
+                    if !out_of_stock_regions.is_empty() && !in_stock {
+                        println!("  ❌ Out of Stock:");
+                        for r in out_of_stock_regions {
+                            println!("     - {r}");
+                        }
+                    }
+                }
+            }
+        }
+
+        Commands::Regions => {
+            let regions = provider.list_regions().await?;
+
+            println!("\n🌍 Available Regions");
+            println!("{}", "=".repeat(60));
+            println!(
+                "\n{:<10} {:<25} {:<20}",
+                "SLUG", "NAME", "COUNTRY"
+            );
+            println!("{}", "-".repeat(60));
+
+            for region in regions {
+                let slug = region.attributes.slug.as_deref().unwrap_or("?");
+                let name = region.attributes.name.as_deref().unwrap_or("?");
+                let country = region
+                    .attributes
+                    .country
+                    .as_ref()
+                    .and_then(|c| c.name.as_deref())
+                    .unwrap_or("?");
+
+                println!("{slug:<10} {name:<25} {country:<20}");
             }
         }
 
@@ -723,7 +1032,7 @@ async fn main() -> Result<()> {
             };
 
             // Create second provider instance for parallel ops
-            let provider2 = Latitude::new(&cli.api_key, &cli.project_id)
+            let provider2 = Latitude::new(&api_key, &project_id)
                 .context("Failed to create second Latitude provider")?;
 
             // Variables to track server state (may be restored from saved state)
@@ -1315,7 +1624,372 @@ async fn main() -> Result<()> {
             stack::unseal_openbao(&kubeconfig, &unseal_key)?;
             println!("\n🔓 OpenBao unsealed successfully!");
         }
+
+        Commands::MayastorPoc {
+            name,
+            region,
+            cp_plan,
+            worker_plan,
+            ssh_keys,
+            talos_version,
+            install_disk,
+            output_dir,
+            timeout,
+            mayastor_chart_version,
+            mayastor_namespace,
+            disk_uri,
+            storage_class,
+            bench_pvc_size,
+            bench_runtime_seconds,
+        } => {
+            info!("Mayastor POC: provisioning 3-node cluster: {name}");
+
+            let retry_config = RetryConfig::default();
+            let cp_hostname = format!("{name}-cp1");
+            let worker1_hostname = format!("{name}-worker1");
+            let worker2_hostname = format!("{name}-worker2");
+
+            // Step 1: Create all 3 servers in parallel
+            println!("\n🖥️  Step 1/12: Creating 3 servers in parallel...");
+            let cp_req = CreateServerRequest {
+                hostname: cp_hostname.clone(),
+                plan: cp_plan,
+                region: region.clone(),
+                os: "ubuntu_24_04_x64_lts".to_string(),
+                ssh_keys: ssh_keys.clone(),
+            };
+            let w1_req = CreateServerRequest {
+                hostname: worker1_hostname.clone(),
+                plan: worker_plan.clone(),
+                region: region.clone(),
+                os: "ubuntu_24_04_x64_lts".to_string(),
+                ssh_keys: ssh_keys.clone(),
+            };
+            let w2_req = CreateServerRequest {
+                hostname: worker2_hostname.clone(),
+                plan: worker_plan,
+                region,
+                os: "ubuntu_24_04_x64_lts".to_string(),
+                ssh_keys,
+            };
+
+            let provider2 = Latitude::new(&api_key, &project_id)
+                .context("Failed to create second Latitude provider")?;
+            let provider3 = Latitude::new(&api_key, &project_id)
+                .context("Failed to create third Latitude provider")?;
+
+            let (cp_server, w1_server, w2_server) =
+                with_retry_async(&retry_config, "Create 3 servers", || {
+                    let p1 = &provider;
+                    let p2 = &provider2;
+                    let p3 = &provider3;
+                    let cp = cp_req.clone();
+                    let w1 = w1_req.clone();
+                    let w2 = w2_req.clone();
+                    async move {
+                        let (a, b, c) = tokio::try_join!(
+                            p1.create_server(cp),
+                            p2.create_server(w1),
+                            p3.create_server(w2)
+                        )
+                        .map_err(|e| anyhow::anyhow!("{e}"))?;
+                        Ok::<_, anyhow::Error>((a, b, c))
+                    }
+                })
+                .await?;
+
+            let cp_id = cp_server.id.clone();
+            let w1_id = w1_server.id.clone();
+            let w2_id = w2_server.id.clone();
+            println!("   Control Plane: {cp_id}");
+            println!("   Worker1:       {w1_id}");
+            println!("   Worker2:       {w2_id}");
+
+            // Step 2: Wait for all servers to be ready
+            println!("\n⏳ Step 2/12: Waiting for all servers to be ready...");
+            let (cp_ready, w1_ready, w2_ready) =
+                with_retry_async(&retry_config, "Wait for 3 servers", || {
+                    let p1 = &provider;
+                    let p2 = &provider2;
+                    let p3 = &provider3;
+                    let cp = cp_id.clone();
+                    let w1 = w1_id.clone();
+                    let w2 = w2_id.clone();
+                    async move {
+                        let (a, b, c) = tokio::try_join!(
+                            p1.wait_ready(&cp, timeout),
+                            p2.wait_ready(&w1, timeout),
+                            p3.wait_ready(&w2, timeout)
+                        )
+                        .map_err(|e| anyhow::anyhow!("{e}"))?;
+                        Ok::<_, anyhow::Error>((a, b, c))
+                    }
+                })
+                .await?;
+
+            let cp_addr = cp_ready.ipv4.clone().unwrap_or_default();
+            let w1_addr = w1_ready.ipv4.clone().unwrap_or_default();
+            let w2_addr = w2_ready.ipv4.clone().unwrap_or_default();
+            println!("   ✅ Control plane ready: {cp_addr}");
+            println!("   ✅ Worker1 ready:       {w1_addr}");
+            println!("   ✅ Worker2 ready:       {w2_addr}");
+
+            // Step 3: Trigger Talos iPXE on all 3
+            println!("\n🔄 Step 3/12: Triggering Talos iPXE boot on all 3 nodes...");
+            let talos_cfg =
+                TalosConfig::new(&name).with_version(metal::talos::TalosVersion::new(
+                    &talos_version,
+                    metal::talos::DEFAULT_SCHEMATIC_ID,
+                ));
+            let ipxe_url = talos_cfg.ipxe_url();
+            with_retry_async(&retry_config, "Trigger iPXE", || {
+                let p1 = &provider;
+                let p2 = &provider2;
+                let p3 = &provider3;
+                let cp = cp_id.clone();
+                let w1 = w1_id.clone();
+                let w2 = w2_id.clone();
+                let cp_req = ReinstallIpxeRequest {
+                    hostname: cp_hostname.clone(),
+                    ipxe_url: ipxe_url.clone(),
+                };
+                let w1_req = ReinstallIpxeRequest {
+                    hostname: worker1_hostname.clone(),
+                    ipxe_url: ipxe_url.clone(),
+                };
+                let w2_req = ReinstallIpxeRequest {
+                    hostname: worker2_hostname.clone(),
+                    ipxe_url: ipxe_url.clone(),
+                };
+                async move {
+                    tokio::try_join!(
+                        p1.reinstall_ipxe(&cp, cp_req),
+                        p2.reinstall_ipxe(&w1, w1_req),
+                        p3.reinstall_ipxe(&w2, w2_req)
+                    )
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                    Ok::<_, anyhow::Error>(())
+                }
+            })
+            .await?;
+            println!("   ✅ iPXE triggered on all 3 servers!");
+
+            // Step 4: Wait for Talos maintenance mode on all 3
+            println!("\n📡 Step 4/12: Waiting for Talos maintenance mode on all 3 nodes...");
+            println!("   (This typically takes 10-15 minutes for iPXE boot)");
+            let timeout_duration = Duration::from_secs(timeout);
+            let mut set = JoinSet::new();
+            for (label, ip) in [
+                ("cp", cp_addr.clone()),
+                ("worker1", w1_addr.clone()),
+                ("worker2", w2_addr.clone()),
+            ] {
+                set.spawn(async move {
+                    talos::wait_for_talos(&ip, timeout_duration)?;
+                    Ok::<_, anyhow::Error>((label, ip))
+                });
+            }
+            while let Some(result) = set.join_next().await {
+                match result {
+                    Ok(Ok((node, addr))) => println!("   ✅ {node} Talos ready: {addr}"),
+                    Ok(Err(e)) => anyhow::bail!("Failed waiting for Talos: {e}"),
+                    Err(e) => anyhow::bail!("Task panicked: {e}"),
+                }
+            }
+
+            // Step 5: Generate secrets + configs
+            println!("\n🔐 Step 5/12: Generating Talos secrets and machine configs...");
+            talos::generate_secrets(&output_dir)?;
+            let config = BootstrapConfig::new(&name, &cp_addr)
+                .with_install_disk(&install_disk)
+                .with_output_dir(&output_dir)
+                .with_talos_version(&talos_version);
+            let configs = talos::generate_config(&config)?;
+
+            // Step 6: Apply config to control plane
+            println!("\n🚀 Step 6/12: Applying control plane config (install + reboot)...");
+            talos::apply_config(&cp_addr, &configs.controlplane)?;
+
+            // Step 7: Wait for CP install + bootstrap + kubeconfig
+            println!("\n⏳ Step 7/12: Waiting for control plane installation...");
+            talos::wait_for_install(&cp_addr, &configs.talosconfig, Duration::from_secs(timeout))?;
+
+            println!("\n🎯 Step 8/12: Bootstrapping control plane...");
+            talos::bootstrap_cluster(&cp_addr, &configs.talosconfig)?;
+
+            println!("\n☸️  Step 9/12: Waiting for Kubernetes API...");
+            talos::wait_for_kubernetes(&cp_addr, &configs.talosconfig, Duration::from_secs(300))?;
+
+            let kubeconfig_path = output_dir.join("kubeconfig");
+            talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
+
+            // Step 10: Apply worker config to both workers
+            println!("\n🔄 Step 10/12: Applying worker configs (install + reboot)...");
+            talos::apply_config(&w1_addr, &configs.worker)?;
+            talos::apply_config(&w2_addr, &configs.worker)?;
+
+            // Step 11: Wait for workers to install + join
+            println!("\n⏳ Step 11/12: Waiting for workers to install and join...");
+            let mut set = JoinSet::new();
+            let tcfg = configs.talosconfig.clone();
+            let w1 = w1_addr.clone();
+            set.spawn(async move {
+                talos::wait_for_install(&w1, &tcfg, Duration::from_secs(timeout))?;
+                Ok::<_, anyhow::Error>(w1)
+            });
+            let tcfg2 = configs.talosconfig.clone();
+            let w2 = w2_addr.clone();
+            set.spawn(async move {
+                talos::wait_for_install(&w2, &tcfg2, Duration::from_secs(timeout))?;
+                Ok::<_, anyhow::Error>(w2)
+            });
+            while let Some(result) = set.join_next().await {
+                match result {
+                    Ok(Ok(addr)) => println!("   ✅ Worker installed: {addr}"),
+                    Ok(Err(e)) => anyhow::bail!("Failed waiting for worker install: {e}"),
+                    Err(e) => anyhow::bail!("Task panicked: {e}"),
+                }
+            }
+            talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(600))?;
+
+            // Step 12: Install Mayastor + pools + storageclass + fio
+            println!("\n📦 Step 12/12: Installing Mayastor and running fio benchmark...");
+            stack::deploy_mayastor(
+                &kubeconfig_path,
+                &mayastor_namespace,
+                &mayastor_chart_version,
+            )?;
+
+            // Discover node names (for DiskPool.spec.node)
+            let nodes = Command::new("kubectl")
+                .arg("--kubeconfig")
+                .arg(&kubeconfig_path)
+                .args(["get", "nodes", "-o", "jsonpath={.items[*].metadata.name}"])
+                .output()
+                .context("Failed to list Kubernetes nodes")?;
+            if !nodes.status.success() {
+                anyhow::bail!("kubectl get nodes failed");
+            }
+            let nodes = String::from_utf8_lossy(&nodes.stdout);
+            let node_names: Vec<&str> = nodes.split_whitespace().collect();
+            println!("   Nodes: {}", node_names.join(", "));
+
+            for node in &node_names {
+                let pool_name = format!("pool-{node}");
+                stack::create_mayastor_diskpool(
+                    &kubeconfig_path,
+                    &mayastor_namespace,
+                    &pool_name,
+                    node,
+                    &disk_uri,
+                )?;
+            }
+            println!("   ✅ DiskPools created (one per node)");
+
+            stack::create_mayastor_storage_class(&kubeconfig_path, &storage_class, 3, false)?;
+            println!("   ✅ StorageClass created: {storage_class}");
+
+            let fio_logs = stack::run_fio_benchmark_job(
+                &kubeconfig_path,
+                "bench",
+                "mayastor-fio",
+                &storage_class,
+                &bench_pvc_size,
+                bench_runtime_seconds,
+            )?;
+
+            std::fs::create_dir_all(&output_dir)?;
+            let bench_log_path = output_dir.join("mayastor-fio.log");
+            std::fs::write(&bench_log_path, &fio_logs)?;
+            println!("\n📈 fio logs saved to: {}", bench_log_path.display());
+
+            println!("\n🎉 Mayastor POC complete!");
+            println!("\n📊 Summary:");
+            println!("   Cluster:        {name}");
+            println!("   Control Plane:  {cp_addr} ({cp_id})");
+            println!("   Worker1:        {w1_addr} ({w1_id})");
+            println!("   Worker2:        {w2_addr} ({w2_id})");
+            println!("   Mayastor NS:    {mayastor_namespace}");
+            println!("   StorageClass:   {storage_class} (repl=3)");
+            println!("\n📋 Next steps:");
+            println!("   export KUBECONFIG={}", kubeconfig_path.display());
+            println!("   kubectl get nodes");
+            println!("   kubectl get dsp -n {mayastor_namespace}");
+        }
     }
 
     Ok(())
+}
+
+fn resolve_latitude_creds(cli: &Cli) -> Result<(String, String)> {
+    let mut api_key = cli.api_key.trim().to_string();
+    let mut project_id = cli.project_id.trim().to_string();
+
+    if !api_key.is_empty() && !project_id.is_empty() {
+        return Ok((api_key, project_id));
+    }
+
+    // If missing, try 1Password (either explicitly or as a fallback).
+    if !cli.use_1password && api_key.is_empty() && project_id.is_empty() {
+        // still attempt, since user preference is to pull from 1Password when not provided.
+    }
+
+    ensure_op_ready()?;
+
+    let vault = cli.op_vault.trim();
+    let item = cli.op_latitude_item.trim();
+
+    if api_key.is_empty() {
+        api_key = op_item_get_field(
+            item,
+            if vault.is_empty() { None } else { Some(vault) },
+            cli.op_latitude_api_key_field.trim(),
+        )
+        .context("Failed to read Latitude API key from 1Password")?;
+    }
+
+    if project_id.is_empty() {
+        project_id = op_item_get_field(
+            item,
+            if vault.is_empty() { None } else { Some(vault) },
+            cli.op_latitude_project_id_field.trim(),
+        )
+        .context("Failed to read Latitude project ID from 1Password")?;
+    }
+
+    if api_key.is_empty() || project_id.is_empty() {
+        anyhow::bail!(
+            "Latitude credentials are missing. Provide --api-key/--project-id (or env vars), or configure 1Password flags: --op-latitude-item/--op-latitude-*-field"
+        );
+    }
+
+    Ok((api_key, project_id))
+}
+
+fn ensure_op_ready() -> Result<()> {
+    let version = Command::new("op").arg("--version").output();
+    if version.is_err() {
+        anyhow::bail!("1Password CLI `op` not found. Install it and run: `eval $(op signin)`");
+    }
+
+    // Verify auth (do not attempt signin automatically because it requires shell eval).
+    let auth = Command::new("op").args(["account", "get"]).output();
+    match auth {
+        Ok(out) if out.status.success() => Ok(()),
+        _ => anyhow::bail!("Not authenticated to 1Password. Run: `eval $(op signin)`"),
+    }
+}
+
+fn op_item_get_field(item: &str, vault: Option<&str>, field: &str) -> Result<String> {
+    let mut cmd = Command::new("op");
+    cmd.args(["item", "get", item, "--fields", field, "--reveal"]);
+    if let Some(v) = vault {
+        cmd.args(["--vault", v]);
+    }
+    let out = cmd.output().context("Failed to execute `op item get`")?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        anyhow::bail!("`op item get` failed: {stderr}");
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
