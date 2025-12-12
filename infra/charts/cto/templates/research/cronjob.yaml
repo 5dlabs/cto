@@ -115,5 +115,88 @@ spec:
                     name: tools-firecrawl-secrets
               resources:
                 {{- toYaml .Values.research.resources | nindent 16 }}
+
+---
+# CronJob that sends email digests of new research entries
+{{- if .Values.research.digest.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: research-digest
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    app.kubernetes.io/name: research-digest
+    app.kubernetes.io/part-of: research
+spec:
+  schedule: {{ .Values.research.digest.schedule | default "0 13 * * *" | quote }}
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: research-digest
+        spec:
+          serviceAccountName: research
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          restartPolicy: OnFailure
+          {{- include "cto.imagePullSecrets" . | nindent 10 }}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: DoesNotExist
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: research-data
+          containers:
+            - name: research
+              image: "{{ include "cto.imageRef" (dict "component" "research" "image" .Values.research.image "global" .Values.global) }}"
+              imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.research.image "global" .Values.global) }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+              args:
+                - digest
+                - --dir=/data/research
+                - --state=/data/digest-state.json
+                - --check-and-send
+                - --hours-between={{ .Values.research.digest.hoursBetween | default "24" }}
+                - --model={{ .Values.research.digest.model | default .Values.research.model | default "claude-sonnet-4-20250514" }}
+                {{- if .Values.research.digest.skipAnalysis }}
+                - --skip-analysis
+                {{- end }}
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              envFrom:
+                - secretRef:
+                    name: research-twitter-secrets
+                - secretRef:
+                    name: cto-secrets
+                - secretRef:
+                    name: tools-firecrawl-secrets
+                - secretRef:
+                    name: {{ .Values.research.digest.secretName | default "research-digest-secrets" }}
+              resources:
+                {{- toYaml .Values.research.resources | nindent 16 }}
+{{- end }}
 {{- end }}
 
