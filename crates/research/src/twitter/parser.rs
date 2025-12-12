@@ -17,20 +17,28 @@ impl BookmarkParser {
         let document = Html::parse_document(html);
         let mut bookmarks = Vec::new();
 
-        // Select all tweet containers
+        // Prefer the stable testid selector; fall back to article containers if X changes markup.
         let tweet_selector =
             Selector::parse("[data-testid='tweet']").expect("Invalid tweet selector");
+        let article_selector = Selector::parse("article").expect("Invalid article selector");
 
         // Extract tweet links and text
         let link_selector = Selector::parse("a[href*='/status/']").expect("Invalid link selector");
         let text_selector =
             Selector::parse("[data-testid='tweetText']").expect("Invalid text selector");
+        let lang_text_selector = Selector::parse("div[lang]").expect("Invalid lang text selector");
 
-        let tweets: Vec<_> = document.select(&tweet_selector).collect();
+        let mut tweets: Vec<_> = document.select(&tweet_selector).collect();
+        if tweets.is_empty() {
+            tweets = document.select(&article_selector).collect();
+        }
         tracing::debug!(tweet_count = tweets.len(), "Found tweet containers");
 
         if tweets.is_empty() {
-            tracing::warn!("No tweets found in HTML - page may need JavaScript rendering");
+            tracing::warn!(
+                "No tweet containers found in HTML (selectors: data-testid=tweet, article). \
+                 The page may not have rendered or X markup may have changed."
+            );
             return Ok(bookmarks);
         }
 
@@ -53,11 +61,18 @@ impl BookmarkParser {
                 continue;
             };
 
-            // Extract the tweet text
+            // Extract the tweet text.
+            // Prefer the tweetText testid; fall back to div[lang] which often holds the rendered text.
             let text = tweet
                 .select(&text_selector)
                 .next()
                 .map(|el| el.text().collect::<String>())
+                .or_else(|| {
+                    tweet
+                        .select(&lang_text_selector)
+                        .next()
+                        .map(|el| el.text().collect::<String>())
+                })
                 .unwrap_or_default();
 
             if text.is_empty() {
