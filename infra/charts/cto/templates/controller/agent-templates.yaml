@@ -245,6 +245,9 @@ data:
         echo "  ✅ Repository accessible"
     fi
 
+    # Write repository URL early (so Argo can capture it even if later steps fail)
+    echo "$REPOSITORY_URL" > /tmp/repository-url
+
     # =========================================================================
     # Webhook Setup (Optional)
     # =========================================================================
@@ -261,18 +264,51 @@ data:
         
         if [ -n "$EXISTING_WEBHOOK" ]; then
             echo "  ⚠️ Webhook already exists (ID: $EXISTING_WEBHOOK)"
+            activity_action_complete "Webhook configured" "${REPO_PATH}" "Already exists (id: ${EXISTING_WEBHOOK})"
         else
-            # Create webhook
-            gh api "repos/${REPO_PATH}/hooks" \
-                -f name=web \
-                -f "config[url]=$WEBHOOK_CALLBACK_URL" \
-                -f "config[content_type]=json" \
-                -f "events[]=push" \
-                -f "events[]=pull_request" \
-                -f "events[]=check_run" \
-                -f "events[]=check_suite" \
-                -f active=true \
-                &>/dev/null && echo "  ✅ Webhook created" || echo "  ⚠️ Could not create webhook (may lack permissions)"
+            # Create webhook using JSON input (ensures correct types for booleans)
+            printf '{"name":"web","active":true,"events":["push","pull_request","check_run","check_suite"],"config":{"url":"%s","content_type":"json"}}' "${WEBHOOK_CALLBACK_URL}" > /tmp/webhook-input.json
+
+            if OUT=$(gh api --method POST "repos/${REPO_PATH}/hooks" --input /tmp/webhook-input.json 2>&1); then
+                echo "  ✅ Webhook created"
+                activity_action_complete "Webhook configured" "${REPO_PATH}" "Created webhook for ${WEBHOOK_CALLBACK_URL}"
+            else
+                echo "  ❌ Failed to create webhook"
+                activity_error "Webhook creation failed for ${REPO_PATH}.\n\nURL: ${WEBHOOK_CALLBACK_URL}\n\n---\n${OUT}\n---"
+                # Non-fatal: continue even if webhook fails (permissions issue)
+            fi
+        fi
+    fi
+
+    # =========================================================================
+    # Branch Protection (Optional but recommended)
+    # =========================================================================
+
+    REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+    BRANCH_NAME="main"
+
+    echo ""
+    echo "🔒 Ensuring branch protection on ${BRANCH_NAME}..."
+    activity_action "Protect branch" "${REPO_PATH}:${BRANCH_NAME}"
+
+    # Check if protection already exists
+    if gh api "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" >/tmp/branch-protection.json 2>/dev/null; then
+        echo "  ✅ Branch protection already enabled"
+        SUMMARY=$(jq -r '"- requiredApprovingReviews: \(.required_pull_request_reviews.required_approving_review_count // 0)\n- requireCodeOwnerReviews: \(.required_pull_request_reviews.require_code_owner_reviews // false)\n- allowForcePushes: \(.allow_force_pushes.enabled // false)\n- allowDeletions: \(.allow_deletions.enabled // false)"' /tmp/branch-protection.json 2>/dev/null || echo "- existing protection detected")
+        activity_action_complete "Branch protected" "${REPO_PATH}:${BRANCH_NAME}" "Already enabled.\n\n${SUMMARY}"
+    else
+        # Apply branch protection using JSON input (ensures correct types)
+        printf '{"required_status_checks":null,"enforce_admins":true,"required_pull_request_reviews":{"dismiss_stale_reviews":true,"require_code_owner_reviews":false,"required_approving_review_count":1},"restrictions":null,"required_linear_history":true,"allow_force_pushes":false,"allow_deletions":false}' > /tmp/branch-protection-input.json
+
+        if OUT=$(gh api --method PUT "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" \
+            -H "Accept: application/vnd.github+json" \
+            --input /tmp/branch-protection-input.json 2>&1); then
+            echo "  ✅ Branch protection applied"
+            activity_action_complete "Branch protected" "${REPO_PATH}:${BRANCH_NAME}" "Applied branch protection (1 review required, no force push)"
+        else
+            echo "  ⚠️ Could not apply branch protection"
+            activity_error "Branch protection failed for ${REPO_PATH}:${BRANCH_NAME}.\n\n---\n${OUT}\n---"
+            # Non-fatal: continue even if branch protection fails
         fi
     fi
 
@@ -287,9 +323,6 @@ data:
     echo "════════════════════════════════════════════════════════════════"
 
     activity_action_complete "GitHub prep complete" "$REPOSITORY_URL" "Repository ready"
-
-    # Write output for next step
-    echo "$REPOSITORY_URL" > /tmp/repository-url
 
   # Intake workflow script - parses PRD and generates tasks
   # NOTE: This script expects REPOSITORY_URL to be valid (set by github_prep step)
