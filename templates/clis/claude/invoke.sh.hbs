@@ -85,8 +85,16 @@ rm -f "$FIFO_PATH" 2>/dev/null || true
 mkfifo "$FIFO_PATH"
 chmod 666 "$FIFO_PATH" || true
 
-# Start Claude (reader) in background
-$CLAUDE_CMD < "$FIFO_PATH" &
+# Stream output file for sidecar to parse (structured activities)
+STREAM_OUTPUT="/workspace/claude-stream.jsonl"
+rm -f "$STREAM_OUTPUT" 2>/dev/null || true
+touch "$STREAM_OUTPUT"
+chmod 666 "$STREAM_OUTPUT" || true
+
+echo "✓ Claude stream output: $STREAM_OUTPUT"
+
+# Start Claude (reader) in background, tee output to stream file
+$CLAUDE_CMD < "$FIFO_PATH" | tee "$STREAM_OUTPUT" &
 CLAUDE_PID=$!
 
 # Determine prompt source

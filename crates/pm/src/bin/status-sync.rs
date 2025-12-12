@@ -47,6 +47,7 @@ pub struct Config {
     pub status_file: String,
     pub log_file: String,
     pub input_fifo: String,
+    pub claude_stream_file: String,
 
     // Service URLs
     pub linear_service_url: String,
@@ -56,6 +57,7 @@ pub struct Config {
     pub status_poll_interval_ms: u64,
     pub log_post_interval_ms: u64,
     pub input_poll_interval_ms: u64,
+    pub stream_poll_interval_ms: u64,
 
     // HTTP server
     pub http_port: u16,
@@ -80,6 +82,8 @@ impl Config {
                 .unwrap_or_else(|_| "/workspace/agent.log".to_string()),
             input_fifo: std::env::var("INPUT_FIFO_PATH")
                 .unwrap_or_else(|_| "/workspace/agent-input.jsonl".to_string()),
+            claude_stream_file: std::env::var("CLAUDE_STREAM_FILE")
+                .unwrap_or_else(|_| "/workspace/claude-stream.jsonl".to_string()),
 
             linear_service_url: std::env::var("LINEAR_SERVICE_URL")
                 .unwrap_or_else(|_| "http://pm-svc.cto.svc.cluster.local:8081".to_string()),
@@ -98,6 +102,10 @@ impl Config {
                 .unwrap_or_else(|_| "2000".to_string())
                 .parse()
                 .unwrap_or(2000),
+            stream_poll_interval_ms: std::env::var("STREAM_POLL_INTERVAL_MS")
+                .unwrap_or_else(|_| "500".to_string())
+                .parse()
+                .unwrap_or(500),
 
             http_port: std::env::var("HTTP_PORT")
                 .unwrap_or_else(|_| "8080".to_string())
@@ -526,6 +534,293 @@ async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiCli
 }
 
 // =============================================================================
+// Claude Stream Parsing
+// =============================================================================
+
+/// Claude stream event types from stream-json output.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ClaudeStreamEvent {
+    /// System initialization event
+    System {
+        subtype: Option<String>,
+        model: Option<String>,
+        tools: Option<Vec<String>>,
+        session_id: Option<String>,
+    },
+    /// Assistant message (may contain text or tool_use)
+    Assistant {
+        message: Option<AssistantMessage>,
+        session_id: Option<String>,
+    },
+    /// User message (usually tool results)
+    User {
+        message: Option<UserMessage>,
+        tool_use_result: Option<String>,
+        session_id: Option<String>,
+    },
+    /// Final result with stats
+    Result {
+        subtype: Option<String>,
+        duration_ms: Option<u64>,
+        total_cost_usd: Option<f64>,
+        num_turns: Option<u32>,
+        result: Option<String>,
+        session_id: Option<String>,
+    },
+}
+
+/// Assistant message content
+#[derive(Debug, Clone, Deserialize)]
+pub struct AssistantMessage {
+    pub model: Option<String>,
+    pub content: Option<Vec<ContentBlock>>,
+    pub usage: Option<UsageInfo>,
+}
+
+/// User message content
+#[derive(Debug, Clone, Deserialize)]
+pub struct UserMessage {
+    pub content: Option<Vec<ContentBlock>>,
+}
+
+/// Content block (text or tool_use)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentBlock {
+    Text {
+        text: String,
+    },
+    ToolUse {
+        id: Option<String>,
+        name: String,
+        input: Option<serde_json::Value>,
+    },
+    ToolResult {
+        tool_use_id: Option<String>,
+        content: Option<String>,
+        is_error: Option<bool>,
+    },
+}
+
+/// Usage information
+#[derive(Debug, Clone, Deserialize)]
+pub struct UsageInfo {
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+}
+
+/// Claude stream parsing task - reads stream-json and emits structured activities.
+async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApiClient>) {
+    let Some(client) = linear_client else {
+        info!("Linear API not configured, Claude stream parsing disabled");
+        return;
+    };
+
+    // Wait for stream file to exist
+    loop {
+        if fs::metadata(&config.claude_stream_file).await.is_ok() {
+            break;
+        }
+        debug!(path = %config.claude_stream_file, "Waiting for Claude stream file to exist");
+        sleep(Duration::from_secs(2)).await;
+    }
+
+    info!(path = %config.claude_stream_file, "Starting Claude stream parsing");
+
+    // Open file and track position
+    let file = match File::open(&config.claude_stream_file).await {
+        Ok(f) => f,
+        Err(e) => {
+            error!(error = %e, "Failed to open Claude stream file");
+            return;
+        }
+    };
+
+    let mut reader = BufReader::new(file);
+    let mut processed_lines = 0u64;
+    let mut last_tool_name: Option<String> = None;
+    let mut total_cost: f64 = 0.0;
+
+    loop {
+        let mut line = String::new();
+        match reader.read_line(&mut line).await {
+            Ok(0) => {
+                // No new data
+                sleep(Duration::from_millis(config.stream_poll_interval_ms)).await;
+            }
+            Ok(_) => {
+                processed_lines += 1;
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                // Parse the JSON event
+                match serde_json::from_str::<ClaudeStreamEvent>(line) {
+                    Ok(event) => {
+                        if let Err(e) = process_stream_event(
+                            &client,
+                            &config.linear_session_id,
+                            &event,
+                            &mut last_tool_name,
+                            &mut total_cost,
+                        )
+                        .await
+                        {
+                            warn!(error = %e, line = processed_lines, "Failed to process stream event");
+                        }
+                    }
+                    Err(e) => {
+                        debug!(error = %e, line = %line, "Failed to parse stream event (may be partial)");
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "Error reading Claude stream file");
+                sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+}
+
+/// Process a single Claude stream event and emit appropriate Linear activity.
+async fn process_stream_event(
+    client: &LinearApiClient,
+    session_id: &str,
+    event: &ClaudeStreamEvent,
+    last_tool_name: &mut Option<String>,
+    total_cost: &mut f64,
+) -> Result<()> {
+    match event {
+        ClaudeStreamEvent::System { model, tools, .. } => {
+            let tool_count = tools.as_ref().map_or(0, Vec::len);
+            let model_name = model.as_deref().unwrap_or("unknown");
+            let msg = format!("🚀 Starting with **{model_name}** | {tool_count} tools available");
+            client.emit_thought(session_id, &msg).await?;
+        }
+
+        ClaudeStreamEvent::Assistant { message, .. } => {
+            if let Some(msg) = message {
+                for content in msg.content.as_ref().unwrap_or(&vec![]) {
+                    match content {
+                        ContentBlock::ToolUse { name, input, .. } => {
+                            // Format tool input summary (truncate if long)
+                            let input_summary = input
+                                .as_ref()
+                                .map(|v| {
+                                    let s = v.to_string();
+                                    if s.len() > 100 {
+                                        format!("{}...", &s[..100])
+                                    } else {
+                                        s
+                                    }
+                                })
+                                .unwrap_or_else(|| "()".to_string());
+
+                            let activity = format!("🔧 **{name}** → `{input_summary}`");
+                            client.emit_thought(session_id, &activity).await?;
+                            *last_tool_name = Some(name.clone());
+                        }
+                        ContentBlock::Text { text } => {
+                            // Only emit significant text (not single words/confirmations)
+                            if text.len() > 50
+                                && !text.starts_with("I'll")
+                                && !text.starts_with("Let me")
+                            {
+                                // Truncate very long text
+                                let display_text = if text.len() > 500 {
+                                    format!("{}...", &text[..500])
+                                } else {
+                                    text.clone()
+                                };
+                                client.emit_thought(session_id, &display_text).await?;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        ClaudeStreamEvent::User {
+            tool_use_result,
+            message,
+            ..
+        } => {
+            // Tool result - show success/error status
+            if let Some(result) = tool_use_result {
+                let tool_name = last_tool_name.as_deref().unwrap_or("Tool");
+                let is_error = result.contains("error") || result.contains("Error");
+                let status = if is_error { "❌" } else { "✅" };
+
+                // Truncate result
+                let result_preview = if result.len() > 200 {
+                    format!("{}...", &result[..200])
+                } else {
+                    result.clone()
+                };
+
+                let activity = format!("{status} **{tool_name}** → {result_preview}");
+                client.emit_thought(session_id, &activity).await?;
+            } else if let Some(msg) = message {
+                // Check for tool_result in content blocks
+                for content in msg.content.as_ref().unwrap_or(&vec![]) {
+                    if let ContentBlock::ToolResult {
+                        content, is_error, ..
+                    } = content
+                    {
+                        let tool_name = last_tool_name.as_deref().unwrap_or("Tool");
+                        let status = if is_error.unwrap_or(false) {
+                            "❌"
+                        } else {
+                            "✅"
+                        };
+                        let result_text = content.as_deref().unwrap_or("completed");
+
+                        // Truncate result
+                        let result_preview = if result_text.len() > 200 {
+                            format!("{}...", &result_text[..200])
+                        } else {
+                            result_text.to_string()
+                        };
+
+                        let activity = format!("{status} **{tool_name}** → {result_preview}");
+                        client.emit_thought(session_id, &activity).await?;
+                    }
+                }
+            }
+        }
+
+        ClaudeStreamEvent::Result {
+            duration_ms,
+            total_cost_usd,
+            num_turns,
+            subtype,
+            ..
+        } => {
+            *total_cost += total_cost_usd.unwrap_or(0.0);
+            let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
+            let turns = num_turns.unwrap_or(0);
+            let cost = total_cost_usd.unwrap_or(0.0);
+
+            let status = match subtype.as_deref() {
+                Some("success") => "✅",
+                Some("error") => "❌",
+                _ => "ℹ️",
+            };
+
+            let summary = format!(
+                "{status} **Completed** | {duration_secs:.1}s | ${cost:.4} | {turns} turns"
+            );
+            client.emit_thought(session_id, &summary).await?;
+        }
+    }
+
+    Ok(())
+}
+
+// =============================================================================
 // Input Polling
 // =============================================================================
 
@@ -764,6 +1059,7 @@ async fn main() -> Result<()> {
         has_api = config.has_linear_api(),
         status_file = %config.status_file,
         log_file = %config.log_file,
+        claude_stream_file = %config.claude_stream_file,
         input_fifo = %config.input_fifo,
         http_port = config.http_port,
         "Sidecar configured"
@@ -816,6 +1112,15 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Claude stream parsing task (structured activities from stream-json)
+    let config_clone = config.clone();
+    let linear_client_clone = linear_client.clone();
+    let stream_handle = tokio::spawn(async move {
+        if config_clone.has_linear_api() {
+            claude_stream_task(config_clone, linear_client_clone).await;
+        }
+    });
+
     let config_clone = config.clone();
     let linear_client_clone = linear_client.clone();
     let input_handle = tokio::spawn(async move {
@@ -857,6 +1162,12 @@ async fn main() -> Result<()> {
                 warn!(error = %e, "Log stream task panicked");
             }
             warn!("Log stream task exited");
+        }
+        result = stream_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Claude stream task panicked");
+            }
+            warn!("Claude stream task exited");
         }
         result = input_handle => {
             if let Err(e) = result {
