@@ -26,7 +26,9 @@ impl DigestGenerator {
         let analysis_html = if let Some(a) = analysis {
             Self::build_analysis_html(a)
         } else {
-            String::from(r#"<div class="section"><p class="muted">AI analysis not available</p></div>"#)
+            String::from(
+                r#"<div class="section"><p class="muted">AI analysis not available</p></div>"#,
+            )
         };
 
         // Build entries section

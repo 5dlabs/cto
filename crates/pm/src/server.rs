@@ -362,9 +362,10 @@ async fn handle_session_created(
         );
 
         // Create emitter for activity emission
-        let emitter = state.linear_client.as_ref().map(|client| {
-            LinearAgentEmitter::new(client.clone(), session_id)
-        });
+        let emitter = state
+            .linear_client
+            .as_ref()
+            .map(|client| LinearAgentEmitter::new(client.clone(), session_id));
 
         // Emit initial thought and plan
         if let Some(ref emitter) = emitter {
@@ -512,9 +513,10 @@ async fn handle_session_created(
         );
 
         // Create emitter for activity emission
-        let emitter = state.linear_client.as_ref().map(|client| {
-            LinearAgentEmitter::new(client.clone(), session_id)
-        });
+        let emitter = state
+            .linear_client
+            .as_ref()
+            .map(|client| LinearAgentEmitter::new(client.clone(), session_id));
 
         // Emit initial thought and plan
         if let Some(ref emitter) = emitter {

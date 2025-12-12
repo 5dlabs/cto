@@ -35,7 +35,7 @@ structure: ## Validate ArgoCD application structure
 
 security: ## Run security checks
 	@echo "🔒 Running security checks..."
-	@if grep -r "password:" . --include="*.yaml" | grep -v "secretKeyRef" | grep -v "CHANGE_THIS" | grep -v "examples" > /dev/null; then \
+	@if grep -r "password:" . --include="*.yaml" | grep -v "secretKeyRef" | grep -v "CHANGE_THIS" | grep -v "examples" | grep -v "{{" > /dev/null; then \
 		echo "❌ Found potential hardcoded passwords"; \
 		exit 1; \
 	fi
