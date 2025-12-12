@@ -212,6 +212,62 @@ spec:
             minReplicas: 0
 
           # ---------------------------------------------------------
+          # GLM-4.5 MODELS (Zhipu AI - MIT License)
+          # ---------------------------------------------------------
+          # Hybrid reasoning model: thinking mode + non-thinking mode
+          # Excellent for agentic tasks, coding, and complex reasoning
+          # Source: https://huggingface.co/zai-org/GLM-4.5-Air
+
+          # GLM-4.5-Air FP8 - Best quality/hardware balance (H100 x 2)
+          glm-4.5-air-fp8-h100:
+            enabled: false  # Enable when H100 GPUs available
+            features: [TextGeneration]
+            url: "hf://zai-org/GLM-4.5-Air-FP8"
+            engine: VLLM
+            resourceProfile: nvidia-gpu-h100:2
+            minReplicas: 0
+            maxReplicas: 2
+            targetRequests: 100
+            args:
+              - --tool-call-parser=glm45
+              - --reasoning-parser=glm45
+              - --enable-auto-tool-choice
+              - --max-model-len=32768
+              - --max-num-batched-token=32768
+              - --gpu-memory-utilization=0.9
+              - --tensor-parallel-size=2
+              - --enable-prefix-caching
+              - --disable-log-requests
+
+          # GLM-4.5-Air BF16 - Full precision (H100 x 4)
+          glm-4.5-air-bf16-h100:
+            enabled: false
+            features: [TextGeneration]
+            url: "hf://zai-org/GLM-4.5-Air"
+            engine: VLLM
+            resourceProfile: nvidia-gpu-h100:4
+            minReplicas: 0
+            args:
+              - --tool-call-parser=glm45
+              - --reasoning-parser=glm45
+              - --enable-auto-tool-choice
+              - --max-model-len=65536
+              - --max-num-batched-token=65536
+              - --gpu-memory-utilization=0.9
+              - --tensor-parallel-size=4
+              - --enable-prefix-caching
+              - --disable-log-requests
+
+          # GLM-4.5-Air via Ollama - Easier setup (quantized)
+          glm-4.5-air-ollama:
+            enabled: false
+            features: [TextGeneration]
+            url: "ollama://MichelRosselli/GLM-4.5-Air:Q4_K_M"
+            engine: OLlama
+            resourceProfile: nvidia-gpu-h100:1
+            minReplicas: 0
+
+          # ---------------------------------------------------------
           # GEMMA MODELS (Google - Permissive License)
           # ---------------------------------------------------------
 
