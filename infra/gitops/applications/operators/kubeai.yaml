@@ -51,16 +51,69 @@ spec:
           type: ClusterIP
           port: 80
 
-        # Model catalog - enable models as needed
-        # Models are deployed via Model CRDs after operator installation
-        # Example model catalog entries (disabled by default):
-        # catalog:
-        #   llama-3.2-1b:
-        #     enabled: false
-        #     features: [TextGeneration]
-        #     url: 'ollama://llama3.2:1b'
-        #     engine: OLlama
-        #     resourceProfile: 'cpu:1'
+        # Resource profiles for different GPU types
+        # These define node selectors, resource requests/limits for model pods
+        resourceProfiles:
+          # CPU-only profile
+          cpu:
+            requests:
+              cpu: "1"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+
+          # NVIDIA L4 GPU (24GB VRAM) - Cost-effective inference
+          nvidia-gpu-l4:
+            nodeSelector:
+              # Adjust based on your cluster's GPU node labels
+              nvidia.com/gpu.product: "NVIDIA-L4"
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: "8"
+              memory: "32Gi"
+
+          # NVIDIA H100 GPU (80GB VRAM) - High performance
+          nvidia-gpu-h100:
+            nodeSelector:
+              nvidia.com/gpu.product: "NVIDIA-H100-80GB-HBM3"
+            requests:
+              cpu: "8"
+              memory: "64Gi"
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: "16"
+              memory: "128Gi"
+
+          # NVIDIA A100 80GB - Training and large model inference
+          nvidia-gpu-a100-80gb:
+            nodeSelector:
+              nvidia.com/gpu.product: "NVIDIA-A100-SXM4-80GB"
+            requests:
+              cpu: "8"
+              memory: "64Gi"
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: "16"
+              memory: "128Gi"
+
+          # NVIDIA GH200 Grace Hopper (96GB unified memory)
+          nvidia-gpu-gh200:
+            nodeSelector:
+              nvidia.com/gpu.product: "NVIDIA-GH200-120GB"
+            requests:
+              cpu: "16"
+              memory: "128Gi"
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: "72"
+              memory: "480Gi"
+
+        # Models are deployed separately via ai-models/kubeai-models.yaml
+        # See that file for the full model catalog
 
   destination:
     server: https://kubernetes.default.svc
