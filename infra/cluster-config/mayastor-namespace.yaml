@@ -1,10 +1,10 @@
 ---
-# Managed Namespace for longhorn-system with Pod Security labels
-# Required for Longhorn's privileged daemonsets (host paths, device access)
+# Managed Namespace for mayastor with Pod Security labels
+# Required for Mayastor's privileged daemonsets (NVMe access, hugepages)
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: longhorn-system
+  name: mayastor
   labels:
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest
@@ -12,4 +12,7 @@ metadata:
     pod-security.kubernetes.io/warn-version: latest
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/audit-version: latest
+
+
+
 

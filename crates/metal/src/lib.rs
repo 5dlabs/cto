@@ -36,6 +36,7 @@
 
 pub mod cilium;
 pub mod clustermesh;
+pub mod inventory;
 pub mod providers;
 pub mod stack;
 pub mod state;
@@ -47,3 +48,8 @@ pub use providers::{CreateServerRequest, Provider, ReinstallIpxeRequest, Server,
 // Re-export Cilium types for convenience
 pub use cilium::CiliumConfig;
 pub use clustermesh::ClusterMeshStatus;
+
+// Re-export inventory types for convenience
+pub use inventory::{
+    InventoryManager, PlanAvailability, RegionAvailability, RegionStrategy, StockLevel,
+};

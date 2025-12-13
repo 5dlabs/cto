@@ -73,25 +73,40 @@ check_command() {
     return 0
 }
 
-# Get list of all Rust crates in the repo
+# Get package name from Cargo.toml
+get_package_name() {
+    local crate_dir="$1"
+    local toml="$REPO_ROOT/crates/$crate_dir/Cargo.toml"
+    if [ -f "$toml" ]; then
+        grep '^name = ' "$toml" | head -1 | sed 's/name = "\(.*\)"/\1/'
+    fi
+}
+
+# Get list of all Rust crates in the repo (returns package names)
 get_all_crates() {
     find "$REPO_ROOT/crates" -name "Cargo.toml" -type f 2>/dev/null | while read -r toml; do
-        dirname "$toml" | xargs basename
+        grep '^name = ' "$toml" | head -1 | sed 's/name = "\(.*\)"/\1/'
     done | sort -u
 }
 
-# Get list of changed crates based on git diff
+# Get list of changed crates based on git diff (returns package names)
 get_changed_crates() {
     local base_ref="${1:-origin/main}"
     local changed_files
-    
+
     if git rev-parse "$base_ref" >/dev/null 2>&1; then
         changed_files=$(git diff --name-only "$base_ref"...HEAD 2>/dev/null || git diff --name-only HEAD)
     else
         changed_files=$(git diff --name-only HEAD)
     fi
-    
-    echo "$changed_files" | grep -E '^crates/[^/]+/' | sed 's|crates/\([^/]*\)/.*|\1|' | sort -u
+
+    # Get directory names first, then convert to package names
+    local crate_dirs
+    crate_dirs=$(echo "$changed_files" | grep -E '^crates/[^/]+/' | sed 's|crates/\([^/]*\)/.*|\1|' | sort -u)
+
+    for dir in $crate_dirs; do
+        get_package_name "$dir"
+    done
 }
 
 # Check if infrastructure files changed
@@ -108,10 +123,16 @@ infra_changed() {
     echo "$changed_files" | grep -qE '^infra/'
 }
 
-# Check if a crate exists
+# Check if a crate (package) exists in the workspace
 crate_exists() {
-    local crate="$1"
-    [ -d "$REPO_ROOT/crates/$crate" ] && [ -f "$REPO_ROOT/crates/$crate/Cargo.toml" ]
+    local package="$1"
+    # Check if any Cargo.toml in crates/ has this package name
+    for toml in "$REPO_ROOT"/crates/*/Cargo.toml; do
+        if [ -f "$toml" ] && grep -q "^name = \"$package\"" "$toml"; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 # =============================================================================
@@ -572,6 +593,11 @@ EOF
 }
 
 main "$@"
+
+
+
+
+
 
 
 
