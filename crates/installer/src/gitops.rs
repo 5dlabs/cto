@@ -91,24 +91,39 @@ impl GitOpsVerifier {
 
     /// Apply the app-of-apps manifest from GitHub using kubectl.
     ///
+    /// This method first applies the platform project (required by app-of-apps),
+    /// then applies the app-of-apps manifest itself.
+    ///
     /// # Errors
     ///
-    /// Returns an error if fetching or applying the manifest fails.
+    /// Returns an error if fetching or applying the manifests fails.
     pub async fn apply_app_of_apps(&self, repo: &str, branch: &str) -> Result<()> {
         info!(repo = %repo, branch = %branch, "Applying app-of-apps manifest");
 
-        // Construct raw GitHub URL
+        // Construct raw GitHub URL base
         // raw.githubusercontent.com format: https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
-        let url = format!(
-            "{}/{}/infra/gitops/app-of-apps.yaml",
-            repo.replace("github.com", "raw.githubusercontent.com"),
-            branch
-        );
+        let base_url = repo.replace("github.com", "raw.githubusercontent.com");
 
-        debug!(url = %url, "Fetching app-of-apps manifest");
+        // First apply the platform project (required by app-of-apps)
+        let project_url =
+            format!("{base_url}/{branch}/infra/gitops/projects/platform-project.yaml");
+        debug!(url = %project_url, "Fetching platform project manifest");
 
-        // Fetch the manifest
-        let manifest = reqwest::get(&url)
+        let project_manifest = reqwest::get(&project_url)
+            .await
+            .context("Failed to fetch platform project manifest")?
+            .text()
+            .await
+            .context("Failed to read platform project manifest body")?;
+
+        self.kubectl_apply(&project_manifest).await?;
+        info!("Platform project applied successfully");
+
+        // Now apply the app-of-apps
+        let app_url = format!("{base_url}/{branch}/infra/gitops/app-of-apps.yaml");
+        debug!(url = %app_url, "Fetching app-of-apps manifest");
+
+        let manifest = reqwest::get(&app_url)
             .await
             .context("Failed to fetch app-of-apps manifest")?
             .text()

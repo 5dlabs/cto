@@ -23,14 +23,15 @@ spec:
     path: infra/gitops
 
     # Directory configuration
-    # Organized by category: platform, observability, operators, secrets, workloads, ai-models
-    # NOTE: recurse is false - we explicitly list directories containing ArgoCD Application definitions
-    # Child apps manage their own resources (ingress, CRDs, etc.) in subdirectories
+    # Organized by category: platform, observability, operators, secrets, storage, workloads, ai-models
+    # NOTE: recurse is true - we scan all subdirectories and use include/exclude to filter
+    # Include only ArgoCD Application definitions (*.yaml in category folders)
+    # Exclude nested directories that contain CRD instances (not ArgoCD Applications)
     directory:
-      recurse: false
+      recurse: true
+      include: "{applications/*/*.yaml,projects/*.yaml}"
       # yamllint disable-line rule:line-length
-      include: "{applications/platform,applications/observability,applications/operators,applications/secrets,applications/storage,applications/workloads,applications/ai-models,projects}/*.yaml"
-      exclude: "*.md"
+      exclude: "{*.md,**/ingress/*,**/llamastack-distributions/*,**/ollama-model-crds/*,**/kubeai-models/*}"
 
   # Destination configuration
   destination:
