@@ -13,11 +13,18 @@ name = "cto"
 path = "src/main.rs"
 
 [dependencies]
+# Internal crates
+metal = { path = "../metal" }
+
 # CLI framework
 clap = { workspace = true }
 dialoguer = { workspace = true }
 indicatif = { workspace = true }
 colored = { workspace = true }
+
+# Kubernetes
+kube = { workspace = true }
+k8s-openapi = { workspace = true }
 
 # Serialization
 serde = { workspace = true }
@@ -30,9 +37,17 @@ thiserror = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
+futures = { workspace = true }
 
 # HTTP Client
 reqwest = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
 
 # File system
 tempfile = "3.8"
@@ -43,3 +58,5 @@ which = "7.0"
 # System info
 sysinfo = "0.33"
 
+# Directories
+dirs = "5.0"

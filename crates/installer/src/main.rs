@@ -1,92 +1,80 @@
+//! CTO Platform Installer CLI.
+//!
+//! This CLI provisions bare metal Kubernetes clusters on Latitude.sh,
+//! bootstraps Talos Linux, and deploys the full CTO platform via GitOps.
+
+// Allow product names without backticks in doc comments
+#![allow(clippy::doc_markdown)]
+// Allow async functions that don't use await (may need await in future)
+#![allow(clippy::unused_async)]
+// Allow imports after statements in functions
+#![allow(clippy::items_after_statements)]
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use colored::Colorize;
+use tracing_subscriber::EnvFilter;
 
+mod bare_metal;
+mod bootstrap;
 mod commands;
 mod config;
-mod installer;
+mod gitops;
+mod kubeconfig;
+mod orchestrator;
+mod state;
 mod ui;
 mod validator;
 
 use commands::install::InstallCommand;
 
-/// CTO Platform - Multi-Agent Development Orchestration
+/// CTO Platform - Bare Metal Kubernetes Platform Installer.
 #[derive(Parser)]
 #[command(
     name = "cto",
     version,
-    about = "CTO Platform installer and management CLI",
-    long_about = "Install and manage the CTO multi-agent development platform.\n\n\
-                  The CTO platform orchestrates AI agents (Rex, Cleo, Tess, Blaze, Cipher, Morgan)\n\
-                  to automate software development workflows with production-grade quality assurance."
+    about = "CTO Platform bare metal installer",
+    long_about = "Install the CTO Platform on bare metal servers.\n\n\
+                  This CLI provisions servers on Latitude.sh, installs Talos Linux,\n\
+                  bootstraps Kubernetes, and deploys the full platform via GitOps.\n\n\
+                  All operations are idempotent - re-running the same command will\n\
+                  resume from where it left off."
 )]
 #[command(propagate_version = true)]
 struct Cli {
+    /// Enable verbose logging.
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Install the CTO platform
+    /// Install the CTO platform on bare metal.
+    ///
+    /// Provisions servers, installs Talos Linux, bootstraps Kubernetes,
+    /// and deploys the full platform stack via GitOps.
     Install(InstallCommand),
-
-    /// Show platform status
-    Status,
-
-    /// Upgrade platform components
-    Upgrade,
-
-    /// Uninstall the platform
-    Uninstall,
-
-    /// Validate installation
-    Validate,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Print banner
-    print_banner();
-
     let cli = Cli::parse();
+
+    // Initialize tracing
+    let filter = if cli.verbose {
+        EnvFilter::new("info,metal=debug,cto_cli=debug")
+    } else {
+        EnvFilter::new("warn,metal=info,cto_cli=info")
+    };
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .init();
 
     match cli.command {
         Commands::Install(cmd) => cmd.run().await,
-        Commands::Status => {
-            println!("{}", "Status command not yet implemented".yellow());
-            Ok(())
-        }
-        Commands::Upgrade => {
-            println!("{}", "Upgrade command not yet implemented".yellow());
-            Ok(())
-        }
-        Commands::Uninstall => {
-            println!("{}", "Uninstall command not yet implemented".yellow());
-            Ok(())
-        }
-        Commands::Validate => {
-            println!("{}", "Validate command not yet implemented".yellow());
-            Ok(())
-        }
     }
-}
-
-fn print_banner() {
-    let banner = r"
-    ╔═══════════════════════════════════════════════════════════╗
-    ║                                                           ║
-    ║   ██████╗████████╗ ██████╗     ██████╗ ██╗      █████╗  ║
-    ║  ██╔════╝╚══██╔══╝██╔═══██╗    ██╔══██╗██║     ██╔══██╗ ║
-    ║  ██║        ██║   ██║   ██║    ██████╔╝██║     ███████║ ║
-    ║  ██║        ██║   ██║   ██║    ██╔═══╝ ██║     ██╔══██║ ║
-    ║  ╚██████╗   ██║   ╚██████╔╝    ██║     ███████╗██║  ██║ ║
-    ║   ╚═════╝   ╚═╝    ╚═════╝     ╚═╝     ╚══════╝╚═╝  ╚═╝ ║
-    ║                                                           ║
-    ║         Multi-Agent Development Orchestration            ║
-    ║                                                           ║
-    ╚═══════════════════════════════════════════════════════════╝
-";
-
-    println!("{}", banner.cyan().bold());
 }
