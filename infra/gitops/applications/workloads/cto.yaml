@@ -101,6 +101,23 @@ spec:
         cloudflare:
           enabled: true
 
+        # BuildKit - Remote build infrastructure
+        # Configure per-cluster: nodeSelector and insecureRegistries
+        # To find worker nodes: kubectl get nodes -l node-role.kubernetes.io/control-plane!=
+        # To find node IPs: kubectl get nodes -o wide
+        buildkit:
+          enabled: true
+          # Schedule on a worker node with sufficient resources
+          # Update this to match your cluster's worker node hostname
+          nodeSelector:
+            kubernetes.io/hostname: talos-a43-ee1  # Simple cluster worker
+          # Allow pushing to local in-cluster registry (HTTP)
+          # Update IPs to match your cluster's node IPs
+          config:
+            insecureRegistries:
+              - "192.168.1.72:30500"  # Worker node registry
+              - "192.168.1.77:30500"  # Control plane registry
+
   destination:
     server: https://kubernetes.default.svc
     namespace: cto

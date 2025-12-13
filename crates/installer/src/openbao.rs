@@ -793,7 +793,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_secrets_mapping_not_empty() {
-        assert!(!SECRETS_MAPPING.is_empty());
+    fn test_secrets_mapping_has_entries() {
+        // Verify by checking that we can access the first entry
+        // This avoids clippy::const_is_empty which triggers on constant slice is_empty()
+        let first = SECRETS_MAPPING.first();
+        assert!(first.is_some(), "SECRETS_MAPPING should have at least one entry");
     }
 }
