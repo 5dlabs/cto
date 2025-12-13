@@ -87,6 +87,23 @@ pub struct InstallCommand {
     /// GitOps branch to deploy from.
     #[arg(long, default_value = "develop")]
     gitops_branch: String,
+
+    /// Enable VLAN private networking for node-to-node communication.
+    /// Creates a Latitude VLAN and configures Talos with private IPs.
+    #[arg(long, default_value = "true")]
+    enable_vlan: bool,
+
+    /// Private network subnet for VLAN (e.g., "10.8.0.0/24").
+    #[arg(long, default_value = "10.8.0.0/24")]
+    vlan_subnet: String,
+
+    /// Parent NIC for VLAN interface (secondary NIC on Latitude servers).
+    #[arg(long, default_value = "eth1")]
+    vlan_interface: String,
+
+    /// Enable Talos Ingress Firewall for host-level security.
+    #[arg(long, default_value = "true")]
+    enable_firewall: bool,
 }
 
 impl InstallCommand {
@@ -170,6 +187,10 @@ impl InstallCommand {
             gitops_branch: self.gitops_branch.clone(),
             sync_timeout_minutes: self.sync_timeout,
             profile,
+            enable_vlan: self.enable_vlan,
+            vlan_subnet: self.vlan_subnet.clone(),
+            vlan_parent_interface: self.vlan_interface.clone(),
+            enable_firewall: self.enable_firewall,
         })
     }
 }

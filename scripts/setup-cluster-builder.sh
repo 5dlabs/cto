@@ -92,6 +92,12 @@ detect_registry_url() {
         host=$(detect_buildkit_host) || return 1
     fi
     
+    # Validate that host looks like a valid IP or hostname (not a placeholder)
+    # Must start with a digit (IP) or letter (hostname), not special chars like '('
+    if [[ ! "$host" =~ ^[0-9a-zA-Z] ]]; then
+        return 1
+    fi
+    
     echo "${host}:${REGISTRY_PORT}"
 }
 

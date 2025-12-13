@@ -169,6 +169,9 @@ impl Installer {
             InstallStep::CreatingServers => {
                 self.create_servers().await?;
             }
+            InstallStep::CreatingVLAN => {
+                self.create_vlan().await?;
+            }
             InstallStep::WaitingServersReady => {
                 self.wait_servers_ready().await?;
             }
@@ -261,6 +264,50 @@ impl Installer {
         Ok(())
     }
 
+    async fn create_vlan(&mut self) -> Result<()> {
+        // Skip if VLAN is disabled
+        if !self.state.config.enable_vlan {
+            ui::print_info("VLAN private networking disabled, skipping");
+            return Ok(());
+        }
+
+        let orchestrator = BareMetalOrchestrator::new(&self.state.config).await?;
+        let region = self
+            .state
+            .selected_region
+            .as_ref()
+            .context("Region not selected")?;
+
+        // Create VLAN
+        ui::print_info("Creating VLAN for private networking...");
+        let (vlan_id, vlan_vid) = orchestrator.create_vlan(region).await?;
+        self.state.set_vlan(vlan_id, vlan_vid)?;
+
+        // Allocate private IPs for all servers
+        let cp_id = self.state.control_plane.as_ref().map(|cp| cp.id.clone());
+        if let Some(cp_id) = cp_id {
+            let private_ip = self.state.allocate_next_private_ip();
+            ui::print_info(&format!(
+                "Allocated private IP {private_ip} for control plane"
+            ));
+            self.state.set_private_ip(&cp_id, private_ip)?;
+        }
+
+        let worker_ids: Vec<_> = self.state.workers.iter().map(|w| w.id.clone()).collect();
+        for (i, worker_id) in worker_ids.iter().enumerate() {
+            let private_ip = self.state.allocate_next_private_ip();
+            ui::print_info(&format!("Allocated private IP {private_ip} for worker {i}"));
+            self.state.set_private_ip(worker_id, private_ip)?;
+        }
+
+        ui::print_success(&format!(
+            "VLAN created (VID: {vlan_vid}) with {} private IPs",
+            self.state.private_ips.len()
+        ));
+
+        Ok(())
+    }
+
     async fn wait_servers_ready(&mut self) -> Result<()> {
         let orchestrator = BareMetalOrchestrator::new(&self.state.config).await?;
 
@@ -328,7 +375,7 @@ impl Installer {
             .as_ref()
             .context("Control plane not found in state")?;
 
-        let config = metal::talos::BootstrapConfig::new(
+        let mut config = metal::talos::BootstrapConfig::new(
             self.state.config.cluster_name.clone(),
             cp.ip.clone(),
         )
@@ -337,6 +384,59 @@ impl Installer {
         .with_talos_version(&self.state.config.talos_version)
         .with_kube_proxy_mode("none") // We use Cilium
         .with_cilium_cni();
+
+        // Add VLAN configuration if enabled
+        if self.state.config.enable_vlan {
+            if let Some(vlan_vid) = self.state.vlan_vid {
+                // Get control plane's private IP
+                let cp_private_ip = self
+                    .state
+                    .get_private_ip(&cp.id)
+                    .cloned()
+                    .unwrap_or_else(|| "10.8.0.1".to_string());
+
+                let private_ip_cidr = format!("{cp_private_ip}/24");
+
+                ui::print_info(&format!(
+                    "Adding VLAN config: VID={vlan_vid}, Interface={}, IP={private_ip_cidr}",
+                    self.state.config.vlan_parent_interface
+                ));
+
+                config = config
+                    .with_vlan_interface(
+                        vlan_vid,
+                        &private_ip_cidr,
+                        &self.state.config.vlan_parent_interface,
+                    )
+                    .with_private_network(&self.state.config.vlan_subnet);
+            }
+        }
+
+        // Add firewall configuration if enabled
+        if self.state.config.enable_firewall {
+            // Get control plane's private IP for etcd rules
+            let cp_private_ip = if self.state.config.enable_vlan {
+                self.state
+                    .get_private_ip(&cp.id)
+                    .cloned()
+                    .unwrap_or_else(|| "10.8.0.1".to_string())
+            } else {
+                cp.ip.clone()
+            };
+
+            let cluster_subnet = if self.state.config.enable_vlan {
+                self.state.config.vlan_subnet.clone()
+            } else {
+                "10.0.0.0/8".to_string() // Default private subnet
+            };
+
+            ui::print_info(&format!(
+                "Adding firewall config: cluster_subnet={cluster_subnet}"
+            ));
+
+            // Apply control plane firewall rules (most permissive - includes etcd/K8s API)
+            config = config.with_ingress_firewall(&cluster_subnet, true, &[&cp_private_ip]);
+        }
 
         // Generate secrets
         metal::talos::generate_secrets(&self.state.config.output_dir)?;

@@ -3,6 +3,7 @@
 //! This module provides state tracking for cluster installation operations,
 //! allowing automatic recovery from failures and resumption of interrupted processes.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -25,6 +26,8 @@ pub enum InstallStep {
     // Infrastructure (server provisioning)
     /// Creating bare metal servers.
     CreatingServers,
+    /// Creating VLAN for private networking.
+    CreatingVLAN,
     /// Waiting for servers to be ready.
     WaitingServersReady,
     /// Triggering Talos iPXE boot.
@@ -84,7 +87,8 @@ impl InstallStep {
         match self {
             Self::NotStarted => Self::ValidatingPrerequisites,
             Self::ValidatingPrerequisites => Self::CreatingServers,
-            Self::CreatingServers => Self::WaitingServersReady,
+            Self::CreatingServers => Self::CreatingVLAN,
+            Self::CreatingVLAN => Self::WaitingServersReady,
             Self::WaitingServersReady => Self::BootingTalos,
             Self::BootingTalos => Self::WaitingTalosMaintenance,
             Self::WaitingTalosMaintenance => Self::GeneratingConfigs,
@@ -115,6 +119,7 @@ impl InstallStep {
             Self::NotStarted => "Not started",
             Self::ValidatingPrerequisites => "Validating prerequisites",
             Self::CreatingServers => "Creating bare metal servers",
+            Self::CreatingVLAN => "Creating VLAN for private networking",
             Self::WaitingServersReady => "Waiting for servers to be ready",
             Self::BootingTalos => "Triggering Talos iPXE boot",
             Self::WaitingTalosMaintenance => "Waiting for Talos maintenance mode",
@@ -146,32 +151,33 @@ impl InstallStep {
             Self::NotStarted => 0,
             Self::ValidatingPrerequisites => 1,
             Self::CreatingServers => 2,
-            Self::WaitingServersReady => 3,
-            Self::BootingTalos => 4,
-            Self::WaitingTalosMaintenance => 5,
-            Self::GeneratingConfigs => 6,
-            Self::ApplyingCPConfig => 7,
-            Self::WaitingCPInstall => 8,
-            Self::Bootstrapping => 9,
-            Self::DeployingCilium => 10,
-            Self::WaitingKubernetes => 11,
-            Self::ApplyingWorkerConfig => 12,
-            Self::WaitingWorkerJoin => 13,
-            Self::DeployingBootstrapResources => 14,
-            Self::DeployingLocalPathProvisioner => 15,
-            Self::DeployingArgoCD => 16,
-            Self::WaitingArgoCDReady => 17,
-            Self::ApplyingAppOfApps => 18,
-            Self::WaitingGitOpsSync => 19,
-            Self::ConfiguringStorage => 20,
-            Self::BootstrappingOpenBao => 21,
-            Self::ConfiguringKubeconfig => 22,
-            Self::Complete => 23,
+            Self::CreatingVLAN => 3,
+            Self::WaitingServersReady => 4,
+            Self::BootingTalos => 5,
+            Self::WaitingTalosMaintenance => 6,
+            Self::GeneratingConfigs => 7,
+            Self::ApplyingCPConfig => 8,
+            Self::WaitingCPInstall => 9,
+            Self::Bootstrapping => 10,
+            Self::DeployingCilium => 11,
+            Self::WaitingKubernetes => 12,
+            Self::ApplyingWorkerConfig => 13,
+            Self::WaitingWorkerJoin => 14,
+            Self::DeployingBootstrapResources => 15,
+            Self::DeployingLocalPathProvisioner => 16,
+            Self::DeployingArgoCD => 17,
+            Self::WaitingArgoCDReady => 18,
+            Self::ApplyingAppOfApps => 19,
+            Self::WaitingGitOpsSync => 20,
+            Self::ConfiguringStorage => 21,
+            Self::BootstrappingOpenBao => 22,
+            Self::ConfiguringKubeconfig => 23,
+            Self::Complete => 24,
         }
     }
 
     /// Total number of steps.
-    pub const TOTAL_STEPS: u8 = 23;
+    pub const TOTAL_STEPS: u8 = 24;
 }
 
 impl std::fmt::Display for InstallStep {
@@ -218,6 +224,17 @@ pub struct InstallState {
     pub attempt_count: u32,
     /// Last error message (if any).
     pub last_error: Option<String>,
+
+    // VLAN state
+    /// VLAN resource ID from Latitude (e.g., `vlan_xxx`).
+    #[serde(default)]
+    pub vlan_id: Option<String>,
+    /// VLAN ID (VID) for OS configuration (e.g., 2063).
+    #[serde(default)]
+    pub vlan_vid: Option<u16>,
+    /// Private IP addresses for each server (server_id -> private_ip).
+    #[serde(default)]
+    pub private_ips: HashMap<String, String>,
 }
 
 impl InstallState {
@@ -235,6 +252,9 @@ impl InstallState {
             updated_at: chrono::Utc::now().to_rfc3339(),
             attempt_count: 0,
             last_error: None,
+            vlan_id: None,
+            vlan_vid: None,
+            private_ips: HashMap::new(),
         }
     }
 
@@ -423,6 +443,54 @@ impl InstallState {
     #[must_use]
     pub fn can_resume(&self) -> bool {
         self.step != InstallStep::NotStarted && self.step != InstallStep::Complete
+    }
+
+    /// Set VLAN info.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if saving fails.
+    pub fn set_vlan(&mut self, vlan_id: String, vlan_vid: u16) -> Result<()> {
+        self.vlan_id = Some(vlan_id);
+        self.vlan_vid = Some(vlan_vid);
+        self.save()
+    }
+
+    /// Set a private IP for a server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if saving fails.
+    pub fn set_private_ip(&mut self, server_id: &str, private_ip: String) -> Result<()> {
+        self.private_ips.insert(server_id.to_string(), private_ip);
+        self.save()
+    }
+
+    /// Get the private IP for a server.
+    #[must_use]
+    #[allow(dead_code)] // Will be used when generating configs with VLAN
+    pub fn get_private_ip(&self, server_id: &str) -> Option<&String> {
+        self.private_ips.get(server_id)
+    }
+
+    /// Allocate the next private IP from the VLAN subnet.
+    ///
+    /// Returns IPs in sequence: 10.8.0.1, 10.8.0.2, etc.
+    #[must_use]
+    pub fn allocate_next_private_ip(&self) -> String {
+        let base = self
+            .config
+            .vlan_subnet
+            .split('/')
+            .next()
+            .unwrap_or("10.8.0.0");
+        let parts: Vec<&str> = base.split('.').collect();
+        if parts.len() == 4 {
+            let next_host = self.private_ips.len() + 1;
+            format!("{}.{}.{}.{}", parts[0], parts[1], parts[2], next_host)
+        } else {
+            format!("10.8.0.{}", self.private_ips.len() + 1)
+        }
     }
 }
 

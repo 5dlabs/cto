@@ -4,6 +4,7 @@
 //! including waiting for maintenance mode, generating configs, applying
 //! configs, and bootstrapping the control plane.
 
+use std::fmt::Write as _;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -185,7 +186,7 @@ impl BootstrapConfig {
     pub fn with_private_network(self, subnet: &str) -> Self {
         // Configure kubelet to use the private IP and etcd to advertise on private network
         let patch = format!(
-            r#"machine:
+            "machine:
   kubelet:
     nodeIP:
       validSubnets:
@@ -194,7 +195,7 @@ cluster:
   etcd:
     advertisedSubnets:
       - {subnet}
-"#
+"
         );
         self.with_config_patch(patch)
     }
@@ -206,6 +207,243 @@ cluster:
     #[must_use]
     pub fn with_private_network_10(self) -> Self {
         self.with_private_network("10.0.0.0/8")
+    }
+
+    /// Configure a VLAN interface for private networking.
+    ///
+    /// This creates a VLAN sub-interface on the specified parent interface with
+    /// a static IP address. Used for Latitude.sh private networking where servers
+    /// share a Layer 2 VLAN.
+    ///
+    /// # Arguments
+    ///
+    /// * `vlan_id` - VLAN ID (VID) from the provider (e.g., 2063)
+    /// * `private_ip_cidr` - Static IP with CIDR (e.g., "10.8.0.1/24")
+    /// * `parent_interface` - Parent NIC name (e.g., "eth1", "eno2", "enp1s0")
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use metal::talos::BootstrapConfig;
+    ///
+    /// let config = BootstrapConfig::new("cluster", "64.34.91.100")
+    ///     .with_vlan_interface(2063, "10.8.0.1/24", "eth1")
+    ///     .with_private_network("10.8.0.0/24")
+    ///     .with_cilium_cni();
+    /// ```
+    #[must_use]
+    pub fn with_vlan_interface(
+        self,
+        vlan_id: u16,
+        private_ip_cidr: &str,
+        parent_interface: &str,
+    ) -> Self {
+        let patch = format!(
+            "machine:
+  network:
+    interfaces:
+      - interface: {parent_interface}
+        vlans:
+          - vlanId: {vlan_id}
+            addresses:
+              - {private_ip_cidr}
+            mtu: 1500
+"
+        );
+        self.with_config_patch(patch)
+    }
+
+    /// Configure Talos Ingress Firewall for secure host-level traffic control.
+    ///
+    /// This sets the default ingress policy to `block` and adds rules to allow
+    /// only necessary traffic. Much simpler than CNI-level firewalls.
+    ///
+    /// # Arguments
+    ///
+    /// * `cluster_subnet` - CIDR of the cluster's private network (e.g., "10.8.0.0/24")
+    /// * `is_controlplane` - Whether this is a control plane node (adds etcd/API rules)
+    /// * `controlplane_ips` - List of control plane node IPs (for etcd peer access)
+    ///
+    /// # Rules Applied
+    ///
+    /// **All nodes:**
+    /// - Default: block all ingress
+    /// - Allow kubelet (10250/tcp) from cluster subnet
+    /// - Allow Talos API (50000/tcp) from anywhere (for talosctl)
+    /// - Allow trustd (50001/tcp) from cluster subnet
+    /// - Allow Cilium VXLAN (8472/udp) from cluster subnet
+    ///
+    /// **Control plane only:**
+    /// - Allow Kubernetes API (6443/tcp) from anywhere
+    /// - Allow etcd (2379-2380/tcp) from control plane IPs
+    ///
+    /// # Reference
+    ///
+    /// See: <https://docs.siderolabs.com/talos/v1.11/networking/ingress-firewall>
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use metal::talos::BootstrapConfig;
+    ///
+    /// // Control plane node
+    /// let cp_config = BootstrapConfig::new("cluster", "10.8.0.1")
+    ///     .with_ingress_firewall("10.8.0.0/24", true, &["10.8.0.1"]);
+    ///
+    /// // Worker node
+    /// let worker_config = BootstrapConfig::new("cluster", "10.8.0.2")
+    ///     .with_ingress_firewall("10.8.0.0/24", false, &["10.8.0.1"]);
+    /// ```
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn with_ingress_firewall(
+        self,
+        cluster_subnet: &str,
+        is_controlplane: bool,
+        controlplane_ips: &[&str],
+    ) -> Self {
+        let mut rules = String::new();
+
+        // Default action: block all ingress
+        rules.push_str(
+            "---
+apiVersion: v1alpha1
+kind: NetworkDefaultActionConfig
+ingress: block
+",
+        );
+
+        // Kubelet - from cluster subnet
+        let _ = write!(
+            rules,
+            "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: kubelet-ingress
+portSelector:
+  ports:
+    - 10250
+  protocol: tcp
+ingress:
+  - subnet: {cluster_subnet}
+"
+        );
+
+        // Talos API (apid) - from anywhere for talosctl access
+        rules.push_str(
+            "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: apid-ingress
+portSelector:
+  ports:
+    - 50000
+  protocol: tcp
+ingress:
+  - subnet: 0.0.0.0/0
+  - subnet: ::/0
+",
+        );
+
+        // Trustd - from cluster subnet
+        let _ = write!(
+            rules,
+            "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: trustd-ingress
+portSelector:
+  ports:
+    - 50001
+  protocol: tcp
+ingress:
+  - subnet: {cluster_subnet}
+"
+        );
+
+        // Cilium VXLAN - from cluster subnet
+        let _ = write!(
+            rules,
+            "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: cilium-vxlan
+portSelector:
+  ports:
+    - 8472
+  protocol: udp
+ingress:
+  - subnet: {cluster_subnet}
+"
+        );
+
+        // Cilium health checks - from cluster subnet
+        let _ = write!(
+            rules,
+            "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: cilium-health
+portSelector:
+  ports:
+    - 4240
+  protocol: tcp
+ingress:
+  - subnet: {cluster_subnet}
+"
+        );
+
+        if is_controlplane {
+            // Kubernetes API - from anywhere
+            rules.push_str(
+                "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: kubernetes-api-ingress
+portSelector:
+  ports:
+    - 6443
+  protocol: tcp
+ingress:
+  - subnet: 0.0.0.0/0
+  - subnet: ::/0
+",
+            );
+
+            // etcd - from control plane nodes only
+            let mut etcd_subnets = String::new();
+            for ip in controlplane_ips {
+                let _ = writeln!(etcd_subnets, "  - subnet: {ip}/32");
+            }
+            let _ = write!(
+                rules,
+                "---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: etcd-ingress
+portSelector:
+  ports:
+    - 2379-2380
+  protocol: tcp
+ingress:
+{etcd_subnets}"
+            );
+        }
+
+        self.with_config_patch(rules)
+    }
+
+    /// Configure Talos Ingress Firewall with sensible defaults for CTO platform.
+    ///
+    /// This is a convenience method that uses the 10.8.0.0/24 VLAN subnet.
+    ///
+    /// # Arguments
+    ///
+    /// * `is_controlplane` - Whether this is a control plane node
+    /// * `controlplane_ip` - IP of the control plane (for etcd rules)
+    #[must_use]
+    pub fn with_default_firewall(self, is_controlplane: bool, controlplane_ip: &str) -> Self {
+        self.with_ingress_firewall("10.8.0.0/24", is_controlplane, &[controlplane_ip])
     }
 }
 
@@ -789,5 +1027,82 @@ mod tests {
         assert_eq!(config.config_patches.len(), 2);
         assert!(config.config_patches[0].contains("proxy:"));
         assert!(config.config_patches[1].contains("vm.nr_hugepages:"));
+    }
+
+    #[test]
+    fn test_vlan_interface_config() {
+        let config = BootstrapConfig::new("vlan-cluster", "64.34.91.100").with_vlan_interface(
+            2063,
+            "10.8.0.1/24",
+            "eth1",
+        );
+
+        assert_eq!(config.config_patches.len(), 1);
+        let patch = &config.config_patches[0];
+        assert!(patch.contains("interface: eth1"));
+        assert!(patch.contains("vlanId: 2063"));
+        assert!(patch.contains("10.8.0.1/24"));
+        assert!(patch.contains("mtu: 1500"));
+    }
+
+    #[test]
+    fn test_ingress_firewall_controlplane() {
+        let config = BootstrapConfig::new("fw-cluster", "10.8.0.1").with_ingress_firewall(
+            "10.8.0.0/24",
+            true,
+            &["10.8.0.1"],
+        );
+
+        assert_eq!(config.config_patches.len(), 1);
+        let patch = &config.config_patches[0];
+
+        // Check default action
+        assert!(patch.contains("NetworkDefaultActionConfig"));
+        assert!(patch.contains("ingress: block"));
+
+        // Check common rules
+        assert!(patch.contains("name: kubelet-ingress"));
+        assert!(patch.contains("name: apid-ingress"));
+        assert!(patch.contains("name: trustd-ingress"));
+        assert!(patch.contains("name: cilium-vxlan"));
+        assert!(patch.contains("ports:\n    - 8472"));
+
+        // Check control plane specific rules
+        assert!(patch.contains("name: kubernetes-api-ingress"));
+        assert!(patch.contains("ports:\n    - 6443"));
+        assert!(patch.contains("name: etcd-ingress"));
+        assert!(patch.contains("ports:\n    - 2379-2380"));
+        assert!(patch.contains("10.8.0.1/32")); // etcd peer
+    }
+
+    #[test]
+    fn test_ingress_firewall_worker() {
+        let config = BootstrapConfig::new("fw-cluster", "10.8.0.2").with_ingress_firewall(
+            "10.8.0.0/24",
+            false,
+            &["10.8.0.1"],
+        );
+
+        let patch = &config.config_patches[0];
+
+        // Workers should NOT have K8s API or etcd rules
+        assert!(!patch.contains("kubernetes-api-ingress"));
+        assert!(!patch.contains("etcd-ingress"));
+
+        // But should have common rules
+        assert!(patch.contains("kubelet-ingress"));
+        assert!(patch.contains("cilium-vxlan"));
+    }
+
+    #[test]
+    fn test_full_vlan_config() {
+        let config = BootstrapConfig::new("full-vlan", "64.34.91.100")
+            .with_vlan_interface(2063, "10.8.0.1/24", "eth1")
+            .with_private_network("10.8.0.0/24")
+            .with_ingress_firewall("10.8.0.0/24", true, &["10.8.0.1"])
+            .with_cilium_cni();
+
+        // Should have 4 patches: VLAN, private network, firewall, CNI
+        assert_eq!(config.config_patches.len(), 4);
     }
 }

@@ -467,7 +467,9 @@ impl Latitude {
     /// # Errors
     ///
     /// Returns `ProviderError` if the API request fails.
-    pub async fn list_virtual_networks(&self) -> Result<Vec<VirtualNetworkResource>, ProviderError> {
+    pub async fn list_virtual_networks(
+        &self,
+    ) -> Result<Vec<VirtualNetworkResource>, ProviderError> {
         let response: ApiResponse<Vec<VirtualNetworkResource>> =
             self.get("/virtual_networks").await?;
         Ok(response.data)
@@ -479,9 +481,20 @@ impl Latitude {
     /// private IP address. The server will then be able to communicate with
     /// other servers on the same VLAN using their private IPs.
     ///
+    /// # API Availability Note
+    ///
+    /// As of December 2025, the Latitude.sh public API does not expose the
+    /// server-to-VLAN assignment endpoint. This method will return an error
+    /// indicating manual assignment via the Latitude dashboard is required.
+    ///
+    /// For Talos-based clusters, VLAN configuration can still be achieved by:
+    /// 1. Creating the VLAN via API (works)
+    /// 2. Configuring VLAN interfaces in Talos machine config with static IPs
+    /// 3. Using the VLAN ID (`vid`) for Layer 2 tagging
+    ///
     /// # Arguments
     ///
-    /// * `vlan_id` - Virtual Network ID (e.g., "vlan_xxx")
+    /// * `vlan_id` - Virtual Network ID (e.g., `vlan_xxx`)
     /// * `server_id` - Server ID to assign
     ///
     /// # Returns
@@ -490,7 +503,7 @@ impl Latitude {
     ///
     /// # Errors
     ///
-    /// Returns `ProviderError` if the API request fails.
+    /// Returns `ProviderError` if the API request fails or endpoint is unavailable.
     pub async fn assign_server_to_vlan(
         &self,
         vlan_id: &str,
