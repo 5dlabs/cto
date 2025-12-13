@@ -25,13 +25,15 @@ metadata:
       tools=ghcr.io/5dlabs/tools,
       openmemory=ghcr.io/5dlabs/openmemory,
       healer=ghcr.io/5dlabs/healer,
-      tweakcn=ghcr.io/5dlabs/tweakcn
+      tweakcn=ghcr.io/5dlabs/tweakcn,
+      research=ghcr.io/5dlabs/research
     argocd-image-updater.argoproj.io/controller.update-strategy: latest
     argocd-image-updater.argoproj.io/pm.update-strategy: latest
     argocd-image-updater.argoproj.io/tools.update-strategy: latest
     argocd-image-updater.argoproj.io/openmemory.update-strategy: latest
     argocd-image-updater.argoproj.io/healer.update-strategy: latest
     argocd-image-updater.argoproj.io/tweakcn.update-strategy: latest
+    argocd-image-updater.argoproj.io/research.update-strategy: latest
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -98,25 +100,49 @@ spec:
             repository: ghcr.io/5dlabs/tweakcn
             tag: latest
 
+        # Research - Twitter/X bookmark research pipeline
+        research:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/research
+            tag: latest
+          # CronJob schedule (every 5 minutes)
+          schedule: "*/5 * * * *"
+          # Research configuration
+          minRelevance: "0.4"  # Lower threshold to capture more bookmarks
+          batchSize: "50"      # Process more per run
+          model: "claude-sonnet-4-20250514"
+          # PR creation disabled - research is local
+          createPR: false
+          # Email digest (daily at 9am UTC / 4am EST)
+          digest:
+            enabled: true
+            schedule: "0 9 * * *"
+            hoursBetween: "24"
+            skipAnalysis: false
+
         cloudflare:
           enabled: true
 
         # BuildKit - Remote build infrastructure
-        # Configure per-cluster: nodeSelector and insecureRegistries
+        # NOTE: BuildKit config is cluster-specific and must be updated per deployment
         # To find worker nodes: kubectl get nodes -l node-role.kubernetes.io/control-plane!=
         # To find node IPs: kubectl get nodes -o wide
+        # For Latitude clusters, update nodeSelector and insecureRegistries after provisioning
         buildkit:
           enabled: true
           # Schedule on a worker node with sufficient resources
           # Update this to match your cluster's worker node hostname
           nodeSelector:
-            kubernetes.io/hostname: talos-a43-ee1  # Simple cluster worker
+            # TODO: Update for Latitude cluster worker node
+            kubernetes.io/hostname: talos-a43-ee1  # Simple cluster (update per cluster)
           # Allow pushing to local in-cluster registry (HTTP)
           # Update IPs to match your cluster's node IPs
           config:
             insecureRegistries:
-              - "192.168.1.72:30500"  # Worker node registry
-              - "192.168.1.77:30500"  # Control plane registry
+              # TODO: Update for Latitude cluster node IPs
+              - "192.168.1.72:30500"  # Simple cluster worker (update per cluster)
+              - "192.168.1.77:30500"  # Simple cluster control plane (update per cluster)
 
   destination:
     server: https://kubernetes.default.svc
