@@ -11,11 +11,7 @@ All operators are selected for compatibility with proprietary distribution. We p
 2. **MIT/BSD** - Permissive, no restrictions
 3. **MPL 2.0** - Weak copyleft, file-level disclosure only
 
-### ⚠️ Licensing Concerns
-
-| Operator | License | Risk | Alternative |
-|----------|---------|------|-------------|
-| MinIO | AGPL v3 | Network use requires source disclosure | SeaweedFS (Apache 2.0) |
+All storage operators use permissive licenses that allow proprietary distribution.
 
 ## Operator Categories
 
@@ -25,7 +21,6 @@ All operators are selected for compatibility with proprietary distribution. We p
 
 ### Storage
 - **seaweedfs-operator.yaml** - S3-compatible object storage - Apache 2.0
-- **minio-operator.yaml** - S3-compatible object storage - ⚠️ AGPL v3
 
 > **Note**: Block storage (Mayastor) is in `applications/storage/` directory.
 
@@ -76,4 +71,4 @@ Operators use ArgoCD sync waves for dependency management:
 - Wave `-1`: Observability (Jaeger)
 - Wave `0`: Default (most operators)
 - Wave `1`: Application-level (KubeAI)
-- Wave `2`: Dependent services (Harbor, MinIO tenants)
+- Wave `2`: Dependent services (Harbor)

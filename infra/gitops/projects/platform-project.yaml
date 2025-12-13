@@ -52,8 +52,6 @@ spec:
     - 'https://kubernetes.github.io/ingress-nginx'
     # Cert-Manager Helm chart repository
     - 'https://charts.jetstack.io'
-    # MinIO Operator Helm chart repository
-    - 'https://operator.min.io'
     # ClickHouse Operator (Altinity)
     - 'https://github.com/Altinity/clickhouse-operator'
     # External Secrets Operator Helm chart repository
@@ -136,9 +134,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: arc-systems
       server: https://kubernetes.default.svc
-    # MinIO Object Storage
-    - namespace: minio-screenshots
-      server: https://kubernetes.default.svc
     # NATS Messaging (service, not operator)
     - namespace: nats
       server: https://kubernetes.default.svc
@@ -179,13 +174,6 @@ spec:
       kind: '*'
     # Kilo WireGuard VPN CRDs
     - group: 'kilo.squat.ai'
-      kind: '*'
-    # MinIO Operator CRDs
-    - group: 'minio.min.io'
-      kind: '*'
-    - group: 'sts.min.io'
-      kind: '*'
-    - group: 'job.min.io'
       kind: '*'
     # Cloudflare Tunnel Operator CRDs (ClusterTunnel is cluster-scoped)
     - group: 'networking.cfargotunnel.com'
@@ -304,13 +292,6 @@ spec:
       kind: '*'
     # Kilo WireGuard VPN CRDs
     - group: 'kilo.squat.ai'
-      kind: '*'
-    # MinIO Operator CRDs
-    - group: 'minio.min.io'
-      kind: '*'
-    - group: 'sts.min.io'
-      kind: '*'
-    - group: 'job.min.io'
       kind: '*'
     # ClickHouse Operator CRDs (Altinity)
     - group: 'clickhouse.altinity.com'

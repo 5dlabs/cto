@@ -84,7 +84,7 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 | **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% | Apache 2.0 |
 | **RabbitMQ** | Amazon MQ, CloudAMQP | ~70-80% | MPL 2.0 |
 | **NATS** | AWS SNS/SQS, GCP Pub/Sub | ~80-90% | Apache 2.0 |
-| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% | AGPL 3.0 |
+| **SeaweedFS** | AWS S3, GCS, Azure Blob | ~80-90% | Apache 2.0 |
 | **Redis Operator** | ElastiCache, Memorystore | ~70-80% | Apache 2.0 |
 | **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% | Apache 2.0 |
 | **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
@@ -114,7 +114,7 @@ The platform is under active development.
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, MinIO, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
+✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
 ✅ Long-term memory with OpenMemory  
 ✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
@@ -1407,7 +1407,7 @@ For more details, see the [LICENSE](LICENSE) file.
 | **Backend** | Rust, Go, Node.js, TypeScript |
 | **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
 | **Messaging** | Kafka (Strimzi) |
-| **Storage** | MinIO (S3-compatible) |
+| **Storage** | SeaweedFS (S3-compatible, Apache 2.0) |
 | **Secrets** | OpenBao (Vault fork) |
 | **Networking** | Cloudflare Tunnels, Kilo VPN (WireGuard) |
 | **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
