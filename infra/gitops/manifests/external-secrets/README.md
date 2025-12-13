@@ -12,7 +12,7 @@ The External Secrets Operator automatically syncs secrets from OpenBao into Kube
 - **argocd-secrets.yaml** - ExternalSecrets for the `argocd` namespace (repository credentials)
 - **cto-secrets.yaml** - ExternalSecrets for the `cto` namespace
 - **infra-secrets.yaml** - ExternalSecrets for the `infra` namespace
-- **minio-secrets.yaml** - ExternalSecrets for the `minio-screenshots` namespace
+- **seaweedfs-secrets.yaml** - ExternalSecrets for SeaweedFS S3 credentials (in `cto` namespace)
 
 ## Prerequisites
 
@@ -128,7 +128,7 @@ kubectl delete secret <name> -n <namespace>
 | `secret/tools-kubernetes` | `tools-kubernetes-secrets` | `cto` |
 | `secret/github-app-morgan` | `github-app-5dlabs-morgan` | `cto` |
 | `secret/cloudflare` | `cloudflare-api-credentials` | `infra` |
-| `secret/minio-screenshots-credentials` | `minio-screenshots-credentials` | `minio-screenshots` |
+| `secret/seaweedfs-s3-credentials` | `seaweedfs-s3-credentials` | `cto` |
 
 ## ArgoCD Repository Credentials
 
