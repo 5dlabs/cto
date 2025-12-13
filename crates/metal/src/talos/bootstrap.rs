@@ -441,7 +441,9 @@ pub fn bootstrap_cluster(node_ip: &str, talosconfig: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Wait for Kubernetes API to be ready.
+/// Wait for Kubernetes API to be ready (full health check with nodes Ready).
+///
+/// This waits for the full `talosctl health` to pass, which requires CNI to be deployed.
 ///
 /// # Errors
 ///
@@ -495,6 +497,45 @@ pub fn wait_for_kubernetes(node_ip: &str, talosconfig: &Path, timeout: Duration)
 
         debug!("Kubernetes not ready yet...");
         std::thread::sleep(Duration::from_secs(10));
+    }
+}
+
+/// Wait for Kubernetes API port to be reachable (without full health check).
+///
+/// This is a lighter-weight check that just ensures the API server is accepting connections.
+/// It does NOT wait for nodes to be Ready (which requires CNI).
+/// Use this when you need kubeconfig before deploying CNI.
+///
+/// # Errors
+///
+/// Returns an error if the timeout is reached before the API port is reachable.
+pub fn wait_for_kubernetes_api_port(node_ip: &str, timeout: Duration) -> Result<()> {
+    let start = Instant::now();
+    let k8s_addr = format!("{node_ip}:{K8S_API_PORT}");
+
+    info!(
+        "Waiting for Kubernetes API port to be reachable (timeout: {}s)...",
+        timeout.as_secs()
+    );
+
+    loop {
+        if start.elapsed() > timeout {
+            bail!("Timeout waiting for Kubernetes API port");
+        }
+
+        // Check if K8s API port is open
+        if TcpStream::connect_timeout(
+            &k8s_addr.parse().context("Invalid address")?,
+            Duration::from_secs(5),
+        )
+        .is_ok()
+        {
+            info!("✅ Kubernetes API port is reachable!");
+            return Ok(());
+        }
+
+        debug!("Kubernetes API port not reachable yet...");
+        std::thread::sleep(Duration::from_secs(5));
     }
 }
 

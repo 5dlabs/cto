@@ -385,10 +385,11 @@ impl Installer {
 
         metal::talos::bootstrap_cluster(&cp.ip, &talosconfig)?;
 
-        // Wait briefly for K8s API to become available
-        ui::print_info("Waiting for Kubernetes API to be available...");
+        // Wait for K8s API port to be reachable (NOT full health check)
+        // Full health check requires CNI, which we deploy next step
+        ui::print_info("Waiting for Kubernetes API port to be reachable...");
         let timeout = Duration::from_secs(300); // 5 minutes
-        metal::talos::wait_for_kubernetes(&cp.ip, &talosconfig, timeout)?;
+        metal::talos::wait_for_kubernetes_api_port(&cp.ip, timeout)?;
 
         // Get kubeconfig (needed for Cilium deployment)
         ui::print_info("Getting kubeconfig...");
