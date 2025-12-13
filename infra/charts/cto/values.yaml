@@ -484,10 +484,16 @@ cloudflare:
 # Enables remote builds from development machines with massive cache storage.
 #
 # Setup on build machine:
+#   ./scripts/setup-cluster-builder.sh
+#
+# Or manually:
 #   docker buildx create --name cluster-builder \
 #     --driver remote \
-#     tcp://<node-ip>:30501
+#     tcp://<node-ip>:30502
 #   docker buildx use cluster-builder
+#
+# Note: nodeSelector and insecureRegistries should be overridden per-cluster
+# in the ArgoCD Application values (infra/gitops/applications/workloads/cto.yaml)
 #
 buildkit:
   enabled: true
@@ -500,12 +506,13 @@ buildkit:
     # NodePort for remote access from build machines
     nodePort: 30502
 
-  # Schedule on worker node (more resources - 16 cores, 128GB RAM)
-  nodeSelector:
-    kubernetes.io/hostname: talos-a43-ee1
+  # Node selector for BuildKit pod placement
+  # Override per-cluster to schedule on appropriate worker node
+  # Example: kubernetes.io/hostname: my-worker-node
+  nodeSelector: {}
 
-  # No limits - let BuildKit consume what it needs from the node
-  # Node has 16 cores and 128GB RAM available
+  # Resource requests - adjust based on available node resources
+  # Defaults are conservative; override per-cluster for larger nodes
   resources:
     requests:
       cpu: 2000m
@@ -527,7 +534,7 @@ buildkit:
     # Garbage collection - keep cache for 7 days, up to 80GB
     gcKeepDuration: "168h"
     gcKeepBytes: 85899345920
-    # Allow pushing to local registry (HTTP)
-    insecureRegistries:
-      - "192.168.1.72:30500"
-      - "192.168.1.77:30500"
+    # Allow pushing to insecure (HTTP) registries
+    # Override per-cluster with local registry IPs
+    # Example: ["192.168.1.72:30500", "192.168.1.77:30500"]
+    insecureRegistries: []
