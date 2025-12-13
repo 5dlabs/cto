@@ -213,11 +213,14 @@ impl BareMetalOrchestrator {
         Ok(())
     }
 
-    /// Trigger Talos iPXE boot on all servers.
+    /// Trigger Talos iPXE boot on all servers and wait for them to come back online.
+    ///
+    /// This triggers a reinstall with Talos iPXE, then polls the Latitude API
+    /// until each server's status returns to "on" before proceeding.
     ///
     /// # Errors
     ///
-    /// Returns an error if iPXE reinstall fails.
+    /// Returns an error if iPXE reinstall fails or servers don't come back online.
     pub async fn boot_talos(&self, cp_id: &str, worker_ids: &[String]) -> Result<()> {
         // Generate iPXE URL
         let talos_version = TalosVersion::new(&self.config.talos_version, DEFAULT_SCHEMATIC_ID);
@@ -267,7 +270,35 @@ impl BareMetalOrchestrator {
         }
 
         ui::print_success("Talos iPXE boot triggered on all servers");
-        ui::print_info("Servers will reboot and install Talos. This may take 5-10 minutes.");
+
+        // Wait for ALL servers to return to "on" status via Latitude API
+        // This ensures the reinstall/reboot has completed before we try to connect to Talos
+        ui::print_info("Waiting for ALL servers to come back online (polling Latitude API)...");
+        ui::print_info("This ensures reinstall is complete before attempting Talos connection.");
+        let timeout_secs = 900; // 15 minutes for reinstall
+
+        // Wait for control plane first
+        ui::print_info(&format!("  → Control plane ({cp_id})..."));
+        self.provider
+            .wait_ready(cp_id, timeout_secs)
+            .await
+            .context("Control plane did not come back online after Talos reinstall")?;
+        ui::print_success("  ✓ Control plane is online (status: on)");
+
+        // Wait for all workers
+        for (i, worker_id) in worker_ids.iter().enumerate() {
+            ui::print_info(&format!("  → Worker {} ({worker_id})...", i + 1));
+            self.provider
+                .wait_ready(worker_id, timeout_secs)
+                .await
+                .with_context(|| {
+                    format!("Worker {} did not come back online after Talos reinstall", i + 1)
+                })?;
+            ui::print_success(&format!("  ✓ Worker {} is online (status: on)", i + 1));
+        }
+
+        ui::print_success("All servers are online (Latitude API status: on)");
+        ui::print_info("Now safe to proceed with Talos API polling...");
 
         Ok(())
     }
