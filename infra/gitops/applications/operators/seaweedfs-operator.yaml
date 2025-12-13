@@ -135,6 +135,12 @@ spec:
         csi:
           enabled: false  # Enable if you want to use SeaweedFS as a CSI driver
 
+        # Note: Buckets are created dynamically via S3 API or weed shell
+        # The screenshots bucket will be created by init containers or manually:
+        #   kubectl exec -n seaweedfs seaweedfs-master-0 -- \
+        #     weed shell -master=localhost:9333 -filer=seaweedfs-filer:8888 \
+        #     -shell.command='s3.bucket.create -name screenshots'
+
   destination:
     server: https://kubernetes.default.svc
     namespace: seaweedfs

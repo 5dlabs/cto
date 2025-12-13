@@ -18,19 +18,20 @@ for i in $(seq 1 $WAIT_SECONDS); do
     sleep 1
 done
 
-# Configure MinIO client (mc) alias via environment variable if credentials are set
+# Configure S3 client (mc) alias via environment variable if credentials are set
 # MC_HOST_<alias> format: PROTOCOL://ACCESS_KEY:SECRET_KEY@HOST
-if [ -n "$MINIO_ENDPOINT" ] && [ -n "$MINIO_ACCESS_KEY" ] && [ -n "$MINIO_SECRET_KEY" ]; then
+# Works with any S3-compatible storage (SeaweedFS, MinIO, AWS S3, etc.)
+if [ -n "$S3_ENDPOINT" ] && [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
     # Detect protocol and extract host
-    if [[ "$MINIO_ENDPOINT" == https://* ]]; then
-        MINIO_PROTOCOL="https"
-        MINIO_HOST="${MINIO_ENDPOINT#https://}"
+    if [[ "$S3_ENDPOINT" == https://* ]]; then
+        S3_PROTOCOL="https"
+        S3_HOST="${S3_ENDPOINT#https://}"
     else
-        MINIO_PROTOCOL="http"
-        MINIO_HOST="${MINIO_ENDPOINT#http://}"
+        S3_PROTOCOL="http"
+        S3_HOST="${S3_ENDPOINT#http://}"
     fi
-    export MC_HOST_minio="${MINIO_PROTOCOL}://${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}@${MINIO_HOST}"
-    echo "MinIO client configured with alias 'minio' -> ${MINIO_ENDPOINT}"
+    export MC_HOST_s3="${S3_PROTOCOL}://${S3_ACCESS_KEY}:${S3_SECRET_KEY}@${S3_HOST}"
+    echo "S3 client configured with alias 's3' -> ${S3_ENDPOINT}"
 fi
 
 # Run the application

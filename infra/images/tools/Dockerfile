@@ -38,6 +38,7 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     rm kubectl
 
 # Install MinIO client (mc) for S3-compatible object storage operations
+# Note: mc works with any S3-compatible storage (SeaweedFS, AWS S3, etc.)
 # hadolint ignore=DL3059
 RUN curl -LO https://dl.min.io/client/mc/release/linux-arm64/mc && \
     install -o root -g root -m 0755 mc /usr/local/bin/mc && \
