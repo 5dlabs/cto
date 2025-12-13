@@ -24,6 +24,16 @@ const DEFAULT_TIMEOUT_SECS: u64 = 30;
 /// Polling interval when waiting for server status.
 const POLL_INTERVAL_SECS: u64 = 10;
 
+/// Buffer delay after server reaches "on" status before attempting operations.
+/// This gives the Latitude API time to fully register the server as ready.
+const POST_READY_BUFFER_SECS: u64 = 15;
+
+/// Maximum retries for reinstall when server reports "still provisioning".
+const REINSTALL_MAX_RETRIES: u32 = 6;
+
+/// Delay between reinstall retries.
+const REINSTALL_RETRY_DELAY_SECS: u64 = 30;
+
 /// Latitude.sh bare metal provider.
 #[derive(Clone)]
 pub struct Latitude {
@@ -263,10 +273,19 @@ impl Provider for Latitude {
                 server_id = %id,
                 status = %server.status,
                 elapsed_secs = start.elapsed().as_secs(),
-                "Polling server status"
+                "Polling server status via API"
             );
 
             if server.status == ServerStatus::On {
+                info!(
+                    server_id = %id,
+                    buffer_secs = POST_READY_BUFFER_SECS,
+                    "Server status is 'on', waiting buffer period before proceeding"
+                );
+                // Wait a buffer period after status becomes "on" to ensure
+                // the Latitude API has fully registered the server as ready
+                // for subsequent operations like reinstall.
+                tokio::time::sleep(Duration::from_secs(POST_READY_BUFFER_SECS)).await;
                 info!(server_id = %id, "Server is ready");
                 return Ok(server);
             }
@@ -295,17 +314,49 @@ impl Provider for Latitude {
                 resource_type: "reinstalls".to_string(),
                 attributes: ReinstallServerAttributes {
                     operating_system: "ipxe".to_string(),
-                    hostname: req.hostname,
-                    ipxe: Some(req.ipxe_url),
+                    hostname: req.hostname.clone(),
+                    ipxe: Some(req.ipxe_url.clone()),
                 },
             },
         };
 
-        self.post_empty(&format!("/servers/{id}/reinstall"), &body)
-            .await?;
+        // Retry loop for "SERVER_BEING_PROVISIONED" errors
+        // The Latitude API may still report provisioning even after status is "on"
+        for attempt in 1..=REINSTALL_MAX_RETRIES {
+            match self
+                .post_empty(&format!("/servers/{id}/reinstall"), &body)
+                .await
+            {
+                Ok(()) => {
+                    info!(server_id = %id, "iPXE reinstall triggered");
+                    return Ok(());
+                }
+                Err(ProviderError::Api { status, message })
+                    if message.contains("SERVER_BEING_PROVISIONED")
+                        || message.contains("being provisioned") =>
+                {
+                    if attempt < REINSTALL_MAX_RETRIES {
+                        warn!(
+                            server_id = %id,
+                            attempt,
+                            max_retries = REINSTALL_MAX_RETRIES,
+                            retry_delay_secs = REINSTALL_RETRY_DELAY_SECS,
+                            "Server still provisioning, retrying reinstall"
+                        );
+                        tokio::time::sleep(Duration::from_secs(REINSTALL_RETRY_DELAY_SECS)).await;
+                    } else {
+                        return Err(ProviderError::Api { status, message });
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
 
-        info!(server_id = %id, "iPXE reinstall triggered");
-        Ok(())
+        // Should not reach here, but handle it gracefully
+        Err(ProviderError::Api {
+            status: 422,
+            message: "Reinstall failed after max retries".to_string(),
+        })
     }
 
     async fn delete_server(&self, id: &str) -> Result<(), ProviderError> {
