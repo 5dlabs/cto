@@ -1,0 +1,12 @@
+---
+# Self-signed ClusterIssuer for internal certificates
+# Used by operators that need webhook certificates (Jaeger, QuestDB, etc.)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: issuer
+spec:
+  selfSigned: {}
