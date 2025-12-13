@@ -231,6 +231,9 @@ impl Installer {
             InstallStep::ConfiguringStorage => {
                 self.configure_storage().await?;
             }
+            InstallStep::BootstrappingOpenBao => {
+                self.bootstrap_openbao().await?;
+            }
             InstallStep::ConfiguringKubeconfig => {
                 self.configure_kubeconfig().await?;
             }
@@ -684,6 +687,23 @@ impl Installer {
         )?;
 
         ui::print_success("Mayastor storage configured!");
+
+        Ok(())
+    }
+
+    async fn bootstrap_openbao(&mut self) -> Result<()> {
+        let kubeconfig_path = self
+            .state
+            .kubeconfig_path
+            .as_ref()
+            .context("Kubeconfig not found in state")?;
+
+        ui::print_info("Bootstrapping OpenBao secrets management...");
+
+        let mut bootstrap = crate::openbao::OpenBaoBootstrap::new(kubeconfig_path);
+        bootstrap.bootstrap().await?;
+
+        ui::print_success("OpenBao secrets bootstrap complete!");
 
         Ok(())
     }

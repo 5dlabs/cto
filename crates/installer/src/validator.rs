@@ -91,7 +91,7 @@ impl PrerequisitesValidator {
             critical: true,
         });
 
-        // 1Password CLI (optional, for credential management)
+        // 1Password CLI (required for secrets management)
         requirements.push(Requirement {
             name: "1Password CLI (op)".to_string(),
             check: Box::new(|| {
@@ -104,9 +104,9 @@ impl PrerequisitesValidator {
                     .ok_or_else(|| anyhow::anyhow!("op not found"))
             }),
             install_instructions:
-                "Install 1Password CLI from https://1password.com/downloads/command-line/ (optional, for credential management)"
+                "Install 1Password CLI from https://1password.com/downloads/command-line/"
                     .to_string(),
-            critical: false,
+            critical: true,
         });
 
         // Lens/OpenLens (optional, for Kubernetes IDE)

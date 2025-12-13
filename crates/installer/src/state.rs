@@ -67,6 +67,8 @@ pub enum InstallStep {
     // Post-GitOps configuration
     /// Configuring Mayastor storage (DiskPools + StorageClass).
     ConfiguringStorage,
+    /// Bootstrapping OpenBao (init, unseal, seed secrets from 1Password).
+    BootstrappingOpenBao,
     /// Configuring local kubeconfig for kubectl and Lens access.
     ConfiguringKubeconfig,
 
@@ -100,7 +102,8 @@ impl InstallStep {
             Self::WaitingArgoCDReady => Self::ApplyingAppOfApps,
             Self::ApplyingAppOfApps => Self::WaitingGitOpsSync,
             Self::WaitingGitOpsSync => Self::ConfiguringStorage,
-            Self::ConfiguringStorage => Self::ConfiguringKubeconfig,
+            Self::ConfiguringStorage => Self::BootstrappingOpenBao,
+            Self::BootstrappingOpenBao => Self::ConfiguringKubeconfig,
             Self::ConfiguringKubeconfig | Self::Complete => Self::Complete,
         }
     }
@@ -130,6 +133,7 @@ impl InstallStep {
             Self::ApplyingAppOfApps => "Applying app-of-apps manifest",
             Self::WaitingGitOpsSync => "Waiting for GitOps sync",
             Self::ConfiguringStorage => "Configuring Mayastor storage",
+            Self::BootstrappingOpenBao => "Bootstrapping OpenBao secrets",
             Self::ConfiguringKubeconfig => "Configuring kubeconfig for Lens",
             Self::Complete => "Complete",
         }
@@ -160,13 +164,14 @@ impl InstallStep {
             Self::ApplyingAppOfApps => 18,
             Self::WaitingGitOpsSync => 19,
             Self::ConfiguringStorage => 20,
-            Self::ConfiguringKubeconfig => 21,
-            Self::Complete => 22,
+            Self::BootstrappingOpenBao => 21,
+            Self::ConfiguringKubeconfig => 22,
+            Self::Complete => 23,
         }
     }
 
     /// Total number of steps.
-    pub const TOTAL_STEPS: u8 = 22;
+    pub const TOTAL_STEPS: u8 = 23;
 }
 
 impl std::fmt::Display for InstallStep {
