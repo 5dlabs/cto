@@ -131,14 +131,63 @@ impl<'a> OpenBaoBootstrap<'a> {
         } else if status.sealed {
             // Already initialized but sealed - retrieve keys from 1Password
             ui::print_info("OpenBao is sealed, retrieving unseal keys from 1Password...");
-            let unseal_keys = self.get_unseal_keys_from_1password()?;
 
-            ui::print_info("Unsealing OpenBao...");
-            self.unseal_openbao(&unseal_keys)?;
-            ui::print_success("OpenBao unsealed");
+            match self.get_unseal_keys_from_1password() {
+                Ok(unseal_keys) => {
+                    ui::print_info("Unsealing OpenBao...");
+                    match self.unseal_openbao(&unseal_keys) {
+                        Ok(()) => {
+                            ui::print_success("OpenBao unsealed");
+                            self.get_root_token_from_1password()?
+                        }
+                        Err(e) if e.to_string().contains("must be a valid hex or base64") => {
+                            // Keys are invalid - need to reinitialize
+                            warn!("Unseal keys are invalid, reinitializing OpenBao...");
+                            ui::print_warning("Unseal keys are invalid. Reinitializing OpenBao...");
 
-            // Get root token from 1Password
-            self.get_root_token_from_1password()?
+                            self.reinitialize_openbao()?;
+
+                            // Now initialize fresh
+                            ui::print_info("Initializing fresh OpenBao instance...");
+                            let init_result = self.initialize_openbao()?;
+
+                            ui::print_info("Storing new unseal keys in 1Password...");
+                            self.update_unseal_keys_in_1password(&init_result)?;
+                            ui::print_success("Unseal keys updated in 1Password");
+
+                            ui::print_info("Unsealing OpenBao...");
+                            self.unseal_openbao(&init_result.unseal_keys_b64)?;
+                            ui::print_success("OpenBao unsealed");
+
+                            init_result.root_token
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                Err(e) => {
+                    // No keys found in 1Password - need to reinitialize
+                    warn!("No unseal keys found in 1Password: {e}");
+                    ui::print_warning(
+                        "No unseal keys found in 1Password. Reinitializing OpenBao...",
+                    );
+
+                    self.reinitialize_openbao()?;
+
+                    // Now initialize fresh
+                    ui::print_info("Initializing fresh OpenBao instance...");
+                    let init_result = self.initialize_openbao()?;
+
+                    ui::print_info("Storing unseal keys in 1Password...");
+                    self.store_unseal_keys_in_1password(&init_result)?;
+                    ui::print_success("Unseal keys stored in 1Password");
+
+                    ui::print_info("Unsealing OpenBao...");
+                    self.unseal_openbao(&init_result.unseal_keys_b64)?;
+                    ui::print_success("OpenBao unsealed");
+
+                    init_result.root_token
+                }
+            }
         } else {
             // Already initialized and unsealed
             ui::print_info("OpenBao is already initialized and unsealed");
@@ -344,18 +393,103 @@ impl<'a> OpenBaoBootstrap<'a> {
         Ok(init_output)
     }
 
+    /// Reinitialize OpenBao by deleting its data and restarting the pod.
+    ///
+    /// This is used when unseal keys are invalid or lost.
+    fn reinitialize_openbao(&self) -> Result<()> {
+        info!("Reinitializing OpenBao - deleting PVC and restarting pod");
+
+        // Delete the PVC to clear all data
+        let output = Command::new("kubectl")
+            .args([
+                "--kubeconfig",
+                self.kubeconfig.to_str().unwrap_or_default(),
+                "delete",
+                "pvc",
+                "-n",
+                "openbao",
+                "--all",
+                "--wait=false",
+            ])
+            .output()
+            .context("Failed to delete OpenBao PVC")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!("Failed to delete PVC (may not exist): {stderr}");
+        }
+
+        // Force delete the pod to trigger recreation
+        let output = Command::new("kubectl")
+            .args([
+                "--kubeconfig",
+                self.kubeconfig.to_str().unwrap_or_default(),
+                "delete",
+                "pod",
+                "openbao-0",
+                "-n",
+                "openbao",
+                "--force",
+                "--grace-period=0",
+            ])
+            .output()
+            .context("Failed to delete OpenBao pod")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!("Failed to delete pod: {stderr}");
+        }
+
+        // Wait for pod to come back up
+        ui::print_info("Waiting for OpenBao pod to restart...");
+        std::thread::sleep(Duration::from_secs(15));
+
+        // Poll until pod is ready
+        let start = Instant::now();
+        let timeout = Duration::from_secs(120);
+
+        loop {
+            if start.elapsed() > timeout {
+                bail!("Timeout waiting for OpenBao pod to restart");
+            }
+
+            let output = Command::new("kubectl")
+                .args([
+                    "--kubeconfig",
+                    self.kubeconfig.to_str().unwrap_or_default(),
+                    "get",
+                    "pod",
+                    "openbao-0",
+                    "-n",
+                    "openbao",
+                    "-o",
+                    "jsonpath={.status.phase}",
+                ])
+                .output()
+                .context("Failed to check OpenBao pod status")?;
+
+            if output.status.success() {
+                let phase = String::from_utf8_lossy(&output.stdout);
+                if phase.trim() == "Running" {
+                    info!("OpenBao pod is running");
+                    // Give it a moment to fully start
+                    std::thread::sleep(Duration::from_secs(5));
+                    return Ok(());
+                }
+                debug!("OpenBao pod phase: {}", phase.trim());
+            }
+
+            std::thread::sleep(Duration::from_secs(5));
+        }
+    }
+
     /// Store unseal keys and root token in 1Password.
     fn store_unseal_keys_in_1password(&self, init: &OpenBaoInitOutput) -> Result<()> {
         // Create a new item in 1Password with the unseal keys
         let title = "OpenBao Unseal Keys - CTO Platform";
 
         // Build the item creation command
-        let mut args = vec![
-            "item",
-            "create",
-            "--category=password",
-            "--vault=Personal",
-        ];
+        let mut args = vec!["item", "create", "--category=password", "--vault=Personal"];
 
         // We need to build owned strings for the dynamic parts
         let title_arg = format!("--title={title}");

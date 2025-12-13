@@ -44,6 +44,13 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          # Fix deprecated bitnami-shell image (moved to bitnami/os-shell)
+          volumePermissions:
+            enabled: true
+            image:
+              registry: docker.io
+              repository: bitnami/os-shell
+              tag: 12-debian-12-r30
 
         # Disable bundled monitoring (we use our own observability stack)
         loki-stack:
