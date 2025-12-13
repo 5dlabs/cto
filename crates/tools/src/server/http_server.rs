@@ -2684,7 +2684,7 @@ impl BridgeState {
                 // Screenshot upload tool for headless visual testing
                 all_tools.push(json!({
                     "name": "tools_screenshot_upload",
-                    "description": "Upload a screenshot to MinIO storage and get a URL for embedding in PRs. Use after browser_take_screenshot to upload captures for visual documentation.",
+                    "description": "Upload a screenshot to S3-compatible storage (SeaweedFS) and get a URL for embedding in PRs. Use after browser_take_screenshot to upload captures for visual documentation.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -2765,7 +2765,7 @@ impl BridgeState {
                                     }]
                                 })
                             } else if tool_name == "tools_screenshot_upload" {
-                                // Handle screenshot upload to MinIO
+                                // Handle screenshot upload to S3-compatible storage (SeaweedFS)
                                 let arguments =
                                     params.get("arguments").cloned().unwrap_or(json!({}));
 
@@ -2806,14 +2806,14 @@ impl BridgeState {
                                         "{repo}/pr-{pr_number}/{timestamp}-{name}.{extension}"
                                     );
 
-                                    // Get bucket from environment
-                                    let bucket = std::env::var("MINIO_BUCKET")
+                                    // Get bucket and endpoint from environment (S3-compatible)
+                                    let bucket = std::env::var("S3_BUCKET")
                                         .unwrap_or_else(|_| "screenshots".to_string());
                                     let endpoint =
-                                        std::env::var("MINIO_ENDPOINT").unwrap_or_default();
+                                        std::env::var("S3_ENDPOINT").unwrap_or_default();
 
-                                    // Upload using mc command
-                                    let mc_dest = format!("minio/{bucket}/{key}");
+                                    // Upload using mc command (works with any S3-compatible storage)
+                                    let mc_dest = format!("s3/{bucket}/{key}");
 
                                     tracing::info!(
                                         "📸 Uploading screenshot: {file_path} -> {mc_dest}"
@@ -2857,7 +2857,7 @@ impl BridgeState {
                                             json!({
                                                 "content": [{
                                                     "type": "text",
-                                                    "text": format!("❌ Failed to execute mc command: {e}\n\nEnsure mc is installed and configured with MinIO credentials.")
+                                                    "text": format!("❌ Failed to execute mc command: {e}\n\nEnsure mc is installed and configured with S3 credentials.")
                                                 }],
                                                 "isError": true
                                             })

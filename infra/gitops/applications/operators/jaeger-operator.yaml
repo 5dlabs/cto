@@ -79,8 +79,8 @@ spec:
             # Use cert-manager for certificate management
             provide: "certmanager"
             issuerRef:
-              kind: Issuer
-              name: jaeger-operator-selfsigned-issuer
+              kind: ClusterIssuer
+              name: selfsigned-issuer
 
         # Extra arguments for the operator
         extraArgs: []
