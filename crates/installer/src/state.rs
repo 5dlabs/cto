@@ -41,7 +41,9 @@ pub enum InstallStep {
     WaitingCPInstall,
     /// Bootstrapping etcd and Kubernetes.
     Bootstrapping,
-    /// Waiting for Kubernetes API.
+    /// Deploying Cilium CNI (required for nodes to be Ready).
+    DeployingCilium,
+    /// Waiting for Kubernetes API and nodes to be ready.
     WaitingKubernetes,
     /// Applying config to worker nodes.
     ApplyingWorkerConfig,
@@ -49,8 +51,6 @@ pub enum InstallStep {
     WaitingWorkerJoin,
 
     // Platform stack
-    /// Deploying Cilium CNI (required before other workloads).
-    DeployingCilium,
     /// Deploying pre-ArgoCD bootstrap resources.
     DeployingBootstrapResources,
     /// Deploying local-path-provisioner.
@@ -89,11 +89,11 @@ impl InstallStep {
             Self::GeneratingConfigs => Self::ApplyingCPConfig,
             Self::ApplyingCPConfig => Self::WaitingCPInstall,
             Self::WaitingCPInstall => Self::Bootstrapping,
-            Self::Bootstrapping => Self::WaitingKubernetes,
+            Self::Bootstrapping => Self::DeployingCilium,
+            Self::DeployingCilium => Self::WaitingKubernetes,
             Self::WaitingKubernetes => Self::ApplyingWorkerConfig,
             Self::ApplyingWorkerConfig => Self::WaitingWorkerJoin,
-            Self::WaitingWorkerJoin => Self::DeployingCilium,
-            Self::DeployingCilium => Self::DeployingBootstrapResources,
+            Self::WaitingWorkerJoin => Self::DeployingBootstrapResources,
             Self::DeployingBootstrapResources => Self::DeployingLocalPathProvisioner,
             Self::DeployingLocalPathProvisioner => Self::DeployingArgoCD,
             Self::DeployingArgoCD => Self::WaitingArgoCDReady,
@@ -119,10 +119,10 @@ impl InstallStep {
             Self::ApplyingCPConfig => "Applying control plane config",
             Self::WaitingCPInstall => "Waiting for control plane installation",
             Self::Bootstrapping => "Bootstrapping Kubernetes cluster",
-            Self::WaitingKubernetes => "Waiting for Kubernetes API",
+            Self::DeployingCilium => "Deploying Cilium CNI",
+            Self::WaitingKubernetes => "Waiting for nodes to be Ready",
             Self::ApplyingWorkerConfig => "Applying worker node configs",
             Self::WaitingWorkerJoin => "Waiting for workers to join",
-            Self::DeployingCilium => "Deploying Cilium CNI",
             Self::DeployingBootstrapResources => "Deploying bootstrap resources",
             Self::DeployingLocalPathProvisioner => "Deploying local-path-provisioner",
             Self::DeployingArgoCD => "Deploying ArgoCD",
@@ -149,10 +149,10 @@ impl InstallStep {
             Self::ApplyingCPConfig => 7,
             Self::WaitingCPInstall => 8,
             Self::Bootstrapping => 9,
-            Self::WaitingKubernetes => 10,
-            Self::ApplyingWorkerConfig => 11,
-            Self::WaitingWorkerJoin => 12,
-            Self::DeployingCilium => 13,
+            Self::DeployingCilium => 10,
+            Self::WaitingKubernetes => 11,
+            Self::ApplyingWorkerConfig => 12,
+            Self::WaitingWorkerJoin => 13,
             Self::DeployingBootstrapResources => 14,
             Self::DeployingLocalPathProvisioner => 15,
             Self::DeployingArgoCD => 16,
