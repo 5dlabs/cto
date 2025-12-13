@@ -820,10 +820,13 @@ async fn wait_for_deployment(
     }
 }
 
-/// Wait for a specific node to be Ready using kubectl.
+/// Wait for any control plane node to be Ready using kubectl.
+///
+/// Note: We can't rely on hostname matching because Talos may use the hardware
+/// name (e.g., `hardware-212s000865`) instead of the configured hostname.
 async fn wait_for_node_ready_kubectl(
     kubeconfig: &Path,
-    node_name: &str,
+    _node_name: &str, // Ignored - we check for any control-plane node
     timeout: Duration,
 ) -> Result<()> {
     use std::process::Command;
@@ -833,25 +836,27 @@ async fn wait_for_node_ready_kubectl(
 
     loop {
         if start.elapsed() > timeout {
-            anyhow::bail!("Timeout waiting for node {node_name} to be Ready");
+            anyhow::bail!("Timeout waiting for control plane node to be Ready");
         }
 
+        // Check if any node with control-plane role is Ready
         let output = Command::new("kubectl")
             .args([
                 "--kubeconfig",
                 kubeconfig.to_str().unwrap_or_default(),
                 "get",
-                "node",
-                node_name,
+                "nodes",
+                "-l",
+                "node-role.kubernetes.io/control-plane",
                 "-o",
-                "jsonpath={.status.conditions[?(@.type=='Ready')].status}",
+                "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}",
             ])
             .output()
-            .context("Failed to run kubectl get node")?;
+            .context("Failed to run kubectl get nodes")?;
 
         if output.status.success() {
             let status = String::from_utf8_lossy(&output.stdout);
-            if status.trim() == "True" {
+            if status.contains("True") {
                 return Ok(());
             }
         }

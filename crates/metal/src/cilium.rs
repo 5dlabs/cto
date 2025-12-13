@@ -210,27 +210,58 @@ pub fn get_cilium_status(kubeconfig: &Path) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-/// Wait for Cilium to be healthy.
+/// Wait for Cilium CNI to be functional (nodes can become Ready).
+///
+/// This is a lighter-weight check than `cilium status --wait`, which requires
+/// ALL Cilium components (including hubble, operator replicas) to be fully healthy.
+/// For single-node clusters or during initial bootstrap, we just need the
+/// cilium agent daemonset to be running so nodes can become Ready.
 ///
 /// # Errors
 ///
-/// Returns an error if Cilium does not become healthy within the timeout.
+/// Returns an error if Cilium does not become functional within the timeout.
 pub fn wait_for_cilium_healthy(kubeconfig: &Path) -> Result<()> {
+    use std::time::{Duration, Instant};
+
     info!("Waiting for Cilium to be healthy...");
 
-    let output = Command::new("cilium")
-        .env("KUBECONFIG", kubeconfig)
-        .args(["status", "--wait"])
-        .output()
-        .context("Failed to run cilium status --wait")?;
+    let start = Instant::now();
+    let timeout = Duration::from_secs(300); // 5 minutes
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Cilium is not healthy: {stderr}");
+    loop {
+        if start.elapsed() > timeout {
+            bail!("Timeout waiting for Cilium to become functional");
+        }
+
+        // Check if cilium daemonset has at least one pod ready
+        let output = Command::new("kubectl")
+            .env("KUBECONFIG", kubeconfig)
+            .args([
+                "get",
+                "daemonset",
+                "cilium",
+                "-n",
+                "kube-system",
+                "-o",
+                "jsonpath={.status.numberReady}",
+            ])
+            .output()
+            .context("Failed to check cilium daemonset status")?;
+
+        if output.status.success() {
+            let ready_count = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse::<u32>()
+                .unwrap_or(0);
+
+            if ready_count > 0 {
+                info!("Cilium CNI is functional ({} agent(s) ready)", ready_count);
+                return Ok(());
+            }
+        }
+
+        std::thread::sleep(Duration::from_secs(10));
     }
-
-    info!("Cilium is healthy");
-    Ok(())
 }
 
 #[cfg(test)]
