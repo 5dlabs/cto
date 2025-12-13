@@ -532,7 +532,12 @@ async fn main() -> Result<()> {
                 let slug = plan.attributes.slug.as_deref().unwrap_or("unknown");
 
                 // Filter for Gen 4 plans (they start with m4, f4, rs4, etc.)
-                if gen4 && !slug.contains("4-metal") && !slug.starts_with("m4") && !slug.starts_with("f4") && !slug.starts_with("rs4") {
+                if gen4
+                    && !slug.contains("4-metal")
+                    && !slug.starts_with("m4")
+                    && !slug.starts_with("f4")
+                    && !slug.starts_with("rs4")
+                {
                     continue;
                 }
 
@@ -540,17 +545,15 @@ async fn main() -> Result<()> {
                 let specs = plan.attributes.specs.as_ref();
 
                 // Format CPU
-                let cpu_desc = specs
-                    .and_then(|s| s.cpu.as_ref())
-                    .map_or_else(
-                        || "N/A".to_string(),
-                        |c| {
-                            let cores = c.cores.unwrap_or(0);
-                            let clock = c.clock.unwrap_or(0.0);
-                            let cpu_type = c.cpu_type.as_deref().unwrap_or("Unknown");
-                            format!("{cores} cores @ {clock:.1}GHz ({cpu_type})")
-                        },
-                    );
+                let cpu_desc = specs.and_then(|s| s.cpu.as_ref()).map_or_else(
+                    || "N/A".to_string(),
+                    |c| {
+                        let cores = c.cores.unwrap_or(0);
+                        let clock = c.clock.unwrap_or(0.0);
+                        let cpu_type = c.cpu_type.as_deref().unwrap_or("Unknown");
+                        format!("{cores} cores @ {clock:.1}GHz ({cpu_type})")
+                    },
+                );
 
                 // Format RAM
                 let ram = specs
@@ -678,10 +681,7 @@ async fn main() -> Result<()> {
 
             println!("\n🌍 Available Regions");
             println!("{}", "=".repeat(60));
-            println!(
-                "\n{:<10} {:<25} {:<20}",
-                "SLUG", "NAME", "COUNTRY"
-            );
+            println!("\n{:<10} {:<25} {:<20}", "SLUG", "NAME", "COUNTRY");
             println!("{}", "-".repeat(60));
 
             for region in regions {
@@ -1736,11 +1736,10 @@ async fn main() -> Result<()> {
 
             // Step 3: Trigger Talos iPXE on all 3
             println!("\n🔄 Step 3/12: Triggering Talos iPXE boot on all 3 nodes...");
-            let talos_cfg =
-                TalosConfig::new(&name).with_version(metal::talos::TalosVersion::new(
-                    &talos_version,
-                    metal::talos::DEFAULT_SCHEMATIC_ID,
-                ));
+            let talos_cfg = TalosConfig::new(&name).with_version(metal::talos::TalosVersion::new(
+                &talos_version,
+                metal::talos::DEFAULT_SCHEMATIC_ID,
+            ));
             let ipxe_url = talos_cfg.ipxe_url();
             with_retry_async(&retry_config, "Trigger iPXE", || {
                 let p1 = &provider;

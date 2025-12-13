@@ -79,7 +79,7 @@ spec:
     - 'https://www.kubeai.org'
     - 'https://helm.ngc.nvidia.com/nvidia'
     # Storage Operators
-    - 'https://charts.longhorn.io'
+    - 'https://openebs.github.io/mayastor-extensions'
     - 'https://seaweedfs.github.io/seaweedfs/helm'
     # Observability Operators
     - 'https://jaegertracing.github.io/helm-charts'
@@ -227,7 +227,7 @@ spec:
     - group: 'nvidia.com'
       kind: '*'
     # Storage Operator CRDs
-    - group: 'longhorn.io'
+    - group: 'openebs.io'
       kind: '*'
     - group: 'seaweedfs.com'
       kind: '*'
@@ -342,7 +342,7 @@ spec:
     - group: 'nvidia.com'
       kind: '*'
     # Storage Operator CRDs
-    - group: 'longhorn.io'
+    - group: 'openebs.io'
       kind: '*'
     - group: 'seaweedfs.com'
       kind: '*'

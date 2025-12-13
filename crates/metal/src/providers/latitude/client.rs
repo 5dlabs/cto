@@ -8,7 +8,7 @@ use tracing::{debug, info, warn};
 
 use super::models::{
     ApiResponse, CreateServerAttributes, CreateServerBody, CreateServerData, PlanResource,
-    ReinstallServerAttributes, ReinstallServerBody, ReinstallServerData, RegionResource,
+    RegionResource, ReinstallServerAttributes, ReinstallServerBody, ReinstallServerData,
     ServerResource,
 };
 use crate::providers::traits::{

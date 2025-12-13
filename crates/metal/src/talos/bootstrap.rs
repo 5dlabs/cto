@@ -122,6 +122,44 @@ impl BootstrapConfig {
         let patch = format!("cluster:\n  network:\n    podSubnets:\n      - {cidr}\n");
         self.with_config_patch(patch)
     }
+
+    /// Configure `HugePages` for `OpenEBS` Mayastor support.
+    ///
+    /// Mayastor's SPDK-based io-engine requires 2MB `HugePages` for `NVMe` performance.
+    /// This configures 1024 2MB pages (2GiB) by default. The sysctls are required
+    /// on all worker nodes where Mayastor io-engine will run.
+    #[must_use]
+    pub fn with_hugepages(self) -> Self {
+        self.with_hugepages_count(1024)
+    }
+
+    /// Configure `HugePages` with a custom page count.
+    ///
+    /// Each 2MB `HugePage` consumes 2MiB of memory. For example:
+    /// - 1024 pages = 2GiB
+    /// - 512 pages = 1GiB
+    #[must_use]
+    pub fn with_hugepages_count(self, nr_hugepages: u32) -> Self {
+        let patch = format!(
+            r#"machine:
+  sysctls:
+    vm.nr_hugepages: "{nr_hugepages}"
+"#
+        );
+        self.with_config_patch(patch)
+    }
+
+    /// Configure for Mayastor-ready setup (Cilium CNI + `HugePages`).
+    ///
+    /// This is a convenience method that combines:
+    /// - Cilium CNI configuration (cni=none, kube-proxy disabled)
+    /// - `HugePages` configuration for Mayastor io-engine
+    ///
+    /// Use `with_pod_cidr()` after this for `ClusterMesh` compatibility.
+    #[must_use]
+    pub fn with_mayastor_ready(self) -> Self {
+        self.with_cilium_cni().with_hugepages()
+    }
 }
 
 /// Wait for Talos to be reachable in maintenance mode.
@@ -636,5 +674,32 @@ mod tests {
             .with_pod_cidr("10.2.0.0/16");
 
         assert_eq!(config.config_patches.len(), 2);
+    }
+
+    #[test]
+    fn test_hugepages_config() {
+        let config = BootstrapConfig::new("mayastor-cluster", "10.0.0.1").with_hugepages();
+
+        assert_eq!(config.config_patches.len(), 1);
+        assert!(config.config_patches[0].contains("vm.nr_hugepages:"));
+        assert!(config.config_patches[0].contains("1024"));
+    }
+
+    #[test]
+    fn test_hugepages_custom_count() {
+        let config =
+            BootstrapConfig::new("mayastor-cluster", "10.0.0.1").with_hugepages_count(2048);
+
+        assert!(config.config_patches[0].contains("2048"));
+    }
+
+    #[test]
+    fn test_mayastor_ready_config() {
+        let config = BootstrapConfig::new("mayastor-cluster", "10.0.0.1").with_mayastor_ready();
+
+        // Should have both Cilium CNI and HugePages patches
+        assert_eq!(config.config_patches.len(), 2);
+        assert!(config.config_patches[0].contains("proxy:"));
+        assert!(config.config_patches[1].contains("vm.nr_hugepages:"));
     }
 }

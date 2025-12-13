@@ -1,8 +1,29 @@
+//! UI helpers for the installer CLI.
+//!
+//! Provides consistent formatting for console output during installation.
+
 use colored::Colorize;
 
-use crate::config::{ClusterType, InstallConfig};
+/// Print the CTO Platform banner.
+pub fn print_banner() {
+    println!();
+    println!(
+        "{}",
+        r"
+   _____ _____ ___    ____  _       _    __                     
+  / ____|_   _/ _ \  |  _ \| |     | |  / _|                    
+ | |      | || | | | | |_) | | __ _| |_| |_ ___  _ __ _ __ ___  
+ | |      | || | | | |  __/| |/ _` | __|  _/ _ \| '__| '_ ` _ \ 
+ | |____ _| || |_| | | |   | | (_| | |_| || (_) | |  | | | | | |
+  \_____|_____\___/  |_|   |_|\__,_|\__|_| \___/|_|  |_| |_| |_|
+"
+        .cyan()
+    );
+    println!("  {}", "Bare Metal Kubernetes Platform".bright_black());
+    println!();
+}
 
-/// Print a section header
+/// Print a section header.
 pub fn print_section(title: &str) {
     println!();
     println!("{}", "═".repeat(70).bright_black());
@@ -11,8 +32,13 @@ pub fn print_section(title: &str) {
     println!();
 }
 
-/// Print a step indicator
-pub fn print_step(current: usize, total: usize, message: &str) {
+/// Print a step indicator with message.
+pub fn print_step(message: &str) {
+    println!("{} {}", "▶".cyan(), message.bold());
+}
+
+/// Print a progress step with step number.
+pub fn print_progress_step(current: u8, total: u8, message: &str) {
     println!(
         "{} {} {}",
         format!("[{current}/{total}]").bright_black(),
@@ -21,119 +47,40 @@ pub fn print_step(current: usize, total: usize, message: &str) {
     );
 }
 
-/// Print a success message
+/// Print a success message.
 pub fn print_success(message: &str) {
-    println!();
     println!("{} {}", "✓".green().bold(), message.green());
-    println!();
 }
 
-/// Print a warning message
+/// Print a warning message.
 pub fn print_warning(message: &str) {
     println!("{} {}", "⚠".yellow().bold(), message.yellow());
 }
 
-/// Print an info message
+/// Print an error message.
+pub fn print_error(message: &str) {
+    println!("{} {}", "✗".red().bold(), message.red());
+}
+
+/// Print an info message.
 pub fn print_info(message: &str) {
     println!("{} {}", "ℹ".blue().bold(), message);
 }
 
-/// Print a configuration summary
-pub fn print_config_summary(config: &InstallConfig) {
-    println!("{}", "Configuration Summary".cyan().bold());
-    println!("{}", "─".repeat(70).bright_black());
-    println!();
-
-    println!(
-        "  {} {}",
-        "Profile:".bright_black(),
-        config.profile.name().green()
-    );
-    println!(
-        "  {} {}",
-        "Cluster:".bright_black(),
-        match config.cluster_type {
-            ClusterType::Kind => "Local kind cluster".to_string(),
-            ClusterType::Remote => "Remote Kubernetes cluster".to_string(),
-        }
-        .green()
-    );
-    println!(
-        "  {} {}",
-        "Namespace:".bright_black(),
-        config.namespace.green()
-    );
-
-    if let Some(org) = &config.github_org {
-        println!("  {} {}", "GitHub Org:".bright_black(), org.green());
-    }
-
-    if let Some(repo) = &config.github_repo {
-        println!("  {} {}", "GitHub Repo:".bright_black(), repo.green());
-    }
-
-    println!(
-        "  {} {}",
-        "Registry:".bright_black(),
-        config.get_registry_prefix().green()
-    );
-
-    if let Some(domain) = &config.domain {
-        println!("  {} {}", "Domain:".bright_black(), domain.green());
-    }
-
-    println!();
-    println!("{}", "Components".cyan().bold());
-    println!("{}", "─".repeat(70).bright_black());
-    println!();
-
-    let components = vec![
-        ("ArgoCD", true),
-        ("Argo Workflows", true),
-        ("Argo Events", true),
-        ("CTO Controller", true),
-        ("Monitoring Stack", config.install_monitoring),
-        ("Database Operators", config.install_databases),
-    ];
-
-    for (component, enabled) in components {
-        let status = if enabled {
-            "✓".green()
-        } else {
-            "○".bright_black()
-        };
-        println!("  {status} {component}");
-    }
-
-    println!();
-    println!("{}", "Resource Requirements".cyan().bold());
-    println!("{}", "─".repeat(70).bright_black());
-    println!();
-    println!(
-        "  {} {} cores",
-        "CPU:".bright_black(),
-        config.profile.cpu_requirement().to_string().yellow()
-    );
-    println!(
-        "  {} {} GB",
-        "Memory:".bright_black(),
-        config.profile.memory_requirement_gb().to_string().yellow()
-    );
-    println!();
-}
-
-/// Print installation progress
+/// Print installation progress.
+#[allow(dead_code)]
 pub fn print_progress(message: &str) {
     println!("  {} {}", "→".cyan(), message);
 }
 
-/// Print a component installation header
+/// Print a component installation header.
+#[allow(dead_code)]
 pub fn print_component(name: &str) {
     println!();
     println!("{} {}", "📦".bold(), name.cyan().bold());
 }
 
-/// Print prerequisite check result
+/// Print prerequisite check result.
 pub fn print_check_result(name: &str, passed: bool, message: Option<&str>) {
     let status = if passed { "✓".green() } else { "✗".red() };
 
@@ -144,4 +91,62 @@ pub fn print_check_result(name: &str, passed: bool, message: Option<&str>) {
     };
 
     println!("  {status} {text}");
+}
+
+/// Print GitOps sync progress.
+pub fn print_gitops_progress(synced: usize, healthy: usize, total: usize) {
+    let health_pct = if total > 0 {
+        (healthy * 100) / total
+    } else {
+        0
+    };
+
+    // Build progress bar
+    let bar_width = 30;
+    let filled = (health_pct * bar_width) / 100;
+    let empty = bar_width - filled;
+
+    let bar = format!(
+        "{}{}",
+        "█".repeat(filled).green(),
+        "░".repeat(empty).bright_black()
+    );
+
+    // Clear line and print progress
+    print!(
+        "\r  {} GitOps: [{}] {}/{} synced, {}/{} healthy",
+        "⟳".cyan(),
+        bar,
+        synced,
+        total,
+        healthy,
+        total
+    );
+
+    // Flush to ensure immediate display
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+
+    // If complete, print newline
+    if synced == total && healthy == total && total > 0 {
+        println!();
+    }
+}
+
+/// Print a key-value pair.
+#[allow(dead_code)]
+pub fn print_kv(key: &str, value: &str) {
+    println!("  {} {}", format!("{key}:").bright_black(), value.green());
+}
+
+/// Print a list item.
+#[allow(dead_code)]
+pub fn print_list_item(item: &str) {
+    println!("  {} {item}", "•".bright_black());
+}
+
+/// Print a numbered step.
+#[allow(dead_code)]
+pub fn print_numbered_step(num: usize, message: &str) {
+    println!("  {}. {}", num.to_string().cyan(), message);
 }

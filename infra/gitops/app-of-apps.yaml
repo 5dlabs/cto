@@ -28,7 +28,8 @@ spec:
     # Child apps manage their own resources (ingress, CRDs, etc.) in subdirectories
     directory:
       recurse: false
-      include: "{applications/platform,applications/observability,applications/operators,applications/secrets,applications/workloads,applications/ai-models,projects}/*.yaml"
+      # yamllint disable-line rule:line-length
+      include: "{applications/platform,applications/observability,applications/operators,applications/secrets,applications/storage,applications/workloads,applications/ai-models,projects}/*.yaml"
       exclude: "*.md"
 
   # Destination configuration

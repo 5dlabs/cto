@@ -24,9 +24,10 @@ All operators are selected for compatibility with proprietary distribution. We p
 - **nvidia-gpu-operator.yaml** - GPU provisioning and management - Apache 2.0
 
 ### Storage
-- **longhorn.yaml** - Distributed block storage - Apache 2.0
 - **seaweedfs-operator.yaml** - S3-compatible object storage - Apache 2.0
 - **minio-operator.yaml** - S3-compatible object storage - ⚠️ AGPL v3
+
+> **Note**: Block storage (Mayastor) is in `applications/storage/` directory.
 
 ### Databases
 - **cloudnative-pg-operator.yaml** - PostgreSQL - Apache 2.0
@@ -69,7 +70,7 @@ Before adding a new operator:
 
 Operators use ArgoCD sync waves for dependency management:
 
-- Wave `-4`: Storage (Longhorn)
+- Wave `-10`: Storage (Mayastor - in `applications/storage/`)
 - Wave `-3`: GPU Operator
 - Wave `-2`: Core operators (OpenTelemetry, cert-manager deps)
 - Wave `-1`: Observability (Jaeger)

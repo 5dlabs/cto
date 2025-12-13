@@ -597,11 +597,15 @@ pub fn get_argocd_password(kubeconfig: &Path) -> Result<String> {
     Ok(output.trim().to_string())
 }
 
-/// Deploy Cilium CNI with `ClusterMesh` support.
+/// Deploy Cilium CNI with `ClusterMesh` support for Talos Linux.
 ///
 /// Cilium is installed with kube-proxy replacement, `WireGuard` encryption,
 /// and Hubble observability. Each cluster needs a unique `cluster_name` and
 /// `cluster_id` (1-255) for `ClusterMesh` connectivity.
+///
+/// **Important**: This uses Talos-specific capability settings that drop
+/// `SYS_MODULE` (which Talos doesn't allow for Kubernetes workloads) and
+/// configures cgroup mounts correctly for Talos.
 ///
 /// # Arguments
 ///
@@ -622,7 +626,7 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
     );
     helm(kubeconfig, &["repo", "update"])?;
 
-    // Install Cilium with ClusterMesh-ready configuration
+    // Install Cilium with ClusterMesh-ready configuration and Talos-specific settings
     let cluster_name_arg = format!("cluster.name={cluster_name}");
     let cluster_id_arg = format!("cluster.id={cluster_id}");
 
@@ -636,7 +640,10 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "--namespace",
             "kube-system",
             "--version",
-            "1.16.4",
+            "1.15.6",
+            // IPAM mode
+            "--set",
+            "ipam.mode=kubernetes",
             // Kube-proxy replacement
             "--set",
             "kubeProxyReplacement=true",
@@ -644,6 +651,16 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "k8sServiceHost=localhost",
             "--set",
             "k8sServicePort=7445", // KubePrism port for Talos
+            // Talos-specific: capabilities (drops SYS_MODULE which Talos blocks)
+            "--set",
+            "securityContext.capabilities.ciliumAgent={CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}",
+            "--set",
+            "securityContext.capabilities.cleanCiliumState={NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}",
+            // Talos-specific: cgroup configuration (Talos pre-mounts these)
+            "--set",
+            "cgroup.autoMount.enabled=false",
+            "--set",
+            "cgroup.hostRoot=/sys/fs/cgroup",
             // Cluster identity for ClusterMesh
             "--set",
             &cluster_name_arg,

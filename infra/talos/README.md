@@ -1,12 +1,13 @@
-# Talos Kubernetes Home Cluster
+Uh,# Talos Kubernetes Home Cluster
 
 This repository contains the configuration for a minimal Talos Kubernetes cluster running on bare metal hardware.
 
 ## Current Cluster Configuration
 
 - **Control Plane**: Intel Mac Mini at `192.168.1.77`
-- **Worker Node**: Dell system with NVME storage at `192.168.1.72`
-- **CNI**: Flannel (simple and reliable)
+- **Worker Node 1**: Dell system with NVME storage at `192.168.1.72` (x86-64)
+- **Worker Node 2**: MacBook Pro with Apple Silicon (ARM64) - uses USB Ethernet adapter
+- **CNI**: Cilium
 - **Ingress**: NGINX Ingress Controller with NodePort
 - **Storage**: Local Path Provisioner with 100GB NVME volume
 
@@ -35,7 +36,8 @@ This repository contains the configuration for a minimal Talos Kubernetes cluste
 talos-home/
 ├── config/simple/           # Current working cluster configuration
 │   ├── controlplane.yaml    # Control plane configuration
-│   ├── worker.yaml          # Worker node configuration
+│   ├── worker.yaml          # Worker node config (x86-64)
+│   ├── worker-arm64.yaml    # Worker node config (ARM64/Apple Silicon)
 │   └── talosconfig          # Talos client configuration
 └── local-path-provisioner/  # Storage provisioner configuration
     ├── kustomization.yaml   # Kustomize deployment configuration
@@ -168,6 +170,52 @@ talos-home/
 
 
    - System will install to NVME and reboot
+
+### Adding ARM64 Worker (Apple Silicon MacBook Pro)
+
+1. **Download ARM64 Talos ISO**:
+   ```bash
+   curl -LO https://github.com/siderolabs/talos/releases/download/v1.10.4/metal-arm64.iso
+   ```
+
+2. **Create bootable USB** (on macOS):
+   ```bash
+   # Find your USB device
+   diskutil list
+   
+   # Unmount the USB (replace diskX with your disk)
+   diskutil unmountDisk /dev/diskX
+   
+   # Write the ISO to USB (replace diskX with your disk)
+   sudo dd if=metal-arm64.iso of=/dev/rdiskX bs=1m status=progress
+   
+   # Eject the USB
+   diskutil eject /dev/diskX
+   ```
+
+3. **Boot MacBook Pro**:
+   - Connect Diamond Gigabit USB Ethernet Adapter
+   - Connect power adapter (required for boot)
+   - Plug in the bootable USB
+   - Hold power button to enter startup options
+   - Select the USB drive to boot from
+
+4. **Note the IP Address**:
+   - The system will boot into Talos maintenance mode
+   - The IP address will be displayed on screen (assigned via DHCP)
+
+5. **Apply Worker Configuration**:
+   ```bash
+   # Replace <IP> with the actual IP address shown on the MacBook
+   talosctl apply-config --insecure --nodes <IP> --file config/simple/worker-arm64.yaml
+   ```
+
+6. **Post-Install**:
+   - Remove USB after configuration is applied
+   - System will install to internal NVME and reboot
+   - The node will automatically join the cluster
+
+**Note**: The `worker-arm64.yaml` config uses a device selector to find the USB Ethernet adapter by driver (ASIX chipset). If your adapter uses a different chipset, check the network interface once booted and adjust accordingly.
 
 7. **Get kubeconfig**:
    ```bash
