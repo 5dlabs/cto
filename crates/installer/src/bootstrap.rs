@@ -43,19 +43,9 @@ impl BootstrapResources {
             include_str!("../../../infra/cluster-config/observability-namespace.yaml"),
         )?;
 
-        // Local path provisioner config for Talos
-        Self::apply_yaml(
-            kubeconfig,
-            "local-path-config",
-            include_str!("../../../infra/cluster-config/local-path-config-patch.yaml"),
-        )?;
-
-        // Talos local path volume
-        Self::apply_yaml(
-            kubeconfig,
-            "talos-local-path-volume",
-            include_str!("../../../infra/cluster-config/talos-local-path-volume.yaml"),
-        )?;
+        // NOTE: local-path-config is now applied directly in deploy_local_path_provisioner()
+        // to ensure it's applied AFTER the provisioner is installed, not before.
+        // See: crates/metal/src/stack.rs
 
         info!("Bootstrap resources applied successfully");
         Ok(())

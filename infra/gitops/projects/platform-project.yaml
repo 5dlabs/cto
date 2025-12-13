@@ -142,6 +142,9 @@ spec:
     # NATS Messaging (service, not operator)
     - namespace: nats
       server: https://kubernetes.default.svc
+    # Mayastor distributed storage
+    - namespace: mayastor
+      server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
   clusterResourceWhitelist:
@@ -246,6 +249,13 @@ spec:
     # Cilium CNI CRDs
     - group: 'cilium.io'
       kind: '*'
+    # Storage resources (StorageClass is cluster-scoped)
+    - group: 'storage.k8s.io'
+      kind: StorageClass
+    - group: 'storage.k8s.io'
+      kind: CSIDriver
+    - group: 'storage.k8s.io'
+      kind: CSINode
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
