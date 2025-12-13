@@ -36,35 +36,35 @@ struct SecretMapping {
 const SECRETS_MAPPING: &[SecretMapping] = &[
     // Cloudflare credentials for external-dns
     SecretMapping {
-        op_path: "op://CTO Platform/Cloudflare API/credential",
+        op_path: "op://Personal/Cloudflare API/credential",
         bao_path: "secret/cloudflare",
         bao_key: "api-key",
     },
     SecretMapping {
-        op_path: "op://CTO Platform/Cloudflare API/email",
+        op_path: "op://Personal/Cloudflare API/email",
         bao_path: "secret/cloudflare",
         bao_key: "email",
     },
     // Discord webhook for Alertmanager
     SecretMapping {
-        op_path: "op://CTO Platform/Discord Alertmanager Webhook/url",
+        op_path: "op://Personal/Discord Alertmanager Webhook/url",
         bao_path: "secret/alertmanager-discord",
         bao_key: "webhook-url",
     },
     // GitHub credentials for ArgoCD
     SecretMapping {
-        op_path: "op://CTO Platform/GitHub PAT - ArgoCD/credential",
+        op_path: "op://Personal/GitHub PAT - ArgoCD/credential",
         bao_path: "secret/tools-github",
         bao_key: "password",
     },
     SecretMapping {
-        op_path: "op://CTO Platform/GitHub PAT - ArgoCD/username",
+        op_path: "op://Personal/GitHub PAT - ArgoCD/username",
         bao_path: "secret/tools-github",
         bao_key: "username",
     },
     // GHCR credentials for CTO namespace
     SecretMapping {
-        op_path: "op://CTO Platform/GHCR Pull Secret/credential",
+        op_path: "op://Personal/GHCR Pull Secret/credential",
         bao_path: "secret/ghcr-secret",
         bao_key: ".dockerconfigjson",
     },
@@ -354,7 +354,7 @@ impl<'a> OpenBaoBootstrap<'a> {
             "item",
             "create",
             "--category=password",
-            "--vault=CTO Platform",
+            "--vault=Personal",
         ];
 
         // We need to build owned strings for the dynamic parts
@@ -400,7 +400,7 @@ impl<'a> OpenBaoBootstrap<'a> {
 
         // First, delete the existing item
         let _ = self
-            .op_command(&["item", "delete", title, "--vault=CTO Platform"])
+            .op_command(&["item", "delete", title, "--vault=Personal"])
             .output();
 
         // Then create a new one
@@ -418,7 +418,7 @@ impl<'a> OpenBaoBootstrap<'a> {
                     "item",
                     "get",
                     "OpenBao Unseal Keys - CTO Platform",
-                    "--vault=CTO Platform",
+                    "--vault=Personal",
                     "--fields",
                     &field,
                 ])
@@ -450,7 +450,7 @@ impl<'a> OpenBaoBootstrap<'a> {
                 "item",
                 "get",
                 "OpenBao Unseal Keys - CTO Platform",
-                "--vault=CTO Platform",
+                "--vault=Personal",
                 "--fields",
                 "password",
             ])
