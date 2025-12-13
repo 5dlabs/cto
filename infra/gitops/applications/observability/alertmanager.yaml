@@ -24,7 +24,7 @@ spec:
         # Persistence
         persistence:
           enabled: true
-          storageClass: local-path
+          storageClass: ""  # Use default storage class (Mayastor when configured)
           size: 2Gi
 
         # Resource allocation

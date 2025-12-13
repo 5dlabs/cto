@@ -22,7 +22,7 @@ spec:
         server:
           persistentVolume:
             enabled: true
-            storageClass: local-path
+            storageClass: ""  # Use default storage class (Mayastor when configured)
             size: 50Gi
           # Pod security context
           securityContext:

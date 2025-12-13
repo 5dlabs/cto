@@ -73,7 +73,63 @@ fn kubectl_apply_yaml(kubeconfig: &Path, yaml: &str) -> Result<()> {
     res
 }
 
+/// Talos-specific local-path-provisioner `ConfigMap`.
+///
+/// On Talos Linux, `/opt` is a read-only overlay filesystem.
+/// The only writable persistent storage is under `/var/lib`.
+/// This `ConfigMap` configures local-path-provisioner to use `/var/lib/local-path-provisioner`.
+const TALOS_LOCAL_PATH_CONFIG: &str = r#"---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-path-config
+  namespace: local-path-storage
+data:
+  config.json: |-
+    {
+            "nodePathMap":[
+            {
+                    "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",
+                    "paths":["/var/lib/local-path-provisioner"]
+            }
+            ]
+    }
+  helperPod.yaml: |-
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: helper-pod
+    spec:
+      priorityClassName: system-node-critical
+      tolerations:
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        fsGroup: 0
+        runAsUser: 0
+        runAsGroup: 0
+      containers:
+      - name: helper-pod
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: true
+  setup: |-
+    #!/bin/sh
+    set -eu
+    mkdir -m 0777 -p "$VOL_DIR"
+  teardown: |-
+    #!/bin/sh
+    set -eu
+    rm -rf "$VOL_DIR"
+"#;
+
 /// Deploy local-path-provisioner for bare metal PVC support.
+///
+/// On Talos Linux, this also applies a Talos-specific `ConfigMap` that
+/// configures the provisioner to use `/var/lib/local-path-provisioner`
+/// instead of the default `/opt/local-path-provisioner` (which is read-only on Talos).
 ///
 /// # Errors
 ///
@@ -81,6 +137,7 @@ fn kubectl_apply_yaml(kubeconfig: &Path, yaml: &str) -> Result<()> {
 pub fn deploy_local_path_provisioner(kubeconfig: &Path) -> Result<()> {
     println!("   Deploying local-path-provisioner...");
 
+    // Step 1: Deploy the base local-path-provisioner
     kubectl(
         kubeconfig,
         &[
@@ -90,7 +147,70 @@ pub fn deploy_local_path_provisioner(kubeconfig: &Path) -> Result<()> {
         ],
     )?;
 
-    // Set as default storage class
+    // Step 2: Add Pod Security labels to allow privileged helper pods
+    // The helper pods need hostPath volumes and privileged security context
+    println!("   Adding Pod Security labels to local-path-storage namespace...");
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "label",
+            "namespace",
+            "local-path-storage",
+            "pod-security.kubernetes.io/enforce=privileged",
+            "pod-security.kubernetes.io/enforce-version=latest",
+            "pod-security.kubernetes.io/audit=privileged",
+            "pod-security.kubernetes.io/audit-version=latest",
+            "pod-security.kubernetes.io/warn=privileged",
+            "pod-security.kubernetes.io/warn-version=latest",
+            "--overwrite",
+        ],
+    );
+
+    // Step 3: Wait for the deployment to exist before patching
+    println!("   Waiting for local-path-provisioner deployment...");
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "wait",
+            "--for=condition=available",
+            "deployment/local-path-provisioner",
+            "-n",
+            "local-path-storage",
+            "--timeout=60s",
+        ],
+    );
+
+    // Step 4: Apply Talos-specific ConfigMap (use /var/lib instead of /opt)
+    println!("   Applying Talos-specific local-path config...");
+    kubectl_apply_yaml(kubeconfig, TALOS_LOCAL_PATH_CONFIG)?;
+
+    // Step 4: Restart the provisioner to pick up the new config
+    println!("   Restarting local-path-provisioner to apply config...");
+    kubectl(
+        kubeconfig,
+        &[
+            "rollout",
+            "restart",
+            "deployment/local-path-provisioner",
+            "-n",
+            "local-path-storage",
+        ],
+    )?;
+
+    // Step 5: Wait for restart to complete
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "rollout",
+            "status",
+            "deployment/local-path-provisioner",
+            "-n",
+            "local-path-storage",
+            "--timeout=60s",
+        ],
+    );
+
+    // Step 6: Set as default storage class
     kubectl(
         kubeconfig,
         &[
@@ -102,7 +222,7 @@ pub fn deploy_local_path_provisioner(kubeconfig: &Path) -> Result<()> {
         ],
     )?;
 
-    println!("   ✅ local-path-provisioner deployed");
+    println!("   ✅ local-path-provisioner deployed with Talos config");
     Ok(())
 }
 

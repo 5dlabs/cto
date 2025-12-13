@@ -51,7 +51,7 @@ spec:
           namespace: cto
           imagePullSecrets:
             - name: ghcr-secret
-          storageClass: local-path
+          storageClass: ""  # Use default storage class (Mayastor when configured)
 
         controller:
           enabled: true
