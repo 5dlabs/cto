@@ -587,6 +587,92 @@ impl Installer {
             report.total_count
         ));
 
+        // Apply ClusterIssuer for cert-manager after it's synced
+        // This is needed by Jaeger, QuestDB, and other operators for webhook certs
+        ui::print_info("Applying cert-manager ClusterIssuer for operator webhooks...");
+        self.apply_cluster_issuer(kubeconfig_path).await?;
+
+        Ok(())
+    }
+
+    /// Apply the self-signed ClusterIssuer for cert-manager.
+    ///
+    /// This is required by operators like Jaeger and QuestDB that use cert-manager
+    /// to generate webhook certificates.
+    async fn apply_cluster_issuer(&self, kubeconfig: &Path) -> Result<()> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        const CLUSTER_ISSUER_YAML: &str = r#"---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: issuer
+spec:
+  selfSigned: {}
+"#;
+
+        // Wait for cert-manager CRDs to be available
+        let start = std::time::Instant::now();
+        let crd_timeout = Duration::from_secs(120);
+
+        loop {
+            let output = Command::new("kubectl")
+                .args([
+                    "--kubeconfig",
+                    kubeconfig.to_str().unwrap_or_default(),
+                    "get",
+                    "crd",
+                    "clusterissuers.cert-manager.io",
+                ])
+                .output()
+                .context("Failed to check for cert-manager CRDs")?;
+
+            if output.status.success() {
+                break;
+            }
+
+            if start.elapsed() > crd_timeout {
+                anyhow::bail!("Timeout waiting for cert-manager CRDs to be available");
+            }
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+
+        // Apply the ClusterIssuer
+        let mut child = Command::new("kubectl")
+            .args([
+                "--kubeconfig",
+                kubeconfig.to_str().unwrap_or_default(),
+                "apply",
+                "-f",
+                "-",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .context("Failed to spawn kubectl")?;
+
+        if let Some(ref mut stdin) = child.stdin {
+            stdin
+                .write_all(CLUSTER_ISSUER_YAML.as_bytes())
+                .context("Failed to write ClusterIssuer YAML")?;
+        }
+
+        let output = child
+            .wait_with_output()
+            .context("Failed to wait for kubectl")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("Failed to apply ClusterIssuer: {stderr}");
+        }
+
+        ui::print_success("ClusterIssuer 'selfsigned-issuer' created");
         Ok(())
     }
 
