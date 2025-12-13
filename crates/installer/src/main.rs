@@ -23,9 +23,11 @@ mod kubeconfig;
 mod orchestrator;
 mod state;
 mod ui;
+mod validation;
 mod validator;
 
 use commands::install::InstallCommand;
+use commands::validate::ValidateCommand;
 
 /// CTO Platform - Bare Metal Kubernetes Platform Installer.
 #[derive(Parser)]
@@ -50,12 +52,19 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)] // Install is the primary command, boxing adds indirection
 enum Commands {
     /// Install the CTO platform on bare metal.
     ///
     /// Provisions servers, installs Talos Linux, bootstraps Kubernetes,
     /// and deploys the full platform stack via GitOps.
     Install(InstallCommand),
+
+    /// Validate a cluster with AI-powered health checks.
+    ///
+    /// Runs Claude with full kubectl access to thoroughly test the cluster,
+    /// deploy test workloads, and optionally remediate issues.
+    Validate(ValidateCommand),
 }
 
 #[tokio::main]
@@ -76,5 +85,6 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Install(cmd) => cmd.run().await,
+        Commands::Validate(cmd) => cmd.run().await,
     }
 }
