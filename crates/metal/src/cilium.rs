@@ -235,7 +235,7 @@ pub fn wait_for_cilium_healthy(kubeconfig: &Path) -> Result<()> {
 
         // Check if cilium daemonset has at least one pod ready
         let output = Command::new("kubectl")
-            .env("KUBECONFIG", kubeconfig)
+        .env("KUBECONFIG", kubeconfig)
             .args([
                 "get",
                 "daemonset",
@@ -245,7 +245,7 @@ pub fn wait_for_cilium_healthy(kubeconfig: &Path) -> Result<()> {
                 "-o",
                 "jsonpath={.status.numberReady}",
             ])
-            .output()
+        .output()
             .context("Failed to check cilium daemonset status")?;
 
         if output.status.success() {
@@ -257,7 +257,7 @@ pub fn wait_for_cilium_healthy(kubeconfig: &Path) -> Result<()> {
             if ready_count > 0 {
                 info!("Cilium CNI is functional ({} agent(s) ready)", ready_count);
                 return Ok(());
-            }
+    }
         }
 
         std::thread::sleep(Duration::from_secs(10));
