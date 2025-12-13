@@ -56,9 +56,7 @@ else:
     fi
     
     # Write to OpenBao using JSON input (stdin with -)
-    echo "$DATA_JSON" | kubectl exec -i -n $OPENBAO_NS openbao-0 -- bao kv put "secret/$path" - >/dev/null 2>&1
-    
-    if [ $? -eq 0 ]; then
+    if echo "$DATA_JSON" | kubectl exec -i -n $OPENBAO_NS openbao-0 -- bao kv put "secret/$path" - >/dev/null 2>&1; then
         echo "OK"
     else
         echo "FAILED"

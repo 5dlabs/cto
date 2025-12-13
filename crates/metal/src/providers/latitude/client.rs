@@ -7,9 +7,11 @@ use reqwest::{Client, StatusCode};
 use tracing::{debug, info, warn};
 
 use super::models::{
-    ApiResponse, CreateServerAttributes, CreateServerBody, CreateServerData, PlanResource,
-    RegionResource, ReinstallServerAttributes, ReinstallServerBody, ReinstallServerData,
-    ServerResource,
+    ApiResponse, AssignVirtualNetworkAttributes, AssignVirtualNetworkBody,
+    AssignVirtualNetworkData, CreateServerAttributes, CreateServerBody, CreateServerData,
+    CreateVirtualNetworkAttributes, CreateVirtualNetworkBody, CreateVirtualNetworkData,
+    PlanResource, RegionResource, ReinstallServerAttributes, ReinstallServerBody,
+    ReinstallServerData, ServerResource, VirtualNetworkAssignmentResource, VirtualNetworkResource,
 };
 use crate::providers::traits::{
     CreateServerRequest, Provider, ProviderError, ReinstallIpxeRequest, Server, ServerStatus,
@@ -393,6 +395,158 @@ impl Latitude {
     pub async fn list_regions(&self) -> Result<Vec<RegionResource>, ProviderError> {
         let response: ApiResponse<Vec<RegionResource>> = self.get("/regions").await?;
         Ok(response.data)
+    }
+
+    // ========================================================================
+    // Virtual Network (VLAN) operations
+    // ========================================================================
+
+    /// Create a Virtual Network (VLAN) in a specific site.
+    ///
+    /// VLANs provide private networking between servers in the same location.
+    /// This is essential for secure cluster-internal communication.
+    ///
+    /// # Arguments
+    ///
+    /// * `site` - Site slug (e.g., "MIA2")
+    /// * `description` - Description of the VLAN
+    ///
+    /// # Returns
+    ///
+    /// The created Virtual Network resource with its VLAN ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn create_virtual_network(
+        &self,
+        site: &str,
+        description: &str,
+    ) -> Result<VirtualNetworkResource, ProviderError> {
+        info!(site = %site, description = %description, "Creating Virtual Network");
+
+        let body = CreateVirtualNetworkBody {
+            data: CreateVirtualNetworkData {
+                resource_type: "virtual_networks".to_string(),
+                attributes: CreateVirtualNetworkAttributes {
+                    description: description.to_string(),
+                    project: self.project_id.clone(),
+                    site: site.to_string(),
+                },
+            },
+        };
+
+        let response: ApiResponse<VirtualNetworkResource> =
+            self.post("/virtual_networks", &body).await?;
+
+        info!(
+            vlan_id = %response.data.id,
+            vid = %response.data.attributes.vid,
+            "Virtual Network created"
+        );
+
+        Ok(response.data)
+    }
+
+    /// Get a Virtual Network by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn get_virtual_network(
+        &self,
+        vlan_id: &str,
+    ) -> Result<VirtualNetworkResource, ProviderError> {
+        let response: ApiResponse<VirtualNetworkResource> =
+            self.get(&format!("/virtual_networks/{vlan_id}")).await?;
+        Ok(response.data)
+    }
+
+    /// List all Virtual Networks in the project.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn list_virtual_networks(&self) -> Result<Vec<VirtualNetworkResource>, ProviderError> {
+        let response: ApiResponse<Vec<VirtualNetworkResource>> =
+            self.get("/virtual_networks").await?;
+        Ok(response.data)
+    }
+
+    /// Assign a server to a Virtual Network.
+    ///
+    /// This attaches the server's internal NIC to the VLAN and assigns a
+    /// private IP address. The server will then be able to communicate with
+    /// other servers on the same VLAN using their private IPs.
+    ///
+    /// # Arguments
+    ///
+    /// * `vlan_id` - Virtual Network ID (e.g., "vlan_xxx")
+    /// * `server_id` - Server ID to assign
+    ///
+    /// # Returns
+    ///
+    /// The assignment resource with the private IP.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn assign_server_to_vlan(
+        &self,
+        vlan_id: &str,
+        server_id: &str,
+    ) -> Result<VirtualNetworkAssignmentResource, ProviderError> {
+        info!(vlan_id = %vlan_id, server_id = %server_id, "Assigning server to VLAN");
+
+        let body = AssignVirtualNetworkBody {
+            data: AssignVirtualNetworkData {
+                resource_type: "virtual_network_assignment".to_string(),
+                attributes: AssignVirtualNetworkAttributes {
+                    server_id: server_id.to_string(),
+                },
+            },
+        };
+
+        let response: ApiResponse<VirtualNetworkAssignmentResource> = self
+            .post(&format!("/virtual_networks/{vlan_id}/assignments"), &body)
+            .await?;
+
+        info!(
+            assignment_id = %response.data.id,
+            private_ip = ?response.data.attributes.ip,
+            "Server assigned to VLAN"
+        );
+
+        Ok(response.data)
+    }
+
+    /// List all server assignments for a Virtual Network.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn list_vlan_assignments(
+        &self,
+        vlan_id: &str,
+    ) -> Result<Vec<VirtualNetworkAssignmentResource>, ProviderError> {
+        let response: ApiResponse<Vec<VirtualNetworkAssignmentResource>> = self
+            .get(&format!("/virtual_networks/{vlan_id}/assignments"))
+            .await?;
+        Ok(response.data)
+    }
+
+    /// Delete a Virtual Network.
+    ///
+    /// Note: All server assignments must be removed first.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn delete_virtual_network(&self, vlan_id: &str) -> Result<(), ProviderError> {
+        info!(vlan_id = %vlan_id, "Deleting Virtual Network");
+        self.delete(&format!("/virtual_networks/{vlan_id}")).await?;
+        info!(vlan_id = %vlan_id, "Virtual Network deleted");
+        Ok(())
     }
 }
 
