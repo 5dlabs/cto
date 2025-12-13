@@ -378,3 +378,113 @@ pub struct RegionCountry {
     /// Country slug.
     pub slug: Option<String>,
 }
+
+// ============================================================================
+// Virtual Network (VLAN) types
+// ============================================================================
+
+/// Virtual Network resource from API.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VirtualNetworkResource {
+    /// Virtual Network ID (e.g., "vlan_xxx").
+    pub id: String,
+    /// Resource type (always "virtual_networks").
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    /// Virtual Network attributes.
+    pub attributes: VirtualNetworkAttributes,
+}
+
+/// Virtual Network attributes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VirtualNetworkAttributes {
+    /// VLAN ID (802.1Q tag).
+    pub vid: u16,
+    /// VLAN name (auto-generated, e.g., "MIA2-2063").
+    pub name: Option<String>,
+    /// User-provided description.
+    pub description: Option<String>,
+    /// Site slug where the VLAN exists.
+    pub site: Option<String>,
+    /// Creation timestamp.
+    pub created_at: Option<String>,
+    /// Number of servers assigned to this VLAN.
+    pub assignments_count: Option<u32>,
+}
+
+/// Request body for creating a Virtual Network.
+#[derive(Debug, Serialize)]
+pub struct CreateVirtualNetworkBody {
+    /// Request data.
+    pub data: CreateVirtualNetworkData,
+}
+
+/// Create Virtual Network data wrapper.
+#[derive(Debug, Serialize)]
+pub struct CreateVirtualNetworkData {
+    /// Resource type.
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    /// Virtual Network attributes.
+    pub attributes: CreateVirtualNetworkAttributes,
+}
+
+/// Attributes for creating a Virtual Network.
+#[derive(Debug, Serialize)]
+pub struct CreateVirtualNetworkAttributes {
+    /// Description of the VLAN.
+    pub description: String,
+    /// Project ID to associate with.
+    pub project: String,
+    /// Site slug (e.g., "MIA2").
+    pub site: String,
+}
+
+/// Virtual Network assignment resource.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VirtualNetworkAssignmentResource {
+    /// Assignment ID.
+    pub id: String,
+    /// Resource type.
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    /// Assignment attributes.
+    pub attributes: VirtualNetworkAssignmentAttributes,
+}
+
+/// Virtual Network assignment attributes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VirtualNetworkAssignmentAttributes {
+    /// Server ID assigned to the VLAN.
+    pub server_id: Option<String>,
+    /// VLAN ID.
+    pub vid: Option<u16>,
+    /// Private IP assigned on this VLAN.
+    pub ip: Option<String>,
+    /// Status of the assignment.
+    pub status: Option<String>,
+}
+
+/// Request body for assigning a server to a Virtual Network.
+#[derive(Debug, Serialize)]
+pub struct AssignVirtualNetworkBody {
+    /// Request data.
+    pub data: AssignVirtualNetworkData,
+}
+
+/// Assign Virtual Network data wrapper.
+#[derive(Debug, Serialize)]
+pub struct AssignVirtualNetworkData {
+    /// Resource type.
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    /// Assignment attributes.
+    pub attributes: AssignVirtualNetworkAttributes,
+}
+
+/// Attributes for assigning a server to a Virtual Network.
+#[derive(Debug, Serialize)]
+pub struct AssignVirtualNetworkAttributes {
+    /// Server ID to assign.
+    pub server_id: String,
+}

@@ -36,7 +36,6 @@ OP_VAULT=""
 OP_TITLE=""
 KEY_SHARES=5
 KEY_THRESHOLD=3
-DEV_MODE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -66,7 +65,6 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --dev)
-            DEV_MODE=true
             KEY_SHARES=1
             KEY_THRESHOLD=1
             shift
@@ -183,7 +181,6 @@ store_in_1password() {
     
     # Extract values
     ROOT_TOKEN=$(echo "$init_output" | jq -r '.root_token')
-    UNSEAL_KEYS=$(echo "$init_output" | jq -r '.unseal_keys_b64 | join("\n")')
     KEY_COUNT=$(echo "$init_output" | jq -r '.unseal_keys_b64 | length')
     
     # Build the 1Password item
@@ -191,7 +188,7 @@ store_in_1password() {
     local key_fields=""
     for i in $(seq 1 "$KEY_COUNT"); do
         KEY=$(echo "$init_output" | jq -r ".unseal_keys_b64[$((i-1))]")
-        key_fields="$key_fields 'Unseal Key $i[password]=$KEY'"
+        key_fields="$key_fields 'Unseal Key ${i}[password]=$KEY'"
     done
     
     # Check if item already exists
@@ -201,6 +198,7 @@ store_in_1password() {
     fi
     
     # Create the item
+    # shellcheck disable=SC2086
     eval op item create \
         --category=login \
         --title="\"$OP_TITLE\"" \

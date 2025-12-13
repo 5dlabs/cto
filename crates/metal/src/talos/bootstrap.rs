@@ -160,6 +160,53 @@ impl BootstrapConfig {
     pub fn with_mayastor_ready(self) -> Self {
         self.with_cilium_cni().with_hugepages()
     }
+
+    /// Configure kubelet and etcd to use a specific private subnet.
+    ///
+    /// This is critical for multi-homed bare metal servers that have both
+    /// public and private IP addresses. Without this configuration, Talos
+    /// may use the public IP as the node's internal IP, which breaks
+    /// Cilium VXLAN tunneling between nodes.
+    ///
+    /// # Arguments
+    ///
+    /// * `subnet` - The private subnet CIDR (e.g., "10.0.0.0/8", "192.168.0.0/16")
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use metal::talos::BootstrapConfig;
+    ///
+    /// let config = BootstrapConfig::new("cluster", "10.4.0.1")
+    ///     .with_private_network("10.0.0.0/8")
+    ///     .with_cilium_cni();
+    /// ```
+    #[must_use]
+    pub fn with_private_network(self, subnet: &str) -> Self {
+        // Configure kubelet to use the private IP and etcd to advertise on private network
+        let patch = format!(
+            r#"machine:
+  kubelet:
+    nodeIP:
+      validSubnets:
+        - {subnet}
+cluster:
+  etcd:
+    advertisedSubnets:
+      - {subnet}
+"#
+        );
+        self.with_config_patch(patch)
+    }
+
+    /// Configure kubelet and etcd to use the 10.0.0.0/8 private subnet.
+    ///
+    /// This is a convenience method for the common case where Latitude.sh
+    /// or similar providers assign private IPs from the 10.x.x.x range.
+    #[must_use]
+    pub fn with_private_network_10(self) -> Self {
+        self.with_private_network("10.0.0.0/8")
+    }
 }
 
 /// Wait for Talos to be reachable in maintenance mode.

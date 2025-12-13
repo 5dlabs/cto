@@ -123,12 +123,52 @@ kubectl delete secret <name> -n <namespace>
 | `secret/api-keys` | `cto-secrets` | `cto` |
 | `secret/linear-sync` | `linear-secrets` | `cto` |
 | `secret/research-twitter` | `research-twitter-secrets` | `cto` |
+| `secret/research-digest` | `research-digest-secrets` | `cto` |
 | `secret/tools-github` | `tools-github-secrets` | `cto` |
 | `secret/tools-firecrawl` | `tools-firecrawl-secrets` | `cto` |
 | `secret/tools-kubernetes` | `tools-kubernetes-secrets` | `cto` |
 | `secret/github-app-morgan` | `github-app-5dlabs-morgan` | `cto` |
 | `secret/cloudflare` | `cloudflare-api-credentials` | `infra` |
 | `secret/seaweedfs-s3-credentials` | `seaweedfs-s3-credentials` | `cto` |
+
+## Research Pipeline Secrets
+
+The research pipeline requires two secrets for full functionality:
+
+### research-twitter-secrets
+
+Twitter/X authentication cookies for bookmark polling. Store in OpenBao at `secret/research-twitter`:
+
+```bash
+kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
+  bao kv put secret/research-twitter \
+    TWITTER_AUTH_TOKEN="your-auth-token-from-twitter-cookies" \
+    TWITTER_CT0="your-ct0-token-from-twitter-cookies"
+```
+
+To get these tokens:
+1. Log into Twitter/X in your browser
+2. Open DevTools → Application → Cookies
+3. Copy `auth_token` and `ct0` values
+
+### research-digest-secrets
+
+Gmail SMTP credentials for sending email digests. Store in OpenBao at `secret/research-digest`:
+
+```bash
+kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
+  bao kv put secret/research-digest \
+    GMAIL_USERNAME="your-email@gmail.com" \
+    GMAIL_APP_PASSWORD="your-gmail-app-password" \
+    DIGEST_TO_EMAIL="recipient@email.com" \
+    DIGEST_BURST_THRESHOLD="10" \
+    DIGEST_MIN_ENTRIES="3"
+```
+
+To get a Gmail App Password:
+1. Go to [Google Account Security](https://myaccount.google.com/security)
+2. Enable 2-Step Verification if not already enabled
+3. Go to App Passwords → Generate new app password for "Mail"
 
 ## ArgoCD Repository Credentials
 
