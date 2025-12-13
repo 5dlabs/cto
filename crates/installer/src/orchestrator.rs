@@ -192,6 +192,11 @@ impl Installer {
             InstallStep::Bootstrapping => {
                 self.bootstrap_cluster().await?;
             }
+            // Cilium must be deployed before WaitingKubernetes because nodes
+            // can't be Ready without CNI
+            InstallStep::DeployingCilium => {
+                self.deploy_cilium().await?;
+            }
             InstallStep::WaitingKubernetes => {
                 self.wait_kubernetes().await?;
             }
@@ -203,9 +208,6 @@ impl Installer {
             }
 
             // Platform stack steps
-            InstallStep::DeployingCilium => {
-                self.deploy_cilium().await?;
-            }
             InstallStep::DeployingBootstrapResources => {
                 self.deploy_bootstrap_resources().await?;
             }
@@ -379,8 +381,19 @@ impl Installer {
             .context("Control plane not found in state")?;
 
         let talosconfig = self.state.config.talosconfig_path();
+        let kubeconfig_path = self.state.config.kubeconfig_path();
 
         metal::talos::bootstrap_cluster(&cp.ip, &talosconfig)?;
+
+        // Wait briefly for K8s API to become available
+        ui::print_info("Waiting for Kubernetes API to be available...");
+        let timeout = Duration::from_secs(300); // 5 minutes
+        metal::talos::wait_for_kubernetes(&cp.ip, &talosconfig, timeout)?;
+
+        // Get kubeconfig (needed for Cilium deployment)
+        ui::print_info("Getting kubeconfig...");
+        metal::talos::get_kubeconfig(&cp.ip, &talosconfig, &kubeconfig_path)?;
+        self.state.set_kubeconfig(kubeconfig_path)?;
 
         Ok(())
     }
@@ -392,17 +405,19 @@ impl Installer {
             .as_ref()
             .context("Control plane not found in state")?;
 
-        let talosconfig = self.state.config.talosconfig_path();
-        let kubeconfig_path = self.state.config.kubeconfig_path();
-        let timeout = Duration::from_secs(600); // 10 minutes
+        let kubeconfig_path = self
+            .state
+            .kubeconfig_path
+            .as_ref()
+            .context("Kubeconfig not found in state")?;
 
-        // Wait for K8s API
-        metal::talos::wait_for_kubernetes(&cp.ip, &talosconfig, timeout)?;
+        // Now that Cilium is deployed, wait for all nodes to be Ready
+        ui::print_info("Waiting for all nodes to be Ready (CNI is now deployed)...");
 
-        // Get kubeconfig
-        metal::talos::get_kubeconfig(&cp.ip, &talosconfig, &kubeconfig_path)?;
-
-        self.state.set_kubeconfig(kubeconfig_path)?;
+        // Use kubectl to check node status instead of talosctl health
+        // because talosctl health is too strict (requires all nodes ready)
+        let timeout = Duration::from_secs(300); // 5 minutes
+        wait_for_node_ready_kubectl(kubeconfig_path, &cp.hostname, timeout).await?;
 
         Ok(())
     }
@@ -798,6 +813,46 @@ async fn wait_for_deployment(
 
         if output.status.success() {
             return Ok(());
+        }
+
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    }
+}
+
+/// Wait for a specific node to be Ready using kubectl.
+async fn wait_for_node_ready_kubectl(
+    kubeconfig: &Path,
+    node_name: &str,
+    timeout: Duration,
+) -> Result<()> {
+    use std::process::Command;
+    use std::time::Instant;
+
+    let start = Instant::now();
+
+    loop {
+        if start.elapsed() > timeout {
+            anyhow::bail!("Timeout waiting for node {node_name} to be Ready");
+        }
+
+        let output = Command::new("kubectl")
+            .args([
+                "--kubeconfig",
+                kubeconfig.to_str().unwrap_or_default(),
+                "get",
+                "node",
+                node_name,
+                "-o",
+                "jsonpath={.status.conditions[?(@.type=='Ready')].status}",
+            ])
+            .output()
+            .context("Failed to run kubectl get node")?;
+
+        if output.status.success() {
+            let status = String::from_utf8_lossy(&output.stdout);
+            if status.trim() == "True" {
+                return Ok(());
+            }
         }
 
         tokio::time::sleep(Duration::from_secs(10)).await;
