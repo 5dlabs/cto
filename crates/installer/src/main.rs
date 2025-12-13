@@ -20,6 +20,7 @@ mod commands;
 mod config;
 mod gitops;
 mod kubeconfig;
+mod openbao;
 mod orchestrator;
 mod state;
 mod ui;

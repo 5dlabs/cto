@@ -292,7 +292,10 @@ impl BareMetalOrchestrator {
                 .wait_ready(worker_id, timeout_secs)
                 .await
                 .with_context(|| {
-                    format!("Worker {} did not come back online after Talos reinstall", i + 1)
+                    format!(
+                        "Worker {} did not come back online after Talos reinstall",
+                        i + 1
+                    )
                 })?;
             ui::print_success(&format!("  ✓ Worker {} is online (status: on)", i + 1));
         }
