@@ -360,7 +360,7 @@ impl Installer {
         // Allocate private IPs for all servers
         let cp_id = self.state.control_plane.as_ref().map(|cp| cp.id.clone());
         if let Some(cp_id) = cp_id {
-            let private_ip = self.state.allocate_next_private_ip();
+            let private_ip = self.state.allocate_next_private_ip()?;
             ui::print_info(&format!(
                 "Allocated private IP {private_ip} for control plane"
             ));
@@ -369,7 +369,7 @@ impl Installer {
 
         let worker_ids: Vec<_> = self.state.workers.iter().map(|w| w.id.clone()).collect();
         for (i, worker_id) in worker_ids.iter().enumerate() {
-            let private_ip = self.state.allocate_next_private_ip();
+            let private_ip = self.state.allocate_next_private_ip()?;
             ui::print_info(&format!("Allocated private IP {private_ip} for worker {i}"));
             self.state.set_private_ip(worker_id, private_ip)?;
         }

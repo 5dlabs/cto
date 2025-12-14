@@ -61,7 +61,11 @@ spec:
               set -e
               echo "=== BuildKit Benchmark (tmpfs=${use_tmpfs}) ==="
               
-              WORK_DIR="${use_tmpfs:+/workspace}${use_tmpfs:-/var/lib/buildkit/benchmark}"
+              if [ "${use_tmpfs}" = "true" ]; then
+                WORK_DIR="/workspace"
+              else
+                WORK_DIR="/var/lib/buildkit/benchmark"
+              fi
               mkdir -p "\$WORK_DIR"
               cd "\$WORK_DIR"
               

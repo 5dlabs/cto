@@ -476,20 +476,61 @@ impl InstallState {
     /// Allocate the next private IP from the VLAN subnet.
     ///
     /// Returns IPs in sequence: 10.8.0.1, 10.8.0.2, etc.
-    #[must_use]
-    pub fn allocate_next_private_ip(&self) -> String {
-        let base = self
-            .config
-            .vlan_subnet
+    /// Validates that the host number stays within valid range (1-254).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The subnet format is invalid
+    /// - The subnet is exhausted (>254 hosts for a /24)
+    pub fn allocate_next_private_ip(&self) -> Result<String> {
+        let subnet = &self.config.vlan_subnet;
+        let base = subnet.split('/').next().unwrap_or("10.8.0.0");
+
+        // Parse CIDR prefix to determine available hosts
+        let prefix_len: u8 = subnet
             .split('/')
-            .next()
-            .unwrap_or("10.8.0.0");
+            .nth(1)
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(24);
+
+        // Calculate max hosts for this subnet (2^(32-prefix) - 2 for network/broadcast)
+        // For /24: 254, /25: 126, /26: 62, etc.
+        let max_hosts = if prefix_len >= 31 {
+            // /31 and /32 are special cases (point-to-point or single host)
+            anyhow::bail!("Subnet /{prefix_len} too small for cluster networking");
+        } else {
+            (1u32 << (32 - prefix_len)) - 2
+        };
+
+        let next_host = self.private_ips.len() + 1;
+
+        if next_host > max_hosts as usize {
+            anyhow::bail!(
+                "VLAN subnet {} exhausted: cannot allocate host {} (max {} hosts)",
+                subnet,
+                next_host,
+                max_hosts
+            );
+        }
+
+        // For simplicity, we allocate sequentially in the last octet
+        // This works correctly for /24 and smaller subnets
+        if next_host > 254 {
+            anyhow::bail!(
+                "Host number {} exceeds single-octet limit (254). Use a larger subnet.",
+                next_host
+            );
+        }
+
         let parts: Vec<&str> = base.split('.').collect();
         if parts.len() == 4 {
-            let next_host = self.private_ips.len() + 1;
-            format!("{}.{}.{}.{}", parts[0], parts[1], parts[2], next_host)
+            Ok(format!(
+                "{}.{}.{}.{}",
+                parts[0], parts[1], parts[2], next_host
+            ))
         } else {
-            format!("10.8.0.{}", self.private_ips.len() + 1)
+            Ok(format!("10.8.0.{next_host}"))
         }
     }
 }
