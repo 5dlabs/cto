@@ -60,11 +60,14 @@ spec:
         loki:
           enabled: false
 
-        # Reduce NATS replicas for 2-worker setup
+        # HOME LAB ONLY: Reduce NATS replicas for 2-worker setup
+        # For provider environments with 3+ workers, set cluster.replicas: 3
         nats:
-          replicaCount: 2
+          cluster:
+            replicas: 2
 
-        # Reduce MinIO replicas for 2-worker setup
+        # HOME LAB ONLY: Reduce MinIO replicas for 2-worker setup
+        # For provider environments with 3+ workers, set replicas: 3
         minio:
           replicas: 2
 
