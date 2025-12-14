@@ -475,10 +475,11 @@ impl InstallState {
 
     /// Allocate the next private IP from the VLAN subnet.
     ///
-    /// Returns IPs in sequence based on subnet size:
-    /// - /24: 10.8.0.1, 10.8.0.2, ..., 10.8.0.254
-    /// - /23: 10.8.0.1, ..., 10.8.0.254, 10.8.1.1, ..., 10.8.1.254 (510 hosts)
-    /// - /16: 10.8.0.1, ..., 10.8.255.254 (65534 hosts)
+    /// Returns IPs in sequence, skipping network (.0) and broadcast (.255) addresses
+    /// within each /24 block:
+    /// - /24: 10.8.0.1, 10.8.0.2, ..., 10.8.0.254 (254 hosts)
+    /// - /23: 10.8.0.1, ..., 10.8.0.254, 10.8.1.1, ..., 10.8.1.254 (508 hosts)
+    /// - /16: 10.8.0.1, ..., 10.8.0.254, 10.8.1.1, ..., 10.8.255.254 (65024 hosts)
     ///
     /// # Errors
     ///
@@ -496,20 +497,26 @@ impl InstallState {
             .and_then(|p| p.parse().ok())
             .unwrap_or(24);
 
-        // Calculate max hosts for this subnet (2^(32-prefix) - 2 for network/broadcast)
-        // For /24: 254, /25: 126, /26: 62, /23: 510, /16: 65534
+        // Calculate max usable hosts, accounting for .0 and .255 in each /24 block
+        // Each /24 block has 254 usable hosts (1-254), skipping 0 (network) and 255 (broadcast)
         let max_hosts = if prefix_len >= 31 {
             // /31 and /32 are special cases (point-to-point or single host)
             anyhow::bail!("Subnet /{prefix_len} too small for cluster networking");
-        } else {
+        } else if prefix_len >= 24 {
+            // Single /24 or smaller: 2^(32-prefix) - 2
             (1u32 << (32 - prefix_len)) - 2
+        } else {
+            // Multiple /24 blocks: 254 hosts per /24 block
+            let num_slash24_blocks = 1u32 << (24 - prefix_len);
+            num_slash24_blocks * 254
         };
 
-        let next_host = self.private_ips.len() + 1;
+        let allocation_index = self.private_ips.len();
 
-        if next_host > max_hosts as usize {
+        if allocation_index >= max_hosts as usize {
             anyhow::bail!(
-                "VLAN subnet {subnet} exhausted: cannot allocate host {next_host} (max {max_hosts} hosts)"
+                "VLAN subnet {subnet} exhausted: cannot allocate host {} (max {max_hosts} hosts)",
+                allocation_index + 1
             );
         }
 
@@ -525,20 +532,25 @@ impl InstallState {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| anyhow::anyhow!("Invalid subnet base address: {base}"))?;
 
-        // Calculate the IP by adding host number to the network address
-        // For sequential allocation, host 1 = .0.1, host 255 = .1.1, etc.
-        // We skip .0 addresses (network) and .255 addresses (broadcast within /24 blocks)
-        let host_num = u32::try_from(next_host)
-            .map_err(|_| anyhow::anyhow!("Host number {next_host} too large for IPv4"))?;
-
-        // Convert base to u32, add host offset, convert back
+        // Convert base to u32
         let base_ip = u32::from(octets[0]) << 24
             | u32::from(octets[1]) << 16
             | u32::from(octets[2]) << 8
             | u32::from(octets[3]);
 
-        // Add host number to get the final IP
-        let result_ip = base_ip + host_num;
+        // Calculate the IP by mapping allocation index to valid host addresses
+        // Each /24 block has 254 usable addresses (1-254), skipping .0 and .255
+        let allocation_u32 = u32::try_from(allocation_index)
+            .map_err(|_| anyhow::anyhow!("Allocation index {allocation_index} too large"))?;
+
+        // Which /24 block and which host within that block?
+        let block_index = allocation_u32 / 254; // Which /24 block (0, 1, 2, ...)
+        let host_in_block = allocation_u32 % 254; // Host within block (0-253 -> 1-254)
+
+        // Calculate offset from base: (block * 256) + (host + 1)
+        // block * 256 moves to the next /24, host + 1 skips the .0 address
+        let offset = block_index * 256 + host_in_block + 1;
+        let result_ip = base_ip + offset;
 
         // Convert back to octets
         let o1 = ((result_ip >> 24) & 0xFF) as u8;
@@ -645,5 +657,117 @@ mod tests {
         assert!(config.should_retry(9));
         assert!(!config.should_retry(10));
         assert!(!config.should_retry(100));
+    }
+
+    /// Helper to create a minimal state for testing IP allocation.
+    fn create_test_state_with_subnet(subnet: &str) -> InstallState {
+        use crate::config::{BareMetalProvider, InstallConfig, InstallProfile};
+
+        let config = InstallConfig {
+            cluster_name: "test".into(),
+            provider: BareMetalProvider::Latitude,
+            region: "MIA2".into(),
+            auto_region: false,
+            fallback_regions: vec![],
+            cp_plan: "test".into(),
+            worker_plan: "test".into(),
+            node_count: 3,
+            ssh_keys: vec![],
+            talos_version: "v1.0.0".into(),
+            install_disk: "/dev/sda".into(),
+            storage_disk: None,
+            storage_replicas: 2,
+            output_dir: PathBuf::from("/tmp/test"),
+            gitops_repo: "test".into(),
+            gitops_branch: "main".into(),
+            sync_timeout_minutes: 30,
+            profile: InstallProfile::default(),
+            enable_vlan: true,
+            vlan_subnet: subnet.into(),
+            vlan_parent_interface: "eth1".into(),
+            enable_firewall: true,
+        };
+
+        InstallState {
+            config,
+            step: InstallStep::NotStarted,
+            selected_region: None,
+            control_plane: None,
+            workers: vec![],
+            kubeconfig_path: None,
+            argocd_password: None,
+            updated_at: String::new(),
+            attempt_count: 0,
+            last_error: None,
+            vlan_id: None,
+            vlan_vid: None,
+            private_ips: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_allocate_private_ip_slash24_sequential() {
+        let mut state = create_test_state_with_subnet("10.8.0.0/24");
+
+        // First 3 allocations should be .1, .2, .3
+        let ip1 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip1, "10.8.0.1");
+        state.private_ips.insert("server1".into(), ip1);
+
+        let ip2 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip2, "10.8.0.2");
+        state.private_ips.insert("server2".into(), ip2);
+
+        let ip3 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip3, "10.8.0.3");
+        state.private_ips.insert("server3".into(), ip3);
+    }
+
+    #[test]
+    fn test_allocate_private_ip_skips_broadcast() {
+        let mut state = create_test_state_with_subnet("10.8.0.0/24");
+
+        // Pre-fill 253 IPs (indices 0-252 -> addresses .1-.253)
+        for i in 0..253 {
+            state
+                .private_ips
+                .insert(format!("server{i}"), format!("10.8.0.{}", i + 1));
+        }
+
+        // Next allocation (index 253) should be .254, NOT .255 (broadcast)
+        let ip254 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip254, "10.8.0.254");
+        state.private_ips.insert("server253".into(), ip254);
+
+        // Subnet should now be exhausted (254 hosts max in /24)
+        let result = state.allocate_next_private_ip();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("exhausted"));
+    }
+
+    #[test]
+    fn test_allocate_private_ip_slash23_wraps_blocks() {
+        let mut state = create_test_state_with_subnet("10.8.0.0/23");
+
+        // Pre-fill first /24 block (254 hosts: .0.1 through .0.254)
+        for i in 0..254 {
+            state
+                .private_ips
+                .insert(format!("server{i}"), format!("10.8.0.{}", i + 1));
+        }
+
+        // Next allocation should wrap to .1.1, skipping .0.255 (broadcast) and .1.0 (network)
+        let ip = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip, "10.8.1.1");
+    }
+
+    #[test]
+    fn test_allocate_private_ip_small_subnet_error() {
+        let state = create_test_state_with_subnet("10.8.0.0/31");
+
+        // /31 should fail as too small
+        let result = state.allocate_next_private_ip();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too small"));
     }
 }
