@@ -1135,6 +1135,64 @@ The platform includes built-in MCP tools for project management, workflow orches
 | **`cto-metal`** | Bare-metal provisioning CLI for Talos Linux clusters on any provider |
 | **`cto-installer`** | Platform installation and validation tool |
 
+### **🔧 Integrated MCP Servers**
+
+The platform includes pre-configured MCP servers proxied through the tools service:
+
+| Server | Description | Transport |
+|--------|-------------|-----------|
+| **Brave Search** | Web search using Brave Search API | stdio |
+| **OpenMemory** | Long-term memory system for AI agents | HTTP |
+| **Context7** | Up-to-date library documentation and code examples | stdio |
+| **Docker** | Docker container management | stdio |
+| **Kubernetes** | Kubernetes cluster management with Helm support | stdio |
+| **GitHub** | GitHub API operations for repos, issues, PRs, and code scanning | stdio |
+| **shadcn/ui** | shadcn/ui component library with source code and demos | stdio |
+| **AI Elements** | AI-native UI component library | HTTP |
+| **Rust Tools** | Rust analyzer integration (local, runs in agent containers) | stdio |
+
+### **📚 Available Tool Categories**
+
+#### **Context7** — Library Documentation
+- `resolve_library_id` — Find library IDs for documentation lookup
+- `get_library_docs` — Get up-to-date docs and code examples
+
+#### **Kubernetes** — Cluster Management
+- **Pods**: `pods_log`, `pods_exec`, `pods_list`, `pods_get`
+- **Resources**: `listResources`, `getResource`, `describeResource`, `createResource`
+- **Monitoring**: `getEvents`, `getPodsLogs`, `getPodMetrics`, `getNodeMetrics`, `getAPIResources`
+- **Helm**: `helmList`, `helmGet`, `helmHistory`, `helmInstall`, `helmUpgrade`, `helmRollback`, `helmUninstall`, `helmRepoAdd`, `helmRepoList`
+
+#### **ArgoCD** — GitOps Management
+- `get_application` — Get application details and status
+- `sync_application` — Trigger application sync
+- `get_application_workload_logs` — View workload logs
+- `get_application_events` — View application events
+
+#### **GitHub** — Repository & Code Management
+- **Repositories**: `search_repositories`, `create_repository`, `get_file_contents`
+- **Pull Requests**: `create_pull_request`, `get_pull_request`, `update_pull_request`, `list_pull_requests`, `merge_pull_request`, `get_pull_request_status`, `get_pull_request_files`, `get_pull_request_comments`, `add_pull_request_review_comment`, `create_pull_request_review`
+- **Issues**: `search_issues`, `create_issue`, `get_issue`, `list_issues`, `update_issue`, `add_issue_comment`
+- **Code**: `push_files`, `create_or_update_file`, `create_branch`, `list_commits`, `search_code`
+- **Security**: `list_code_scanning_alerts`, `get_code_scanning_alert`, `list_secret_scanning_alerts`, `get_secret_scanning_alert`
+
+#### **OpenMemory** — Agent Memory
+- `openmemory_query` — Search memories by context
+- `openmemory_store` — Store new memories
+- `openmemory_list` — List all memories
+- `openmemory_reinforce` — Strengthen memory associations
+- `openmemory_get` — Retrieve specific memories
+
+#### **Brave Search** — Web Search
+- `brave_web_search` — Search the web with Brave Search API
+
+#### **shadcn/ui** — Component Library
+- `list_components` — List available shadcn/ui components
+- `get_component` — Get component source code and demos
+
+#### **AI Elements** — UI Components
+- `get_ai_elements_components` — Browse AI-native UI components
+
 ### Detailed Tool Reference
 
 ### 1. **`intake()` - Unified Project Intake** ⭐ NEW
