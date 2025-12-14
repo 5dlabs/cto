@@ -434,8 +434,10 @@ impl Installer {
                 "Adding firewall config: cluster_subnet={cluster_subnet}"
             ));
 
-            // Apply control plane firewall rules (most permissive - includes etcd/K8s API)
-            config = config.with_ingress_firewall(&cluster_subnet, true, &[&cp_private_ip]);
+            // Apply firewall rules:
+            // - Common rules (kubelet, apid, trustd, cilium) → all nodes
+            // - Control plane rules (K8s API, etcd) → only controlplane.yaml
+            config = config.with_ingress_firewall(&cluster_subnet, &[&cp_private_ip]);
         }
 
         // Generate secrets

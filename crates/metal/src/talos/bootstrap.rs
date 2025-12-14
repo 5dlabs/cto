@@ -32,8 +32,12 @@ pub struct BootstrapConfig {
     pub output_dir: PathBuf,
     /// Talos version string (e.g., "v1.9.0").
     pub talos_version: String,
-    /// Optional config patches (YAML) to apply.
+    /// Config patches (YAML) to apply to ALL nodes.
     pub config_patches: Vec<String>,
+    /// Config patches (YAML) to apply ONLY to control plane nodes.
+    pub config_patches_controlplane: Vec<String>,
+    /// Config patches (YAML) to apply ONLY to worker nodes.
+    pub config_patches_worker: Vec<String>,
 }
 
 impl BootstrapConfig {
@@ -47,6 +51,8 @@ impl BootstrapConfig {
             output_dir: PathBuf::from("/tmp/talos-bootstrap"),
             talos_version: "v1.9.0".to_string(),
             config_patches: Vec::new(),
+            config_patches_controlplane: Vec::new(),
+            config_patches_worker: Vec::new(),
         }
     }
 
@@ -71,10 +77,25 @@ impl BootstrapConfig {
         self
     }
 
-    /// Add a config patch (inline YAML).
+    /// Add a config patch (inline YAML) applied to ALL node types.
     #[must_use]
     pub fn with_config_patch(mut self, patch: impl Into<String>) -> Self {
         self.config_patches.push(patch.into());
+        self
+    }
+
+    /// Add a config patch (inline YAML) applied ONLY to control plane nodes.
+    #[must_use]
+    pub fn with_controlplane_patch(mut self, patch: impl Into<String>) -> Self {
+        self.config_patches_controlplane.push(patch.into());
+        self
+    }
+
+    /// Add a config patch (inline YAML) applied ONLY to worker nodes.
+    #[must_use]
+    #[allow(dead_code)] // Will be used when worker-specific patches are needed
+    pub fn with_worker_patch(mut self, patch: impl Into<String>) -> Self {
+        self.config_patches_worker.push(patch.into());
         self
     }
 
@@ -258,22 +279,29 @@ cluster:
     /// This sets the default ingress policy to `block` and adds rules to allow
     /// only necessary traffic. Much simpler than CNI-level firewalls.
     ///
+    /// # Important
+    ///
+    /// This method generates **separate patches** for common rules (all nodes) and
+    /// control-plane-only rules. This ensures that worker nodes do NOT receive
+    /// firewall rules for K8s API (6443) and etcd (2379-2380) ports, which should
+    /// only be accessible on control plane nodes.
+    ///
     /// # Arguments
     ///
     /// * `cluster_subnet` - CIDR of the cluster's private network (e.g., "10.8.0.0/24")
-    /// * `is_controlplane` - Whether this is a control plane node (adds etcd/API rules)
     /// * `controlplane_ips` - List of control plane node IPs (for etcd peer access)
     ///
     /// # Rules Applied
     ///
-    /// **All nodes:**
+    /// **All nodes (via `--config-patch`):**
     /// - Default: block all ingress
     /// - Allow kubelet (10250/tcp) from cluster subnet
     /// - Allow Talos API (50000/tcp) from anywhere (for talosctl)
     /// - Allow trustd (50001/tcp) from cluster subnet
     /// - Allow Cilium VXLAN (8472/udp) from cluster subnet
+    /// - Allow Cilium health (4240/tcp) from cluster subnet
     ///
-    /// **Control plane only:**
+    /// **Control plane only (via `--config-patch-control-plane`):**
     /// - Allow Kubernetes API (6443/tcp) from anywhere
     /// - Allow etcd (2379-2380/tcp) from control plane IPs
     ///
@@ -286,26 +314,20 @@ cluster:
     /// ```rust
     /// use metal::talos::BootstrapConfig;
     ///
-    /// // Control plane node
-    /// let cp_config = BootstrapConfig::new("cluster", "10.8.0.1")
-    ///     .with_ingress_firewall("10.8.0.0/24", true, &["10.8.0.1"]);
-    ///
-    /// // Worker node
-    /// let worker_config = BootstrapConfig::new("cluster", "10.8.0.2")
-    ///     .with_ingress_firewall("10.8.0.0/24", false, &["10.8.0.1"]);
+    /// // Single call applies correct rules to both controlplane.yaml and worker.yaml
+    /// let config = BootstrapConfig::new("cluster", "10.8.0.1")
+    ///     .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"]);
     /// ```
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn with_ingress_firewall(
-        self,
-        cluster_subnet: &str,
-        is_controlplane: bool,
-        controlplane_ips: &[&str],
-    ) -> Self {
-        let mut rules = String::new();
+    pub fn with_ingress_firewall(self, cluster_subnet: &str, controlplane_ips: &[&str]) -> Self {
+        // ========================================================================
+        // Common rules - applied to ALL nodes (control plane and workers)
+        // ========================================================================
+        let mut common_rules = String::new();
 
         // Default action: block all ingress
-        rules.push_str(
+        common_rules.push_str(
             "---
 apiVersion: v1alpha1
 kind: NetworkDefaultActionConfig
@@ -315,7 +337,7 @@ ingress: block
 
         // Kubelet - from cluster subnet
         let _ = write!(
-            rules,
+            common_rules,
             "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
@@ -330,7 +352,7 @@ ingress:
         );
 
         // Talos API (apid) - from anywhere for talosctl access
-        rules.push_str(
+        common_rules.push_str(
             "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
@@ -347,7 +369,7 @@ ingress:
 
         // Trustd - from cluster subnet
         let _ = write!(
-            rules,
+            common_rules,
             "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
@@ -363,7 +385,7 @@ ingress:
 
         // Cilium VXLAN - from cluster subnet
         let _ = write!(
-            rules,
+            common_rules,
             "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
@@ -379,7 +401,7 @@ ingress:
 
         // Cilium health checks - from cluster subnet
         let _ = write!(
-            rules,
+            common_rules,
             "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
@@ -393,10 +415,14 @@ ingress:
 "
         );
 
-        if is_controlplane {
-            // Kubernetes API - from anywhere
-            rules.push_str(
-                "---
+        // ========================================================================
+        // Control plane only rules - only applied to controlplane.yaml
+        // ========================================================================
+        let mut cp_rules = String::new();
+
+        // Kubernetes API - from anywhere
+        cp_rules.push_str(
+            "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
 name: kubernetes-api-ingress
@@ -408,16 +434,16 @@ ingress:
   - subnet: 0.0.0.0/0
   - subnet: ::/0
 ",
-            );
+        );
 
-            // etcd - from control plane nodes only
-            let mut etcd_subnets = String::new();
-            for ip in controlplane_ips {
-                let _ = writeln!(etcd_subnets, "  - subnet: {ip}/32");
-            }
-            let _ = write!(
-                rules,
-                "---
+        // etcd - from control plane nodes only
+        let mut etcd_subnets = String::new();
+        for ip in controlplane_ips {
+            let _ = writeln!(etcd_subnets, "  - subnet: {ip}/32");
+        }
+        let _ = write!(
+            cp_rules,
+            "---
 apiVersion: v1alpha1
 kind: NetworkRuleConfig
 name: etcd-ingress
@@ -427,10 +453,11 @@ portSelector:
   protocol: tcp
 ingress:
 {etcd_subnets}"
-            );
-        }
+        );
 
-        self.with_config_patch(rules)
+        // Apply common rules to all nodes, control plane rules only to control plane
+        self.with_config_patch(common_rules)
+            .with_controlplane_patch(cp_rules)
     }
 
     /// Configure Talos Ingress Firewall with sensible defaults for CTO platform.
@@ -439,11 +466,10 @@ ingress:
     ///
     /// # Arguments
     ///
-    /// * `is_controlplane` - Whether this is a control plane node
     /// * `controlplane_ip` - IP of the control plane (for etcd rules)
     #[must_use]
-    pub fn with_default_firewall(self, is_controlplane: bool, controlplane_ip: &str) -> Self {
-        self.with_ingress_firewall("10.8.0.0/24", is_controlplane, &[controlplane_ip])
+    pub fn with_default_firewall(self, controlplane_ip: &str) -> Self {
+        self.with_ingress_firewall("10.8.0.0/24", &[controlplane_ip])
     }
 }
 
@@ -566,9 +592,19 @@ pub fn generate_config(config: &BootstrapConfig) -> Result<GeneratedConfigs> {
     .arg(&config.output_dir)
     .args(["--install-disk", &config.install_disk]);
 
-    // Add any config patches
+    // Add config patches (applies to all nodes)
     for patch in &config.config_patches {
         cmd.args(["--config-patch", patch]);
+    }
+
+    // Add control-plane-only patches (applies only to controlplane.yaml)
+    for patch in &config.config_patches_controlplane {
+        cmd.args(["--config-patch-control-plane", patch]);
+    }
+
+    // Add worker-only patches (applies only to worker.yaml)
+    for patch in &config.config_patches_worker {
+        cmd.args(["--config-patch-worker", patch]);
     }
 
     let output = cmd.output().context("Failed to run talosctl gen config")?;
@@ -1046,52 +1082,72 @@ mod tests {
     }
 
     #[test]
-    fn test_ingress_firewall_controlplane() {
-        let config = BootstrapConfig::new("fw-cluster", "10.8.0.1").with_ingress_firewall(
-            "10.8.0.0/24",
-            true,
-            &["10.8.0.1"],
-        );
+    fn test_ingress_firewall_common_rules() {
+        // The new API generates both common and control-plane patches in a single call
+        let config = BootstrapConfig::new("fw-cluster", "10.8.0.1")
+            .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"]);
 
+        // Should have 1 common patch and 1 control-plane-only patch
         assert_eq!(config.config_patches.len(), 1);
-        let patch = &config.config_patches[0];
+        assert_eq!(config.config_patches_controlplane.len(), 1);
 
-        // Check default action
-        assert!(patch.contains("NetworkDefaultActionConfig"));
-        assert!(patch.contains("ingress: block"));
+        let common_patch = &config.config_patches[0];
 
-        // Check common rules
-        assert!(patch.contains("name: kubelet-ingress"));
-        assert!(patch.contains("name: apid-ingress"));
-        assert!(patch.contains("name: trustd-ingress"));
-        assert!(patch.contains("name: cilium-vxlan"));
-        assert!(patch.contains("ports:\n    - 8472"));
+        // Check default action in common rules
+        assert!(common_patch.contains("NetworkDefaultActionConfig"));
+        assert!(common_patch.contains("ingress: block"));
 
-        // Check control plane specific rules
-        assert!(patch.contains("name: kubernetes-api-ingress"));
-        assert!(patch.contains("ports:\n    - 6443"));
-        assert!(patch.contains("name: etcd-ingress"));
-        assert!(patch.contains("ports:\n    - 2379-2380"));
-        assert!(patch.contains("10.8.0.1/32")); // etcd peer
+        // Check common rules (applied to ALL nodes)
+        assert!(common_patch.contains("name: kubelet-ingress"));
+        assert!(common_patch.contains("name: apid-ingress"));
+        assert!(common_patch.contains("name: trustd-ingress"));
+        assert!(common_patch.contains("name: cilium-vxlan"));
+        assert!(common_patch.contains("ports:\n    - 8472"));
+        assert!(common_patch.contains("name: cilium-health"));
+        assert!(common_patch.contains("ports:\n    - 4240"));
+
+        // Common rules should NOT contain control-plane-specific rules
+        assert!(!common_patch.contains("kubernetes-api-ingress"));
+        assert!(!common_patch.contains("etcd-ingress"));
     }
 
     #[test]
-    fn test_ingress_firewall_worker() {
-        let config = BootstrapConfig::new("fw-cluster", "10.8.0.2").with_ingress_firewall(
-            "10.8.0.0/24",
-            false,
-            &["10.8.0.1"],
-        );
+    fn test_ingress_firewall_controlplane_rules() {
+        let config = BootstrapConfig::new("fw-cluster", "10.8.0.1")
+            .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1", "10.8.0.2"]);
 
-        let patch = &config.config_patches[0];
+        let cp_patch = &config.config_patches_controlplane[0];
 
-        // Workers should NOT have K8s API or etcd rules
-        assert!(!patch.contains("kubernetes-api-ingress"));
-        assert!(!patch.contains("etcd-ingress"));
+        // Check control plane specific rules
+        assert!(cp_patch.contains("name: kubernetes-api-ingress"));
+        assert!(cp_patch.contains("ports:\n    - 6443"));
+        assert!(cp_patch.contains("name: etcd-ingress"));
+        assert!(cp_patch.contains("ports:\n    - 2379-2380"));
 
-        // But should have common rules
-        assert!(patch.contains("kubelet-ingress"));
-        assert!(patch.contains("cilium-vxlan"));
+        // etcd rules should include all control plane IPs
+        assert!(cp_patch.contains("10.8.0.1/32"));
+        assert!(cp_patch.contains("10.8.0.2/32"));
+    }
+
+    #[test]
+    fn test_ingress_firewall_worker_separation() {
+        // Verify that worker.yaml (via config_patches) doesn't get control-plane rules
+        let config = BootstrapConfig::new("fw-cluster", "10.8.0.1")
+            .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"]);
+
+        // Workers only receive common patches (config_patches), not control-plane patches
+        let common_patch = &config.config_patches[0];
+
+        // Workers get basic rules
+        assert!(common_patch.contains("kubelet-ingress"));
+        assert!(common_patch.contains("cilium-vxlan"));
+        assert!(common_patch.contains("apid-ingress"));
+
+        // Workers do NOT get K8s API or etcd rules (those are in config_patches_controlplane)
+        assert!(!common_patch.contains("kubernetes-api-ingress"));
+        assert!(!common_patch.contains("etcd-ingress"));
+        assert!(!common_patch.contains("6443"));
+        assert!(!common_patch.contains("2379-2380"));
     }
 
     #[test]
@@ -1099,10 +1155,12 @@ mod tests {
         let config = BootstrapConfig::new("full-vlan", "64.34.91.100")
             .with_vlan_interface(2063, "10.8.0.1/24", "eth1")
             .with_private_network("10.8.0.0/24")
-            .with_ingress_firewall("10.8.0.0/24", true, &["10.8.0.1"])
+            .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"])
             .with_cilium_cni();
 
-        // Should have 4 patches: VLAN, private network, firewall, CNI
+        // Common patches: VLAN, private network, firewall-common, CNI = 4
         assert_eq!(config.config_patches.len(), 4);
+        // Control plane patches: firewall-controlplane = 1
+        assert_eq!(config.config_patches_controlplane.len(), 1);
     }
 }
