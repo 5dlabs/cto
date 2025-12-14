@@ -44,7 +44,7 @@ spec:
         persistence:
           enabled: true
           size: 10Gi
-          storageClassName: ""  # Use default storage class (Mayastor when configured)
+          storageClassName: "mayastor-single-replica"  # High-performance NVMe storage
 
         # Service configuration
         service:
