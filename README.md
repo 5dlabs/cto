@@ -1137,7 +1137,7 @@ The platform includes built-in MCP tools for project management, workflow orches
 
 ### **🔧 Integrated MCP Servers**
 
-The platform includes 13 pre-configured MCP servers proxied through the tools service:
+The platform includes 17 pre-configured MCP servers proxied through the tools service:
 
 | Server | Description | Transport |
 |--------|-------------|-----------|
@@ -1153,6 +1153,10 @@ The platform includes 13 pre-configured MCP servers proxied through the tools se
 | **PostgreSQL AI Guide** | AI-optimized PostgreSQL expertise with semantic search over official docs | HTTP |
 | **Solana** | Solana blockchain development tools | HTTP |
 | **Firecrawl** | Web scraping, crawling, and content extraction with search capabilities | stdio |
+| **Grafana** | Dashboards, alerts, Prometheus/Loki queries, and incident management | stdio |
+| **Loki** | Query and analyze Grafana Loki logs with LogQL | stdio |
+| **Prometheus** | Query and analyze Prometheus metrics with PromQL | stdio |
+| **Cloudflare** | Workers, DNS, security, and edge computing management | HTTP |
 | **Rust Tools** | Rust analyzer integration (local, runs in agent containers) | stdio |
 
 ### **📚 Available Tool Categories**
@@ -1216,6 +1220,32 @@ The platform includes 13 pre-configured MCP servers proxied through the tools se
 
 #### **Solana** — Blockchain Development
 - Solana blockchain tools for Web3 development
+
+#### **Grafana** — Observability & Dashboards
+- `search_dashboards` — Find dashboards by title
+- `get_dashboard_by_uid` — Retrieve full dashboard details
+- `query_prometheus` — Execute PromQL queries
+- `query_loki_logs` — Run LogQL queries
+- `list_alert_rules` — View alert rules and statuses
+- `list_incidents` — Search and manage incidents
+- `list_datasources` — View configured datasources
+
+#### **Loki** — Log Aggregation
+- `loki_query` — Query logs with LogQL
+- Supports time ranges, limits, and multi-tenant org IDs
+
+#### **Prometheus** — Metrics & Monitoring
+- `execute_query` — Execute instant PromQL queries
+- `execute_range_query` — Execute range queries with step intervals
+- `list_metrics` — List available metrics with filtering
+- `get_metric_metadata` — Get metadata for specific metrics
+- `get_targets` — View all scrape targets
+
+#### **Cloudflare** — Edge & CDN
+- Workers development and deployment
+- DNS management and analytics
+- Security configuration
+- Edge computing primitives
 
 ### Detailed Tool Reference
 
@@ -1557,7 +1587,7 @@ For more details, see the [LICENSE](LICENSE) file.
 | **Platform** | Kubernetes, Helm, ArgoCD, Argo Workflows |
 | **Language** | Rust (Tokio, Axum, Serde) |
 | **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM |
-| **MCP Servers** | OpenMemory, Context7, GitHub, Kubernetes, Terraform, Playwright, Firecrawl, PostgreSQL AI Guide, Solana, shadcn/ui, AI Elements |
+| **MCP Servers** | OpenMemory, Context7, GitHub, Kubernetes, Terraform, Playwright, Firecrawl, Grafana, Loki, Prometheus, Cloudflare, PostgreSQL AI Guide, Solana, shadcn/ui, AI Elements |
 | **Frontend** | React, Next.js, shadcn/ui, Tailwind CSS, Expo, Electron |
 | **Backend** | Rust, Go, Node.js, TypeScript |
 | **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
