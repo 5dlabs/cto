@@ -158,8 +158,8 @@ spec:
 "#;
 
 /// Cleanup manifest - removes all test resources.
-pub const CLEANUP_SCRIPT: &str = r#"
+pub const CLEANUP_SCRIPT: &str = r"
 kubectl delete pod validation-test-pod validation-test-storage validation-test-server validation-test-client -n default --ignore-not-found --grace-period=0 --force
 kubectl delete pvc validation-test-pvc -n default --ignore-not-found
 kubectl delete service validation-test-server -n default --ignore-not-found
-"#;
+";

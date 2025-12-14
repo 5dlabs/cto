@@ -7,7 +7,7 @@
 #[allow(dead_code)] // Reference material for AI agent prompt
 ///
 /// These are provided as context to Claude so it knows what to check.
-pub const HEALTH_CHECKS: &str = r#"
+pub const HEALTH_CHECKS: &str = r"
 # Cluster Health Checks
 
 ## 1. Node Health
@@ -15,7 +15,7 @@ pub const HEALTH_CHECKS: &str = r#"
 - Node versions match expected Kubernetes version
 - No node conditions indicating problems
 
-## 2. Node Connectivity  
+## 2. Node Connectivity
 - Cilium reports all nodes reachable
 - All endpoints reachable (critical for pod networking)
 - WireGuard peers established (if encryption enabled)
@@ -51,4 +51,4 @@ pub const HEALTH_CHECKS: &str = r#"
 - cert-manager issuing certificates
 - External Secrets Operator connected to vault
 - Pod Security Standards enforced
-"#;
+";

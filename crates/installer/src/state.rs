@@ -450,9 +450,9 @@ impl InstallState {
     /// # Errors
     ///
     /// Returns an error if saving fails.
-    pub fn set_vlan(&mut self, vlan_id: String, vlan_vid: u16) -> Result<()> {
+    pub fn set_vlan(&mut self, vlan_id: String, vid: u16) -> Result<()> {
         self.vlan_id = Some(vlan_id);
-        self.vlan_vid = Some(vlan_vid);
+        self.vlan_vid = Some(vid);
         self.save()
     }
 

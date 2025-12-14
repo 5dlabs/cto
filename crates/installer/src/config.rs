@@ -171,7 +171,7 @@ impl InstallConfig {
             enable_vlan: true, // Recommended for bare metal
             vlan_subnet: "10.8.0.0/24".into(),
             vlan_parent_interface: "enp1s0f1".into(), // Secondary NIC on Latitude c2/c3
-            enable_firewall: true,                // Recommended for security
+            enable_firewall: true,                    // Recommended for security
         }
     }
 

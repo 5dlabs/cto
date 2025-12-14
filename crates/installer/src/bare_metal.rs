@@ -106,6 +106,58 @@ impl BareMetalOrchestrator {
         }
     }
 
+    /// Validate that plans have stock in the given region before creating servers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if plans don't have stock in the region.
+    pub async fn validate_stock(&self, region: &str) -> Result<()> {
+        ui::print_info(&format!("Validating stock for plans in {region}..."));
+
+        let (api_key, project_id) = get_latitude_credentials()?;
+        let latitude = Latitude::new(&api_key, &project_id)
+            .context("Failed to create Latitude provider for stock validation")?;
+
+        let mut inventory = InventoryManager::new(latitude);
+
+        // Check control plane plan
+        let cp_stock = inventory
+            .validate_region(&self.config.cp_plan, region)
+            .await
+            .with_context(|| {
+                format!(
+                    "Control plane plan '{}' has no stock in region '{}'",
+                    self.config.cp_plan, region
+                )
+            })?;
+
+        ui::print_info(&format!(
+            "   ✓ CP plan '{}' has {:?} stock in {}",
+            self.config.cp_plan, cp_stock, region
+        ));
+
+        // Check worker plan (if different)
+        if self.config.worker_plan != self.config.cp_plan && self.config.node_count > 1 {
+            let worker_stock = inventory
+                .validate_region(&self.config.worker_plan, region)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Worker plan '{}' has no stock in region '{}'",
+                        self.config.worker_plan, region
+                    )
+                })?;
+
+            ui::print_info(&format!(
+                "   ✓ Worker plan '{}' has {:?} stock in {}",
+                self.config.worker_plan, worker_stock, region
+            ));
+        }
+
+        ui::print_success(&format!("Stock validated for all plans in {region}"));
+        Ok(())
+    }
+
     /// Create servers for the cluster.
     ///
     /// Returns control plane server and worker servers.
@@ -117,6 +169,9 @@ impl BareMetalOrchestrator {
         &self,
         region: &str,
     ) -> Result<(CreatedServer, Vec<CreatedServer>)> {
+        // Validate stock before creating servers
+        self.validate_stock(region).await?;
+
         let cp_hostname = self.config.cp_hostname();
         let worker_hostnames = self.config.worker_hostnames();
 
@@ -332,22 +387,20 @@ impl BareMetalOrchestrator {
                     .context("Failed to create VLAN")?;
 
                 let vlan_id = vlan.id;
-                let vlan_vid = vlan.attributes.vid;
+                let vid = vlan.attributes.vid;
 
-                ui::print_success(&format!(
-                    "Created VLAN {vlan_id} (VID: {vlan_vid}) in {region}"
-                ));
+                ui::print_success(&format!("Created VLAN {vlan_id} (VID: {vid}) in {region}"));
 
                 // Note: Server assignment to VLAN via API is not currently exposed by Latitude.
                 // The VLAN interface will be configured in Talos machine config with static IPs.
                 // Manual assignment via Latitude dashboard may be needed for full L2 connectivity.
                 ui::print_info("Note: Configure Talos with VLAN interface for private networking.");
                 ui::print_info(&format!(
-                    "      VLAN VID: {vlan_vid}, Subnet: {}",
+                    "      VLAN VID: {vid}, Subnet: {}",
                     self.config.vlan_subnet
                 ));
 
-                Ok((vlan_id, vlan_vid))
+                Ok((vlan_id, vid))
             }
         }
     }
