@@ -105,13 +105,32 @@ impl Installer {
                     new_config.cluster_name
                 );
             }
+            // VLAN parent interface is hardware-specific to provisioned servers.
+            // Changing it after servers exist would cause Talos config to reference
+            // the wrong NIC, breaking VLAN connectivity.
+            if old.vlan_parent_interface != new_config.vlan_parent_interface {
+                ui::print_warning(&format!(
+                    "⚠️  VLAN interface changed from '{}' to '{}' but servers already exist!",
+                    old.vlan_parent_interface, new_config.vlan_parent_interface
+                ));
+                ui::print_info(
+                    "   The VLAN interface is hardware-specific. Continuing with existing value.",
+                );
+                ui::print_info(&format!(
+                    "   Delete state file to start fresh with interface '{}'.",
+                    new_config.vlan_parent_interface
+                ));
+            }
         }
 
         // Safe to update fields (update state with new config values)
         let config = &mut existing.config;
 
-        // Update VLAN settings (these affect config generation)
-        if config.vlan_parent_interface != new_config.vlan_parent_interface {
+        // VLAN interface can only be updated if no servers exist yet
+        if existing.control_plane.is_none()
+            && existing.workers.is_empty()
+            && config.vlan_parent_interface != new_config.vlan_parent_interface
+        {
             ui::print_info(&format!(
                 "Updating VLAN interface: {} -> {}",
                 config.vlan_parent_interface, new_config.vlan_parent_interface
