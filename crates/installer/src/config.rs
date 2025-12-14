@@ -124,6 +124,23 @@ pub struct InstallConfig {
     // Profile
     /// Installation profile for resource sizing.
     pub profile: InstallProfile,
+
+    // Networking
+    /// Enable VLAN private networking for node-to-node communication.
+    /// When enabled, creates a Latitude VLAN and configures Talos with a
+    /// VLAN sub-interface for private cluster traffic (etcd, kubelet, Cilium VXLAN).
+    /// Public IPs are still used for ingress traffic.
+    pub enable_vlan: bool,
+    /// Private network subnet for VLAN (e.g., "10.8.0.0/24").
+    /// Node private IPs are allocated from this subnet.
+    pub vlan_subnet: String,
+    /// Parent NIC for VLAN interface (e.g., "enp1s0f1", "eth1").
+    /// Latitude c2/c3 servers use "enp1s0f1" as the secondary NIC.
+    /// This is the internal/PXE NIC on Latitude servers.
+    pub vlan_parent_interface: String,
+    /// Enable Talos Ingress Firewall for host-level traffic control.
+    /// Blocks all ingress by default, allowing only necessary cluster traffic.
+    pub enable_firewall: bool,
 }
 
 impl InstallConfig {
@@ -151,6 +168,10 @@ impl InstallConfig {
             gitops_branch: "develop".into(),
             sync_timeout_minutes: 30,
             profile: InstallProfile::default(),
+            enable_vlan: true, // Recommended for bare metal
+            vlan_subnet: "10.8.0.0/24".into(),
+            vlan_parent_interface: "enp1s0f1".into(), // Secondary NIC on Latitude c2/c3
+            enable_firewall: true,                    // Recommended for security
         }
     }
 

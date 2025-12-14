@@ -518,12 +518,23 @@ buildkit:
       cpu: 2000m
       memory: 8Gi
 
-  # Persistent cache storage
+  # Persistent cache storage (SSD-backed for layer cache persistence)
   cache:
     # BuildKit layer cache (Docker layers, intermediate builds)
     buildkitSize: 100Gi
     # Cargo registry cache (Rust dependencies)
     cargoSize: 50Gi
+
+  # RAM-backed workspace for faster I/O during builds
+  # Benchmarks show 2-4x faster I/O compared to SSD
+  # Uses tmpfs (memory-backed filesystem) for temporary build artifacts
+  workspace:
+    # Enable RAM-backed workspace (recommended for faster builds)
+    useMemory: true
+    # Size limit for RAM workspace (adjust based on available node RAM)
+    # For 128GB nodes, 32Gi is ~25% - good balance
+    # For smaller nodes, reduce accordingly
+    sizeLimit: 32Gi
 
   config:
     # Max parallel build operations

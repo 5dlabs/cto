@@ -386,9 +386,9 @@ pub struct RegionCountry {
 /// Virtual Network resource from API.
 #[derive(Debug, Clone, Deserialize)]
 pub struct VirtualNetworkResource {
-    /// Virtual Network ID (e.g., "vlan_xxx").
+    /// Virtual Network ID (e.g., `vlan_xxx`).
     pub id: String,
-    /// Resource type (always "virtual_networks").
+    /// Resource type (always `virtual_networks`).
     #[serde(rename = "type")]
     pub resource_type: String,
     /// Virtual Network attributes.

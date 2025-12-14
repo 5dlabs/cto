@@ -51,6 +51,10 @@ spec:
               mountPath: /var/lib/buildkit
             - name: cargo-cache
               mountPath: /cargo-cache
+            {{- if .Values.buildkit.workspace.useMemory }}
+            - name: tmpfs-workspace
+              mountPath: /tmp
+            {{- end }}
             {{- if .Values.buildkit.config.insecureRegistries }}
             - name: buildkit-config
               mountPath: /etc/buildkit
@@ -61,6 +65,13 @@ spec:
             - name: BUILDKIT_STEP_LOG_MAX_SPEED
               value: "{{ .Values.buildkit.config.maxLogSpeed }}"
       volumes:
+        {{- if .Values.buildkit.workspace.useMemory }}
+        # RAM-backed workspace for faster I/O (2-4x speedup vs SSD)
+        - name: tmpfs-workspace
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.buildkit.workspace.sizeLimit }}
+        {{- end }}
         {{- if .Values.buildkit.config.insecureRegistries }}
         - name: buildkit-config
           configMap:

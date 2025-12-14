@@ -106,6 +106,58 @@ impl BareMetalOrchestrator {
         }
     }
 
+    /// Validate that plans have stock in the given region before creating servers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if plans don't have stock in the region.
+    pub async fn validate_stock(&self, region: &str) -> Result<()> {
+        ui::print_info(&format!("Validating stock for plans in {region}..."));
+
+        let (api_key, project_id) = get_latitude_credentials()?;
+        let latitude = Latitude::new(&api_key, &project_id)
+            .context("Failed to create Latitude provider for stock validation")?;
+
+        let mut inventory = InventoryManager::new(latitude);
+
+        // Check control plane plan
+        let cp_stock = inventory
+            .validate_region(&self.config.cp_plan, region)
+            .await
+            .with_context(|| {
+                format!(
+                    "Control plane plan '{}' has no stock in region '{}'",
+                    self.config.cp_plan, region
+                )
+            })?;
+
+        ui::print_info(&format!(
+            "   ✓ CP plan '{}' has {:?} stock in {}",
+            self.config.cp_plan, cp_stock, region
+        ));
+
+        // Check worker plan (if different)
+        if self.config.worker_plan != self.config.cp_plan && self.config.node_count > 1 {
+            let worker_stock = inventory
+                .validate_region(&self.config.worker_plan, region)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Worker plan '{}' has no stock in region '{}'",
+                        self.config.worker_plan, region
+                    )
+                })?;
+
+            ui::print_info(&format!(
+                "   ✓ Worker plan '{}' has {:?} stock in {}",
+                self.config.worker_plan, worker_stock, region
+            ));
+        }
+
+        ui::print_success(&format!("Stock validated for all plans in {region}"));
+        Ok(())
+    }
+
     /// Create servers for the cluster.
     ///
     /// Returns control plane server and worker servers.
@@ -117,6 +169,9 @@ impl BareMetalOrchestrator {
         &self,
         region: &str,
     ) -> Result<(CreatedServer, Vec<CreatedServer>)> {
+        // Validate stock before creating servers
+        self.validate_stock(region).await?;
+
         let cp_hostname = self.config.cp_hostname();
         let worker_hostnames = self.config.worker_hostnames();
 
@@ -303,6 +358,97 @@ impl BareMetalOrchestrator {
         ui::print_success("All servers are online (Latitude API status: on)");
         ui::print_info("Now safe to proceed with Talos API polling...");
 
+        Ok(())
+    }
+
+    /// Create a VLAN for private networking.
+    ///
+    /// Returns the VLAN ID and VID (for OS configuration).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if VLAN creation fails.
+    pub async fn create_vlan(&self, region: &str) -> Result<(String, u16)> {
+        // Currently only Latitude supports VLANs
+        match self.config.provider {
+            BareMetalProvider::Latitude => {
+                let (api_key, project_id) = get_latitude_credentials()?;
+                let latitude = Latitude::new(&api_key, &project_id)
+                    .context("Failed to create Latitude provider for VLAN")?;
+
+                let description = format!("{} Private Network", self.config.cluster_name);
+
+                info!(region = %region, description = %description, "Creating VLAN");
+                ui::print_info(&format!("Creating VLAN in {region}..."));
+
+                let vlan = latitude
+                    .create_virtual_network(region, &description)
+                    .await
+                    .context("Failed to create VLAN")?;
+
+                let vlan_id = vlan.id;
+                let vid = vlan.attributes.vid;
+
+                ui::print_success(&format!("Created VLAN {vlan_id} (VID: {vid}) in {region}"));
+
+                // Note: Server assignment to VLAN via API is not currently exposed by Latitude.
+                // The VLAN interface will be configured in Talos machine config with static IPs.
+                // Manual assignment via Latitude dashboard may be needed for full L2 connectivity.
+                ui::print_info("Note: Configure Talos with VLAN interface for private networking.");
+                ui::print_info(&format!(
+                    "      VLAN VID: {vid}, Subnet: {}",
+                    self.config.vlan_subnet
+                ));
+
+                Ok((vlan_id, vid))
+            }
+        }
+    }
+
+    /// Delete a VLAN.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if VLAN deletion fails.
+    #[allow(dead_code)] // Will be used when destroy command is added
+    pub async fn delete_vlan(&self, vlan_id: &str) -> Result<()> {
+        match self.config.provider {
+            BareMetalProvider::Latitude => {
+                let (api_key, project_id) = get_latitude_credentials()?;
+                let latitude = Latitude::new(&api_key, &project_id)
+                    .context("Failed to create Latitude provider for VLAN deletion")?;
+
+                info!(vlan_id = %vlan_id, "Deleting VLAN");
+                ui::print_info(&format!("Deleting VLAN {vlan_id}..."));
+
+                latitude
+                    .delete_virtual_network(vlan_id)
+                    .await
+                    .context("Failed to delete VLAN")?;
+
+                ui::print_success(&format!("VLAN {vlan_id} deleted"));
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Delete a server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if server deletion fails.
+    #[allow(dead_code)] // Will be used when destroy command is added
+    pub async fn delete_server(&self, server_id: &str) -> Result<()> {
+        info!(server_id = %server_id, "Deleting server");
+        ui::print_info(&format!("Deleting server {server_id}..."));
+
+        self.provider
+            .delete_server(server_id)
+            .await
+            .context("Failed to delete server")?;
+
+        ui::print_success(&format!("Server {server_id} deleted"));
         Ok(())
     }
 }

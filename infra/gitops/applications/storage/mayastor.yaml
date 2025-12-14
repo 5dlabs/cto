@@ -25,7 +25,7 @@ spec:
   source:
     repoURL: https://openebs.github.io/mayastor-extensions
     chart: mayastor
-    targetRevision: 2.7.0
+    targetRevision: 2.10.0
     helm:
       values: |
         # Mayastor configuration for Talos bare metal clusters

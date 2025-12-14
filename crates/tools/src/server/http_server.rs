@@ -2809,8 +2809,7 @@ impl BridgeState {
                                     // Get bucket and endpoint from environment (S3-compatible)
                                     let bucket = std::env::var("S3_BUCKET")
                                         .unwrap_or_else(|_| "screenshots".to_string());
-                                    let endpoint =
-                                        std::env::var("S3_ENDPOINT").unwrap_or_default();
+                                    let endpoint = std::env::var("S3_ENDPOINT").unwrap_or_default();
 
                                     // Upload using mc command (works with any S3-compatible storage)
                                     let mc_dest = format!("s3/{bucket}/{key}");
