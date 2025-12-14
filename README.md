@@ -76,53 +76,51 @@ Your entire platform can run on air-gapped infrastructure while still being acce
 
 Replace expensive managed cloud services with open-source Kubernetes operators:
 
-#### **🗄️ Databases & Storage**
-
 | Operator | Replaces | Savings | License |
 |----------|----------|---------|---------|
 | **CloudNative-PG** | AWS RDS PostgreSQL, Cloud SQL, Azure PostgreSQL | ~70-80% | Apache 2.0 |
 | **Percona MySQL** | AWS RDS MySQL, Aurora, Cloud SQL MySQL | ~70-80% | Apache 2.0 |
 | **Percona MongoDB** | MongoDB Atlas, DocumentDB | ~60-70% | Apache 2.0 |
-| **Redis Operator** | ElastiCache, Memorystore | ~70-80% | Apache 2.0 |
-| **ScyllaDB** | AWS DynamoDB, Cassandra Managed | ~70-80% | Apache 2.0 |
-| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% | Apache 2.0 |
-| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
-| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% | Apache 2.0 |
-| **SeaweedFS** | AWS S3, GCS, Azure Blob | ~80-90% | Apache 2.0 |
-| **Harbor** | Docker Hub, ECR, GCR, ACR | ~90%+ | Apache 2.0 |
-
-#### **📨 Messaging & Orchestration**
-
-| Operator | Replaces | Savings | License |
-|----------|----------|---------|---------|
 | **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% | Apache 2.0 |
 | **RabbitMQ** | Amazon MQ, CloudAMQP | ~70-80% | MPL 2.0 |
 | **NATS** | AWS SNS/SQS, GCP Pub/Sub | ~80-90% | Apache 2.0 |
-| **Temporal** | AWS Step Functions, Azure Logic Apps | ~80-90% | Apache 2.0 |
-
-#### **🔐 Identity & Security**
-
-| Operator | Replaces | Savings | License |
-|----------|----------|---------|---------|
+| **SeaweedFS** | AWS S3, GCS, Azure Blob | ~80-90% | Apache 2.0 |
+| **Redis Operator** | ElastiCache, Memorystore | ~70-80% | Apache 2.0 |
+| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% | Apache 2.0 |
+| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
+| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% | Apache 2.0 |
 | **Keycloak** | AWS Cognito, Auth0, Okta | ~90%+ | Apache 2.0 |
-
-#### **🤖 AI/ML Infrastructure**
-
-| Operator | Replaces | Savings | License |
-|----------|----------|---------|---------|
-| **NVIDIA GPU Operator** | Manual GPU driver management | N/A | Apache 2.0 |
-| **Ollama Operator** | OpenAI API, Anthropic API (for local models) | ~80-95% | MIT |
-| **KubeAI** | SageMaker, Vertex AI | ~70-80% | Apache 2.0 |
-| **LlamaStack** | Managed LLM endpoints | ~70-80% | MIT |
-
-#### **📊 Observability**
-
-| Operator | Replaces | Savings | License |
-|----------|----------|---------|---------|
-| **OpenTelemetry Operator** | Datadog, New Relic, Splunk | ~80-90% | Apache 2.0 |
-| **Jaeger Operator** | AWS X-Ray, Datadog APM | ~80-90% | Apache 2.0 |
+| **Temporal** | AWS Step Functions, Azure Logic Apps | ~80-90% | Apache 2.0 |
+| **ScyllaDB** | AWS DynamoDB, Cassandra Managed | ~70-80% | Apache 2.0 |
 
 **Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
+
+### **🌐 Supported Infrastructure Providers**
+
+Deploy CTO on any infrastructure—bare-metal, on-premises, or cloud:
+
+#### **Bare-Metal Providers**
+
+| Provider | Description | Regions |
+|----------|-------------|---------|
+| **Latitude.sh** | Global bare-metal cloud with Gen4 10G+ networking | Americas, Europe, Asia-Pacific |
+| **Hetzner** | European dedicated servers with excellent price/performance | Germany, Finland |
+| **OVH** | European cloud & bare-metal with global reach | Europe, Americas, Asia-Pacific |
+| **Vultr** | Global bare-metal & cloud with simple pricing | 25+ locations worldwide |
+| **Scaleway** | European cloud provider with ARM & x86 options | France, Netherlands, Poland |
+| **Cherry Servers** | European bare-metal with high-performance networking | Lithuania, Netherlands |
+| **DigitalOcean** | Developer-friendly bare-metal droplets | Americas, Europe, Asia-Pacific |
+| **On-Premises** | Your own hardware with Talos Linux | Anywhere |
+
+#### **Cloud Providers**
+
+| Provider | Services | Description |
+|----------|----------|-------------|
+| **AWS** | EC2, EKS | Full AWS integration for hybrid deployments |
+| **Azure** | VMs, AKS | Microsoft Azure support for enterprise environments |
+| **GCP** | GCE, GKE | Google Cloud Platform integration |
+
+All providers are managed through the `cto-metal` CLI with unified provisioning workflows.
 
 </div>
 
@@ -143,9 +141,7 @@ The platform is under active development.
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB, Harbor)  
-✅ AI/ML operators (NVIDIA GPU, Ollama, KubeAI, LlamaStack)  
-✅ Observability operators (OpenTelemetry, Jaeger)  
+✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
 ✅ Long-term memory with OpenMemory  
 ✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
@@ -1114,12 +1110,30 @@ Each agent independently configured with its own CLI, model, and tool access.
 
 ## **🔧 MCP Tools (Model Context Protocol)**
 
-The platform includes built-in MCP tools, but you can add ANY external MCP servers or custom tools you need:
+The platform includes built-in MCP tools for project management, workflow orchestration, and infrastructure provisioning:
 
-- **`addTool()`** — Dynamically add any MCP server by GitHub URL — agents instantly gain access to new capabilities
-- **`intake()`** — Project onboarding — initializes new projects with proper structure and configuration
-- **`docs()`** — Documentation generation — Morgan analyzes projects and creates comprehensive docs
+### **🎯 Project & Workflow Tools**
+
+- **`intake()`** — Project onboarding — parses PRDs, generates tasks, and creates documentation
 - **`play()`** — Full orchestration — coordinates the entire team through build/test/deploy phases
+- **`play_status()`** — Query workflow progress — shows active workflows, next tasks, and blocked tasks
+- **`jobs()`** — List running workflows — view all active Argo workflows with status
+- **`stop_job()`** — Stop workflows — gracefully terminate running workflows
+- **`input()`** — Send messages — communicate with running agent jobs in real-time
+
+### **🔌 MCP Server Management**
+
+- **`add_mcp_server()`** — Add MCP servers — install new MCP servers from GitHub repos with auto-PR and merge
+- **`remove_mcp_server()`** — Remove MCP servers — uninstall MCP servers with auto-cleanup
+- **`update_mcp_server()`** — Update MCP servers — refresh server configs from upstream repos
+
+### **🖥️ CLI Tools**
+
+| Tool | Description |
+|------|-------------|
+| **`cto-mcp`** | MCP server that integrates with any AI coding CLI (Claude, Cursor, Codex, Factory, etc.) |
+| **`cto-metal`** | Bare-metal provisioning CLI for Talos Linux clusters on any provider |
+| **`cto-installer`** | Platform installation and validation tool |
 
 ### Detailed Tool Reference
 
@@ -1460,22 +1474,20 @@ For more details, see the [LICENSE](LICENSE) file.
 |----------|-------------|
 | **Platform** | Kubernetes, Helm, ArgoCD, Argo Workflows |
 | **Language** | Rust (Tokio, Axum, Serde) |
-| **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM, KubeAI, LlamaStack |
-| **GPU** | NVIDIA GPU Operator, CUDA |
+| **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM |
 | **MCP Tools** | Context7, OpenMemory, Brave Search, Hexstrike |
 | **Frontend** | React, Next.js, shadcn/ui, Tailwind CSS, Expo, Electron |
 | **Backend** | Rust, Go, Node.js, TypeScript |
-| **Databases** | PostgreSQL (CloudNative-PG), MySQL (Percona), MongoDB (Percona), Redis, ScyllaDB, ClickHouse, QuestDB, OpenSearch |
-| **Messaging** | Kafka (Strimzi), RabbitMQ, NATS |
-| **Storage** | SeaweedFS (S3-compatible), Harbor (Container Registry) |
+| **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
+| **Messaging** | Kafka (Strimzi) |
+| **Storage** | SeaweedFS (S3-compatible, Apache 2.0) |
 | **Secrets** | OpenBao (Vault fork) |
-| **Identity** | Keycloak |
-| **Orchestration** | Temporal |
 | **Networking** | Cloudflare Tunnels, Kilo VPN (WireGuard) |
 | **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
-| **Observability** | Prometheus, Grafana, Loki, OpenTelemetry, Jaeger |
+| **Observability** | Prometheus, Grafana, Loki |
 | **Security** | Trivy, Kube-bench, Gitleaks, Falco |
-| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr |
+| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean |
+| **Cloud** | AWS, Azure, GCP |
 | **Agent Runtime** | Custom container image with multi-CLI support, Git, and development tooling |
 
 ---
