@@ -15,7 +15,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.research.persistence.size | default "5Gi" }}
-  storageClassName: {{ .Values.research.persistence.storageClass | default .Values.storageClass | default "local-path" }}
+  storageClassName: {{ .Values.research.persistence.storageClass | default .Values.global.storageClass | default "mayastor" }}
 
 ---
 # ServiceAccount for research CronJob

@@ -40,7 +40,7 @@ spec:
   storage:
     volumeClaimTemplate:
       spec:
-        storageClassName: local-path
+        storageClassName: mayastor
         accessModes:
           - ReadWriteOnce
         resources:

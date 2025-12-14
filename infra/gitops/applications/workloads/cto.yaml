@@ -53,7 +53,7 @@ spec:
           namespace: cto
           imagePullSecrets:
             - name: ghcr-secret
-          storageClass: "mayastor-single-replica"  # High-performance NVMe storage
+          storageClass: "mayastor"  # High-performance NVMe storage
 
         controller:
           enabled: true
