@@ -74,63 +74,111 @@ impl Installer {
     /// Check if config has changed and update safe-to-update fields.
     ///
     /// Certain fields (like plan) cannot change mid-installation if servers exist.
-    /// Other fields (like VLAN interface) can be updated.
+    /// Other fields (like VLAN interface) can be updated when safe.
     fn check_and_update_config(
         existing: &mut InstallState,
         new_config: &InstallConfig,
     ) -> Result<()> {
-        let old = &existing.config;
+        let servers_exist = existing.control_plane.is_some() || !existing.workers.is_empty();
 
         // Critical fields that can't change once servers exist
-        if existing.control_plane.is_some() || !existing.workers.is_empty() {
-            if old.cp_plan != new_config.cp_plan {
-                ui::print_warning(&format!(
-                    "⚠️  Control plane plan changed from '{}' to '{}' but servers already exist!",
-                    old.cp_plan, new_config.cp_plan
-                ));
-                ui::print_info(
-                    "   Delete state file to start fresh, or continue with existing plan.",
-                );
-            }
-            if old.worker_plan != new_config.worker_plan {
-                ui::print_warning(&format!(
-                    "⚠️  Worker plan changed from '{}' to '{}' but servers already exist!",
-                    old.worker_plan, new_config.worker_plan
-                ));
-            }
-            if old.cluster_name != new_config.cluster_name {
-                anyhow::bail!(
-                    "Cluster name changed from '{}' to '{}'. Delete state file to start fresh.",
-                    old.cluster_name,
-                    new_config.cluster_name
-                );
-            }
-            // VLAN parent interface is hardware-specific to provisioned servers.
-            // Changing it after servers exist would cause Talos config to reference
-            // the wrong NIC, breaking VLAN connectivity.
-            if old.vlan_parent_interface != new_config.vlan_parent_interface {
-                ui::print_warning(&format!(
-                    "⚠️  VLAN interface changed from '{}' to '{}' but servers already exist!",
-                    old.vlan_parent_interface, new_config.vlan_parent_interface
-                ));
-                ui::print_info(
-                    "   The VLAN interface is hardware-specific. Continuing with existing value.",
-                );
-                ui::print_info(&format!(
-                    "   Delete state file to start fresh with interface '{}'.",
-                    new_config.vlan_parent_interface
-                ));
-            }
+        if servers_exist {
+            Self::warn_protected_field_changes(&existing.config, new_config)?;
         }
 
-        // Safe to update fields (update state with new config values)
-        let config = &mut existing.config;
+        // VLAN-related fields can only be updated if no servers exist yet
+        // (these affect Talos machine config and private IP allocation)
+        if !servers_exist {
+            Self::update_vlan_config(&mut existing.config, new_config);
+        }
 
-        // VLAN interface can only be updated if no servers exist yet
-        if existing.control_plane.is_none()
-            && existing.workers.is_empty()
-            && config.vlan_parent_interface != new_config.vlan_parent_interface
-        {
+        // Update GitOps settings (always safe to update)
+        existing
+            .config
+            .gitops_repo
+            .clone_from(&new_config.gitops_repo);
+        existing
+            .config
+            .gitops_branch
+            .clone_from(&new_config.gitops_branch);
+        existing.config.sync_timeout_minutes = new_config.sync_timeout_minutes;
+
+        existing.save()?;
+        Ok(())
+    }
+
+    /// Warn about protected field changes when servers exist.
+    fn warn_protected_field_changes(old: &InstallConfig, new: &InstallConfig) -> Result<()> {
+        if old.cp_plan != new.cp_plan {
+            ui::print_warning(&format!(
+                "⚠️  Control plane plan changed from '{}' to '{}' but servers already exist!",
+                old.cp_plan, new.cp_plan
+            ));
+            ui::print_info("   Delete state file to start fresh, or continue with existing plan.");
+        }
+        if old.worker_plan != new.worker_plan {
+            ui::print_warning(&format!(
+                "⚠️  Worker plan changed from '{}' to '{}' but servers already exist!",
+                old.worker_plan, new.worker_plan
+            ));
+        }
+        if old.cluster_name != new.cluster_name {
+            anyhow::bail!(
+                "Cluster name changed from '{}' to '{}'. Delete state file to start fresh.",
+                old.cluster_name,
+                new.cluster_name
+            );
+        }
+        if old.vlan_parent_interface != new.vlan_parent_interface {
+            ui::print_warning(&format!(
+                "⚠️  VLAN interface changed from '{}' to '{}' but servers already exist!",
+                old.vlan_parent_interface, new.vlan_parent_interface
+            ));
+            ui::print_info(
+                "   The VLAN interface is hardware-specific. Continuing with existing value.",
+            );
+            ui::print_info(&format!(
+                "   Delete state file to start fresh with interface '{}'.",
+                new.vlan_parent_interface
+            ));
+        }
+        if old.vlan_subnet != new.vlan_subnet {
+            ui::print_warning(&format!(
+                "⚠️  VLAN subnet changed from '{}' to '{}' but servers already exist!",
+                old.vlan_subnet, new.vlan_subnet
+            ));
+            ui::print_info(
+                "   Private IPs were allocated from the original subnet. Continuing with existing value.",
+            );
+            ui::print_info(&format!(
+                "   Delete state file to start fresh with subnet '{}'.",
+                new.vlan_subnet
+            ));
+        }
+        if old.enable_vlan != new.enable_vlan {
+            ui::print_warning(&format!(
+                "⚠️  enable_vlan changed from '{}' to '{}' but servers already exist!",
+                old.enable_vlan, new.enable_vlan
+            ));
+            ui::print_info(
+                "   VLAN configuration was applied based on original setting. Continuing with existing value.",
+            );
+        }
+        if old.enable_firewall != new.enable_firewall {
+            ui::print_warning(&format!(
+                "⚠️  enable_firewall changed from '{}' to '{}' but servers already exist!",
+                old.enable_firewall, new.enable_firewall
+            ));
+            ui::print_info(
+                "   Firewall rules were applied based on original setting. Continuing with existing value.",
+            );
+        }
+        Ok(())
+    }
+
+    /// Update VLAN config fields when safe (no servers exist).
+    fn update_vlan_config(config: &mut InstallConfig, new_config: &InstallConfig) {
+        if config.vlan_parent_interface != new_config.vlan_parent_interface {
             ui::print_info(&format!(
                 "Updating VLAN interface: {} -> {}",
                 config.vlan_parent_interface, new_config.vlan_parent_interface
@@ -139,25 +187,27 @@ impl Installer {
                 .vlan_parent_interface
                 .clone_from(&new_config.vlan_parent_interface);
         }
+        if config.vlan_subnet != new_config.vlan_subnet {
+            ui::print_info(&format!(
+                "Updating VLAN subnet: {} -> {}",
+                config.vlan_subnet, new_config.vlan_subnet
+            ));
+            config.vlan_subnet.clone_from(&new_config.vlan_subnet);
+        }
         if config.enable_vlan != new_config.enable_vlan {
+            ui::print_info(&format!(
+                "Updating enable_vlan: {} -> {}",
+                config.enable_vlan, new_config.enable_vlan
+            ));
             config.enable_vlan = new_config.enable_vlan;
         }
         if config.enable_firewall != new_config.enable_firewall {
+            ui::print_info(&format!(
+                "Updating enable_firewall: {} -> {}",
+                config.enable_firewall, new_config.enable_firewall
+            ));
             config.enable_firewall = new_config.enable_firewall;
         }
-        if config.vlan_subnet != new_config.vlan_subnet {
-            config.vlan_subnet.clone_from(&new_config.vlan_subnet);
-        }
-
-        // Update GitOps settings
-        config.gitops_repo.clone_from(&new_config.gitops_repo);
-        config.gitops_branch.clone_from(&new_config.gitops_branch);
-        config.sync_timeout_minutes = new_config.sync_timeout_minutes;
-
-        // Save updated config
-        existing.save()?;
-
-        Ok(())
     }
 
     /// Run installation to completion with automatic retry/resume.
@@ -364,33 +414,53 @@ impl Installer {
             return Ok(());
         }
 
-        let orchestrator = BareMetalOrchestrator::new(&self.state.config).await?;
-        let region = self
-            .state
-            .selected_region
-            .as_ref()
-            .context("Region not selected")?;
+        // Idempotency: check if VLAN was already created (retry scenario)
+        let vid = if let Some(ref existing_vlan_id) = self.state.vlan_id {
+            ui::print_info(&format!(
+                "VLAN already created ({existing_vlan_id}), skipping creation"
+            ));
+            self.state.vlan_vid.context("VLAN VID missing from state")?
+        } else {
+            let orchestrator = BareMetalOrchestrator::new(&self.state.config).await?;
+            let region = self
+                .state
+                .selected_region
+                .as_ref()
+                .context("Region not selected")?;
 
-        // Create VLAN
-        ui::print_info("Creating VLAN for private networking...");
-        let (vlan_id, vid) = orchestrator.create_vlan(region).await?;
-        self.state.set_vlan(vlan_id, vid)?;
+            // Create VLAN
+            ui::print_info("Creating VLAN for private networking...");
+            let (vlan_id, vid) = orchestrator.create_vlan(region).await?;
+            self.state.set_vlan(vlan_id, vid)?;
+            vid
+        };
 
         // Allocate private IPs for all servers
+        // Idempotency: skip servers that already have a private IP allocated
         let cp_id = self.state.control_plane.as_ref().map(|cp| cp.id.clone());
         if let Some(cp_id) = cp_id {
-            let private_ip = self.state.allocate_next_private_ip()?;
-            ui::print_info(&format!(
-                "Allocated private IP {private_ip} for control plane"
-            ));
-            self.state.set_private_ip(&cp_id, private_ip)?;
+            if self.state.get_private_ip(&cp_id).is_some() {
+                ui::print_info("Control plane already has private IP, skipping allocation");
+            } else {
+                let private_ip = self.state.allocate_next_private_ip()?;
+                ui::print_info(&format!(
+                    "Allocated private IP {private_ip} for control plane"
+                ));
+                self.state.set_private_ip(&cp_id, private_ip)?;
+            }
         }
 
         let worker_ids: Vec<_> = self.state.workers.iter().map(|w| w.id.clone()).collect();
         for (i, worker_id) in worker_ids.iter().enumerate() {
-            let private_ip = self.state.allocate_next_private_ip()?;
-            ui::print_info(&format!("Allocated private IP {private_ip} for worker {i}"));
-            self.state.set_private_ip(worker_id, private_ip)?;
+            if self.state.get_private_ip(worker_id).is_some() {
+                ui::print_info(&format!(
+                    "Worker {i} already has private IP, skipping allocation"
+                ));
+            } else {
+                let private_ip = self.state.allocate_next_private_ip()?;
+                ui::print_info(&format!("Allocated private IP {private_ip} for worker {i}"));
+                self.state.set_private_ip(worker_id, private_ip)?;
+            }
         }
 
         ui::print_success(&format!(
