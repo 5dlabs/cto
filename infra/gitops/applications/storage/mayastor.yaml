@@ -106,9 +106,8 @@ spec:
               cpu: 2000m
               memory: 2Gi
               hugepages-2Mi: 2Gi
-          # DPDK args - use PA mode to avoid IOVA allocation issues on certain hardware
-          args:
-            - "--iova-mode=pa"
+          # DPDK environment - use PA mode to avoid IOVA allocation issues on certain hardware
+          envcontext: iova-mode=pa
           # Tolerations
           tolerations:
             - operator: Exists
