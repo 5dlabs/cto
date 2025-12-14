@@ -79,7 +79,6 @@ pub struct OpenBaoBootstrap<'a> {
 
 impl<'a> OpenBaoBootstrap<'a> {
     /// Create a new OpenBao bootstrap manager.
-    #[must_use]
     pub fn new(kubeconfig: &'a Path) -> Self {
         Self {
             kubeconfig,
@@ -97,10 +96,6 @@ impl<'a> OpenBaoBootstrap<'a> {
     /// 5. Unseal OpenBao
     /// 6. Create the openbao-token secret for ESO
     /// 7. Seed secrets from 1Password into OpenBao
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any bootstrap step fails.
     pub async fn bootstrap(&mut self) -> Result<()> {
         info!("Starting OpenBao bootstrap");
 

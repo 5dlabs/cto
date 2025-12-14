@@ -1,4 +1,0 @@
-# Clippy configuration for cto-cost crate
-
-# Allow module inception (e.g., foo/mod.rs containing mod foo)
-allow-unwrap-in-tests = true

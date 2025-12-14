@@ -67,10 +67,6 @@ pub enum InstallStep {
     /// Waiting for all GitOps applications to sync.
     WaitingGitOpsSync,
 
-    // Apps repository setup (customer workloads)
-    /// Configuring customer's ArgoCD apps repository for Bolt deployments.
-    ConfiguringAppsRepo,
-
     // Post-GitOps configuration
     /// Configuring Mayastor storage (DiskPools + StorageClass).
     ConfiguringStorage,
@@ -109,8 +105,7 @@ impl InstallStep {
             Self::DeployingArgoCD => Self::WaitingArgoCDReady,
             Self::WaitingArgoCDReady => Self::ApplyingAppOfApps,
             Self::ApplyingAppOfApps => Self::WaitingGitOpsSync,
-            Self::WaitingGitOpsSync => Self::ConfiguringAppsRepo,
-            Self::ConfiguringAppsRepo => Self::ConfiguringStorage,
+            Self::WaitingGitOpsSync => Self::ConfiguringStorage,
             Self::ConfiguringStorage => Self::BootstrappingOpenBao,
             Self::BootstrappingOpenBao => Self::ConfiguringKubeconfig,
             Self::ConfiguringKubeconfig | Self::Complete => Self::Complete,
@@ -142,7 +137,6 @@ impl InstallStep {
             Self::WaitingArgoCDReady => "Waiting for ArgoCD to be ready",
             Self::ApplyingAppOfApps => "Applying app-of-apps manifest",
             Self::WaitingGitOpsSync => "Waiting for GitOps sync",
-            Self::ConfiguringAppsRepo => "Configuring apps repository",
             Self::ConfiguringStorage => "Configuring Mayastor storage",
             Self::BootstrappingOpenBao => "Bootstrapping OpenBao secrets",
             Self::ConfiguringKubeconfig => "Configuring kubeconfig for Lens",
@@ -175,16 +169,15 @@ impl InstallStep {
             Self::WaitingArgoCDReady => 18,
             Self::ApplyingAppOfApps => 19,
             Self::WaitingGitOpsSync => 20,
-            Self::ConfiguringAppsRepo => 21,
-            Self::ConfiguringStorage => 22,
-            Self::BootstrappingOpenBao => 23,
-            Self::ConfiguringKubeconfig => 24,
-            Self::Complete => 25,
+            Self::ConfiguringStorage => 21,
+            Self::BootstrappingOpenBao => 22,
+            Self::ConfiguringKubeconfig => 23,
+            Self::Complete => 24,
         }
     }
 
     /// Total number of steps.
-    pub const TOTAL_STEPS: u8 = 25;
+    pub const TOTAL_STEPS: u8 = 24;
 }
 
 impl std::fmt::Display for InstallStep {
@@ -369,11 +362,6 @@ impl InstallState {
         self.save()
     }
 
-    /// Set control plane server details.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if saving fails.
     pub fn set_control_plane(&mut self, id: String, ip: String, hostname: String) -> Result<()> {
         self.control_plane = Some(ServerState {
             id,
@@ -693,8 +681,6 @@ mod tests {
             gitops_repo: "test".into(),
             gitops_branch: "main".into(),
             sync_timeout_minutes: 30,
-            apps_repo: None,
-            apps_repo_branch: "main".into(),
             profile: InstallProfile::default(),
             enable_vlan: true,
             vlan_subnet: subnet.into(),

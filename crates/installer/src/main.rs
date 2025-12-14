@@ -14,7 +14,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
-mod apps_repo;
 mod bare_metal;
 mod bootstrap;
 mod commands;

@@ -55,24 +55,24 @@ spec:
           resourcePolicy: "keep"
           persistentVolumeClaim:
             registry:
-              storageClass: "local-path"  # Use local-path until Mayastor is configured
+              storageClass: ""
               accessMode: ReadWriteOnce
               size: 50Gi
             jobservice:
               jobLog:
-                storageClass: "local-path"
+                storageClass: ""
                 accessMode: ReadWriteOnce
                 size: 1Gi
             database:
-              storageClass: "local-path"
+              storageClass: ""
               accessMode: ReadWriteOnce
               size: 10Gi
             redis:
-              storageClass: "local-path"
+              storageClass: ""
               accessMode: ReadWriteOnce
               size: 1Gi
             trivy:
-              storageClass: "local-path"
+              storageClass: ""
               accessMode: ReadWriteOnce
               size: 5Gi
 
