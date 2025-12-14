@@ -13,6 +13,10 @@ name = "cto-mcp"
 path = "src/main.rs"
 
 [dependencies]
+# Internal crates
+cto-cli = { path = "../installer" }
+cto-cloud = { path = "../cloud" }
+
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

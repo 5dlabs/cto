@@ -114,12 +114,20 @@ pub struct InstallConfig {
     pub output_dir: PathBuf,
 
     // GitOps
-    /// GitOps repository URL.
+    /// GitOps repository URL (CTO platform infrastructure).
     pub gitops_repo: String,
     /// GitOps branch to deploy from.
     pub gitops_branch: String,
     /// Timeout in minutes for GitOps sync.
     pub sync_timeout_minutes: u32,
+
+    // Apps Repository (customer workloads deployed by Bolt)
+    /// Customer's ArgoCD apps repository URL (e.g., "https://github.com/myorg/cto-apps").
+    /// This is where Bolt will create ArgoCD Application manifests for deployed workloads.
+    /// If not provided, apps deployment features will be disabled.
+    pub apps_repo: Option<String>,
+    /// Branch for the apps repository (defaults to "main").
+    pub apps_repo_branch: String,
 
     // Profile
     /// Installation profile for resource sizing.
@@ -167,6 +175,8 @@ impl InstallConfig {
             gitops_repo: "https://github.com/5dlabs/cto".into(),
             gitops_branch: "develop".into(),
             sync_timeout_minutes: 30,
+            apps_repo: None,
+            apps_repo_branch: "main".into(),
             profile: InstallProfile::default(),
             enable_vlan: true, // Recommended for bare metal
             vlan_subnet: "10.8.0.0/24".into(),
