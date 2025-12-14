@@ -76,22 +76,51 @@ Your entire platform can run on air-gapped infrastructure while still being acce
 
 Replace expensive managed cloud services with open-source Kubernetes operators:
 
+#### **🗄️ Databases & Storage**
+
 | Operator | Replaces | Savings | License |
 |----------|----------|---------|---------|
 | **CloudNative-PG** | AWS RDS PostgreSQL, Cloud SQL, Azure PostgreSQL | ~70-80% | Apache 2.0 |
 | **Percona MySQL** | AWS RDS MySQL, Aurora, Cloud SQL MySQL | ~70-80% | Apache 2.0 |
 | **Percona MongoDB** | MongoDB Atlas, DocumentDB | ~60-70% | Apache 2.0 |
-| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% | Apache 2.0 |
-| **RabbitMQ** | Amazon MQ, CloudAMQP | ~70-80% | MPL 2.0 |
-| **NATS** | AWS SNS/SQS, GCP Pub/Sub | ~80-90% | Apache 2.0 |
-| **SeaweedFS** | AWS S3, GCS, Azure Blob | ~80-90% | Apache 2.0 |
 | **Redis Operator** | ElastiCache, Memorystore | ~70-80% | Apache 2.0 |
+| **ScyllaDB** | AWS DynamoDB, Cassandra Managed | ~70-80% | Apache 2.0 |
 | **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% | Apache 2.0 |
 | **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
 | **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% | Apache 2.0 |
-| **Keycloak** | AWS Cognito, Auth0, Okta | ~90%+ | Apache 2.0 |
+| **SeaweedFS** | AWS S3, GCS, Azure Blob | ~80-90% | Apache 2.0 |
+| **Harbor** | Docker Hub, ECR, GCR, ACR | ~90%+ | Apache 2.0 |
+
+#### **📨 Messaging & Orchestration**
+
+| Operator | Replaces | Savings | License |
+|----------|----------|---------|---------|
+| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% | Apache 2.0 |
+| **RabbitMQ** | Amazon MQ, CloudAMQP | ~70-80% | MPL 2.0 |
+| **NATS** | AWS SNS/SQS, GCP Pub/Sub | ~80-90% | Apache 2.0 |
 | **Temporal** | AWS Step Functions, Azure Logic Apps | ~80-90% | Apache 2.0 |
-| **ScyllaDB** | AWS DynamoDB, Cassandra Managed | ~70-80% | Apache 2.0 |
+
+#### **🔐 Identity & Security**
+
+| Operator | Replaces | Savings | License |
+|----------|----------|---------|---------|
+| **Keycloak** | AWS Cognito, Auth0, Okta | ~90%+ | Apache 2.0 |
+
+#### **🤖 AI/ML Infrastructure**
+
+| Operator | Replaces | Savings | License |
+|----------|----------|---------|---------|
+| **NVIDIA GPU Operator** | Manual GPU driver management | N/A | Apache 2.0 |
+| **Ollama Operator** | OpenAI API, Anthropic API (for local models) | ~80-95% | MIT |
+| **KubeAI** | SageMaker, Vertex AI | ~70-80% | Apache 2.0 |
+| **LlamaStack** | Managed LLM endpoints | ~70-80% | MIT |
+
+#### **📊 Observability**
+
+| Operator | Replaces | Savings | License |
+|----------|----------|---------|---------|
+| **OpenTelemetry Operator** | Datadog, New Relic, Splunk | ~80-90% | Apache 2.0 |
+| **Jaeger Operator** | AWS X-Ray, Datadog APM | ~80-90% | Apache 2.0 |
 
 **Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
 
@@ -114,7 +143,9 @@ The platform is under active development.
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
+✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB, Harbor)  
+✅ AI/ML operators (NVIDIA GPU, Ollama, KubeAI, LlamaStack)  
+✅ Observability operators (OpenTelemetry, Jaeger)  
 ✅ Long-term memory with OpenMemory  
 ✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
@@ -1429,17 +1460,20 @@ For more details, see the [LICENSE](LICENSE) file.
 |----------|-------------|
 | **Platform** | Kubernetes, Helm, ArgoCD, Argo Workflows |
 | **Language** | Rust (Tokio, Axum, Serde) |
-| **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM |
+| **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM, KubeAI, LlamaStack |
+| **GPU** | NVIDIA GPU Operator, CUDA |
 | **MCP Tools** | Context7, OpenMemory, Brave Search, Hexstrike |
 | **Frontend** | React, Next.js, shadcn/ui, Tailwind CSS, Expo, Electron |
 | **Backend** | Rust, Go, Node.js, TypeScript |
-| **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
-| **Messaging** | Kafka (Strimzi) |
-| **Storage** | SeaweedFS (S3-compatible, Apache 2.0) |
+| **Databases** | PostgreSQL (CloudNative-PG), MySQL (Percona), MongoDB (Percona), Redis, ScyllaDB, ClickHouse, QuestDB, OpenSearch |
+| **Messaging** | Kafka (Strimzi), RabbitMQ, NATS |
+| **Storage** | SeaweedFS (S3-compatible), Harbor (Container Registry) |
 | **Secrets** | OpenBao (Vault fork) |
+| **Identity** | Keycloak |
+| **Orchestration** | Temporal |
 | **Networking** | Cloudflare Tunnels, Kilo VPN (WireGuard) |
 | **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
-| **Observability** | Prometheus, Grafana, Loki |
+| **Observability** | Prometheus, Grafana, Loki, OpenTelemetry, Jaeger |
 | **Security** | Trivy, Kube-bench, Gitleaks, Falco |
 | **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr |
 | **Agent Runtime** | Custom container image with multi-CLI support, Git, and development tooling |
