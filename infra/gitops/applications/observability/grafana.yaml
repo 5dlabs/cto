@@ -44,7 +44,7 @@ spec:
         persistence:
           enabled: true
           size: 10Gi
-          storageClassName: ""  # Use default storage class (Mayastor when configured)
+          storageClassName: "local-path"  # Use local-path until Mayastor is configured with hugepages
 
         # Service configuration
         service:

@@ -80,13 +80,22 @@ pub struct InstallCommand {
     #[arg(long, default_value = "standard")]
     profile: String,
 
-    /// GitOps repository URL.
+    /// GitOps repository URL (CTO platform infrastructure).
     #[arg(long, default_value = "https://github.com/5dlabs/cto")]
     gitops_repo: String,
 
     /// GitOps branch to deploy from.
     #[arg(long, default_value = "develop")]
     gitops_branch: String,
+
+    /// Customer's ArgoCD apps repository URL (e.g., "https://github.com/myorg/cto-apps").
+    /// This is where Bolt will create ArgoCD Application manifests for deployed workloads.
+    #[arg(long)]
+    apps_repo: Option<String>,
+
+    /// Branch for the apps repository.
+    #[arg(long, default_value = "main")]
+    apps_repo_branch: String,
 
     /// Enable VLAN private networking for node-to-node communication.
     /// Creates a Latitude VLAN and configures Talos with private IPs.
@@ -187,6 +196,8 @@ impl InstallCommand {
             gitops_repo: self.gitops_repo.clone(),
             gitops_branch: self.gitops_branch.clone(),
             sync_timeout_minutes: self.sync_timeout,
+            apps_repo: self.apps_repo.clone(),
+            apps_repo_branch: self.apps_repo_branch.clone(),
             profile,
             enable_vlan: self.enable_vlan,
             vlan_subnet: self.vlan_subnet.clone(),

@@ -20,6 +20,7 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
 
+mod cluster;
 mod doc_proxy;
 mod tools;
 
@@ -3267,6 +3268,31 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                     }]
                 }))),
                 Ok("update_mcp_server") => Some(handle_update_mcp_server(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                // Cluster management tools
+                Ok("cluster_create") => Some(cluster::handle_cluster_create_sync(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("cluster_status") => Some(cluster::handle_cluster_status(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("cluster_list") => Some(cluster::handle_cluster_list(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("cluster_delete") => Some(cluster::handle_cluster_delete_sync(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())

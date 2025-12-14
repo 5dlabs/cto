@@ -457,6 +457,7 @@ cluster:
           exemptions:
         namespaces:
             - kube-system
+            - mayastor  # Mayastor requires privileged access for storage operations
         runtimeClasses: []
         usernames: []
           kind: PodSecurityConfiguration

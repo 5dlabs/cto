@@ -103,6 +103,13 @@ impl Installer {
             .clone_from(&new_config.gitops_branch);
         existing.config.sync_timeout_minutes = new_config.sync_timeout_minutes;
 
+        // Update apps repository settings (always safe to update)
+        existing.config.apps_repo.clone_from(&new_config.apps_repo);
+        existing
+            .config
+            .apps_repo_branch
+            .clone_from(&new_config.apps_repo_branch);
+
         existing.save()?;
         Ok(())
     }
@@ -371,6 +378,11 @@ impl Installer {
             }
             InstallStep::WaitingGitOpsSync => {
                 self.wait_gitops_sync().await?;
+            }
+
+            // Apps repository configuration
+            InstallStep::ConfiguringAppsRepo => {
+                self.configure_apps_repo().await?;
             }
 
             // Post-GitOps configuration
@@ -953,6 +965,39 @@ spec:
         }
 
         ui::print_success("ClusterIssuer 'selfsigned-issuer' created");
+        Ok(())
+    }
+
+    // --- Apps Repository Configuration ---
+
+    async fn configure_apps_repo(&mut self) -> Result<()> {
+        // Check if apps repo is configured
+        let Some(ref apps_repo) = self.state.config.apps_repo else {
+            ui::print_info("Apps repository not configured, skipping");
+            ui::print_info("To enable Bolt deployments, re-run with --apps-repo <url>");
+            return Ok(());
+        };
+
+        let kubeconfig_path = self
+            .state
+            .kubeconfig_path
+            .as_ref()
+            .context("Kubeconfig not found in state")?;
+
+        ui::print_info(&format!("Configuring apps repository: {apps_repo}"));
+
+        // Use a temp directory for cloning/initialization
+        let temp_dir = tempfile::tempdir().context("Failed to create temp directory")?;
+
+        crate::apps_repo::configure_apps_repo(
+            apps_repo,
+            &self.state.config.apps_repo_branch,
+            kubeconfig_path,
+            temp_dir.path(),
+        )
+        .await?;
+
+        ui::print_success("Apps repository configured for Bolt deployments");
         Ok(())
     }
 

@@ -797,12 +797,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "cto-cost"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "url",
+ "wiremock",
+]
+
+[[package]]
 name = "cto-mcp"
 version = "0.0.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
+ "cto-cli",
+ "cto-cloud",
  "reqwest",
  "serde",
  "serde_json",

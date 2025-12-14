@@ -8,6 +8,10 @@ repository.workspace = true
 description = "CTO Platform installer and management CLI"
 homepage = "https://github.com/5dlabs/cto"
 
+[lib]
+name = "cto_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cto"
 path = "src/main.rs"
