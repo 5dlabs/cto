@@ -475,14 +475,16 @@ impl InstallState {
 
     /// Allocate the next private IP from the VLAN subnet.
     ///
-    /// Returns IPs in sequence: 10.8.0.1, 10.8.0.2, etc.
-    /// Validates that the host number stays within valid range (1-254).
+    /// Returns IPs in sequence based on subnet size:
+    /// - /24: 10.8.0.1, 10.8.0.2, ..., 10.8.0.254
+    /// - /23: 10.8.0.1, ..., 10.8.0.254, 10.8.1.1, ..., 10.8.1.254 (510 hosts)
+    /// - /16: 10.8.0.1, ..., 10.8.255.254 (65534 hosts)
     ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - The subnet format is invalid
-    /// - The subnet is exhausted (>254 hosts for a /24)
+    /// - The subnet is exhausted
     pub fn allocate_next_private_ip(&self) -> Result<String> {
         let subnet = &self.config.vlan_subnet;
         let base = subnet.split('/').next().unwrap_or("10.8.0.0");
@@ -495,7 +497,7 @@ impl InstallState {
             .unwrap_or(24);
 
         // Calculate max hosts for this subnet (2^(32-prefix) - 2 for network/broadcast)
-        // For /24: 254, /25: 126, /26: 62, etc.
+        // For /24: 254, /25: 126, /26: 62, /23: 510, /16: 65534
         let max_hosts = if prefix_len >= 31 {
             // /31 and /32 are special cases (point-to-point or single host)
             anyhow::bail!("Subnet /{prefix_len} too small for cluster networking");
@@ -507,31 +509,44 @@ impl InstallState {
 
         if next_host > max_hosts as usize {
             anyhow::bail!(
-                "VLAN subnet {} exhausted: cannot allocate host {} (max {} hosts)",
-                subnet,
-                next_host,
-                max_hosts
+                "VLAN subnet {subnet} exhausted: cannot allocate host {next_host} (max {max_hosts} hosts)"
             );
         }
 
-        // For simplicity, we allocate sequentially in the last octet
-        // This works correctly for /24 and smaller subnets
-        if next_host > 254 {
-            anyhow::bail!(
-                "Host number {} exceeds single-octet limit (254). Use a larger subnet.",
-                next_host
-            );
-        }
-
+        // Parse base IP octets
         let parts: Vec<&str> = base.split('.').collect();
-        if parts.len() == 4 {
-            Ok(format!(
-                "{}.{}.{}.{}",
-                parts[0], parts[1], parts[2], next_host
-            ))
-        } else {
-            Ok(format!("10.8.0.{next_host}"))
+        if parts.len() != 4 {
+            anyhow::bail!("Invalid subnet base address: {base}");
         }
+
+        let octets: Vec<u8> = parts
+            .iter()
+            .map(|p| p.parse::<u8>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| anyhow::anyhow!("Invalid subnet base address: {base}"))?;
+
+        // Calculate the IP by adding host number to the network address
+        // For sequential allocation, host 1 = .0.1, host 255 = .1.1, etc.
+        // We skip .0 addresses (network) and .255 addresses (broadcast within /24 blocks)
+        let host_num = u32::try_from(next_host)
+            .map_err(|_| anyhow::anyhow!("Host number {next_host} too large for IPv4"))?;
+
+        // Convert base to u32, add host offset, convert back
+        let base_ip = u32::from(octets[0]) << 24
+            | u32::from(octets[1]) << 16
+            | u32::from(octets[2]) << 8
+            | u32::from(octets[3]);
+
+        // Add host number to get the final IP
+        let result_ip = base_ip + host_num;
+
+        // Convert back to octets
+        let o1 = ((result_ip >> 24) & 0xFF) as u8;
+        let o2 = ((result_ip >> 16) & 0xFF) as u8;
+        let o3 = ((result_ip >> 8) & 0xFF) as u8;
+        let o4 = (result_ip & 0xFF) as u8;
+
+        Ok(format!("{o1}.{o2}.{o3}.{o4}"))
     }
 }
 

@@ -488,30 +488,36 @@ impl Installer {
 
         // Add firewall configuration if enabled
         if self.state.config.enable_firewall {
-            // Get control plane's private IP for etcd rules
-            let cp_private_ip = if self.state.config.enable_vlan {
-                self.state
+            // Firewall requires VLAN for proper private network isolation
+            // Without VLAN, nodes communicate via public IPs and host-level
+            // firewall rules would need to allow arbitrary public IP ranges
+            if self.state.config.enable_vlan {
+                // Get control plane's private IP for etcd rules
+                let cp_private_ip = self
+                    .state
                     .get_private_ip(&cp.id)
                     .cloned()
-                    .unwrap_or_else(|| "10.8.0.1".to_string())
+                    .unwrap_or_else(|| "10.8.0.1".to_string());
+
+                let cluster_subnet = self.state.config.vlan_subnet.clone();
+
+                ui::print_info(&format!(
+                    "Adding firewall config: cluster_subnet={cluster_subnet}"
+                ));
+
+                // Apply firewall rules:
+                // - Common rules (kubelet, apid, trustd, cilium) → all nodes
+                // - Control plane rules (K8s API, etcd) → only controlplane.yaml
+                config = config.with_ingress_firewall(&cluster_subnet, &[&cp_private_ip]);
             } else {
-                cp.ip.clone()
-            };
-
-            let cluster_subnet = if self.state.config.enable_vlan {
-                self.state.config.vlan_subnet.clone()
-            } else {
-                "10.0.0.0/8".to_string() // Default private subnet
-            };
-
-            ui::print_info(&format!(
-                "Adding firewall config: cluster_subnet={cluster_subnet}"
-            ));
-
-            // Apply firewall rules:
-            // - Common rules (kubelet, apid, trustd, cilium) → all nodes
-            // - Control plane rules (K8s API, etcd) → only controlplane.yaml
-            config = config.with_ingress_firewall(&cluster_subnet, &[&cp_private_ip]);
+                ui::print_warning(
+                    "⚠️  Firewall enabled but VLAN disabled - skipping host firewall configuration.",
+                );
+                ui::print_info(
+                    "   Host-level firewall requires VLAN for private network isolation.",
+                );
+                ui::print_info("   Use Kubernetes NetworkPolicies or cloud firewall for security.");
+            }
         }
 
         // Generate secrets
