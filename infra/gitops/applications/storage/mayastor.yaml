@@ -157,6 +157,12 @@ spec:
       kind: CustomResourceDefinition
       jsonPointers:
         - /metadata/annotations
+    # StatefulSet volumeClaimTemplates get apiVersion/kind added by K8s
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
 
   syncPolicy:
     automated:
