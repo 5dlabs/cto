@@ -95,6 +95,33 @@ Replace expensive managed cloud services with open-source Kubernetes operators:
 
 **Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
 
+### **🌐 Supported Infrastructure Providers**
+
+Deploy CTO on any infrastructure—bare-metal, on-premises, or cloud:
+
+#### **Bare-Metal Providers**
+
+| Provider | Description | Regions |
+|----------|-------------|---------|
+| **Latitude.sh** | Global bare-metal cloud with Gen4 10G+ networking | Americas, Europe, Asia-Pacific |
+| **Hetzner** | European dedicated servers with excellent price/performance | Germany, Finland |
+| **OVH** | European cloud & bare-metal with global reach | Europe, Americas, Asia-Pacific |
+| **Vultr** | Global bare-metal & cloud with simple pricing | 25+ locations worldwide |
+| **Scaleway** | European cloud provider with ARM & x86 options | France, Netherlands, Poland |
+| **Cherry Servers** | European bare-metal with high-performance networking | Lithuania, Netherlands |
+| **DigitalOcean** | Developer-friendly bare-metal droplets | Americas, Europe, Asia-Pacific |
+| **On-Premises** | Your own hardware with Talos Linux | Anywhere |
+
+#### **Cloud Providers**
+
+| Provider | Services | Description |
+|----------|----------|-------------|
+| **AWS** | EC2, EKS | Full AWS integration for hybrid deployments |
+| **Azure** | VMs, AKS | Microsoft Azure support for enterprise environments |
+| **GCP** | GCE, GKE | Google Cloud Platform integration |
+
+All providers are managed through the `cto-metal` CLI with unified provisioning workflows.
+
 </div>
 
 ---
@@ -1083,12 +1110,112 @@ Each agent independently configured with its own CLI, model, and tool access.
 
 ## **🔧 MCP Tools (Model Context Protocol)**
 
-The platform includes built-in MCP tools, but you can add ANY external MCP servers or custom tools you need:
+The platform includes built-in MCP tools for project management, workflow orchestration, and infrastructure provisioning:
 
-- **`addTool()`** — Dynamically add any MCP server by GitHub URL — agents instantly gain access to new capabilities
-- **`intake()`** — Project onboarding — initializes new projects with proper structure and configuration
-- **`docs()`** — Documentation generation — Morgan analyzes projects and creates comprehensive docs
+### **🎯 Project & Workflow Tools**
+
+- **`intake()`** — Project onboarding — parses PRDs, generates tasks, and creates documentation
 - **`play()`** — Full orchestration — coordinates the entire team through build/test/deploy phases
+- **`play_status()`** — Query workflow progress — shows active workflows, next tasks, and blocked tasks
+- **`jobs()`** — List running workflows — view all active Argo workflows with status
+- **`stop_job()`** — Stop workflows — gracefully terminate running workflows
+- **`input()`** — Send messages — communicate with running agent jobs in real-time
+
+### **🔌 MCP Server Management**
+
+- **`add_mcp_server()`** — Add MCP servers — install new MCP servers from GitHub repos with auto-PR and merge
+- **`remove_mcp_server()`** — Remove MCP servers — uninstall MCP servers with auto-cleanup
+- **`update_mcp_server()`** — Update MCP servers — refresh server configs from upstream repos
+
+### **🖥️ CLI Tools**
+
+| Tool | Description |
+|------|-------------|
+| **`cto-mcp`** | MCP server that integrates with any AI coding CLI (Claude, Cursor, Codex, Factory, etc.) |
+| **`cto-metal`** | Bare-metal provisioning CLI for Talos Linux clusters on any provider |
+| **`cto-installer`** | Platform installation and validation tool |
+
+### **🔧 Integrated MCP Servers**
+
+The platform includes 13 pre-configured MCP servers proxied through the tools service:
+
+| Server | Description | Transport |
+|--------|-------------|-----------|
+| **OpenMemory** | Long-term memory system for AI agents | HTTP |
+| **Context7** | Up-to-date library documentation and code examples | stdio |
+| **Docker** | Docker container management | stdio |
+| **Kubernetes** | Kubernetes cluster management with Helm support | stdio |
+| **Terraform** | Terraform Registry API integration | stdio |
+| **GitHub** | GitHub API operations for repos, issues, PRs, and code scanning | stdio |
+| **shadcn/ui** | Official shadcn/ui MCP server - browse, search, and install components | stdio |
+| **AI Elements** | AI-native UI component library for chat interfaces and streaming UIs | HTTP |
+| **Playwright** | Headless browser automation for visual testing - navigate, interact, screenshot | stdio |
+| **PostgreSQL AI Guide** | AI-optimized PostgreSQL expertise with semantic search over official docs | HTTP |
+| **Solana** | Solana blockchain development tools | HTTP |
+| **Firecrawl** | Web scraping, crawling, and content extraction with search capabilities | stdio |
+| **Rust Tools** | Rust analyzer integration (local, runs in agent containers) | stdio |
+
+### **📚 Available Tool Categories**
+
+#### **Context7** — Library Documentation
+- `resolve_library_id` — Find library IDs for documentation lookup
+- `get_library_docs` — Get up-to-date docs and code examples
+
+#### **Kubernetes** — Cluster Management
+- **Pods**: `pods_log`, `pods_exec`, `pods_list`, `pods_get`
+- **Resources**: `listResources`, `getResource`, `describeResource`, `createResource`
+- **Monitoring**: `getEvents`, `getPodsLogs`, `getPodMetrics`, `getNodeMetrics`, `getAPIResources`
+- **Helm**: `helmList`, `helmGet`, `helmHistory`, `helmInstall`, `helmUpgrade`, `helmRollback`, `helmUninstall`, `helmRepoAdd`, `helmRepoList`
+
+#### **ArgoCD** — GitOps Management
+- `get_application` — Get application details and status
+- `sync_application` — Trigger application sync
+- `get_application_workload_logs` — View workload logs
+- `get_application_events` — View application events
+
+#### **GitHub** — Repository & Code Management
+- **Repositories**: `search_repositories`, `create_repository`, `get_file_contents`
+- **Pull Requests**: `create_pull_request`, `get_pull_request`, `update_pull_request`, `list_pull_requests`, `merge_pull_request`, `get_pull_request_status`, `get_pull_request_files`, `get_pull_request_comments`, `add_pull_request_review_comment`, `create_pull_request_review`
+- **Issues**: `search_issues`, `create_issue`, `get_issue`, `list_issues`, `update_issue`, `add_issue_comment`
+- **Code**: `push_files`, `create_or_update_file`, `create_branch`, `list_commits`, `search_code`
+- **Security**: `list_code_scanning_alerts`, `get_code_scanning_alert`, `list_secret_scanning_alerts`, `get_secret_scanning_alert`
+
+#### **OpenMemory** — Agent Memory
+- `openmemory_query` — Search memories by context
+- `openmemory_store` — Store new memories
+- `openmemory_list` — List all memories
+- `openmemory_reinforce` — Strengthen memory associations
+- `openmemory_get` — Retrieve specific memories
+
+#### **Firecrawl** — Web Scraping
+- `scrape` — Scrape content from a single URL
+- `crawl` — Crawl a website and extract content from multiple pages
+- `search` — Search the web and extract content from results
+- `map` — Discover all URLs on a website
+
+#### **Playwright** — Browser Automation
+- `navigate` — Navigate to a URL
+- `screenshot` — Take screenshots of pages
+- `click` — Click on elements
+- `fill` — Fill form fields
+- `evaluate` — Execute JavaScript in the browser
+
+#### **Terraform** — Infrastructure as Code
+- Registry API for provider and module documentation
+
+#### **shadcn/ui** — Component Library
+- `list_components` — List available shadcn/ui components
+- `get_component` — Get component source code and demos
+- `install_component` — Install components to your project
+
+#### **AI Elements** — UI Components
+- `get_ai_elements_components` — Browse AI-native UI components for chat and streaming interfaces
+
+#### **PostgreSQL AI Guide** — Database Expertise
+- Semantic search over PostgreSQL documentation and best practices
+
+#### **Solana** — Blockchain Development
+- Solana blockchain tools for Web3 development
 
 ### Detailed Tool Reference
 
@@ -1430,7 +1557,7 @@ For more details, see the [LICENSE](LICENSE) file.
 | **Platform** | Kubernetes, Helm, ArgoCD, Argo Workflows |
 | **Language** | Rust (Tokio, Axum, Serde) |
 | **AI/ML** | Claude, GPT, Gemini, Ollama, vLLM |
-| **MCP Tools** | Context7, OpenMemory, Brave Search, Hexstrike |
+| **MCP Servers** | OpenMemory, Context7, GitHub, Kubernetes, Terraform, Playwright, Firecrawl, PostgreSQL AI Guide, Solana, shadcn/ui, AI Elements |
 | **Frontend** | React, Next.js, shadcn/ui, Tailwind CSS, Expo, Electron |
 | **Backend** | Rust, Go, Node.js, TypeScript |
 | **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
@@ -1441,7 +1568,8 @@ For more details, see the [LICENSE](LICENSE) file.
 | **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
 | **Observability** | Prometheus, Grafana, Loki |
 | **Security** | Trivy, Kube-bench, Gitleaks, Falco |
-| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr |
+| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean |
+| **Cloud** | AWS, Azure, GCP |
 | **Agent Runtime** | Custom container image with multi-CLI support, Git, and development tooling |
 
 ---
