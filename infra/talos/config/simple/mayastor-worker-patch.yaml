@@ -1,0 +1,20 @@
+---
+# Mayastor prerequisites patch for worker nodes
+# Apply with: talosctl patch machineconfig -n <node-ip> --patch @mayastor-worker-patch.yaml
+machine:
+  sysctls:
+    vm.nr_hugepages: "1024"  # 2GiB of 2MiB hugepages for Mayastor io_engine
+  nodeLabels:
+    openebs.io/engine: "mayastor"
+  kernel:
+    modules:
+      - name: nvme_tcp
+  kubelet:
+    extraMounts:
+      - destination: /var/local
+        type: bind
+        source: /var/local
+        options:
+          - bind
+          - rshared
+          - rw

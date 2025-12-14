@@ -7,6 +7,16 @@ persist: true
 machine:
   type: worker
   token: qt315g.8f9e1kb2r4p79efs
+  # Mayastor prerequisites: hugepages for NVMe storage
+  sysctls:
+    vm.nr_hugepages: "1024"  # 2GiB of 2MiB hugepages for Mayastor io_engine
+  # Node labels for Mayastor storage nodes
+  nodeLabels:
+    openebs.io/engine: "mayastor"
+  # Kernel modules for NVMe-oF
+  kernel:
+    modules:
+      - name: nvme_tcp
   ca:
     crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJQakNCOGFBREFnRUNBaEJ2TFQ0dzN2cnp1NE50UUUrcDZGeVhNQVVHQXl0bGNEQVFNUTR3REFZRFZRUUsKRXdWMFlXeHZjekFlRncweU5UQTJNekF5TXpBeE1UZGFGdzB6TlRBMk1qZ3lNekF4TVRkYU1CQXhEakFNQmdOVgpCQW9UQlhSaGJHOXpNQ293QlFZREsyVndBeUVBckNVc2YxeGZxenhwWnpFSFRsQXVCSllLSTh5UVpnS0RwZEJyCkFPY1JRZ2lqWVRCZk1BNEdBMVVkRHdFQi93UUVBd0lDaERBZEJnTlZIU1VFRmpBVUJnZ3JCZ0VGQlFjREFRWUkKS3dZQkJRVUhBd0l3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFkQmdOVkhRNEVGZ1FVa1pBa2xPcVM2YnNmYjROdAo3ekNJTUR5cXVETXdCUVlESzJWd0EwRUFlbXJHVlpDa3RKeXRpdmJZNjV1TFJDODVFUThpbFpsOVd0WHpldjM3CmdjR1lpVkFzT1pDdzRXV21GMld6SWgrOVlGT1F3ZEZJblRSOFJIak93RHZIQ3c9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
     key: ""
@@ -20,6 +30,15 @@ machine:
     nodeIP:
       validSubnets:
         - 192.168.1.0/24
+    # Mayastor requires /var/local mount for data paths
+    extraMounts:
+      - destination: /var/local
+        type: bind
+        source: /var/local
+        options:
+          - bind
+          - rshared
+          - rw
   network:
     # USB Ethernet adapters on Linux typically get predictable names like enx<mac>
     # We use a device selector to match by driver instead of hardcoding interface name
@@ -75,6 +94,7 @@ cluster:
       kubernetes:
         disabled: true
       service: {}
+
 
 
 

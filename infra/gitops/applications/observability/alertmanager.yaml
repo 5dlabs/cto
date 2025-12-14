@@ -24,7 +24,7 @@ spec:
         # Persistence
         persistence:
           enabled: true
-          storageClass: ""  # Use default storage class (Mayastor when configured)
+          storageClass: "local-path"  # Use local-path until Mayastor is configured
           size: 2Gi
 
         # Resource allocation
@@ -79,6 +79,24 @@ spec:
             repeat_interval: 4h
             receiver: 'discord-default'
             routes:
+              # CTO Platform alerts - send to healer for automated remediation
+              - matchers:
+                  - platform="cto"
+                receiver: 'healer-platform'
+                group_wait: 30s
+                group_interval: 2m
+                repeat_interval: 30m
+                continue: true  # Also send to Discord
+
+              # Argo Workflow alerts - send to healer for automated remediation
+              - matchers:
+                  - platform="argo"
+                receiver: 'healer-workflows'
+                group_wait: 30s
+                group_interval: 2m
+                repeat_interval: 30m
+                continue: true  # Also send to Discord
+
               # Critical alerts - immediate notification
               - matchers:
                   - severity="critical"
@@ -96,6 +114,22 @@ spec:
                 receiver: 'discord-webhooks'
                 group_by: ['alertname', 'instance']
           receivers:
+            # Healer Platform receiver - automated CTO platform remediation
+            - name: 'healer-platform'
+              webhook_configs:
+                - url: 'http://cto-healer.cto.svc.cluster.local:8080/api/alerts/platform'
+                  send_resolved: true
+                  http_config:
+                    follow_redirects: true
+
+            # Healer Workflows receiver - automated workflow remediation
+            - name: 'healer-workflows'
+              webhook_configs:
+                - url: 'http://cto-healer.cto.svc.cluster.local:8080/api/alerts/workflows'
+                  send_resolved: true
+                  http_config:
+                    follow_redirects: true
+
             # Default receiver - all alerts go to Discord
             - name: 'discord-default'
               discord_configs:

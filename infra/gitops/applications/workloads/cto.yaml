@@ -53,7 +53,7 @@ spec:
           namespace: cto
           imagePullSecrets:
             - name: ghcr-secret
-          storageClass: ""  # Use default storage class (Mayastor when configured)
+          storageClass: "local-path"  # Use local-path until Mayastor is configured with hugepages
 
         controller:
           enabled: true
