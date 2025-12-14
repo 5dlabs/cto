@@ -79,6 +79,10 @@ spec:
         storageClass:
           enabled: false
 
+        # Disable localpv-provisioner (we use rancher local-path for etcd)
+        localpv-provisioner:
+          enabled: false
+
         # Mayastor CSI driver
         csi:
           node:
