@@ -488,7 +488,16 @@ impl Installer {
                     .cloned()
                     .unwrap_or_else(|| "10.8.0.1".to_string());
 
-                let private_ip_cidr = format!("{cp_private_ip}/24");
+                // Extract prefix length from vlan_subnet (e.g., "10.8.0.0/24" -> "24")
+                let prefix = self
+                    .state
+                    .config
+                    .vlan_subnet
+                    .split('/')
+                    .nth(1)
+                    .unwrap_or("24");
+
+                let private_ip_cidr = format!("{cp_private_ip}/{prefix}");
 
                 ui::print_info(&format!(
                     "Adding VLAN config: VID={vlan_vid}, Interface={}, IP={private_ip_cidr}",
