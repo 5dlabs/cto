@@ -134,7 +134,8 @@ pub struct InstallConfig {
     /// Private network subnet for VLAN (e.g., "10.8.0.0/24").
     /// Node private IPs are allocated from this subnet.
     pub vlan_subnet: String,
-    /// Parent NIC for VLAN interface (e.g., "eth1", "eno2").
+    /// Parent NIC for VLAN interface (e.g., "enp1s0f1", "eth1").
+    /// Latitude c2/c3 servers use "enp1s0f1" as the secondary NIC.
     /// This is the internal/PXE NIC on Latitude servers.
     pub vlan_parent_interface: String,
     /// Enable Talos Ingress Firewall for host-level traffic control.
@@ -169,7 +170,7 @@ impl InstallConfig {
             profile: InstallProfile::default(),
             enable_vlan: true, // Recommended for bare metal
             vlan_subnet: "10.8.0.0/24".into(),
-            vlan_parent_interface: "eth1".into(), // Secondary NIC on Latitude
+            vlan_parent_interface: "enp1s0f1".into(), // Secondary NIC on Latitude c2/c3
             enable_firewall: true,                // Recommended for security
         }
     }
