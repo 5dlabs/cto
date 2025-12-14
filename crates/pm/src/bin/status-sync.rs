@@ -559,7 +559,7 @@ pub enum ClaudeStreamEvent {
         tools: Option<Vec<String>>,
         session_id: Option<String>,
     },
-    /// Assistant message (may contain text or tool_use)
+    /// Assistant message (may contain text or `tool_use`)
     Assistant {
         message: Option<AssistantMessage>,
         session_id: Option<String>,
@@ -595,7 +595,7 @@ pub struct UserMessage {
     pub content: Option<Vec<ContentBlock>>,
 }
 
-/// Content block (text or tool_use)
+/// Content block (text or `tool_use`)
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
@@ -717,10 +717,10 @@ async fn process_stream_event(
                     match content {
                         ContentBlock::ToolUse { name, input, .. } => {
                             // Format tool input summary (truncate if long, Unicode-safe)
-                            let input_summary = input
-                                .as_ref()
-                                .map(|v| truncate_chars(&v.to_string(), 100))
-                                .unwrap_or_else(|| "()".to_string());
+                            let input_summary = input.as_ref().map_or_else(
+                                || "()".to_string(),
+                                |v| truncate_chars(&v.to_string(), 100),
+                            );
 
                             let activity = format!("🔧 **{name}** → `{input_summary}`");
                             client.emit_thought(session_id, &activity).await?;
@@ -737,7 +737,7 @@ async fn process_stream_event(
                                 client.emit_thought(session_id, &display_text).await?;
                             }
                         }
-                        _ => {}
+                        ContentBlock::ToolResult { .. } => {}
                     }
                 }
             }
@@ -792,6 +792,7 @@ async fn process_stream_event(
             ..
         } => {
             *total_cost += total_cost_usd.unwrap_or(0.0);
+            #[allow(clippy::cast_precision_loss)]
             let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
             let turns = num_turns.unwrap_or(0);
 
