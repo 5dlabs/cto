@@ -76,15 +76,22 @@ Your entire platform can run on air-gapped infrastructure while still being acce
 
 Replace expensive managed cloud services with open-source Kubernetes operators:
 
-| Operator | Replaces | Savings |
-|----------|----------|---------|
-| **CloudNative-PG** | AWS RDS, Cloud SQL, Azure PostgreSQL | ~70-80% |
-| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% |
-| **MinIO** | AWS S3, GCS, Azure Blob | ~80-90% |
-| **Redis Operator** | ElastiCache, Memorystore | ~70-80% |
-| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% |
-| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% |
-| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% |
+| Operator | Replaces | Savings | License |
+|----------|----------|---------|---------|
+| **CloudNative-PG** | AWS RDS PostgreSQL, Cloud SQL, Azure PostgreSQL | ~70-80% | Apache 2.0 |
+| **Percona MySQL** | AWS RDS MySQL, Aurora, Cloud SQL MySQL | ~70-80% | Apache 2.0 |
+| **Percona MongoDB** | MongoDB Atlas, DocumentDB | ~60-70% | Apache 2.0 |
+| **Strimzi Kafka** | AWS MSK, Confluent Cloud | ~60-70% | Apache 2.0 |
+| **RabbitMQ** | Amazon MQ, CloudAMQP | ~70-80% | MPL 2.0 |
+| **NATS** | AWS SNS/SQS, GCP Pub/Sub | ~80-90% | Apache 2.0 |
+| **SeaweedFS** | AWS S3, GCS, Azure Blob | ~80-90% | Apache 2.0 |
+| **Redis Operator** | ElastiCache, Memorystore | ~70-80% | Apache 2.0 |
+| **OpenSearch** | AWS OpenSearch, Elastic Cloud | ~60-70% | Apache 2.0 |
+| **ClickHouse** | BigQuery, Redshift, Snowflake | ~70-80% | Apache 2.0 |
+| **QuestDB** | TimescaleDB Cloud, InfluxDB Cloud | ~70-80% | Apache 2.0 |
+| **Keycloak** | AWS Cognito, Auth0, Okta | ~90%+ | Apache 2.0 |
+| **Temporal** | AWS Step Functions, Azure Logic Apps | ~80-90% | Apache 2.0 |
+| **ScyllaDB** | AWS DynamoDB, Cassandra Managed | ~70-80% | Apache 2.0 |
 
 **Bolt** automatically deploys, monitors, and maintains these operators—giving you managed-service reliability at self-hosted prices.
 
@@ -107,7 +114,7 @@ The platform is under active development.
 ✅ GitHub Apps + Linear integration  
 ✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
-✅ Infrastructure operators (PostgreSQL, Kafka, Redis, MinIO, OpenSearch, ClickHouse, QuestDB)  
+✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
 ✅ Long-term memory with OpenMemory  
 ✅ Parallel task batching for faster development  
 🔄 Documentation and onboarding improvements  
@@ -1428,7 +1435,7 @@ For more details, see the [LICENSE](LICENSE) file.
 | **Backend** | Rust, Go, Node.js, TypeScript |
 | **Databases** | PostgreSQL (CloudNative-PG), Redis, ClickHouse, QuestDB, OpenSearch |
 | **Messaging** | Kafka (Strimzi) |
-| **Storage** | MinIO (S3-compatible) |
+| **Storage** | SeaweedFS (S3-compatible, Apache 2.0) |
 | **Secrets** | OpenBao (Vault fork) |
 | **Networking** | Cloudflare Tunnels, Kilo VPN (WireGuard) |
 | **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
@@ -1455,3 +1462,4 @@ For more details, see the [LICENSE](LICENSE) file.
 *The platform runs on Kubernetes and automatically manages multi-CLI agent deployments, workspace isolation, and GitHub integration. All you need to do is call the MCP tools and review the resulting PRs.*
 
 </div>
+

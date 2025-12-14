@@ -1,0 +1,364 @@
+---
+# =========================================================================
+# Project Intake WorkflowTemplate
+# =========================================================================
+# This template handles PRD intake with a separate GitHub preparation step:
+#
+# 1. github-prep: Creates new repo (if needed) or validates existing repo,
+#                 sets up webhooks, outputs repository URL
+# 2. intake-container: Runs tasks CLI to parse PRD and generate tasks
+# 3. cleanup: Removes temporary ConfigMaps
+#
+# The github-prep step is decoupled from intake, ensuring repository
+# creation/setup is handled separately before the main intake runs.
+# =========================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: project-intake
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: controller
+    app.kubernetes.io/component: project-intake
+    app.kubernetes.io/managed-by: Helm
+spec:
+  activeDeadlineSeconds: 7200
+  serviceAccountName: argo-workflow
+  entrypoint: intake-main
+  arguments:
+    parameters:
+      # Core parameters
+      - name: configmap-name
+        description: "Name of the ConfigMap containing intake files"
+      - name: project-name
+        description: "Project name (used for repo creation if no URL provided)"
+        value: ""
+      - name: repository-url
+        description: "Target repository URL (empty = create new repo)"
+        value: ""
+      - name: source-branch
+        description: "Source branch to work from"
+        value: "main"
+      # GitHub parameters
+      - name: github-app
+        description: "GitHub App for authentication"
+      - name: github-default-org
+        description: "Default GitHub org for new repos"
+        value: "5dlabs"
+      - name: github-visibility
+        description: "Visibility for new repos (public/private)"
+        value: "private"
+      - name: webhook-callback-url
+        description: "Webhook callback URL for GitHub events"
+        value: ""
+      # AI model parameters
+      - name: primary-model
+        description: "Primary AI model for task generation"
+      - name: research-model
+        description: "Research AI model"
+      - name: fallback-model
+        description: "Fallback AI model"
+      - name: primary-provider
+        description: "Primary AI provider"
+      - name: research-provider
+        description: "Research AI provider"
+      - name: fallback-provider
+        description: "Fallback AI provider"
+      # Task generation parameters
+      - name: num-tasks
+        description: "Target number of tasks to generate"
+        value: "15"
+      - name: expand-tasks
+        description: "Whether to expand tasks with subtasks"
+        value: "true"
+      - name: analyze-complexity
+        description: "Whether to analyze task complexity"
+        value: "true"
+      - name: docs-model
+        description: "Model for documentation generation"
+        value: ""
+      - name: enrich-context
+        description: "Whether to enrich context from URLs"
+        value: "true"
+      - name: include-codebase
+        description: "Whether to include codebase context"
+        value: "false"
+      - name: cli
+        description: "CLI tool to use"
+        value: "claude"
+      # Linear callback parameters
+      - name: linear-session-id
+        description: "Linear session ID for callbacks"
+        value: ""
+      - name: linear-issue-id
+        description: "Linear issue ID"
+        value: ""
+      - name: linear-issue-identifier
+        description: "Linear issue identifier (e.g., TSK-1)"
+        value: ""
+      - name: linear-team-id
+        description: "Linear team ID"
+        value: ""
+      # Runtime image (can be overridden for dev)
+      - name: runtime-image
+        description: "Container image for workflow steps"
+        value: "ghcr.io/5dlabs/runtime:latest"
+
+  templates:
+    # =========================================================================
+    # Main Entry Point
+    # =========================================================================
+    - name: intake-main
+      steps:
+        # Step 1: GitHub Preparation (creates repo if needed, sets up webhooks)
+        - - name: github-prep
+            template: github-prep-container
+            arguments:
+              parameters:
+                - name: configmap-name
+                  value: "{{workflow.parameters.configmap-name}}"
+
+        # Step 2: Run intake (expects valid repository URL from github-prep)
+        - - name: run-intake
+            template: intake-container
+            arguments:
+              parameters:
+                - name: configmap-name
+                  value: "{{workflow.parameters.configmap-name}}"
+                - name: repository-url
+                  value: "{{steps.github-prep.outputs.parameters.repository-url}}"
+
+        # Step 3: Cleanup ConfigMap
+        - - name: cleanup-config
+            template: cleanup-intake-config
+            arguments:
+              parameters:
+                - name: configmap-name
+                  value: "{{workflow.parameters.configmap-name}}"
+
+    # =========================================================================
+    # GitHub Preparation Step
+    # =========================================================================
+    # Creates repository if not provided, validates access, sets up webhooks
+    - name: github-prep-container
+      inputs:
+        parameters:
+          - name: configmap-name
+      outputs:
+        parameters:
+          - name: repository-url
+            valueFrom:
+              path: /tmp/repository-url
+      container:
+        image: "{{workflow.parameters.runtime-image}}"
+        imagePullPolicy: Always
+        command: ["/bin/bash"]
+        args: ["/agent-templates/github_prep.sh"]
+        workingDir: /workspace
+        env:
+          # Linear Agent Activity emission (pm-activity)
+          - name: LINEAR_SESSION_ID
+            value: "{{workflow.parameters.linear-session-id}}"
+          - name: LINEAR_ISSUE_ID
+            value: "{{workflow.parameters.linear-issue-id}}"
+          - name: LINEAR_ISSUE_IDENTIFIER
+            value: "{{workflow.parameters.linear-issue-identifier}}"
+          - name: LINEAR_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: linear-secrets
+                key: LINEAR_OAUTH_TOKEN
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+                optional: true
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+                optional: true
+          - name: GITHUB_APP_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: client-id
+                optional: true
+          - name: GITHUB_APP_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: client-secret
+                optional: true
+          - name: GITHUB_APP
+            value: "{{workflow.parameters.github-app}}"
+        volumeMounts:
+          - name: intake-files
+            mountPath: /intake-files
+            readOnly: true
+          - name: agent-templates
+            mountPath: /agent-templates
+            readOnly: true
+      volumes:
+        - name: intake-files
+          configMap:
+            name: "{{inputs.parameters.configmap-name}}"
+        - name: agent-templates
+          projected:
+            sources:
+              - configMap:
+                  name: controller-agent-templates-intake
+                  optional: true
+
+    # =========================================================================
+    # Intake Container Step
+    # =========================================================================
+    # Runs the tasks CLI to parse PRD and generate tasks
+    - name: intake-container
+      inputs:
+        parameters:
+          - name: configmap-name
+          - name: repository-url
+      container:
+        image: "{{workflow.parameters.runtime-image}}"
+        imagePullPolicy: Always
+        command: ["/bin/bash"]
+        args: ["/agent-templates/intake_intake.sh"]
+        workingDir: /workspace
+        env:
+          # Linear Agent Activity emission (pm-activity)
+          - name: LINEAR_SESSION_ID
+            value: "{{workflow.parameters.linear-session-id}}"
+          - name: LINEAR_ISSUE_ID
+            value: "{{workflow.parameters.linear-issue-id}}"
+          - name: LINEAR_ISSUE_IDENTIFIER
+            value: "{{workflow.parameters.linear-issue-identifier}}"
+          - name: LINEAR_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: linear-secrets
+                key: LINEAR_OAUTH_TOKEN
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: ANTHROPIC_API_KEY
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: OPENAI_API_KEY
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+                optional: true
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+                optional: true
+          - name: GITHUB_APP_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: client-id
+                optional: true
+          - name: GITHUB_APP_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: client-secret
+                optional: true
+          - name: GITHUB_APP
+            value: "{{workflow.parameters.github-app}}"
+          - name: PRIMARY_MODEL
+            value: "{{workflow.parameters.primary-model}}"
+          - name: RESEARCH_MODEL
+            value: "{{workflow.parameters.research-model}}"
+          - name: FALLBACK_MODEL
+            value: "{{workflow.parameters.fallback-model}}"
+          - name: PRIMARY_PROVIDER
+            value: "{{workflow.parameters.primary-provider}}"
+          - name: RESEARCH_PROVIDER
+            value: "{{workflow.parameters.research-provider}}"
+          - name: FALLBACK_PROVIDER
+            value: "{{workflow.parameters.fallback-provider}}"
+          - name: NUM_TASKS
+            value: "{{workflow.parameters.num-tasks}}"
+          - name: EXPAND_TASKS
+            value: "{{workflow.parameters.expand-tasks}}"
+          - name: ANALYZE_COMPLEXITY
+            value: "{{workflow.parameters.analyze-complexity}}"
+          # Pass repository URL from github-prep step
+          - name: REPOSITORY_URL
+            value: "{{inputs.parameters.repository-url}}"
+        volumeMounts:
+          - name: intake-files
+            mountPath: /intake-files
+            readOnly: true
+          - name: agent-templates
+            mountPath: /agent-templates
+            readOnly: true
+          - name: agents-config
+            mountPath: /config/agents
+            readOnly: true
+      volumes:
+        - name: intake-files
+          configMap:
+            name: "{{inputs.parameters.configmap-name}}"
+        - name: agent-templates
+          projected:
+            sources:
+              - configMap:
+                  name: controller-agent-templates-shared
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-claude
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-codex
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-cursor
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-factory
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-opencode
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-code-shared
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-docs
+                  optional: true
+              - configMap:
+                  name: controller-agent-templates-intake
+                  optional: true
+        - name: agents-config
+          configMap:
+            name: controller-agents
+
+    # =========================================================================
+    # Cleanup Step
+    # =========================================================================
+    - name: cleanup-intake-config
+      inputs:
+        parameters:
+          - name: configmap-name
+      script:
+        image: "{{workflow.parameters.runtime-image}}"
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          echo "Cleaning up ConfigMap: {{inputs.parameters.configmap-name}}"
+          kubectl delete configmap "{{inputs.parameters.configmap-name}}" \
+            -n cto \
+            --ignore-not-found=true
+          echo "Cleanup complete"

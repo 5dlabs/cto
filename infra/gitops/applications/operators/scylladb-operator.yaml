@@ -1,0 +1,105 @@
+---
+# ScyllaDB Operator - High-Performance Wide-Column Database
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/scylladb/scylla-operator
+#
+# Features:
+# - Cassandra-compatible (CQL)
+# - DynamoDB-compatible (Alternator API)
+# - Automatic scaling
+# - Multi-region replication
+# - Repair and backup
+# - Rolling upgrades
+# - Shard-aware drivers
+#
+# Note: ScyllaDB OSS is AGPL, but the operator is Apache 2.0
+# Users deploy ScyllaDB images, not us bundling them
+#
+# AWS Replacement: DynamoDB, Keyspaces (Cassandra)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: scylladb-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: scylladb-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/type: wide-column
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: platform
+  source:
+    repoURL: https://scylla-operator-charts.storage.googleapis.com/stable
+    chart: scylla-operator
+    targetRevision: "1.14.0"
+    helm:
+      values: |
+        # Operator configuration
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: scylladb-operator
+
+        # Webhook configuration
+        webhook:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+        # Leader election
+        leaderElection:
+          enabled: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: operators
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD and webhook differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle

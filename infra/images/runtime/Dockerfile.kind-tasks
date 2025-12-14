@@ -1,0 +1,33 @@
+# Runtime image with tasks CLI and pm-activity for Kind testing
+# Multi-stage build: compile binaries for Linux, then add to runtime
+
+# ===== BUILDER STAGE =====
+FROM rust:latest AS builder
+
+WORKDIR /build
+
+# Copy entire workspace for proper dependency resolution
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+
+# Build tasks binary
+RUN cargo build --release --package tasks --bin tasks
+
+# Build pm-activity binary (for Linear agent activities from workflows)
+RUN cargo build --release --package pm --bin pm-activity
+
+# ===== RUNTIME STAGE =====
+FROM ghcr.io/5dlabs/runtime:latest
+
+# Copy tasks binary from builder
+COPY --from=builder /build/target/release/tasks /usr/local/bin/tasks
+RUN chmod +x /usr/local/bin/tasks
+
+# Copy pm-activity binary from builder (for Linear agent activity emission)
+COPY --from=builder /build/target/release/pm-activity /usr/local/bin/pm-activity
+RUN chmod +x /usr/local/bin/pm-activity
+
+# Verify installation
+RUN tasks --version 2>&1 || tasks --help 2>&1 | head -5
+RUN pm-activity --help 2>&1 | head -5
+

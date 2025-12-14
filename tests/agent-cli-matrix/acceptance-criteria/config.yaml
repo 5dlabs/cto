@@ -1,0 +1,94 @@
+---
+# Config File Acceptance Criteria
+# Defines what makes a valid CLI config output
+
+criteria:
+  # Must-have checks
+  required:
+    - id: renders_without_error
+      description: "Config file renders without errors"
+      severity: critical
+
+    - id: not_empty
+      description: "Output is not empty"
+      severity: critical
+
+    - id: valid_format
+      description: "Output is valid JSON/TOML (depending on CLI)"
+      check: "is_valid_format()"
+      severity: critical
+
+  # Common fields
+  common:
+    - id: has_model_config
+      description: "Contains model configuration"
+      check: "has_field_any(['model', 'modelId', 'model_id'])"
+      severity: high
+
+  # CLI-specific structure
+  cli_specific:
+    claude:
+      file: "settings.json"
+      format: json
+      checks:
+        - id: has_permissions
+          description: "Contains permissions configuration"
+          check: "has_field('permissions')"
+        - id: has_env
+          description: "Contains environment configuration"
+          check: "has_field('env')"
+
+    codex:
+      file: "codex-config.toml"
+      format: toml
+      checks:
+        - id: has_model
+          description: "Contains model configuration"
+          check: "has_field('model')"
+        - id: has_approval
+          description: "Contains approval mode"
+          check: "has_field('approval_mode')"
+
+    cursor:
+      file: "cursor-cli-config.json"
+      format: json
+      checks:
+        - id: has_cursor_settings
+          description: "Contains Cursor-specific settings"
+          check: "is_object()"
+
+    factory:
+      file: "factory-cli-config.json"
+      format: json
+      checks:
+        - id: has_factory_settings
+          description: "Contains Factory-specific settings"
+          check: "is_object()"
+
+    gemini:
+      file: "settings.json"
+      format: json
+      checks:
+        - id: has_gemini_settings
+          description: "Contains Gemini-specific settings"
+          check: "is_object()"
+
+    opencode:
+      file: "opencode-config.json"
+      format: json
+      checks:
+        - id: has_opencode_settings
+          description: "Contains OpenCode-specific settings"
+          check: "is_object()"
+
+  # Size checks
+  size:
+    - id: minimum_size
+      description: "Config is at least 100 bytes"
+      check: "size_bytes >= 100"
+      severity: medium
+
+    - id: maximum_size
+      description: "Config is less than 10KB"
+      check: "size_bytes <= 10000"
+      severity: low

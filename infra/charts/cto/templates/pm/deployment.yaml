@@ -1,0 +1,51 @@
+{{- if .Values.pm.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.pm.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.pm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.pm.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.pm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cto.pm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.pm.fullname" . }}
+      containers:
+        - name: pm
+          image: "{{ include "cto.imageRef" (dict "component" "pm" "image" .Values.pm.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.pm.image "global" .Values.global) }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.pm.service.port }}
+              protocol: TCP
+          env:
+            - name: PM_PROVIDER
+              value: {{ .Values.pm.provider | quote }}
+            - name: KUBERNETES_NAMESPACE
+              value: {{ include "cto.namespace" . }}
+            - name: NAMESPACE
+              value: {{ include "cto.namespace" . }}
+            {{- if eq .Values.pm.provider "linear" }}
+            - name: LINEAR_ENABLED
+              value: {{ .Values.pm.linear.enabled | quote }}
+            - name: LINEAR_PORT
+              value: {{ .Values.pm.service.port | quote }}
+            {{- if .Values.pm.maxTimestampAgeMs }}
+            - name: LINEAR_MAX_TIMESTAMP_AGE_MS
+              value: {{ .Values.pm.maxTimestampAgeMs | quote }}
+            {{- end }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.pm.secrets.secretName }}
+          resources:
+            {{- toYaml .Values.pm.resources | nindent 12 }}
+{{- end }}

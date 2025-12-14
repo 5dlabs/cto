@@ -1,0 +1,115 @@
+---
+# Memory/System Prompt Acceptance Criteria
+# Defines what makes a valid system prompt output
+
+criteria:
+  # Must-have checks
+  required:
+    - id: renders_without_error
+      description: "System prompt template renders without errors"
+      severity: critical
+
+    - id: not_empty
+      description: "Output is not empty"
+      severity: critical
+
+    - id: is_markdown
+      description: "Contains markdown formatting (headers, lists)"
+      check: "contains_any(['#', '- ', '* ', '1.'])"
+      severity: high
+
+  # Content checks
+  content:
+    - id: has_identity
+      description: "Contains agent identity/role description"
+      check: "contains_any(['You are', 'Your role', 'assistant'])"
+      severity: high
+
+    - id: has_expertise
+      description: "Contains expertise/specialization context"
+      check: "has_agent_keywords()"
+      severity: medium
+
+    - id: no_unresolved_vars
+      description: "No unresolved Handlebars variables ({{}})"
+      check: "not_contains_pattern('\\{\\{[^}]+\\}\\}')"
+      severity: high
+
+  # Agent-specific content
+  agent_specific:
+    rex:
+      - id: rust_context
+        description: "Contains Rust-specific context"
+        check: "contains_any(['rust', 'cargo', 'Rust', 'Cargo'])"
+
+    blaze:
+      - id: frontend_context
+        description: "Contains frontend-specific context"
+        check: "contains_any(['frontend', 'React', 'UI', 'component'])"
+
+    grizz:
+      - id: go_context
+        description: "Contains Go-specific context"
+        check: "contains_any(['Go', 'golang', 'Golang'])"
+
+    nova:
+      - id: node_context
+        description: "Contains Node.js-specific context"
+        check: "contains_any(['Node', 'TypeScript', 'JavaScript', 'npm'])"
+
+    tap:
+      - id: mobile_context
+        description: "Contains mobile-specific context"
+        check: "contains_any(['mobile', 'React Native', 'iOS', 'Android'])"
+
+    spark:
+      - id: python_context
+        description: "Contains Python-specific context"
+        check: "contains_any(['Python', 'pip', 'python'])"
+
+    bolt:
+      - id: deploy_context
+        description: "Contains deployment-specific context"
+        check: "contains_any(['deploy', 'CI', 'CD', 'pipeline', 'release'])"
+
+    cipher:
+      - id: security_context
+        description: "Contains security-specific context"
+        check: "contains_any(['security', 'vulnerab', 'audit', 'scan'])"
+
+    cleo:
+      - id: quality_context
+        description: "Contains quality-specific context"
+        check: "contains_any(['quality', 'review', 'standard'])"
+
+    tess:
+      - id: test_context
+        description: "Contains testing-specific context"
+        check: "contains_any(['test', 'coverage', 'spec', 'QA'])"
+
+    stitch:
+      - id: review_context
+        description: "Contains review-specific context"
+        check: "contains_any(['review', 'PR', 'pull request', 'feedback'])"
+
+    morgan:
+      - id: docs_context
+        description: "Contains documentation-specific context"
+        check: "contains_any(['document', 'PRD', 'spec', 'requirement'])"
+
+    atlas:
+      - id: integration_context
+        description: "Contains integration-specific context"
+        check: "contains_any(['merge', 'conflict', 'integrate', 'rebase'])"
+
+  # Size checks
+  size:
+    - id: minimum_size
+      description: "System prompt is at least 500 bytes"
+      check: "size_bytes >= 500"
+      severity: medium
+
+    - id: maximum_size
+      description: "System prompt is less than 50KB"
+      check: "size_bytes <= 50000"
+      severity: low

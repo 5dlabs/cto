@@ -1,0 +1,166 @@
+---
+# Cilium Helm values for Talos Kubernetes clusters
+# This configuration is optimized for ClusterMesh multi-cluster networking
+
+# Cluster identity - MUST be unique per cluster
+# Override these values per-cluster using ArgoCD ApplicationSet or environment-specific values
+cluster:
+  name: default-cluster
+  id: 1  # Must be unique 1-255 for ClusterMesh
+
+# Kube-proxy replacement using eBPF
+kubeProxyReplacement: true
+
+# Talos-specific: Use KubePrism for API server access
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+# Enable IPAM (IP Address Management)
+ipam:
+  mode: kubernetes
+
+# WireGuard encryption for pod-to-pod traffic
+encryption:
+  enabled: true
+  type: wireguard
+  # Node-to-node encryption (includes control plane traffic)
+  nodeEncryption: false
+  # Strict mode requires all traffic to be encrypted
+  strictMode:
+    enabled: false
+
+# Hubble observability
+hubble:
+  enabled: true
+  # Hubble relay for aggregating flows
+  relay:
+    enabled: true
+    replicas: 1
+  # Hubble UI for visualization
+  ui:
+    enabled: true
+    replicas: 1
+    frontend:
+      server:
+        ipv6:
+          enabled: false
+  # Metrics export
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - httpV2:context=source;sourceContext=pod
+
+# Cilium Operator settings
+operator:
+  replicas: 1
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Cilium Agent settings
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 100m
+    memory: 512Mi
+
+# Enable BPF masquerading (required for kube-proxy replacement)
+bpf:
+  masquerade: true
+  # Enable host routing for better performance
+  hostLegacyRouting: false
+
+# Endpoint health checking
+endpointHealthChecking:
+  enabled: true
+
+# Enable local redirect policy for node-local DNS
+localRedirectPolicy: true
+
+# Enable bandwidth manager for better QoS
+bandwidthManager:
+  enabled: true
+  bbr: true
+
+# Enable socket load balancing for better performance
+socketLB:
+  enabled: true
+  hostNamespaceOnly: true
+
+# Enable host firewall for node protection
+hostFirewall:
+  enabled: false
+
+# External workloads support (for VMs or bare metal outside K8s)
+externalWorkloads:
+  enabled: false
+
+# BGP support (disabled by default)
+bgp:
+  enabled: false
+
+# Gateway API support
+gatewayAPI:
+  enabled: false
+
+# Ingress controller (use dedicated ingress instead)
+ingressController:
+  enabled: false
+
+# Node init container for compatibility
+nodeinit:
+  enabled: false
+
+# Prometheus metrics
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Enable if Prometheus Operator is installed
+
+# Install CNI configuration
+cni:
+  install: true
+  # Talos uses /etc/cni/net.d
+  confPath: /etc/cni/net.d
+  binPath: /opt/cni/bin
+  # Use exclusive mode to prevent conflicts
+  exclusive: true
+
+# Image settings
+image:
+  pullPolicy: IfNotPresent
+
+# Security context
+securityContext:
+  privileged: true
+
+# Tolerations for control plane nodes
+tolerations:
+  - operator: Exists
+
+# Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 2
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 2
+
+# Enable debug if needed
+debug:
+  enabled: false

@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.7-labs
+## Dexter Agent - Local Development Image
+## 
+## This Dockerfile uses Ubuntu base for local development on arm64/amd64.
+## For production, use the main Dockerfile with the runtime base image.
+##
+## https://github.com/virattt/dexter
+
+FROM ubuntu:24.04
+
+# Use bash for complex RUN steps
+SHELL ["/bin/bash", "-lc"]
+
+ARG TZ=UTC
+ENV TZ="$TZ"
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install base dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python-is-python3 \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user (node with UID/GID 1000)
+# Handle case where GID/UID 1000 already exists (common in Ubuntu)
+RUN if ! getent group node > /dev/null 2>&1; then \
+        groupadd -g 1000 node 2>/dev/null || groupadd node; \
+    fi && \
+    if ! id -u node > /dev/null 2>&1; then \
+        useradd --shell /bin/bash --create-home -u 1000 -g node node 2>/dev/null || \
+        useradd --shell /bin/bash --create-home -g node node; \
+    fi
+
+# Setup workspace and ensure correct ownership
+RUN mkdir -p /workspace /home/node/.cache/pip /home/node/.dexter && \
+    chown -R node:node /home/node /workspace
+
+WORKDIR /workspace
+
+# Install uv (fast Python package manager from Astral)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Clone and install Dexter using uv (required for uv-managed projects)
+ARG DEXTER_VERSION=latest
+RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
+    cd /opt/dexter && \
+    if [ "$DEXTER_VERSION" != "latest" ]; then \
+      git checkout "v${DEXTER_VERSION}"; \
+    fi && \
+    uv sync && \
+    ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
+
+# Verify installation
+RUN cd /opt/dexter && uv run python -c "from dexter.agent import Agent; print('Dexter installed successfully')"
+
+# Switch to node user for git config
+USER node
+
+# Configure git identity for agent operations
+RUN git config --global user.name "5D Labs Agent" && \
+    git config --global user.email "agent@5dlabs.com"
+
+# Environment defaults
+# Default to Claude Sonnet 4 for Anthropic compatibility
+# Can be overridden with DEXTER_MODEL env var (gpt-4.1, claude-*, gemini-*)
+ENV DEXTER_MODEL="claude-sonnet-4-20250514" \
+    DEXTER_MAX_STEPS="20" \
+    DEXTER_MAX_STEPS_PER_TASK="5"

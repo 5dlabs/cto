@@ -1,0 +1,94 @@
+[package]
+name = "controller"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "5D Labs platform orchestrator core library (controllers and CRDs)"
+homepage = "https://github.com/5dlabs/cto"
+
+# This is a library/binary crate for internal use only
+
+[dependencies]
+# Web framework
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Kubernetes
+kube = { workspace = true }
+kube-derive = { workspace = true }
+k8s-openapi = { workspace = true }
+schemars = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging and tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# OpenTelemetry
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# GitHub API
+octocrab = "0.38"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async utilities
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Time handling
+
+# Text processing
+regex = { workspace = true }
+handlebars = { workspace = true }
+lazy_static = "1.4"
+pulldown-cmark = "0.9"
+dashmap = "5.4"
+
+# Encoding
+base64 = "0.22"
+
+# File system
+tempfile = "3.8"
+
+# UUID generation
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+# Notifications
+notify = { path = "../notify" }
+
+# Binary configurations with proper naming
+[[bin]]
+name = "agent-controller"  # Kebab-case binary name (good for K8s/CLI)
+path = "src/bin/agent_controller.rs"  # Snake-case file name (Rust convention)
+
+[[bin]]
+name = "test-templates"
+path = "src/bin/test_templates.rs"
+
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = { workspace = true }
+wiremock = { workspace = true }
+uuid = { workspace = true }
+serial_test = { workspace = true }

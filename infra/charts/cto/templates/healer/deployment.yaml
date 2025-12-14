@@ -1,0 +1,73 @@
+{{- if .Values.healer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.healer.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.healer.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.healer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cto.healer.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.healer.fullname" . }}
+      containers:
+        - name: healer
+          image: "{{ include "cto.imageRef" (dict "component" "healer" "image" .Values.healer.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.healer.image "global" .Values.global) }}
+          command: ["healer"]
+          args: ["server"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: HEALER_CONFIG_PATH
+              value: /config/healer-config.json
+            - name: HEALER_TEMPLATES_DIR
+              value: "/app/templates/healer"
+            - name: RUST_LOG
+              value: "info"
+          envFrom:
+            - secretRef:
+                name: cto-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            {{- if .Values.healer.persistence.enabled }}
+            - name: workspace
+              mountPath: /workspace
+            {{- end }}
+          resources:
+            {{- toYaml .Values.healer.resources | nindent 12 }}
+        {{- if .Values.healer.filebrowser.enabled }}
+        - name: filebrowser
+          image: filebrowser/filebrowser:latest
+          ports:
+            - name: filebrowser
+              containerPort: {{ .Values.healer.filebrowser.port }}
+          args:
+            - --port={{ .Values.healer.filebrowser.port }}
+            - --noauth
+            - --root=/workspace
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "cto.healer.fullname" . }}-config
+        {{- if .Values.healer.persistence.enabled }}
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ include "cto.healer.fullname" . }}
+        {{- end }}
+{{- end }}

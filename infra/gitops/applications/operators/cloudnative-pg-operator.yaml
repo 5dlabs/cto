@@ -1,0 +1,123 @@
+---
+# Argo CD Application for CloudNativePG Operator
+# The most popular PostgreSQL operator for Kubernetes
+# Source: https://cloudnative-pg.io/
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudnative-pg-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project configuration
+  project: platform
+
+  # Source configuration - Using official CloudNativePG Helm chart
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: cloudnative-pg
+    targetRevision: 0.26.1
+    helm:
+      values: |
+        # Operator configuration
+        crds:
+          create: true
+
+        # Watch all namespaces
+        config:
+          create: true
+          data:
+            # Default configuration for operator
+            INHERITED_ANNOTATIONS: "*"
+            INHERITED_LABELS: "*"
+
+        # Pod labels for log collection
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing Deployments
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: cloudnative-pg-operator
+
+        # Operator resources
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Monitoring configuration
+        monitoring:
+          podMonitorEnabled: false  # Enable if using Prometheus Operator
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: cloudnative-pg
+
+  # Destination configuration
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: operators
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore certain differences in CRDs and webhook CA bundles
+  # The CNPG operator manages its own self-signed certificates and updates
+  # the webhook configurations dynamically. We must ignore caBundle changes
+  # to prevent ArgoCD from overwriting the operator's certificate updates.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/conversion
+        - /spec/preserveUnknownFields
+        - /metadata/annotations
+    # Ignore CA bundle differences - these are dynamically managed by the operator
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: cnpg-mutating-webhook-configuration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+        - /webhooks/2/clientConfig/caBundle
+        - /webhooks/3/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: cnpg-validating-webhook-configuration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+        - /webhooks/2/clientConfig/caBundle
+        - /webhooks/3/clientConfig/caBundle
+        - /webhooks/4/clientConfig/caBundle
+
+  # Revision history
+  revisionHistoryLimit: 5

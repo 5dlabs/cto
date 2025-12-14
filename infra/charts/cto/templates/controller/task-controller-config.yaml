@@ -1,0 +1,69 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-controller-config
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    job:
+      activeDeadlineSeconds: 7200
+    
+    agent:
+      image:
+        repository: {{ .Values.agent.image.repository | quote }}
+        tag: {{ .Values.agent.image.tag | quote }}
+      imagePullSecrets:
+        - ghcr-secret
+      cliImages:
+        {{- toYaml .Values.agent.cliImages | nindent 8 }}
+    
+    secrets:
+      apiKeySecretName: cto-secrets
+      apiKeySecretKey: ANTHROPIC_API_KEY
+      cliApiKeys:
+        codex:
+          secretKey: OPENAI_API_KEY
+          envVar: OPENAI_API_KEY
+        gemini:
+          secretKey: GEMINI_API_KEY
+          envVar: GEMINI_API_KEY
+        factory:
+          secretKey: FACTORY_API_KEY
+          envVar: FACTORY_API_KEY
+    
+    permissions:
+      agentToolsOverride: false
+      allow:
+        - "Bash(*)"
+        - "Edit(*)"
+        - "Read(*)"
+        - "Write(*)"
+        - "MultiEdit(*)"
+        - "Glob(*)"
+        - "Grep(*)"
+        - "LS(*)"
+      deny:
+        - "Bash(npm:install*, yarn:install*, cargo:install*, docker:*, kubectl:*, rm:-rf*, git:*)"
+    
+    telemetry:
+      enabled: true
+      otlpEndpoint: "http://otel-collector.observability.svc.cluster.local:4317"
+      otlpProtocol: "grpc"
+      logsEndpoint: "http://otel-collector.observability.svc.cluster.local:4318"
+      logsProtocol: "http"
+    
+    storage:
+      storageClassName: {{ .Values.global.storageClass | default "local-path" }}
+      workspaceSize: "10Gi"
+    
+    cleanup:
+      enabled: true
+      successTTLSeconds: 3600
+      failureTTLSeconds: 7200
+      completedJobDelayMinutes: 5
+      failedJobDelayMinutes: 60
+      deleteConfigMap: true
+{{- end }}

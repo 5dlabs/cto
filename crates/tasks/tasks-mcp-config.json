@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-mcp-config.json",
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "description": "Context7 - Real-time library documentation lookup"
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      },
+      "description": "Firecrawl - Web scraping and search"
+    }
+  }
+}
+
+
+
+
+

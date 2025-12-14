@@ -1,0 +1,68 @@
+[package]
+name = "pm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Project management server (Linear, Asana, Jira, etc.) for CTO platform"
+
+[[bin]]
+name = "pm-server"
+path = "src/bin/pm-server.rs"
+
+[[bin]]
+name = "status-sync"
+path = "src/bin/status-sync.rs"
+
+[[bin]]
+name = "pm-activity"
+path = "src/bin/pm-activity.rs"
+
+[dependencies]
+# CLI
+clap.workspace = true
+
+# Async trait for emitter abstraction
+async-trait.workspace = true
+# Workspace dependencies
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+reqwest.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+# HTTP server
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+# Kubernetes
+kube.workspace = true
+k8s-openapi.workspace = true
+
+# HMAC signature verification
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
+# Subtle for constant-time comparison
+subtle = "2.5"
+
+# Regex for task ID extraction
+regex = "1"
+
+# YAML frontmatter parsing
+serde_yaml = "0.9"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+wiremock.workspace = true
+
+
+

@@ -1,0 +1,25 @@
+{{- if .Values.cloudflare.enabled }}
+---
+# ClusterTunnel: Main Cloudflare Tunnel for CTO Platform
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: ClusterTunnel
+metadata:
+  name: {{ .Values.cloudflare.tunnel.name }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-tunnel
+spec:
+  newTunnel:
+    name: {{ .Values.cloudflare.tunnel.name }}
+  cloudflare:
+    domain: {{ .Values.cloudflare.domain }}
+    secret: {{ .Values.cloudflare.secretName }}
+    accountId: {{ .Values.cloudflare.accountId }}
+    {{- if .Values.cloudflare.email }}
+    email: {{ .Values.cloudflare.email }}
+    {{- end }}
+  fallbackTarget: http_status:404
+{{- end }}
+
+
+

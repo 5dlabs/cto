@@ -1,0 +1,178 @@
+---
+name: Healer CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/healer/**'
+      - 'infra/images/healer/**'
+      - '.github/workflows/healer-ci.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/healer/**'
+      - 'infra/images/healer/**'
+      - '.github/workflows/healer-ci.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job (lightweight - stays on ubuntu)
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      healer: ${{ steps.filter.outputs.healer }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            healer:
+              - 'crates/healer/**'
+              - '!crates/healer/**/*.md'
+            docker:
+              - 'infra/images/healer/**'
+
+  # Rust linting using composite action
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    outputs:
+      format-needed: ${{ steps.lint.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          components: rustfmt, clippy
+          sccache-size: '50G'
+
+      - name: Lint healer
+        id: lint
+        uses: ./.github/actions/rust-lint
+        with:
+          package: healer
+          use-sccache: 'true'
+
+  # Run tests using composite action
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Test healer
+        uses: ./.github/actions/rust-test
+        with:
+          package: healer
+          use-sccache: 'true'
+
+  # Build check using composite action
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build healer
+        uses: ./.github/actions/rust-build
+        with:
+          package: healer
+          binary: healer
+          use-sccache: 'true'
+
+  # Security audit (non-blocking)
+  security-audit:
+    needs: changes
+    if: needs.changes.outputs.healer == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run security audit
+        run: |
+          cargo install cargo-audit --version 0.21.2 2>/dev/null || true
+          cargo audit || true
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/images/healer/Dockerfile
+          failure-threshold: warning
+
+  # Build and push Docker image (only on push to main)
+  build-docker:
+    needs: [lint-rust, test-rust, build-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build healer binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: healer
+          binary: healer
+          output-path: healer
+          use-sccache: 'true'
+
+      - name: Verify templates directory
+        run: |
+          # Templates are in the unified templates/ directory (same pattern as controller)
+          echo "Verifying templates directory structure..."
+          ls -la templates/
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/healer/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "healer") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: healer
+          context: .
+          dockerfile: ./infra/images/healer/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

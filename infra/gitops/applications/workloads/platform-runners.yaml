@@ -1,0 +1,138 @@
+---
+# GitHub Actions Runner Scale Set for 5D Labs Platform
+# Uses the new official ARC runner scale sets
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-runner
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: k8s-runner
+    app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy after arc-controller which installs required CRDs
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  # Ignore differences in CRD fields that cause sync issues
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/preserveUnknownFields
+        - /metadata/annotations
+
+  source:
+    repoURL: https://github.com/actions/actions-runner-controller
+    targetRevision: gha-runner-scale-set-0.12.1
+    path: charts/gha-runner-scale-set
+
+    helm:
+      values: |
+        githubConfigUrl: "https://github.com/5dlabs"
+        githubConfigSecret: github-pat
+        runnerScaleSetName: "k8s-runner"
+        minRunners: 2
+        maxRunners: 4  # Reduced from 8 to prevent OOM - each runner can use up to 12Gi
+        runnerGroup: "Default"
+
+        # Docker-in-Docker configuration for container builds
+        containerMode:
+          type: "dind"
+
+        # Listener configuration for stable runner management
+        listenerTemplate:
+          spec:
+            # Allow listener to run on control plane if needed (critical for runners)
+            tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+            containers:
+            - name: listener
+              env:
+              - name: ACTIONS_RUNNER_CONTROLLER_IDLE_TIMEOUT
+                value: "3600"
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "150m"
+
+        controllerServiceAccount:
+          name: "arc-gha-rs-controller"
+          namespace: "arc-systems"
+
+        # Force persistent runner behavior with explicit configuration
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing resources
+        template:
+          metadata:
+            labels:
+              platform.5dlabs.io/log-collection: enabled
+            annotations:
+              logs.platform.5dlabs.io/collect: "true"
+              logs.platform.5dlabs.io/service: github-runner
+          spec:
+            restartPolicy: OnFailure
+            activeDeadlineSeconds: 3600
+            containers:
+            - name: runner
+              image: ghcr.io/5dlabs/rust-builder:latest
+              imagePullPolicy: Always
+              command: ["/home/runner/run.sh"]
+              # Resource limits to prevent OOM on the node
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "2Gi"
+                limits:
+                  cpu: "4"
+                  memory: "12Gi"
+              env:
+              - name: ACTIONS_RUNNER_EPHEMERAL
+                value: "false"
+              - name: RUNNER_SCOPE
+                value: "org"
+              - name: RUNNER_LABELS
+                value: "k8s-runner,self-hosted,linux,x64"
+              - name: DISABLE_RUNNER_UPDATE
+                value: "true"
+              - name: ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT
+                value: "true"
+              volumeMounts:
+              - name: rust-cache
+                mountPath: /cache
+            volumes:
+            - name: rust-cache
+              persistentVolumeClaim:
+                claimName: runner-cache-pvc
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-runners  # Namespace for runner scale set
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 10

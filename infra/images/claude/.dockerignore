@@ -1,0 +1,52 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Development files
+.taskmaster/
+.cursor/
+.env
+.env.*
+
+# Build artifacts
+node_modules/
+dist/
+build/
+*.log
+
+# Test files
+test/
+tests/
+*.test.*
+*.spec.*
+
+# Kubernetes/Helm files
+helm/
+infrastructure/
+*.yaml
+*.yml
+
+# Scripts (except needed ones)
+scripts/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak

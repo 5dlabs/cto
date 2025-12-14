@@ -1,0 +1,161 @@
+{{- if .Values.tools.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.tools.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.tools.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  replicas: {{ .Values.tools.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cto.tools.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: tools
+  template:
+    metadata:
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: "tools-mcp"
+      labels:
+        {{- include "cto.tools.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: tools
+        platform.5dlabs.io/log-collection: enabled
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.tools.fullname" . }}
+      securityContext:
+        # Match the 'app' user/group from the container image (UID/GID 1001)
+        fsGroup: 1001
+      initContainers:
+        - name: setup-directories
+          image: alpine:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Setting up directories..."
+              # Setup npm cache in home directory (matches Dockerfile /home/app)
+              mkdir -p /home/app/.npm
+              mkdir -p /home/app/.npm/_logs
+              chown -R 1001:1001 /home/app
+              chmod 755 /home/app/.npm
+              
+              # Setup data directory with correct ownership for app user
+              mkdir -p /data/workspace
+              chown -R 1001:1001 /data
+              
+              # Docker data directory is managed by the dind sidecar (runs as root)
+              mkdir -p /docker-data
+              
+              echo "Setup complete"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: home-app
+              mountPath: /home/app
+            - name: docker-data
+              mountPath: /docker-data
+      containers:
+        - name: tools
+          image: "{{ include "cto.imageRef" (dict "component" "tools" "image" .Values.tools.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.tools.image "global" .Values.global) }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+          ports:
+            - name: http
+              containerPort: {{ .Values.tools.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.tools.service.port | quote }}
+            - name: RUST_LOG
+              value: "info,kube=debug,tools=trace"
+            - name: SYSTEM_CONFIG_PATH
+              value: "/config"
+            # Set HOME to match the Dockerfile's app user home directory
+            - name: HOME
+              value: "/home/app"
+            # Docker host points to the dind sidecar via shared socket
+            - name: DOCKER_HOST
+              value: "unix:///var/run/docker.sock"
+            {{- if .Values.tools.config.secrets.context7 }}
+            - name: CONTEXT7_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.tools.config.secrets.context7 }}
+                  key: CONTEXT7_API_KEY
+                  optional: true
+            {{- end }}
+            {{- if .Values.tools.config.secrets.github }}
+            - name: GITHUB_PERSONAL_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.tools.config.secrets.github }}
+                  key: GITHUB_PERSONAL_ACCESS_TOKEN
+                  optional: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.tools.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: home-app
+              mountPath: /home/app
+            - name: docker-sock-dir
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+        # Docker-in-Docker sidecar for Docker-based MCP servers
+        - name: docker-daemon
+          image: docker:dind
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          volumeMounts:
+            - name: docker-sock-dir
+              mountPath: /var/run
+            - name: docker-data
+              mountPath: /var/lib/docker
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "cto.tools.fullname" . }}-config
+        - name: data
+          {{- if .Values.tools.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "cto.tools.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: home-app
+          emptyDir: {}
+        - name: docker-sock-dir
+          emptyDir: {}
+        - name: docker-data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

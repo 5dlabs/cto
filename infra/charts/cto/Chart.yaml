@@ -1,0 +1,15 @@
+---
+apiVersion: v2
+name: cto
+description: CTO Platform - AI Development Orchestration
+type: application
+version: 0.0.1
+appVersion: "0.0.1"
+keywords:
+  - ai
+  - agents
+  - orchestration
+  - kubernetes
+maintainers:
+  - name: 5D Labs
+    url: https://5dlabs.ai

@@ -1,0 +1,306 @@
+---
+# Argo CD Application for Prometheus
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 25.27.0
+    chart: prometheus
+    helm:
+      values: |
+        # Prometheus configuration
+        server:
+          persistentVolume:
+            enabled: true
+            storageClass: ""  # Use default storage class (Mayastor when configured)
+            size: 50Gi
+          # Pod security context
+          securityContext:
+            fsGroup: 65534
+            runAsUser: 65534
+            runAsGroup: 65534
+            runAsNonRoot: true
+          # Pod labels/annotations for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: prometheus
+          # Resource allocation
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+          # Data retention
+          retention: 15d
+          # Enable remote write receiver for OTel collector
+          extraFlags:
+            - web.enable-remote-write-receiver
+          # Global scrape configuration
+          global:
+            scrape_interval: 15s
+            scrape_timeout: 10s
+            evaluation_interval: 15s
+
+        # Scrape configurations
+        serverFiles:
+          prometheus.yml:
+            # Alerting configuration - connect to Alertmanager
+            alerting:
+              alertmanagers:
+                - static_configs:
+                    - targets:
+                        - alertmanager.observability.svc.cluster.local:9093
+
+            # Rule files to load
+            rule_files:
+              - /etc/config/alerting_rules.yml
+
+            scrape_configs:
+              # Self-scrape Prometheus
+              - job_name: prometheus
+                static_configs:
+                  - targets:
+                      - localhost:9090
+              # Scrape kube-state-metrics for pod/container status
+              - job_name: kube-state-metrics
+                static_configs:
+                  - targets:
+                      - kube-state-metrics.observability.svc.cluster.local:8080
+                metric_relabel_configs:
+                  # Keep pod and container status metrics
+                  - source_labels: [__name__]
+                    regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*'
+                    action: keep
+              # OTEL collector metrics
+              - job_name: otel-collector
+                static_configs:
+                  - targets:
+                      - otel-collector-opentelemetry-collector.observability.svc.cluster.local:8889
+                    labels:
+                      namespace: observability
+                      service: otel-collector
+              # Loki metrics (for LokiDown alert)
+              - job_name: loki
+                static_configs:
+                  - targets:
+                      - loki-gateway.observability.svc.cluster.local:80
+                    labels:
+                      namespace: observability
+                      service: loki
+              # Alertmanager metrics (for AlertmanagerDown alert)
+              - job_name: alertmanager
+                static_configs:
+                  - targets:
+                      - alertmanager.observability.svc.cluster.local:9093
+                    labels:
+                      namespace: observability
+                      service: alertmanager
+              # Grafana metrics (for GrafanaDown alert)
+              - job_name: grafana
+                static_configs:
+                  - targets:
+                      - grafana.observability.svc.cluster.local:80
+                    labels:
+                      namespace: observability
+                      service: grafana
+
+              # =================================================================
+              # Blackbox Exporter - External Endpoint Monitoring
+              # =================================================================
+              # Monitors external webhooks and APIs via Cloudflare tunnels
+              # to detect issues like stale tunnel configs or SSL problems
+
+              # External health endpoints (GET requests expecting 200)
+              - job_name: blackbox-external-endpoints
+                metrics_path: /probe
+                params:
+                  module: [http_health]
+                static_configs:
+                  - targets:
+                      - https://pm.5dlabs.ai/health
+                      - https://pm.5dlabs.ai/ready
+                    labels:
+                      service: pm
+                      endpoint_type: health
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.observability.svc:9115
+
+              # External webhook endpoints (POST requests, expect 4xx without payload)
+              - job_name: blackbox-external-webhooks
+                metrics_path: /probe
+                params:
+                  module: [http_webhook]
+                static_configs:
+                  - targets:
+                      - https://pm.5dlabs.ai/webhooks/linear
+                    labels:
+                      service: pm
+                      endpoint_type: webhook
+                      integration: linear
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.observability.svc:9115
+
+              # SSL certificate monitoring
+              - job_name: blackbox-ssl-certificates
+                metrics_path: /probe
+                params:
+                  module: [http_ssl]
+                scrape_interval: 1h  # Check SSL less frequently
+                static_configs:
+                  - targets:
+                      - https://pm.5dlabs.ai
+                    labels:
+                      service: pm
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.observability.svc:9115
+
+              # Blackbox exporter self-metrics
+              - job_name: blackbox-exporter
+                static_configs:
+                  - targets:
+                      - prometheus-blackbox-exporter.observability.svc:9115
+                    labels:
+                      namespace: observability
+                      service: blackbox-exporter
+
+          # =================================================================
+          # Alerting Rules for External Endpoint Monitoring
+          # =================================================================
+          alerting_rules.yml:
+            groups:
+              - name: external-endpoints
+                rules:
+                  # Alert when any external endpoint is unreachable
+                  - alert: ExternalEndpointDown
+                    expr: probe_success == 0
+                    for: 3m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "External endpoint unreachable: {{ $labels.instance }}"
+                      description: |
+                        The external endpoint {{ $labels.instance }} has been unreachable for more than 3 minutes.
+                        Service: {{ $labels.service }}
+                        Type: {{ $labels.endpoint_type }}
+                        This may indicate a Cloudflare tunnel misconfiguration or service outage.
+
+                  # Alert specifically for webhook endpoints
+                  - alert: WebhookEndpointDown
+                    expr: probe_success{endpoint_type="webhook"} == 0
+                    for: 2m
+                    labels:
+                      severity: critical
+                      service: "{{ $labels.service }}"
+                    annotations:
+                      summary: "Webhook endpoint down: {{ $labels.instance }}"
+                      description: |
+                        The {{ $labels.integration }} webhook endpoint at {{ $labels.instance }} is unreachable.
+                        Integration events (e.g., Linear webhooks) will fail to be received.
+                        Check Cloudflare tunnel configuration and PM service status.
+
+                  # High latency warning
+                  - alert: ExternalEndpointHighLatency
+                    expr: probe_duration_seconds > 5
+                    for: 5m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "High latency on external endpoint: {{ $labels.instance }}"
+                      description: |
+                        The endpoint {{ $labels.instance }} is responding slowly ({{ $value | printf "%.2f" }}s).
+                        Service: {{ $labels.service }}
+
+                  # SSL certificate expiring soon (within 14 days)
+                  - alert: SSLCertificateExpiringSoon
+                    expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+                    for: 1h
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "SSL certificate expiring soon: {{ $labels.instance }}"
+                      description: |
+                        The SSL certificate for {{ $labels.instance }} will expire in less than 14 days.
+                        Days remaining: {{ $value | humanizeDuration }}
+
+                  # SSL certificate expired or expiring very soon (within 3 days)
+                  - alert: SSLCertificateExpiring
+                    expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 3
+                    for: 10m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "SSL certificate expiring: {{ $labels.instance }}"
+                      description: |
+                        URGENT: The SSL certificate for {{ $labels.instance }} will expire in less than 3 days.
+                        Renew immediately to avoid service disruption.
+
+              - name: observability-stack
+                rules:
+                  # Blackbox exporter down
+                  - alert: BlackboxExporterDown
+                    expr: up{job="blackbox-exporter"} == 0
+                    for: 5m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "Blackbox exporter is down"
+                      description: |
+                        The Blackbox exporter is not responding. External endpoint monitoring is disabled.
+                        Check the blackbox-exporter deployment in the observability namespace.
+
+        # Disable components we don't need (using separate Alertmanager deployment)
+        alertmanager:
+          enabled: false
+
+        # Disable kube-state-metrics (deployed separately)
+        kube-state-metrics:
+          enabled: false
+
+        # Disable prometheus-node-exporter
+        prometheus-node-exporter:
+          enabled: false
+
+        # Disable prometheus-pushgateway
+        prometheus-pushgateway:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

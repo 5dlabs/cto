@@ -1,0 +1,238 @@
+---
+# Argo CD Application for OpenTelemetry Collector
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-collector
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: otel-collector
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    targetRevision: 0.127.2
+    chart: opentelemetry-collector
+    helm:
+      values: |
+        mode: deployment
+        replicaCount: 1
+
+        # Image configuration
+        image:
+          repository: otel/opentelemetry-collector-contrib
+          pullPolicy: IfNotPresent
+          tag: "0.105.0"
+
+        # Resource allocation - adjusted for development environment
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+
+        # Service configuration
+        ports:
+          otlp:
+            enabled: true
+            containerPort: 4317
+            servicePort: 4317
+            hostPort: 4317
+            protocol: TCP
+          otlp-http:
+            enabled: true
+            containerPort: 4318
+            servicePort: 4318
+            hostPort: 4318
+            protocol: TCP
+          prometheus:
+            enabled: true
+            containerPort: 8889
+            servicePort: 8889
+            protocol: TCP
+
+        # OpenTelemetry Collector configuration
+        config:
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                  max_recv_msg_size_mib: 64
+                http:
+                  endpoint: 0.0.0.0:4318
+                  cors:
+                    allowed_origins:
+                      - "*"
+
+          processors:
+            batch:
+              timeout: 10s
+              send_batch_size: 1024
+              send_batch_max_size: 2048
+
+            memory_limiter:
+              check_interval: 1s
+              limit_mib: 1500
+              spike_limit_mib: 512
+
+            resource:
+              attributes:
+                - key: cluster.name
+                  value: telemetry-dev
+                  action: insert
+                - key: deployment.environment
+                  value: development
+                  action: insert
+
+            # Transform metric names from dots to underscores for Prometheus compatibility
+            # NOTE: Claude Code emits metrics WITHOUT the claude_code prefix!
+            transform/metrics:
+              metric_statements:
+                - context: datapoint
+                  statements:
+                    # Transform actual metric names (no prefix) to Prometheus format with prefix
+                    - set(metric.name, "claude_code_lines_of_code_count") where metric.name == "lines_of_code.count"
+                    - set(metric.name, "claude_code_cost_usage") where metric.name == "cost.usage"
+                    - set(metric.name, "claude_code_token_usage") where metric.name == "token.usage"
+                    - set(metric.name, "claude_code_session_count") where metric.name == "session.count"
+                    - set(metric.name, "claude_code_commit_count") where metric.name == "commit.count"
+                    - set(metric.name, "claude_code_pull_request_count") where metric.name == "pull_request.count"
+                    - set(metric.name, "claude_code_code_edit_tool_decision") where metric.name == "code_edit_tool.decision"
+
+          exporters:
+            # Prometheus exporter for scraping
+            prometheus:
+              endpoint: "0.0.0.0:8889"
+              send_timestamps: true
+
+            # Prometheus Remote Write exporter for sending metrics to Prometheus
+            prometheusremotewrite:
+              endpoint: http://prometheus-server.observability.svc.cluster.local:9090/api/v1/write
+              tls:
+                insecure: true
+              timeout: 30s
+              retry_on_failure:
+                enabled: true
+                initial_interval: 5s
+                max_interval: 30s
+                max_elapsed_time: 300s
+
+            # Loki exporter for logs using OTLP/HTTP
+            otlphttp/loki:
+              endpoint: http://loki-gateway.observability.svc.cluster.local:80/otlp
+              tls:
+                insecure: true
+              retry_on_failure:
+                enabled: true
+                initial_interval: 5s
+                max_interval: 30s
+                max_elapsed_time: 300s
+
+            # Debug exporter for troubleshooting
+            debug:
+              verbosity: detailed
+              sampling_initial: 5
+              sampling_thereafter: 200
+
+          extensions:
+            health_check:
+              endpoint: 0.0.0.0:13133
+            pprof:
+              endpoint: 0.0.0.0:1777
+            zpages:
+              endpoint: 0.0.0.0:55679
+
+          service:
+            extensions: [health_check, pprof, zpages]
+            pipelines:
+              metrics:
+                receivers: [otlp]
+                processors: [memory_limiter, batch, resource, transform/metrics]
+                exporters: [prometheusremotewrite, prometheus, debug]
+              logs:
+                receivers: [otlp]
+                processors: [memory_limiter, batch, resource]
+                exporters: [otlphttp/loki, debug]
+              traces:
+                receivers: [otlp]
+                processors: [memory_limiter, batch, resource]
+                exporters: [debug]
+            telemetry:
+              metrics:
+                level: detailed
+                address: 0.0.0.0:8890
+
+        # Pod labels for log collection
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing Deployments
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        # Pod annotations for monitoring and log collection
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "8889"
+          prometheus.io/path: "/metrics"
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: otel-collector
+
+        # Liveness and readiness probes
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+        # Ingress configuration for OTLP gRPC endpoint
+        # Note: HTTP endpoint (port 4318) is excluded as nginx ingress annotations
+        # apply to the entire Ingress resource. If HTTP ingress is needed, create
+        # a separate Ingress resource without gRPC annotations.
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+            nginx.ingress.kubernetes.io/grpc-backend: "true"
+          hosts:
+            - host: otel-grpc.local
+              paths:
+                - path: /
+                  pathType: Prefix
+                  port: 4317
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

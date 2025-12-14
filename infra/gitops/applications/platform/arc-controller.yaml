@@ -1,0 +1,102 @@
+---
+# GitHub Actions Runner Controller (ARC)
+# Manages ephemeral GitHub Actions runners in Kubernetes
+# Previously manually deployed via Helm, now GitOps managed
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: arc-controller
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ci-cd
+  annotations:
+    # Deploy before platform-runners which depends on ARC CRDs
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  # Using Git repository instead of OCI registry due to ArgoCD OCI compatibility issues
+  # See: https://github.com/orgs/community/discussions/160686
+  source:
+    repoURL: https://github.com/actions/actions-runner-controller
+    targetRevision: gha-runner-scale-set-0.12.1
+    path: charts/gha-runner-scale-set-controller
+
+    helm:
+      values: |
+        # Controller configuration
+        replicaCount: 1
+
+        # Image configuration (use official image)
+        image:
+          repository: ghcr.io/actions/gha-runner-scale-set-controller
+          tag: "0.12.1"
+          pullPolicy: IfNotPresent
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: arc-gha-rs-controller
+
+        # Pod labels for log collection
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing Deployments
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: arc-controller
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Flags for controller
+        flags:
+          logLevel: info
+          logFormat: text
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-systems
+
+  # Ignore CRD differences that cause sync issues
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/preserveUnknownFields
+        - /metadata/annotations
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      # ServerSideApply uses managed fields instead of last-applied-configuration
+      # annotation, avoiding Kubernetes' 262144 byte limit for large CRDs like ARC's
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

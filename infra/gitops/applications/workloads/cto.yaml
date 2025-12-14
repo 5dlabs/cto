@@ -1,0 +1,198 @@
+---
+# CTO Platform - Single Application Deployment
+# Deploys all CTO platform components from a single Helm chart:
+# - Controller: Agent orchestration and CodeRun management
+# - PM Server: Project management integrations (Linear)
+# - Tools Server: MCP server proxy
+# - Healer: Self-healing platform monitor
+# - OpenMemory: Long-term AI agent memory
+# - Sensors: Argo Event automation
+# - Webhooks: GitHub event handling
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto
+    app.kubernetes.io/part-of: cto-platform
+  annotations:
+    # Image Updater for all CTO images
+    argocd-image-updater.argoproj.io/image-list: |
+      controller=ghcr.io/5dlabs/controller,
+      pm=ghcr.io/5dlabs/pm-server,
+      tools=ghcr.io/5dlabs/tools,
+      openmemory=ghcr.io/5dlabs/openmemory,
+      healer=ghcr.io/5dlabs/healer,
+      tweakcn=ghcr.io/5dlabs/tweakcn,
+      research=ghcr.io/5dlabs/research
+    argocd-image-updater.argoproj.io/controller.update-strategy: latest
+    argocd-image-updater.argoproj.io/pm.update-strategy: latest
+    argocd-image-updater.argoproj.io/tools.update-strategy: latest
+    argocd-image-updater.argoproj.io/openmemory.update-strategy: latest
+    argocd-image-updater.argoproj.io/healer.update-strategy: latest
+    argocd-image-updater.argoproj.io/tweakcn.update-strategy: latest
+    argocd-image-updater.argoproj.io/research.update-strategy: latest
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: develop
+    path: infra/charts/cto
+    helm:
+      valueFiles:
+        - values.yaml
+      # Production overrides
+      values: |
+        global:
+          namespace: cto
+          imagePullSecrets:
+            - name: ghcr-secret
+          storageClass: ""  # Use default storage class (Mayastor when configured)
+
+        controller:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/controller
+            tag: latest
+
+        pm:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/pm-server
+            tag: latest
+          github:
+            defaultOrg: "5dlabs"
+            webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
+
+        tools:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/tools
+            tag: latest
+
+        healer:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/healer
+            tag: latest
+
+        openmemory:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/openmemory
+            tag: latest
+
+        sensors:
+          enabled: true
+
+        webhooks:
+          enabled: true
+
+        tweakcn:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/tweakcn
+            tag: latest
+
+        # Research - Twitter/X bookmark research pipeline
+        research:
+          enabled: true
+          image:
+            repository: ghcr.io/5dlabs/research
+            tag: latest
+          # CronJob schedule (every 5 minutes)
+          schedule: "*/5 * * * *"
+          # Research configuration
+          minRelevance: "0.4"  # Lower threshold to capture more bookmarks
+          batchSize: "50"      # Process more per run
+          model: "claude-sonnet-4-20250514"
+          # PR creation disabled - research is local
+          createPR: false
+          # Email digest (daily at 9am UTC / 4am EST)
+          digest:
+            enabled: true
+            schedule: "0 9 * * *"
+            hoursBetween: "24"
+            skipAnalysis: false
+
+        cloudflare:
+          enabled: true
+
+        # BuildKit - Remote build infrastructure
+        # NOTE: BuildKit config is cluster-specific and must be updated per deployment
+        # To find worker nodes: kubectl get nodes -l node-role.kubernetes.io/control-plane!=
+        # To find node IPs: kubectl get nodes -o wide
+        # For Latitude clusters, update nodeSelector and insecureRegistries after provisioning
+        buildkit:
+          enabled: true
+          # Schedule on a worker node with sufficient resources
+          # Update this to match your cluster's worker node hostname
+          nodeSelector:
+            # TODO: Update for Latitude cluster worker node
+            kubernetes.io/hostname: talos-a43-ee1  # Simple cluster (update per cluster)
+          # Allow pushing to local in-cluster registry (HTTP)
+          # Update IPs to match your cluster's node IPs
+          config:
+            insecureRegistries:
+              # TODO: Update for Latitude cluster node IPs
+              - "192.168.1.72:30500"  # Simple cluster worker (update per cluster)
+              - "192.168.1.77:30500"  # Simple cluster control plane (update per cluster)
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    # Cloudflare operator adds default values
+    - group: networking.cfargotunnel.com
+      kind: ClusterTunnel
+      jsonPointers:
+        - /status
+    - group: networking.cfargotunnel.com
+      kind: TunnelBinding
+      jqPathExpressions:
+        - .subjects
+        - .tunnelRef
+    # StatefulSet field defaulting by API server (buildkit has 2 PVCs)
+    - group: apps
+      kind: StatefulSet
+      name: buildkit
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/volumeClaimTemplates/0/status
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
+        - /spec/volumeClaimTemplates/1/status
+        - /spec/volumeClaimTemplates/1/apiVersion
+        - /spec/volumeClaimTemplates/1/kind
+
+  revisionHistoryLimit: 5

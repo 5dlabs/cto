@@ -1,0 +1,101 @@
+---
+# RabbitMQ Cluster Operator
+# License: MPL 2.0 - Safe to distribute (file-level copyleft only)
+# Source: https://github.com/rabbitmq/cluster-operator
+#
+# Features:
+# - RabbitMQ cluster lifecycle management
+# - Automatic peer discovery
+# - TLS support
+# - Prometheus metrics
+# - Topology Operator for declarative queues/exchanges
+# - Messaging Topology Operator for policies
+#
+# Note: Using official RabbitMQ operator manifest instead of Bitnami Helm chart
+# due to Bitnami image availability issues.
+#
+# AWS Replacement: Amazon MQ, SQS (different paradigm)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rabbitmq-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: rabbitmq-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: messaging-operator
+    app.kubernetes.io/type: message-queue
+    platform.5dlabs.io/license: mpl-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/rabbitmq/cluster-operator
+    path: config/installation
+    targetRevision: v2.11.0
+    kustomize:
+      # Override the namespace from rabbitmq-system to operators
+      namespace: operators
+      # Add security context patches to comply with PodSecurity restricted policy
+      patches:
+        - target:
+            kind: Deployment
+            name: rabbitmq-cluster-operator
+          patch: |-
+            - op: add
+              path: /spec/template/spec/securityContext
+              value:
+                runAsNonRoot: true
+                fsGroup: 1001
+                seccompProfile:
+                  type: RuntimeDefault
+            - op: add
+              path: /spec/template/spec/containers/0/securityContext
+              value:
+                runAsUser: 1001
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: operators
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD and webhook differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle

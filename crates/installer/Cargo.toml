@@ -1,0 +1,62 @@
+[package]
+name = "cto-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CTO Platform installer and management CLI"
+homepage = "https://github.com/5dlabs/cto"
+
+[[bin]]
+name = "cto"
+path = "src/main.rs"
+
+[dependencies]
+# Internal crates
+metal = { path = "../metal" }
+
+# CLI framework
+clap = { workspace = true }
+dialoguer = { workspace = true }
+indicatif = { workspace = true }
+colored = { workspace = true }
+
+# Kubernetes
+kube = { workspace = true }
+k8s-openapi = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# HTTP Client
+reqwest = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# File system
+tempfile = "3.8"
+
+# Process execution
+which = "7.0"
+
+# System info
+sysinfo = "0.33"
+
+# Directories
+dirs = "5.0"

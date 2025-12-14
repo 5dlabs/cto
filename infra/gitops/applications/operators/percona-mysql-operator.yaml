@@ -1,0 +1,85 @@
+---
+# Percona Operator for MySQL based on Percona XtraDB Cluster
+# License: Apache 2.0 - Safe to distribute commercially
+# Source: https://github.com/percona/percona-xtradb-cluster-operator
+#
+# Features:
+# - Galera-based synchronous replication
+# - Automated backups to S3/GCS/Azure
+# - Point-in-time recovery
+# - ProxySQL for connection pooling
+# - Horizontal scaling
+# - PMM monitoring integration
+#
+# AWS Replacement: RDS MySQL, Aurora MySQL
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: percona-mysql-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: percona-mysql-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database-operator
+    app.kubernetes.io/type: relational
+    platform.5dlabs.io/license: apache-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+spec:
+  project: platform
+  source:
+    repoURL: https://percona.github.io/percona-helm-charts
+    chart: pxc-operator
+    targetRevision: "1.15.1"
+    helm:
+      values: |
+        # Watch all namespaces for PerconaXtraDBCluster resources
+        watchAllNamespaces: true
+
+        # Operator resources
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Disable cluster creation - we'll create clusters via CRDs
+        disableTelemetry: true
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: percona-mysql-operator
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: operators
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD annotation differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion

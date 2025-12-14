@@ -1,0 +1,45 @@
+# =========================================================================
+# Task Files
+# =========================================================================
+
+mkdir -p "$CLI_WORK_DIR/task"
+cp -R /task-files/* "$CLI_WORK_DIR/task/" 2>/dev/null || true
+
+# Verify critical task files
+echo ""
+echo "📁 Task Files:"
+
+# Prompt (required)
+if [ -f "$CLI_WORK_DIR/task/prompt.md" ]; then
+    echo "  ✓ prompt.md"
+else
+    echo "  ⚠️ prompt.md not found"
+fi
+
+# Acceptance Criteria (required for verification)
+if [ -f "$CLI_WORK_DIR/task/acceptance-criteria.md" ]; then
+    echo "  ✓ acceptance-criteria.md"
+    # Count criteria for summary
+    CRITERIA_COUNT=$(grep -cE '^\s*-\s*\[([ x])\]' "$CLI_WORK_DIR/task/acceptance-criteria.md" 2>/dev/null || echo "0")
+    echo "    └─ $CRITERIA_COUNT criteria items"
+else
+    echo "  ⚠️ acceptance-criteria.md not found (verification will be skipped)"
+fi
+
+# Task definition
+if [ -f "$CLI_WORK_DIR/task/task.md" ]; then
+    echo "  ✓ task.md"
+fi
+
+# Tools guide (optional)
+if [ -f "$CLI_WORK_DIR/task/tools-guide.md" ]; then
+    echo "  ✓ tools-guide.md"
+fi
+
+# Agent guidelines
+if [ -f /task-files/AGENTS.md ]; then
+    cp /task-files/AGENTS.md "$CLI_WORK_DIR/"
+    echo "  ✓ AGENTS.md"
+fi
+
+echo ""

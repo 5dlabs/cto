@@ -1,0 +1,45 @@
+---
+# Supplementary RBAC for OpenBao Kubernetes Service Registration
+#
+# The upstream OpenBao Helm chart doesn't include RBAC for pod label updates
+# needed by the Kubernetes service registration feature. This manifests the
+# required permissions to eliminate 403 errors in the logs.
+#
+# Apply alongside the Helm install:
+#   kubectl apply -f rbac-service-registration.yaml
+#
+# Or include in ArgoCD application with multiple sources.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-service-registration
+  namespace: openbao
+  labels:
+    app.kubernetes.io/name: openbao
+    app.kubernetes.io/instance: openbao
+    app.kubernetes.io/component: server
+rules:
+  # Required for Kubernetes service registration to update pod labels
+  # Labels updated: openbao-active, openbao-sealed, openbao-initialized
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openbao-service-registration
+  namespace: openbao
+  labels:
+    app.kubernetes.io/name: openbao
+    app.kubernetes.io/instance: openbao
+    app.kubernetes.io/component: server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openbao-service-registration
+subjects:
+  - kind: ServiceAccount
+    name: openbao
+    namespace: openbao

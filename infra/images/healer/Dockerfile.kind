@@ -1,0 +1,71 @@
+# Multi-stage Dockerfile for building healer with cargo-chef
+# Uses 3-stage build for optimal dependency caching
+
+# =============================================================================
+# Stage 1: Chef - Prepare recipe (dependency manifest)
+# =============================================================================
+FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
+WORKDIR /build
+
+# =============================================================================
+# Stage 2: Planner - Analyze dependencies
+# =============================================================================
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN cargo chef prepare --recipe-path recipe.json
+
+# =============================================================================
+# Stage 3: Builder - Build dependencies then application
+# =============================================================================
+FROM chef AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build dependencies - THIS IS THE CACHED LAYER!
+COPY --from=planner /build/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo chef cook --release --recipe-path recipe.json
+
+# Now copy source and build the actual application
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo build --release --package healer && \
+    cp /build/target/release/healer /tmp/healer
+
+# =============================================================================
+# Stage 4: Runtime - Minimal production image
+# =============================================================================
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -r -u 1000 -m -s /bin/bash app
+
+WORKDIR /app
+
+# Copy built binary to PATH location (Helm chart uses 'command: healer')
+COPY --from=builder /tmp/healer /usr/local/bin/healer
+
+# Copy healer templates (required at runtime)
+COPY templates/healer /app/templates/healer
+
+RUN chmod +x /usr/local/bin/healer && chown -R app:app /app
+
+USER 1000
+
+EXPOSE 8080
+
+CMD ["healer"]

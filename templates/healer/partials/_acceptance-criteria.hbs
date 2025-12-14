@@ -1,0 +1,23 @@
+{{!--
+  UNUSED TEMPLATE: This partial is only used by _base.hbs which is not active.
+  Currently, all alerts have their own hardcoded acceptance criteria sections.
+
+  Required context field (not yet in AlertContext):
+  - acceptance_criteria: Vec<{section: String, items: Vec<String>}>
+--}}
+```bash
+cat > "${ISSUE_DIR}/acceptance-criteria.md" << CRITERIA
+# Acceptance Criteria - Issue #${ISSUE_NUMBER}
+
+## Definition of Done
+
+{{#each acceptance_criteria}}
+### {{section}}
+{{#each items}}
+- [ ] {{this}}
+{{/each}}
+
+{{/each}}
+CRITERIA
+```
+

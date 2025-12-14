@@ -1,0 +1,58 @@
+---
+# LlamaStack + GLM-4.5-Air Distribution
+# Combines Meta's LlamaStack framework with Zhipu AI's GLM-4.5-Air model
+# License: MIT (GLM-4.5), MIT (LlamaStack)
+#
+# Features:
+# - Hybrid reasoning (thinking + non-thinking modes)
+# - Built-in safety guardrails from LlamaStack
+# - Tool calling and function execution
+# - 128K context window
+#
+# Requirements:
+# - H100 x 2 (FP8) or H100 x 4 (BF16) GPUs
+# - HuggingFace token for model download
+apiVersion: llamastack.io/v1alpha1
+kind: LlamaStackDistribution
+metadata:
+  name: llamastack-glm45
+  labels:
+    app.kubernetes.io/name: llamastack-glm45
+    app.kubernetes.io/component: ai-stack
+spec:
+  replicas: 1
+  server:
+    distribution:
+      name: vllm
+    containerSpec:
+      port: 8321
+      env:
+        # GLM-4.5-Air FP8 for better memory efficiency
+        - name: VLLM_MODEL
+          value: "zai-org/GLM-4.5-Air-FP8"
+        # Enable GPU
+        - name: VLLM_TARGET_DEVICE
+          value: "gpu"
+        # Tensor parallelism for multi-GPU
+        - name: VLLM_TENSOR_PARALLEL_SIZE
+          value: "2"
+        # GLM-4.5 specific parsers
+        - name: VLLM_TOOL_CALL_PARSER
+          value: "glm45"
+        - name: VLLM_REASONING_PARSER
+          value: "glm45"
+      resources:
+        requests:
+          memory: "64Gi"
+          cpu: "8"
+          nvidia.com/gpu: "2"
+        limits:
+          memory: "128Gi"
+          cpu: "16"
+          nvidia.com/gpu: "2"
+    storage:
+      size: "100Gi"
+      mountPath: "/home/lls/.lls"
+  # Requires secret with HuggingFace token
+  # kubectl create secret generic hf-token-secret \
+  #   --from-literal=token=<your-hf-token> -n llama-stack

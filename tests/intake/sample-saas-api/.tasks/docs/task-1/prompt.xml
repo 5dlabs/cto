@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" priority="high" agent="rex">
+    <meta>
+        <title>Setup project foundation and database infrastructure</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 1 with production-quality code.</role>
+
+    <context>
+        <overview>Initialize Rust/Axum project with PostgreSQL and Redis integration, establishing core infrastructure for the TeamSync API</overview>
+        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+    </context>
+
+    <requirements>
+        <description>1. Create Cargo workspace with axum 0.7, sqlx, redis dependencies
+2. Setup PostgreSQL connection pool with sqlx migrations
+3. Configure Redis client for sessions and rate limiting
+4. Implement health check endpoints (/health/live, /health/ready)
+5. Add structured JSON logging with tracing and trace IDs
+6. Create Docker multi-stage build with Rust 1.75+
+7. Setup basic error handling and middleware stack
+
+```rust
+// Main structure
+struct AppState {
+    db: PgPool,
+    redis: redis::Client,
+}
+
+// Health checks
+async fn liveness() -&gt; StatusCode { StatusCode::OK }
+async fn readiness(State(state): State&lt;AppState&gt;) -&gt; Result&lt;StatusCode&gt; {
+    // Check DB and Redis connectivity
+}
+```</description>
+        <constraints>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-1): Setup project foundation and database infrastructure</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>Unit tests for health endpoints, integration tests for DB/Redis connectivity, verify Docker build completes successfully and container starts</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test (Rust)</command>
+        <command>cargo clippy -- -D warnings (Rust)</command>
+        <command>go test ./... (Go)</command>
+        <command>npm test (Node.js)</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
+    </deliverables>
+</task>

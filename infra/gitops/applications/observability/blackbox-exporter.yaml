@@ -1,0 +1,118 @@
+---
+# Argo CD Application for Blackbox Exporter
+# Monitors external endpoints (webhooks, APIs) for availability
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: blackbox-exporter
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: blackbox-exporter
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 9.1.0
+    chart: prometheus-blackbox-exporter
+    helm:
+      values: |
+        # Blackbox Exporter configuration for external endpoint monitoring
+        replicaCount: 1
+
+        # Resource allocation
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+
+        # Pod labels/annotations for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: blackbox-exporter
+
+        # Security context
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+
+        # Blackbox modules configuration
+        config:
+          modules:
+            # Standard HTTP GET check - expects 200
+            http_2xx:
+              prober: http
+              timeout: 10s
+              http:
+                valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+                valid_status_codes: [200]
+                method: GET
+                follow_redirects: true
+                preferred_ip_protocol: "ip4"
+                tls_config:
+                  insecure_skip_verify: false
+
+            # HTTP GET for health endpoints - more lenient timeout
+            http_health:
+              prober: http
+              timeout: 15s
+              http:
+                valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+                valid_status_codes: [200]
+                method: GET
+                follow_redirects: true
+                preferred_ip_protocol: "ip4"
+
+            # Webhook endpoint check (POST returns 4xx without valid payload)
+            http_webhook:
+              prober: http
+              timeout: 10s
+              http:
+                valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+                # Webhooks return 400/401/403 without valid payload, which is expected
+                valid_status_codes: [200, 400, 401, 403, 405]
+                method: POST
+                follow_redirects: true
+                preferred_ip_protocol: "ip4"
+                headers:
+                  Content-Type: application/json
+                body: "{}"
+
+            # SSL certificate check
+            http_ssl:
+              prober: http
+              timeout: 10s
+              http:
+                valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+                method: GET
+                fail_if_ssl: false
+                fail_if_not_ssl: true
+                preferred_ip_protocol: "ip4"
+
+        # Service configuration
+        service:
+          type: ClusterIP
+          port: 9115
+
+        # ServiceMonitor for Prometheus Operator (if used)
+        serviceMonitor:
+          enabled: false  # We'll use static scrape config instead
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

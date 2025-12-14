@@ -1,0 +1,61 @@
+---
+# Markdown linting configuration - Very lenient for technical documentation
+# Only enable the most critical rules for content quality
+
+# Default state - disable most rules
+default: false
+
+# Enable only essential content quality rules
+MD001: true  # Heading levels should only increment by one level at a time
+MD003: true  # Heading style should be consistent
+MD004: true  # Unordered list style should be consistent
+MD005: true  # Inconsistent indentation for list items at the same level
+MD006: true  # Consider starting bulleted lists at the beginning of the line
+MD009: true  # Trailing spaces
+MD010: true  # Hard tabs
+MD011: true  # Reversed link syntax
+MD014: true  # Dollar signs used before commands without showing output
+MD018: true  # No space after hash on atx style heading
+MD019: true  # Multiple spaces after hash on atx style heading
+MD023: true  # Headings must start at the beginning of the line
+MD027: true  # Multiple spaces after blockquote symbol
+MD028: true  # Blank line inside blockquote
+MD037: true  # Spaces inside emphasis markers
+MD038: true  # Spaces inside code span elements
+MD039: true  # Spaces inside link text
+MD042: true  # No empty links
+
+# Explicitly disable problematic rules that are too strict for technical docs
+MD012: false  # Multiple consecutive blank lines
+MD013: false  # Line length - too restrictive for technical docs
+MD022: false  # Headings surrounded by blank lines
+MD025: false  # Multiple top-level headings
+MD026: false  # Trailing punctuation in heading
+MD029: false  # Ordered list item prefix
+MD030: false  # Spaces after list markers
+MD031: false  # Fenced code blocks surrounded by blank lines
+MD032: false  # Lists surrounded by blank lines
+MD033: false  # Inline HTML
+MD034: false  # Bare URL without angle brackets
+MD036: false  # Emphasis used instead of heading
+MD040: false  # Fenced code blocks should have language specified
+MD041: false  # First line in file should be top-level heading
+MD045: false  # Images should have alternate text
+MD047: false  # Files should end with single newline
+
+# Configure the few rules we do enable
+MD007:
+  indent: 2
+  start_indented: false
+
+MD046:
+  style: "fenced"
+
+MD048:
+  style: "backtick"
+
+MD049:
+  style: "asterisk"
+
+MD050:
+  style: "asterisk"

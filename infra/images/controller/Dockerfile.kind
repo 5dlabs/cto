@@ -1,0 +1,85 @@
+# Multi-stage Dockerfile for building controller with cargo-chef
+# Uses 3-stage build for optimal dependency caching
+
+# =============================================================================
+# Stage 1: Chef - Prepare recipe (dependency manifest)
+# =============================================================================
+FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
+WORKDIR /build
+
+# =============================================================================
+# Stage 2: Planner - Analyze dependencies
+# =============================================================================
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN cargo chef prepare --recipe-path recipe.json
+
+# =============================================================================
+# Stage 3: Builder - Build dependencies then application
+# =============================================================================
+FROM chef AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build dependencies - THIS IS THE CACHED LAYER!
+# As long as Cargo.toml/Cargo.lock don't change, this layer is reused
+COPY --from=planner /build/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo chef cook --release --recipe-path recipe.json
+
+# Now copy source and build the actual application
+# Only this step runs when source code changes
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo build --release --bin agent-controller && \
+    cp /build/target/release/agent-controller /tmp/agent-controller
+
+# =============================================================================
+# Stage 4: Runtime - Minimal production image
+# =============================================================================
+FROM debian:bookworm-slim
+
+# Install only essential runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    wget \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create app user
+RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
+
+# Set working directory
+WORKDIR /app
+
+# Copy built binary from builder stage
+COPY --from=builder /tmp/agent-controller /app/agent-controller
+
+# Copy templates directory (required by controller at runtime)
+COPY templates /app/templates
+
+# Make binary executable and change ownership to app user  
+RUN chmod +x /app/agent-controller && \
+    chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Run the application
+CMD ["./agent-controller"]

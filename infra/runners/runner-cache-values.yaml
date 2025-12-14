@@ -1,0 +1,50 @@
+---
+# ARC Runner Scale Set Values - Cache Configuration
+# This configures runners with shared cache PVC
+
+# Runner labels for GitHub Actions targeting
+githubConfigSecret: github-pat
+runnerLabels:
+  - k8s-runner
+
+template:
+  spec:
+    # Node affinity to ensure all runners land on same node for ReadWriteOnce cache sharing
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: Exists
+      podAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  actions.github.com/scale-set-name: k8s-runner
+              topologyKey: kubernetes.io/hostname
+    containers:
+      - name: runner
+        image: ghcr.io/5dlabs/rust-builder:latest
+        imagePullPolicy: Always
+        command: ["/home/runner/run.sh"]
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: cache-volume
+            mountPath: /cache
+          - name: cache-volume
+            mountPath: /home/runner/.cargo
+            subPath: cargo
+          - name: cache-volume
+            mountPath: /home/runner/.cache
+            subPath: general
+    volumes:
+      - name: work
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: runner-cache-pvc

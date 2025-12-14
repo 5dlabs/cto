@@ -1,0 +1,551 @@
+---
+# =============================================================================
+# CTO Platform - Unified Configuration
+# =============================================================================
+# Single chart for all CTO platform components:
+# - Controller: Agent orchestration and CodeRun management
+# - PM: Project management integrations (Linear)
+# - Tools: MCP server proxy
+# - Healer: Self-healing platform monitor
+# - OpenMemory: Long-term AI agent memory
+# - Sensors: Argo Event sensors for automation
+# - Webhooks: GitHub webhook event handling
+
+# Global configuration shared across all components
+global:
+  namespace: cto
+  imagePullSecrets:
+    - name: ghcr-secret
+  # Storage class for PVCs
+  storageClass: local-path
+
+  # ==========================================================================
+  # Dev Registry - Toggle between GHCR and local in-cluster registry
+  # ==========================================================================
+  # Enable this to use images from a local registry instead of GHCR.
+  # Useful for fast iteration during development without pushing to GHCR.
+  #
+  # Setup: ./scripts/dev-load.sh --setup
+  # Build: ./scripts/dev-load.sh controller
+  # Toggle: helm upgrade cto ./infra/charts/cto --set global.devRegistry.enabled=true
+  #
+  devRegistry:
+    # Set to true to use local in-cluster registry images
+    enabled: false
+    # URL of the local registry (node-ip:nodeport)
+    # Get this from: kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+    url: "192.168.1.77:30500"
+    # Tag for dev images (default: dev-local)
+    tag: "dev-local"
+    # Pull policy for dev images (use Always to get latest pushes)
+    pullPolicy: Always
+    # Override specific components (leave empty to use defaults)
+    # Example: { controller: "my-custom-tag", tools: "feature-branch" }
+    componentTags: {}
+
+# =============================================================================
+# Controller - Agent Orchestration
+# =============================================================================
+controller:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/5dlabs/controller
+    pullPolicy: Always
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  # Argo workflow templates
+  argo:
+    enabled: true
+
+  # Template version - bump to force pod restart
+  templatesVersion: "v1.1.0"
+
+  config:
+    kubernetesNamespace: "cto"
+    serverHost: "0.0.0.0"
+    serverPort: "8080"
+    rustLog: "debug"
+
+# =============================================================================
+# Agent Configuration - CodeRun/Workflow Defaults
+# =============================================================================
+agent:
+  image:
+    repository: ghcr.io/5dlabs/agent
+    tag: latest
+  serviceAccountName: ""
+  cliImages:
+    claude:
+      repository: ghcr.io/5dlabs/claude-code
+      tag: latest
+    cursor:
+      repository: ghcr.io/5dlabs/cursor
+      tag: latest
+    codex:
+      repository: ghcr.io/5dlabs/codex
+      tag: latest
+    gemini:
+      repository: ghcr.io/5dlabs/gemini
+      tag: latest
+    factory:
+      repository: ghcr.io/5dlabs/factory
+      tag: latest
+    opencode:
+      repository: ghcr.io/5dlabs/opencode
+      tag: latest
+  cliProviders: {}
+  agentCliConfigs: {}
+  inputBridge:
+    enabled: false
+    image:
+      repository: ""
+      tag: ""
+    port: 8080
+
+# =============================================================================
+# PM Server - Project Management
+# =============================================================================
+pm:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/5dlabs/pm-server
+    pullPolicy: IfNotPresent
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 8081
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # PM provider configuration
+  provider: linear
+  maxTimestampAgeMs: 60000
+
+  # Linear integration
+  linear:
+    enabled: true
+
+  # GitHub configuration
+  github:
+    defaultOrg: "5dlabs"
+    webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
+
+  # Secrets
+  secrets:
+    secretName: linear-secrets
+
+# =============================================================================
+# Tools Server - MCP Proxy
+# =============================================================================
+tools:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/5dlabs/tools
+    pullPolicy: Always
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+  persistence:
+    enabled: true
+    size: 10Gi
+
+  rbac:
+    create: true
+    clusterWide: true
+
+  # MCP Server Configuration
+  config:
+    # Secret references for API keys
+    secrets:
+      context7: "tools-context7-secrets"
+      github: "tools-github-secrets"
+
+    # MCP Servers - proxied through tools service
+    servers:
+      # --- Search & Web ---
+      brave-search:
+        name: "Brave Search"
+        description: "Web search using Brave Search API"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@modelcontextprotocol/server-brave-search"]
+        workingDirectory: "/tmp"
+
+      # --- Memory & Context ---
+      openmemory:
+        name: "OpenMemory"
+        description: "Long-term memory system for AI agents"
+        transport: "http"
+        url: "http://cto-openmemory.cto.svc.cluster.local:3000/mcp"
+
+      context7:
+        name: "Context7"
+        description: "Up-to-date library documentation and code examples"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@upstash/context7-mcp"]
+        workingDirectory: "/tmp"
+
+      # --- Infrastructure ---
+      docker:
+        name: "Docker"
+        description: "Docker container management"
+        transport: "stdio"
+        command: "docker"
+        args: ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "mcp/docker"]
+        workingDirectory: "/tmp"
+
+      kubernetes:
+        name: "Kubernetes"
+        description: "Kubernetes cluster management"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@manusa/mcp-server-kubernetes"]
+        workingDirectory: "/tmp"
+
+      # --- Development Tools ---
+      github:
+        name: "GitHub"
+        description: "GitHub API operations for repositories, issues, and pull requests"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@modelcontextprotocol/server-github"]
+        workingDirectory: "/tmp"
+
+      # --- UI Components ---
+      shadcn:
+        name: "shadcn/ui"
+        description: "shadcn/ui component library with source code and demos"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
+        workingDirectory: "/tmp"
+
+      ai-elements:
+        name: "AI Elements"
+        description: "AI-native UI component library"
+        transport: "http"
+        url: "https://registry.ai-sdk.dev/api/mcp"
+
+      # --- Local Servers (run in agent containers, not proxied) ---
+      rust-tools:
+        name: "Rust Development Tools"
+        description: "Rust analyzer integration"
+        transport: "stdio"
+        command: "/home/node/.cargo/bin/cursor-rust-tools"
+        args: ["--no-ui"]
+        workingDirectory: "/workspace"
+        local: true
+
+# =============================================================================
+# Healer - Self-Healing Monitor
+# =============================================================================
+healer:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/5dlabs/healer
+    pullPolicy: Always
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  config:
+    cli: "Factory"
+    model: "claude-opus-4-5-20250929"
+    maxAttempts: 3
+    timeWindowMins: 10
+    memoryUrl: "http://openmemory.cto.svc:3000"
+    memoryEnabled: true
+
+  persistence:
+    enabled: true
+    size: 10Gi
+
+  filebrowser:
+    enabled: true
+    port: 8081
+
+# =============================================================================
+# OpenMemory - AI Agent Memory
+# =============================================================================
+openmemory:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/5dlabs/openmemory
+    pullPolicy: Always
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# =============================================================================
+# Sensors - Argo Event Automation
+# =============================================================================
+sensors:
+  enabled: true
+  # Sensors are deployed to the automation namespace
+  namespace: automation
+
+# =============================================================================
+# Webhooks - GitHub Event Handling
+# =============================================================================
+webhooks:
+  enabled: true
+  # EventSource and sensors for GitHub events
+  namespace: automation
+
+# =============================================================================
+# TweakCN - Theme Editor
+# =============================================================================
+tweakcn:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/5dlabs/tweakcn
+    pullPolicy: Always
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# =============================================================================
+# Research - Twitter/X Research Pipeline
+# =============================================================================
+research:
+  enabled: true
+
+  image:
+    repository: ghcr.io/5dlabs/research
+    pullPolicy: Always
+    tag: "latest"
+
+  # CronJob schedule (every 5 minutes)
+  schedule: "*/5 * * * *"
+
+  # Research configuration
+  minRelevance: "0.5"
+  batchSize: "10"
+  model: "claude-sonnet-4-20250514"
+
+  # PR creation
+  createPR: true
+  repo: "5dlabs/cto"
+  baseBranch: "develop"
+  researchDir: "docs/research"
+
+  persistence:
+    size: 5Gi
+    storageClass: ""  # Uses global.storageClass if empty
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Email digest (separate CronJob)
+  digest:
+    enabled: true
+    # Daily at 13:00 UTC by default
+    schedule: "0 13 * * *"
+    hoursBetween: "24"
+    # If true, don't do AI analysis; just send the list
+    skipAnalysis: false
+    # Optional override; defaults to research.model
+    model: ""
+    # Kubernetes Secret containing: GMAIL_USERNAME, GMAIL_APP_PASSWORD, optional DIGEST_* vars
+    secretName: "research-digest-secrets" # pragma: allowlist secret
+
+# =============================================================================
+# Maintenance - Workspace and Event Cleanup
+# =============================================================================
+maintenance:
+  enabled: true
+
+  # Kubectl image for cleanup jobs
+  image: bitnami/kubectl:latest
+
+  # Workspace PVC cleaner
+  pvcCleaner:
+    schedule: "15 * * * *"  # Every hour at :15
+    retentionHours: "12"
+    maxDeletions: "15"
+
+  # Event cleaner
+  eventCleaner:
+    schedule: "*/30 * * * *"  # Every 30 minutes
+    retentionMinutes: "60"
+
+# =============================================================================
+# Cloudflare Tunnel - Ingress via Cloudflare
+# =============================================================================
+cloudflare:
+  enabled: true
+  # Cloudflare domain (must be a zone you own)
+  domain: 5dlabs.ai
+  # Cloudflare Account ID
+  accountId: b73ec19faa187789b3f9d1deb0e0d95f
+  # Email for API Key authentication
+  email: j@jonathonfritz.com
+  # Secret name (in cloudflare-operator-system namespace)
+  secretName: cloudflare-api-credentials
+
+  # Tunnel configuration
+  tunnel:
+    name: cto-main
+
+  # Service bindings
+  bindings:
+    pm:
+      hostname: pm.5dlabs.ai
+    webhooks:
+      hostname: github-webhooks.5dlabs.ai
+
+# =============================================================================
+# BuildKit - Remote Build Infrastructure
+# =============================================================================
+# High-performance build server running on the cluster.
+# Enables remote builds from development machines with massive cache storage.
+#
+# Setup on build machine:
+#   ./scripts/setup-cluster-builder.sh
+#
+# Or manually:
+#   docker buildx create --name cluster-builder \
+#     --driver remote \
+#     tcp://<node-ip>:30502
+#   docker buildx use cluster-builder
+#
+# Note: nodeSelector and insecureRegistries should be overridden per-cluster
+# in the ArgoCD Application values (infra/gitops/applications/workloads/cto.yaml)
+#
+buildkit:
+  enabled: true
+
+  image:
+    repository: moby/buildkit
+    tag: latest
+
+  service:
+    # NodePort for remote access from build machines
+    nodePort: 30502
+
+  # Node selector for BuildKit pod placement
+  # Override per-cluster to schedule on appropriate worker node
+  # Example: kubernetes.io/hostname: my-worker-node
+  nodeSelector: {}
+
+  # Resource requests - adjust based on available node resources
+  # Defaults are conservative; override per-cluster for larger nodes
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+
+  # Persistent cache storage (SSD-backed for layer cache persistence)
+  cache:
+    # BuildKit layer cache (Docker layers, intermediate builds)
+    buildkitSize: 100Gi
+    # Cargo registry cache (Rust dependencies)
+    cargoSize: 50Gi
+
+  # RAM-backed workspace for faster I/O during builds
+  # Benchmarks show 2-4x faster I/O compared to SSD
+  # Uses tmpfs (memory-backed filesystem) for temporary build artifacts
+  workspace:
+    # Enable RAM-backed workspace (recommended for faster builds)
+    useMemory: true
+    # Size limit for RAM workspace (adjust based on available node RAM)
+    # For 128GB nodes, 32Gi is ~25% - good balance
+    # For smaller nodes, reduce accordingly
+    sizeLimit: 32Gi
+
+  config:
+    # Max parallel build operations
+    maxParallelism: 8
+    # Log settings
+    maxLogSize: "10000000"
+    maxLogSpeed: "10000000"
+    # Garbage collection - keep cache for 7 days, up to 80GB
+    gcKeepDuration: "168h"
+    gcKeepBytes: 85899345920
+    # Allow pushing to insecure (HTTP) registries
+    # Override per-cluster with local registry IPs
+    # Example: ["192.168.1.72:30500", "192.168.1.77:30500"]
+    insecureRegistries: []

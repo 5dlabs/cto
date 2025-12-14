@@ -1,0 +1,135 @@
+---
+# Argo CD Application for Kubernetes Metrics Server
+# Provides container resource metrics collection API for HPA, kubectl top, and monitoring
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: metrics-server
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project configuration
+  project: platform
+
+  # Source configuration - using official Kubernetes metrics-server Helm chart
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    targetRevision: 3.12.1
+    chart: metrics-server
+
+    # Helm values
+    helm:
+      values: |
+        # Image configuration
+        image:
+          repository: registry.k8s.io/metrics-server/metrics-server
+          tag: v0.7.1
+          pullPolicy: IfNotPresent
+
+        # Resource allocation
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+
+        # High availability
+        replicas: 2
+        podDisruptionBudget:
+          enabled: true
+          minAvailable: 1
+
+        # Metrics server arguments
+        args:
+          - --cert-dir=/tmp
+          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+          - --kubelet-use-node-status-port
+          # metric-resolution must be > kubelet-request-timeout
+          - --metric-resolution=60s
+          # For development/local clusters that may have self-signed certs
+          - --kubelet-insecure-tls
+          # Increase timeout for kubelet scraping (default 10s is too tight for busy nodes)
+          - --kubelet-request-timeout=30s
+
+        # Service monitor for Prometheus-compatible monitoring
+        serviceMonitor:
+          enabled: false
+
+        # Update strategy
+        updateStrategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 0
+            maxSurge: 1
+
+        # Pod labels for log collection
+        # Note: Don't override app.kubernetes.io/component - it's part of the
+        # selector and can't be changed on existing Deployments
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        # Pod annotations for monitoring (for documentation - endpoint discovery is used)
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "4443"
+          prometheus.io/scheme: "https"
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: metrics-server
+
+        # Affinity for pod distribution
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: app.kubernetes.io/name
+                        operator: In
+                        values:
+                          - metrics-server
+                  topologyKey: kubernetes.io/hostname
+
+  # Destination configuration - deploy to kube-system namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=false  # kube-system already exists
+      - PrunePropagationPolicy=foreground
+      - ServerSideApply=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  # Revision history
+  revisionHistoryLimit: 5
