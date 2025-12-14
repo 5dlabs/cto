@@ -160,9 +160,10 @@ spec:
     # StatefulSet volumeClaimTemplates get apiVersion/kind added by K8s
     - group: apps
       kind: StatefulSet
+      name: mayastor-etcd
       jqPathExpressions:
-        - .spec.volumeClaimTemplates[]?.apiVersion
-        - .spec.volumeClaimTemplates[]?.kind
+        - .spec.volumeClaimTemplates[].apiVersion
+        - .spec.volumeClaimTemplates[].kind
     # etcd JWT token is generated and changes between syncs
     - kind: Secret
       name: mayastor-etcd-jwt-token
