@@ -31,4 +31,5 @@ spec:
           cpu: "2"
     storage:
       size: "20Gi"
+      storageClassName: "mayastor"
       mountPath: "/home/lls/.lls"

@@ -75,6 +75,10 @@ spec:
           callhome:
             enabled: false
 
+        # Disable built-in StorageClass (we define our own 'mayastor' class)
+        storageClass:
+          enabled: false
+
         # Mayastor CSI driver
         csi:
           node:
