@@ -104,12 +104,15 @@ spec:
               - name: ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT
                 value: "true"
               volumeMounts:
-              - name: rust-cache
-                mountPath: /cache
+              - name: work
+                mountPath: /home/runner/_work
             volumes:
-            - name: rust-cache
-              persistentVolumeClaim:
-                claimName: runner-cache-pvc
+            # Use emptyDir for runner workspace - each runner gets isolated storage
+            # Build caching should use GitHub Actions' actions/cache instead of shared PVCs
+            # This avoids Multi-Attach errors when multiple runners scale up simultaneously
+            - name: work
+              emptyDir:
+                sizeLimit: 20Gi
 
   destination:
     server: https://kubernetes.default.svc
