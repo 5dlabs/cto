@@ -3,6 +3,7 @@
 //! This module provides state tracking for cluster installation operations,
 //! allowing automatic recovery from failures and resumption of interrupted processes.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -25,6 +26,8 @@ pub enum InstallStep {
     // Infrastructure (server provisioning)
     /// Creating bare metal servers.
     CreatingServers,
+    /// Creating VLAN for private networking.
+    CreatingVLAN,
     /// Waiting for servers to be ready.
     WaitingServersReady,
     /// Triggering Talos iPXE boot.
@@ -84,7 +87,8 @@ impl InstallStep {
         match self {
             Self::NotStarted => Self::ValidatingPrerequisites,
             Self::ValidatingPrerequisites => Self::CreatingServers,
-            Self::CreatingServers => Self::WaitingServersReady,
+            Self::CreatingServers => Self::CreatingVLAN,
+            Self::CreatingVLAN => Self::WaitingServersReady,
             Self::WaitingServersReady => Self::BootingTalos,
             Self::BootingTalos => Self::WaitingTalosMaintenance,
             Self::WaitingTalosMaintenance => Self::GeneratingConfigs,
@@ -115,6 +119,7 @@ impl InstallStep {
             Self::NotStarted => "Not started",
             Self::ValidatingPrerequisites => "Validating prerequisites",
             Self::CreatingServers => "Creating bare metal servers",
+            Self::CreatingVLAN => "Creating VLAN for private networking",
             Self::WaitingServersReady => "Waiting for servers to be ready",
             Self::BootingTalos => "Triggering Talos iPXE boot",
             Self::WaitingTalosMaintenance => "Waiting for Talos maintenance mode",
@@ -146,32 +151,33 @@ impl InstallStep {
             Self::NotStarted => 0,
             Self::ValidatingPrerequisites => 1,
             Self::CreatingServers => 2,
-            Self::WaitingServersReady => 3,
-            Self::BootingTalos => 4,
-            Self::WaitingTalosMaintenance => 5,
-            Self::GeneratingConfigs => 6,
-            Self::ApplyingCPConfig => 7,
-            Self::WaitingCPInstall => 8,
-            Self::Bootstrapping => 9,
-            Self::DeployingCilium => 10,
-            Self::WaitingKubernetes => 11,
-            Self::ApplyingWorkerConfig => 12,
-            Self::WaitingWorkerJoin => 13,
-            Self::DeployingBootstrapResources => 14,
-            Self::DeployingLocalPathProvisioner => 15,
-            Self::DeployingArgoCD => 16,
-            Self::WaitingArgoCDReady => 17,
-            Self::ApplyingAppOfApps => 18,
-            Self::WaitingGitOpsSync => 19,
-            Self::ConfiguringStorage => 20,
-            Self::BootstrappingOpenBao => 21,
-            Self::ConfiguringKubeconfig => 22,
-            Self::Complete => 23,
+            Self::CreatingVLAN => 3,
+            Self::WaitingServersReady => 4,
+            Self::BootingTalos => 5,
+            Self::WaitingTalosMaintenance => 6,
+            Self::GeneratingConfigs => 7,
+            Self::ApplyingCPConfig => 8,
+            Self::WaitingCPInstall => 9,
+            Self::Bootstrapping => 10,
+            Self::DeployingCilium => 11,
+            Self::WaitingKubernetes => 12,
+            Self::ApplyingWorkerConfig => 13,
+            Self::WaitingWorkerJoin => 14,
+            Self::DeployingBootstrapResources => 15,
+            Self::DeployingLocalPathProvisioner => 16,
+            Self::DeployingArgoCD => 17,
+            Self::WaitingArgoCDReady => 18,
+            Self::ApplyingAppOfApps => 19,
+            Self::WaitingGitOpsSync => 20,
+            Self::ConfiguringStorage => 21,
+            Self::BootstrappingOpenBao => 22,
+            Self::ConfiguringKubeconfig => 23,
+            Self::Complete => 24,
         }
     }
 
     /// Total number of steps.
-    pub const TOTAL_STEPS: u8 = 23;
+    pub const TOTAL_STEPS: u8 = 24;
 }
 
 impl std::fmt::Display for InstallStep {
@@ -218,6 +224,17 @@ pub struct InstallState {
     pub attempt_count: u32,
     /// Last error message (if any).
     pub last_error: Option<String>,
+
+    // VLAN state
+    /// VLAN resource ID from Latitude (e.g., `vlan_xxx`).
+    #[serde(default)]
+    pub vlan_id: Option<String>,
+    /// VLAN ID (VID) for OS configuration (e.g., 2063).
+    #[serde(default)]
+    pub vlan_vid: Option<u16>,
+    /// Private IP addresses for each server (server_id -> private_ip).
+    #[serde(default)]
+    pub private_ips: HashMap<String, String>,
 }
 
 impl InstallState {
@@ -235,6 +252,9 @@ impl InstallState {
             updated_at: chrono::Utc::now().to_rfc3339(),
             attempt_count: 0,
             last_error: None,
+            vlan_id: None,
+            vlan_vid: None,
+            private_ips: HashMap::new(),
         }
     }
 
@@ -424,6 +444,122 @@ impl InstallState {
     pub fn can_resume(&self) -> bool {
         self.step != InstallStep::NotStarted && self.step != InstallStep::Complete
     }
+
+    /// Set VLAN info.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if saving fails.
+    pub fn set_vlan(&mut self, vlan_id: String, vid: u16) -> Result<()> {
+        self.vlan_id = Some(vlan_id);
+        self.vlan_vid = Some(vid);
+        self.save()
+    }
+
+    /// Set a private IP for a server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if saving fails.
+    pub fn set_private_ip(&mut self, server_id: &str, private_ip: String) -> Result<()> {
+        self.private_ips.insert(server_id.to_string(), private_ip);
+        self.save()
+    }
+
+    /// Get the private IP for a server.
+    #[must_use]
+    #[allow(dead_code)] // Will be used when generating configs with VLAN
+    pub fn get_private_ip(&self, server_id: &str) -> Option<&String> {
+        self.private_ips.get(server_id)
+    }
+
+    /// Allocate the next private IP from the VLAN subnet.
+    ///
+    /// Returns IPs in sequence, skipping network (.0) and broadcast (.255) addresses
+    /// within each /24 block:
+    /// - /24: 10.8.0.1, 10.8.0.2, ..., 10.8.0.254 (254 hosts)
+    /// - /23: 10.8.0.1, ..., 10.8.0.254, 10.8.1.1, ..., 10.8.1.254 (508 hosts)
+    /// - /16: 10.8.0.1, ..., 10.8.0.254, 10.8.1.1, ..., 10.8.255.254 (65024 hosts)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The subnet format is invalid
+    /// - The subnet is exhausted
+    pub fn allocate_next_private_ip(&self) -> Result<String> {
+        let subnet = &self.config.vlan_subnet;
+        let base = subnet.split('/').next().unwrap_or("10.8.0.0");
+
+        // Parse CIDR prefix to determine available hosts
+        let prefix_len: u8 = subnet
+            .split('/')
+            .nth(1)
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(24);
+
+        // Calculate max usable hosts, accounting for .0 and .255 in each /24 block
+        // Each /24 block has 254 usable hosts (1-254), skipping 0 (network) and 255 (broadcast)
+        let max_hosts = if prefix_len >= 31 {
+            // /31 and /32 are special cases (point-to-point or single host)
+            anyhow::bail!("Subnet /{prefix_len} too small for cluster networking");
+        } else if prefix_len >= 24 {
+            // Single /24 or smaller: 2^(32-prefix) - 2
+            (1u32 << (32 - prefix_len)) - 2
+        } else {
+            // Multiple /24 blocks: 254 hosts per /24 block
+            let num_slash24_blocks = 1u32 << (24 - prefix_len);
+            num_slash24_blocks * 254
+        };
+
+        let allocation_index = self.private_ips.len();
+
+        if allocation_index >= max_hosts as usize {
+            anyhow::bail!(
+                "VLAN subnet {subnet} exhausted: cannot allocate host {} (max {max_hosts} hosts)",
+                allocation_index + 1
+            );
+        }
+
+        // Parse base IP octets
+        let parts: Vec<&str> = base.split('.').collect();
+        if parts.len() != 4 {
+            anyhow::bail!("Invalid subnet base address: {base}");
+        }
+
+        let octets: Vec<u8> = parts
+            .iter()
+            .map(|p| p.parse::<u8>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| anyhow::anyhow!("Invalid subnet base address: {base}"))?;
+
+        // Convert base to u32
+        let base_ip = u32::from(octets[0]) << 24
+            | u32::from(octets[1]) << 16
+            | u32::from(octets[2]) << 8
+            | u32::from(octets[3]);
+
+        // Calculate the IP by mapping allocation index to valid host addresses
+        // Each /24 block has 254 usable addresses (1-254), skipping .0 and .255
+        let allocation_u32 = u32::try_from(allocation_index)
+            .map_err(|_| anyhow::anyhow!("Allocation index {allocation_index} too large"))?;
+
+        // Which /24 block and which host within that block?
+        let block_index = allocation_u32 / 254; // Which /24 block (0, 1, 2, ...)
+        let host_in_block = allocation_u32 % 254; // Host within block (0-253 -> 1-254)
+
+        // Calculate offset from base: (block * 256) + (host + 1)
+        // block * 256 moves to the next /24, host + 1 skips the .0 address
+        let offset = block_index * 256 + host_in_block + 1;
+        let result_ip = base_ip + offset;
+
+        // Convert back to octets
+        let o1 = ((result_ip >> 24) & 0xFF) as u8;
+        let o2 = ((result_ip >> 16) & 0xFF) as u8;
+        let o3 = ((result_ip >> 8) & 0xFF) as u8;
+        let o4 = (result_ip & 0xFF) as u8;
+
+        Ok(format!("{o1}.{o2}.{o3}.{o4}"))
+    }
 }
 
 /// Retry configuration for operations.
@@ -521,5 +657,117 @@ mod tests {
         assert!(config.should_retry(9));
         assert!(!config.should_retry(10));
         assert!(!config.should_retry(100));
+    }
+
+    /// Helper to create a minimal state for testing IP allocation.
+    fn create_test_state_with_subnet(subnet: &str) -> InstallState {
+        use crate::config::{BareMetalProvider, InstallConfig, InstallProfile};
+
+        let config = InstallConfig {
+            cluster_name: "test".into(),
+            provider: BareMetalProvider::Latitude,
+            region: "MIA2".into(),
+            auto_region: false,
+            fallback_regions: vec![],
+            cp_plan: "test".into(),
+            worker_plan: "test".into(),
+            node_count: 3,
+            ssh_keys: vec![],
+            talos_version: "v1.0.0".into(),
+            install_disk: "/dev/sda".into(),
+            storage_disk: None,
+            storage_replicas: 2,
+            output_dir: PathBuf::from("/tmp/test"),
+            gitops_repo: "test".into(),
+            gitops_branch: "main".into(),
+            sync_timeout_minutes: 30,
+            profile: InstallProfile::default(),
+            enable_vlan: true,
+            vlan_subnet: subnet.into(),
+            vlan_parent_interface: "eth1".into(),
+            enable_firewall: true,
+        };
+
+        InstallState {
+            config,
+            step: InstallStep::NotStarted,
+            selected_region: None,
+            control_plane: None,
+            workers: vec![],
+            kubeconfig_path: None,
+            argocd_password: None,
+            updated_at: String::new(),
+            attempt_count: 0,
+            last_error: None,
+            vlan_id: None,
+            vlan_vid: None,
+            private_ips: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_allocate_private_ip_slash24_sequential() {
+        let mut state = create_test_state_with_subnet("10.8.0.0/24");
+
+        // First 3 allocations should be .1, .2, .3
+        let ip1 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip1, "10.8.0.1");
+        state.private_ips.insert("server1".into(), ip1);
+
+        let ip2 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip2, "10.8.0.2");
+        state.private_ips.insert("server2".into(), ip2);
+
+        let ip3 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip3, "10.8.0.3");
+        state.private_ips.insert("server3".into(), ip3);
+    }
+
+    #[test]
+    fn test_allocate_private_ip_skips_broadcast() {
+        let mut state = create_test_state_with_subnet("10.8.0.0/24");
+
+        // Pre-fill 253 IPs (indices 0-252 -> addresses .1-.253)
+        for i in 0..253 {
+            state
+                .private_ips
+                .insert(format!("server{i}"), format!("10.8.0.{}", i + 1));
+        }
+
+        // Next allocation (index 253) should be .254, NOT .255 (broadcast)
+        let ip254 = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip254, "10.8.0.254");
+        state.private_ips.insert("server253".into(), ip254);
+
+        // Subnet should now be exhausted (254 hosts max in /24)
+        let result = state.allocate_next_private_ip();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("exhausted"));
+    }
+
+    #[test]
+    fn test_allocate_private_ip_slash23_wraps_blocks() {
+        let mut state = create_test_state_with_subnet("10.8.0.0/23");
+
+        // Pre-fill first /24 block (254 hosts: .0.1 through .0.254)
+        for i in 0..254 {
+            state
+                .private_ips
+                .insert(format!("server{i}"), format!("10.8.0.{}", i + 1));
+        }
+
+        // Next allocation should wrap to .1.1, skipping .0.255 (broadcast) and .1.0 (network)
+        let ip = state.allocate_next_private_ip().unwrap();
+        assert_eq!(ip, "10.8.1.1");
+    }
+
+    #[test]
+    fn test_allocate_private_ip_small_subnet_error() {
+        let state = create_test_state_with_subnet("10.8.0.0/31");
+
+        // /31 should fail as too small
+        let result = state.allocate_next_private_ip();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too small"));
     }
 }

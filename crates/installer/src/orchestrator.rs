@@ -41,13 +41,17 @@ impl Installer {
         // Ensure output directory exists
         std::fs::create_dir_all(&config.output_dir).context("Failed to create output directory")?;
 
-        let state = if let Some(existing) = InstallState::load(&config.output_dir)? {
+        let state = if let Some(mut existing) = InstallState::load(&config.output_dir)? {
             // Found existing state - resume from there
             if existing.can_resume() {
                 ui::print_info(&format!("Resuming installation from: {}", existing.step));
                 if let Some(ref err) = existing.last_error {
                     ui::print_warning(&format!("Previous error: {err}"));
                 }
+
+                // Check if config has changed - warn and update for certain fields
+                Self::check_and_update_config(&mut existing, &config)?;
+
                 existing
             } else if existing.is_complete() {
                 ui::print_success("Installation already complete!");
@@ -65,6 +69,95 @@ impl Installer {
             state,
             retry_config: RetryConfig::default(),
         })
+    }
+
+    /// Check if config has changed and update safe-to-update fields.
+    ///
+    /// Certain fields (like plan) cannot change mid-installation if servers exist.
+    /// Other fields (like VLAN interface) can be updated.
+    fn check_and_update_config(
+        existing: &mut InstallState,
+        new_config: &InstallConfig,
+    ) -> Result<()> {
+        let old = &existing.config;
+
+        // Critical fields that can't change once servers exist
+        if existing.control_plane.is_some() || !existing.workers.is_empty() {
+            if old.cp_plan != new_config.cp_plan {
+                ui::print_warning(&format!(
+                    "⚠️  Control plane plan changed from '{}' to '{}' but servers already exist!",
+                    old.cp_plan, new_config.cp_plan
+                ));
+                ui::print_info(
+                    "   Delete state file to start fresh, or continue with existing plan.",
+                );
+            }
+            if old.worker_plan != new_config.worker_plan {
+                ui::print_warning(&format!(
+                    "⚠️  Worker plan changed from '{}' to '{}' but servers already exist!",
+                    old.worker_plan, new_config.worker_plan
+                ));
+            }
+            if old.cluster_name != new_config.cluster_name {
+                anyhow::bail!(
+                    "Cluster name changed from '{}' to '{}'. Delete state file to start fresh.",
+                    old.cluster_name,
+                    new_config.cluster_name
+                );
+            }
+            // VLAN parent interface is hardware-specific to provisioned servers.
+            // Changing it after servers exist would cause Talos config to reference
+            // the wrong NIC, breaking VLAN connectivity.
+            if old.vlan_parent_interface != new_config.vlan_parent_interface {
+                ui::print_warning(&format!(
+                    "⚠️  VLAN interface changed from '{}' to '{}' but servers already exist!",
+                    old.vlan_parent_interface, new_config.vlan_parent_interface
+                ));
+                ui::print_info(
+                    "   The VLAN interface is hardware-specific. Continuing with existing value.",
+                );
+                ui::print_info(&format!(
+                    "   Delete state file to start fresh with interface '{}'.",
+                    new_config.vlan_parent_interface
+                ));
+            }
+        }
+
+        // Safe to update fields (update state with new config values)
+        let config = &mut existing.config;
+
+        // VLAN interface can only be updated if no servers exist yet
+        if existing.control_plane.is_none()
+            && existing.workers.is_empty()
+            && config.vlan_parent_interface != new_config.vlan_parent_interface
+        {
+            ui::print_info(&format!(
+                "Updating VLAN interface: {} -> {}",
+                config.vlan_parent_interface, new_config.vlan_parent_interface
+            ));
+            config
+                .vlan_parent_interface
+                .clone_from(&new_config.vlan_parent_interface);
+        }
+        if config.enable_vlan != new_config.enable_vlan {
+            config.enable_vlan = new_config.enable_vlan;
+        }
+        if config.enable_firewall != new_config.enable_firewall {
+            config.enable_firewall = new_config.enable_firewall;
+        }
+        if config.vlan_subnet != new_config.vlan_subnet {
+            config.vlan_subnet.clone_from(&new_config.vlan_subnet);
+        }
+
+        // Update GitOps settings
+        config.gitops_repo.clone_from(&new_config.gitops_repo);
+        config.gitops_branch.clone_from(&new_config.gitops_branch);
+        config.sync_timeout_minutes = new_config.sync_timeout_minutes;
+
+        // Save updated config
+        existing.save()?;
+
+        Ok(())
     }
 
     /// Run installation to completion with automatic retry/resume.
@@ -169,6 +262,9 @@ impl Installer {
             InstallStep::CreatingServers => {
                 self.create_servers().await?;
             }
+            InstallStep::CreatingVLAN => {
+                self.create_vlan().await?;
+            }
             InstallStep::WaitingServersReady => {
                 self.wait_servers_ready().await?;
             }
@@ -261,6 +357,50 @@ impl Installer {
         Ok(())
     }
 
+    async fn create_vlan(&mut self) -> Result<()> {
+        // Skip if VLAN is disabled
+        if !self.state.config.enable_vlan {
+            ui::print_info("VLAN private networking disabled, skipping");
+            return Ok(());
+        }
+
+        let orchestrator = BareMetalOrchestrator::new(&self.state.config).await?;
+        let region = self
+            .state
+            .selected_region
+            .as_ref()
+            .context("Region not selected")?;
+
+        // Create VLAN
+        ui::print_info("Creating VLAN for private networking...");
+        let (vlan_id, vid) = orchestrator.create_vlan(region).await?;
+        self.state.set_vlan(vlan_id, vid)?;
+
+        // Allocate private IPs for all servers
+        let cp_id = self.state.control_plane.as_ref().map(|cp| cp.id.clone());
+        if let Some(cp_id) = cp_id {
+            let private_ip = self.state.allocate_next_private_ip()?;
+            ui::print_info(&format!(
+                "Allocated private IP {private_ip} for control plane"
+            ));
+            self.state.set_private_ip(&cp_id, private_ip)?;
+        }
+
+        let worker_ids: Vec<_> = self.state.workers.iter().map(|w| w.id.clone()).collect();
+        for (i, worker_id) in worker_ids.iter().enumerate() {
+            let private_ip = self.state.allocate_next_private_ip()?;
+            ui::print_info(&format!("Allocated private IP {private_ip} for worker {i}"));
+            self.state.set_private_ip(worker_id, private_ip)?;
+        }
+
+        ui::print_success(&format!(
+            "VLAN created (VID: {vid}) with {} private IPs",
+            self.state.private_ips.len()
+        ));
+
+        Ok(())
+    }
+
     async fn wait_servers_ready(&mut self) -> Result<()> {
         let orchestrator = BareMetalOrchestrator::new(&self.state.config).await?;
 
@@ -328,7 +468,7 @@ impl Installer {
             .as_ref()
             .context("Control plane not found in state")?;
 
-        let config = metal::talos::BootstrapConfig::new(
+        let mut config = metal::talos::BootstrapConfig::new(
             self.state.config.cluster_name.clone(),
             cp.ip.clone(),
         )
@@ -337,6 +477,76 @@ impl Installer {
         .with_talos_version(&self.state.config.talos_version)
         .with_kube_proxy_mode("none") // We use Cilium
         .with_cilium_cni();
+
+        // Add VLAN configuration if enabled
+        if self.state.config.enable_vlan {
+            if let Some(vlan_vid) = self.state.vlan_vid {
+                // Get control plane's private IP
+                let cp_private_ip = self
+                    .state
+                    .get_private_ip(&cp.id)
+                    .cloned()
+                    .unwrap_or_else(|| "10.8.0.1".to_string());
+
+                // Extract prefix length from vlan_subnet (e.g., "10.8.0.0/24" -> "24")
+                let prefix = self
+                    .state
+                    .config
+                    .vlan_subnet
+                    .split('/')
+                    .nth(1)
+                    .unwrap_or("24");
+
+                let private_ip_cidr = format!("{cp_private_ip}/{prefix}");
+
+                ui::print_info(&format!(
+                    "Adding VLAN config: VID={vlan_vid}, Interface={}, IP={private_ip_cidr}",
+                    self.state.config.vlan_parent_interface
+                ));
+
+                config = config
+                    .with_vlan_interface(
+                        vlan_vid,
+                        &private_ip_cidr,
+                        &self.state.config.vlan_parent_interface,
+                    )
+                    .with_private_network(&self.state.config.vlan_subnet);
+            }
+        }
+
+        // Add firewall configuration if enabled
+        if self.state.config.enable_firewall {
+            // Firewall requires VLAN for proper private network isolation
+            // Without VLAN, nodes communicate via public IPs and host-level
+            // firewall rules would need to allow arbitrary public IP ranges
+            if self.state.config.enable_vlan {
+                // Get control plane's private IP for etcd rules
+                let cp_private_ip = self
+                    .state
+                    .get_private_ip(&cp.id)
+                    .cloned()
+                    .unwrap_or_else(|| "10.8.0.1".to_string());
+
+                let cluster_subnet = self.state.config.vlan_subnet.clone();
+
+                ui::print_info(&format!(
+                    "Adding firewall config: cluster_subnet={cluster_subnet}"
+                ));
+
+                // Apply firewall rules:
+                // - Common rules (kubelet, apid, trustd, cilium) → all nodes
+                // - Control plane rules (K8s API, etcd) → only controlplane.yaml
+                config = config.with_ingress_firewall(&cluster_subnet, &[&cp_private_ip]);
+            } else {
+                ui::print_warning(
+                    "⚠️  Firewall enabled but VLAN disabled - skipping host firewall configuration.",
+                );
+                ui::print_info(
+                    "   Host-level firewall requires VLAN for private network isolation.",
+                );
+                ui::print_info("   Use Kubernetes NetworkPolicies or cloud firewall for security.");
+            }
+        }
 
         // Generate secrets
         metal::talos::generate_secrets(&self.state.config.output_dir)?;
@@ -603,7 +813,7 @@ impl Installer {
         use std::io::Write;
         use std::process::{Command, Stdio};
 
-        const CLUSTER_ISSUER_YAML: &str = r#"---
+        const CLUSTER_ISSUER_YAML: &str = r"---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -613,7 +823,7 @@ metadata:
     app.kubernetes.io/component: issuer
 spec:
   selfSigned: {}
-"#;
+";
 
         // Wait for cert-manager CRDs to be available
         let start = std::time::Instant::now();
