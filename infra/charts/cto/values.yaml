@@ -299,6 +299,39 @@ tools:
         args: ["-y", "firecrawl-mcp"]
         workingDirectory: "/tmp"
 
+      # --- Observability ---
+      grafana:
+        name: "Grafana"
+        description: "Grafana dashboards, alerts, Prometheus/Loki queries, and incident management"
+        transport: "stdio"
+        command: "docker"
+        args: ["run", "-i", "--rm", "-e", "GRAFANA_URL", "-e", "GRAFANA_SERVICE_ACCOUNT_TOKEN", "mcp/grafana", "-t", "stdio"]
+        workingDirectory: "/tmp"
+
+      loki:
+        name: "Loki"
+        description: "Query and analyze Grafana Loki logs with LogQL"
+        transport: "stdio"
+        command: "docker"
+        args: ["run", "-i", "--rm", "-e", "LOKI_URL", "grafana/loki-mcp:latest"]
+        workingDirectory: "/tmp"
+
+      prometheus:
+        name: "Prometheus"
+        description: "Query and analyze Prometheus metrics with PromQL"
+        transport: "stdio"
+        command: "docker"
+        args: ["run", "-i", "--rm", "-e", "PROMETHEUS_URL", "ghcr.io/pab1it0/prometheus-mcp-server:latest"]
+        workingDirectory: "/tmp"
+
+      # --- Edge & CDN ---
+      cloudflare:
+        name: "Cloudflare"
+        description: "Cloudflare Workers, DNS, security, and edge computing management"
+        transport: "http"
+        url: "https://bindings.mcp.cloudflare.com/mcp"
+        workingDirectory: "/tmp"
+
       # --- Local Servers (run in agent containers, not proxied) ---
       rust-tools:
         name: "Rust Development Tools"
