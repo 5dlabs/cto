@@ -1,0 +1,19 @@
+---
+# Mayastor Storage Class
+# Universal storage class name used across all environments.
+# Replication level (repl) is configured per-cluster:
+#   - Home lab: repl=1 (single disk pool)
+#   - Latitude/providers: repl=2+ (multiple nodes with NVMe)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: mayastor
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+parameters:
+  protocol: nvmf
+  repl: "1"  # Default to 1; override per environment for redundancy
+provisioner: io.openebs.csi-mayastor
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

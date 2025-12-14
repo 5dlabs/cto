@@ -24,7 +24,7 @@ spec:
         # Persistence
         persistence:
           enabled: true
-          storageClass: "mayastor-single-replica"  # High-performance NVMe storage
+          storageClass: "mayastor"  # High-performance NVMe storage
           size: 2Gi
 
         # Resource allocation

@@ -55,24 +55,24 @@ spec:
           resourcePolicy: "keep"
           persistentVolumeClaim:
             registry:
-              storageClass: "mayastor-single-replica"
+              storageClass: "mayastor"
               accessMode: ReadWriteOnce
               size: 50Gi
             jobservice:
               jobLog:
-                storageClass: "mayastor-single-replica"
+                storageClass: "mayastor"
                 accessMode: ReadWriteOnce
                 size: 1Gi
             database:
-              storageClass: "mayastor-single-replica"
+              storageClass: "mayastor"
               accessMode: ReadWriteOnce
               size: 10Gi
             redis:
-              storageClass: "mayastor-single-replica"
+              storageClass: "mayastor"
               accessMode: ReadWriteOnce
               size: 1Gi
             trivy:
-              storageClass: "mayastor-single-replica"
+              storageClass: "mayastor"
               accessMode: ReadWriteOnce
               size: 5Gi
 

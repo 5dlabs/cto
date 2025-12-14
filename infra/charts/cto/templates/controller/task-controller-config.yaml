@@ -56,7 +56,7 @@ data:
       logsProtocol: "http"
     
     storage:
-      storageClassName: {{ .Values.global.storageClass | default "local-path" }}
+      storageClassName: {{ .Values.global.storageClass | default "mayastor" }}
       workspaceSize: "10Gi"
     
     cleanup:

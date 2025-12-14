@@ -48,7 +48,7 @@ spec:
           data:
             type: persistentVolumeClaim
             size: 10Gi
-            storageClass: "mayastor-single-replica"
+            storageClass: "mayastor"
           # Disable hostPath logs (not available on Talos read-only filesystem)
           logs:
             type: emptyDir
@@ -83,7 +83,7 @@ spec:
             - name: data
               type: persistentVolumeClaim
               size: 100Gi
-              storageClass: "mayastor-single-replica"
+              storageClass: "mayastor"
               maxVolumes: 100
           # Disable hostPath logs (not available on Talos read-only filesystem)
           logs:
@@ -119,7 +119,7 @@ spec:
           data:
             type: persistentVolumeClaim
             size: 20Gi
-            storageClass: "mayastor-single-replica"
+            storageClass: "mayastor"
           # Disable hostPath logs (not available on Talos read-only filesystem)
           logs:
             type: emptyDir

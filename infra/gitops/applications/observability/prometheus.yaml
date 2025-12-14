@@ -22,7 +22,7 @@ spec:
         server:
           persistentVolume:
             enabled: true
-            storageClass: "mayastor-single-replica"  # High-performance NVMe storage
+            storageClass: "mayastor"  # High-performance NVMe storage
             size: 50Gi
           # Pod security context
           securityContext:

@@ -15,8 +15,8 @@ metadata:
     app.kubernetes.io/component: cache
 spec:
   accessModes:
-    - ReadWriteOnce  # local-path limitation - use node affinity for sharing
+    - ReadWriteOnce
   resources:
     requests:
       storage: 200Gi  # Large cache for Rust builds and dependencies
-  storageClassName: local-path  # Adjust based on your storage class
+  storageClassName: mayastor

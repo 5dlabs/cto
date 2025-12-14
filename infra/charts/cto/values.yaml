@@ -17,7 +17,7 @@ global:
   imagePullSecrets:
     - name: ghcr-secret
   # Storage class for PVCs
-  storageClass: local-path
+  storageClass: mayastor
 
   # ==========================================================================
   # Dev Registry - Toggle between GHCR and local in-cluster registry

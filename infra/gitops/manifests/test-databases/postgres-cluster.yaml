@@ -30,7 +30,7 @@ spec:
   # Storage configuration
   storage:
     size: 5Gi
-    storageClass: local-path
+    storageClass: mayastor
 
   # Resource allocation
   resources:
