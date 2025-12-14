@@ -41,13 +41,17 @@ impl Installer {
         // Ensure output directory exists
         std::fs::create_dir_all(&config.output_dir).context("Failed to create output directory")?;
 
-        let state = if let Some(existing) = InstallState::load(&config.output_dir)? {
+        let state = if let Some(mut existing) = InstallState::load(&config.output_dir)? {
             // Found existing state - resume from there
             if existing.can_resume() {
                 ui::print_info(&format!("Resuming installation from: {}", existing.step));
                 if let Some(ref err) = existing.last_error {
                     ui::print_warning(&format!("Previous error: {err}"));
                 }
+
+                // Check if config has changed - warn and update for certain fields
+                Self::check_and_update_config(&mut existing, &config)?;
+
                 existing
             } else if existing.is_complete() {
                 ui::print_success("Installation already complete!");
@@ -65,6 +69,69 @@ impl Installer {
             state,
             retry_config: RetryConfig::default(),
         })
+    }
+
+    /// Check if config has changed and update safe-to-update fields.
+    ///
+    /// Certain fields (like plan) cannot change mid-installation if servers exist.
+    /// Other fields (like VLAN interface) can be updated.
+    fn check_and_update_config(existing: &mut InstallState, new_config: &InstallConfig) -> Result<()> {
+        let old = &existing.config;
+
+        // Critical fields that can't change once servers exist
+        if existing.control_plane.is_some() || !existing.workers.is_empty() {
+            if old.cp_plan != new_config.cp_plan {
+                ui::print_warning(&format!(
+                    "⚠️  Control plane plan changed from '{}' to '{}' but servers already exist!",
+                    old.cp_plan, new_config.cp_plan
+                ));
+                ui::print_info("   Delete state file to start fresh, or continue with existing plan.");
+            }
+            if old.worker_plan != new_config.worker_plan {
+                ui::print_warning(&format!(
+                    "⚠️  Worker plan changed from '{}' to '{}' but servers already exist!",
+                    old.worker_plan, new_config.worker_plan
+                ));
+            }
+            if old.cluster_name != new_config.cluster_name {
+                anyhow::bail!(
+                    "Cluster name changed from '{}' to '{}'. Delete state file to start fresh.",
+                    old.cluster_name,
+                    new_config.cluster_name
+                );
+            }
+        }
+
+        // Safe to update fields (update state with new config values)
+        let config = &mut existing.config;
+
+        // Update VLAN settings (these affect config generation)
+        if config.vlan_parent_interface != new_config.vlan_parent_interface {
+            ui::print_info(&format!(
+                "Updating VLAN interface: {} -> {}",
+                config.vlan_parent_interface, new_config.vlan_parent_interface
+            ));
+            config.vlan_parent_interface = new_config.vlan_parent_interface.clone();
+        }
+        if config.enable_vlan != new_config.enable_vlan {
+            config.enable_vlan = new_config.enable_vlan;
+        }
+        if config.enable_firewall != new_config.enable_firewall {
+            config.enable_firewall = new_config.enable_firewall;
+        }
+        if config.vlan_subnet != new_config.vlan_subnet {
+            config.vlan_subnet = new_config.vlan_subnet.clone();
+        }
+
+        // Update GitOps settings
+        config.gitops_repo = new_config.gitops_repo.clone();
+        config.gitops_branch = new_config.gitops_branch.clone();
+        config.sync_timeout_minutes = new_config.sync_timeout_minutes;
+
+        // Save updated config
+        existing.save()?;
+
+        Ok(())
     }
 
     /// Run installation to completion with automatic retry/resume.

@@ -106,6 +106,60 @@ impl BareMetalOrchestrator {
         }
     }
 
+    /// Validate that plans have stock in the given region before creating servers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if plans don't have stock in the region.
+    pub async fn validate_stock(&self, region: &str) -> Result<()> {
+        ui::print_info(&format!(
+            "Validating stock for plans in {region}..."
+        ));
+
+        let (api_key, project_id) = get_latitude_credentials()?;
+        let latitude = Latitude::new(&api_key, &project_id)
+            .context("Failed to create Latitude provider for stock validation")?;
+
+        let mut inventory = InventoryManager::new(latitude);
+
+        // Check control plane plan
+        let cp_stock = inventory
+            .validate_region(&self.config.cp_plan, region)
+            .await
+            .with_context(|| {
+                format!(
+                    "Control plane plan '{}' has no stock in region '{}'",
+                    self.config.cp_plan, region
+                )
+            })?;
+
+        ui::print_info(&format!(
+            "   ✓ CP plan '{}' has {:?} stock in {}",
+            self.config.cp_plan, cp_stock, region
+        ));
+
+        // Check worker plan (if different)
+        if self.config.worker_plan != self.config.cp_plan && self.config.node_count > 1 {
+            let worker_stock = inventory
+                .validate_region(&self.config.worker_plan, region)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Worker plan '{}' has no stock in region '{}'",
+                        self.config.worker_plan, region
+                    )
+                })?;
+
+            ui::print_info(&format!(
+                "   ✓ Worker plan '{}' has {:?} stock in {}",
+                self.config.worker_plan, worker_stock, region
+            ));
+        }
+
+        ui::print_success(&format!("Stock validated for all plans in {region}"));
+        Ok(())
+    }
+
     /// Create servers for the cluster.
     ///
     /// Returns control plane server and worker servers.
@@ -117,6 +171,9 @@ impl BareMetalOrchestrator {
         &self,
         region: &str,
     ) -> Result<(CreatedServer, Vec<CreatedServer>)> {
+        // Validate stock before creating servers
+        self.validate_stock(region).await?;
+
         let cp_hostname = self.config.cp_hostname();
         let worker_hostnames = self.config.worker_hostnames();
 
