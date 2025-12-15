@@ -269,45 +269,6 @@ spec:
                 Add                 service.component   ci-runner
                 Add                 service.namespace   arc-runners
 
-            # Try to parse JSON logs to extract level field
-            [FILTER]
-                Name                parser
-                Match               kube.*
-                Key_Name            log
-                Parser              json_log
-                Reserve_Data        On
-                Preserve_Key        On
-
-            # Detect ERROR level from log content
-            [FILTER]
-                Name                modify
-                Match               kube.*
-                Condition           Key_value_matches log (?i)(ERROR|FATAL|PANIC|error\[E|"level"\s*:\s*"error")
-                Add                 detected_level error
-
-            # Detect WARN level from log content (only if not already set)
-            [FILTER]
-                Name                modify
-                Match               kube.*
-                Condition           Key_Does_Not_Exist detected_level
-                Condition           Key_value_matches log (?i)(WARN|WARNING|"level"\s*:\s*"warn)
-                Add                 detected_level warn
-
-            # Detect INFO level from log content (only if not already set)
-            [FILTER]
-                Name                modify
-                Match               kube.*
-                Condition           Key_Does_Not_Exist detected_level
-                Condition           Key_value_matches log (?i)(\sINFO\s|"level"\s*:\s*"info"|level=info)
-                Add                 detected_level info
-
-            # Default to info if no level detected
-            [FILTER]
-                Name                modify
-                Match               kube.*
-                Condition           Key_Does_Not_Exist detected_level
-                Add                 detected_level info
-
           outputs: |
             # Send to OTEL Collector (which exports to Loki)
             [OUTPUT]
