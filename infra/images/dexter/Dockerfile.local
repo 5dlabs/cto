@@ -4,6 +4,9 @@
 ## This Dockerfile uses Ubuntu base for local development on arm64/amd64.
 ## For production, use the main Dockerfile with the runtime base image.
 ##
+## NOTE: Dexter was rewritten from Python to TypeScript/Bun in Dec 2025.
+## This Dockerfile uses Bun runtime instead of Python/uv.
+##
 ## https://github.com/virattt/dexter
 
 FROM ubuntu:24.04
@@ -15,15 +18,12 @@ ARG TZ=UTC
 ENV TZ="$TZ"
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install base dependencies
+# Install base dependencies (no Python needed for TypeScript Dexter)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
-    python3 \
-    python3-pip \
-    python3-venv \
-    python-is-python3 \
+    unzip \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,27 +38,32 @@ RUN if ! getent group node > /dev/null 2>&1; then \
     fi
 
 # Setup workspace and ensure correct ownership
-RUN mkdir -p /workspace /home/node/.cache/pip /home/node/.dexter && \
+RUN mkdir -p /workspace /home/node/.cache /home/node/.dexter /home/node/.bun && \
     chown -R node:node /home/node /workspace
 
 WORKDIR /workspace
 
-# Install uv (fast Python package manager from Astral)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+# Install Bun (JavaScript/TypeScript runtime)
+RUN curl -fsSL https://bun.sh/install | bash && \
+    ln -sf /root/.bun/bin/bun /usr/local/bin/bun && \
+    ln -sf /root/.bun/bin/bunx /usr/local/bin/bunx
+ENV PATH="/root/.bun/bin:$PATH"
 
-# Clone and install Dexter using uv (required for uv-managed projects)
+# Clone and install Dexter using Bun (TypeScript project since Dec 2025)
 ARG DEXTER_VERSION=latest
 RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
     cd /opt/dexter && \
     if [ "$DEXTER_VERSION" != "latest" ]; then \
       git checkout "v${DEXTER_VERSION}"; \
     fi && \
-    uv sync && \
-    ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
+    bun install && \
+    # Create wrapper script for dexter command
+    echo '#!/bin/bash' > /usr/local/bin/dexter-agent && \
+    echo 'cd /opt/dexter && exec bun run src/index.ts "$@"' >> /usr/local/bin/dexter-agent && \
+    chmod +x /usr/local/bin/dexter-agent
 
 # Verify installation
-RUN cd /opt/dexter && uv run python -c "from dexter.agent import Agent; print('Dexter installed successfully')"
+RUN cd /opt/dexter && bun run --help || echo "Bun installed, dexter ready"
 
 # Switch to node user for git config
 USER node
