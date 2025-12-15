@@ -119,6 +119,11 @@ spec:
       kind: DaemonSet
       jsonPointers:
         - /spec/template/metadata/annotations
+    # ClusterPolicy has operator-managed fields
+    - group: nvidia.com
+      kind: ClusterPolicy
+      jsonPointers:
+        - /spec
 
   syncPolicy:
     automated:
