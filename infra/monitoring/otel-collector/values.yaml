@@ -1,20 +1,20 @@
 ---
-# OpenTelemetry Collector Configuration for Victoria Logs Integration
+# OpenTelemetry Collector Configuration for Loki Integration
 mode: deployment
 
 # Required image configuration
 image:
   repository: otel/opentelemetry-collector-k8s
 
-# Custom configuration with Victoria Logs exporter
+# Custom configuration with Loki exporter
 config:
   exporters:
     debug:
       verbosity: detailed
 
-    # Victoria Logs OTLP HTTP exporter
-    otlphttp/victorialogs:
-      endpoint: http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+    # Loki OTLP HTTP exporter
+    otlphttp/loki:
+      endpoint: http://loki-gateway.observability.svc.cluster.local:80/otlp
       tls:
         insecure: true
 
@@ -73,7 +73,7 @@ config:
       - health_check
 
     pipelines:
-      # Logs pipeline - send to Victoria Logs
+      # Logs pipeline - send to Loki
       logs:
         receivers:
           - otlp
@@ -82,7 +82,7 @@ config:
           - resource
           - batch
         exporters:
-          - otlphttp/victorialogs
+          - otlphttp/loki
           - debug
 
       # Metrics pipeline

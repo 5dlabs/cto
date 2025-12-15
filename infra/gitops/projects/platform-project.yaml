@@ -30,7 +30,6 @@ spec:
     - 'https://prometheus-community.github.io/helm-charts'
     - 'https://grafana.github.io/helm-charts'
     - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
-    - 'https://victoriametrics.github.io/helm-charts/'
     - 'https://actions-runner-controller.github.io/actions-runner-controller'
     - 'https://twingate.github.io/helm-charts'
     - 'https://github.com/actions/actions-runner-controller'
