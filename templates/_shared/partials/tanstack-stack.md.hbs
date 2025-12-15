@@ -304,8 +304,13 @@ function CreateUserForm() {
     },
   });
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    form.handleSubmit();
+  };
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); form.handleSubmit(); }}>
+    <form onSubmit={handleSubmit}>
       <form.Field name="name">
         {(field) => (
           <div>
