@@ -396,6 +396,11 @@ pub struct AgentDefinition {
     /// Allows cycling through multiple models on retry attempts
     #[serde(default, rename = "modelRotation")]
     pub model_rotation: Option<ModelRotationConfig>,
+
+    /// Frontend stack preference for this agent (primarily for Blaze)
+    /// Supported values: "shadcn" (default), "tanstack"
+    #[serde(default, rename = "frontendStack")]
+    pub frontend_stack: Option<String>,
 }
 
 /// Model rotation configuration for an agent
