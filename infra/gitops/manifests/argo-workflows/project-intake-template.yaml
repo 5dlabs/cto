@@ -240,6 +240,7 @@ spec:
               secretKeyRef:
                 name: linear-secrets
                 key: LINEAR_OAUTH_TOKEN
+          # AI Provider API Keys (all CLIs)
           - name: ANTHROPIC_API_KEY
             valueFrom:
               secretKeyRef:
@@ -250,6 +251,42 @@ spec:
               secretKeyRef:
                 name: agent-platform-secrets
                 key: OPENAI_API_KEY
+          - name: GEMINI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: GEMINI_API_KEY
+                optional: true
+          - name: GOOGLE_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: GOOGLE_API_KEY
+                optional: true
+          - name: CURSOR_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: CURSOR_API_KEY
+                optional: true
+          - name: XAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: XAI_API_KEY
+                optional: true
+          - name: PERPLEXITY_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: PERPLEXITY_API_KEY
+                optional: true
+          - name: CONTEXT7_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-platform-secrets
+                key: CONTEXT7_API_KEY
+                optional: true
           - name: GITHUB_APP_ID
             valueFrom:
               secretKeyRef:
