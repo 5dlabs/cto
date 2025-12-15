@@ -42,8 +42,19 @@ pub struct AppState {
 
 /// Build the HTTP router for the Linear service.
 pub fn build_router(state: AppState) -> Router {
+    // Create HTTP client for external API calls
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
+    // Get GitHub token from environment (optional)
+    let github_token = std::env::var("GITHUB_TOKEN").ok();
+
     let callback_state = Arc::new(CallbackState {
         linear_client: state.linear_client.clone(),
+        http_client,
+        github_token,
     });
 
     Router::new()
