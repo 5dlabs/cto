@@ -298,7 +298,7 @@ data:
         activity_action_complete "Branch protected" "${REPO_PATH}:${BRANCH_NAME}" "Already enabled.\n\n${SUMMARY}"
     else
         # Apply branch protection using JSON input (ensures correct types)
-        printf '{"required_status_checks":null,"enforce_admins":true,"required_pull_request_reviews":{"dismiss_stale_reviews":true,"require_code_owner_reviews":false,"required_approving_review_count":1},"restrictions":null,"required_linear_history":true,"allow_force_pushes":false,"allow_deletions":false}' > /tmp/branch-protection-input.json
+        printf '{"required_status_checks":null,"enforce_admins":false,"required_pull_request_reviews":{"dismiss_stale_reviews":true,"require_code_owner_reviews":false,"required_approving_review_count":1},"restrictions":null,"required_linear_history":true,"allow_force_pushes":false,"allow_deletions":false}' > /tmp/branch-protection-input.json
 
         if OUT=$(gh api --method PUT "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" \
             -H "Accept: application/vnd.github+json" \
