@@ -95,7 +95,45 @@ stringData:
   DATABASE_URL: postgresql://user:password@app-db-rw.databases.svc:5432/app_production  # pragma: allowlist secret
 ```
 
-### Step 6: Document Connection Details
+### Step 6: Create Shared Infrastructure ConfigMap
+
+**CRITICAL**: Create a ConfigMap that other agents will use to connect to infrastructure:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{service}}-infra-config
+  namespace: {{service}}
+  labels:
+    app.kubernetes.io/part-of: {{service}}
+    cto.platform/type: infrastructure-config
+data:
+  # PostgreSQL connection
+  DATABASE_URL: postgresql://{{service}}_user:$DB_PASSWORD@{{service}}-db-rw.databases.svc:5432/{{service}}
+  DATABASE_HOST: {{service}}-db-rw.databases.svc
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: {{service}}
+  DATABASE_USER: {{service}}_user
+  
+  # Redis/Valkey connection
+  REDIS_URL: redis://{{service}}-cache.databases.svc:6379
+  REDIS_HOST: {{service}}-cache.databases.svc
+  REDIS_PORT: "6379"
+  
+  # S3/Object Storage (if provisioned)
+  S3_ENDPOINT: http://seaweedfs-filer.seaweedfs.svc:8333
+  S3_BUCKET: {{service}}-uploads
+```
+
+Apply this ConfigMap:
+```bash
+kubectl apply -f infra/{{service}}-infra-config.yaml
+```
+
+This ConfigMap will be mounted into implementation agent containers at `/config/infra/`.
+
+### Step 7: Document Connection Details
 
 Create `infra/README.md` with connection information:
 
@@ -103,18 +141,24 @@ Create `infra/README.md` with connection information:
 # Infrastructure Components
 
 ## PostgreSQL
-- Host: app-db-rw.databases.svc
+- Host: {{service}}-db-rw.databases.svc
 - Port: 5432
-- Database: app_production
-- Secret: app-db-app (in databases namespace)
+- Database: {{service}}
+- Secret: {{service}}-db-app (in databases namespace)
 
 ## Valkey
-- Host: app-cache.databases.svc
+- Host: {{service}}-cache.databases.svc
 - Port: 6379
 
 ## S3 (SeaweedFS)
 - Endpoint: http://seaweedfs-filer.seaweedfs.svc:8333
-- Bucket: app-uploads
+- Bucket: {{service}}-uploads
+
+## Using Connection Details
+
+Other agents will read from ConfigMap `{{service}}-infra-config`:
+- Mounted at `/config/infra/` in containers
+- Environment variables available: DATABASE_URL, REDIS_URL, S3_ENDPOINT
 ```
 
 ## Component Type Mappings
@@ -170,9 +214,11 @@ If provisioning fails:
 ## Deliverables
 
 1. **Kubernetes manifests** in `infra/` directory
-2. **Connection documentation** in `infra/README.md`
-3. **PR with infrastructure code** ready for review
-4. **Verification output** showing healthy components
+2. **Infrastructure ConfigMap** `{{service}}-infra-config` applied to cluster
+3. **Connection documentation** in `infra/README.md`
+4. **PR with infrastructure code** ready for review
+5. **Verification output** showing healthy components
+6. **Update Linear issue** with infrastructure status and connection details
 
 ## Task Context
 

@@ -55,6 +55,10 @@ pub struct CallbackState {
     pub http_client: reqwest::Client,
     /// GitHub token for API authentication (optional).
     pub github_token: Option<String>,
+    /// Kubernetes namespace for workflows.
+    pub namespace: String,
+    /// Play workflow configuration.
+    pub play_config: crate::config::PlayConfig,
 }
 
 /// Handle intake workflow completion callback.
