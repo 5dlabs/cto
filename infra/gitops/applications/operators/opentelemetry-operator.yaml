@@ -31,6 +31,12 @@ spec:
       values: |
         # Manager (operator) configuration
         manager:
+          # Collector image configuration (required since chart v0.56.0)
+          # Using GHCR as recommended for new installations
+          # See: https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-operator/UPGRADING.md
+          collectorImage:
+            repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+
           # Resource limits for the operator
           resources:
             requests:
