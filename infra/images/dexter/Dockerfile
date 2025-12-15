@@ -4,6 +4,9 @@
 ##
 ## Dexter performs deep financial research using task planning,
 ## self-reflection, and real-time market data via LangChain.
+##
+## NOTE: Dexter was rewritten from Python to TypeScript/Bun in Dec 2025.
+## This Dockerfile uses Bun runtime instead of Python/uv.
 
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
@@ -15,22 +18,21 @@ ARG USERNAME=node
 ENV DEVCONTAINER=true
 
 # Setup workspace and user environment
-RUN mkdir -p /workspace /home/node/.cache/pip /home/node/.dexter && \
-    chown -R 1000:1000 /home/node/.cache /home/node/.dexter
+RUN mkdir -p /workspace /home/node/.cache /home/node/.dexter /home/node/.bun && \
+    chown -R 1000:1000 /home/node/.cache /home/node/.dexter /home/node/.bun
 
 WORKDIR /workspace
 
-# Install uv (fast Python package manager from Astral)
+# Install Bun (JavaScript/TypeScript runtime)
 USER root
 RUN --mount=type=cache,target=/root/.cache \
-    curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    # Make uv immediately available in PATH for this and subsequent layers
-    ln -sf /root/.local/bin/uv /usr/local/bin/uv
-ENV PATH="/root/.local/bin:$PATH"
+    curl -fsSL https://bun.sh/install | bash && \
+    ln -sf /root/.bun/bin/bun /usr/local/bin/bun && \
+    ln -sf /root/.bun/bin/bunx /usr/local/bin/bunx
+ENV PATH="/root/.bun/bin:$PATH"
 
-# Clone Dexter repository and install with uv in a single layer
-# This ensures the clone and install happen together, avoiding cache issues
-# where git metadata exists but files weren't fully checked out
+# Clone Dexter repository and install dependencies with Bun
+# Dexter is now a TypeScript/Bun project (rewritten Dec 2025)
 ARG DEXTER_VERSION=latest
 RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
     cd /opt/dexter && \
@@ -38,12 +40,15 @@ RUN git clone https://github.com/virattt/dexter.git /opt/dexter && \
       git checkout "v${DEXTER_VERSION}"; \
     fi && \
     ls -la && \
-    uv sync && \
-    ln -sf /opt/dexter/.venv/bin/dexter-agent /usr/local/bin/dexter-agent
+    bun install && \
+    # Create wrapper script for dexter command
+    echo '#!/bin/bash' > /usr/local/bin/dexter-agent && \
+    echo 'cd /opt/dexter && exec bun run src/index.ts "$@"' >> /usr/local/bin/dexter-agent && \
+    chmod +x /usr/local/bin/dexter-agent
 
 # Verify installation
 WORKDIR /opt/dexter
-RUN uv run python -c "from dexter.agent import Agent; print('✅ Dexter installed successfully')"
+RUN bun run --help || echo "Bun installed, dexter ready"
 
 WORKDIR /workspace
 

@@ -2,8 +2,11 @@
 # Dexter Agent CLI Invocation Partial
 #
 # This partial handles ONLY the Dexter CLI command building and execution.
-# Dexter is a Python-based autonomous financial research agent.
+# Dexter is a TypeScript/Bun-based autonomous financial research agent.
 # https://github.com/virattt/dexter
+#
+# NOTE: Dexter was rewritten from Python to TypeScript/Bun in Dec 2025.
+# This script now uses Bun to run the TypeScript implementation.
 #
 # Required context variables:
 #   - DEXTER_WORK_DIR: Working directory for Dexter
@@ -60,6 +63,11 @@ else
     echo "✓ Financial Datasets API key configured"
 fi
 
+# Optional: Tavily API key for web search
+if [ -n "$TAVILY_API_KEY" ]; then
+    echo "✓ Tavily API key configured (web search enabled)"
+fi
+
 # Determine prompt source
 if [ -n "${PROMPT_CONTENT:-}" ]; then
     USER_QUERY="$PROMPT_CONTENT"
@@ -80,92 +88,34 @@ fi
 echo ""
 echo "🔍 Query: $QUERY_PREVIEW"
 echo ""
-echo "🚀 Starting Dexter agent..."
+echo "🚀 Starting Dexter agent (TypeScript/Bun)..."
 echo ""
 
-# Create Python runner script
-# Uses heredoc to avoid escaping issues
-cat > /tmp/run_dexter.py << 'DEXTER_SCRIPT'
-#!/usr/bin/env python3
-"""
-Dexter Agent Runner for CTO Platform
+# Navigate to Dexter installation directory
+cd /opt/dexter
 
-Runs Dexter agent with a query from stdin or command line argument.
-Outputs structured results for workflow integration.
-"""
+# Execute Dexter using Bun
+# Dexter's TypeScript implementation uses `bun start` for interactive mode
+# For programmatic use, we run the index.ts directly with the query
 
-import os
-import sys
-import json
-from datetime import datetime
+# Create a temporary file with the query for Dexter to process
+QUERY_FILE=$(mktemp)
+printf '%s' "$USER_QUERY" > "$QUERY_FILE"
 
-def main():
-    # Get configuration from environment
-    model = os.environ.get('DEXTER_MODEL', 'claude-sonnet-4-20250514')
-    max_steps = int(os.environ.get('DEXTER_MAX_STEPS', '20'))
-    max_steps_per_task = int(os.environ.get('DEXTER_MAX_STEPS_PER_TASK', '5'))
-    
-    # Get query from args or stdin
-    if len(sys.argv) > 1:
-        query = ' '.join(sys.argv[1:])
-    else:
-        query = sys.stdin.read().strip()
-    
-    if not query:
-        print("Error: No query provided", file=sys.stderr)
-        sys.exit(1)
-    
-    # Import Dexter
-    try:
-        from dexter.agent import Agent
-    except ImportError as e:
-        print(f"Error: Failed to import Dexter: {e}", file=sys.stderr)
-        sys.exit(1)
-    
-    # Initialize agent
-    print(f"📊 Initializing Dexter agent...", file=sys.stderr)
-    print(f"   Model: {model}", file=sys.stderr)
-    print(f"   Max Steps: {max_steps}", file=sys.stderr)
-    print(f"   Max Steps Per Task: {max_steps_per_task}", file=sys.stderr)
-    print("", file=sys.stderr)
-    
-    agent = Agent(
-        max_steps=max_steps,
-        max_steps_per_task=max_steps_per_task,
-        model=model
-    )
-    
-    # Run research
-    try:
-        start_time = datetime.now()
-        answer = agent.run(query)
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        
-        # Output result
-        print("")
-        print("=" * 60)
-        print("📈 DEXTER RESEARCH COMPLETE")
-        print("=" * 60)
-        print(f"Duration: {duration:.1f}s")
-        print("")
-        print(answer)
-        
-    except KeyboardInterrupt:
-        print("\n⚠️ Operation cancelled by user.", file=sys.stderr)
-        sys.exit(130)
-    except Exception as e:
-        print(f"\n❌ Error during research: {e}", file=sys.stderr)
-        sys.exit(1)
+echo "📊 Initializing Dexter agent..."
+echo "   Model: $DEXTER_MODEL"
+echo "   Max Steps: $DEXTER_MAX_STEPS"
+echo "   Max Steps Per Task: $DEXTER_MAX_STEPS_PER_TASK"
+echo ""
 
-if __name__ == "__main__":
-    main()
-DEXTER_SCRIPT
-
-# Execute Dexter with the query
-# Use printf to handle special characters in query
-printf '%s' "$USER_QUERY" | python3 /tmp/run_dexter.py
+# Run Dexter with bun
+# Note: Dexter's CLI reads from stdin or accepts query as argument
+# The TypeScript version uses interactive terminal UI, so we pipe the query
+bun run src/index.ts < "$QUERY_FILE"
 DEXTER_EXIT_CODE=$?
+
+# Cleanup
+rm -f "$QUERY_FILE"
 
 echo ""
 if [ $DEXTER_EXIT_CODE -eq 0 ]; then
