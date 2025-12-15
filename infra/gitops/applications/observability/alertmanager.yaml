@@ -22,9 +22,12 @@ spec:
         replicaCount: 1
 
         # Persistence
+        # NOTE: Use empty string to rely on default storage class (mayastor).
+        # Explicit storageClass causes StatefulSet immutable field errors since
+        # the existing StatefulSet was created with an empty storageClass.
         persistence:
           enabled: true
-          storageClass: "mayastor"  # High-performance NVMe storage
+          storageClass: ""  # Uses default storage class (mayastor)
           size: 2Gi
 
         # Resource allocation
