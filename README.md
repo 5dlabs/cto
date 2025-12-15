@@ -583,7 +583,11 @@ Dynamic MCP tool registration with 60+ pre-configured tools:
 | **Context7** | Library documentation lookup and code examples |
 | **OpenMemory** | Persistent memory across agent sessions |
 
-**Frontend Stack**: shadcn/ui components, Tailwind CSS, React patterns built-in
+**Frontend Stack Options**: Blaze supports two frontend philosophies:
+- **shadcn Stack** (default): Next.js App Router + shadcn/ui + Server Actions + React Query
+- **TanStack Stack**: TanStack Router + DB + Query + Table + Form + Virtual for client-first, reactive UIs
+
+Configure via `frontendStack: "shadcn" | "tanstack"` in Blaze's agent config or let Morgan auto-detect based on PRD keywords
 
 **Component Architecture:**
 - **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with dynamic tool registration
@@ -983,6 +987,7 @@ This allows you to:
 - **`temperature`**: Model temperature (creativity vs determinism)
 - **`reasoningEffort`**: Reasoning effort level (`low`, `medium`, `high`)
 - **`modelRotation`**: Enable automatic model rotation for resilience and cost optimization
+- **`frontendStack`** (Blaze only): Frontend stack choice - `"shadcn"` (default) or `"tanstack"`
 - **`tools.remote`**: Array of remote MCP tool names
 - **`tools.localServers`**: Local MCP server configurations
 

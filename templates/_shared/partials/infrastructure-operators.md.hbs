@@ -1,0 +1,340 @@
+## Platform Infrastructure Operators
+
+The CTO platform provides Kubernetes operators for common infrastructure components. Use these operators to provision databases, caches, messaging systems, and object storage for your applications.
+
+### Quick Reference
+
+| Component | Operator | CRD Kind | API Group | Namespace |
+|-----------|----------|----------|-----------|-----------|
+| PostgreSQL | CloudNative-PG | `Cluster` | `postgresql.cnpg.io/v1` | `databases` |
+| Redis/Valkey | Redis Operator | `Redis` | `redis.redis.opstreelabs.in/v1beta2` | `databases` |
+| S3 Storage | SeaweedFS | Helm chart | N/A (use filer S3 API) | `seaweedfs` |
+| Kafka | Strimzi | `Kafka` | `kafka.strimzi.io/v1beta2` | `kafka` |
+| MongoDB | Percona PSMDB | `PerconaServerMongoDB` | `psmdb.percona.com/v1` | `databases` |
+| MySQL | Percona PXC | `PerconaXtraDBCluster` | `pxc.percona.com/v1` | `databases` |
+| NATS | NATS Helm | Helm chart | N/A | `nats` |
+| RabbitMQ | RabbitMQ Operator | `RabbitmqCluster` | `rabbitmq.com/v1beta1` | `messaging` |
+
+### Size Presets
+
+Use these presets to specify resource requirements:
+
+| Size | CPU Request | Memory Request | Storage |
+|------|-------------|----------------|---------|
+| `small` | 100m | 256Mi | 5Gi |
+| `medium` | 500m | 1Gi | 20Gi |
+| `large` | 1000m | 4Gi | 100Gi |
+
+---
+
+### PostgreSQL (CloudNative-PG)
+
+**Use for**: Relational data, ACID transactions, complex queries
+
+**Connection**: `postgresql://<user>:<password>@<cluster-name>-rw.<namespace>.svc:5432/<database>`
+
+**Secrets**: The operator creates `<cluster-name>-app` secret with credentials
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{app_name}}-postgres
+  namespace: databases
+spec:
+  instances: 1  # Use 3 for HA
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+  storage:
+    size: 10Gi
+    storageClass: mayastor
+  bootstrap:
+    initdb:
+      database: {{app_name}}_db
+      owner: {{app_name}}_user
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+```
+
+---
+
+### Redis/Valkey (Redis Operator)
+
+**Use for**: Caching, sessions, real-time data, pub/sub
+
+**Connection**: `redis://{{app_name}}-valkey.<namespace>.svc:6379`
+
+**Note**: Uses Valkey images (BSD-3 licensed Redis fork) for license compliance
+
+```yaml
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: {{app_name}}-valkey
+  namespace: databases
+spec:
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+  kubernetesConfig:
+    image: valkey/valkey:7.2-alpine
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: mayastor
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+```
+
+---
+
+### SeaweedFS (S3-Compatible Object Storage)
+
+**Use for**: File uploads, static assets, backups, large binary data
+
+**S3 Endpoint**: `http://seaweedfs-filer.seaweedfs.svc:8333`
+
+**Note**: SeaweedFS is deployed cluster-wide. Create buckets via S3 API.
+
+```bash
+# Create bucket using AWS CLI
+aws s3 mb s3://{{app_name}}-uploads \
+  --endpoint-url http://seaweedfs-filer.seaweedfs.svc:8333
+
+# Or via weed shell
+kubectl exec -n seaweedfs seaweedfs-master-0 -- \
+  weed shell -master=localhost:9333 -filer=seaweedfs-filer:8888 \
+  -shell.command='s3.bucket.create -name {{app_name}}-uploads'
+```
+
+**Environment Variables for Application**:
+```yaml
+env:
+  - name: S3_ENDPOINT
+    value: "http://seaweedfs-filer.seaweedfs.svc:8333"
+  - name: S3_BUCKET
+    value: "{{app_name}}-uploads"
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: seaweedfs-s3-credentials
+        key: access-key
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: seaweedfs-s3-credentials
+        key: secret-key
+```
+
+---
+
+### Kafka (Strimzi)
+
+**Use for**: Event streaming, event sourcing, log aggregation, high-throughput messaging
+
+**Bootstrap**: `{{app_name}}-kafka-bootstrap.<namespace>.svc:9092`
+
+```yaml
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: {{app_name}}-kafka
+  namespace: kafka
+spec:
+  kafka:
+    version: "3.8.0"
+    replicas: 1  # Use 3 for production
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+    storage:
+      type: persistent-claim
+      size: 10Gi
+      class: mayastor
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+  zookeeper:
+    replicas: 1
+    storage:
+      type: persistent-claim
+      size: 5Gi
+      class: mayastor
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: {{app_name}}-events
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: {{app_name}}-kafka
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000  # 7 days
+```
+
+---
+
+### MongoDB (Percona)
+
+**Use for**: Document storage, flexible schemas, geospatial data
+
+**Connection**: `mongodb://{{app_name}}-mongodb-rs0.<namespace>.svc:27017`
+
+```yaml
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: {{app_name}}-mongodb
+  namespace: databases
+spec:
+  crVersion: "1.18.0"
+  image: percona/percona-server-mongodb:7.0.14-8
+  imagePullPolicy: IfNotPresent
+  replsets:
+    - name: rs0
+      size: 1  # Use 3 for HA
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: mayastor
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+  secrets:
+    users: {{app_name}}-mongodb-secrets
+```
+
+---
+
+### NATS (Messaging)
+
+**Use for**: Lightweight pub/sub, request/reply, queue groups
+
+**Connection**: `nats://nats.nats.svc:4222`
+
+**Note**: NATS is deployed cluster-wide via Helm chart with JetStream enabled.
+
+```yaml
+# Application deployment environment
+env:
+  - name: NATS_URL
+    value: "nats://nats.nats.svc:4222"
+```
+
+---
+
+### RabbitMQ
+
+**Use for**: Task queues, work distribution, reliable messaging
+
+**Connection**: `amqp://{{app_name}}-rabbitmq.<namespace>.svc:5672`
+
+```yaml
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: {{app_name}}-rabbitmq
+  namespace: messaging
+spec:
+  replicas: 1  # Use 3 for HA
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  persistence:
+    storageClassName: mayastor
+    storage: 10Gi
+  rabbitmq:
+    additionalConfig: |
+      vm_memory_high_watermark.relative = 0.8
+```
+
+---
+
+### Infrastructure Task Requirements Format
+
+When specifying infrastructure requirements in tasks, use this XML format:
+
+```xml
+<infrastructure>
+  <component type="postgresql" name="app-db">
+    <size>small</size>
+    <replicas>1</replicas>
+    <database>app_production</database>
+  </component>
+  <component type="valkey" name="app-cache">
+    <size>small</size>
+    <storage>1Gi</storage>
+  </component>
+  <component type="s3" name="uploads">
+    <bucket>app-uploads</bucket>
+  </component>
+</infrastructure>
+```
+
+### Connection Patterns
+
+Applications should read connection details from environment variables or Kubernetes secrets:
+
+```yaml
+# Example deployment environment configuration
+env:
+  # PostgreSQL
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: {{app_name}}-postgres-app
+        key: uri
+  # Valkey/Redis  
+  - name: REDIS_URL
+    value: "redis://{{app_name}}-valkey.databases.svc:6379"
+  # S3
+  - name: S3_ENDPOINT
+    value: "http://seaweedfs-filer.seaweedfs.svc:8333"
+```
+

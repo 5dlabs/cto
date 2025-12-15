@@ -30,6 +30,20 @@ Your task is to implement frontend changes based on the task specification in `t
 
 ---
 
+## Frontend Stack
+
+{{#if is_tanstack_stack}}
+Your task specifies the **TanStack stack**. Use TanStack Router, DB, Query, Table, Form, and Virtual for client-first, reactive UIs.
+
+{{> tanstack-stack }}
+{{else}}
+Your task uses the **shadcn stack** (default). Use Next.js App Router, Server Actions, and shadcn/ui components.
+
+{{> shadcn-stack }}
+{{/if}}
+
+---
+
 ## Animation Library: Anime.js
 
 When building UIs that need animations, **use anime.js** (`npm install animejs`) to create **visually stunning, impressive animations** that make interfaces feel magical. Don't settle for basic fade-ins—push creative boundaries!
