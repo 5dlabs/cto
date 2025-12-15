@@ -4194,6 +4194,7 @@ mod tests {
                 tools: Some(agent_tools.clone()),
                 client_config: None,
                 model_rotation: None,
+                frontend_stack: None,
             },
         );
 
@@ -4226,6 +4227,7 @@ mod tests {
                         }
                     }
                 })),
+                frontend_stack: None,
             },
         );
 
@@ -4307,6 +4309,7 @@ mod tests {
                 tools: Some(helm_tools),
                 client_config: None,
                 model_rotation: None,
+                frontend_stack: None,
             },
         );
 
