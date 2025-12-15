@@ -508,11 +508,21 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
+<<<<<<< HEAD
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
         let frontend_stack = cli_config
             .get("frontendStack")
             .and_then(Value::as_str)
+=======
+        // Determine frontend stack from annotations (defaults to shadcn)
+        let frontend_stack = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/frontend-stack"))
+            .map(String::as_str)
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -895,11 +905,21 @@ impl CodeTemplateGenerator {
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(1);
 
+<<<<<<< HEAD
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
         let frontend_stack = cli_config
             .get("frontendStack")
             .and_then(Value::as_str)
+=======
+        // Determine frontend stack from annotations (defaults to shadcn)
+        let frontend_stack = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/frontend-stack"))
+            .map(String::as_str)
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -1218,11 +1238,21 @@ impl CodeTemplateGenerator {
             .unwrap_or(&code_run.spec.model)
             .to_string();
 
+<<<<<<< HEAD
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
         let frontend_stack = cli_config
             .get("frontendStack")
             .and_then(Value::as_str)
+=======
+        // Determine frontend stack from annotations (defaults to shadcn)
+        let frontend_stack = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/frontend-stack"))
+            .map(String::as_str)
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -1510,11 +1540,21 @@ impl CodeTemplateGenerator {
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
+<<<<<<< HEAD
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
         let frontend_stack = cli_config
             .get("frontendStack")
             .and_then(Value::as_str)
+=======
+        // Determine frontend stack from annotations (defaults to shadcn)
+        let frontend_stack = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/frontend-stack"))
+            .map(String::as_str)
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -2799,11 +2839,21 @@ impl CodeTemplateGenerator {
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
+<<<<<<< HEAD
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
         let frontend_stack = cli_config
             .get("frontendStack")
             .and_then(Value::as_str)
+=======
+        // Determine frontend stack from annotations (defaults to shadcn)
+        let frontend_stack = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/frontend-stack"))
+            .map(String::as_str)
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -3145,11 +3195,21 @@ impl CodeTemplateGenerator {
             .unwrap_or(&code_run.spec.model)
             .to_string();
 
+<<<<<<< HEAD
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
         let frontend_stack = cli_config
             .get("frontendStack")
             .and_then(Value::as_str)
+=======
+        // Determine frontend stack from annotations (defaults to shadcn)
+        let frontend_stack = code_run
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get("agents.platform/frontend-stack"))
+            .map(String::as_str)
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -3735,8 +3795,11 @@ impl CodeTemplateGenerator {
             ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
             ("tanstack-stack", PARTIAL_TANSTACK_STACK),
             ("shadcn-stack", PARTIAL_SHADCN_STACK),
+<<<<<<< HEAD
             // Infrastructure operators partial (for Bolt/Morgan)
             ("infrastructure-operators", PARTIAL_INFRASTRUCTURE_OPERATORS),
+=======
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
         ];
 
         // Legacy partials (for backwards compatibility)

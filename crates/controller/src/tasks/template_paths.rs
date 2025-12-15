@@ -36,10 +36,13 @@ pub const PARTIAL_FRONTEND_TOOLKITS: &str = "_shared/partials/frontend-toolkits.
 pub const PARTIAL_TANSTACK_STACK: &str = "_shared/partials/tanstack-stack.md.hbs";
 pub const PARTIAL_SHADCN_STACK: &str = "_shared/partials/shadcn-stack.md.hbs";
 
+<<<<<<< HEAD
 // Infrastructure operators partial (for Bolt/Morgan agents)
 pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
     "_shared/partials/infrastructure-operators.md.hbs";
 
+=======
+>>>>>>> e8225a102 (Enhance Blaze agent with frontend stack options and documentation. Introduced support for "shadcn" and "tanstack" stacks, allowing users to configure the frontend stack in agent settings. Updated README and templates to reflect new stack options, including detailed guidelines for each stack. Added new partials for frontend toolkits and stack-specific documentation. Improved infrastructure provisioning scripts and system prompts for better clarity and usability.)
 // ============================================================================
 // CLI-specific templates (invocation scripts, settings)
 // Config templates removed - adapters now serialize directly
