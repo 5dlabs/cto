@@ -43,6 +43,7 @@ spec:
             - --excluded-workflows={{ .Values.healer.sensor.excludedWorkflows }}
             {{- end }}
             - --namespace={{ include "cto.namespace" . }}
+            - --verbose
           env:
             - name: RUST_LOG
               value: "info,healer=debug"
