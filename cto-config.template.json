@@ -196,6 +196,7 @@
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
       "model": "gpt-4o",
+      "frontendStack": "shadcn",
       "features": {
         "effectSolutions": false
       },
@@ -293,7 +294,8 @@
     "defaults.play.autoMerge": "Whether Tess should automatically merge PRs after approval (true/false)",
     "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access",
-    "agents.*.features.effectSolutions": "Enable Effect.ts integration - includes effect-solutions CLI instructions in agent prompts for idiomatic Effect TypeScript patterns"
+    "agents.*.features.effectSolutions": "Enable Effect.ts integration - includes effect-solutions CLI instructions in agent prompts for idiomatic Effect TypeScript patterns",
+    "agents.blaze.frontendStack": "Frontend stack selection: 'shadcn' (default) for Next.js + shadcn/ui, or 'tanstack' for TanStack Router + DB + Query ecosystem. Affects which patterns Blaze uses for routing, data fetching, and UI components"
   },
   "_usage_examples": {
     "minimal_task_call": "task(task_id=1, repository='https://github.com/org/repo')",

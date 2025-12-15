@@ -508,6 +508,14 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
+            .unwrap_or("shadcn");
+        let is_tanstack_stack = frontend_stack == "tanstack";
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -534,6 +542,9 @@ impl CodeTemplateGenerator {
             "tools": {
                 "tools": remote_tools,
             },
+            // Frontend stack context for Blaze agent
+            "frontend_stack": frontend_stack,
+            "is_tanstack_stack": is_tanstack_stack,
         });
 
         handlebars.render("cursor_agents", &context).map_err(|e| {
@@ -884,6 +895,14 @@ impl CodeTemplateGenerator {
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(1);
 
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
+            .unwrap_or("shadcn");
+        let is_tanstack_stack = frontend_stack == "tanstack";
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -911,6 +930,9 @@ impl CodeTemplateGenerator {
             "tools": {
                 "tools": remote_tools,
             },
+            // Frontend stack context for Blaze agent
+            "frontend_stack": frontend_stack,
+            "is_tanstack_stack": is_tanstack_stack,
         });
 
         handlebars.render("factory_agents", &context).map_err(|e| {
@@ -1196,6 +1218,14 @@ impl CodeTemplateGenerator {
             .unwrap_or(&code_run.spec.model)
             .to_string();
 
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
+            .unwrap_or("shadcn");
+        let is_tanstack_stack = frontend_stack == "tanstack";
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1220,6 +1250,9 @@ impl CodeTemplateGenerator {
             "tools": {
                 "tools": remote_tools,
             },
+            // Frontend stack context for Blaze agent
+            "frontend_stack": frontend_stack,
+            "is_tanstack_stack": is_tanstack_stack,
         });
 
         handlebars.render("claude_memory", &context).map_err(|e| {
@@ -1477,6 +1510,14 @@ impl CodeTemplateGenerator {
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
+            .unwrap_or("shadcn");
+        let is_tanstack_stack = frontend_stack == "tanstack";
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -1503,6 +1544,9 @@ impl CodeTemplateGenerator {
             "tools": {
                 "tools": remote_tools,
             },
+            // Frontend stack context for Blaze agent
+            "frontend_stack": frontend_stack,
+            "is_tanstack_stack": is_tanstack_stack,
         });
 
         handlebars.render("codex_agents", &context).map_err(|e| {
@@ -1538,6 +1582,14 @@ impl CodeTemplateGenerator {
                     if enriched.get("modelRotation").is_none() {
                         enriched["modelRotation"] = json!(model_rotation.models);
                     }
+                }
+            }
+
+            // If agent has frontend stack preference, inject it into cli_config
+            // This is primarily used by Blaze agent for shadcn vs tanstack stack selection
+            if let Some(frontend_stack) = &agent_config.frontend_stack {
+                if enriched.get("frontendStack").is_none() {
+                    enriched["frontendStack"] = json!(frontend_stack);
                 }
             }
         }
@@ -2747,6 +2799,14 @@ impl CodeTemplateGenerator {
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
+            .unwrap_or("shadcn");
+        let is_tanstack_stack = frontend_stack == "tanstack";
+
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": model,
@@ -2768,6 +2828,9 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
+            // Frontend stack context for Blaze agent
+            "frontend_stack": frontend_stack,
+            "is_tanstack_stack": is_tanstack_stack,
         });
 
         handlebars.render("opencode_agents", &context).map_err(|e| {
@@ -3082,6 +3145,14 @@ impl CodeTemplateGenerator {
             .unwrap_or(&code_run.spec.model)
             .to_string();
 
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
+            .unwrap_or("shadcn");
+        let is_tanstack_stack = frontend_stack == "tanstack";
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -3106,6 +3177,9 @@ impl CodeTemplateGenerator {
             "tools": {
                 "tools": remote_tools,
             },
+            // Frontend stack context for Blaze agent
+            "frontend_stack": frontend_stack,
+            "is_tanstack_stack": is_tanstack_stack,
         });
 
         handlebars.render("gemini_memory", &context).map_err(|e| {
@@ -3617,6 +3691,7 @@ impl CodeTemplateGenerator {
             PARTIAL_COMPLETION,
             PARTIAL_CONFIG,
             PARTIAL_EXPO_ENV,
+            PARTIAL_FRONTEND_TOOLKITS,
             PARTIAL_GITHUB_AUTH,
             PARTIAL_GIT_SETUP,
             PARTIAL_GO_ENV,
@@ -3624,6 +3699,8 @@ impl CodeTemplateGenerator {
             PARTIAL_NODE_ENV,
             PARTIAL_RETRY_LOOP,
             PARTIAL_RUST_ENV,
+            PARTIAL_SHADCN_STACK,
+            PARTIAL_TANSTACK_STACK,
             PARTIAL_TASK_FILES,
             PARTIAL_TOOLS_CONFIG,
             // Legacy partials
@@ -3653,6 +3730,10 @@ impl CodeTemplateGenerator {
             ("acceptance-probe", PARTIAL_ACCEPTANCE_PROBE),
             ("retry-loop", PARTIAL_RETRY_LOOP),
             ("completion", PARTIAL_COMPLETION),
+            // Frontend stack partials (for Blaze/Morgan)
+            ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
+            ("tanstack-stack", PARTIAL_TANSTACK_STACK),
+            ("shadcn-stack", PARTIAL_SHADCN_STACK),
         ];
 
         // Legacy partials (for backwards compatibility)
@@ -3722,6 +3803,10 @@ impl CodeTemplateGenerator {
     /// Register shared agent system prompt partials
     /// These partials are used by agent-specific templates via {{> agents/partial-name}}
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
+        use crate::tasks::template_paths::{
+            PARTIAL_FRONTEND_TOOLKITS, PARTIAL_SHADCN_STACK, PARTIAL_TANSTACK_STACK,
+        };
+
         // List of shared agent system prompt partials that need to be registered
         let agent_partials = vec![
             "agents/cipher-system-prompt",
@@ -3730,6 +3815,39 @@ impl CodeTemplateGenerator {
             "agents/tess-system-prompt",
             "agents/system-prompt",
         ];
+
+        // Frontend stack partials used by Blaze and Morgan system prompts
+        let frontend_stack_partials = vec![
+            ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
+            ("tanstack-stack", PARTIAL_TANSTACK_STACK),
+            ("shadcn-stack", PARTIAL_SHADCN_STACK),
+        ];
+
+        // Register frontend stack partials first
+        for (partial_name, template_path) in frontend_stack_partials {
+            match Self::load_template(template_path) {
+                Ok(content) => {
+                    handlebars
+                        .register_partial(partial_name, content)
+                        .map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to register frontend stack partial {partial_name}: {e}"
+                            ))
+                        })?;
+                    debug!(
+                        "Successfully registered frontend stack partial: {}",
+                        partial_name
+                    );
+                }
+                Err(e) => {
+                    // Warn but don't fail - the partial may not be needed for non-frontend agents
+                    warn!(
+                        "Failed to load frontend stack partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Blaze/Morgan templates referencing this partial will fail to render."
+                    );
+                }
+            }
+        }
 
         let mut failed_partials = Vec::new();
 

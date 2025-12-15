@@ -185,12 +185,12 @@ jobs:
             TOOLS_VERSION=${{ steps.binaries-version.outputs.tools_version }}
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
-          # Use both local cache (fast) and registry cache (persistent across runners)
+          # Use GHA cache (built-in, fast) and registry cache (persistent fallback)
           cache-from: |
-            type=local,src=/cache/buildx/base
+            type=gha,scope=runtime
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
           cache-to: |
-            type=local,dest=/cache/buildx/base,mode=max
+            type=gha,scope=runtime,mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache,mode=max
 
       - name: Set build output
@@ -416,10 +416,8 @@ jobs:
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
             VERSION=${{ steps.version.outputs.version }}
             CACHE_BUST=${{ github.run_id }}
-          cache-from: |
-            type=local,src=/cache/buildx/${{ matrix.id }}
-          cache-to: |
-            type=local,dest=/cache/buildx/${{ matrix.id }},mode=max
+          cache-from: type=gha,scope=${{ matrix.id }}
+          cache-to: type=gha,scope=${{ matrix.id }},mode=max
 
       - name: Append summary
         run: |

@@ -31,6 +31,11 @@ pub const PARTIAL_ACCEPTANCE_PROBE: &str = "_shared/partials/acceptance-probe.sh
 pub const PARTIAL_RETRY_LOOP: &str = "_shared/partials/retry-loop.sh.hbs";
 pub const PARTIAL_COMPLETION: &str = "_shared/partials/completion.sh.hbs";
 
+// Frontend stack partials (for Blaze agent)
+pub const PARTIAL_FRONTEND_TOOLKITS: &str = "_shared/partials/frontend-toolkits.md.hbs";
+pub const PARTIAL_TANSTACK_STACK: &str = "_shared/partials/tanstack-stack.md.hbs";
+pub const PARTIAL_SHADCN_STACK: &str = "_shared/partials/shadcn-stack.md.hbs";
+
 // ============================================================================
 // CLI-specific templates (invocation scripts, settings)
 // Config templates removed - adapters now serialize directly
