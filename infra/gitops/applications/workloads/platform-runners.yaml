@@ -81,7 +81,7 @@ spec:
             activeDeadlineSeconds: 3600
             containers:
             - name: runner
-              image: ghcr.io/5dlabs/rust-builder:latest
+              image: ghcr.io/actions/actions-runner:latest
               imagePullPolicy: Always
               command: ["/home/runner/run.sh"]
               # Resource limits to prevent OOM on the node
@@ -93,14 +93,6 @@ spec:
                   cpu: "4"
                   memory: "12Gi"
               env:
-              - name: ACTIONS_RUNNER_EPHEMERAL
-                value: "false"
-              - name: RUNNER_SCOPE
-                value: "org"
-              - name: RUNNER_LABELS
-                value: "k8s-runner,self-hosted,linux,x64"
-              - name: DISABLE_RUNNER_UPDATE
-                value: "true"
               - name: ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT
                 value: "true"
               volumeMounts:
