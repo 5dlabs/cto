@@ -65,13 +65,15 @@ import { Input } from '@/components/ui/input';
 export function UserSearch({ onSearch }: { onSearch: (query: string) => void }) {
   const [query, setQuery] = useState('');
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+    onSearch(e.target.value);
+  };
+
   return (
     <Input
       value={query}
-      onChange={(e) => {
-        setQuery(e.target.value);
-        onSearch(e.target.value);
-      }}
+      onChange={handleChange}
       placeholder="Search users..."
     />
   );

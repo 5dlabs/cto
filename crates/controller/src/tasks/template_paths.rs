@@ -36,6 +36,10 @@ pub const PARTIAL_FRONTEND_TOOLKITS: &str = "_shared/partials/frontend-toolkits.
 pub const PARTIAL_TANSTACK_STACK: &str = "_shared/partials/tanstack-stack.md.hbs";
 pub const PARTIAL_SHADCN_STACK: &str = "_shared/partials/shadcn-stack.md.hbs";
 
+// Infrastructure operators partial (for Bolt/Morgan agents)
+pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
+    "_shared/partials/infrastructure-operators.md.hbs";
+
 // ============================================================================
 // CLI-specific templates (invocation scripts, settings)
 // Config templates removed - adapters now serialize directly
