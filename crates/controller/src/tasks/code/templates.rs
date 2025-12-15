@@ -508,13 +508,11 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
-        // Determine frontend stack from annotations (defaults to shadcn)
-        let frontend_stack = code_run
-            .metadata
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get("agents.platform/frontend-stack"))
-            .map(String::as_str)
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -897,13 +895,11 @@ impl CodeTemplateGenerator {
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(1);
 
-        // Determine frontend stack from annotations (defaults to shadcn)
-        let frontend_stack = code_run
-            .metadata
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get("agents.platform/frontend-stack"))
-            .map(String::as_str)
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -1222,13 +1218,11 @@ impl CodeTemplateGenerator {
             .unwrap_or(&code_run.spec.model)
             .to_string();
 
-        // Determine frontend stack from annotations (defaults to shadcn)
-        let frontend_stack = code_run
-            .metadata
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get("agents.platform/frontend-stack"))
-            .map(String::as_str)
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -1516,13 +1510,11 @@ impl CodeTemplateGenerator {
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
-        // Determine frontend stack from annotations (defaults to shadcn)
-        let frontend_stack = code_run
-            .metadata
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get("agents.platform/frontend-stack"))
-            .map(String::as_str)
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -2807,13 +2799,11 @@ impl CodeTemplateGenerator {
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
-        // Determine frontend stack from annotations (defaults to shadcn)
-        let frontend_stack = code_run
-            .metadata
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get("agents.platform/frontend-stack"))
-            .map(String::as_str)
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
@@ -3155,13 +3145,11 @@ impl CodeTemplateGenerator {
             .unwrap_or(&code_run.spec.model)
             .to_string();
 
-        // Determine frontend stack from annotations (defaults to shadcn)
-        let frontend_stack = code_run
-            .metadata
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get("agents.platform/frontend-stack"))
-            .map(String::as_str)
+        // Determine frontend stack from agent config (defaults to shadcn)
+        // Priority: cli_config.frontendStack > default "shadcn"
+        let frontend_stack = cli_config
+            .get("frontendStack")
+            .and_then(Value::as_str)
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
