@@ -532,11 +532,17 @@ impl CodeRunSpawner {
         labels.insert("healer/branch", sanitize_label(branch));
         labels.insert("healer/task-id", task_id.clone());
 
-        // Escape prompt for YAML
-        let escaped_prompt = prompt
+        // Escape prompt for YAML - remove control characters first, then escape
+        let cleaned_prompt: String = prompt
+            .chars()
+            .filter(|c| !c.is_control() || *c == '\n' || *c == '\r' || *c == '\t')
+            .collect();
+        let escaped_prompt = cleaned_prompt
             .replace('\\', "\\\\")
             .replace('"', "\\\"")
-            .replace('\n', "\\n");
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\t', "    "); // Replace tabs with spaces for YAML
 
         let yaml = format!(
             r#"apiVersion: cto.5dlabs.io/v1

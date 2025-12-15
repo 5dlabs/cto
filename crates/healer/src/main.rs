@@ -12,6 +12,7 @@ mod k8s;
 pub mod loki;
 pub mod play;
 pub mod scanner;
+pub mod sensors;
 mod templates;
 
 use anyhow::{Context, Result};
@@ -27,7 +28,7 @@ use std::process::Command;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as AsyncCommand;
 use tokio::sync::mpsc;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// Self-healing platform monitor - detects issues and spawns remediation agents
 #[derive(Parser)]
@@ -420,6 +421,57 @@ enum Commands {
         /// Show remediation candidates
         #[arg(long)]
         show_candidates: bool,
+    },
+    /// [SENSOR] Monitor GitHub Actions for workflow failures and spawn remediation
+    Sensor {
+        #[command(subcommand)]
+        action: SensorCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum SensorCommands {
+    /// Run the GitHub Actions sensor (polls for failures)
+    GithubActions {
+        /// Repositories to monitor (comma-separated, e.g., "5dlabs/cto,5dlabs/docs")
+        #[arg(long, default_value = "5dlabs/cto")]
+        repositories: String,
+
+        /// Poll interval in seconds
+        #[arg(long, default_value = "60")]
+        poll_interval: u64,
+
+        /// How far back to look for failures on first poll (minutes)
+        #[arg(long, default_value = "60")]
+        lookback_mins: u64,
+
+        /// Create GitHub issues for detected failures
+        #[arg(long, default_value = "true")]
+        create_issues: bool,
+
+        /// Labels to add to created issues (comma-separated)
+        #[arg(long, default_value = "healer,ci-failure")]
+        issue_labels: String,
+
+        /// Branches to monitor (comma-separated, empty = all)
+        #[arg(long, default_value = "")]
+        branches: String,
+
+        /// Workflows to exclude (comma-separated)
+        #[arg(long, default_value = "")]
+        excluded_workflows: String,
+
+        /// Kubernetes namespace for CodeRuns
+        #[arg(long, default_value = "cto")]
+        namespace: String,
+
+        /// Run once and exit (instead of continuous loop)
+        #[arg(long)]
+        once: bool,
+
+        /// Path to remediation config file (optional)
+        #[arg(long)]
+        config: Option<String>,
     },
 }
 
@@ -1841,7 +1893,7 @@ async fn main() -> Result<()> {
     // Initialize tracing if verbose
     if cli.verbose {
         tracing_subscriber::fmt()
-            .with_env_filter("play_monitor=debug")
+            .with_env_filter("healer=debug")
             .init();
     }
 
@@ -2176,6 +2228,144 @@ async fn main() -> Result<()> {
             )
             .await?;
         }
+        Commands::Sensor { action } => match action {
+            SensorCommands::GithubActions {
+                repositories,
+                poll_interval,
+                lookback_mins,
+                create_issues,
+                issue_labels,
+                branches,
+                excluded_workflows,
+                namespace,
+                once,
+                config,
+            } => {
+                run_github_actions_sensor(
+                    &repositories,
+                    poll_interval,
+                    lookback_mins,
+                    create_issues,
+                    &issue_labels,
+                    &branches,
+                    &excluded_workflows,
+                    &namespace,
+                    once,
+                    config.as_deref(),
+                )
+                .await?;
+            }
+        },
+    }
+
+    Ok(())
+}
+
+// =============================================================================
+// GitHub Actions Sensor
+// =============================================================================
+
+/// Run the GitHub Actions sensor to monitor for workflow failures.
+async fn run_github_actions_sensor(
+    repositories: &str,
+    poll_interval: u64,
+    lookback_mins: u64,
+    create_issues: bool,
+    issue_labels: &str,
+    branches: &str,
+    excluded_workflows: &str,
+    namespace: &str,
+    once: bool,
+    config_path: Option<&str>,
+) -> Result<()> {
+    use sensors::{GitHubActionsSensor, SensorConfig};
+
+    info!("Starting GitHub Actions sensor");
+
+    // Parse repositories
+    let repos: Vec<String> = repositories
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if repos.is_empty() {
+        anyhow::bail!("No repositories specified");
+    }
+
+    // Parse labels
+    let labels: Vec<String> = issue_labels
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // Parse branches filter
+    let branch_filter: Vec<String> = branches
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // Parse excluded workflows
+    let excluded: Vec<String> = excluded_workflows
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // Build sensor config
+    let sensor_config = SensorConfig {
+        repositories: repos.clone(),
+        poll_interval_secs: poll_interval,
+        lookback_mins,
+        create_issues,
+        issue_labels: labels,
+        branches: branch_filter,
+        excluded_workflows: excluded,
+        max_per_poll: 10,
+        namespace: namespace.to_string(),
+    };
+
+    // Load remediation config if provided
+    let remediation_config = if let Some(path) = config_path {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read config file: {path}"))?;
+        serde_json::from_str(&content).with_context(|| "Failed to parse remediation config")?
+    } else {
+        ci::types::RemediationConfig::default()
+    };
+
+    info!(
+        "Monitoring {} repositories: {:?}",
+        repos.len(),
+        repos
+    );
+    info!(
+        "Poll interval: {}s, lookback: {}m, create issues: {}",
+        poll_interval, lookback_mins, create_issues
+    );
+
+    let mut sensor = GitHubActionsSensor::new(sensor_config, remediation_config);
+
+    if once {
+        // Run once and exit
+        info!("Running single poll cycle...");
+        let failures = sensor.poll_once().await?;
+        info!("Processed {} failure(s)", failures.len());
+        for failure in &failures {
+            println!(
+                "  - {} ({}) @ {} [{}]",
+                failure.workflow_name,
+                failure.run_id,
+                failure.branch,
+                failure.html_url
+            );
+        }
+    } else {
+        // Run continuous loop
+        info!("Starting continuous monitoring loop (Ctrl+C to stop)");
+        sensor.run().await?;
     }
 
     Ok(())

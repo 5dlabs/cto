@@ -1,0 +1,70 @@
+{{- if and .Values.healer.enabled .Values.healer.sensor.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto.healer.fullname" . }}-sensor
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "cto.healer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sensor
+  template:
+    metadata:
+      labels:
+        {{- include "cto.healer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sensor
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.healer.fullname" . }}
+      containers:
+        - name: sensor
+          image: "{{ include "cto.imageRef" (dict "component" "healer" "image" .Values.healer.image "global" .Values.global) }}"
+          imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.healer.image "global" .Values.global) }}
+          command: ["healer"]
+          args:
+            - sensor
+            - github-actions
+            - --repositories={{ .Values.healer.sensor.repositories | default "5dlabs/cto" }}
+            - --poll-interval={{ .Values.healer.sensor.pollInterval | default 60 }}
+            - --lookback-mins={{ .Values.healer.sensor.lookbackMins | default 60 }}
+            {{- if .Values.healer.sensor.createIssues }}
+            - --create-issues
+            {{- end }}
+            - --issue-labels={{ .Values.healer.sensor.issueLabels | default "healer,ci-failure" }}
+            {{- if .Values.healer.sensor.branches }}
+            - --branches={{ .Values.healer.sensor.branches }}
+            {{- end }}
+            {{- if .Values.healer.sensor.excludedWorkflows }}
+            - --excluded-workflows={{ .Values.healer.sensor.excludedWorkflows }}
+            {{- end }}
+            - --namespace={{ include "cto.namespace" . }}
+          env:
+            - name: RUST_LOG
+              value: "info,healer=debug"
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-secrets
+                  key: GITHUB_TOKEN
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cto-secrets
+                  key: GITHUB_TOKEN
+          envFrom:
+            - secretRef:
+                name: cto-secrets
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+{{- end }}
+
