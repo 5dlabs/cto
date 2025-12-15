@@ -36,14 +36,14 @@
     Match               kube.*
     Add                 cluster telemetry-dev
 
-# Send directly to Victoria Logs using HTTP (single output to avoid duplicates)
+# Send to OTEL Collector which forwards to Loki
 [OUTPUT]
-    Name                http
+    Name                opentelemetry
     Match               kube.*
-    Host                victoria-logs-victoria-logs-single-server.observability.svc.cluster.local
-    Port                9428
-    URI                 /insert/jsonline
-    Format              json_lines
-    Json_date_key       _time
-    Json_date_format    iso8601
+    Host                otel-collector-opentelemetry-collector.observability.svc.cluster.local
+    Port                4318
+    TLS                 Off
+    Logs_uri            /v1/logs
+    logs_body_key       log
+    logs_resource_metadata_key kubernetes
     Retry_Limit         3

@@ -30,8 +30,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use tracing::{debug, warn};
 
-/// Default Loki service URL (internal Kubernetes DNS)
-const DEFAULT_LOKI_URL: &str = "http://loki.logging.svc.cluster.local:3100";
+/// Default Loki service URL (internal Kubernetes DNS via gateway)
+const DEFAULT_LOKI_URL: &str = "http://loki-gateway.observability.svc.cluster.local:80";
 
 /// Configuration for the Loki client
 #[derive(Debug, Clone)]
