@@ -1,0 +1,136 @@
+---
+# CronWorkflow for hourly log scanning
+# Scans Loki for errors/warnings across platform namespaces
+# and determines if automated remediation should be triggered.
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: log-error-scanner
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/component: log-scanner
+    app.kubernetes.io/managed-by: gitops
+spec:
+  # Run every hour at minute 0
+  schedule: "0 * * * *"
+
+  # Timezone (optional, defaults to UTC)
+  timezone: "UTC"
+
+  # Don't run if previous scan is still running
+  concurrencyPolicy: "Forbid"
+
+  # Keep last 3 successful and 3 failed workflow runs
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  # Start deadline - if scheduler misses window, don't run
+  startingDeadlineSeconds: 300
+
+  workflowSpec:
+    entrypoint: scan-and-report
+    serviceAccountName: argo-workflow
+
+    # Workflow-level TTL for cleanup
+    ttlStrategy:
+      secondsAfterCompletion: 3600  # Keep for 1 hour after completion
+      secondsAfterSuccess: 1800     # Keep successful for 30 min
+      secondsAfterFailure: 7200     # Keep failed for 2 hours
+
+    # Pod garbage collection
+    podGC:
+      strategy: OnPodSuccess
+      deleteDelayDuration: "60s"
+
+    templates:
+      - name: scan-and-report
+        steps:
+          # Step 1: Run the log scan
+          - - name: scan-logs
+              template: healer-scan
+
+          # Step 2: If remediation is recommended, log it
+          # (Future: spawn remediation CodeRun)
+          - - name: report-results
+              template: report
+              arguments:
+                parameters:
+                  - name: scan-output
+                    value: "{{steps.scan-logs.outputs.result}}"
+
+      - name: healer-scan
+        container:
+          image: ghcr.io/5dlabs/healer:latest
+          imagePullPolicy: Always
+          command: ["healer"]
+          args:
+            - "scan-logs"
+            - "--window=1h"
+            - "--namespaces=cto,automation,argocd,infra,observability"
+            - "--error-threshold=5"
+            - "--warn-threshold=20"
+            - "--output=json"
+            - "--show-candidates"
+          env:
+            - name: LOKI_URL
+              value: "http://loki-gateway.observability.svc.cluster.local:80"
+            - name: RUST_LOG
+              value: "info"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+      - name: report
+        inputs:
+          parameters:
+            - name: scan-output
+        script:
+          image: ghcr.io/5dlabs/healer:latest
+          command: ["/bin/sh"]
+          source: |
+            #!/bin/sh
+            set -e
+
+            echo "=== Log Scan Results ==="
+            echo '{{inputs.parameters.scan-output}}' | jq -r '
+              "Scan Time: \(.scan_time)",
+              "Window: \(.window_minutes) minutes",
+              "Total Errors: \(.total_errors)",
+              "Total Warnings: \(.total_warnings)",
+              "Services with Issues: \(.services_with_issues | length)",
+              "",
+              "Remediation Recommended: \(.remediation_recommended)",
+              if .recommendation_reason then "Reason: \(.recommendation_reason)" else "" end
+            '
+
+            # Check if remediation is recommended
+            REMEDIATION=$(echo '{{inputs.parameters.scan-output}}' | jq -r '.remediation_recommended')
+
+            if [ "$REMEDIATION" = "true" ]; then
+              echo ""
+              echo "⚠️  REMEDIATION RECOMMENDED"
+              echo "Future: This would trigger a remediation CodeRun"
+
+              # Extract services needing attention
+              echo ""
+              echo "Services needing attention:"
+              echo '{{inputs.parameters.scan-output}}' | jq -r '
+                .services_with_issues[] |
+                "  - \(.namespace)/\(.service): \(.error_count) errors, \(.warn_count) warnings"
+              '
+            else
+              echo ""
+              echo "✓ No remediation needed at this time"
+            fi
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"

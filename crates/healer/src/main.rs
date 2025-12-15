@@ -11,6 +11,7 @@ mod github;
 mod k8s;
 pub mod loki;
 pub mod play;
+pub mod scanner;
 mod templates;
 
 use anyhow::{Context, Result};
@@ -393,6 +394,32 @@ enum Commands {
         /// Path to remediation config file
         #[arg(long)]
         config: Option<String>,
+    },
+    /// [SCANNER] Scan logs for errors and warnings across platform namespaces
+    ScanLogs {
+        /// Time window to scan (e.g., "1h", "30m", "2h")
+        #[arg(long, default_value = "1h")]
+        window: String,
+
+        /// Namespaces to scan (comma-separated, empty = default platform namespaces)
+        #[arg(long, default_value = "cto,automation,argocd,infra,observability")]
+        namespaces: String,
+
+        /// Minimum error count to report a service
+        #[arg(long, default_value = "5")]
+        error_threshold: u32,
+
+        /// Minimum warning count to report a service
+        #[arg(long, default_value = "20")]
+        warn_threshold: u32,
+
+        /// Output format (json, text, summary)
+        #[arg(long, default_value = "summary")]
+        output: String,
+
+        /// Show remediation candidates
+        #[arg(long)]
+        show_candidates: bool,
     },
 }
 
@@ -2130,6 +2157,24 @@ async fn main() -> Result<()> {
             config: config_path,
         } => {
             run_server_command(&addr, &repository, &namespace, config_path.as_deref()).await?;
+        }
+        Commands::ScanLogs {
+            window,
+            namespaces,
+            error_threshold,
+            warn_threshold,
+            output,
+            show_candidates,
+        } => {
+            run_scan_logs_command(
+                &window,
+                &namespaces,
+                error_threshold,
+                warn_threshold,
+                &output,
+                show_candidates,
+            )
+            .await?;
         }
     }
 
@@ -7265,6 +7310,174 @@ async fn run_server_command(
     ci::run_server(state, addr).await?;
 
     Ok(())
+}
+
+/// Run the log scanning command.
+#[allow(clippy::too_many_lines)]
+async fn run_scan_logs_command(
+    window: &str,
+    namespaces: &str,
+    error_threshold: u32,
+    warn_threshold: u32,
+    output_format: &str,
+    show_candidates: bool,
+) -> Result<()> {
+    use scanner::{format_report_text, LogScanner, ScannerConfig};
+
+    // Parse window duration
+    let window_duration = parse_duration(window)?;
+
+    // Parse namespaces
+    let namespace_list: Vec<String> = namespaces
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    println!("{}", "═".repeat(60).cyan());
+    println!("{}", "HEALER LOG SCANNER".cyan().bold());
+    println!("{}", "═".repeat(60).cyan());
+    println!();
+    println!("  Window:          {}", window.green());
+    println!("  Namespaces:      {}", namespace_list.join(", ").green());
+    println!("  Error Threshold: {}", error_threshold);
+    println!("  Warn Threshold:  {}", warn_threshold);
+    println!();
+
+    // Create scanner
+    let loki = loki::LokiClient::with_defaults();
+
+    // Check Loki connectivity
+    if !loki.health_check().await.unwrap_or(false) {
+        println!(
+            "{}",
+            "⚠️  Warning: Loki health check failed - results may be incomplete".yellow()
+        );
+    }
+
+    let config = ScannerConfig {
+        namespaces: namespace_list,
+        error_threshold,
+        warn_threshold,
+        include_info: false,
+    };
+
+    let scanner = LogScanner::with_config(loki, config);
+
+    println!("{}", "Scanning logs...".cyan());
+    let report = scanner.scan(window_duration).await?;
+
+    // Output based on format
+    match output_format {
+        "json" => {
+            let json = serde_json::to_string_pretty(&report)?;
+            println!("{json}");
+        }
+        "text" => {
+            println!("{}", format_report_text(&report));
+        }
+        _ => {
+            println!();
+            println!(
+                "  Total Errors:   {}",
+                if report.total_errors > 0 {
+                    report.total_errors.to_string().red()
+                } else {
+                    report.total_errors.to_string().green()
+                }
+            );
+            println!(
+                "  Total Warnings: {}",
+                if report.total_warnings > 50 {
+                    report.total_warnings.to_string().yellow()
+                } else {
+                    report.total_warnings.to_string().green()
+                }
+            );
+            println!(
+                "  Services with Issues: {}",
+                report.services_with_issues.len()
+            );
+            println!();
+
+            if !report.services_with_issues.is_empty() {
+                println!("{}", "Services with Issues:".yellow());
+                for issue in &report.services_with_issues {
+                    let severity_icon = if issue.error_count >= 20 {
+                        "🔴"
+                    } else if issue.error_count >= 10 {
+                        "🟠"
+                    } else if issue.error_count >= 5 {
+                        "🟡"
+                    } else {
+                        "⚪"
+                    };
+                    println!(
+                        "  {} {}/{}: {} errors, {} warnings",
+                        severity_icon,
+                        issue.namespace,
+                        issue.service,
+                        issue.error_count,
+                        issue.warn_count
+                    );
+                }
+                println!();
+            }
+
+            if report.remediation_recommended {
+                println!("{}", "⚠️  REMEDIATION RECOMMENDED".red().bold());
+                if let Some(reason) = &report.recommendation_reason {
+                    println!("    Reason: {}", reason);
+                }
+            } else {
+                println!("{}", "✓ No immediate remediation needed".green());
+            }
+        }
+    }
+
+    // Show remediation candidates if requested
+    if show_candidates && !report.services_with_issues.is_empty() {
+        println!();
+        println!("{}", "Remediation Candidates:".yellow());
+        let candidates = scanner.determine_candidates(&report);
+        for candidate in candidates {
+            println!(
+                "  - {} {}/{} ({})",
+                match candidate.severity.as_str() {
+                    "critical" => "🔴",
+                    "high" => "🟠",
+                    "medium" => "🟡",
+                    _ => "⚪",
+                },
+                candidate.namespace,
+                candidate.service,
+                candidate.severity
+            );
+            println!("    Agent: {}", candidate.suggested_agent.cyan());
+            println!("    Reason: {}", candidate.reason);
+        }
+    }
+
+    Ok(())
+}
+
+/// Parse a duration string like "1h", "30m", "2h30m".
+fn parse_duration(s: &str) -> Result<chrono::Duration> {
+    let s = s.trim().to_lowercase();
+
+    if let Some(hours) = s.strip_suffix('h') {
+        let h: i64 = hours.parse().context("Invalid hours")?;
+        return Ok(chrono::Duration::hours(h));
+    }
+
+    if let Some(mins) = s.strip_suffix('m') {
+        let m: i64 = mins.parse().context("Invalid minutes")?;
+        return Ok(chrono::Duration::minutes(m));
+    }
+
+    // Try parsing as minutes by default
+    let m: i64 = s.parse().context("Invalid duration format")?;
+    Ok(chrono::Duration::minutes(m))
 }
 
 #[cfg(test)]

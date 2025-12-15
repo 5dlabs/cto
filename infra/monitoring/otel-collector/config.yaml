@@ -3,13 +3,11 @@ exporters:
   debug:
     verbosity: detailed
 
-  # Victoria Logs Elasticsearch exporter
-  elasticsearch/victorialogs:
-    endpoints:
-      - http://victoria-logs-victoria-logs-single-server.observability.svc.cluster.local:9428/insert/elasticsearch/_bulk
+  # Loki OTLP HTTP exporter
+  otlphttp/loki:
+    endpoint: http://loki-gateway.observability.svc.cluster.local:80/otlp
     tls:
       insecure: true
-    logs_index: logs
 
 extensions:
   health_check:
@@ -66,7 +64,7 @@ service:
     - health_check
 
   pipelines:
-    # Logs pipeline - send to Victoria Logs
+    # Logs pipeline - send to Loki
     logs:
       receivers:
         - otlp
@@ -75,7 +73,7 @@ service:
         - resource
         - batch
       exporters:
-        - elasticsearch/victorialogs
+        - otlphttp/loki
         - debug
 
     # Metrics pipeline
