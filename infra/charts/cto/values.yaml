@@ -299,6 +299,17 @@ tools:
         args: ["-y", "firecrawl-mcp"]
         workingDirectory: "/tmp"
 
+      # --- Project Management ---
+      linear:
+        name: "Linear"
+        description: "Linear issue tracking - create, update, and manage issues and projects"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@anthropics/linear-mcp"]
+        workingDirectory: "/tmp"
+        env:
+          LINEAR_API_KEY: "${LINEAR_API_KEY}"
+
       # --- Observability ---
       grafana:
         name: "Grafana"

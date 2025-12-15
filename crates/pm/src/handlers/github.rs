@@ -240,7 +240,7 @@ pub async fn handle_github_webhook(
                          **Project:** [{}]({})\n\
                          **Issues Created:** {}\n\
                          **PR Merged:** [#{}]({})\n\n\
-                         Your tasks are ready for implementation!",
+                         Starting play workflow...",
                         result.project_name,
                         result.project_url.as_deref().unwrap_or("#"),
                         result.issue_count,
@@ -253,6 +253,40 @@ pub async fn handle_github_webhook(
                 warn!(error = %e, "Failed to emit completion activity");
             }
 
+            // Trigger play workflow for the project
+            let play_result = trigger_play_workflow(
+                &state,
+                client,
+                &payload,
+                &metadata,
+                &result,
+            )
+            .await;
+
+            let workflow_info = match &play_result {
+                Ok(wf) => {
+                    info!(
+                        workflow_name = %wf.workflow_name,
+                        "Play workflow submitted successfully"
+                    );
+                    Some(json!({
+                        "workflow_name": wf.workflow_name,
+                        "status": "submitted"
+                    }))
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to submit play workflow");
+                    // Emit error but don't fail the whole request
+                    let _ = client
+                        .emit_error(
+                            &metadata.session_id,
+                            format!("⚠️ Failed to start play workflow: {e}"),
+                        )
+                        .await;
+                    None
+                }
+            };
+
             Ok(Json(json!({
                 "status": "success",
                 "action": "project_created",
@@ -260,7 +294,8 @@ pub async fn handle_github_webhook(
                 "project_name": result.project_name,
                 "issue_count": result.issue_count,
                 "pr_number": payload.pull_request.number,
-                "repository": payload.repository.full_name
+                "repository": payload.repository.full_name,
+                "play_workflow": workflow_info
             })))
         }
         Err(e) => {
@@ -689,4 +724,137 @@ pub async fn fetch_tasks_json_from_repo(
     );
 
     Ok(tasks_json)
+}
+
+/// Result of triggering a play workflow.
+#[derive(Debug)]
+pub struct PlayTriggerResult {
+    /// Workflow name.
+    pub workflow_name: String,
+}
+
+/// Trigger the play workflow after intake PR is merged.
+///
+/// Submits a play-project-workflow-template to process all tasks in the project.
+async fn trigger_play_workflow(
+    state: &Arc<CallbackState>,
+    client: &LinearClient,
+    payload: &PullRequestEvent,
+    metadata: &IntakeMetadata,
+    _project_result: &IntakeProjectResult,
+) -> anyhow::Result<PlayTriggerResult> {
+    use anyhow::Context;
+
+    let timestamp = chrono::Utc::now().timestamp();
+    let workflow_name = format!(
+        "play-intake-{}-{}",
+        metadata.prd_identifier.to_lowercase().replace('-', ""),
+        timestamp
+    );
+
+    // Build workflow parameters
+    // We use the play-project-workflow-template which handles multiple tasks
+    let play_config = &state.play_config;
+    let namespace = &state.namespace;
+
+    let repository = format!("https://github.com/{}", payload.repository.full_name);
+
+    // Determine project directory (normalize project name)
+    let project_dir = metadata.project_dir.clone().unwrap_or_else(|| {
+        metadata
+            .project_name
+            .clone()
+            .unwrap_or_else(|| payload.repository.name.clone())
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-")
+    });
+
+    let args = vec![
+        "submit".to_string(),
+        "--from".to_string(),
+        "workflowtemplate/play-project-workflow-template".to_string(),
+        "-n".to_string(),
+        namespace.clone(),
+        "--name".to_string(),
+        workflow_name.clone(),
+        "-p".to_string(),
+        format!("repository={repository}"),
+        "-p".to_string(),
+        format!("service={project_dir}"),
+        "-p".to_string(),
+        format!("github-app={}", play_config.github_app),
+        "-p".to_string(),
+        format!("model={}", play_config.model),
+        "-p".to_string(),
+        format!("implementation-agent={}", play_config.implementation_agent),
+        "-p".to_string(),
+        format!("testing-agent={}", play_config.testing_agent),
+        "-p".to_string(),
+        format!("quality-agent={}", play_config.quality_agent),
+        "-p".to_string(),
+        format!("frontend-agent={}", play_config.frontend_agent),
+        "-p".to_string(),
+        format!("parallel-execution={}", play_config.parallel_execution),
+        "-p".to_string(),
+        format!("auto-merge={}", play_config.auto_merge),
+        // Linear metadata for activity updates
+        "-p".to_string(),
+        format!("linear-session-id={}", metadata.session_id),
+        "-p".to_string(),
+        format!("linear-issue-id={}", metadata.prd_issue_id),
+        "-p".to_string(),
+        format!("linear-team-id={}", metadata.team_id),
+        "-l".to_string(),
+        format!("linear-session={}", metadata.session_id),
+        "-l".to_string(),
+        "source=github-pr-merge".to_string(),
+        "-l".to_string(),
+        format!("linear-issue={}", metadata.prd_identifier),
+        "--wait=false".to_string(),
+    ];
+
+    info!(
+        workflow_name = %workflow_name,
+        repository = %repository,
+        project_dir = %project_dir,
+        "Submitting play-project-workflow-template"
+    );
+
+    // Emit activity before submission
+    let _ = client
+        .emit_response(
+            &metadata.session_id,
+            format!(
+                "## 🚀 Starting Play Workflow\n\n\
+                 **Workflow:** `{workflow_name}`\n\
+                 **Repository:** {repository}\n\
+                 **Project:** {project_dir}\n\n\
+                 Tasks will be implemented by agents..."
+            ),
+        )
+        .await;
+
+    let output = tokio::process::Command::new("argo")
+        .args(&args)
+        .output()
+        .await
+        .context("Failed to execute argo submit command")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("Failed to submit play workflow: {stderr}");
+    }
+
+    info!(
+        workflow_name = %workflow_name,
+        "Play workflow submitted successfully"
+    );
+
+    Ok(PlayTriggerResult { workflow_name })
 }

@@ -27,6 +27,20 @@ Your task is to implement frontend changes based on the task specification in `t
 - Keep components reusable and composable
 - Test user interactions
 - **Add purposeful animations** that enhance UX (not distract)
+- **Update your Linear issue** with progress and status
+
+## Infrastructure Configuration
+
+If your task requires API connections, read backend URLs from the shared infrastructure ConfigMap:
+
+```bash
+# ConfigMap is mounted at /config/infra/ or available via kubectl
+kubectl get configmap {{service}}-infra-config -n {{service}} -o yaml
+```
+
+Use `NEXT_PUBLIC_API_URL` or `VITE_API_URL` environment variables for frontend configuration:
+- Point to the backend service provisioned by Bolt
+- Use environment-specific URLs from ConfigMap where available
 
 ---
 

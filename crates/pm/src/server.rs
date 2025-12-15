@@ -55,6 +55,8 @@ pub fn build_router(state: AppState) -> Router {
         linear_client: state.linear_client.clone(),
         http_client,
         github_token,
+        namespace: state.config.namespace.clone(),
+        play_config: state.config.play.clone(),
     });
 
     Router::new()

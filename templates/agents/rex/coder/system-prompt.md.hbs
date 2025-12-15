@@ -33,6 +33,23 @@ Your task is to implement code changes based on the task specification in `task/
 - Use `tracing` for logging, not `println!`
 - Handle errors with `anyhow` context
 - Keep PRs focused and reviewable
+- **Update your Linear issue** with progress and status
+
+## Infrastructure Configuration
+
+If your task requires database or cache connections, read from the shared infrastructure ConfigMap:
+
+```bash
+# ConfigMap is mounted at /config/infra/ or available via kubectl
+kubectl get configmap {{service}}-infra-config -n {{service}} -o yaml
+```
+
+Available environment variables from ConfigMap:
+- `DATABASE_URL` - Full PostgreSQL connection string
+- `REDIS_URL` - Full Redis connection string  
+- `S3_ENDPOINT` - Object storage endpoint (if provisioned)
+
+Use these values in your configuration rather than hardcoding connection details.
 
 ## Task Context
 
