@@ -51,6 +51,10 @@ fn default_true() -> bool {
 pub struct CallbackState {
     /// Linear client for API calls.
     pub linear_client: Option<LinearClient>,
+    /// HTTP client for external API calls (GitHub, etc.).
+    pub http_client: reqwest::Client,
+    /// GitHub token for API authentication (optional).
+    pub github_token: Option<String>,
 }
 
 /// Handle intake workflow completion callback.

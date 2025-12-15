@@ -122,6 +122,9 @@ pub struct IntakeMetadata {
     /// Project name (defaults to repo name)
     #[serde(default)]
     pub project_name: Option<String>,
+    /// Project directory name within repo (normalized project name)
+    #[serde(default)]
+    pub project_dir: Option<String>,
 }
 
 /// Handle GitHub webhook
@@ -220,7 +223,7 @@ pub async fn handle_github_webhook(
     };
 
     // Create project and issues
-    match create_project_from_intake(client, &payload, &metadata).await {
+    match create_project_from_intake(&state, client, &payload, &metadata).await {
         Ok(result) => {
             info!(
                 project_id = %result.project_id,
@@ -353,36 +356,82 @@ struct IntakeProjectResult {
 
 /// Create a Linear project from a merged intake PR
 async fn create_project_from_intake(
+    state: &Arc<CallbackState>,
     client: &LinearClient,
     payload: &PullRequestEvent,
     metadata: &IntakeMetadata,
 ) -> anyhow::Result<IntakeProjectResult> {
-    // Determine project name
+    use anyhow::Context;
+
+    // Determine project name and directory
     let project_name = metadata
         .project_name
         .clone()
         .unwrap_or_else(|| payload.repository.name.clone());
 
-    // Create the project
+    // Derive project directory from metadata or project name
+    let project_dir = metadata.project_dir.clone().unwrap_or_else(|| {
+        // Normalize project name to directory format (lowercase, alphanumeric + hyphens)
+        project_name
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-")
+    });
+
+    info!(
+        project_name = %project_name,
+        project_dir = %project_dir,
+        repo = %payload.repository.full_name,
+        "Starting Linear project creation from intake PR"
+    );
+
+    // Step 1: Fetch tasks.json from the repository
+    let tasks_json = fetch_tasks_json_from_repo(
+        &state.http_client,
+        state.github_token.as_deref(),
+        &payload.repository.full_name,
+        payload.pull_request.merge_commit_sha.as_deref(),
+        &project_dir,
+    )
+    .await
+    .context("Failed to fetch tasks.json from repository")?;
+
+    let task_count = tasks_json.tasks.len();
+    info!(
+        task_count = task_count,
+        "Fetched {task_count} tasks from tasks.json"
+    );
+
+    // Step 2: Create the Linear project
     let project_input = ProjectCreateInput {
         name: project_name.clone(),
         description: Some(format!(
             "Generated from intake PR [#{}]({}) in repository `{}`.\n\n\
              **PRD:** {}\n\
-             **Repository:** [{}]({})",
+             **Repository:** [{}]({})\n\
+             **Tasks:** {}",
             payload.pull_request.number,
             payload.pull_request.html_url,
             payload.repository.full_name,
             metadata.prd_identifier,
             payload.repository.name,
-            payload.repository.html_url
+            payload.repository.html_url,
+            task_count
         )),
         team_ids: Some(vec![metadata.team_id.clone()]),
         lead_id: None,
         target_date: None,
     };
 
-    let project = client.create_project(project_input).await?;
+    let project = client
+        .create_project(project_input)
+        .await
+        .context("Failed to create Linear project")?;
 
     info!(
         project_id = %project.id,
@@ -390,16 +439,23 @@ async fn create_project_from_intake(
         "Created Linear project"
     );
 
-    // Now we need to get tasks.json from the merged PR
-    // For now, we'll create a placeholder - in practice this would be fetched
-    // from the repository or passed via the callback
-    let issue_count = 0; // TODO: Parse tasks.json and create issues
+    // Step 3: Create Linear issues for each task
+    let created_issues = create_issues_from_tasks(
+        client,
+        &metadata.team_id,
+        &project.id,
+        &metadata.prd_issue_id,
+        &tasks_json.tasks,
+    )
+    .await
+    .context("Failed to create issues from tasks")?;
 
-    // In a full implementation, we would:
-    // 1. Fetch tasks.json from the repository at the merge commit
-    // 2. Parse the tasks
-    // 3. Create Linear issues for each task
-    // 4. Link them to the project
+    let issue_count = created_issues.len();
+    info!(
+        issue_count = issue_count,
+        project_id = %project.id,
+        "Created {issue_count} Linear issues from tasks"
+    );
 
     Ok(IntakeProjectResult {
         project_id: project.id,
@@ -514,4 +570,123 @@ pub async fn create_issues_from_tasks(
     }
 
     Ok(created_issues)
+}
+
+/// Root structure of tasks.json
+#[derive(Debug, Clone, Deserialize)]
+pub struct TasksJson {
+    /// Tasks array
+    pub tasks: Vec<TaskFromJson>,
+    /// Metadata
+    #[serde(default)]
+    pub metadata: Option<TasksJsonMetadata>,
+}
+
+/// Metadata from tasks.json
+#[derive(Debug, Clone, Deserialize)]
+pub struct TasksJsonMetadata {
+    /// Total task count
+    #[serde(default)]
+    pub task_count: Option<u32>,
+    /// Version
+    #[serde(default)]
+    pub version: Option<String>,
+}
+
+/// GitHub content response for file fetching
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct GitHubContentResponse {
+    /// Base64-encoded content
+    content: Option<String>,
+    /// Encoding type (usually "base64")
+    encoding: Option<String>,
+    /// File path
+    path: Option<String>,
+}
+
+/// Fetch tasks.json from a GitHub repository at a specific commit
+///
+/// Uses the GitHub Contents API to fetch the file at the merge commit SHA.
+pub async fn fetch_tasks_json_from_repo(
+    http_client: &reqwest::Client,
+    github_token: Option<&str>,
+    repo_full_name: &str,
+    commit_sha: Option<&str>,
+    project_dir: &str,
+) -> anyhow::Result<TasksJson> {
+    use anyhow::Context;
+    use base64::Engine;
+
+    // Build the path to tasks.json
+    let file_path = format!("{project_dir}/.tasks/tasks/tasks.json");
+
+    // Build URL with optional ref (commit SHA)
+    let url = if let Some(sha) = commit_sha {
+        format!("https://api.github.com/repos/{repo_full_name}/contents/{file_path}?ref={sha}")
+    } else {
+        format!("https://api.github.com/repos/{repo_full_name}/contents/{file_path}")
+    };
+
+    info!(
+        url = %url,
+        repo = %repo_full_name,
+        project_dir = %project_dir,
+        "Fetching tasks.json from GitHub"
+    );
+
+    // Build request
+    let mut request = http_client
+        .get(&url)
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "cto-pm-server/1.0");
+
+    // Add auth token if available
+    if let Some(token) = github_token {
+        request = request.header("Authorization", format!("Bearer {token}"));
+    }
+
+    // Execute request
+    let response = request
+        .send()
+        .await
+        .context("Failed to send GitHub API request")?;
+
+    // Check status
+    let status = response.status();
+    if !status.is_success() {
+        let error_body = response.text().await.unwrap_or_default();
+        anyhow::bail!("GitHub API returned {status}: {error_body}");
+    }
+
+    // Parse response
+    let content_response: GitHubContentResponse = response
+        .json()
+        .await
+        .context("Failed to parse GitHub content response")?;
+
+    // Decode base64 content
+    let content = content_response
+        .content
+        .ok_or_else(|| anyhow::anyhow!("No content in GitHub response"))?;
+
+    // GitHub returns base64 with newlines, so we need to strip them
+    let content_clean: String = content.chars().filter(|c| !c.is_whitespace()).collect();
+
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(&content_clean)
+        .context("Failed to decode base64 content")?;
+
+    let json_str = String::from_utf8(decoded).context("tasks.json is not valid UTF-8")?;
+
+    // Parse tasks.json
+    let tasks_json: TasksJson =
+        serde_json::from_str(&json_str).context("Failed to parse tasks.json")?;
+
+    info!(
+        task_count = tasks_json.tasks.len(),
+        "Successfully fetched tasks.json"
+    );
+
+    Ok(tasks_json)
 }
