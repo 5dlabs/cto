@@ -545,7 +545,7 @@ impl CodeRunSpawner {
             .replace('\t', "    "); // Replace tabs with spaces for YAML
 
         let yaml = format!(
-            r#"apiVersion: cto.5dlabs.io/v1
+            r#"apiVersion: agents.platform/v1
 kind: CodeRun
 metadata:
   generateName: {name_prefix}
