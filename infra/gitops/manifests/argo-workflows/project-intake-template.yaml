@@ -100,9 +100,10 @@ spec:
         description: "Linear team ID"
         value: ""
       # Runtime image (can be overridden for dev)
+      # Uses local dev registry when argocd-dev-mode is enabled
       - name: runtime-image
         description: "Container image for workflow steps"
-        value: "ghcr.io/5dlabs/runtime:latest"
+        value: "192.168.1.72:30500/runtime:tilt-dev"
 
   templates:
     # =========================================================================
