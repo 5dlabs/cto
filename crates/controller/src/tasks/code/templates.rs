@@ -3696,6 +3696,7 @@ impl CodeTemplateGenerator {
             PARTIAL_GIT_SETUP,
             PARTIAL_GO_ENV,
             PARTIAL_HEADER,
+            PARTIAL_INFRASTRUCTURE_OPERATORS,
             PARTIAL_NODE_ENV,
             PARTIAL_RETRY_LOOP,
             PARTIAL_RUST_ENV,
@@ -3734,6 +3735,8 @@ impl CodeTemplateGenerator {
             ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
             ("tanstack-stack", PARTIAL_TANSTACK_STACK),
             ("shadcn-stack", PARTIAL_SHADCN_STACK),
+            // Infrastructure operators partial (for Bolt/Morgan)
+            ("infrastructure-operators", PARTIAL_INFRASTRUCTURE_OPERATORS),
         ];
 
         // Legacy partials (for backwards compatibility)
