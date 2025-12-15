@@ -1,0 +1,48 @@
+{{- if .Values.healer.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cto.healer.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cto.healer.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+rules:
+  # CodeRun management for spawning remediation agents
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  # Pod access for gathering diagnostics
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+  # Events for monitoring
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cto.healer.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cto.healer.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cto.healer.fullname" . }}
+    namespace: {{ include "cto.namespace" . }}
+{{- end }}
+
