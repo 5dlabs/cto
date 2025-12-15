@@ -51,6 +51,11 @@ spec:
               registry: docker.io
               repository: bitnami/os-shell
               tag: latest
+          # Disable JWT authentication (internal cluster networking)
+          # This fixes etcd CrashLoop when jwt-token.pem is missing
+          auth:
+            token:
+              enabled: false
 
         # Disable bundled monitoring (we use our own observability stack)
         loki-stack:
