@@ -261,7 +261,7 @@ impl CodeRunSpawner {
     /// - A remediation already exists for this workflow run (unless retry)
     /// - A recent remediation exists for this branch (unless retry)
     /// - Prompt rendering fails
-    /// - kubectl apply fails
+    /// - kubectl create fails
     pub fn spawn(&self, agent: Agent, ctx: &RemediationContext) -> Result<String> {
         // Skip deduplication checks for retries - the previous CodeRun will still exist
         // but we intentionally want to spawn a new one for the retry attempt
@@ -589,14 +589,14 @@ spec:
         yaml
     }
 
-    /// Apply the `CodeRun` YAML and return the created name.
+    /// Create the `CodeRun` from YAML and return the created name.
     fn apply_coderun(yaml: &str) -> Result<String> {
         use std::io::Write;
         use std::process::Stdio;
 
-        // Apply with kubectl using stdin to avoid temp files
+        // Create with kubectl using stdin (using create instead of apply for generateName support)
         let mut child = Command::new("kubectl")
-            .args(["apply", "-f", "-", "-o", "jsonpath={.metadata.name}"])
+            .args(["create", "-f", "-", "-o", "jsonpath={.metadata.name}"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -616,7 +616,7 @@ spec:
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("kubectl apply failed: {stderr}");
+            bail!("kubectl create failed: {stderr}");
         }
 
         let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
