@@ -155,11 +155,13 @@ spec:
     namespace: seaweedfs
 
   ignoreDifferences:
-    # StatefulSet replicas may be scaled
+    # StatefulSet replicas may be scaled, and volumeClaimTemplates have API-defaulted fields
     - group: apps
       kind: StatefulSet
       jsonPointers:
         - /spec/replicas
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[]?
 
   syncPolicy:
     automated:

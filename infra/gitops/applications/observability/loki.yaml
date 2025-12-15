@@ -114,6 +114,12 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
+  # Ignore differences for fields defaulted by Kubernetes API server
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[]?
   syncPolicy:
     automated:
       prune: true
