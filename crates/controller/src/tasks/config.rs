@@ -774,6 +774,7 @@ cleanup:
                 tools: None,
                 client_config: None,
                 model_rotation: None,
+                frontend_stack: None,
             },
         );
         config.merge_agent_cli_defaults();
