@@ -16,7 +16,7 @@ spec:
 
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: HEAD
+    targetRevision: develop
     path: infra/gitops/manifests/argo-workflows
 
   destination:
