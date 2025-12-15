@@ -382,6 +382,24 @@ healer:
     enabled: true
     port: 8081
 
+  # GitHub Actions Sensor - monitors CI failures and spawns remediation
+  sensor:
+    enabled: true
+    # Comma-separated list of repositories to monitor
+    repositories: "5dlabs/cto"
+    # Poll interval in seconds (60 = 1 minute, 180 = 3 minutes)
+    pollInterval: 60
+    # How far back to look on first poll (minutes)
+    lookbackMins: 60
+    # Create GitHub issues for detected failures
+    createIssues: true
+    # Labels to add to created issues (comma-separated)
+    issueLabels: "healer,ci-failure"
+    # Branches to monitor (empty = all branches)
+    branches: ""
+    # Workflows to exclude from monitoring (comma-separated)
+    excludedWorkflows: ""
+
 # =============================================================================
 # OpenMemory - AI Agent Memory
 # =============================================================================
