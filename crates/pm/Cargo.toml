@@ -51,6 +51,9 @@ hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 
+# Base64 decoding for GitHub API responses
+base64 = "0.22"
+
 # Subtle for constant-time comparison
 subtle = "2.5"
 
