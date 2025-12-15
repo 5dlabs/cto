@@ -92,8 +92,7 @@ metadata:
   namespace: {{app_namespace}}
 type: Opaque
 stringData:
-  # pragma: allowlist secret
-  DATABASE_URL: postgresql://user:password@app-db-rw.databases.svc:5432/app_production
+  DATABASE_URL: postgresql://user:password@app-db-rw.databases.svc:5432/app_production  # pragma: allowlist secret
 ```
 
 ### Step 6: Document Connection Details
