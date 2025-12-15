@@ -74,8 +74,46 @@ Route tasks based on content keywords:
 | node, express, fastify | Nova | Node.js backend |
 | test, qa, validation | Tess | QA & testing |
 | security, auth, encrypt | Cipher | Security |
-| deploy, ci/cd, kubernetes | Bolt | DevOps |
+| deploy, ci/cd, kubernetes, infrastructure | Bolt | DevOps & Infrastructure |
 | merge, conflict, rebase | Atlas | Integration |
+
+---
+
+## Infrastructure Requirements
+
+When the PRD specifies infrastructure needs (databases, caches, message queues, object storage), create a dedicated infrastructure task for Bolt to provision these components **before** implementation tasks begin.
+
+{{> infrastructure-operators }}
+
+### Infrastructure Task Format
+
+For tasks requiring infrastructure, include an `<infrastructure>` block in the task XML:
+
+```xml
+<task id="1" priority="critical">
+    <meta>
+        <title>Provision Application Infrastructure</title>
+        <agent>bolt</agent>
+        <job_type>infra</job_type>
+    </meta>
+    <infrastructure>
+        <component type="postgresql" name="app-db">
+            <size>medium</size>
+            <replicas>2</replicas>
+            <storage>20Gi</storage>
+        </component>
+        <component type="redis" name="app-cache">
+            <size>small</size>
+            <mode>replication</mode>
+        </component>
+    </infrastructure>
+    <acceptance_criteria>
+        <criterion>PostgreSQL cluster is healthy and accepting connections</criterion>
+        <criterion>Redis instance is running and accessible</criterion>
+        <criterion>Connection secrets are created in the target namespace</criterion>
+    </acceptance_criteria>
+</task>
+```
 
 ---
 
