@@ -186,6 +186,18 @@ tools:
     enabled: true
     size: 10Gi
 
+  # Ingress configuration for external access
+  ingress:
+    enabled: true
+    className: nginx
+    annotations: {}
+    hosts:
+      - host: tools.platform.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
   rbac:
     create: true
     clusterWide: true

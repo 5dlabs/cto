@@ -1,0 +1,42 @@
+{{- if and .Values.tools.enabled .Values.tools.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "cto.tools.fullname" . }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.tools.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.tools.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.tools.ingress.className | default "nginx" }}
+  {{- if .Values.tools.ingress.tls }}
+  tls:
+    {{- range .Values.tools.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.tools.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "cto.tools.fullname" $ }}
+                port:
+                  number: {{ $.Values.tools.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+
