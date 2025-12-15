@@ -2336,11 +2336,7 @@ async fn run_github_actions_sensor(
         ci::types::RemediationConfig::default()
     };
 
-    info!(
-        "Monitoring {} repositories: {:?}",
-        repos.len(),
-        repos
-    );
+    info!("Monitoring {} repositories: {:?}", repos.len(), repos);
     info!(
         "Poll interval: {}s, lookback: {}m, create issues: {}",
         poll_interval, lookback_mins, create_issues
@@ -2356,10 +2352,7 @@ async fn run_github_actions_sensor(
         for failure in &failures {
             println!(
                 "  - {} ({}) @ {} [{}]",
-                failure.workflow_name,
-                failure.run_id,
-                failure.branch,
-                failure.html_url
+                failure.workflow_name, failure.run_id, failure.branch, failure.html_url
             );
         }
     } else {
