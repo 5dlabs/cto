@@ -30,37 +30,37 @@ spec:
       # Store initial parameters for forwarding to subsequent tasks
       platform.agents/initial-params: |
         {
-          "implementation-agent": "{{{{workflow.parameters.implementation-agent}}}}",
-          "implementation-cli": "{{{{workflow.parameters.implementation-cli}}}}",
-          "implementation-model": "{{{{workflow.parameters.implementation-model}}}}",
-          "frontend-agent": "{{{{workflow.parameters.frontend-agent}}}}",
-          "frontend-cli": "{{{{workflow.parameters.frontend-cli}}}}",
-          "frontend-model": "{{{{workflow.parameters.frontend-model}}}}",
-          "mobile-agent": "{{{{workflow.parameters.mobile-agent}}}}",
-          "mobile-cli": "{{{{workflow.parameters.mobile-cli}}}}",
-          "mobile-model": "{{{{workflow.parameters.mobile-model}}}}",
-          "quality-agent": "{{{{workflow.parameters.quality-agent}}}}",
-          "quality-cli": "{{{{workflow.parameters.quality-cli}}}}",
-          "quality-model": "{{{{workflow.parameters.quality-model}}}}",
-          "security-agent": "{{{{workflow.parameters.security-agent}}}}",
-          "security-cli": "{{{{workflow.parameters.security-cli}}}}",
-          "security-model": "{{{{workflow.parameters.security-model}}}}",
-          "testing-agent": "{{{{workflow.parameters.testing-agent}}}}",
-          "testing-cli": "{{{{workflow.parameters.testing-cli}}}}",
-          "testing-model": "{{{{workflow.parameters.testing-model}}}}",
-          "repository": "{{{{workflow.parameters.repository}}}}",
-          "service": "{{{{workflow.parameters.service}}}}",
-          "docs-repository": "{{{{workflow.parameters.docs-repository}}}}",
-          "docs-project-directory": "{{{{workflow.parameters.docs-project-directory}}}}",
-          "working-directory": "{{{{workflow.parameters.working-directory}}}}",
-          "implementation-max-retries": "{{{{workflow.parameters.implementation-max-retries}}}}",
-          "frontend-max-retries": "{{{{workflow.parameters.frontend-max-retries}}}}",
-          "mobile-max-retries": "{{{{workflow.parameters.mobile-max-retries}}}}",
-          "quality-max-retries": "{{{{workflow.parameters.quality-max-retries}}}}",
-          "security-max-retries": "{{{{workflow.parameters.security-max-retries}}}}",
-          "testing-max-retries": "{{{{workflow.parameters.testing-max-retries}}}}",
-          "auto-merge": "{{{{workflow.parameters.auto-merge}}}}",
-          "final-task": "{{{{workflow.parameters.final-task}}}}"
+          "implementation-agent": "{{workflow.parameters.implementation-agent}}",
+          "implementation-cli": "{{workflow.parameters.implementation-cli}}",
+          "implementation-model": "{{workflow.parameters.implementation-model}}",
+          "frontend-agent": "{{workflow.parameters.frontend-agent}}",
+          "frontend-cli": "{{workflow.parameters.frontend-cli}}",
+          "frontend-model": "{{workflow.parameters.frontend-model}}",
+          "mobile-agent": "{{workflow.parameters.mobile-agent}}",
+          "mobile-cli": "{{workflow.parameters.mobile-cli}}",
+          "mobile-model": "{{workflow.parameters.mobile-model}}",
+          "quality-agent": "{{workflow.parameters.quality-agent}}",
+          "quality-cli": "{{workflow.parameters.quality-cli}}",
+          "quality-model": "{{workflow.parameters.quality-model}}",
+          "security-agent": "{{workflow.parameters.security-agent}}",
+          "security-cli": "{{workflow.parameters.security-cli}}",
+          "security-model": "{{workflow.parameters.security-model}}",
+          "testing-agent": "{{workflow.parameters.testing-agent}}",
+          "testing-cli": "{{workflow.parameters.testing-cli}}",
+          "testing-model": "{{workflow.parameters.testing-model}}",
+          "repository": "{{workflow.parameters.repository}}",
+          "service": "{{workflow.parameters.service}}",
+          "docs-repository": "{{workflow.parameters.docs-repository}}",
+          "docs-project-directory": "{{workflow.parameters.docs-project-directory}}",
+          "working-directory": "{{workflow.parameters.working-directory}}",
+          "implementation-max-retries": "{{workflow.parameters.implementation-max-retries}}",
+          "frontend-max-retries": "{{workflow.parameters.frontend-max-retries}}",
+          "mobile-max-retries": "{{workflow.parameters.mobile-max-retries}}",
+          "quality-max-retries": "{{workflow.parameters.quality-max-retries}}",
+          "security-max-retries": "{{workflow.parameters.security-max-retries}}",
+          "testing-max-retries": "{{workflow.parameters.testing-max-retries}}",
+          "auto-merge": "{{workflow.parameters.auto-merge}}",
+          "final-task": "{{workflow.parameters.final-task}}"
         }
 
   # Main entry point
@@ -255,16 +255,16 @@ spec:
             arguments:
               parameters:
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
 
           # Stage 1: Initialize workflow stage tracking
           # Only run if starting fresh (not resuming from later stage)
           - name: initialize-stage
             depends: "check-main-resume.Succeeded"
             template: update-workflow-stage
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' == 'implementation'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' == 'implementation'"
             arguments:
               parameters:
                 - name: new-stage
@@ -278,18 +278,18 @@ spec:
           - name: fast-forward-stage
             depends: "check-main-resume.Succeeded"
             template: initialize-resume-stage
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'implementation'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'implementation'"
             arguments:
               parameters:
                 - name: resume-stage
-                  value: "{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}"
+                  value: "{{tasks.check-main-resume.outputs.parameters.resume-stage}}"
 
           # Stage 2: Update to implementation stage before Rex starts
           # Only run if starting fresh (not resuming from later stage)
           - name: update-to-implementation
             depends: "(initialize-stage.Succeeded || initialize-stage.Skipped) && (fast-forward-stage.Succeeded || fast-forward-stage.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' == 'implementation'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' == 'implementation'"
             arguments:
               parameters:
                 - name: new-stage
@@ -302,11 +302,11 @@ spec:
           - name: agent-sequence
             depends: "(update-to-implementation.Succeeded || update-to-implementation.Skipped) && check-main-resume.Succeeded"
             template: agent-sequence
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-atlas' && '{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-merge'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-atlas' && '{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: max-retries
-                  value: "{{{{workflow.parameters.implementation-max-retries}}}}"
+                  value: "{{workflow.parameters.implementation-max-retries}}"
 
           # Atlas integration gate (pause workflow until Atlas finishes)
           # Only run if coming from agent-sequence (not resuming at Atlas stage)
@@ -314,7 +314,7 @@ spec:
           - name: update-to-waiting-atlas
             depends: "(agent-sequence.Succeeded || agent-sequence.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-atlas' && '{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-merge'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-atlas' && '{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -325,7 +325,7 @@ spec:
           - name: wait-for-atlas-integration
             depends: "(update-to-waiting-atlas.Succeeded || update-to-waiting-atlas.Skipped) && check-main-resume.Succeeded"
             template: suspend-for-event
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-atlas' && '{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-merge'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-atlas' && '{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: event-type
@@ -338,7 +338,7 @@ spec:
           - name: update-to-waiting-merge
             depends: "wait-for-atlas-integration.Succeeded || wait-for-atlas-integration.Skipped"
             template: update-workflow-stage
-            when: "'{{{{tasks.check-main-resume.outputs.parameters.resume-stage}}}}' != 'waiting-merge'"
+            when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -363,11 +363,11 @@ spec:
             arguments:
               parameters:
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: approval-status
                   value: "completed"
                 - name: merge-sha
-                  value: "{{{{workflow.parameters.merge-sha}}}}"
+                  value: "{{workflow.parameters.merge-sha}}"
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
     # Implementation cycle: run Rex, then check/poll for PR; if not found, repeat by failing upstream
@@ -390,45 +390,45 @@ spec:
         parameters:
           - name: pr-url
             valueFrom:
-              parameter: "{{{{steps.wait-for-pr.outputs.parameters.pr-url}}}}"
+              parameter: "{{steps.wait-for-pr.outputs.parameters.pr-url}}"
           - name: pr-number
             valueFrom:
-              parameter: "{{{{steps.wait-for-pr.outputs.parameters.pr-number}}}}"
+              parameter: "{{steps.wait-for-pr.outputs.parameters.pr-number}}"
       steps:
         - - name: implementation-work
             template: agent-coderun
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{{{inputs.parameters.github-app}}}}"
+                  value: "{{inputs.parameters.github-app}}"
                 - name: task-id
-                  value: "{{{{inputs.parameters.task-id}}}}"
+                  value: "{{inputs.parameters.task-id}}"
                 - name: stage
-                  value: "{{{{inputs.parameters.stage}}}}"
+                  value: "{{inputs.parameters.stage}}"
                 - name: cli-type
-                  value: "{{{{inputs.parameters.cli-type}}}}"
+                  value: "{{inputs.parameters.cli-type}}"
                 - name: model
-                  value: "{{{{inputs.parameters.model}}}}"
+                  value: "{{inputs.parameters.model}}"
                 - name: model-rotation
-                  value: "{{{{inputs.parameters.model-rotation}}}}"
+                  value: "{{inputs.parameters.model-rotation}}"
                 - name: tools-config
-                  value: "{{{{workflow.parameters.implementation-tools}}}}"
+                  value: "{{workflow.parameters.implementation-tools}}"
                 - name: max-retries
-                  value: "{{{{inputs.parameters.max-retries}}}}"
+                  value: "{{inputs.parameters.max-retries}}"
                 - name: task-language
-                  value: "{{{{inputs.parameters.task-language}}}}"
+                  value: "{{inputs.parameters.task-language}}"
                 - name: task-framework
-                  value: "{{{{inputs.parameters.task-framework}}}}"
+                  value: "{{inputs.parameters.task-framework}}"
         - - name: wait-for-pr
             template: check-or-wait-for-pr
             arguments:
               parameters:
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: task-id
-                  value: "{{{{inputs.parameters.task-id}}}}"
+                  value: "{{inputs.parameters.task-id}}"
                 - name: stage
-                  value: "{{{{inputs.parameters.stage}}}}"
+                  value: "{{inputs.parameters.stage}}"
 
     # Run agent sequence: Rex → Cleo → Cipher → Tess (no remediation loop)
     # Now supports resume from ConfigMap - skips already-completed stages
@@ -441,10 +441,10 @@ spec:
         parameters:
           - name: pr-url
             valueFrom:
-              parameter: "{{{{steps.resolve-pr-info.outputs.parameters.pr-url}}}}"
+              parameter: "{{steps.resolve-pr-info.outputs.parameters.pr-url}}"
           - name: pr-number
             valueFrom:
-              parameter: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+              parameter: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
       steps:
         # Step 0: Determine resume point from ConfigMap
         - - name: check-resume-point
@@ -452,18 +452,18 @@ spec:
             arguments:
               parameters:
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
         - - name: get-pr-info-from-github
             template: get-pr-info-from-github
             arguments:
               parameters:
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
-            when: "'{{{{steps.check-resume-point.outputs.parameters.resume-stage}}}}' != 'implementation'"
+                  value: "{{workflow.parameters.task-id}}"
+            when: "'{{steps.check-resume-point.outputs.parameters.resume-stage}}' != 'implementation'"
 
         # Step 1: Check if implementation stage should run
         - - name: should-run-implementation
@@ -471,62 +471,62 @@ spec:
             arguments:
               parameters:
                 - name: resume-stage
-                  value: "{{{{steps.check-resume-point.outputs.parameters.resume-stage}}}}"
+                  value: "{{steps.check-resume-point.outputs.parameters.resume-stage}}"
                 - name: current-stage
                   value: "implementation"
 
         - - name: determine-agent
             template: determine-task-agent
-            when: "'{{{{steps.should-run-implementation.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{steps.should-run-implementation.outputs.parameters.should-run}}' == 'true'"
             arguments:
               parameters:
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: docs-repository
-                  value: "{{{{workflow.parameters.docs-repository}}}}"
+                  value: "{{workflow.parameters.docs-repository}}"
                 - name: docs-project-directory
-                  value: "{{{{workflow.parameters.docs-project-directory}}}}"
+                  value: "{{workflow.parameters.docs-project-directory}}"
         - - name: implementation
-            when: "'{{{{steps.should-run-implementation.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{steps.should-run-implementation.outputs.parameters.should-run}}' == 'true'"
             template: implementation-cycle
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{{{steps.determine-agent.outputs.parameters.github-app}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.github-app}}"
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: stage
                   value: "implementation"
                 - name: cli-type
-                  value: "{{{{steps.determine-agent.outputs.parameters.cli-type}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.cli-type}}"
                 - name: model
-                  value: "{{{{steps.determine-agent.outputs.parameters.model}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.model}}"
                 - name: model-rotation
-                  value: "{{{{steps.determine-agent.outputs.parameters.model-rotation}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.model-rotation}}"
                 - name: max-retries
-                  value: "{{{{steps.determine-agent.outputs.parameters.max-retries}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.max-retries}}"
                 - name: task-language
-                  value: "{{{{steps.determine-agent.outputs.parameters.task-language}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.task-language}}"
                 - name: task-framework
-                  value: "{{{{steps.determine-agent.outputs.parameters.task-framework}}}}"
+                  value: "{{steps.determine-agent.outputs.parameters.task-framework}}"
         - - name: resolve-pr-info
             template: resolve-pr-info
             arguments:
               parameters:
                 - name: resume-stage
-                  value: "{{{{steps.check-resume-point.outputs.parameters.resume-stage}}}}"
+                  value: "{{steps.check-resume-point.outputs.parameters.resume-stage}}"
                 - name: pr-url-from-configmap
                   value: ""
                 - name: pr-number-from-configmap
                   value: ""
                 - name: pr-url-from-github
-                  value: "{{{{steps.get-pr-info-from-github.outputs.parameters.pr-url}}}}"
+                  value: "{{steps.get-pr-info-from-github.outputs.parameters.pr-url}}"
                 - name: pr-number-from-github
-                  value: "{{{{steps.get-pr-info-from-github.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.get-pr-info-from-github.outputs.parameters.pr-number}}"
                 - name: pr-url-from-implementation
-                  value: "{{{{steps.implementation.outputs.parameters.pr-url}}}}"
+                  value: "{{steps.implementation.outputs.parameters.pr-url}}"
                 - name: pr-number-from-implementation
-                  value: "{{{{steps.implementation.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.implementation.outputs.parameters.pr-number}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
@@ -537,13 +537,13 @@ spec:
             arguments:
               parameters:
                 - name: resume-stage
-                  value: "{{{{steps.check-resume-point.outputs.parameters.resume-stage}}}}"
+                  value: "{{steps.check-resume-point.outputs.parameters.resume-stage}}"
                 - name: current-stage
                   value: "quality"
 
         - - name: update-to-quality-in-progress
             template: update-workflow-stage
-            when: "'{{{{steps.should-run-quality.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{steps.should-run-quality.outputs.parameters.should-run}}' == 'true'"
             arguments:
               parameters:
                 - name: new-stage
@@ -551,54 +551,54 @@ spec:
                 - name: verify-update
                   value: "true"
         - - name: check-quality-completion
-            when: "'{{{{steps.should-run-quality.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{steps.should-run-quality.outputs.parameters.should-run}}' == 'true'"
             template: check-pr-merge-status
             arguments:
               parameters:
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: pr-number
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: stage-name
                   value: "quality"
         - - name: quality-work
             template: agent-coderun
             continueOn:
               failed: true  # Allow workflow to proceed to Cipher even if Cleo finds issues
-            when: "'{{{{steps.should-run-quality.outputs.parameters.should-run}}}}' == 'true' && '{{{{steps.check-quality-completion.outputs.parameters.skip-stage}}}}' != 'true'"
+            when: "'{{steps.should-run-quality.outputs.parameters.should-run}}' == 'true' && '{{steps.check-quality-completion.outputs.parameters.skip-stage}}' != 'true'"
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{{{workflow.parameters.quality-agent}}}}"
+                  value: "{{workflow.parameters.quality-agent}}"
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: stage
                   value: "quality"
                 - name: cli-type
-                  value: "{{{{workflow.parameters.quality-cli}}}}"
+                  value: "{{workflow.parameters.quality-cli}}"
                 - name: model
-                  value: "{{{{workflow.parameters.quality-model}}}}"
+                  value: "{{workflow.parameters.quality-model}}"
                 - name: model-rotation
-                  value: "{{{{workflow.parameters.quality-model-rotation}}}}"
+                  value: "{{workflow.parameters.quality-model-rotation}}"
                 - name: tools-config
-                  value: "{{{{workflow.parameters.quality-tools}}}}"
+                  value: "{{workflow.parameters.quality-tools}}"
                 - name: pr-url
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-url}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-url}}"
                 - name: pr-number
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: max-retries
-                  value: "{{{{workflow.parameters.quality-max-retries}}}}"
+                  value: "{{workflow.parameters.quality-max-retries}}"
         # Proceed to Cipher security scanning after Cleo quality checks
         # Skip security stage if agent/cli/model are not configured
 
         # Step 3: Check if security stage should run
         - - name: should-run-security
             template: check-stage-needed
-            when: "'{{{{workflow.parameters.security-agent}}}}' != '' && '{{{{workflow.parameters.security-cli}}}}' != '' && '{{{{workflow.parameters.security-model}}}}' != ''"
+            when: "'{{workflow.parameters.security-agent}}' != '' && '{{workflow.parameters.security-cli}}' != '' && '{{workflow.parameters.security-model}}' != ''"
             arguments:
               parameters:
                 - name: resume-stage
-                  value: "{{{{steps.check-resume-point.outputs.parameters.resume-stage}}}}"
+                  value: "{{steps.check-resume-point.outputs.parameters.resume-stage}}"
                 - name: current-stage
                   value: "security"
 
@@ -610,16 +610,16 @@ spec:
                   value: "security-in-progress"
                 - name: verify-update
                   value: "true"
-            when: "'{{{{workflow.parameters.security-agent}}}}' != '' && '{{{{workflow.parameters.security-cli}}}}' != '' && '{{{{workflow.parameters.security-model}}}}' != '' && '{{{{steps.should-run-security.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{workflow.parameters.security-agent}}' != '' && '{{workflow.parameters.security-cli}}' != '' && '{{workflow.parameters.security-model}}' != '' && '{{steps.should-run-security.outputs.parameters.should-run}}' == 'true'"
         - - name: check-security-completion
-            when: "'{{{{workflow.parameters.security-agent}}}}' != '' && '{{{{workflow.parameters.security-cli}}}}' != '' && '{{{{workflow.parameters.security-model}}}}' != '' && '{{{{steps.should-run-security.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{workflow.parameters.security-agent}}' != '' && '{{workflow.parameters.security-cli}}' != '' && '{{workflow.parameters.security-model}}' != '' && '{{steps.should-run-security.outputs.parameters.should-run}}' == 'true'"
             template: check-pr-merge-status
             arguments:
               parameters:
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: pr-number
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: stage-name
                   value: "security"
         - - name: security-work
@@ -629,26 +629,26 @@ spec:
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{{{workflow.parameters.security-agent}}}}"
+                  value: "{{workflow.parameters.security-agent}}"
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: stage
                   value: "security"
                 - name: cli-type
-                  value: "{{{{workflow.parameters.security-cli}}}}"
+                  value: "{{workflow.parameters.security-cli}}"
                 - name: model
-                  value: "{{{{workflow.parameters.security-model}}}}"
+                  value: "{{workflow.parameters.security-model}}"
                 - name: model-rotation
-                  value: "{{{{workflow.parameters.security-model-rotation}}}}"
+                  value: "{{workflow.parameters.security-model-rotation}}"
                 - name: tools-config
-                  value: "{{{{workflow.parameters.security-tools}}}}"
+                  value: "{{workflow.parameters.security-tools}}"
                 - name: pr-url
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-url}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-url}}"
                 - name: pr-number
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: max-retries
-                  value: "{{{{workflow.parameters.security-max-retries}}}}"
-            when: "'{{{{workflow.parameters.security-agent}}}}' != '' && '{{{{workflow.parameters.security-cli}}}}' != '' && '{{{{workflow.parameters.security-model}}}}' != '' && '{{{{steps.should-run-security.outputs.parameters.should-run}}}}' == 'true' && '{{{{steps.check-security-completion.outputs.parameters.skip-stage}}}}' != 'true'"
+                  value: "{{workflow.parameters.security-max-retries}}"
+            when: "'{{workflow.parameters.security-agent}}' != '' && '{{workflow.parameters.security-cli}}' != '' && '{{workflow.parameters.security-model}}' != '' && '{{steps.should-run-security.outputs.parameters.should-run}}' == 'true' && '{{steps.check-security-completion.outputs.parameters.skip-stage}}' != 'true'"
         - - name: skip-security-stage
             template: skip-stage-notice
             arguments:
@@ -657,7 +657,7 @@ spec:
                   value: "security"
                 - name: reason
                   value: "security-agent, security-cli, or security-model not configured"
-            when: "'{{{{workflow.parameters.security-agent}}}}' == '' || '{{{{workflow.parameters.security-cli}}}}' == '' || '{{{{workflow.parameters.security-model}}}}' == ''"
+            when: "'{{workflow.parameters.security-agent}}' == '' || '{{workflow.parameters.security-cli}}' == '' || '{{workflow.parameters.security-model}}' == ''"
         # Proceed directly to Tess testing after Cipher completes
         # No suspension needed - Tess runs automatically after security review
         # continueOn.failed allows workflow to complete even if Tess finds issues
@@ -668,19 +668,19 @@ spec:
             arguments:
               parameters:
                 - name: resume-stage
-                  value: "{{{{steps.check-resume-point.outputs.parameters.resume-stage}}}}"
+                  value: "{{steps.check-resume-point.outputs.parameters.resume-stage}}"
                 - name: current-stage
                   value: "testing"
 
         - - name: check-testing-completion
             template: check-pr-merge-status
-            when: "'{{{{steps.should-run-testing.outputs.parameters.should-run}}}}' == 'true'"
+            when: "'{{steps.should-run-testing.outputs.parameters.should-run}}' == 'true'"
             arguments:
               parameters:
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: pr-number
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: stage-name
                   value: "testing"
         - - name: update-to-testing
@@ -691,40 +691,40 @@ spec:
                   value: "testing-in-progress"
                 - name: verify-update
                   value: "true"
-            when: "'{{{{steps.should-run-testing.outputs.parameters.should-run}}}}' == 'true' && '{{{{steps.check-testing-completion.outputs.parameters.skip-stage}}}}' != 'true'"
+            when: "'{{steps.should-run-testing.outputs.parameters.should-run}}' == 'true' && '{{steps.check-testing-completion.outputs.parameters.skip-stage}}' != 'true'"
         - - name: testing-work
             template: agent-coderun
             continueOn:
               failed: true
-            when: "'{{{{steps.should-run-testing.outputs.parameters.should-run}}}}' == 'true' && '{{{{steps.check-testing-completion.outputs.parameters.skip-stage}}}}' != 'true'"
+            when: "'{{steps.should-run-testing.outputs.parameters.should-run}}' == 'true' && '{{steps.check-testing-completion.outputs.parameters.skip-stage}}' != 'true'"
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{{{workflow.parameters.testing-agent}}}}"
+                  value: "{{workflow.parameters.testing-agent}}"
                 - name: task-id
-                  value: "{{{{workflow.parameters.task-id}}}}"
+                  value: "{{workflow.parameters.task-id}}"
                 - name: stage
                   value: "testing"
                 - name: cli-type
-                  value: "{{{{workflow.parameters.testing-cli}}}}"
+                  value: "{{workflow.parameters.testing-cli}}"
                 - name: model
-                  value: "{{{{workflow.parameters.testing-model}}}}"
+                  value: "{{workflow.parameters.testing-model}}"
                 - name: model-rotation
-                  value: "{{{{workflow.parameters.testing-model-rotation}}}}"
+                  value: "{{workflow.parameters.testing-model-rotation}}"
                 - name: tools-config
-                  value: "{{{{workflow.parameters.testing-tools}}}}"
+                  value: "{{workflow.parameters.testing-tools}}"
                 - name: pr-url
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-url}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-url}}"
                 - name: pr-number
-                  value: "{{{{steps.resolve-pr-info.outputs.parameters.pr-number}}}}"
+                  value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: max-retries
-                  value: "{{{{workflow.parameters.testing-max-retries}}}}"
+                  value: "{{workflow.parameters.testing-max-retries}}"
                 - name: qa-ready
                   value: "true"
                 - name: auto-merge
-                  value: "{{{{workflow.parameters.auto-merge}}}}"
+                  value: "{{workflow.parameters.auto-merge}}"
                 - name: final-task
-                  value: "{{{{workflow.parameters.final-task}}}}"
+                  value: "{{workflow.parameters.final-task}}"
         # After Tess completes testing, agents are done
         # Workflow will proceed to wait for PR merge
 
@@ -769,16 +769,16 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          REPO="{{{{inputs.parameters.repository}}}}"
-          TASK_ID="{{{{inputs.parameters.task-id}}}}"
+          REPO="{{inputs.parameters.repository}}"
+          TASK_ID="{{inputs.parameters.task-id}}"
           TASK_LABEL="task-${TASK_ID}"
-          RUN_LABEL="run-{{{{workflow.name}}}}"
-          SERVICE_LABEL="service-{{{{workflow.parameters.service}}}}"
+          RUN_LABEL="run-{{workflow.name}}"
+          SERVICE_LABEL="service-{{workflow.parameters.service}}"
           EXPECTED_BRANCH="feature/task-${TASK_ID}-implementation"
 
           # For single-repo setups, we need to find PRs from the current workflow run
           # Always use both task label AND run label to avoid finding old PRs from previous runs
-          STAGE="{{{{inputs.parameters.stage}}}}"
+          STAGE="{{inputs.parameters.stage}}"
 
           echo "🔎 Stage $STAGE: Looking for PR with labels ${TASK_LABEL} and ${RUN_LABEL} in ${REPO}"
 
@@ -1054,66 +1054,66 @@ spec:
         parameters:
           - name: coderun-name
             valueFrom:
-              parameter: "{{{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}}}"
+              parameter: "{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}"
       steps:
         - - name: create-coderun-resource
             template: create-coderun-resource
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{{{inputs.parameters.github-app}}}}"
+                  value: "{{inputs.parameters.github-app}}"
                 - name: task-id
-                  value: "{{{{inputs.parameters.task-id}}}}"
+                  value: "{{inputs.parameters.task-id}}"
                 - name: stage
-                  value: "{{{{inputs.parameters.stage}}}}"
+                  value: "{{inputs.parameters.stage}}"
                 - name: cli-type
-                  value: "{{{{inputs.parameters.cli-type}}}}"
+                  value: "{{inputs.parameters.cli-type}}"
                 - name: model
-                  value: "{{{{inputs.parameters.model}}}}"
+                  value: "{{inputs.parameters.model}}"
                 - name: model-rotation
-                  value: "{{{{inputs.parameters.model-rotation}}}}"
+                  value: "{{inputs.parameters.model-rotation}}"
                 - name: tools-config
-                  value: "{{{{inputs.parameters.tools-config}}}}"
+                  value: "{{inputs.parameters.tools-config}}"
                 - name: pr-url
-                  value: "{{{{inputs.parameters.pr-url}}}}"
+                  value: "{{inputs.parameters.pr-url}}"
                 - name: pr-number
-                  value: "{{{{inputs.parameters.pr-number}}}}"
+                  value: "{{inputs.parameters.pr-number}}"
                 - name: qa-ready
-                  value: "{{{{inputs.parameters.qa-ready}}}}"
+                  value: "{{inputs.parameters.qa-ready}}"
                 - name: max-retries
-                  value: "{{{{inputs.parameters.max-retries}}}}"
+                  value: "{{inputs.parameters.max-retries}}"
                 - name: auto-merge
-                  value: "{{{{inputs.parameters.auto-merge}}}}"
+                  value: "{{inputs.parameters.auto-merge}}"
                 - name: final-task
-                  value: "{{{{inputs.parameters.final-task}}}}"
+                  value: "{{inputs.parameters.final-task}}"
                 - name: task-language
-                  value: "{{{{inputs.parameters.task-language}}}}"
+                  value: "{{inputs.parameters.task-language}}"
                 - name: task-framework
-                  value: "{{{{inputs.parameters.task-framework}}}}"
+                  value: "{{inputs.parameters.task-framework}}"
         - - name: resolve-coderun-name
             template: resolve-coderun-name
             arguments:
               parameters:
                 - name: stage
-                  value: "{{{{inputs.parameters.stage}}}}"
+                  value: "{{inputs.parameters.stage}}"
                 - name: task-id
-                  value: "{{{{inputs.parameters.task-id}}}}"
+                  value: "{{inputs.parameters.task-id}}"
                 - name: candidate-name
-                  value: "{{{{steps.create-coderun-resource.outputs.parameters.name}}}}"
+                  value: "{{steps.create-coderun-resource.outputs.parameters.name}}"
         - - name: wait-for-job-creation
             template: wait-for-job-creation
             arguments:
               parameters:
                 - name: coderun-name
-                  value: "{{{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}}}"
+                  value: "{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}"
         - - name: wait-for-completion
             template: wait-coderun-completion
             arguments:
               parameters:
                 - name: coderun-name
-                  value: "{{{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}}}"
+                  value: "{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}"
 
-    # Template for creating CodeRun resources
+    # Template for creating CodeRun resources (using script instead of resource to avoid YAML validation issues)
     - name: create-coderun-resource
       inputs:
         parameters:
@@ -1148,70 +1148,102 @@ spec:
         parameters:
           - name: name
             valueFrom:
-              jsonPath: '{.metadata.name}'
-      resource:
-        action: create
-        setOwnerReference: true
-        successCondition: status.phase == Succeeded
-        failureCondition: status.phase == Failed
-        manifest: |
+              path: /tmp/coderun-name.txt
+      script:
+        image: alpine/k8s:1.31.0
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+
+          # Build the CodeRun manifest using environment variables (safer than inline templating)
+          SERVICE="{{workflow.parameters.service}}"
+          TASK_ID="{{inputs.parameters.task-id}}"
+          STAGE="{{inputs.parameters.stage}}"
+          GITHUB_APP="{{inputs.parameters.github-app}}"
+          WORKFLOW_NAME="{{workflow.name}}"
+          CLI_TYPE="{{inputs.parameters.cli-type}}"
+          MODEL="{{inputs.parameters.model}}"
+          MODEL_ROTATION='{{inputs.parameters.model-rotation}}'
+          TOOLS_CONFIG='{{inputs.parameters.tools-config}}'
+          REPOSITORY="{{workflow.parameters.repository}}"
+          DOCS_REPO="{{workflow.parameters.docs-repository}}"
+          DOCS_DIR="{{workflow.parameters.docs-project-directory}}"
+          WORKING_DIR="{{workflow.parameters.working-directory}}"
+          TASK_REQUIREMENTS="{{workflow.parameters.task-requirements}}"
+          PR_URL="{{inputs.parameters.pr-url}}"
+          PR_NUMBER="{{inputs.parameters.pr-number}}"
+          QA_READY="{{inputs.parameters.qa-ready}}"
+          MAX_RETRIES="{{inputs.parameters.max-retries}}"
+          AUTO_MERGE="{{inputs.parameters.auto-merge}}"
+          FINAL_TASK="{{inputs.parameters.final-task}}"
+          TASK_LANGUAGE="{{inputs.parameters.task-language}}"
+          TASK_FRAMEWORK="{{inputs.parameters.task-framework}}"
+          OPENCODE_VERBOSE="{{workflow.parameters.opencode-verbose}}"
+
+          cat > /tmp/coderun.yaml << MANIFEST_EOF
           apiVersion: agents.platform/v1
           kind: CodeRun
           metadata:
-            generateName: "coderun-{{{{workflow.parameters.service}}}}-t{{{{inputs.parameters.task-id}}}}-{{{{inputs.parameters.stage}}}}-"
+            generateName: "coderun-${SERVICE}-t${TASK_ID}-${STAGE}-"
             namespace: cto
             labels:
-              task-id: "{{{{inputs.parameters.task-id}}}}"
-              service: "{{{{workflow.parameters.service}}}}"
-              github-app: "{{{{inputs.parameters.github-app}}}}"
-              workflow-name: "{{{{workflow.name}}}}"
-              workflow-run: "{{{{workflow.name}}}}"
-              stage: "{{{{inputs.parameters.stage}}}}"
-              workflow-stage: "{{{{inputs.parameters.stage}}}}"
+              task-id: "${TASK_ID}"
+              service: "${SERVICE}"
+              github-app: "${GITHUB_APP}"
+              workflow-name: "${WORKFLOW_NAME}"
+              workflow-run: "${WORKFLOW_NAME}"
+              stage: "${STAGE}"
+              workflow-stage: "${STAGE}"
               workflow-type: "play-orchestration"
             annotations:
               agents.platform/tools-config: |
-                {{{{inputs.parameters.tools-config}}}}
+                ${TOOLS_CONFIG}
           spec:
-            taskId: {{{{inputs.parameters.task-id}}}}
-            service: "{{{{workflow.parameters.service}}}}"
-            repositoryUrl: "{{{{workflow.parameters.repository}}}}"
-            docsRepositoryUrl: "https://github.com/{{{{workflow.parameters.docs-repository}}}}"
-            docsProjectDirectory: "{{{{workflow.parameters.docs-project-directory}}}}"
-            workingDirectory: "{{{{workflow.parameters.working-directory}}}}"
-            githubApp: "{{{{inputs.parameters.github-app}}}}"
-            model: "{{{{inputs.parameters.model}}}}"
+            taskId: ${TASK_ID}
+            service: "${SERVICE}"
+            repositoryUrl: "${REPOSITORY}"
+            docsRepositoryUrl: "https://github.com/${DOCS_REPO}"
+            docsProjectDirectory: "${DOCS_DIR}"
+            workingDirectory: "${WORKING_DIR}"
+            githubApp: "${GITHUB_APP}"
+            model: "${MODEL}"
             continueSession: true
             overwriteMemory: false
             docsBranch: "main"
             contextVersion: 1
             cliConfig:
-              cliType: "{{{{inputs.parameters.cli-type}}}}"
-              model: "{{{{inputs.parameters.model}}}}"
-              modelRotation: {{{{inputs.parameters.model-rotation}}}}
-            # Pass task requirements if available
-            taskRequirements: "{{{{workflow.parameters.task-requirements}}}}"
-            # Pass PR context as environment if available
+              cliType: "${CLI_TYPE}"
+              model: "${MODEL}"
+              modelRotation: ${MODEL_ROTATION}
+            taskRequirements: "${TASK_REQUIREMENTS}"
             env:
-              PR_URL: "{{{{inputs.parameters.pr-url}}}}"
-              PR_NUMBER: "{{{{inputs.parameters.pr-number}}}}"
-              QA_READY: "{{{{inputs.parameters.qa-ready}}}}"
-              WORKFLOW_STAGE: "{{{{inputs.parameters.stage}}}}"
-              WORKFLOW_NAME: "{{{{workflow.name}}}}"
-              SERVICE_NAME: "{{{{workflow.parameters.service}}}}"
-              RUN_NAME: "{{{{workflow.name}}}}"
-              TASK_ID: "{{{{inputs.parameters.task-id}}}}"
-              TASK_LANGUAGE: "{{{{inputs.parameters.task-language}}}}"
-              TASK_FRAMEWORK: "{{{{inputs.parameters.task-framework}}}}"
-              EXECUTION_MAX_RETRIES: "{{{{inputs.parameters.max-retries}}}}"
-              FACTORY_MAX_RETRIES: "{{{{inputs.parameters.max-retries}}}}"
-              CODEX_MAX_RETRIES: "{{{{inputs.parameters.max-retries}}}}"
-              CURSOR_MAX_RETRIES: "{{{{inputs.parameters.max-retries}}}}"
-              CLAUDE_MAX_RETRIES: "{{{{inputs.parameters.max-retries}}}}"
-              OPENCODE_MAX_RETRIES: "{{{{inputs.parameters.max-retries}}}}"
-              OPENCODE_VERBOSE: "{{{{workflow.parameters.opencode-verbose}}}}"
-              AUTO_MERGE: "{{{{inputs.parameters.auto-merge}}}}"
-              FINAL_TASK: "{{{{inputs.parameters.final-task}}}}"
+              PR_URL: "${PR_URL}"
+              PR_NUMBER: "${PR_NUMBER}"
+              QA_READY: "${QA_READY}"
+              WORKFLOW_STAGE: "${STAGE}"
+              WORKFLOW_NAME: "${WORKFLOW_NAME}"
+              SERVICE_NAME: "${SERVICE}"
+              RUN_NAME: "${WORKFLOW_NAME}"
+              TASK_ID: "${TASK_ID}"
+              TASK_LANGUAGE: "${TASK_LANGUAGE}"
+              TASK_FRAMEWORK: "${TASK_FRAMEWORK}"
+              EXECUTION_MAX_RETRIES: "${MAX_RETRIES}"
+              FACTORY_MAX_RETRIES: "${MAX_RETRIES}"
+              CODEX_MAX_RETRIES: "${MAX_RETRIES}"
+              CURSOR_MAX_RETRIES: "${MAX_RETRIES}"
+              CLAUDE_MAX_RETRIES: "${MAX_RETRIES}"
+              OPENCODE_MAX_RETRIES: "${MAX_RETRIES}"
+              OPENCODE_VERBOSE: "${OPENCODE_VERBOSE}"
+              AUTO_MERGE: "${AUTO_MERGE}"
+              FINAL_TASK: "${FINAL_TASK}"
+          MANIFEST_EOF
+
+          echo "Creating CodeRun resource..."
+          RESULT=$(kubectl create -f /tmp/coderun.yaml -o json)
+          NAME=$(echo "$RESULT" | jq -r '.metadata.name')
+          echo "Created CodeRun: $NAME"
+          echo "$NAME" > /tmp/coderun-name.txt
 
     # Helper to reliably resolve the created CodeRun name before waiting for completion
     - name: resolve-coderun-name
@@ -1232,7 +1264,7 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          CANDIDATE="{{{{inputs.parameters.candidate-name}}}}"
+          CANDIDATE="{{inputs.parameters.candidate-name}}"
           if [ -n "$CANDIDATE" ] && [ "$CANDIDATE" != "null" ]; then
             echo "$CANDIDATE" > /tmp/coderun-name.txt
             exit 0
@@ -1241,7 +1273,7 @@ spec:
           ATTEMPTS=12
           while [ $ATTEMPTS -gt 0 ]; do
             NAME=$(kubectl get coderun.agents.platform -n cto \
-              -l workflow-name={{{{workflow.name}}}},workflow-stage={{{{inputs.parameters.stage}}}},task-id={{{{inputs.parameters.task-id}}}} \
+              -l workflow-name={{workflow.name}},workflow-stage={{inputs.parameters.stage}},task-id={{inputs.parameters.task-id}} \
               -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
             if [ -n "$NAME" ]; then
               echo "$NAME" > /tmp/coderun-name.txt
@@ -1272,7 +1304,7 @@ spec:
           apiVersion: agents.platform/v1
           kind: CodeRun
           metadata:
-            name: "{{{{inputs.parameters.coderun-name}}}}"
+            name: "{{inputs.parameters.coderun-name}}"
             namespace: cto
         successCondition: status.jobName
         failureCondition: status.phase == Failed
@@ -1295,7 +1327,7 @@ spec:
           apiVersion: agents.platform/v1
           kind: CodeRun
           metadata:
-            name: "{{{{inputs.parameters.coderun-name}}}}"
+            name: "{{inputs.parameters.coderun-name}}"
             namespace: cto
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
@@ -1336,9 +1368,9 @@ spec:
           echo "========================================="
           echo "Updating Workflow Stage"
           echo "========================================="
-          echo "Workflow: {{{{workflow.name}}}}"
-          echo "Current Task: {{{{workflow.parameters.task-id}}}}"
-          echo "New Stage: {{{{inputs.parameters.new-stage}}}}"
+          echo "Workflow: {{workflow.name}}"
+          echo "Current Task: {{workflow.parameters.task-id}}"
+          echo "New Stage: {{inputs.parameters.new-stage}}"
           echo ""
 
           # Function to validate stage transition
@@ -1423,7 +1455,7 @@ spec:
 
           # Get current state and resource version for optimistic locking
           echo "Fetching current workflow state..."
-          WORKFLOW_JSON=$(kubectl get workflow "{{{{workflow.name}}}}" \
+          WORKFLOW_JSON=$(kubectl get workflow "{{workflow.name}}" \
             -n cto \
             -o json)
 
@@ -1440,7 +1472,7 @@ spec:
           RESOURCE_VERSION=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.resourceVersion')
           echo "Resource version: $RESOURCE_VERSION"
 
-          TARGET_STAGE="{{{{inputs.parameters.new-stage}}}}"
+          TARGET_STAGE="{{inputs.parameters.new-stage}}"
 
           # Persist the current resource version for downstream steps even if we early-exit
           echo "$RESOURCE_VERSION" > /tmp/resource-version.txt
@@ -1459,13 +1491,13 @@ spec:
           fi
 
           # Prepare the JSON patch with optimistic locking
-          REPOSITORY_LABEL=$(echo '{{{{workflow.parameters.repository}}}}' | tr '/' '-')
+          REPOSITORY_LABEL=$(echo '{{workflow.parameters.repository}}' | tr '/' '-')
           PATCH_JSON='{
             "metadata": {
               "resourceVersion": "'$RESOURCE_VERSION'",
               "labels": {
-                "current-stage": "{{{{inputs.parameters.new-stage}}}}",
-                "task-id": "{{{{workflow.parameters.task-id}}}}",
+                "current-stage": "{{inputs.parameters.new-stage}}",
+                "task-id": "{{workflow.parameters.task-id}}",
                 "repository": "'$REPOSITORY_LABEL'",
                 "previous-stage": "'$CURRENT_STAGE'"
               }
@@ -1486,7 +1518,7 @@ spec:
             echo ""
             echo "Attempt $((RETRY_COUNT+1)) of $MAX_RETRIES..."
 
-            if kubectl patch workflow "{{{{workflow.name}}}}" \
+            if kubectl patch workflow "{{workflow.name}}" \
               --type='merge' \
               --patch="$PATCH_JSON" \
               -n cto; then
@@ -1500,7 +1532,7 @@ spec:
               sleep $BACKOFF_TIME
 
               # Update resource version before retry
-              RESOURCE_VERSION=$(kubectl get workflow "{{{{workflow.name}}}}" \
+              RESOURCE_VERSION=$(kubectl get workflow "{{workflow.name}}" \
                 -n cto \
                 -o jsonpath='{.metadata.resourceVersion}')
 
@@ -1525,7 +1557,7 @@ spec:
           VERIFY_SUCCESS=false
 
           while [ $VERIFY_COUNT -lt $VERIFY_MAX_RETRIES ]; do
-            WORKFLOW_JSON=$(kubectl get workflow "{{{{workflow.name}}}}" \
+            WORKFLOW_JSON=$(kubectl get workflow "{{workflow.name}}" \
               -n cto \
               -o json)
 
@@ -1537,7 +1569,7 @@ spec:
             echo "Previous Stage: $PREVIOUS_STAGE"
             echo "Resource Version: $NEW_RESOURCE_VERSION"
 
-            if [ "$CURRENT_STAGE" = "{{{{inputs.parameters.new-stage}}}}" ]; then
+            if [ "$CURRENT_STAGE" = "{{inputs.parameters.new-stage}}" ]; then
               VERIFY_SUCCESS=true
               echo "✅ Verification successful: Stage transition complete"
               echo "success" > /tmp/update-status.txt
@@ -1559,8 +1591,8 @@ spec:
           echo ""
           echo "Updating ConfigMap for resume tracking..."
 
-          REPO="{{{{workflow.parameters.repository}}}}"
-          TASK_ID="{{{{workflow.parameters.task-id}}}}"
+          REPO="{{workflow.parameters.repository}}"
+          TASK_ID="{{workflow.parameters.task-id}}"
           CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')-task-${TASK_ID}"
           CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -1572,11 +1604,11 @@ spec:
             kubectl patch configmap "$CONFIGMAP_NAME" \
               -n cto \
               --type merge \
-              -p "{\"data\":{\"stage\":\"{{{{inputs.parameters.new-stage}}}}\",\"last-updated\":\"$CURRENT_TIMESTAMP\",\"workflow-name\":\"{{{{workflow.name}}}}\",\"current-task-id\":\"$TASK_ID\"}}" || {
+              -p "{\"data\":{\"stage\":\"{{inputs.parameters.new-stage}}\",\"last-updated\":\"$CURRENT_TIMESTAMP\",\"workflow-name\":\"{{workflow.name}}\",\"current-task-id\":\"$TASK_ID\"}}" || {
               echo "⚠️ ConfigMap patch failed, but workflow stage was updated successfully"
             }
 
-            echo "✅ ConfigMap updated with stage: {{{{inputs.parameters.new-stage}}}}"
+            echo "✅ ConfigMap updated with stage: {{inputs.parameters.new-stage}}"
           else
             echo "⚠️ ConfigMap does not exist - creating it now..."
 
@@ -1586,9 +1618,9 @@ spec:
               --from-literal=repository="$REPO" \
               --from-literal=branch="main" \
               --from-literal=current-task-id="$TASK_ID" \
-              --from-literal=workflow-name="{{{{workflow.name}}}}" \
+              --from-literal=workflow-name="{{workflow.name}}" \
               --from-literal=status="in-progress" \
-              --from-literal=stage="{{{{inputs.parameters.new-stage}}}}" \
+              --from-literal=stage="{{inputs.parameters.new-stage}}" \
               --from-literal=started-at="$CURRENT_TIMESTAMP" \
               --from-literal=last-updated="$CURRENT_TIMESTAMP" \
               --dry-run=client -o yaml | \
@@ -1597,14 +1629,14 @@ spec:
               echo "❌ Failed to create ConfigMap, but workflow will continue"
             }
 
-            echo "✅ ConfigMap created with stage: {{{{inputs.parameters.new-stage}}}}"
+            echo "✅ ConfigMap created with stage: {{inputs.parameters.new-stage}}"
           fi
 
           # Output monitoring metrics
           cat <<EOF > /tmp/stage-transition-metrics.json
           {
-            "workflow": "{{{{workflow.name}}}}",
-            "task_id": "{{{{workflow.parameters.task-id}}}}",
+            "workflow": "{{workflow.name}}",
+            "task_id": "{{workflow.parameters.task-id}}",
             "transition": {
               "from": "$PREVIOUS_STAGE",
               "to": "$CURRENT_STAGE",
@@ -1638,8 +1670,8 @@ spec:
           - name: stage-name
       metadata:
         labels:
-          current-stage: "{{{{inputs.parameters.stage-name}}}}"
-          task-id: "{{{{workflow.parameters.task-id}}}}"
+          current-stage: "{{inputs.parameters.stage-name}}"
+          task-id: "{{workflow.parameters.task-id}}"
           workflow-type: "play-orchestration"
       suspend: {}  # Indefinite suspend until external resume via webhooks
 
@@ -1653,8 +1685,8 @@ spec:
         image: alpine:3.20
         command: [sh]
         source: |
-          echo "⏭️  Skipping {{{{inputs.parameters.stage-name}}}} stage"
-          echo "Reason: {{{{inputs.parameters.reason}}}}"
+          echo "⏭️  Skipping {{inputs.parameters.stage-name}} stage"
+          echo "Reason: {{inputs.parameters.reason}}"
           echo "⚠️  This is optional - workflow will proceed to next stage"
           echo "✅ Stage skipped successfully"
 
@@ -1673,37 +1705,37 @@ spec:
           set -e
 
           echo "========================================="
-          echo "Completing Task {{{{inputs.parameters.task-id}}}}"
+          echo "Completing Task {{inputs.parameters.task-id}}"
           echo "========================================="
-          echo "Approval Status: {{{{inputs.parameters.approval-status}}}}"
-          echo "Merge SHA: {{{{inputs.parameters.merge-sha}}}}"
+          echo "Approval Status: {{inputs.parameters.approval-status}}"
+          echo "Merge SHA: {{inputs.parameters.merge-sha}}"
           echo ""
 
           # Create completion marker
-          echo "Task {{{{inputs.parameters.task-id}}}} completed at $(date)" > /tmp/task-complete.txt
-          echo "Workflow: {{{{workflow.name}}}}" >> /tmp/task-complete.txt
-          echo "Duration: {{{{workflow.duration}}}}" >> /tmp/task-complete.txt
-          echo "PR Approved: {{{{inputs.parameters.approval-status}}}}" >> /tmp/task-complete.txt
+          echo "Task {{inputs.parameters.task-id}} completed at $(date)" > /tmp/task-complete.txt
+          echo "Workflow: {{workflow.name}}" >> /tmp/task-complete.txt
+          echo "Duration: {{workflow.duration}}" >> /tmp/task-complete.txt
+          echo "PR Approved: {{inputs.parameters.approval-status}}" >> /tmp/task-complete.txt
 
           # Generate workflow summary
           cat <<EOF > /tmp/workflow-summary.md
-          # Task {{{{inputs.parameters.task-id}}}} Completion Summary
+          # Task {{inputs.parameters.task-id}} Completion Summary
 
           ## Workflow Details
-          - **Workflow Name**: {{{{workflow.name}}}}
-          - **Task ID**: {{{{inputs.parameters.task-id}}}}
-          - **Repository**: {{{{workflow.parameters.repository}}}}
-          - **Duration**: {{{{workflow.duration}}}}
+          - **Workflow Name**: {{workflow.name}}
+          - **Task ID**: {{inputs.parameters.task-id}}
+          - **Repository**: {{workflow.parameters.repository}}
+          - **Duration**: {{workflow.duration}}
 
           ## Agent Execution
-          - **Implementation Agent**: {{{{workflow.parameters.implementation-agent}}}}
-          - **Quality Agent**: {{{{workflow.parameters.quality-agent}}}}
-          - **Testing Agent**: {{{{workflow.parameters.testing-agent}}}}
+          - **Implementation Agent**: {{workflow.parameters.implementation-agent}}
+          - **Quality Agent**: {{workflow.parameters.quality-agent}}
+          - **Testing Agent**: {{workflow.parameters.testing-agent}}
 
           ## Results
-          - **PR Number**: {{{{workflow.parameters.pr-number}}}}
-          - **Approval Status**: {{{{inputs.parameters.approval-status}}}}
-          - **Merge SHA**: {{{{inputs.parameters.merge-sha}}}}
+          - **PR Number**: {{workflow.parameters.pr-number}}
+          - **Approval Status**: {{inputs.parameters.approval-status}}
+          - **Merge SHA**: {{inputs.parameters.merge-sha}}
 
           ## Stages Completed
           1. ✅ Implementation Work
@@ -1716,7 +1748,7 @@ spec:
 
           echo ""
           echo "Workflow summary generated successfully"
-          echo "Task {{{{inputs.parameters.task-id}}}} workflow completed!"
+          echo "Task {{inputs.parameters.task-id}} workflow completed!"
           echo ""
           echo "Note: Next task will be started automatically by webhook system"
 
@@ -1768,9 +1800,9 @@ spec:
           #!/bin/sh
           set -e
 
-          TASK_ID="{{{{inputs.parameters.task-id}}}}"
-          DOCS_REPO="{{{{inputs.parameters.docs-repository}}}}"
-          DOCS_PROJECT_DIR="{{{{inputs.parameters.docs-project-directory}}}}"
+          TASK_ID="{{inputs.parameters.task-id}}"
+          DOCS_REPO="{{inputs.parameters.docs-repository}}"
+          DOCS_PROJECT_DIR="{{inputs.parameters.docs-project-directory}}"
 
           echo "🔍 Determining agent for task ${TASK_ID}"
           echo "   Docs repository: ${DOCS_REPO}"
@@ -1825,11 +1857,11 @@ spec:
           git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1 || {
             echo "❌ Failed to clone repository"
             # Fallback to implementation agent
-            echo "{{{{workflow.parameters.implementation-agent}}}}" > /tmp/github-app.txt
-            echo "{{{{workflow.parameters.implementation-cli}}}}" > /tmp/cli-type.txt
-            echo "{{{{workflow.parameters.implementation-model}}}}" > /tmp/model.txt
-            echo "{{{{workflow.parameters.implementation-model-rotation}}}}" > /tmp/model-rotation.txt
-            echo "{{{{workflow.parameters.implementation-max-retries}}}}" > /tmp/max-retries.txt
+            echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+            echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+            echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+            echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+            echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
             echo "rust" > /tmp/task-language.txt
             echo "" > /tmp/task-framework.txt
             exit 0
@@ -1994,68 +2026,68 @@ spec:
           case "$AGENT_TYPE" in
             "mobile"|"react-native"|"expo"|"ios"|"android")
               echo "✅ Routing to MOBILE agent (Spark)"
-              MOBILE_AGENT="{{{{workflow.parameters.mobile-agent}}}}"
+              MOBILE_AGENT="{{workflow.parameters.mobile-agent}}"
 
               # Validate mobile-agent is not empty, fallback to frontend-agent
               if [ -z "$MOBILE_AGENT" ] || [ "$MOBILE_AGENT" = "" ]; then
                 echo "⚠️ mobile-agent parameter is empty, falling back to frontend-agent"
-                MOBILE_AGENT="{{{{workflow.parameters.frontend-agent}}}}"
+                MOBILE_AGENT="{{workflow.parameters.frontend-agent}}"
                 if [ -z "$MOBILE_AGENT" ] || [ "$MOBILE_AGENT" = "" ]; then
                   echo "❌ ERROR: Both mobile-agent and frontend-agent are empty!"
                   echo "⚠️ Falling back to implementation-agent"
-                  echo "{{{{workflow.parameters.implementation-agent}}}}" > /tmp/github-app.txt
-                  echo "{{{{workflow.parameters.implementation-cli}}}}" > /tmp/cli-type.txt
-                  echo "{{{{workflow.parameters.implementation-model}}}}" > /tmp/model.txt
-                  echo "{{{{workflow.parameters.implementation-model-rotation}}}}" > /tmp/model-rotation.txt
-                  echo "{{{{workflow.parameters.implementation-max-retries}}}}" > /tmp/max-retries.txt
+                  echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+                  echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+                  echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+                  echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+                  echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
                 else
                   echo "$MOBILE_AGENT" > /tmp/github-app.txt
-                  echo "{{{{workflow.parameters.frontend-cli}}}}" > /tmp/cli-type.txt
-                  echo "{{{{workflow.parameters.frontend-model}}}}" > /tmp/model.txt
-                  echo "{{{{workflow.parameters.frontend-model-rotation}}}}" > /tmp/model-rotation.txt
-                  echo "{{{{workflow.parameters.frontend-max-retries}}}}" > /tmp/max-retries.txt
+                  echo "{{workflow.parameters.frontend-cli}}" > /tmp/cli-type.txt
+                  echo "{{workflow.parameters.frontend-model}}" > /tmp/model.txt
+                  echo "{{workflow.parameters.frontend-model-rotation}}" > /tmp/model-rotation.txt
+                  echo "{{workflow.parameters.frontend-max-retries}}" > /tmp/max-retries.txt
                 fi
               else
                 echo "$MOBILE_AGENT" > /tmp/github-app.txt
-                MOBILE_CLI="{{{{workflow.parameters.mobile-cli}}}}"
-                MOBILE_MODEL="{{{{workflow.parameters.mobile-model}}}}"
+                MOBILE_CLI="{{workflow.parameters.mobile-cli}}"
+                MOBILE_MODEL="{{workflow.parameters.mobile-model}}"
                 # Fallback to frontend CLI/model if mobile-specific not set
                 if [ -z "$MOBILE_CLI" ] || [ "$MOBILE_CLI" = "" ]; then
-                  MOBILE_CLI="{{{{workflow.parameters.frontend-cli}}}}"
+                  MOBILE_CLI="{{workflow.parameters.frontend-cli}}"
                 fi
                 if [ -z "$MOBILE_MODEL" ] || [ "$MOBILE_MODEL" = "" ]; then
-                  MOBILE_MODEL="{{{{workflow.parameters.frontend-model}}}}"
+                  MOBILE_MODEL="{{workflow.parameters.frontend-model}}"
                 fi
                 echo "$MOBILE_CLI" > /tmp/cli-type.txt
                 echo "$MOBILE_MODEL" > /tmp/model.txt
-                echo "{{{{workflow.parameters.mobile-model-rotation}}}}" > /tmp/model-rotation.txt
-                echo "{{{{workflow.parameters.mobile-max-retries}}}}" > /tmp/max-retries.txt
+                echo "{{workflow.parameters.mobile-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.mobile-max-retries}}" > /tmp/max-retries.txt
               fi
               ;;
             "frontend"|"ui"|"react"|"nextjs")
               echo "✅ Routing to FRONTEND agent (Blaze)"
-              FRONTEND_AGENT="{{{{workflow.parameters.frontend-agent}}}}"
+              FRONTEND_AGENT="{{workflow.parameters.frontend-agent}}"
 
               # Validate frontend-agent is not empty
               if [ -z "$FRONTEND_AGENT" ] || [ "$FRONTEND_AGENT" = "" ]; then
                 echo "❌ ERROR: frontend-agent parameter is empty but task requires frontend agent!"
                 echo "⚠️ Falling back to implementation-agent, but this task should use Blaze"
-                echo "{{{{workflow.parameters.implementation-agent}}}}" > /tmp/github-app.txt
-                echo "{{{{workflow.parameters.implementation-cli}}}}" > /tmp/cli-type.txt
-                echo "{{{{workflow.parameters.implementation-model}}}}" > /tmp/model.txt
-                echo "{{{{workflow.parameters.implementation-model-rotation}}}}" > /tmp/model-rotation.txt
-                echo "{{{{workflow.parameters.implementation-max-retries}}}}" > /tmp/max-retries.txt
+                echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+                echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+                echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+                echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
               else
                 echo "$FRONTEND_AGENT" > /tmp/github-app.txt
-                echo "{{{{workflow.parameters.frontend-cli}}}}" > /tmp/cli-type.txt
-                echo "{{{{workflow.parameters.frontend-model}}}}" > /tmp/model.txt
-                echo "{{{{workflow.parameters.frontend-model-rotation}}}}" > /tmp/model-rotation.txt
-                echo "{{{{workflow.parameters.frontend-max-retries}}}}" > /tmp/max-retries.txt
+                echo "{{workflow.parameters.frontend-cli}}" > /tmp/cli-type.txt
+                echo "{{workflow.parameters.frontend-model}}" > /tmp/model.txt
+                echo "{{workflow.parameters.frontend-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.frontend-max-retries}}" > /tmp/max-retries.txt
               fi
               ;;
             *)
               echo "✅ Routing to IMPLEMENTATION agent (Rex)"
-              IMPL_AGENT="{{{{workflow.parameters.implementation-agent}}}}"
+              IMPL_AGENT="{{workflow.parameters.implementation-agent}}"
 
               # Validate implementation-agent is not empty
               if [ -z "$IMPL_AGENT" ] || [ "$IMPL_AGENT" = "" ]; then
@@ -2065,10 +2097,10 @@ spec:
               fi
 
               echo "$IMPL_AGENT" > /tmp/github-app.txt
-              echo "{{{{workflow.parameters.implementation-cli}}}}" > /tmp/cli-type.txt
-              echo "{{{{workflow.parameters.implementation-model}}}}" > /tmp/model.txt
-              echo "{{{{workflow.parameters.implementation-model-rotation}}}}" > /tmp/model-rotation.txt
-              echo "{{{{workflow.parameters.implementation-max-retries}}}}" > /tmp/max-retries.txt
+              echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+              echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+              echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+              echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
               ;;
           esac
 
@@ -2139,9 +2171,9 @@ spec:
           #!/bin/sh
           set -e
 
-          REPO="{{{{inputs.parameters.repository}}}}"
-          PR_NUMBER="{{{{inputs.parameters.pr-number}}}}"
-          STAGE_NAME="{{{{inputs.parameters.stage-name}}}}"
+          REPO="{{inputs.parameters.repository}}"
+          PR_NUMBER="{{inputs.parameters.pr-number}}"
+          STAGE_NAME="{{inputs.parameters.stage-name}}"
 
           echo "========================================="
           echo "Checking PR Merge Status & Agent Completion"
@@ -2308,8 +2340,8 @@ spec:
             apk add --no-cache jq
           fi
 
-          REPO="{{{{inputs.parameters.repository}}}}"
-          TASK_ID="{{{{inputs.parameters.task-id}}}}"
+          REPO="{{inputs.parameters.repository}}"
+          TASK_ID="{{inputs.parameters.task-id}}"
           CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')-task-${TASK_ID}"
 
           echo "=== Checking for Existing Progress ==="
@@ -2337,7 +2369,7 @@ spec:
           # Check if workflow is still RUNNING (prevent concurrent execution)
           # IMPORTANT: Exclude current workflow from this check!
           # FIX: Only block if workflow is Running/Pending, not just if it exists
-          CURRENT_WORKFLOW="{{{{workflow.name}}}}"
+          CURRENT_WORKFLOW="{{workflow.name}}"
           if [ -n "$WORKFLOW_NAME" ] && [ "$WORKFLOW_NAME" != "$CURRENT_WORKFLOW" ]; then
             WORKFLOW_PHASE=$(kubectl get workflow "$WORKFLOW_NAME" -n cto -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
             if [ "$WORKFLOW_PHASE" = "Running" ] || [ "$WORKFLOW_PHASE" = "Pending" ]; then
@@ -2417,8 +2449,8 @@ spec:
           #!/bin/bash
           set -e
 
-          RESUME_STAGE="{{{{inputs.parameters.resume-stage}}}}"
-          CURRENT_STAGE="{{{{inputs.parameters.current-stage}}}}"
+          RESUME_STAGE="{{inputs.parameters.resume-stage}}"
+          CURRENT_STAGE="{{inputs.parameters.current-stage}}"
 
           echo "=== Stage Skip Check ==="
           echo "Resume from: $RESUME_STAGE"
@@ -2478,11 +2510,11 @@ spec:
           echo "========================================="
           echo "Initializing Workflow Stage for Resume"
           echo "========================================="
-          echo "Workflow: {{{{workflow.name}}}}"
-          echo "Resume Stage: {{{{inputs.parameters.resume-stage}}}}"
+          echo "Workflow: {{workflow.name}}"
+          echo "Resume Stage: {{inputs.parameters.resume-stage}}"
           echo ""
 
-          RESUME_STAGE="{{{{inputs.parameters.resume-stage}}}}"
+          RESUME_STAGE="{{inputs.parameters.resume-stage}}"
 
           # Map resume stage to predecessor stage
           # This allows the normal stage transition validation to pass
@@ -2521,7 +2553,7 @@ spec:
           echo ""
 
           # Get current resource version for the patch
-          RESOURCE_VERSION=$(kubectl get workflow "{{{{workflow.name}}}}" \
+          RESOURCE_VERSION=$(kubectl get workflow "{{workflow.name}}" \
             -n cto \
             -o jsonpath='{.metadata.resourceVersion}')
 
@@ -2529,13 +2561,13 @@ spec:
 
           # Prepare the JSON patch - setting the predecessor stage directly
           # This bypasses validation because we're setting up for a resume
-          REPOSITORY_LABEL=$(echo '{{{{workflow.parameters.repository}}}}' | tr '/' '-')
+          REPOSITORY_LABEL=$(echo '{{workflow.parameters.repository}}' | tr '/' '-')
           PATCH_JSON='{
             "metadata": {
               "resourceVersion": "'$RESOURCE_VERSION'",
               "labels": {
                 "current-stage": "'$PREDECESSOR_STAGE'",
-                "task-id": "{{{{workflow.parameters.task-id}}}}",
+                "task-id": "{{workflow.parameters.task-id}}",
                 "repository": "'$REPOSITORY_LABEL'",
                 "resume-initialized": "true"
               }
@@ -2546,7 +2578,7 @@ spec:
           echo "$PATCH_JSON" | jq .
 
           # Apply the patch
-          if kubectl patch workflow "{{{{workflow.name}}}}" \
+          if kubectl patch workflow "{{workflow.name}}" \
             --type='merge' \
             --patch="$PATCH_JSON" \
             -n cto; then
@@ -2593,10 +2625,10 @@ spec:
           #!/bin/sh
           set -e
 
-          REPO="{{{{inputs.parameters.repository}}}}"
-          TASK_ID="{{{{inputs.parameters.task-id}}}}"
+          REPO="{{inputs.parameters.repository}}"
+          TASK_ID="{{inputs.parameters.task-id}}"
           TASK_LABEL="task-${TASK_ID}"
-          RUN_LABEL="run-{{{{workflow.name}}}}"
+          RUN_LABEL="run-{{workflow.name}}"
 
           echo "" > /tmp/pr-url-github.txt
           echo "" > /tmp/pr-number-github.txt
@@ -2703,13 +2735,13 @@ spec:
           #!/bin/sh
           set -e
 
-          RESUME_STAGE="{{{{inputs.parameters.resume-stage}}}}"
-          PR_URL_CONFIGMAP="{{{{inputs.parameters.pr-url-from-configmap}}}}"
-          PR_NUMBER_CONFIGMAP="{{{{inputs.parameters.pr-number-from-configmap}}}}"
-          PR_URL_GITHUB="{{{{inputs.parameters.pr-url-from-github}}}}"
-          PR_NUMBER_GITHUB="{{{{inputs.parameters.pr-number-from-github}}}}"
-          PR_URL_IMPL="{{{{inputs.parameters.pr-url-from-implementation}}}}"
-          PR_NUMBER_IMPL="{{{{inputs.parameters.pr-number-from-implementation}}}}"
+          RESUME_STAGE="{{inputs.parameters.resume-stage}}"
+          PR_URL_CONFIGMAP="{{inputs.parameters.pr-url-from-configmap}}"
+          PR_NUMBER_CONFIGMAP="{{inputs.parameters.pr-number-from-configmap}}"
+          PR_URL_GITHUB="{{inputs.parameters.pr-url-from-github}}"
+          PR_NUMBER_GITHUB="{{inputs.parameters.pr-number-from-github}}"
+          PR_URL_IMPL="{{inputs.parameters.pr-url-from-implementation}}"
+          PR_NUMBER_IMPL="{{inputs.parameters.pr-number-from-implementation}}"
 
           # Helper function to check if a value is a valid (substituted) parameter
           # Returns 1 (false) if value is empty, contains unsubstituted template syntax,
@@ -2769,12 +2801,12 @@ spec:
           echo "========================================="
           echo "Workflow Cleanup Handler"
           echo "========================================="
-          echo "Workflow Name: {{{{workflow.name}}}}"
-          echo "Status: {{{{workflow.status}}}}"
-          echo "Task ID: {{{{workflow.parameters.task-id}}}}"
+          echo "Workflow Name: {{workflow.name}}"
+          echo "Status: {{workflow.status}}"
+          echo "Task ID: {{workflow.parameters.task-id}}"
 
           # Log final workflow state
-          if [ "{{{{workflow.status}}}}" = "Succeeded" ]; then
+          if [ "{{workflow.status}}" = "Succeeded" ]; then
             echo "✅ Workflow completed successfully"
           else
             echo "❌ Workflow failed or was terminated"
@@ -2794,4 +2826,3 @@ spec:
   podGC:
     strategy: OnPodCompletion
     deleteDelayDuration: 300s
-

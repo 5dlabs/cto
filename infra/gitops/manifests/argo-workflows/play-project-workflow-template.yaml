@@ -171,11 +171,11 @@ spec:
           arguments:
             parameters:
             - name: docs-directory
-              value: "{{{{workflow.parameters.docs-project-directory}}}}"
+              value: "{{workflow.parameters.docs-project-directory}}"
             - name: start-from
-              value: "{{{{tasks.check-play-state.outputs.parameters.next-task-id}}}}"
+              value: "{{tasks.check-play-state.outputs.parameters.next-task-id}}"
             - name: max-tasks
-              value: "{{{{workflow.parameters.max-tasks}}}}"
+              value: "{{workflow.parameters.max-tasks}}"
 
         # Build dependency graph (depends on discover-tasks, only if parallel execution enabled)
         - name: build-dependency-graph
@@ -184,8 +184,8 @@ spec:
           arguments:
             parameters:
             - name: docs-directory
-              value: "{{{{workflow.parameters.docs-project-directory}}}}"
-          when: "{{{{workflow.parameters.parallel-execution}}}}"
+              value: "{{workflow.parameters.docs-project-directory}}"
+          when: "{{workflow.parameters.parallel-execution}}"
 
         # Process tasks in parallel (depends on build-dependency-graph)
         - name: process-tasks-parallel
@@ -194,11 +194,11 @@ spec:
           arguments:
             parameters:
             - name: execution-levels
-              value: "{{{{tasks.build-dependency-graph.outputs.parameters.execution-levels}}}}"
+              value: "{{tasks.build-dependency-graph.outputs.parameters.execution-levels}}"
             - name: task-count
-              value: "{{{{tasks.discover-tasks.outputs.parameters.task-count}}}}"
-          when: "{{{{workflow.parameters.parallel-execution}}}}"
-        
+              value: "{{tasks.discover-tasks.outputs.parameters.task-count}}"
+          when: "{{workflow.parameters.parallel-execution}}"
+
         # Process tasks sequentially (depends on discover-tasks)
         - name: process-tasks-sequential
           dependencies: [discover-tasks]
@@ -206,10 +206,10 @@ spec:
           arguments:
             parameters:
             - name: task-list
-              value: "{{{{tasks.discover-tasks.outputs.parameters.task-list}}}}"
+              value: "{{tasks.discover-tasks.outputs.parameters.task-list}}"
             - name: task-count
-              value: "{{{{tasks.discover-tasks.outputs.parameters.task-count}}}}"
-          when: "!{{{{workflow.parameters.parallel-execution}}}}"
+              value: "{{tasks.discover-tasks.outputs.parameters.task-count}}"
+          when: "!{{workflow.parameters.parallel-execution}}"
 
     # Play state checker - reads persisted state to determine next task
     - name: play-state-checker
@@ -248,8 +248,8 @@ spec:
           set -e
 
           echo "🔍 Checking play state for resume..."
-          echo "   Workflow: {{{{workflow.name}}}}"
-          echo "   Repository: {{{{workflow.parameters.repository}}}}"
+          echo "   Workflow: {{workflow.name}}"
+          echo "   Repository: {{workflow.parameters.repository}}"
           echo ""
 
           echo "📦 Installing dependencies..."
@@ -260,7 +260,7 @@ spec:
           echo "✅ Dependencies installed"
 
           # State config map name is based on repository
-          REPO_SLUG="{{{{workflow.parameters.repository}}}}"
+          REPO_SLUG="{{workflow.parameters.repository}}"
           REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
           STATE_CM_NAME="play-state-${REPO_SLUG}"
 
@@ -292,18 +292,18 @@ spec:
             echo "ℹ️ No existing play state found - starting fresh"
 
             # Use the workflow parameter default or 1
-            START_FROM="{{{{workflow.parameters.start-from-task}}}}"
+            START_FROM="{{workflow.parameters.start-from-task}}"
             echo "🎯 Starting from task: $START_FROM"
             echo "$START_FROM" > /tmp/next-task-id.txt
 
             # Create initial state config map
             cat > /tmp/state.json <<EOF
           {
-            "repository": "{{{{workflow.parameters.repository}}}}",
-            "service": "{{{{workflow.parameters.service}}}}",
+            "repository": "{{workflow.parameters.repository}}",
+            "service": "{{workflow.parameters.service}}",
             "last-completed-task": "0",
             "last-completed-level": "-1",
-            "workflow-name": "{{{{workflow.name}}}}",
+            "workflow-name": "{{workflow.name}}",
             "started-at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
             "updated-at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           }
@@ -312,9 +312,9 @@ spec:
             kubectl create configmap "$STATE_CM_NAME" \
               --from-literal=last-completed-task=0 \
               --from-literal=last-completed-level=-1 \
-              --from-literal=repository="{{{{workflow.parameters.repository}}}}" \
-              --from-literal=service="{{{{workflow.parameters.service}}}}" \
-              --from-literal=workflow-name="{{{{workflow.name}}}}" \
+              --from-literal=repository="{{workflow.parameters.repository}}" \
+              --from-literal=service="{{workflow.parameters.service}}" \
+              --from-literal=workflow-name="{{workflow.name}}" \
               --from-literal=started-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
               --from-literal=updated-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
               -n cto \
@@ -388,9 +388,9 @@ spec:
           set -e
 
           echo "🔍 Discovering tasks in workspace..."
-          echo "   Workflow: {{{{workflow.name}}}}"
-          echo "   Docs repository: {{{{workflow.parameters.docs-repository}}}}"
-          echo "   Docs directory: {{{{inputs.parameters.docs-directory}}}}"
+          echo "   Workflow: {{workflow.name}}"
+          echo "   Docs repository: {{workflow.parameters.docs-repository}}"
+          echo "   Docs directory: {{inputs.parameters.docs-directory}}"
           echo ""
 
           # Clone repository to get task structure
@@ -402,7 +402,7 @@ spec:
           echo "✅ Dependencies installed"
 
           # Normalize docs-repository: accept either org/repo or full URL
-          DOCS_REPO_INPUT="{{{{workflow.parameters.docs-repository}}}}"
+          DOCS_REPO_INPUT="{{workflow.parameters.docs-repository}}"
           case "$DOCS_REPO_INPUT" in
             http://*|https://*)
               DOCS_REPO_URL="$DOCS_REPO_INPUT"
@@ -478,10 +478,10 @@ spec:
           fi
 
           echo "🔗 Cloning: $DOCS_REPO_URL"
-          git clone --depth 1 --branch "{{{{workflow.parameters.docs-branch}}}}" \
+          git clone --depth 1 --branch "{{workflow.parameters.docs-branch}}" \
             "$AUTH_URL" /workspace
 
-          cd /workspace/"{{{{inputs.parameters.docs-directory}}}}"
+          cd /workspace/"{{inputs.parameters.docs-directory}}"
 
           # Resilient task directory discovery - check both possible locations
           TASK_DIR=""
@@ -512,7 +512,7 @@ spec:
             task_num=$(basename "$dir" | sed 's/task-//')
 
             # Check if task number is >= start-from
-            if [ "$task_num" -ge "{{{{inputs.parameters.start-from}}}}" ]; then
+            if [ "$task_num" -ge "{{inputs.parameters.start-from}}" ]; then
               if [ -z "$tasks" ]; then
                 tasks="$task_num"
               else
@@ -521,15 +521,15 @@ spec:
               count=$((count + 1))
 
               # Check max tasks limit
-              if [ "$count" -ge "{{{{inputs.parameters.max-tasks}}}}" ]; then
-                echo "⚠️ Reached max tasks limit: {{{{inputs.parameters.max-tasks}}}}"
+              if [ "$count" -ge "{{inputs.parameters.max-tasks}}" ]; then
+                echo "⚠️ Reached max tasks limit: {{inputs.parameters.max-tasks}}"
                 break
               fi
             fi
           done
 
           if [ -z "$tasks" ]; then
-            echo "❌ No tasks found starting from task-{{{{inputs.parameters.start-from}}}}"
+            echo "❌ No tasks found starting from task-{{inputs.parameters.start-from}}"
             # Create empty output files so Argo can read them
             echo "" > /tmp/task-list.txt
             echo "0" > /tmp/task-count.txt
@@ -603,9 +603,9 @@ spec:
           set -e
 
           echo "📊 Building dependency graph from tasks data..."
-          echo "   Workflow: {{{{workflow.name}}}}"
-          echo "   Docs repository: {{{{workflow.parameters.docs-repository}}}}"
-          echo "   Docs directory: {{{{inputs.parameters.docs-directory}}}}"
+          echo "   Workflow: {{workflow.name}}"
+          echo "   Docs repository: {{workflow.parameters.docs-repository}}"
+          echo "   Docs directory: {{inputs.parameters.docs-directory}}"
           echo ""
 
           # Install Python and required packages
@@ -617,7 +617,7 @@ spec:
           echo "✅ Dependencies installed"
 
           # Normalize docs-repository: accept either org/repo or full URL
-          DOCS_REPO_INPUT="{{{{workflow.parameters.docs-repository}}}}"
+          DOCS_REPO_INPUT="{{workflow.parameters.docs-repository}}"
           case "$DOCS_REPO_INPUT" in
             http://*|https://*)
               DOCS_REPO_URL="$DOCS_REPO_INPUT"
@@ -693,10 +693,10 @@ spec:
           fi
 
           echo "🔗 Cloning: $DOCS_REPO_URL"
-          git clone --depth 1 --branch "{{{{workflow.parameters.docs-branch}}}}" \
+          git clone --depth 1 --branch "{{workflow.parameters.docs-branch}}" \
             "$AUTH_URL" /workspace
 
-          cd /workspace/"{{{{inputs.parameters.docs-directory}}}}"
+          cd /workspace/"{{inputs.parameters.docs-directory}}"
 
           # Check for .tasks/tasks/tasks.json
           TASKS_JSON=".tasks/tasks/tasks.json"
@@ -852,7 +852,7 @@ spec:
 
           echo "🚀 Processing tasks in parallel by dependency levels..."
           echo "📋 Template: parallel-task-processor"
-          echo "📋 Workflow: {{{{workflow.name}}}}"
+          echo "📋 Workflow: {{workflow.name}}"
           echo "📋 Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo ""
 
@@ -862,7 +862,7 @@ spec:
           fi
 
           # Parse execution levels
-          LEVELS='{{{{inputs.parameters.execution-levels}}}}'
+          LEVELS='{{inputs.parameters.execution-levels}}'
           echo "📊 Execution levels: $LEVELS"
 
           # Validate and count total levels
@@ -895,7 +895,7 @@ spec:
             # Get tasks for this level
             level_tasks=$(echo "$LEVELS" | jq -r ".[$level_index] | @json")
             task_array=$(echo "$level_tasks" | jq -r '.[]')
-            
+
             if [ -z "$task_array" ]; then
               echo "⚠️ No tasks in level $level_index, skipping..."
               level_index=$((level_index + 1))
@@ -908,16 +908,16 @@ spec:
               IS_FINAL_LEVEL="true"
               echo "📌 This is the final execution level - tasks will trigger deployment verification"
             fi
-            
+
             # Launch all tasks in this level in parallel
             echo "🚀 Launching parallel tasks for level $level_index:"
             workflow_names=""
             for task_id in $task_array; do
               echo "  → Task $task_id"
-              
+
               # Agent routing is handled by child workflow's determine-task-agent step
               # Parent simply passes through all agent parameters for child to use
-              
+
               cat > /tmp/workflow-task-${task_id}.yaml <<EOF
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
@@ -927,9 +927,9 @@ spec:
             labels:
               task-id: "$task_id"
               execution-level: "$level_index"
-              repository: "$(echo "{{{{workflow.parameters.repository}}}}" | tr '/' '-')"
+              repository: "$(echo "{{workflow.parameters.repository}}" | tr '/' '-')"
               current-stage: "pending"
-              parent-workflow: "{{{{workflow.name}}}}"
+              parent-workflow: "{{workflow.name}}"
               project-play: "true"
               parallel-execution: "true"
           spec:
@@ -940,81 +940,81 @@ spec:
                 - name: task-id
                   value: "$task_id"
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: service
-                  value: "{{{{workflow.parameters.service}}}}"
+                  value: "{{workflow.parameters.service}}"
                 - name: docs-repository
-                  value: "{{{{workflow.parameters.docs-repository}}}}"
+                  value: "{{workflow.parameters.docs-repository}}"
                 - name: docs-project-directory
-                  value: "{{{{workflow.parameters.docs-project-directory}}}}"
+                  value: "{{workflow.parameters.docs-project-directory}}"
                 - name: docs-branch
-                  value: "{{{{workflow.parameters.docs-branch}}}}"
+                  value: "{{workflow.parameters.docs-branch}}"
                 - name: implementation-agent
-                  value: "{{{{workflow.parameters.implementation-agent}}}}"
+                  value: "{{workflow.parameters.implementation-agent}}"
                 - name: implementation-cli
-                  value: "{{{{workflow.parameters.implementation-cli}}}}"
+                  value: "{{workflow.parameters.implementation-cli}}"
                 - name: implementation-model
-                  value: "{{{{workflow.parameters.implementation-model}}}}"
+                  value: "{{workflow.parameters.implementation-model}}"
                 - name: implementation-tools
-                  value: '{{{{workflow.parameters.implementation-tools}}}}'
+                  value: '{{workflow.parameters.implementation-tools}}'
                 - name: implementation-model-rotation
-                  value: '{{{{workflow.parameters.implementation-model-rotation}}}}'
+                  value: '{{workflow.parameters.implementation-model-rotation}}'
                 - name: frontend-agent
-                  value: "{{{{workflow.parameters.frontend-agent}}}}"
+                  value: "{{workflow.parameters.frontend-agent}}"
                 - name: frontend-cli
-                  value: "{{{{workflow.parameters.frontend-cli}}}}"
+                  value: "{{workflow.parameters.frontend-cli}}"
                 - name: frontend-model
-                  value: "{{{{workflow.parameters.frontend-model}}}}"
+                  value: "{{workflow.parameters.frontend-model}}"
                 - name: frontend-tools
-                  value: '{{{{workflow.parameters.frontend-tools}}}}'
+                  value: '{{workflow.parameters.frontend-tools}}'
                 - name: frontend-model-rotation
-                  value: '{{{{workflow.parameters.frontend-model-rotation}}}}'
+                  value: '{{workflow.parameters.frontend-model-rotation}}'
                 - name: frontend-max-retries
-                  value: "{{{{workflow.parameters.frontend-max-retries}}}}"
+                  value: "{{workflow.parameters.frontend-max-retries}}"
                 - name: quality-agent
-                  value: "{{{{workflow.parameters.quality-agent}}}}"
+                  value: "{{workflow.parameters.quality-agent}}"
                 - name: quality-cli
-                  value: "{{{{workflow.parameters.quality-cli}}}}"
+                  value: "{{workflow.parameters.quality-cli}}"
                 - name: quality-model
-                  value: "{{{{workflow.parameters.quality-model}}}}"
+                  value: "{{workflow.parameters.quality-model}}"
                 - name: quality-tools
-                  value: '{{{{workflow.parameters.quality-tools}}}}'
+                  value: '{{workflow.parameters.quality-tools}}'
                 - name: quality-model-rotation
-                  value: '{{{{workflow.parameters.quality-model-rotation}}}}'
+                  value: '{{workflow.parameters.quality-model-rotation}}'
                 - name: security-agent
-                  value: "{{{{workflow.parameters.security-agent}}}}"
+                  value: "{{workflow.parameters.security-agent}}"
                 - name: security-cli
-                  value: "{{{{workflow.parameters.security-cli}}}}"
+                  value: "{{workflow.parameters.security-cli}}"
                 - name: security-model
-                  value: "{{{{workflow.parameters.security-model}}}}"
+                  value: "{{workflow.parameters.security-model}}"
                 - name: security-tools
-                  value: '{{{{workflow.parameters.security-tools}}}}'
+                  value: '{{workflow.parameters.security-tools}}'
                 - name: security-model-rotation
-                  value: '{{{{workflow.parameters.security-model-rotation}}}}'
+                  value: '{{workflow.parameters.security-model-rotation}}'
                 - name: testing-agent
-                  value: "{{{{workflow.parameters.testing-agent}}}}"
+                  value: "{{workflow.parameters.testing-agent}}"
                 - name: testing-cli
-                  value: "{{{{workflow.parameters.testing-cli}}}}"
+                  value: "{{workflow.parameters.testing-cli}}"
                 - name: testing-model
-                  value: "{{{{workflow.parameters.testing-model}}}}"
+                  value: "{{workflow.parameters.testing-model}}"
                 - name: testing-tools
-                  value: '{{{{workflow.parameters.testing-tools}}}}'
+                  value: '{{workflow.parameters.testing-tools}}'
                 - name: testing-model-rotation
-                  value: '{{{{workflow.parameters.testing-model-rotation}}}}'
+                  value: '{{workflow.parameters.testing-model-rotation}}'
                 - name: implementation-max-retries
-                  value: "{{{{workflow.parameters.implementation-max-retries}}}}"
+                  value: "{{workflow.parameters.implementation-max-retries}}"
                 - name: quality-max-retries
-                  value: "{{{{workflow.parameters.quality-max-retries}}}}"
+                  value: "{{workflow.parameters.quality-max-retries}}"
                 - name: security-max-retries
-                  value: "{{{{workflow.parameters.security-max-retries}}}}"
+                  value: "{{workflow.parameters.security-max-retries}}"
                 - name: testing-max-retries
-                  value: "{{{{workflow.parameters.testing-max-retries}}}}"
+                  value: "{{workflow.parameters.testing-max-retries}}"
                 - name: opencode-max-retries
-                  value: "{{{{workflow.parameters.opencode-max-retries}}}}"
+                  value: "{{workflow.parameters.opencode-max-retries}}"
                 - name: auto-merge
-                  value: "{{{{workflow.parameters.auto-merge}}}}"
+                  value: "{{workflow.parameters.auto-merge}}"
                 - name: model
-                  value: "{{{{workflow.parameters.model}}}}"
+                  value: "{{workflow.parameters.model}}"
                 - name: final-task
                   value: "$IS_FINAL_LEVEL"
           EOF
@@ -1078,7 +1078,7 @@ spec:
             while [ $elapsed -lt $max_wait ]; do
               all_done=true
               any_failed=false
-              
+
               for workflow_name in $workflow_names; do
                 status=$(kubectl get workflow "$workflow_name" \
                   -n cto \
@@ -1108,11 +1108,11 @@ spec:
                   echo "❌ One or more tasks in level $level_index failed"
                   exit 1
                 fi
-                
+
                 echo "✅ All tasks in level $level_index completed successfully"
 
               # Update play state - save highest completed task in this level
-              REPO_SLUG="{{{{workflow.parameters.repository}}}}"
+              REPO_SLUG="{{workflow.parameters.repository}}"
               REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
               STATE_CM_NAME="play-state-${REPO_SLUG}"
 
@@ -1128,22 +1128,22 @@ spec:
               kubectl create configmap "$STATE_CM_NAME" \
                 --from-literal=last-completed-task="$HIGHEST_TASK" \
                 --from-literal=last-completed-level="$level_index" \
-                --from-literal=repository="{{{{workflow.parameters.repository}}}}" \
-                --from-literal=service="{{{{workflow.parameters.service}}}}" \
-                --from-literal=workflow-name="{{{{workflow.name}}}}" \
+                --from-literal=repository="{{workflow.parameters.repository}}" \
+                --from-literal=service="{{workflow.parameters.service}}" \
+                --from-literal=workflow-name="{{workflow.name}}" \
                 --from-literal=updated-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
                 -n cto \
                 -o yaml --dry-run=client | kubectl apply -n cto -f -
               echo "✅ Play state saved"
 
               # Optional: Create integration PR that merges all task branches in this level
-              if [ "{{{{workflow.parameters.integration-pr-enabled}}}}" = "true" ]; then
+              if [ "{{workflow.parameters.integration-pr-enabled}}" = "true" ]; then
                 echo "🧩 Coordinating integration PR for level $level_index"
 
                 apk add --no-cache git curl openssl
 
                 # Normalize repository: accept either org/repo or full URL
-                REPO_INPUT="{{{{workflow.parameters.repository}}}}"
+                REPO_INPUT="{{workflow.parameters.repository}}"
                 case "$REPO_INPUT" in
                   http://*|https://*)
                     REPO_URL="$REPO_INPUT"
@@ -1214,17 +1214,17 @@ spec:
                     # Clone repo and prepare integration branch
                     WORKDIR="/tmp/integration-$level_index"
                     rm -rf "$WORKDIR" && mkdir -p "$WORKDIR"
-                    git clone --depth 1 --branch "{{{{workflow.parameters.integration-base-branch}}}}" "$AUTH_URL" "$WORKDIR"
+                    git clone --depth 1 --branch "{{workflow.parameters.integration-base-branch}}" "$AUTH_URL" "$WORKDIR"
                     cd "$WORKDIR"
 
-                    BASE_BRANCH="{{{{workflow.parameters.integration-base-branch}}}}"
-                    INTEGRATION_BRANCH="integration/level-$level_index-{{{{workflow.name}}}}"
+                    BASE_BRANCH="{{workflow.parameters.integration-base-branch}}"
+                    INTEGRATION_BRANCH="integration/level-$level_index-{{workflow.name}}"
 
                     # Create or reset integration branch
                     git checkout -B "$INTEGRATION_BRANCH" "origin/$BASE_BRANCH"
 
                     # Optional conflict detection via PR changed files
-                    if [ "{{{{workflow.parameters.conflict-detection}}}}" = "true" ]; then
+                    if [ "{{workflow.parameters.conflict-detection}}" = "true" ]; then
                       echo "🧪 Performing pre-merge conflict detection"
                       ALL_FILES="/tmp/changed-files.txt"
                       : > "$ALL_FILES"
@@ -1282,7 +1282,7 @@ spec:
                     # Push integration branch and create PR
                     git push -f origin "$INTEGRATION_BRANCH"
 
-                    PR_TITLE="Integration PR: Level $level_index for {{{{workflow.name}}}}"
+                    PR_TITLE="Integration PR: Level $level_index for {{workflow.name}}"
                     PR_BODY="This PR merges task branches for level $level_index: $(echo $task_array | tr '\n' ' ')"
                     CREATE_BODY=$(printf '{"title":"%s","head":"%s","base":"%s","body":"%s"}' "$PR_TITLE" "$INTEGRATION_BRANCH" "$BASE_BRANCH" "$PR_BODY")
                     EXISTING=$(curl -s -L \
@@ -1331,25 +1331,25 @@ spec:
               echo "⏱️ TIMEOUT: Level $level_index exceeded maximum wait time ($max_wait seconds)"
               echo "═══════════════════════════════════════════════════════════════"
               echo ""
-              
+
               # Detailed diagnostics for each workflow
               echo "📊 DIAGNOSTICS: Checking status of all workflows in level $level_index..."
               echo ""
-              
+
               stuck_count=0
               failed_count=0
               succeeded_count=0
               unknown_count=0
-              
+
               for workflow_name in $workflow_names; do
                 status=$(kubectl get workflow "$workflow_name" \
                   -n cto \
                   -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-                
+
                 message=$(kubectl get workflow "$workflow_name" \
                   -n cto \
                   -o jsonpath='{.status.message}' 2>/dev/null || echo "")
-                
+
                 case "$status" in
                   "Succeeded")
                     echo "  ✅ $workflow_name: Succeeded"
@@ -1372,14 +1372,14 @@ spec:
                   "Running"|"Pending")
                     echo "  ⏳ $workflow_name: $status (stuck or still processing)"
                     stuck_count=$((stuck_count + 1))
-                    
+
                     # Get active pods for this workflow
                     active_pods=$(kubectl get pods \
                       -n cto \
                       -l workflows.argoproj.io/workflow="$workflow_name" \
                       --field-selector=status.phase=Running \
                       -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-                    
+
                     if [ -n "$active_pods" ]; then
                       echo "     Active pods: $(echo "$active_pods" | wc -w | tr -d ' ')"
                       for pod in $active_pods; do
@@ -1407,7 +1407,7 @@ spec:
                 esac
                 echo ""
               done
-              
+
               echo "═══════════════════════════════════════════════════════════════"
               echo "📈 SUMMARY:"
               echo "  ✅ Succeeded: $succeeded_count"
@@ -1416,7 +1416,7 @@ spec:
               echo "  ❓ Unknown: $unknown_count"
               echo "═══════════════════════════════════════════════════════════════"
               echo ""
-              
+
               # Provide actionable remediation steps
               if [ "$failed_count" -gt 0 ]; then
                 echo "🔧 REMEDIATION:"
@@ -1425,7 +1425,7 @@ spec:
                 echo "  3. Check CodeRun status if applicable: kubectl get coderun -n cto"
                 echo ""
               fi
-              
+
               if [ "$stuck_count" -gt 0 ]; then
                 echo "🔧 REMEDIATION FOR STUCK WORKFLOWS:"
                 echo "  1. Check pod logs: kubectl logs -n cto <pod-name>"
@@ -1434,7 +1434,7 @@ spec:
                 echo "  4. Consider increasing max_wait timeout if tasks legitimately take longer than 2 hours"
                 echo ""
               fi
-              
+
               # Exit with error, but provide context
               if [ "$failed_count" -gt 0 ] && [ "$stuck_count" -eq 0 ]; then
                 echo "❌ Level $level_index failed: $failed_count task(s) failed"
@@ -1478,12 +1478,12 @@ spec:
 
           # Create telemetry summary
           WORKFLOW_END=$(date +%s)
-          WORKFLOW_START=$(kubectl get workflow "{{{{workflow.name}}}}" -n cto -o jsonpath='{.status.startedAt}' | xargs -I {} date -d {} +%s 2>/dev/null || echo "$WORKFLOW_END")
+          WORKFLOW_START=$(kubectl get workflow "{{workflow.name}}" -n cto -o jsonpath='{.status.startedAt}' | xargs -I {} date -d {} +%s 2>/dev/null || echo "$WORKFLOW_END")
           TOTAL_DURATION=$((WORKFLOW_END - WORKFLOW_START))
-          
+
           # Estimate sequential time (sum of all task durations)
-          SEQUENTIAL_ESTIMATE=$(({{{{inputs.parameters.task-count}}}} * 1800))  # Assume 30min per task average
-          
+          SEQUENTIAL_ESTIMATE=$(({{inputs.parameters.task-count}} * 1800))  # Assume 30min per task average
+
           # Calculate actual speedup
           ACTUAL_SPEEDUP="1.0"
           if [ $TOTAL_DURATION -gt 0 ]; then
@@ -1492,9 +1492,9 @@ spec:
 
           cat > /tmp/telemetry.json <<EOF
           {
-            "workflow_name": "{{{{workflow.name}}}}",
+            "workflow_name": "{{workflow.name}}",
             "execution_mode": "parallel",
-            "total_tasks": {{{{inputs.parameters.task-count}}}},
+            "total_tasks": {{inputs.parameters.task-count}},
             "execution_levels": $NUM_LEVELS,
             "total_duration_seconds": $TOTAL_DURATION,
             "estimated_sequential_seconds": $SEQUENTIAL_ESTIMATE,
@@ -1505,14 +1505,14 @@ spec:
 
           echo "📊 PERFORMANCE TELEMETRY"
           echo "════════════════════════════════════════"
-          echo "🎯 Total tasks: {{{{inputs.parameters.task-count}}}}"
+          echo "🎯 Total tasks: {{inputs.parameters.task-count}}"
           echo "📊 Execution levels: $NUM_LEVELS"
           echo "⏱️ Total duration: ${TOTAL_DURATION}s"
           echo "🚀 Estimated speedup: ${ACTUAL_SPEEDUP}x"
           echo ""
 
           # Store telemetry as ConfigMap for later analysis
-          kubectl create configmap "telemetry-{{{{workflow.name}}}}" \
+          kubectl create configmap "telemetry-{{workflow.name}}" \
             --from-file=telemetry.json=/tmp/telemetry.json \
             -n cto \
             --dry-run=client -o yaml | kubectl apply -n cto -f -
@@ -1548,7 +1548,7 @@ spec:
             echo "❌ SEQUENTIAL-TASK-PROCESSOR FAILED (exit code: $EXIT_CODE)"
             echo "════════════════════════════════════════════════════════════"
             echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-            echo "Workflow: {{{{workflow.name}}}}"
+            echo "Workflow: {{workflow.name}}"
             echo ""
             echo "════════════════════════════════════════════════════════════"
             exit $EXIT_CODE
@@ -1557,24 +1557,24 @@ spec:
 
           set -e
 
-          echo "📋 Processing {{{{inputs.parameters.task-count}}}} tasks sequentially..."
-          echo "   Workflow: {{{{workflow.name}}}}"
-          echo "   Repository: {{{{workflow.parameters.repository}}}}"
+          echo "📋 Processing {{inputs.parameters.task-count}} tasks sequentially..."
+          echo "   Workflow: {{workflow.name}}"
+          echo "   Repository: {{workflow.parameters.repository}}"
           echo ""
 
           # Convert comma-separated list to space-separated for iteration
-          task_list="{{{{inputs.parameters.task-list}}}}"
+          task_list="{{inputs.parameters.task-list}}"
           task_list="${task_list//,/ }"
 
           # Process each task sequentially
           task_index=1
-          TOTAL_TASKS={{{{inputs.parameters.task-count}}}}
+          TOTAL_TASKS={{inputs.parameters.task-count}}
           for task_id in $task_list; do
             echo ""
             echo "════════════════════════════════════════"
             echo "🎯 Starting Task $task_id ($task_index/$TOTAL_TASKS)"
             echo "════════════════════════════════════════"
-            
+
             # Determine if this is the final task (for deployment verification)
             IS_FINAL_TASK="false"
             if [ $task_index -eq $TOTAL_TASKS ]; then
@@ -1587,12 +1587,12 @@ spec:
           {
             "task_id": "$task_id",
             "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-            "workflow_id": "{{{{workflow.name}}}}",
+            "workflow_id": "{{workflow.name}}",
             "task_index": $task_index,
-            "total_tasks": {{{{inputs.parameters.task-count}}}}
+            "total_tasks": {{inputs.parameters.task-count}}
           }
           EOF
-            kubectl create configmap current-task-{{{{workflow.name}}}} \
+            kubectl create configmap current-task-{{workflow.name}} \
               --from-file=current-task.json=/tmp/current-task.json \
               -n cto \
               --dry-run=client -o yaml | kubectl apply -n cto -f -
@@ -1611,9 +1611,9 @@ spec:
             namespace: cto
             labels:
               task-id: "$task_id"
-              repository: "$(echo "{{{{workflow.parameters.repository}}}}" | tr '/' '-')"
+              repository: "$(echo "{{workflow.parameters.repository}}" | tr '/' '-')"
               current-stage: "pending"
-              parent-workflow: "{{{{workflow.name}}}}"
+              parent-workflow: "{{workflow.name}}"
               project-play: "true"
           spec:
             workflowTemplateRef:
@@ -1623,81 +1623,81 @@ spec:
                 - name: task-id
                   value: "$task_id"
                 - name: repository
-                  value: "{{{{workflow.parameters.repository}}}}"
+                  value: "{{workflow.parameters.repository}}"
                 - name: service
-                  value: "{{{{workflow.parameters.service}}}}"
+                  value: "{{workflow.parameters.service}}"
                 - name: docs-repository
-                  value: "{{{{workflow.parameters.docs-repository}}}}"
+                  value: "{{workflow.parameters.docs-repository}}"
                 - name: docs-project-directory
-                  value: "{{{{workflow.parameters.docs-project-directory}}}}"
+                  value: "{{workflow.parameters.docs-project-directory}}"
                 - name: docs-branch
-                  value: "{{{{workflow.parameters.docs-branch}}}}"
+                  value: "{{workflow.parameters.docs-branch}}"
                 - name: implementation-agent
-                  value: "{{{{workflow.parameters.implementation-agent}}}}"
+                  value: "{{workflow.parameters.implementation-agent}}"
                 - name: implementation-cli
-                  value: "{{{{workflow.parameters.implementation-cli}}}}"
+                  value: "{{workflow.parameters.implementation-cli}}"
                 - name: implementation-model
-                  value: "{{{{workflow.parameters.implementation-model}}}}"
+                  value: "{{workflow.parameters.implementation-model}}"
                 - name: implementation-tools
-                  value: '{{{{workflow.parameters.implementation-tools}}}}'
+                  value: '{{workflow.parameters.implementation-tools}}'
                 - name: implementation-model-rotation
-                  value: '{{{{workflow.parameters.implementation-model-rotation}}}}'
+                  value: '{{workflow.parameters.implementation-model-rotation}}'
                 - name: frontend-agent
-                  value: "{{{{workflow.parameters.frontend-agent}}}}"
+                  value: "{{workflow.parameters.frontend-agent}}"
                 - name: frontend-cli
-                  value: "{{{{workflow.parameters.frontend-cli}}}}"
+                  value: "{{workflow.parameters.frontend-cli}}"
                 - name: frontend-model
-                  value: "{{{{workflow.parameters.frontend-model}}}}"
+                  value: "{{workflow.parameters.frontend-model}}"
                 - name: frontend-tools
-                  value: '{{{{workflow.parameters.frontend-tools}}}}'
+                  value: '{{workflow.parameters.frontend-tools}}'
                 - name: frontend-model-rotation
-                  value: '{{{{workflow.parameters.frontend-model-rotation}}}}'
+                  value: '{{workflow.parameters.frontend-model-rotation}}'
                 - name: frontend-max-retries
-                  value: "{{{{workflow.parameters.frontend-max-retries}}}}"
+                  value: "{{workflow.parameters.frontend-max-retries}}"
                 - name: quality-agent
-                  value: "{{{{workflow.parameters.quality-agent}}}}"
+                  value: "{{workflow.parameters.quality-agent}}"
                 - name: quality-cli
-                  value: "{{{{workflow.parameters.quality-cli}}}}"
+                  value: "{{workflow.parameters.quality-cli}}"
                 - name: quality-model
-                  value: "{{{{workflow.parameters.quality-model}}}}"
+                  value: "{{workflow.parameters.quality-model}}"
                 - name: quality-tools
-                  value: '{{{{workflow.parameters.quality-tools}}}}'
+                  value: '{{workflow.parameters.quality-tools}}'
                 - name: quality-model-rotation
-                  value: '{{{{workflow.parameters.quality-model-rotation}}}}'
+                  value: '{{workflow.parameters.quality-model-rotation}}'
                 - name: security-agent
-                  value: "{{{{workflow.parameters.security-agent}}}}"
+                  value: "{{workflow.parameters.security-agent}}"
                 - name: security-cli
-                  value: "{{{{workflow.parameters.security-cli}}}}"
+                  value: "{{workflow.parameters.security-cli}}"
                 - name: security-model
-                  value: "{{{{workflow.parameters.security-model}}}}"
+                  value: "{{workflow.parameters.security-model}}"
                 - name: security-tools
-                  value: '{{{{workflow.parameters.security-tools}}}}'
+                  value: '{{workflow.parameters.security-tools}}'
                 - name: security-model-rotation
-                  value: '{{{{workflow.parameters.security-model-rotation}}}}'
+                  value: '{{workflow.parameters.security-model-rotation}}'
                 - name: testing-agent
-                  value: "{{{{workflow.parameters.testing-agent}}}}"
+                  value: "{{workflow.parameters.testing-agent}}"
                 - name: testing-cli
-                  value: "{{{{workflow.parameters.testing-cli}}}}"
+                  value: "{{workflow.parameters.testing-cli}}"
                 - name: testing-model
-                  value: "{{{{workflow.parameters.testing-model}}}}"
+                  value: "{{workflow.parameters.testing-model}}"
                 - name: testing-tools
-                  value: '{{{{workflow.parameters.testing-tools}}}}'
+                  value: '{{workflow.parameters.testing-tools}}'
                 - name: testing-model-rotation
-                  value: '{{{{workflow.parameters.testing-model-rotation}}}}'
+                  value: '{{workflow.parameters.testing-model-rotation}}'
                 - name: implementation-max-retries
-                  value: "{{{{workflow.parameters.implementation-max-retries}}}}"
+                  value: "{{workflow.parameters.implementation-max-retries}}"
                 - name: quality-max-retries
-                  value: "{{{{workflow.parameters.quality-max-retries}}}}"
+                  value: "{{workflow.parameters.quality-max-retries}}"
                 - name: security-max-retries
-                  value: "{{{{workflow.parameters.security-max-retries}}}}"
+                  value: "{{workflow.parameters.security-max-retries}}"
                 - name: testing-max-retries
-                  value: "{{{{workflow.parameters.testing-max-retries}}}}"
+                  value: "{{workflow.parameters.testing-max-retries}}"
                 - name: opencode-max-retries
-                  value: "{{{{workflow.parameters.opencode-max-retries}}}}"
+                  value: "{{workflow.parameters.opencode-max-retries}}"
                 - name: auto-merge
-                  value: "{{{{workflow.parameters.auto-merge}}}}"
+                  value: "{{workflow.parameters.auto-merge}}"
                 - name: model
-                  value: "{{{{workflow.parameters.model}}}}"
+                  value: "{{workflow.parameters.model}}"
                 - name: final-task
                   value: "$IS_FINAL_TASK"
           EOF
@@ -1727,7 +1727,7 @@ spec:
                   echo "✅ Task $task_id completed successfully"
 
                   # Update play state after successful task completion
-                  REPO_SLUG="{{{{workflow.parameters.repository}}}}"
+                  REPO_SLUG="{{workflow.parameters.repository}}"
                   REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
                   STATE_CM_NAME="play-state-${REPO_SLUG}"
 
@@ -1735,9 +1735,9 @@ spec:
                   kubectl create configmap "$STATE_CM_NAME" \
                     --from-literal=last-completed-task="$task_id" \
                     --from-literal=last-completed-level="-1" \
-                    --from-literal=repository="{{{{workflow.parameters.repository}}}}" \
-                    --from-literal=service="{{{{workflow.parameters.service}}}}" \
-                    --from-literal=workflow-name="{{{{workflow.name}}}}" \
+                    --from-literal=repository="{{workflow.parameters.repository}}" \
+                    --from-literal=service="{{workflow.parameters.service}}" \
+                    --from-literal=workflow-name="{{workflow.name}}" \
                     --from-literal=updated-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
                     -n cto \
                     -o yaml --dry-run=client | kubectl apply -n cto -f -
@@ -1770,57 +1770,57 @@ spec:
               echo "⏱️ TIMEOUT: Task $task_id exceeded maximum wait time ($max_wait seconds)"
               echo "═══════════════════════════════════════════════════════════════"
               echo ""
-              
+
               # Get detailed workflow status
               status=$(kubectl get workflow "$workflow_name" \
                 -n cto \
                 -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-              
+
               message=$(kubectl get workflow "$workflow_name" \
                 -n cto \
                 -o jsonpath='{.status.message}' 2>/dev/null || echo "")
-              
+
               echo "📊 Workflow Status: $status"
               if [ -n "$message" ]; then
                 echo "📝 Message: $message"
               fi
-              
+
               # Get active pods
               active_pods=$(kubectl get pods \
                 -n cto \
                 -l workflows.argoproj.io/workflow="$workflow_name" \
                 --field-selector=status.phase=Running \
                 -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-              
+
               if [ -n "$active_pods" ]; then
                 echo "🔍 Active pods:"
                 for pod in $active_pods; do
                   echo "   - $pod"
                 done
               fi
-              
+
               echo ""
               echo "🔧 REMEDIATION:"
               echo "  1. Check workflow logs: kubectl logs -n cto -l workflows.argoproj.io/workflow=$workflow_name"
               echo "  2. Review workflow: kubectl get workflow $workflow_name -n cto -o yaml"
               echo "  3. Check if workflow is suspended waiting for external events"
               echo ""
-              
+
               exit 1
             fi
 
             # Archive task (placeholder for now)
             echo "📦 Archiving task-$task_id..."
-            kubectl create configmap task-archive-${task_id}-{{{{workflow.name}}}} \
+            kubectl create configmap task-archive-${task_id}-{{workflow.name}} \
               --from-literal=task_id="$task_id" \
               --from-literal=completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
               -n cto \
               --dry-run=client -o yaml | kubectl apply -n cto -f -
 
             # Progress report
-            percent=$((task_index * 100 / {{{{inputs.parameters.task-count}}}}))
+            percent=$((task_index * 100 / {{inputs.parameters.task-count}}))
             echo ""
-            echo "📊 PROGRESS: $task_index/{{{{inputs.parameters.task-count}}}} tasks complete ($percent%)"
+            echo "📊 PROGRESS: $task_index/{{inputs.parameters.task-count}} tasks complete ($percent%)"
             printf "["
             for i in $(seq 1 20); do
               if [ $((i * 5)) -le $percent ]; then
@@ -1836,7 +1836,7 @@ spec:
           done
 
           # Clean up current-task marker
-          kubectl delete configmap current-task-{{{{workflow.name}}}} \
+          kubectl delete configmap current-task-{{workflow.name}} \
             -n cto --ignore-not-found=true
 
           echo ""
@@ -1858,36 +1858,36 @@ spec:
         source: |
           #!/bin/bash
           set -euo pipefail
-          
+
           # Note: envsubst is not needed - we use sed for template rendering
           # sed is already installed in the claude image and doesn't require root
-          
+
           echo "🔧 Rendering Morgan PM templates..."
-          
+
           # Define template variables
-          REPOSITORY_URL="{{{{workflow.parameters.repository}}}}"
-          WORKFLOW_NAME="{{{{workflow.name}}}}"
+          REPOSITORY_URL="{{workflow.parameters.repository}}"
+          WORKFLOW_NAME="{{workflow.name}}"
           NAMESPACE="cto"
-          
+
           # Render templates using sed (no root required, already installed)
-          sed -e "s|{{{{repository_url}}}}|$REPOSITORY_URL|g" \
-              -e "s|{{{{workflow_name}}}}|$WORKFLOW_NAME|g" \
-              -e "s|{{{{namespace}}}}|$NAMESPACE|g" \
+          sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
+              -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
+              -e "s|{{namespace}}|$NAMESPACE|g" \
               /pm-templates/github-projects-helpers.sh.hbs > /workspace/github-projects-helpers.sh
           chmod +x /workspace/github-projects-helpers.sh
-          
-          sed -e "s|{{{{repository_url}}}}|$REPOSITORY_URL|g" \
-              -e "s|{{{{workflow_name}}}}|$WORKFLOW_NAME|g" \
-              -e "s|{{{{namespace}}}}|$NAMESPACE|g" \
+
+          sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
+              -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
+              -e "s|{{namespace}}|$NAMESPACE|g" \
               /pm-templates/morgan-pm.sh.hbs > /workspace/morgan-pm.sh
           chmod +x /workspace/morgan-pm.sh
-          
-          sed -e "s|{{{{repository_url}}}}|$REPOSITORY_URL|g" \
-              -e "s|{{{{workflow_name}}}}|$WORKFLOW_NAME|g" \
-              -e "s|{{{{namespace}}}}|$NAMESPACE|g" \
+
+          sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
+              -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
+              -e "s|{{namespace}}|$NAMESPACE|g" \
               /pm-templates/process-issue-comment.sh.hbs > /workspace/process-issue-comment.sh
           chmod +x /workspace/process-issue-comment.sh
-          
+
           echo "✅ Templates rendered, starting Morgan PM..."
           exec /workspace/morgan-pm.sh
         env:
@@ -1904,20 +1904,20 @@ spec:
                 key: private-key
           # Workflow context
           - name: WORKFLOW_NAME
-            value: "{{{{workflow.name}}}}"
+            value: "{{workflow.name}}"
           - name: NAMESPACE
             value: "cto"
           # Repository information
           - name: REPOSITORY_URL
-            value: "{{{{workflow.parameters.repository}}}}"
+            value: "{{workflow.parameters.repository}}"
           - name: DOCS_REPOSITORY
-            value: "{{{{workflow.parameters.docs-repository}}}}"
+            value: "{{workflow.parameters.docs-repository}}"
           - name: DOCS_BRANCH
-            value: "{{{{workflow.parameters.docs-branch}}}}"
+            value: "{{workflow.parameters.docs-branch}}"
           - name: DOCS_PROJECT_DIRECTORY
-            value: "{{{{workflow.parameters.docs-project-directory}}}}"
+            value: "{{workflow.parameters.docs-project-directory}}"
           - name: SERVICE_NAME
-            value: "{{{{workflow.parameters.service}}}}"
+            value: "{{workflow.parameters.service}}"
         volumeMounts:
           - name: morgan-pm-workspace
             mountPath: /shared
@@ -1936,6 +1936,3 @@ spec:
           configMap:
             name: controller-templates-pm
             defaultMode: 0755
-
-
-
