@@ -532,18 +532,8 @@ impl CodeRunSpawner {
         labels.insert("healer/branch", sanitize_label(branch));
         labels.insert("healer/task-id", task_id.clone());
 
-        // Escape prompt for YAML - remove control characters first, then escape
-        let cleaned_prompt: String = prompt
-            .chars()
-            .filter(|c| !c.is_control() || *c == '\n' || *c == '\r' || *c == '\t')
-            .collect();
-        let escaped_prompt = cleaned_prompt
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\t', "    "); // Replace tabs with spaces for YAML
-
+        // Build the yaml with proper CRD schema
+        // Required fields: service, repositoryUrl, docsRepositoryUrl, workingDirectory, model, githubApp
         let yaml = format!(
             r#"apiVersion: agents.platform/v1
 kind: CodeRun
@@ -553,20 +543,27 @@ metadata:
   labels:
 {labels_yaml}
 spec:
+  # Required fields
+  service: healer-ci
   githubApp: {github_app}
-  cli: {cli}
   model: {model}
   repositoryUrl: https://github.com/{repository}
-  prompt: "{escaped_prompt}"
+  docsRepositoryUrl: https://github.com/{repository}
+  workingDirectory: "."
+  # Optional fields
+  runType: implementation
+  docsProjectDirectory: docs
+  docsBranch: develop
+  promptModification: |
+{prompt_yaml}
   env:
-    - name: HEALER_TASK_ID
-      value: "{task_id}"
-    - name: FAILURE_TYPE
-      value: "{failure_type}"
-    - name: WORKFLOW_RUN_ID
-      value: "{workflow_run_id}"
-    - name: TARGET_BRANCH
-      value: "{branch}"
+    HEALER_TASK_ID: "{task_id}"
+    FAILURE_TYPE: "{failure_type}"
+    WORKFLOW_RUN_ID: "{workflow_run_id}"
+    TARGET_BRANCH: "{branch}"
+  cliConfig:
+    cliType: {cli_type}
+    model: {model}
 "#,
             name_prefix = name_prefix,
             namespace = self.namespace,
@@ -576,14 +573,19 @@ spec:
                 .collect::<Vec<_>>()
                 .join("\n"),
             github_app = agent.github_app(),
-            cli = self.config.cli,
             model = self.config.model,
             repository = self.repository,
-            escaped_prompt = escaped_prompt,
+            // Indent prompt by 4 spaces for YAML literal block
+            prompt_yaml = prompt
+                .lines()
+                .map(|line| format!("    {line}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
             task_id = task_id,
             failure_type = failure_type,
             workflow_run_id = workflow_run_id,
             branch = branch,
+            cli_type = self.config.cli.to_lowercase(),
         );
 
         yaml

@@ -37,7 +37,7 @@ pub struct SensorConfig {
     /// Maximum failures to process per poll
     #[serde(default = "default_max_per_poll")]
     pub max_per_poll: usize,
-    /// Kubernetes namespace for CodeRuns
+    /// Kubernetes namespace for `CodeRuns`
     #[serde(default = "default_namespace")]
     pub namespace: String,
 }
@@ -111,7 +111,8 @@ pub struct WorkflowFailure {
 }
 
 impl WorkflowFailure {
-    /// Convert to `CiFailure` for the remediation pipeline.
+    /// Convert to [`CiFailure`] for the remediation pipeline.
+    #[must_use]
     pub fn to_ci_failure(&self) -> CiFailure {
         CiFailure {
             workflow_run_id: self.run_id,
@@ -152,18 +153,29 @@ impl GitHubActionsSensor {
     }
 
     /// Run the sensor in a continuous loop.
+    ///
+    /// # Errors
+    ///
+    /// This function runs indefinitely and only returns an error if
+    /// an unrecoverable failure occurs during polling.
     pub async fn run(&mut self) -> Result<()> {
         loop {
             if let Err(e) = self.poll_once().await {
                 error!("Sensor poll failed: {e}");
             }
 
-            tokio::time::sleep(tokio::time::Duration::from_secs(self.config.poll_interval_secs))
-                .await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                self.config.poll_interval_secs,
+            ))
+            .await;
         }
     }
 
     /// Perform a single poll cycle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if polling repositories or processing failures fails.
     pub async fn poll_once(&mut self) -> Result<Vec<WorkflowFailure>> {
         let mut all_failures = Vec::new();
 
@@ -246,8 +258,8 @@ impl GitHubActionsSensor {
             // Parse created_at timestamp
             let created_at_str = run["createdAt"].as_str().unwrap_or("");
             let created_at = DateTime::parse_from_rfc3339(created_at_str)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|_| Utc::now());
+                .ok()
+                .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
             // Skip old runs (unless this is first poll with last_poll=None)
             if self.last_poll.is_some() && created_at < lookback_cutoff {
@@ -291,10 +303,7 @@ impl GitHubActionsSensor {
                 actor: "unknown".to_string(), // Will be fetched via run view
                 run_started_at: created_at,
                 detected_at: Utc::now(),
-                conclusion: run["conclusion"]
-                    .as_str()
-                    .unwrap_or("failure")
-                    .to_string(),
+                conclusion: run["conclusion"].as_str().unwrap_or("failure").to_string(),
             };
 
             failures.push(failure);
@@ -306,7 +315,7 @@ impl GitHubActionsSensor {
     /// Process a detected failure.
     async fn process_failure(&self, failure: &WorkflowFailure) -> Result<()> {
         // Fetch additional details (job info, actor)
-        let (job_name, job_id, job_url, actor) = self.fetch_failed_job_details(failure).await?;
+        let (job_name, job_id, job_url, actor) = Self::fetch_failed_job_details(failure)?;
         let mut failure = failure.clone();
         failure.job_name = job_name;
         failure.job_id = job_id;
@@ -319,12 +328,12 @@ impl GitHubActionsSensor {
         let ci_failure = failure.to_ci_failure();
 
         // Fetch logs for classification
-        let logs = self.fetch_workflow_logs(&failure).await.unwrap_or_default();
+        let logs = Self::fetch_workflow_logs(&failure).unwrap_or_default();
 
         // Classify and route
         let router = CiRouter::new();
         let failure_type = router.classify_failure(&ci_failure, &logs);
-        
+
         // Build remediation context for routing
         let routing_ctx = ci::types::RemediationContext {
             failure: Some(ci_failure.clone()),
@@ -343,17 +352,11 @@ impl GitHubActionsSensor {
             changes_made_so_far: vec![],
         };
         let agent = router.route(&routing_ctx);
-        info!(
-            "Classified as {:?}, routing to {:?}",
-            failure_type, agent
-        );
+        info!("Classified as {:?}, routing to {:?}", failure_type, agent);
 
         // Create GitHub issue if configured
         if self.config.create_issues {
-            if let Err(e) = self
-                .create_github_issue(&failure, &failure_type, &logs)
-                .await
-            {
+            if let Err(e) = self.create_github_issue(&failure, &failure_type, &logs) {
                 warn!("Failed to create GitHub issue: {}", e);
             }
         }
@@ -372,8 +375,8 @@ impl GitHubActionsSensor {
 
     /// Fetch failed job details for a workflow run.
     /// Returns (job_name, job_id, job_url, actor)
-    async fn fetch_failed_job_details(
-        &self,
+    #[allow(clippy::type_complexity)]
+    fn fetch_failed_job_details(
         failure: &WorkflowFailure,
     ) -> Result<(Option<String>, Option<u64>, Option<String>, Option<String>)> {
         let output = Command::new("gh")
@@ -420,7 +423,7 @@ impl GitHubActionsSensor {
     }
 
     /// Fetch workflow logs.
-    async fn fetch_workflow_logs(&self, failure: &WorkflowFailure) -> Result<String> {
+    fn fetch_workflow_logs(failure: &WorkflowFailure) -> Result<String> {
         let output = Command::new("gh")
             .args([
                 "run",
@@ -454,7 +457,7 @@ impl GitHubActionsSensor {
     }
 
     /// Create a GitHub issue for the failure.
-    async fn create_github_issue(
+    fn create_github_issue(
         &self,
         failure: &WorkflowFailure,
         failure_type: &ci::types::CiFailureType,
@@ -467,7 +470,7 @@ impl GitHubActionsSensor {
             failure.head_sha.chars().take(7).collect::<String>()
         );
 
-        let body = self.generate_issue_body(failure, failure_type, logs);
+        let body = Self::generate_issue_body(failure, failure_type, logs);
 
         let labels = self.config.issue_labels.join(",");
 
@@ -499,7 +502,6 @@ impl GitHubActionsSensor {
 
     /// Generate issue body with failure details.
     fn generate_issue_body(
-        &self,
         failure: &WorkflowFailure,
         failure_type: &ci::types::CiFailureType,
         logs: &str,
@@ -511,7 +513,7 @@ impl GitHubActionsSensor {
         };
 
         format!(
-            r#"## CI Failure Detected
+            r"## CI Failure Detected
 
 | Field | Value |
 |-------|-------|
@@ -543,7 +545,7 @@ impl GitHubActionsSensor {
 
 ---
 *This issue was automatically created by Healer CI Sensor*
-"#,
+",
             failure.workflow_name,
             failure.job_name.as_deref().unwrap_or("N/A"),
             failure.branch,
@@ -582,7 +584,9 @@ mod tests {
             commit_message: "Test commit".to_string(),
             repository: "5dlabs/cto".to_string(),
             html_url: "https://github.com/5dlabs/cto/actions/runs/12345".to_string(),
-            job_url: Some("https://github.com/5dlabs/cto/actions/runs/12345/jobs/67890".to_string()),
+            job_url: Some(
+                "https://github.com/5dlabs/cto/actions/runs/12345/jobs/67890".to_string(),
+            ),
             actor: "testuser".to_string(),
             run_started_at: Utc::now(),
             detected_at: Utc::now(),
@@ -597,10 +601,6 @@ mod tests {
 
     #[test]
     fn test_issue_body_generation() {
-        let config = SensorConfig::default();
-        let remediation_config = ci::types::RemediationConfig::default();
-        let sensor = GitHubActionsSensor::new(config, remediation_config);
-
         let failure = WorkflowFailure {
             run_id: 12345,
             workflow_name: "CI".to_string(),
@@ -618,7 +618,7 @@ mod tests {
             conclusion: "failure".to_string(),
         };
 
-        let body = sensor.generate_issue_body(
+        let body = GitHubActionsSensor::generate_issue_body(
             &failure,
             &ci::types::CiFailureType::RustClippy,
             "error: test error\n",
