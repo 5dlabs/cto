@@ -1,0 +1,449 @@
+{
+  "metadata": {
+    "completedCount": 0,
+    "lastModified": "2025-12-15T13:08:33.701184+00:00",
+    "taskCount": 5,
+    "version": "1.0.0"
+  },
+  "tasks": [
+    {
+      "agentHint": "rex",
+      "dependencies": [],
+      "description": "Provision PostgreSQL database using CloudNative-PG operator and Redis/Valkey cache to support the notification service",
+      "details": "1. Create Kubernetes namespace 'alerthub'\n2. Deploy CloudNative-PG cluster with 1 instance, 1Gi storage\n3. Deploy Redis/Valkey using redis-operator with valkey/valkey:7.2-alpine image\n4. Create database 'alerthub' with user 'alerthub_user'\n5. Generate ConfigMap 'alerthub-infra-config' with DATABASE_URL and REDIS_URL\n6. Verify connectivity and create initial schema",
+      "id": "1",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-15T13:07:06.192542Z",
+          "dependencies": [],
+          "description": "Set up the Kubernetes namespace 'alerthub' and deploy the CloudNative-PG operator to manage PostgreSQL clusters",
+          "details": "Create the 'alerthub' namespace using kubectl. Install CloudNative-PG operator via Helm or YAML manifests. Verify operator pods are running and ready. Ensure proper RBAC permissions are configured for the operator to manage PostgreSQL clusters within the namespace.",
+          "id": 1,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify namespace creation with 'kubectl get ns alerthub' and operator deployment with 'kubectl get pods -n cnpg-system'",
+          "title": "Create namespace and deploy CloudNative-PG operator",
+          "updatedAt": "2025-12-15T13:07:06.192542Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:06.192549Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create a PostgreSQL cluster with 1 instance and 1Gi storage, then set up the alerthub database and user",
+          "details": "Deploy CloudNative-PG Cluster resource with postgresql-15 image, 1 instance, 1Gi PVC storage. Wait for cluster to be ready. Connect to PostgreSQL and create 'alerthub' database. Create 'alerthub_user' with appropriate permissions for the alerthub database. Create initial schema tables if needed.",
+          "id": 2,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Check cluster status with 'kubectl get cluster -n alerthub' and test database connectivity using psql or pg_isready",
+          "title": "Deploy PostgreSQL cluster using CloudNative-PG",
+          "updatedAt": "2025-12-15T13:07:06.192549Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:06.192556Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Set up Redis/Valkey cache service using redis-operator with valkey/valkey:7.2-alpine image",
+          "details": "Install redis-operator if not already available. Create RedisCluster or Redis custom resource using valkey/valkey:7.2-alpine image. Configure appropriate resource limits and persistence settings. Ensure Redis service is accessible within the alerthub namespace and verify basic operations like SET/GET commands.",
+          "id": 3,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify Redis deployment with 'kubectl get redis -n alerthub' and test connectivity using redis-cli ping command",
+          "title": "Deploy Redis/Valkey cache using redis-operator",
+          "updatedAt": "2025-12-15T13:07:06.192556Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:06.192556Z",
+          "dependencies": [
+            "2",
+            "3"
+          ],
+          "description": "Create ConfigMap with database and Redis connection strings, then verify all services are properly connected",
+          "details": "Generate ConfigMap 'alerthub-infra-config' containing DATABASE_URL (postgres://alerthub_user:password@postgres-service:5432/alerthub) and REDIS_URL (redis://redis-service:6379). Deploy a test pod to verify connectivity to both PostgreSQL and Redis services. Run basic connectivity tests and schema validation queries.",
+          "id": 4,
+          "parentId": "1",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Deploy test pod that reads ConfigMap and attempts connections to both services, verifying successful database queries and Redis operations",
+          "title": "Generate configuration and verify connectivity",
+          "updatedAt": "2025-12-15T13:07:06.192556Z"
+        }
+      ],
+      "testStrategy": "Test database and Redis connectivity, verify ConfigMap contains valid connection strings, run basic CRUD operations",
+      "title": "Setup Infrastructure with PostgreSQL and Redis/Valkey"
+    },
+    {
+      "agentHint": "rex",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Build the core notification service with REST API endpoints, database integration, and caching layer",
+      "details": "1. Initialize Rust project with Axum 0.7, sqlx, redis, tokio\n2. Define Notification struct with Uuid, title, message, Priority enum, created_at, read fields\n3. Implement database layer with PostgreSQL connection using sqlx\n4. Add Redis caching for recent notifications\n5. Create API routes: POST /api/v1/notifications, GET /api/v1/notifications (paginated), GET /api/v1/notifications/:id, DELETE /api/v1/notifications/:id, GET /health\n6. Add rate limiting middleware (10 req/sec per IP)\n7. Configure structured logging with tracing",
+      "id": "2",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-15T13:07:31.796003Z",
+          "dependencies": [],
+          "description": "Set up the Rust project structure with all required dependencies including Axum 0.7, sqlx, redis, tokio, and other essential crates for the notification service.",
+          "details": "Create new Rust project with cargo init, configure Cargo.toml with dependencies: axum 0.7, tokio with full features, sqlx with postgres and runtime-tokio-rustls features, redis with tokio-comp feature, serde for serialization, uuid for ID generation, chrono for timestamps, tower for middleware, tower-http for CORS and tracing, tracing and tracing-subscriber for logging, anyhow for error handling. Set up basic project structure with src/main.rs, src/lib.rs, and create folders for models, handlers, database, and middleware modules.",
+          "id": 1,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify project compiles successfully and all dependencies are correctly imported",
+          "title": "Initialize Rust project with dependencies and configuration",
+          "updatedAt": "2025-12-15T13:07:31.796003Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:31.796004Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create the Notification struct with all required fields and implement the PostgreSQL database schema with proper indexes and constraints.",
+          "details": "Define Notification struct with fields: id (Uuid), title (String), message (String), priority (Priority enum with Low/Medium/High/Critical variants), created_at (DateTime<Utc>), read (bool). Implement Serialize/Deserialize traits. Create SQL migration files for notifications table with proper indexes on created_at and priority fields. Add database connection configuration structure and environment variable handling for DATABASE_URL. Implement proper error types for database operations.",
+          "id": 2,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for model serialization/deserialization and database migration validation",
+          "title": "Define data models and database schema",
+          "updatedAt": "2025-12-15T13:07:31.796004Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:31.796006Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Build the database access layer using sqlx with connection pooling, CRUD operations, and proper error handling for notification persistence.",
+          "details": "Create database module with connection pool setup using sqlx::PgPool. Implement NotificationRepository trait with methods: create_notification, get_notification_by_id, get_notifications_paginated (with limit/offset), delete_notification, mark_as_read. Add proper error handling and connection retry logic. Implement database health check function. Use prepared statements for all queries to prevent SQL injection. Add database connection timeout and pool configuration.",
+          "id": 3,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests with test database, mock database tests for error scenarios",
+          "title": "Implement database layer with PostgreSQL integration",
+          "updatedAt": "2025-12-15T13:07:31.796006Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:31.796006Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Add Redis integration for caching recent notifications and frequently accessed data to improve API performance.",
+          "details": "Create caching module with Redis client setup using redis-rs. Implement cache operations: set_notification (with TTL), get_notification, delete_notification, get_recent_notifications (last 100). Add cache-aside pattern for notification retrieval. Implement proper error handling for Redis connection failures with fallback to database. Configure Redis connection pool and timeout settings. Add cache invalidation logic for notification updates and deletions.",
+          "id": 4,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests with Redis mock, integration tests with Redis container",
+          "title": "Implement Redis caching layer",
+          "updatedAt": "2025-12-15T13:07:31.796006Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:31.796006Z",
+          "dependencies": [
+            "3",
+            "4"
+          ],
+          "description": "Implement all REST API endpoints with proper request/response handling, validation, rate limiting middleware, and error responses.",
+          "details": "Create handlers module with endpoints: POST /api/v1/notifications (create), GET /api/v1/notifications (list with pagination query params), GET /api/v1/notifications/:id (get single), DELETE /api/v1/notifications/:id (delete), GET /health (health check). Implement rate limiting middleware using tower with 10 req/sec per IP limit. Add request validation, proper HTTP status codes, and JSON error responses. Implement CORS middleware and request logging. Add pagination with limit/offset parameters and response metadata.",
+          "id": 5,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "API integration tests, rate limiting tests, request validation tests",
+          "title": "Create API endpoints with middleware and rate limiting",
+          "updatedAt": "2025-12-15T13:07:31.796006Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:31.796007Z",
+          "dependencies": [
+            "5"
+          ],
+          "description": "Set up comprehensive logging with tracing, error tracking, and monitoring capabilities for production readiness.",
+          "details": "Configure tracing-subscriber with JSON formatting for structured logs. Add request tracing middleware to log all HTTP requests with request ID, duration, and status code. Implement log levels (ERROR, WARN, INFO, DEBUG) with environment-based configuration. Add database query logging and Redis operation logging. Create custom error types with proper logging context. Add metrics collection points for API response times, database query performance, and cache hit rates. Configure log rotation and output formatting for different environments (development vs production).",
+          "id": 6,
+          "parentId": "2",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Log output validation, tracing span verification, performance metrics testing",
+          "title": "Configure structured logging and monitoring setup",
+          "updatedAt": "2025-12-15T13:07:31.796007Z"
+        }
+      ],
+      "testStrategy": "Unit tests for data models and business logic, integration tests for API endpoints, load testing for rate limiting, verify caching behavior",
+      "title": "Implement Notification Service Backend (Rust/Axum)"
+    },
+    {
+      "agentHint": "blaze",
+      "dependencies": [
+        "2"
+      ],
+      "description": "Create React-based web interface for viewing and managing notifications with modern UI components",
+      "details": "1. Initialize Next.js 14+ project with App Router, React 18, shadcn/ui, TailwindCSS\n2. Setup TanStack Query for server state management and React Hook Form\n3. Create pages: / (dashboard), /notifications/:id (detail), /settings\n4. Implement components: NotificationList (paginated), NotificationCard, CreateNotificationForm, ThemeToggle\n5. Add dark/light theme support with theme persistence\n6. Implement real-time polling (5s interval) for notification updates\n7. Add toast notifications for user actions\n8. Style with TailwindCSS and shadcn/ui components",
+      "id": "3",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-15T13:07:53.394454Z",
+          "dependencies": [],
+          "description": "Set up Next.js 14+ project with App Router, install and configure essential dependencies including React 18, TailwindCSS, shadcn/ui, TanStack Query, and React Hook Form",
+          "details": "Create new Next.js project using create-next-app with App Router, install TailwindCSS and configure tailwind.config.js, initialize shadcn/ui with npx shadcn-ui@latest init, install TanStack Query and React Hook Form, set up TypeScript configuration, create basic folder structure (/components, /lib, /types), and configure ESLint/Prettier",
+          "id": 1,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify project builds successfully, all dependencies resolve correctly, and basic Next.js routing works",
+          "title": "Initialize Next.js project with core dependencies and tooling",
+          "updatedAt": "2025-12-15T13:07:53.394454Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:53.394456Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create reusable UI components using shadcn/ui and establish design system with theme configuration and component variants",
+          "details": "Install shadcn/ui components (Button, Card, Input, Select, Dialog, Toast), create custom NotificationCard component with props for notification data, build NotificationList component with pagination controls, implement CreateNotificationForm with React Hook Form validation, create ThemeToggle component for dark/light mode switching, and establish consistent spacing and typography scales",
+          "id": 2,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test component rendering in isolation, verify prop handling and styling variants, check form validation behavior",
+          "title": "Implement component library and design system foundation",
+          "updatedAt": "2025-12-15T13:07:53.394456Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:53.394458Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Create main application pages with proper routing, layouts, and navigation structure using Next.js App Router",
+          "details": "Create app/layout.tsx with global providers and navigation, implement app/page.tsx dashboard with notification overview, build app/notifications/[id]/page.tsx for detailed notification view, create app/settings/page.tsx for application settings, add responsive navigation header with theme toggle, implement proper loading and error states for each route, and ensure proper SEO meta tags",
+          "id": 3,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test navigation between pages, verify dynamic routing works for notification details, check responsive layout on different screen sizes",
+          "title": "Build page layouts and implement App Router navigation",
+          "updatedAt": "2025-12-15T13:07:53.394458Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:53.394458Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Configure TanStack Query for server state management and implement real-time polling for notification updates with proper error handling",
+          "details": "Set up TanStack Query client with proper configuration, create API hooks for fetching notifications (useNotifications, useNotification), implement real-time polling with 5-second intervals using useQuery refetchInterval, add mutation hooks for creating/updating notifications, implement optimistic updates for better UX, set up proper error boundaries and retry logic, and create loading states for all data operations",
+          "id": 4,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test data fetching and caching behavior, verify real-time updates work correctly, check error handling and retry mechanisms",
+          "title": "Setup state management and implement data fetching with real-time updates",
+          "updatedAt": "2025-12-15T13:07:53.394458Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:07:53.394458Z",
+          "dependencies": [
+            "4"
+          ],
+          "description": "Add complete dark/light theme support with persistence, toast notifications for user actions, and accessibility features",
+          "details": "Implement theme context with localStorage persistence, configure TailwindCSS for dark mode support, integrate toast notifications using shadcn/ui Toast component for user actions (create, update, delete), add proper ARIA labels and keyboard navigation support, implement focus management for modal dialogs, add loading spinners and skeleton states, ensure color contrast meets WCAG guidelines, and test theme switching without flash of incorrect theme",
+          "id": 5,
+          "parentId": "3",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Test theme persistence across page reloads, verify toast notifications appear for all user actions, check accessibility with screen readers and keyboard navigation",
+          "title": "Implement theme system and user interaction features",
+          "updatedAt": "2025-12-15T13:07:53.394458Z"
+        }
+      ],
+      "testStrategy": "Component testing with React Testing Library, E2E tests with Playwright for user flows, accessibility testing, responsive design validation",
+      "title": "Build Web Console Frontend (Next.js/React)"
+    },
+    {
+      "agentHint": "blaze",
+      "dependencies": [
+        "3"
+      ],
+      "description": "Connect frontend to backend API with proper error handling, loading states, and optimistic updates",
+      "details": "1. Configure API client with proper base URL and error handling\n2. Implement TanStack Query hooks for all API endpoints\n3. Add optimistic updates for create/delete operations\n4. Handle loading states and error boundaries\n5. Implement pagination for notification list\n6. Add form validation with React Hook Form\n7. Configure proper cache invalidation strategies\n8. Add retry logic for failed requests",
+      "id": "4",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-15T13:08:06.981043Z",
+          "dependencies": [],
+          "description": "Set up the foundational API client with proper base URL configuration, request/response interceptors, and comprehensive error handling mechanisms",
+          "details": "Create an Axios or fetch-based API client with base URL configuration, request/response interceptors for authentication tokens, global error handling for network failures and HTTP errors, timeout configuration, and proper TypeScript types for API responses. Implement centralized error logging and user-friendly error messages.",
+          "id": 1,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Unit tests for API client configuration, error handling scenarios, and interceptor functionality",
+          "title": "Configure API Client and Error Handling",
+          "updatedAt": "2025-12-15T13:08:06.981043Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:06.981044Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create custom React Query hooks for all API endpoints with proper query keys, caching strategies, and data transformation",
+          "details": "Implement useQuery hooks for data fetching (notifications list, user profile), useMutation hooks for create/update/delete operations, configure proper query keys with hierarchical structure, set up stale time and cache time configurations, implement background refetching strategies, and add proper TypeScript types for all hook parameters and return values.",
+          "id": 2,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Integration tests for query hooks, mock API responses, and cache behavior verification",
+          "title": "Implement TanStack Query Hooks for API Endpoints",
+          "updatedAt": "2025-12-15T13:08:06.981044Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:06.981046Z",
+          "dependencies": [
+            "2"
+          ],
+          "description": "Implement optimistic updates for create/delete operations with proper rollback mechanisms and cache invalidation strategies",
+          "details": "Configure optimistic updates for notification creation and deletion using TanStack Query's onMutate, onError, and onSettled callbacks. Implement proper cache invalidation patterns using queryClient.invalidateQueries(), set up selective cache updates with queryClient.setQueryData(), add rollback functionality for failed optimistic updates, and implement pagination-aware cache management with proper query key invalidation.",
+          "id": 3,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "End-to-end tests for optimistic updates, error scenarios with rollback verification, and cache consistency checks",
+          "title": "Add Optimistic Updates and Cache Management",
+          "updatedAt": "2025-12-15T13:08:06.981046Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:06.981047Z",
+          "dependencies": [
+            "3"
+          ],
+          "description": "Add comprehensive form validation using React Hook Form, loading states, error boundaries, and retry logic for enhanced user experience",
+          "details": "Integrate React Hook Form with Zod schema validation for all forms, implement loading spinners and skeleton screens during API calls, create error boundaries for graceful error handling, add retry mechanisms for failed requests with exponential backoff, implement toast notifications for success/error feedback, add form submission loading states with disabled buttons, and create proper accessibility attributes for form validation errors.",
+          "id": 4,
+          "parentId": "4",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "User acceptance tests for form validation, loading state verification, error boundary testing, and accessibility compliance checks",
+          "title": "Implement Form Validation and UX Enhancements",
+          "updatedAt": "2025-12-15T13:08:06.981047Z"
+        }
+      ],
+      "testStrategy": "Test API integration with mock server, verify error handling scenarios, test optimistic updates rollback, validate pagination and caching behavior",
+      "title": "Implement API Integration and State Management"
+    },
+    {
+      "agentHint": "tess",
+      "dependencies": [
+        "4"
+      ],
+      "description": "Comprehensive testing suite and performance optimization to meet response time and throughput requirements",
+      "details": "1. Setup E2E testing environment with test database\n2. Create comprehensive test suite covering all user workflows\n3. Implement backend performance optimizations: database indexing, connection pooling, Redis caching strategies\n4. Frontend optimizations: code splitting, lazy loading, image optimization\n5. Add monitoring and health checks\n6. Load testing to verify 100 notifications/minute capacity\n7. Performance testing to ensure <200ms p95 response times\n8. Documentation for deployment and maintenance",
+      "id": "5",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [
+        {
+          "createdAt": "2025-12-15T13:08:33.699784Z",
+          "dependencies": [],
+          "description": "Establish comprehensive end-to-end testing infrastructure with isolated test database, test data seeding, and CI/CD integration for automated testing workflows.",
+          "details": "Set up Playwright or Cypress testing framework, create Docker containers for test database isolation, implement test data factories and seeders, configure CI/CD pipeline integration with GitHub Actions or similar, establish test environment variables and configuration management, create base test utilities and helper functions for common operations.",
+          "id": 1,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify test framework can successfully connect to test database, execute sample tests, and generate reports. Validate CI/CD pipeline triggers tests on pull requests.",
+          "title": "Setup E2E Testing Framework and Environment",
+          "updatedAt": "2025-12-15T13:08:33.699784Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:33.699785Z",
+          "dependencies": [
+            "1"
+          ],
+          "description": "Create complete test coverage for all user workflows including authentication, notification management, real-time updates, and error scenarios with measurable coverage targets.",
+          "details": "Develop test cases for user registration/login flows, notification creation and delivery workflows, real-time WebSocket connection testing, notification preferences and filtering, bulk operations testing, error handling and edge cases, cross-browser compatibility tests. Target 90%+ critical path coverage with automated assertions for UI state, API responses, and database changes.",
+          "id": 2,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Measure test coverage using code coverage tools, validate all critical user journeys pass consistently, ensure tests run in under 10 minutes total execution time.",
+          "title": "Implement Comprehensive E2E Test Suite",
+          "updatedAt": "2025-12-15T13:08:33.699785Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:33.699786Z",
+          "dependencies": [],
+          "description": "Implement comprehensive backend optimizations including database indexing, connection pooling, Redis caching strategies, and query optimization to achieve sub-200ms response times.",
+          "details": "Create database indexes for frequently queried columns (user_id, created_at, status), implement connection pooling with pgbouncer or similar (min 10, max 100 connections), deploy Redis cluster for session caching and notification queuing, optimize N+1 queries with eager loading, implement API response caching for static data, add database query monitoring and slow query logging.",
+          "id": 3,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Benchmark API endpoints to ensure p95 response times under 200ms, monitor database connection usage, validate cache hit rates above 80% for cached endpoints.",
+          "title": "Backend Performance Optimization",
+          "updatedAt": "2025-12-15T13:08:33.699786Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:33.699786Z",
+          "dependencies": [],
+          "description": "Implement client-side performance optimizations including code splitting, lazy loading, image optimization, and bundle size reduction to improve user experience and loading times.",
+          "details": "Implement route-based code splitting with React.lazy or similar, add lazy loading for images and non-critical components, optimize images with WebP format and responsive sizing, implement virtual scrolling for large notification lists, minimize bundle size through tree shaking and dependency analysis, add service worker for offline capability and caching, implement preloading for critical resources.",
+          "id": 4,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Measure bundle sizes (target <500KB gzipped), validate Lighthouse performance scores above 90, test loading times on 3G networks under 3 seconds.",
+          "title": "Frontend Performance Optimization",
+          "updatedAt": "2025-12-15T13:08:33.699786Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:33.699786Z",
+          "dependencies": [
+            "2",
+            "3",
+            "4"
+          ],
+          "description": "Execute comprehensive load testing to verify system capacity of 100 notifications/minute and validate performance targets under realistic traffic conditions.",
+          "details": "Set up k6 or Artillery load testing framework, create realistic test scenarios simulating concurrent users, notification creation bursts, and WebSocket connections, execute load tests with gradual ramp-up to 100 notifications/minute sustained load, perform spike testing with 200+ notifications/minute peaks, measure and document p95/p99 response times, database performance under load, memory and CPU utilization patterns.",
+          "id": 5,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Validate system maintains sub-200ms p95 response times under 100 notifications/minute load, ensure zero errors during sustained load testing, confirm system recovery after spike tests.",
+          "title": "Load Testing and Performance Benchmarking",
+          "updatedAt": "2025-12-15T13:08:33.699786Z"
+        },
+        {
+          "createdAt": "2025-12-15T13:08:33.699787Z",
+          "dependencies": [
+            "3",
+            "5"
+          ],
+          "description": "Implement comprehensive monitoring infrastructure, health check endpoints, alerting systems, and create deployment/maintenance documentation for production operations.",
+          "details": "Deploy Prometheus and Grafana for metrics collection and visualization, implement health check endpoints for API, database, and Redis connectivity, set up alerting rules for response time degradation, error rates, and system resource usage, create runbooks for common operational tasks, document deployment procedures with Docker/Kubernetes manifests, establish log aggregation with structured logging, implement uptime monitoring with external services.",
+          "id": 6,
+          "parentId": "5",
+          "priority": "medium",
+          "status": "pending",
+          "testStrategy": "Verify all health checks respond correctly, validate alerts trigger within 2 minutes of threshold breaches, test deployment procedures in staging environment.",
+          "title": "Monitoring, Health Checks, and Documentation Setup",
+          "updatedAt": "2025-12-15T13:08:33.699787Z"
+        }
+      ],
+      "testStrategy": "Full E2E test suite, performance benchmarks against requirements (100 notifications/minute, <200ms p95), load testing with realistic data volumes, monitoring dashboard validation",
+      "title": "End-to-End Testing and Performance Optimization"
+    }
+  ]
+}
