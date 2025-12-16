@@ -648,6 +648,63 @@ data:
     echo "════════════════════════════════════════════════════════════════"
     echo "║ ✅ Intake completed successfully!"
     echo "════════════════════════════════════════════════════════════════"
+---
+# =============================================================================
+# controller-templates-shared - Shared template partials for agent runtime
+# =============================================================================
+# These templates are mounted at /templates in agent pods for runtime access.
+# Used by integration agents (Atlas, Bolt) and healer workflows.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-templates-shared
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: templates
+data:
+  # Placeholder - templates are primarily rendered by controller
+  # This ConfigMap provides runtime access to any shared resources
+  .keep: |
+    # Shared template partials for agent runtime use
+    # The controller renders templates into per-job ConfigMaps
+    # This ConfigMap provides additional runtime resources if needed
+---
+# =============================================================================
+# controller-templates-integration - Integration templates for Atlas/Bolt
+# =============================================================================
+# Guardian scripts and integration helpers for infrastructure agents.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-templates-integration
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: templates
+data:
+  # Placeholder for integration templates
+  .keep: |
+    # Integration templates for infrastructure agents (Atlas, Bolt)
+    # Used for guardian scripts and runtime integration helpers
+---
+# =============================================================================
+# controller-templates-healer - Healer templates for remediation workflows
+# =============================================================================
+# Templates and scripts used by healer/remediation CodeRuns.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-templates-healer
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: templates
+data:
+  # Placeholder for healer templates
+  .keep: |
+    # Healer templates for remediation workflows
+    # Used by Rex-Healer, Blaze-Healer, and other healing agents
 {{- end }}
 
 

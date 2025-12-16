@@ -1491,7 +1491,8 @@ spec:
           fi
 
           # Prepare the JSON patch with optimistic locking
-          REPOSITORY_LABEL=$(echo '{{workflow.parameters.repository}}' | tr '/' '-')
+          # Sanitize repository URL for Kubernetes label (max 63 chars, alphanumeric/-/_/.)
+          REPOSITORY_LABEL=$(echo '{{workflow.parameters.repository}}' | sed 's|https://||g' | sed 's|http://||g' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-63)
           PATCH_JSON='{
             "metadata": {
               "resourceVersion": "'$RESOURCE_VERSION'",
@@ -2561,7 +2562,8 @@ spec:
 
           # Prepare the JSON patch - setting the predecessor stage directly
           # This bypasses validation because we're setting up for a resume
-          REPOSITORY_LABEL=$(echo '{{workflow.parameters.repository}}' | tr '/' '-')
+          # Sanitize repository URL for Kubernetes label (max 63 chars, alphanumeric/-/_/.)
+          REPOSITORY_LABEL=$(echo '{{workflow.parameters.repository}}' | sed 's|https://||g' | sed 's|http://||g' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-63)
           PATCH_JSON='{
             "metadata": {
               "resourceVersion": "'$RESOURCE_VERSION'",

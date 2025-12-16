@@ -47,9 +47,10 @@ fi
 # -------------------------------------------------------------------------
 # Android SDK (for local Android builds)
 # -------------------------------------------------------------------------
-if [ -n "$ANDROID_HOME" ] || [ -n "$ANDROID_SDK_ROOT" ]; then
-  export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-  export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+# Use ${VAR:-} to handle unset variables with set -u
+if [ -n "${ANDROID_HOME:-}" ] || [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+  export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+  export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
   export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
   echo "Android SDK: $ANDROID_HOME"
   
@@ -64,7 +65,7 @@ fi
 # -------------------------------------------------------------------------
 # Java (required for Android builds)
 # -------------------------------------------------------------------------
-if [ -n "$JAVA_HOME" ]; then
+if [ -n "${JAVA_HOME:-}" ]; then
   export PATH="$JAVA_HOME/bin:$PATH"
   echo "Java: $JAVA_HOME"
 elif command -v java >/dev/null 2>&1; then
@@ -102,7 +103,7 @@ export CI=1
 export EXPO_NO_DOTENV=0
 
 # EAS credentials (if provided via secrets)
-if [ -n "$EXPO_TOKEN" ]; then
+if [ -n "${EXPO_TOKEN:-}" ]; then
   echo "EXPO_TOKEN: configured (authenticated)"
 else
   echo "EXPO_TOKEN: not set (will need to run 'eas login' or 'npx expo login')"
