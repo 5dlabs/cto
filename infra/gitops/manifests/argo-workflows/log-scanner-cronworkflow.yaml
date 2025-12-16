@@ -1,7 +1,7 @@
 ---
 # CronWorkflow for hourly log scanning
 # Scans Loki for errors/warnings across platform namespaces
-# and determines if automated remediation should be triggered.
+# and triggers automated remediation CodeRuns when issues are detected.
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
 metadata:
@@ -29,7 +29,7 @@ spec:
   startingDeadlineSeconds: 300
 
   workflowSpec:
-    entrypoint: scan-and-report
+    entrypoint: scan-and-remediate
     serviceAccountName: argo-workflow
 
     # Workflow-level TTL for cleanup
@@ -44,20 +44,28 @@ spec:
       deleteDelayDuration: "60s"
 
     templates:
-      - name: scan-and-report
+      - name: scan-and-remediate
         steps:
           # Step 1: Run the log scan
           - - name: scan-logs
               template: healer-scan
 
-          # Step 2: If remediation is recommended, log it
-          # (Future: spawn remediation CodeRun)
+          # Step 2: Report results for visibility
           - - name: report-results
               template: report
               arguments:
                 parameters:
                   - name: scan-output
                     value: "{{steps.scan-logs.outputs.result}}"
+
+          # Step 3: Trigger remediation if recommended
+          - - name: trigger-remediation
+              template: remediate
+              arguments:
+                parameters:
+                  - name: scan-output
+                    value: "{{steps.scan-logs.outputs.result}}"
+              when: "{{steps.scan-logs.outputs.result}} != ''"
 
       - name: healer-scan
         container:
@@ -114,7 +122,6 @@ spec:
             if [ "$REMEDIATION" = "true" ]; then
               echo ""
               echo "⚠️  REMEDIATION RECOMMENDED"
-              echo "Future: This would trigger a remediation CodeRun"
 
               # Extract services needing attention
               echo ""
@@ -134,3 +141,40 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "200m"
+
+      - name: remediate
+        inputs:
+          parameters:
+            - name: scan-output
+        script:
+          image: ghcr.io/5dlabs/healer:latest
+          command: ["/bin/sh"]
+          source: |
+            #!/bin/sh
+            set -e
+
+            # Check if remediation is recommended before spawning CodeRuns
+            REMEDIATION=$(echo '{{inputs.parameters.scan-output}}' | jq -r '.remediation_recommended')
+
+            if [ "$REMEDIATION" != "true" ]; then
+              echo "✓ No remediation needed, skipping CodeRun creation"
+              exit 0
+            fi
+
+            echo "🔧 Triggering remediation for detected issues..."
+            echo ""
+
+            # Pipe scan output to healer remediate-from-scan
+            # --max-coderuns=3 limits concurrent remediations
+            echo '{{inputs.parameters.scan-output}}' | healer remediate-from-scan \
+              --max-coderuns=3
+
+            echo ""
+            echo "✅ Remediation triggered successfully"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

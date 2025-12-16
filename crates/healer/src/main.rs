@@ -422,6 +422,20 @@ enum Commands {
         #[arg(long)]
         show_candidates: bool,
     },
+    /// [SCANNER] Trigger remediation from scan results (reads JSON from stdin)
+    RemediateFromScan {
+        /// Path to healer config file
+        #[arg(long, default_value = "/app/heal-config.json")]
+        config: String,
+
+        /// Dry run - show what would be created but don't spawn `CodeRuns`
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Maximum number of `CodeRuns` to spawn (0 = unlimited)
+        #[arg(long, default_value = "3")]
+        max_coderuns: usize,
+    },
     /// [SENSOR] Monitor GitHub Actions for workflow failures and spawn remediation
     Sensor {
         #[command(subcommand)]
@@ -2227,6 +2241,13 @@ async fn main() -> Result<()> {
                 show_candidates,
             )
             .await?;
+        }
+        Commands::RemediateFromScan {
+            config,
+            dry_run,
+            max_coderuns,
+        } => {
+            run_remediate_from_scan(&config, dry_run, max_coderuns)?;
         }
         Commands::Sensor { action } => match action {
             SensorCommands::GithubActions {
@@ -7649,6 +7670,386 @@ async fn run_scan_logs_command(
     }
 
     Ok(())
+}
+
+/// Run remediation from scan results.
+///
+/// Reads scan JSON from stdin, parses it, and spawns `CodeRuns` for services
+/// that need remediation.
+#[allow(clippy::too_many_lines)]
+fn run_remediate_from_scan(config_path: &str, dry_run: bool, max_coderuns: usize) -> Result<()> {
+    use scanner::{determine_agent_for_service, ScanReport};
+    use std::io::{self, BufRead};
+
+    println!("{}", "═".repeat(60).cyan());
+    println!("{}", "🔧 REMEDIATE FROM SCAN".cyan().bold());
+    println!("{}", "═".repeat(60).cyan());
+
+    // Read JSON from stdin
+    println!("{}", "📥 Reading scan results from stdin...".dimmed());
+    let stdin = io::stdin();
+    let mut json_input = String::new();
+    for line in stdin.lock().lines() {
+        json_input.push_str(&line?);
+        json_input.push('\n');
+    }
+
+    if json_input.trim().is_empty() {
+        println!("{}", "❌ No input received from stdin".red());
+        return Err(anyhow::anyhow!("No scan JSON provided on stdin"));
+    }
+
+    // Parse scan report
+    let report: ScanReport =
+        serde_json::from_str(&json_input).context("Failed to parse scan JSON")?;
+
+    println!("{}", format!("📊 Scan Time: {}", report.scan_time).dimmed());
+    println!(
+        "{}",
+        format!(
+            "   Window: {} minutes | Errors: {} | Warnings: {}",
+            report.window_minutes, report.total_errors, report.total_warnings
+        )
+        .dimmed()
+    );
+    println!(
+        "{}",
+        format!(
+            "   Services with issues: {}",
+            report.services_with_issues.len()
+        )
+        .dimmed()
+    );
+    println!(
+        "{}",
+        format!(
+            "   Remediation recommended: {}",
+            report.remediation_recommended
+        )
+        .dimmed()
+    );
+
+    if !report.remediation_recommended {
+        println!();
+        println!("{}", "✓ No remediation needed".green());
+        return Ok(());
+    }
+
+    if report.services_with_issues.is_empty() {
+        println!();
+        println!("{}", "✓ No services with issues to remediate".green());
+        return Ok(());
+    }
+
+    // Load healer config
+    let config = load_healer_config(config_path);
+    println!(
+        "{}",
+        format!(
+            "📋 Config: {} ({})",
+            if std::path::Path::new(config_path).exists() {
+                config_path
+            } else {
+                "defaults"
+            },
+            config.coderun.github_app
+        )
+        .dimmed()
+    );
+
+    // Determine which services need CodeRuns
+    let mut coderuns_created = 0usize;
+    let max = if max_coderuns == 0 {
+        usize::MAX
+    } else {
+        max_coderuns
+    };
+
+    println!();
+    println!(
+        "{}",
+        format!(
+            "🎯 Processing {} services (max CodeRuns: {})",
+            report.services_with_issues.len(),
+            if max_coderuns == 0 {
+                "unlimited".to_string()
+            } else {
+                max_coderuns.to_string()
+            }
+        )
+        .yellow()
+    );
+
+    for issue in &report.services_with_issues {
+        if coderuns_created >= max {
+            println!(
+                "{}",
+                format!("⏭️  Max CodeRuns ({max_coderuns}) reached, stopping").yellow()
+            );
+            break;
+        }
+
+        let suggested_agent = determine_agent_for_service(&issue.service, &issue.sample_errors);
+        let severity = if issue.error_count >= 50 {
+            "critical"
+        } else if issue.error_count >= 20 {
+            "high"
+        } else if issue.error_count >= 10 {
+            "medium"
+        } else {
+            "low"
+        };
+
+        println!();
+        println!(
+            "{}",
+            format!(
+                "📦 {}/{}: {} errors, {} warnings [{}]",
+                issue.namespace, issue.service, issue.error_count, issue.warn_count, severity
+            )
+            .cyan()
+        );
+        println!(
+            "{}",
+            format!("   Suggested agent: {suggested_agent}").dimmed()
+        );
+
+        if !issue.sample_errors.is_empty() {
+            println!("{}", "   Sample errors:".dimmed());
+            for (i, err) in issue.sample_errors.iter().take(3).enumerate() {
+                let truncated = if err.len() > 80 {
+                    format!("{}...", &err[..77])
+                } else {
+                    err.clone()
+                };
+                println!("   {}. {}", i + 1, truncated.dimmed());
+            }
+        }
+
+        // Generate CodeRun name
+        let uid = uuid::Uuid::new_v4().to_string()[..8].to_string();
+        let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+        let sanitized_service = issue
+            .service
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+            .collect::<String>()
+            .to_lowercase();
+        let coderun_name = format!(
+            "scan-remediation-{}-{}-{uid}",
+            issue.namespace, sanitized_service
+        );
+
+        // Build prompt with context
+        let prompt = format!(
+            r"# Log Scan Remediation
+
+## Issue Detected
+- **Service**: {service}
+- **Namespace**: {namespace}
+- **Error Count**: {error_count}
+- **Warning Count**: {warn_count}
+- **Severity**: {severity}
+- **Scan Time**: {scan_time}
+
+## Sample Errors
+{sample_errors}
+
+## Task
+Investigate and fix the errors detected in the {service} service.
+
+1. Analyze the error patterns above
+2. Identify the root cause
+3. Implement a fix
+4. Create a PR with the changes
+
+## Affected Pods
+{affected_pods}
+",
+            service = issue.service,
+            namespace = issue.namespace,
+            error_count = issue.error_count,
+            warn_count = issue.warn_count,
+            severity = severity,
+            scan_time = report.scan_time,
+            sample_errors = issue
+                .sample_errors
+                .iter()
+                .map(|e| format!("- {e}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            affected_pods = issue
+                .affected_pods
+                .iter()
+                .map(|p| format!("- {p}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+
+        if dry_run {
+            println!(
+                "{}",
+                format!("   [DRY RUN] Would create CodeRun: {coderun_name}").yellow()
+            );
+            println!(
+                "{}",
+                format!("   [DRY RUN] Agent: {suggested_agent}").yellow()
+            );
+            coderuns_created += 1;
+            continue;
+        }
+
+        // Build and apply CodeRun
+        let coderun_yaml = build_scan_remediation_coderun(
+            &coderun_name,
+            &issue.namespace,
+            &issue.service,
+            &suggested_agent,
+            &prompt,
+            &timestamp,
+            &config,
+        );
+
+        match apply_coderun(&coderun_yaml, &coderun_name) {
+            Ok(()) => {
+                coderuns_created += 1;
+                println!(
+                    "{}",
+                    format!("   ✅ Created CodeRun: {coderun_name}").green()
+                );
+            }
+            Err(e) => {
+                println!("{}", format!("   ❌ Failed to create CodeRun: {e}").red());
+            }
+        }
+    }
+
+    println!();
+    println!("{}", "═".repeat(60).green());
+    if dry_run {
+        println!(
+            "{}",
+            format!("🔍 DRY RUN: Would have created {coderuns_created} CodeRun(s)")
+                .yellow()
+                .bold()
+        );
+    } else {
+        println!(
+            "{}",
+            format!("✅ Created {coderuns_created} CodeRun(s)")
+                .green()
+                .bold()
+        );
+    }
+    println!("{}", "═".repeat(60).green());
+
+    Ok(())
+}
+
+/// Build `CodeRun` YAML for scan-based remediation.
+#[allow(clippy::too_many_arguments)]
+fn build_scan_remediation_coderun(
+    coderun_name: &str,
+    namespace: &str,
+    service: &str,
+    agent: &str,
+    prompt: &str,
+    timestamp: &impl std::fmt::Display,
+    config: &HealerConfig,
+) -> String {
+    let c = &config.coderun;
+
+    // Build optional fields only if non-empty
+    let remote_tools_line = if c.remote_tools.is_empty() {
+        String::new()
+    } else {
+        format!("  remoteTools: \"{}\"\n", c.remote_tools.join(","))
+    };
+    let local_tools_line = if c.local_tools.is_empty() {
+        String::new()
+    } else {
+        format!("  localTools: \"{}\"\n", c.local_tools.join(","))
+    };
+
+    // Escape prompt for YAML (use multiline literal block)
+    let prompt_escaped = prompt
+        .lines()
+        .map(|line| format!("      {line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // Hash service+namespace to numeric task ID
+    let task_id_numeric: u32 = format!("{namespace}-{service}")
+        .bytes()
+        .fold(0u32, |acc, b| {
+            acc.wrapping_mul(31).wrapping_add(u32::from(b))
+        });
+
+    format!(
+        r#"apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: {coderun_name}
+  namespace: {cto_namespace}
+  labels:
+    agents.platform/type: scan-remediation
+    scan-service: "{service}"
+    scan-namespace: "{namespace}"
+    suggested-agent: "{agent}"
+    created-at: "{timestamp}"
+spec:
+  taskId: {task_id_numeric}
+  runType: "{run_type}"
+  githubApp: "{github_app}"
+  model: "{model}"
+  repositoryUrl: "{repository_url}"
+  docsRepositoryUrl: "{docs_repository_url}"
+  docsProjectDirectory: "{docs_project_directory}"
+  docsBranch: "{docs_branch}"
+  workingDirectory: "{working_directory}"
+  service: "{cto_service}"
+  enableDocker: {enable_docker}
+{remote_tools}{local_tools}  cliConfig:
+    cliType: "{cli_type}"
+    model: "{cli_model}"
+    settings:
+      template: "{template}"
+      memoryEnabled: {memory_enabled}
+      memoryAgentName: "{memory_agent_name}"
+      memorySessionPrefix: "{memory_session_prefix}"
+      memoryRetrieveOnStart: {memory_retrieve_on_start}
+      memoryPersistOnComplete: {memory_persist_on_complete}
+  env:
+    SCAN_SERVICE: "{service}"
+    SCAN_NAMESPACE: "{namespace}"
+    SUGGESTED_AGENT: "{agent}"
+    REMEDIATION_MODE: "scan"
+    SCAN_PROMPT: |
+{prompt_escaped}
+"#,
+        cto_namespace = c.namespace,
+        run_type = c.run_type,
+        github_app = c.github_app,
+        model = c.model,
+        repository_url = c.repository_url,
+        docs_repository_url = c.docs_repository_url,
+        docs_project_directory = c.docs_project_directory,
+        docs_branch = c.docs_branch,
+        working_directory = c.working_directory,
+        cto_service = c.service,
+        enable_docker = c.enable_docker,
+        remote_tools = remote_tools_line,
+        local_tools = local_tools_line,
+        cli_type = c.cli_config.cli_type,
+        cli_model = c.cli_config.model,
+        template = c.cli_config.settings.template,
+        memory_enabled = c.memory.enabled,
+        memory_agent_name = c.memory.agent_name,
+        memory_session_prefix = c.memory.session_prefix,
+        memory_retrieve_on_start = c.memory.retrieve_on_start,
+        memory_persist_on_complete = c.memory.persist_on_complete,
+        prompt_escaped = prompt_escaped,
+    )
 }
 
 /// Parse a duration string like "1h", "30m", "2h30m".
