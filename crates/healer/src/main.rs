@@ -7523,8 +7523,8 @@ async fn run_scan_logs_command(
     println!();
     println!("  Window:          {}", window.green());
     println!("  Namespaces:      {}", namespace_list.join(", ").green());
-    println!("  Error Threshold: {}", error_threshold);
-    println!("  Warn Threshold:  {}", warn_threshold);
+    println!("  Error Threshold: {error_threshold}");
+    println!("  Warn Threshold:  {warn_threshold}");
     println!();
 
     // Create scanner
@@ -7610,7 +7610,7 @@ async fn run_scan_logs_command(
             if report.remediation_recommended {
                 println!("{}", "⚠️  REMEDIATION RECOMMENDED".red().bold());
                 if let Some(reason) = &report.recommendation_reason {
-                    println!("    Reason: {}", reason);
+                    println!("    Reason: {reason}");
                 }
             } else {
                 println!("{}", "✓ No immediate remediation needed".green());

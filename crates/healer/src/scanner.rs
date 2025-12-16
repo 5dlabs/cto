@@ -226,7 +226,7 @@ impl LogScanner {
 
             // Extract service name (strip random suffix from pod name)
             let service = extract_service_name(&pod);
-            let key = format!("{}/{}", namespace, service);
+            let key = format!("{namespace}/{service}");
 
             let issue = issues.entry(key).or_insert_with(|| ServiceIssue {
                 service: service.clone(),
@@ -313,8 +313,7 @@ impl LogScanner {
             return (
                 true,
                 Some(format!(
-                    "Multiple services ({}) have errors - possible systemic issue",
-                    services_with_errors
+                    "Multiple services ({services_with_errors}) have errors - possible systemic issue"
                 )),
             );
         }
@@ -544,7 +543,7 @@ pub fn format_report_text(report: &ScanReport) -> String {
     if report.remediation_recommended {
         writeln!(output, "⚠️  REMEDIATION RECOMMENDED").unwrap();
         if let Some(reason) = &report.recommendation_reason {
-            writeln!(output, "    Reason: {}", reason).unwrap();
+            writeln!(output, "    Reason: {reason}").unwrap();
         }
     } else {
         writeln!(output, "✓ No remediation needed").unwrap();

@@ -3,13 +3,13 @@ name: Healer CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'crates/healer/**'
       - 'infra/images/healer/**'
       - '.github/workflows/healer-ci.yaml'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'crates/healer/**'
       - 'infra/images/healer/**'
@@ -129,10 +129,10 @@ jobs:
           dockerfile: infra/images/healer/Dockerfile
           failure-threshold: warning
 
-  # Build and push Docker image (on push to main or workflow_dispatch)
+  # Build and push Docker image (on push to main/develop or workflow_dispatch)
   build-docker:
     needs: [lint-rust, test-rust, build-check]
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) || github.event_name == 'workflow_dispatch'
     runs-on: [k8s-runner]
     permissions:
       contents: read
