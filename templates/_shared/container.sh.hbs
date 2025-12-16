@@ -1,8 +1,12 @@
 {{> header }}
 
-{{#if (or (eq github_app "blaze") (eq task_language "typescript") (eq task_language "javascript"))}}
+{{!-- Node.js environment for JavaScript/TypeScript agents (Blaze, Spark) --}}
+{{#if (or (eq github_app "blaze") (eq github_app "spark") (eq task_language "typescript") (eq task_language "javascript"))}}
 {{> node-env }}
+{{/if}}
 
+{{!-- Expo environment only for Spark (mobile/React Native agent) --}}
+{{#if (eq github_app "spark")}}
 {{> expo-env }}
 {{/if}}
 
