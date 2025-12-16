@@ -1856,7 +1856,7 @@ spec:
     - name: morgan-project-manager
       daemon: true  # Run as background daemon - doesn't block workflow progression
       script:
-        image: ghcr.io/5dlabs/cto-runtime:latest
+        image: ghcr.io/5dlabs/factory:latest
         command: ["/bin/bash"]
         source: |
           #!/bin/bash
