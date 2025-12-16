@@ -89,24 +89,25 @@ agent:
     repository: ghcr.io/5dlabs/agent
     tag: latest
   serviceAccountName: ""
+  # All CLI types use the factory image which contains all CLIs
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/claude-code
+      repository: ghcr.io/5dlabs/factory
       tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/cursor
+      repository: ghcr.io/5dlabs/factory
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/codex
+      repository: ghcr.io/5dlabs/factory
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/gemini
+      repository: ghcr.io/5dlabs/factory
       tag: latest
     factory:
       repository: ghcr.io/5dlabs/factory
       tag: latest
     opencode:
-      repository: ghcr.io/5dlabs/opencode
+      repository: ghcr.io/5dlabs/factory
       tag: latest
   cliProviders: {}
   agentCliConfigs: {}
@@ -422,6 +423,33 @@ healer:
     branches: ""
     # Workflows to exclude from monitoring (comma-separated)
     excludedWorkflows: ""
+
+  # Issue Reconciler - periodically checks and closes resolved issues
+  reconciler:
+    enabled: true
+    # Cron schedule (default: every 5 minutes)
+    schedule: "*/5 * * * *"
+    # Repository to check issues for
+    repository: "5dlabs/cto"
+    # Labels that identify healer-created issues (comma-separated)
+    labels: "heal"
+    # Maximum issues to process per run
+    maxIssues: 50
+    # Dry run mode - check but don't close issues
+    dryRun: false
+    # Log level for the reconciler
+    logLevel: "info"
+    # GitHub secret configuration
+    githubSecretName: "cto-secrets"  # pragma: allowlist secret
+    githubSecretKey: "GITHUB_TOKEN"  # pragma: allowlist secret
+    # Resource limits (defaults to healer resources if not specified)
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
 
 # =============================================================================
 # OpenMemory - AI Agent Memory
