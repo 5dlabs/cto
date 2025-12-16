@@ -146,7 +146,7 @@ spec:
         name: morgan-pm-workspace
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: "standard"
+        # Uses default storage class (mayastor)
         resources:
           requests:
             storage: 1Gi
