@@ -327,11 +327,19 @@ impl LokiClient {
 
     /// Check if Loki is reachable
     ///
+    /// Uses `/loki/api/v1/labels` endpoint which works through Loki gateway
+    /// (the `/ready` endpoint is not available through nginx gateway).
+    ///
     /// # Errors
     /// Returns an error if there's an issue building the request (but not
     /// if the server is unreachable - that returns `Ok(false)`).
     pub async fn health_check(&self) -> Result<bool> {
-        let url = format!("{}/ready", self.config.base_url.trim_end_matches('/'));
+        // Use /loki/api/v1/labels instead of /ready because the Loki gateway
+        // (nginx) doesn't expose the /ready endpoint
+        let url = format!(
+            "{}/loki/api/v1/labels",
+            self.config.base_url.trim_end_matches('/')
+        );
 
         match self.client.get(&url).send().await {
             Ok(response) => Ok(response.status().is_success()),
