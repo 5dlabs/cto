@@ -143,6 +143,7 @@ pub struct GitHubActionsSensor {
 
 impl GitHubActionsSensor {
     /// Create a new sensor with the given configuration.
+    #[must_use]
     pub fn new(config: SensorConfig, remediation_config: ci::types::RemediationConfig) -> Self {
         Self {
             config,
@@ -160,7 +161,7 @@ impl GitHubActionsSensor {
     /// an unrecoverable failure occurs during polling.
     pub async fn run(&mut self) -> Result<()> {
         loop {
-            if let Err(e) = self.poll_once().await {
+            if let Err(e) = self.poll_once() {
                 error!("Sensor poll failed: {e}");
             }
 
@@ -176,11 +177,11 @@ impl GitHubActionsSensor {
     /// # Errors
     ///
     /// Returns an error if polling repositories or processing failures fails.
-    pub async fn poll_once(&mut self) -> Result<Vec<WorkflowFailure>> {
+    pub fn poll_once(&mut self) -> Result<Vec<WorkflowFailure>> {
         let mut all_failures = Vec::new();
 
         for repo in &self.config.repositories.clone() {
-            match self.poll_repository(repo).await {
+            match self.poll_repository(repo) {
                 Ok(failures) => {
                     if !failures.is_empty() {
                         info!("Found {} new failure(s) in {}", failures.len(), repo);
@@ -200,7 +201,7 @@ impl GitHubActionsSensor {
                 "Processing failure: {} (run {})",
                 failure.workflow_name, failure.run_id
             );
-            match self.process_failure(&failure).await {
+            match self.process_failure(&failure) {
                 Ok(()) => processed.push(failure),
                 Err(e) => {
                     error!(
@@ -216,7 +217,7 @@ impl GitHubActionsSensor {
     }
 
     /// Poll a single repository for failures.
-    async fn poll_repository(&mut self, repository: &str) -> Result<Vec<WorkflowFailure>> {
+    fn poll_repository(&mut self, repository: &str) -> Result<Vec<WorkflowFailure>> {
         debug!("Polling repository: {}", repository);
 
         // Use `gh` CLI to list workflow runs
@@ -313,7 +314,7 @@ impl GitHubActionsSensor {
     }
 
     /// Process a detected failure.
-    async fn process_failure(&self, failure: &WorkflowFailure) -> Result<()> {
+    fn process_failure(&self, failure: &WorkflowFailure) -> Result<()> {
         // Fetch additional details (job info, actor)
         let (job_name, job_id, job_url, actor) = Self::fetch_failed_job_details(failure)?;
         let mut failure = failure.clone();
@@ -374,7 +375,7 @@ impl GitHubActionsSensor {
     }
 
     /// Fetch failed job details for a workflow run.
-    /// Returns (job_name, job_id, job_url, actor)
+    /// Returns (`job_name`, `job_id`, `job_url`, `actor`)
     #[allow(clippy::type_complexity)]
     fn fetch_failed_job_details(
         failure: &WorkflowFailure,

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/cloud",
     "crates/controller",
+    "crates/gpu",
     "crates/healer",
     "crates/installer",
     "crates/mcp",
