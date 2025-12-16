@@ -161,7 +161,7 @@ TASK_STATE_CACHE="$SHARED_DIR/task-state-cache.json"
 
 echo "🔍 DEBUG: Sourcing helper functions..."
 # Source helper functions
-source /workspace/github-projects-helpers.sh || {
+source /shared/github-projects-helpers.sh || {
   echo "❌ Failed to source github-projects-helpers.sh"
   exit 1
 }
@@ -315,10 +315,10 @@ initialize_project() {
   
   # Find tasks.json
   TASKS_JSON_PATH=""
-  if [[ -f ".taskmaster/tasks/tasks.json" ]]; then
-    TASKS_JSON_PATH=".taskmaster/tasks/tasks.json"
-  elif [[ -f ".taskmaster/docs/tasks.json" ]]; then
-    TASKS_JSON_PATH=".taskmaster/docs/tasks.json"
+  if [[ -f ".tasks/tasks/tasks.json" ]]; then
+    TASKS_JSON_PATH=".tasks/tasks/tasks.json"
+  elif [[ -f ".tasks/docs/tasks.json" ]]; then
+    TASKS_JSON_PATH=".tasks/docs/tasks.json"
   else
     log "❌ TaskMaster tasks.json not found"
     exit 1
@@ -2047,7 +2047,7 @@ generate_issue_body() {
   local dependencies=$(echo "$task" | jq -r '.dependencies // [] | join(", ")')
   
   # Try to read full task content from docs directory
-  local task_dir="$TEMP_CLONE/$DOCS_DIR/.taskmaster/docs/task-$task_id"
+  local task_dir="$TEMP_CLONE/$DOCS_DIR/.tasks/docs/task-$task_id"
   local task_md_content=""
   local acceptance_criteria=""
   
@@ -2099,7 +2099,7 @@ $test_strategy
 This issue is automatically synchronized with TaskMaster.
 
 **Task File**: \`$tasks_json_path\`  
-**Task Details**: \`.taskmaster/docs/task-$task_id/\`  
+**Task Details**: \`.tasks/docs/task-$task_id/\`  
 **Service**: \`$SERVICE_NAME\`  
 **Workflow**: \`$WORKFLOW_NAME\`
 
