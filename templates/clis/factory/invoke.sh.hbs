@@ -63,8 +63,7 @@ FACTORY_CMD+=("--disabled-tools" "{{disabled_tools}}")
 echo "✓ Disabled tools: {{disabled_tools}}"
 {{/if}}
 
-# Skip permission prompts for automation
-FACTORY_CMD+=("--skip-permissions-unsafe")
+# Note: --skip-permissions-unsafe conflicts with --auto, so we rely on --auto for permissions
 
 # Working directory
 FACTORY_CMD+=("--cwd" "$CLAUDE_WORK_DIR")
