@@ -69,7 +69,9 @@ spec:
 
       - name: healer-scan
         container:
-          image: ghcr.io/5dlabs/healer:latest
+          # Use dev registry image until ghcr.io/5dlabs/healer:latest is built
+          # TODO: Switch back to ghcr.io/5dlabs/healer:latest after PR #3007 merges
+          image: 192.168.1.72:30500/healer:tilt-dev
           imagePullPolicy: Always
           command: ["healer"]
           args:
@@ -98,7 +100,8 @@ spec:
           parameters:
             - name: scan-output
         script:
-          image: ghcr.io/5dlabs/healer:latest
+          # Use dev registry image until ghcr.io/5dlabs/healer:latest is built
+          image: 192.168.1.72:30500/healer:tilt-dev
           command: ["/bin/sh"]
           source: |
             #!/bin/sh
@@ -147,7 +150,8 @@ spec:
           parameters:
             - name: scan-output
         script:
-          image: ghcr.io/5dlabs/healer:latest
+          # Use dev registry image until ghcr.io/5dlabs/healer:latest is built
+          image: 192.168.1.72:30500/healer:tilt-dev
           command: ["/bin/sh"]
           source: |
             #!/bin/sh
