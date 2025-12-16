@@ -107,8 +107,16 @@ spec:
             #!/bin/sh
             set -e
 
+            # Extract JSON from scan output (may contain banner text before JSON)
+            SCAN_JSON=$(echo '{{inputs.parameters.scan-output}}' | grep -o '{.*}' | tail -1)
+
+            if [ -z "$SCAN_JSON" ]; then
+              echo "Error: No JSON found in scan output"
+              exit 1
+            fi
+
             echo "=== Log Scan Results ==="
-            echo '{{inputs.parameters.scan-output}}' | jq -r '
+            echo "$SCAN_JSON" | jq -r '
               "Scan Time: \(.scan_time)",
               "Window: \(.window_minutes) minutes",
               "Total Errors: \(.total_errors)",
@@ -120,7 +128,7 @@ spec:
             '
 
             # Check if remediation is recommended
-            REMEDIATION=$(echo '{{inputs.parameters.scan-output}}' | jq -r '.remediation_recommended')
+            REMEDIATION=$(echo "$SCAN_JSON" | jq -r '.remediation_recommended')
 
             if [ "$REMEDIATION" = "true" ]; then
               echo ""
@@ -129,7 +137,7 @@ spec:
               # Extract services needing attention
               echo ""
               echo "Services needing attention:"
-              echo '{{inputs.parameters.scan-output}}' | jq -r '
+              echo "$SCAN_JSON" | jq -r '
                 .services_with_issues[] |
                 "  - \(.namespace)/\(.service): \(.error_count) errors, \(.warn_count) warnings"
               '
@@ -157,9 +165,12 @@ spec:
             #!/bin/sh
             set -e
 
+            # Extract JSON from scan output (may contain banner text before JSON)
+            SCAN_JSON=$(echo '{{inputs.parameters.scan-output}}' | grep -o '{.*}' | tail -1)
+
             # Check if scan output contains remediation_recommended:true
             # Use grep instead of jq since jq isn't available in healer image
-            if ! echo '{{inputs.parameters.scan-output}}' | grep -q '"remediation_recommended":true'; then
+            if ! echo "$SCAN_JSON" | grep -q '"remediation_recommended":true'; then
               echo "✓ No remediation needed, skipping CodeRun creation"
               exit 0
             fi
@@ -167,9 +178,9 @@ spec:
             echo "🔧 Triggering remediation for detected issues..."
             echo ""
 
-            # Pipe scan output to healer remediate-from-scan
+            # Pipe scan JSON to healer remediate-from-scan
             # --max-coderuns=3 limits concurrent remediations
-            echo '{{inputs.parameters.scan-output}}' | healer remediate-from-scan \
+            echo "$SCAN_JSON" | healer remediate-from-scan \
               --max-coderuns=3
 
             echo ""
