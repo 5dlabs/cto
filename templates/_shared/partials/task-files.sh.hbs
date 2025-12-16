@@ -3,7 +3,71 @@
 # =========================================================================
 
 mkdir -p "$CLI_WORK_DIR/task"
+
+# Copy task files from ConfigMap first (these are templates and agent files)
 cp -R /task-files/* "$CLI_WORK_DIR/task/" 2>/dev/null || true
+
+# Fetch task-specific files from the repository's .tasks directory
+# The task files are located at .tasks/docs/task-{TASK_ID}/ in the repo
+TASK_ID="${TASK_ID:-}"
+if [ -n "$TASK_ID" ]; then
+    echo "📥 Fetching task files for task $TASK_ID..."
+    
+    # Check both possible locations for task files
+    TASK_DOCS_DIR="$REPO_ROOT/.tasks/docs/task-$TASK_ID"
+    TASK_TASKS_DIR="$REPO_ROOT/.tasks/tasks/task-$TASK_ID"
+    PROJECT_TASK_DOCS_DIR="$REPO_ROOT/$DOCS_PROJECT_DIR/.tasks/docs/task-$TASK_ID"
+    PROJECT_TASK_TASKS_DIR="$REPO_ROOT/$DOCS_PROJECT_DIR/.tasks/tasks/task-$TASK_ID"
+    
+    TASK_SOURCE_DIR=""
+    
+    # Try each location in order of preference
+    if [ -d "$TASK_DOCS_DIR" ]; then
+        TASK_SOURCE_DIR="$TASK_DOCS_DIR"
+    elif [ -d "$TASK_TASKS_DIR" ]; then
+        TASK_SOURCE_DIR="$TASK_TASKS_DIR"
+    elif [ -d "$PROJECT_TASK_DOCS_DIR" ]; then
+        TASK_SOURCE_DIR="$PROJECT_TASK_DOCS_DIR"
+    elif [ -d "$PROJECT_TASK_TASKS_DIR" ]; then
+        TASK_SOURCE_DIR="$PROJECT_TASK_TASKS_DIR"
+    fi
+    
+    if [ -n "$TASK_SOURCE_DIR" ]; then
+        echo "  ✓ Found task files at: $TASK_SOURCE_DIR"
+        
+        # Copy prompt.md if it exists
+        if [ -f "$TASK_SOURCE_DIR/prompt.md" ]; then
+            cp "$TASK_SOURCE_DIR/prompt.md" "$CLI_WORK_DIR/task/prompt.md"
+            echo "  ✓ Copied prompt.md"
+        elif [ -f "$TASK_SOURCE_DIR/task.md" ]; then
+            # Some task structures use task.md instead of prompt.md
+            cp "$TASK_SOURCE_DIR/task.md" "$CLI_WORK_DIR/task/prompt.md"
+            echo "  ✓ Copied task.md as prompt.md"
+        fi
+        
+        # Copy acceptance-criteria.md if it exists
+        if [ -f "$TASK_SOURCE_DIR/acceptance-criteria.md" ]; then
+            cp "$TASK_SOURCE_DIR/acceptance-criteria.md" "$CLI_WORK_DIR/task/acceptance-criteria.md"
+            echo "  ✓ Copied acceptance-criteria.md"
+        fi
+        
+        # Copy any other .md files that might be useful
+        for md_file in "$TASK_SOURCE_DIR"/*.md; do
+            if [ -f "$md_file" ]; then
+                base=$(basename "$md_file")
+                if [ "$base" != "prompt.md" ] && [ "$base" != "task.md" ] && [ "$base" != "acceptance-criteria.md" ]; then
+                    cp "$md_file" "$CLI_WORK_DIR/task/$base" 2>/dev/null || true
+                fi
+            fi
+        done
+    else
+        echo "  ⚠️ Task files not found for task $TASK_ID"
+        echo "     Searched: $TASK_DOCS_DIR, $TASK_TASKS_DIR"
+        if [ -n "$DOCS_PROJECT_DIR" ]; then
+            echo "     Also: $PROJECT_TASK_DOCS_DIR, $PROJECT_TASK_TASKS_DIR"
+        fi
+    fi
+fi
 
 # Verify critical task files
 echo ""
