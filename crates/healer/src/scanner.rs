@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -42,7 +42,7 @@ impl Default for ScannerConfig {
 }
 
 /// A service with detected issues
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceIssue {
     /// Service/pod name pattern
     pub service: String,
@@ -63,7 +63,7 @@ pub struct ServiceIssue {
 }
 
 /// Report from a log scan
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanReport {
     /// When the scan was performed
     pub scan_time: DateTime<Utc>,
@@ -84,7 +84,7 @@ pub struct ScanReport {
 }
 
 /// A candidate for automated remediation
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemediationCandidate {
     /// Service that needs remediation
     pub service: String,
@@ -375,7 +375,8 @@ impl LogScanner {
 }
 
 /// Extract service name from pod name (strips random suffixes).
-fn extract_service_name(pod_name: &str) -> String {
+#[must_use]
+pub fn extract_service_name(pod_name: &str) -> String {
     // Pod names typically follow: {service}-{deployment-hash}-{pod-hash}
     // or {service}-{random} for StatefulSets
     // Examples:
@@ -425,7 +426,9 @@ fn extract_service_name(pod_name: &str) -> String {
 }
 
 /// Determine which agent should handle remediation based on service and error patterns.
-fn determine_agent_for_service(service: &str, sample_errors: &[String]) -> String {
+/// Determine which agent should handle remediation for a service based on error patterns.
+#[must_use]
+pub fn determine_agent_for_service(service: &str, sample_errors: &[String]) -> String {
     let errors_lower: Vec<String> = sample_errors.iter().map(|e| e.to_lowercase()).collect();
     let errors_joined = errors_lower.join(" ");
 
