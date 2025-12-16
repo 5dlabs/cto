@@ -11,6 +11,7 @@ mod github;
 mod k8s;
 pub mod loki;
 pub mod play;
+mod reconcile;
 pub mod scanner;
 pub mod sensors;
 mod templates;
@@ -28,7 +29,7 @@ use std::process::Command;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command as AsyncCommand;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Self-healing platform monitor - detects issues and spawns remediation agents
 #[derive(Parser)]
@@ -436,10 +437,74 @@ enum Commands {
         #[arg(long, default_value = "3")]
         max_coderuns: usize,
     },
+    /// [RECONCILER] Check open issues and close ones where condition is resolved
+    ReconcileIssues {
+        /// Repository to check issues for
+        #[arg(long, default_value = "5dlabs/cto")]
+        repository: String,
+
+        /// Kubernetes namespace for checking pod/workflow status
+        #[arg(long, default_value = "cto")]
+        namespace: String,
+
+        /// Labels that identify healer-created issues (comma-separated)
+        #[arg(long, default_value = "heal")]
+        labels: String,
+
+        /// Dry run - check but don't close issues
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Maximum issues to process per run
+        #[arg(long, default_value = "50")]
+        max_issues: usize,
+
+        /// Output format (json or text)
+        #[arg(long, default_value = "text")]
+        output: String,
+    },
     /// [SENSOR] Monitor GitHub Actions for workflow failures and spawn remediation
     Sensor {
         #[command(subcommand)]
         action: SensorCommands,
+    },
+    /// [PLAY-MONITOR] Monitor running plays with real-time log analysis and anomaly detection
+    PlayMonitor {
+        /// Kubernetes namespace for CodeRuns
+        #[arg(long, default_value = "cto")]
+        namespace: String,
+
+        /// Poll interval in seconds
+        #[arg(long, default_value = "30")]
+        poll_interval: u64,
+
+        /// GitHub repository for issue creation (e.g., 5dlabs/cto)
+        #[arg(long)]
+        repository: Option<String>,
+
+        /// Minimum severity to report (critical, high, medium, low)
+        #[arg(long, default_value = "medium")]
+        min_severity: String,
+
+        /// Disable automatic issue creation
+        #[arg(long)]
+        no_issues: bool,
+
+        /// Maximum issues to create per play
+        #[arg(long, default_value = "5")]
+        max_issues: usize,
+
+        /// Cooldown between issues for same pattern (minutes)
+        #[arg(long, default_value = "10")]
+        issue_cooldown: i64,
+
+        /// Time window for log queries (minutes)
+        #[arg(long, default_value = "5")]
+        log_window: i64,
+
+        /// Run once and exit (instead of continuous loop)
+        #[arg(long)]
+        once: bool,
     },
 }
 
@@ -2249,6 +2314,23 @@ async fn main() -> Result<()> {
         } => {
             run_remediate_from_scan(&config, dry_run, max_coderuns)?;
         }
+        Commands::ReconcileIssues {
+            repository,
+            namespace,
+            labels,
+            dry_run,
+            max_issues,
+            output,
+        } => {
+            run_reconcile_issues(
+                &repository,
+                &namespace,
+                &labels,
+                dry_run,
+                max_issues,
+                &output,
+            )?;
+        }
         Commands::Sensor { action } => match action {
             SensorCommands::GithubActions {
                 repositories,
@@ -2277,6 +2359,30 @@ async fn main() -> Result<()> {
                 .await?;
             }
         },
+        Commands::PlayMonitor {
+            namespace,
+            poll_interval,
+            repository,
+            min_severity,
+            no_issues,
+            max_issues,
+            issue_cooldown,
+            log_window,
+            once,
+        } => {
+            run_play_monitor(
+                &namespace,
+                poll_interval,
+                repository.as_deref(),
+                &min_severity,
+                !no_issues,
+                max_issues,
+                issue_cooldown,
+                log_window,
+                once,
+            )
+            .await?;
+        }
     }
 
     Ok(())
@@ -2380,6 +2486,128 @@ async fn run_github_actions_sensor(
         // Run continuous loop
         info!("Starting continuous monitoring loop (Ctrl+C to stop)");
         sensor.run().await?;
+    }
+
+    Ok(())
+}
+
+// =============================================================================
+// Play Monitor - Real-time log analysis for running plays
+// =============================================================================
+
+/// Run the play monitor to watch for anomalies in running plays.
+#[allow(clippy::too_many_arguments)]
+async fn run_play_monitor(
+    namespace: &str,
+    poll_interval: u64,
+    repository: Option<&str>,
+    min_severity: &str,
+    auto_create_issues: bool,
+    max_issues: usize,
+    issue_cooldown: i64,
+    log_window: i64,
+    once: bool,
+) -> Result<()> {
+    use play::{MonitorConfig, PlayMonitor};
+
+    info!("Starting play monitor");
+    info!(
+        "Namespace: {}, poll interval: {}s, min severity: {}",
+        namespace, poll_interval, min_severity
+    );
+    if let Some(repo) = repository {
+        info!(
+            "GitHub repository: {}, auto-create issues: {}",
+            repo, auto_create_issues
+        );
+    }
+
+    let config = MonitorConfig {
+        namespace: namespace.to_string(),
+        poll_interval_secs: poll_interval,
+        min_severity: min_severity.to_string(),
+        repository: repository.map(String::from),
+        auto_create_issues,
+        max_issues_per_play: max_issues,
+        issue_cooldown_mins: issue_cooldown,
+        log_window_mins: log_window,
+    };
+
+    let mut monitor = PlayMonitor::new(config);
+
+    // Set up event channel for logging
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+    monitor.set_event_sender(tx);
+
+    // Spawn event logger
+    tokio::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event.event_type {
+                play::monitor::MonitorEventType::PlayDetected => {
+                    info!(
+                        play_id = ?event.play_id,
+                        "🎬 New play detected"
+                    );
+                }
+                play::monitor::MonitorEventType::PlayCompleted => {
+                    info!(
+                        play_id = ?event.play_id,
+                        details = %event.details,
+                        "✅ Play completed"
+                    );
+                }
+                play::monitor::MonitorEventType::AnomalyDetected => {
+                    warn!(
+                        play_id = ?event.play_id,
+                        details = %event.details,
+                        "⚠️ Anomaly detected"
+                    );
+                }
+                play::monitor::MonitorEventType::IssueCreated => {
+                    info!(
+                        play_id = ?event.play_id,
+                        details = %event.details,
+                        "📝 GitHub issue created"
+                    );
+                }
+                play::monitor::MonitorEventType::SuccessDetected => {
+                    debug!(
+                        play_id = ?event.play_id,
+                        details = %event.details,
+                        "✓ Success pattern detected"
+                    );
+                }
+                play::monitor::MonitorEventType::Error => {
+                    error!(
+                        play_id = ?event.play_id,
+                        details = %event.details,
+                        "❌ Monitor error"
+                    );
+                }
+                _ => {
+                    debug!(
+                        event_type = ?event.event_type,
+                        play_id = ?event.play_id,
+                        "Monitor event"
+                    );
+                }
+            }
+        }
+    });
+
+    if once {
+        // Run once and exit
+        info!("Running single poll cycle...");
+        monitor.poll_once().await?;
+        let status = monitor.get_status();
+        info!(
+            "Status: {} active plays, {} CodeRuns, {} anomalies, {} issues",
+            status.active_plays, status.total_coderuns, status.total_anomalies, status.total_issues
+        );
+    } else {
+        // Run continuous loop
+        info!("Starting continuous monitoring loop (Ctrl+C to stop)");
+        monitor.run().await?;
     }
 
     Ok(())
@@ -7942,6 +8170,79 @@ Investigate and fix the errors detected in the {service} service.
         );
     }
     println!("{}", "═".repeat(60).green());
+
+    Ok(())
+}
+
+/// Run issue reconciliation - check and close resolved issues.
+fn run_reconcile_issues(
+    repository: &str,
+    namespace: &str,
+    labels: &str,
+    dry_run: bool,
+    max_issues: usize,
+    output_format: &str,
+) -> Result<()> {
+    use reconcile::{format_report_text, IssueReconciler, ReconcileConfig};
+
+    let is_json_output = output_format == "json";
+
+    if !is_json_output {
+        println!("{}", "═".repeat(60).cyan());
+        println!("{}", "🔄 ISSUE RECONCILIATION".cyan().bold());
+        println!("{}", "═".repeat(60).cyan());
+        println!();
+    }
+
+    // Parse labels
+    let healer_labels: Vec<String> = labels
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let config = ReconcileConfig {
+        repository: repository.to_string(),
+        namespace: namespace.to_string(),
+        healer_labels,
+        dry_run,
+        max_issues,
+    };
+
+    if !is_json_output {
+        println!("{}", format!("Repository: {}", config.repository).dimmed());
+        println!("{}", format!("Namespace: {}", config.namespace).dimmed());
+        println!(
+            "{}",
+            format!("Dry run: {}", if dry_run { "yes" } else { "no" }).dimmed()
+        );
+        println!();
+    }
+
+    let reconciler = IssueReconciler::new(config);
+    let report = reconciler.reconcile()?;
+
+    // Output based on format
+    match output_format {
+        "json" => {
+            let json = serde_json::to_string_pretty(&report)?;
+            println!("{json}");
+        }
+        _ => {
+            println!("{}", format_report_text(&report));
+
+            // Summary
+            println!();
+            if report.issues_closed > 0 {
+                println!(
+                    "{}",
+                    format!("✅ Closed {} resolved issues", report.issues_closed).green()
+                );
+            } else {
+                println!("{}", "ℹ️  No issues to close".dimmed());
+            }
+        }
+    }
 
     Ok(())
 }

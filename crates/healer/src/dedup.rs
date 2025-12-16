@@ -271,7 +271,8 @@ pub fn check_recent_alert_type_issue(
 /// Extract pod name from a heal issue title.
 ///
 /// Titles follow the pattern: `[HEAL-A2] Silent Failure: pod-name-here`
-fn extract_pod_from_title(title: &str) -> Option<String> {
+#[must_use]
+pub fn extract_pod_from_title(title: &str) -> Option<String> {
     // Look for ": " followed by the pod name
     if let Some(idx) = title.rfind(": ") {
         let pod_part = &title[idx + 2..];

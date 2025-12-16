@@ -1,0 +1,79 @@
+{{- if and .Values.healer.enabled .Values.healer.reconciler.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "cto.healer.fullname" . }}-reconciler
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.healer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: reconciler
+spec:
+  schedule: {{ .Values.healer.reconciler.schedule | default "*/5 * * * *" | quote }}
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            {{- include "cto.healer.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: reconciler
+        spec:
+          {{- include "cto.imagePullSecrets" . | nindent 10 }}
+          serviceAccountName: {{ include "cto.healer.fullname" . }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: DoesNotExist
+          containers:
+            - name: reconciler
+              image: "{{ include "cto.imageRef" (dict "component" "healer" "image" .Values.healer.image "global" .Values.global) }}"
+              imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.healer.image "global" .Values.global) }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+              command: ["healer"]
+              args:
+                - reconcile-issues
+                - --repository={{ .Values.healer.reconciler.repository | default "5dlabs/cto" }}
+                - --namespace={{ include "cto.namespace" . }}
+                - --labels={{ .Values.healer.reconciler.labels | default "heal" }}
+                - --max-issues={{ .Values.healer.reconciler.maxIssues | default "50" }}
+                - --output=json
+                {{- if .Values.healer.reconciler.dryRun }}
+                - --dry-run
+                {{- end }}
+              env:
+                - name: RUST_LOG
+                  value: {{ .Values.healer.reconciler.logLevel | default "info" }}
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.healer.reconciler.githubSecretName | default "cto-secrets" }}
+                      key: {{ .Values.healer.reconciler.githubSecretKey | default "GITHUB_TOKEN" }}
+              envFrom:
+                - secretRef:
+                    name: cto-secrets
+              resources:
+                {{- toYaml (.Values.healer.reconciler.resources | default .Values.healer.resources) | nindent 16 }}
+{{- end }}
+
