@@ -20,9 +20,21 @@ echo "════════════════════════�
 echo "║               CLAUDE CODE CLI INVOCATION                     ║"
 echo "═══════════════════════════════════════════════════════════════"
 
+# Install Claude Code CLI if not available
+if ! command -v claude >/dev/null 2>&1; then
+    echo "Installing Claude Code CLI..."
+    npm install -g @anthropic-ai/claude-code 2>/dev/null || {
+        echo "⚠️ npm install failed, trying npx..."
+        # Use npx as fallback
+        CLAUDE_CMD="npx -y @anthropic-ai/claude-code -p"
+    }
+fi
+
 # Build Claude command with latest CLI flags (as of Dec 2024)
 # Reference: https://code.claude.com/docs/en/cli-reference
-CLAUDE_CMD="claude -p"
+if [ -z "${CLAUDE_CMD:-}" ]; then
+    CLAUDE_CMD="claude -p"
+fi
 
 # Output format: stream-json for programmatic parsing
 CLAUDE_CMD="$CLAUDE_CMD --output-format stream-json"
