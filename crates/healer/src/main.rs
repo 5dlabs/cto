@@ -461,7 +461,7 @@ enum SensorCommands {
         #[arg(long, default_value = "")]
         excluded_workflows: String,
 
-        /// Kubernetes namespace for CodeRuns
+        /// Kubernetes namespace for `CodeRuns`
         #[arg(long, default_value = "cto")]
         namespace: String,
 
@@ -2347,7 +2347,7 @@ async fn run_github_actions_sensor(
     if once {
         // Run once and exit
         info!("Running single poll cycle...");
-        let failures = sensor.poll_once().await?;
+        let failures = sensor.poll_once()?;
         info!("Processed {} failure(s)", failures.len());
         for failure in &failures {
             println!(
