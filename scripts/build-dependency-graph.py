@@ -58,7 +58,11 @@ def build_dependency_graph(tasks: list) -> tuple:
         task_lookup[task_id] = task
         
         # Get dependencies - could be 'dependencies' or 'dependsOn'
-        dependencies = task.get('dependencies', []) or task.get('dependsOn', [])
+        # Check key existence explicitly since empty lists are valid (not falsy fallback)
+        if 'dependencies' in task:
+            dependencies = task['dependencies']
+        else:
+            dependencies = task.get('dependsOn', [])
         
         # Normalize dependencies to list of IDs
         for dep in dependencies:
@@ -107,7 +111,8 @@ def compute_execution_levels(deps: dict, task_lookup: dict) -> list:
             ready_tasks = list(remaining_tasks)
         
         # Sort tasks by ID for consistent ordering
-        ready_tasks.sort(key=lambda x: int(x) if x.isdigit() else x)
+        # Use tuple key to avoid TypeError when comparing int to str in Python 3
+        ready_tasks.sort(key=lambda x: (0, int(x)) if x.isdigit() else (1, x))
         
         # Add to current level
         levels.append(ready_tasks)
