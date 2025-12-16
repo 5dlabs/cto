@@ -1,8 +1,10 @@
 {{> header }}
 
+{{#if (or (eq github_app "blaze") (eq task_language "typescript") (eq task_language "javascript"))}}
 {{> node-env }}
 
 {{> expo-env }}
+{{/if}}
 
 {{> config }}
 
