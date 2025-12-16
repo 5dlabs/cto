@@ -240,7 +240,7 @@ impl GitHubActionsSensor {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("gh run list failed: {}", stderr);
+            anyhow::bail!("gh run list failed: {stderr}");
         }
 
         let runs: Vec<serde_json::Value> =
@@ -497,7 +497,7 @@ impl GitHubActionsSensor {
             Ok(url)
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("gh issue create failed: {}", stderr);
+            anyhow::bail!("gh issue create failed: {stderr}");
         }
     }
 
