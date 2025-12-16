@@ -64,15 +64,20 @@ runs:
       shell: bash
       run: |
         echo "🚀 Setting up optimized Rust build environment..."
-        echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
-        export PATH="/home/runner/.cargo/bin:$PATH"
+        # Ensure cargo bin directory exists
+        mkdir -p "$HOME/.cargo/bin"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
 
         # Install rustup if not present
         if ! command -v rustup &> /dev/null; then
           echo "📥 Installing rustup..."
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-          source "$HOME/.cargo/env"
-          export PATH="/home/runner/.cargo/bin:$PATH"
+          # Source the env file to get PATH updates
+          if [ -f "$HOME/.cargo/env" ]; then
+            source "$HOME/.cargo/env"
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
         fi
 
         # Check if both rustc and cargo are available and working
@@ -114,7 +119,10 @@ runs:
         SCCACHE_CACHE_SIZE: ${{ inputs.sccache-size }}
         SCCACHE_IDLE_TIMEOUT: '0'
       run: |
-        export PATH="/home/runner/.cargo/bin:$PATH"
+        # Ensure cargo bin directory exists
+        mkdir -p "$HOME/.cargo/bin"
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
         # Install sccache if not present (use pre-built binary, much faster)
         if ! command -v sccache &> /dev/null; then
