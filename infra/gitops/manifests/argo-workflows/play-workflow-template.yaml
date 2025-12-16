@@ -1166,7 +1166,12 @@ spec:
           MODEL="{{inputs.parameters.model}}"
           MODEL_ROTATION='{{inputs.parameters.model-rotation}}'
           TOOLS_CONFIG='{{inputs.parameters.tools-config}}'
-          REPOSITORY="{{workflow.parameters.repository}}"
+          REPOSITORY_RAW="{{workflow.parameters.repository}}"
+          # Normalize repository URL - add https://github.com/ if not present
+          case "$REPOSITORY_RAW" in
+            http://*|https://*) REPOSITORY="$REPOSITORY_RAW" ;;
+            *) REPOSITORY="https://github.com/$REPOSITORY_RAW" ;;
+          esac
           DOCS_REPO="{{workflow.parameters.docs-repository}}"
           DOCS_DIR="{{workflow.parameters.docs-project-directory}}"
           WORKING_DIR="{{workflow.parameters.working-directory}}"
