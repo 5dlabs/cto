@@ -1873,26 +1873,27 @@ spec:
           NAMESPACE="cto"
 
           # Render templates using sed (no root required, already installed)
+          # Write to /shared which is the mounted PVC
           sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
               -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
               -e "s|{{namespace}}|$NAMESPACE|g" \
-              /pm-templates/github-projects-helpers.sh.hbs > /workspace/github-projects-helpers.sh
-          chmod +x /workspace/github-projects-helpers.sh
+              /pm-templates/github-projects-helpers.sh.hbs > /shared/github-projects-helpers.sh
+          chmod +x /shared/github-projects-helpers.sh
 
           sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
               -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
               -e "s|{{namespace}}|$NAMESPACE|g" \
-              /pm-templates/morgan-pm.sh.hbs > /workspace/morgan-pm.sh
-          chmod +x /workspace/morgan-pm.sh
+              /pm-templates/morgan-pm.sh.hbs > /shared/morgan-pm.sh
+          chmod +x /shared/morgan-pm.sh
 
           sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
               -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
               -e "s|{{namespace}}|$NAMESPACE|g" \
-              /pm-templates/process-issue-comment.sh.hbs > /workspace/process-issue-comment.sh
-          chmod +x /workspace/process-issue-comment.sh
+              /pm-templates/process-issue-comment.sh.hbs > /shared/process-issue-comment.sh
+          chmod +x /shared/process-issue-comment.sh
 
           echo "✅ Templates rendered, starting Morgan PM..."
-          exec /workspace/morgan-pm.sh
+          exec /shared/morgan-pm.sh
         env:
           # GitHub App credentials for Morgan
           - name: GITHUB_APP_ID
