@@ -260,8 +260,9 @@ spec:
           echo "✅ Dependencies installed"
 
           # State config map name is based on repository
+          # Sanitize URL: remove https://, replace invalid chars, lowercase
           REPO_SLUG="{{workflow.parameters.repository}}"
-          REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
+          REPO_SLUG=$(echo "$REPO_SLUG" | sed 's|https://||;s|http://||' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]')
           STATE_CM_NAME="play-state-${REPO_SLUG}"
 
           echo "📋 Looking for state config map: $STATE_CM_NAME"
@@ -927,7 +928,7 @@ spec:
             labels:
               task-id: "$task_id"
               execution-level: "$level_index"
-              repository: "$(echo "{{workflow.parameters.repository}}" | tr '/' '-')"
+              repository: "$(echo "{{workflow.parameters.repository}}" | sed 's|https://||;s|http://||' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]')"
               current-stage: "pending"
               parent-workflow: "{{workflow.name}}"
               project-play: "true"
@@ -1112,8 +1113,9 @@ spec:
                 echo "✅ All tasks in level $level_index completed successfully"
 
               # Update play state - save highest completed task in this level
+              # Sanitize URL: remove https://, replace invalid chars, lowercase
               REPO_SLUG="{{workflow.parameters.repository}}"
-              REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
+              REPO_SLUG=$(echo "$REPO_SLUG" | sed 's|https://||;s|http://||' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]')
               STATE_CM_NAME="play-state-${REPO_SLUG}"
 
               # Get highest task number from current level
@@ -1611,7 +1613,7 @@ spec:
             namespace: cto
             labels:
               task-id: "$task_id"
-              repository: "$(echo "{{workflow.parameters.repository}}" | tr '/' '-')"
+              repository: "$(echo "{{workflow.parameters.repository}}" | sed 's|https://||;s|http://||' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]')"
               current-stage: "pending"
               parent-workflow: "{{workflow.name}}"
               project-play: "true"
@@ -1727,8 +1729,9 @@ spec:
                   echo "✅ Task $task_id completed successfully"
 
                   # Update play state after successful task completion
+                  # Sanitize URL: remove https://, replace invalid chars, lowercase
                   REPO_SLUG="{{workflow.parameters.repository}}"
-                  REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
+                  REPO_SLUG=$(echo "$REPO_SLUG" | sed 's|https://||;s|http://||' | tr '/:.' '-' | tr '[:upper:]' '[:lower:]')
                   STATE_CM_NAME="play-state-${REPO_SLUG}"
 
                   echo "💾 Saving play state: task $task_id complete"

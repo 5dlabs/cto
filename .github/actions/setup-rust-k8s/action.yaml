@@ -48,6 +48,14 @@ runs:
         echo "/home/runner/.cargo/bin" >> "$GITHUB_PATH"
         export PATH="/home/runner/.cargo/bin:$PATH"
 
+        # Install rustup if not present
+        if ! command -v rustup &> /dev/null; then
+          echo "📥 Installing rustup..."
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          source "$HOME/.cargo/env"
+          export PATH="/home/runner/.cargo/bin:$PATH"
+        fi
+
         # Check if both rustc and cargo are available and working
         if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
           echo "✅ Rust toolchain ready: $(rustc --version)"
@@ -88,6 +96,12 @@ runs:
         SCCACHE_IDLE_TIMEOUT: '0'
       run: |
         export PATH="/home/runner/.cargo/bin:$PATH"
+
+        # Install sccache if not present
+        if ! command -v sccache &> /dev/null; then
+          echo "📥 Installing sccache..."
+          cargo install sccache --locked
+        fi
 
         # Stop any existing sccache server
         sccache --stop-server 2>/dev/null || true
