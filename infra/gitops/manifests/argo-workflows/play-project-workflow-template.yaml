@@ -1858,6 +1858,10 @@ spec:
       script:
         image: ghcr.io/5dlabs/factory:latest
         command: ["/bin/bash"]
+        # Run as root to fix PVC permissions issue (Mayastor mounts as root:root)
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
         source: |
           #!/bin/bash
           set -euo pipefail
