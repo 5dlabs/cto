@@ -268,7 +268,7 @@ Do NOT just restart or retry - fix the underlying issue in code.
         // Create the CodeRun YAML
         // Labels include task-id for cancellation via CancelRemediation command
         let coderun_yaml = format!(
-            r"apiVersion: cto.5dlabs.io/v1alpha1
+            r"apiVersion: agents.platform/v1
 kind: CodeRun
 metadata:
   name: {}
