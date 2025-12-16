@@ -1203,7 +1203,7 @@ spec:
             taskId: ${TASK_ID}
             service: "${SERVICE}"
             repositoryUrl: "${REPOSITORY}"
-            docsRepositoryUrl: "https://github.com/${DOCS_REPO}"
+            docsRepositoryUrl: "${DOCS_REPO}"
             docsProjectDirectory: "${DOCS_DIR}"
             workingDirectory: "${WORKING_DIR}"
             githubApp: "${GITHUB_APP}"
