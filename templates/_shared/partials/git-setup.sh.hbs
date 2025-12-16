@@ -55,6 +55,7 @@ if [ "$WORK_DIR" != "$REPO_NAME" ]; then
 fi
 cd "$CLI_WORK_DIR"
 export CLI_WORK_DIR
+export CLAUDE_WORK_DIR="$CLI_WORK_DIR"
 
 echo "✓ Working directory: $CLI_WORK_DIR"
 echo "✓ Branch: $FEATURE_BRANCH (base: $BASE_BRANCH)"
