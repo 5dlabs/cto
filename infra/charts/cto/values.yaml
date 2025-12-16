@@ -440,8 +440,9 @@ healer:
     # Log level for the reconciler
     logLevel: "info"
     # GitHub secret configuration
-    githubSecretName: "cto-secrets"  # pragma: allowlist secret
-    githubSecretKey: "GITHUB_TOKEN"  # pragma: allowlist secret
+    # Use tools-github-secrets which has GITHUB_PERSONAL_ACCESS_TOKEN
+    githubSecretName: "tools-github-secrets"  # pragma: allowlist secret
+    githubSecretKey: "GITHUB_PERSONAL_ACCESS_TOKEN"  # pragma: allowlist secret
     # Resource limits (defaults to healer resources if not specified)
     resources:
       limits:
