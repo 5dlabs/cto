@@ -7517,21 +7517,26 @@ async fn run_scan_logs_command(
         .filter(|s| !s.is_empty())
         .collect();
 
-    println!("{}", "═".repeat(60).cyan());
-    println!("{}", "HEALER LOG SCANNER".cyan().bold());
-    println!("{}", "═".repeat(60).cyan());
-    println!();
-    println!("  Window:          {}", window.green());
-    println!("  Namespaces:      {}", namespace_list.join(", ").green());
-    println!("  Error Threshold: {error_threshold}");
-    println!("  Warn Threshold:  {warn_threshold}");
-    println!();
+    // Only print header for non-JSON output (JSON must be clean for parsing)
+    let is_json_output = output_format == "json";
+
+    if !is_json_output {
+        println!("{}", "═".repeat(60).cyan());
+        println!("{}", "HEALER LOG SCANNER".cyan().bold());
+        println!("{}", "═".repeat(60).cyan());
+        println!();
+        println!("  Window:          {}", window.green());
+        println!("  Namespaces:      {}", namespace_list.join(", ").green());
+        println!("  Error Threshold: {error_threshold}");
+        println!("  Warn Threshold:  {warn_threshold}");
+        println!();
+    }
 
     // Create scanner
     let loki = loki::LokiClient::with_defaults();
 
-    // Check Loki connectivity
-    if !loki.health_check().await.unwrap_or(false) {
+    // Check Loki connectivity (only warn for non-JSON output)
+    if !loki.health_check().await.unwrap_or(false) && !is_json_output {
         println!(
             "{}",
             "⚠️  Warning: Loki health check failed - results may be incomplete".yellow()
@@ -7547,7 +7552,9 @@ async fn run_scan_logs_command(
 
     let scanner = LogScanner::with_config(loki, config);
 
-    println!("{}", "Scanning logs...".cyan());
+    if !is_json_output {
+        println!("{}", "Scanning logs...".cyan());
+    }
     let report = scanner.scan(window_duration).await?;
 
     // Output based on format
@@ -7618,8 +7625,8 @@ async fn run_scan_logs_command(
         }
     }
 
-    // Show remediation candidates if requested
-    if show_candidates && !report.services_with_issues.is_empty() {
+    // Show remediation candidates if requested (skip for JSON output to keep it clean)
+    if show_candidates && !report.services_with_issues.is_empty() && !is_json_output {
         println!();
         println!("{}", "Remediation Candidates:".yellow());
         let candidates = scanner.determine_candidates(&report);
