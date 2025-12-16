@@ -5,9 +5,47 @@
 GITHUB_APP="{{github_app}}"
 GH_HOST="${GH_HOST:-github.com}"
 
-# Export GitHub token
-if [ -z "${GH_TOKEN:-}" ]; then
-  export GH_TOKEN="${GITHUB_TOKEN:-}"
+# Generate GITHUB_TOKEN from app credentials if not already set
+if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+  echo "🔐 Generating GitHub token from app credentials..."
+  
+  # Generate JWT token using openssl (available in factory image)
+  NOW=$(date +%s)
+  IAT=$((NOW - 60))
+  EXP=$((NOW + 600))
+  
+  # Create JWT header and payload
+  HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  
+  # Create signature
+  SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  
+  JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+  
+  # Get installation ID and generate access token
+  INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+  INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
+  
+  if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+    TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+    
+    if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
+      export GITHUB_TOKEN
+      export GH_TOKEN="$GITHUB_TOKEN"
+      echo "✅ GitHub token generated successfully"
+    else
+      echo "⚠️ Failed to generate GitHub token from app credentials"
+    fi
+  else
+    echo "⚠️ No GitHub App installation found"
+  fi
+fi
+
+# Export GitHub token if set
+if [ -z "${GH_TOKEN:-}" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
+  export GH_TOKEN="${GITHUB_TOKEN}"
 fi
 
 # Configure git credential helper for GitHub App token
@@ -26,5 +64,4 @@ export GIT_AUTHOR_EMAIL
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 export GIT_TERMINAL_PROMPT=0
-
 
