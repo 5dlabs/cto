@@ -277,7 +277,7 @@ impl PlatformAlertHandler {
             .replace('\n', "\\n");
 
         format!(
-            r#"apiVersion: cto.5dlabs.io/v1
+            r#"apiVersion: agents.platform/v1
 kind: CodeRun
 metadata:
   generateName: healer-platform-{agent}-
