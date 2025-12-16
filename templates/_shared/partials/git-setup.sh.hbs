@@ -47,6 +47,13 @@ export FEATURE_BRANCH
 export BASE_BRANCH
 export REPO_ROOT
 
+# Docs project directory (for locating .tasks files)
+DOCS_PROJECT_DIR="{{docs_project_directory}}"
+if [ -z "$DOCS_PROJECT_DIR" ] || [ "$DOCS_PROJECT_DIR" = "null" ]; then
+  DOCS_PROJECT_DIR=""
+fi
+export DOCS_PROJECT_DIR
+
 # Working directory
 CLI_WORK_DIR="$REPO_ROOT"
 if [ "$WORK_DIR" != "$REPO_NAME" ]; then
