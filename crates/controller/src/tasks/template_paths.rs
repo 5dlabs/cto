@@ -128,7 +128,7 @@ pub const REMEDIATE_CLAUDE_AGENTS_TEMPLATE: &str = "agents/rex/healer/system-pro
 // Shared code templates
 // ============================================================================
 
-pub const CODE_MCP_CONFIG_TEMPLATE: &str = "_shared/partials/tools-config.sh.hbs";
+pub const CODE_MCP_CONFIG_TEMPLATE: &str = "code/mcp.json.hbs";
 pub const CODE_CODING_GUIDELINES_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
 pub const CODE_GITHUB_GUIDELINES_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
 pub const REVIEW_FACTORY_POST_REVIEW_TEMPLATE: &str = "agents/stitch/review/system-prompt.md.hbs";

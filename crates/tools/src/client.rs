@@ -58,12 +58,28 @@ impl McpClient {
 
     /// Load new client configuration from environment variable or default location
     fn load_client_config(working_dir: &Option<String>) -> Result<Option<ClientConfig>> {
-        let config_path = if let Ok(config_path) = std::env::var("MCP_TOOLS_CONFIG") {
+        // Check both env vars for backwards compatibility
+        let config_path = if let Ok(config_path) = std::env::var("MCP_CLIENT_CONFIG") {
+            PathBuf::from(config_path)
+        } else if let Ok(config_path) = std::env::var("MCP_TOOLS_CONFIG") {
+            // Legacy env var name
             PathBuf::from(config_path)
         } else if let Some(dir) = working_dir {
-            PathBuf::from(dir).join("tools-config.json")
+            // Try both filenames
+            let client_config = PathBuf::from(dir).join("client-config.json");
+            if client_config.exists() {
+                client_config
+            } else {
+                PathBuf::from(dir).join("tools-config.json")
+            }
         } else {
-            PathBuf::from("tools-config.json")
+            // Try both filenames in current dir
+            let client_config = PathBuf::from("client-config.json");
+            if client_config.exists() {
+                client_config
+            } else {
+                PathBuf::from("tools-config.json")
+            }
         };
 
         if config_path.exists() {
