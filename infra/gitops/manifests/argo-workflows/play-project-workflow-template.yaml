@@ -40,9 +40,9 @@ spec:
         value: "5DLabs-Rex"
         description: "Default agent for backend/general implementation tasks"
       - name: implementation-cli
-        value: "factory"
+        value: ""  # Must be provided by MCP client
       - name: implementation-model
-        value: "claude-sonnet-4-5-20250929"
+        value: ""  # Must be provided by MCP client
       - name: implementation-tools
         value: '{"remote":[],"localServers":{}}'
       - name: implementation-model-rotation
@@ -53,9 +53,9 @@ spec:
         value: "5DLabs-Blaze"
         description: "Specialized agent for frontend tasks (React, UI components)"
       - name: frontend-cli
-        value: "codex"
+        value: ""  # Must be provided by MCP client
       - name: frontend-model
-        value: "gpt-5-codex"
+        value: ""  # Must be provided by MCP client
       - name: frontend-tools
         value: '{"remote":[],"localServers":{}}'
       - name: frontend-model-rotation
@@ -65,9 +65,9 @@ spec:
       - name: quality-agent
         value: "5DLabs-Cleo"
       - name: quality-cli
-        value: "claude"
+        value: ""  # Must be provided by MCP client
       - name: quality-model
-        value: "claude-sonnet-4-5-20250929"
+        value: ""  # Must be provided by MCP client
       - name: quality-tools
         value: '{"remote":[],"localServers":{}}'
       - name: quality-model-rotation
@@ -77,9 +77,9 @@ spec:
       - name: security-agent
         value: "5DLabs-Cipher"
       - name: security-cli
-        value: "codex"
+        value: ""  # Must be provided by MCP client
       - name: security-model
-        value: "gpt-5"
+        value: ""  # Must be provided by MCP client
       - name: security-tools
         value: '{"remote":[],"localServers":{}}'
       - name: security-model-rotation
@@ -89,9 +89,9 @@ spec:
       - name: testing-agent
         value: "5DLabs-Tess"
       - name: testing-cli
-        value: "claude"
+        value: ""  # Must be provided by MCP client
       - name: testing-model
-        value: "claude-sonnet-4-5-20250929"
+        value: ""  # Must be provided by MCP client
       - name: testing-tools
         value: '{"remote":[],"localServers":{}}'
       - name: testing-model-rotation

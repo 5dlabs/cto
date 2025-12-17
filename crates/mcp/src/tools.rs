@@ -189,6 +189,18 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                 "cli": {
                     "type": "string",
                     "description": "CLI tool to use for all agents (optional, defaults to configuration)"
+                },
+                "linear_session_id": {
+                    "type": "string",
+                    "description": "Linear session ID for activity updates (enables Linear sidecar)"
+                },
+                "linear_issue_id": {
+                    "type": "string",
+                    "description": "Linear issue ID for status updates"
+                },
+                "linear_team_id": {
+                    "type": "string",
+                    "description": "Linear team ID"
                 }
             },
             "required": []

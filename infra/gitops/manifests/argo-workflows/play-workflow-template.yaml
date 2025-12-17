@@ -206,6 +206,17 @@ spec:
         description: "Merge commit SHA (populated after PR merge)"
         value: ""
 
+      # Linear integration parameters (for activity updates and 2-way comms)
+      - name: linear-session-id
+        description: "Linear session ID for activity updates"
+        value: ""
+      - name: linear-issue-id
+        description: "Linear issue ID for status updates"
+        value: ""
+      - name: linear-team-id
+        description: "Linear team ID"
+        value: ""
+
       # Task requirements (secrets and environment variables)
       - name: task-requirements
         description: "Base64-encoded requirements.yaml content for all agents"
@@ -1185,6 +1196,9 @@ spec:
           TASK_LANGUAGE="{{inputs.parameters.task-language}}"
           TASK_FRAMEWORK="{{inputs.parameters.task-framework}}"
           OPENCODE_VERBOSE="{{workflow.parameters.opencode-verbose}}"
+          LINEAR_SESSION_ID="{{workflow.parameters.linear-session-id}}"
+          LINEAR_ISSUE_ID="{{workflow.parameters.linear-issue-id}}"
+          LINEAR_TEAM_ID="{{workflow.parameters.linear-team-id}}"
 
           cat > /tmp/coderun.yaml << MANIFEST_EOF
           apiVersion: agents.platform/v1
@@ -1222,6 +1236,21 @@ spec:
               model: "${MODEL}"
               modelRotation: ${MODEL_ROTATION}
             taskRequirements: "${TASK_REQUIREMENTS}"
+          MANIFEST_EOF
+
+          # Add linearIntegration section if LINEAR_SESSION_ID is provided
+          if [ -n "${LINEAR_SESSION_ID}" ]; then
+            cat >> /tmp/coderun.yaml << LINEAR_EOF
+            linearIntegration:
+              enabled: true
+              sessionId: "${LINEAR_SESSION_ID}"
+              issueId: "${LINEAR_ISSUE_ID}"
+              teamId: "${LINEAR_TEAM_ID}"
+          LINEAR_EOF
+          fi
+
+          # Continue with env section
+          cat >> /tmp/coderun.yaml << ENV_EOF
             env:
               PR_URL: "${PR_URL}"
               PR_NUMBER: "${PR_NUMBER}"
@@ -1242,7 +1271,7 @@ spec:
               OPENCODE_VERBOSE: "${OPENCODE_VERBOSE}"
               AUTO_MERGE: "${AUTO_MERGE}"
               FINAL_TASK: "${FINAL_TASK}"
-          MANIFEST_EOF
+          ENV_EOF
 
           echo "Creating CodeRun resource..."
           RESULT=$(kubectl create -f /tmp/coderun.yaml -o json)
