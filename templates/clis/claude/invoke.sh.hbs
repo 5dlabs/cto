@@ -47,8 +47,14 @@ for mcp_path in "${mcp_config_path:-}" "/task-files/mcp.json" "/workspace/.mcp.j
 done
 
 if [ -n "$MCP_CONFIG" ]; then
-    echo "✓ Adding MCP configuration: $MCP_CONFIG"
-    CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG"
+    # Validate the config is valid JSON before passing to Claude
+    if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG" 2>/dev/null; then
+        echo "✓ Adding MCP configuration: $MCP_CONFIG"
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG"
+    else
+        echo "⚠️ MCP config at $MCP_CONFIG is not valid JSON, skipping"
+        MCP_CONFIG=""
+    fi
 else
     echo "ℹ️ No MCP configuration found (checked /task-files/mcp.json, /workspace/.mcp.json)"
 fi
