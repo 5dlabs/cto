@@ -827,3 +827,4 @@ mod tests {
         assert_eq!(agent, AgentType::Rex);
     }
 }
+
