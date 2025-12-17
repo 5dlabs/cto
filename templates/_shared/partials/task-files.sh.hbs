@@ -45,10 +45,19 @@ if [ -n "$TASK_ID" ]; then
             echo "  ✓ Copied task.md as prompt.md"
         fi
         
-        # Copy acceptance-criteria.md if it exists
+        # Copy acceptance criteria (check both naming conventions)
         if [ -f "$TASK_SOURCE_DIR/acceptance-criteria.md" ]; then
             cp "$TASK_SOURCE_DIR/acceptance-criteria.md" "$CLI_WORK_DIR/task/acceptance-criteria.md"
             echo "  ✓ Copied acceptance-criteria.md"
+        elif [ -f "$TASK_SOURCE_DIR/acceptance.md" ]; then
+            cp "$TASK_SOURCE_DIR/acceptance.md" "$CLI_WORK_DIR/task/acceptance-criteria.md"
+            echo "  ✓ Copied acceptance.md as acceptance-criteria.md"
+        fi
+        
+        # Copy prompt.xml for Claude (XML format produces better results)
+        if [ -f "$TASK_SOURCE_DIR/prompt.xml" ]; then
+            cp "$TASK_SOURCE_DIR/prompt.xml" "$CLI_WORK_DIR/task/prompt.xml"
+            echo "  ✓ Copied prompt.xml"
         fi
         
         # Copy any other .md files that might be useful
@@ -73,11 +82,15 @@ fi
 echo ""
 echo "📁 Task Files:"
 
-# Prompt (required)
-if [ -f "$CLI_WORK_DIR/task/prompt.md" ]; then
+# Prompt (required - prefer XML for Claude)
+if [ -f "$CLI_WORK_DIR/task/prompt.xml" ]; then
+    echo "  ✓ prompt.xml (XML format)"
+    export PROMPT_FORMAT="xml"
+elif [ -f "$CLI_WORK_DIR/task/prompt.md" ]; then
     echo "  ✓ prompt.md"
+    export PROMPT_FORMAT="md"
 else
-    echo "  ⚠️ prompt.md not found"
+    echo "  ⚠️ No prompt file found"
 fi
 
 # Acceptance Criteria (required for verification)
