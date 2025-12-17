@@ -20,20 +20,14 @@ echo "════════════════════════�
 echo "║               CLAUDE CODE CLI INVOCATION                     ║"
 echo "═══════════════════════════════════════════════════════════════"
 
-# Install Claude Code CLI if not available
-if ! command -v claude >/dev/null 2>&1; then
-    echo "Installing Claude Code CLI..."
-    npm install -g @anthropic-ai/claude-code 2>/dev/null || {
-        echo "⚠️ npm install failed, trying npx..."
-        # Use npx as fallback
-        CLAUDE_CMD="npx -y @anthropic-ai/claude-code -p"
-    }
-fi
-
-# Build Claude command with latest CLI flags (as of Dec 2024)
-# Reference: https://code.claude.com/docs/en/cli-reference
-if [ -z "${CLAUDE_CMD:-}" ]; then
+# Claude Code CLI - should be pre-installed in base image
+# Fallback to npx if not available (slower but works)
+if command -v claude >/dev/null 2>&1; then
     CLAUDE_CMD="claude -p"
+    echo "✓ Using pre-installed Claude CLI"
+else
+    echo "⚠️ Claude CLI not in PATH, using npx (consider adding to base image)"
+    CLAUDE_CMD="npx -y @anthropic-ai/claude-code -p"
 fi
 
 # Output format: stream-json for programmatic parsing

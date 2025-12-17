@@ -60,11 +60,13 @@ if [ -n "$TASK_ID" ]; then
             echo "  ✓ Copied prompt.xml"
         fi
         
-        # Copy any other .md files that might be useful
+        # Copy any other .md files that might be useful (exclude already-handled files)
         for md_file in "$TASK_SOURCE_DIR"/*.md; do
             if [ -f "$md_file" ]; then
                 base=$(basename "$md_file")
-                if [ "$base" != "prompt.md" ] && [ "$base" != "task.md" ] && [ "$base" != "acceptance-criteria.md" ]; then
+                # Skip files we've already handled specially
+                if [ "$base" != "prompt.md" ] && [ "$base" != "task.md" ] && \
+                   [ "$base" != "acceptance-criteria.md" ] && [ "$base" != "acceptance.md" ]; then
                     cp "$md_file" "$CLI_WORK_DIR/task/$base" 2>/dev/null || true
                 fi
             fi
