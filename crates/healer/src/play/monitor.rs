@@ -762,3 +762,4 @@ mod tests {
         assert!(severity_order("medium") > severity_order(&config.min_severity));
     }
 }
+
