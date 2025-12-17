@@ -1825,10 +1825,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map_or_else(|| config.defaults.play.cli.clone(), String::from);
 
     // Handle model - use provided value or config default (needed for agent resolution)
-    let model = arguments
-        .get("model")
-        .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.play.model.clone(), String::from);
+    // Track if user explicitly provided a model to override agent-specific configs
+    let user_provided_model = arguments.get("model").and_then(|v| v.as_str()).map(String::from);
+    let model = user_provided_model
+        .clone()
+        .unwrap_or_else(|| config.defaults.play.model.clone());
 
     // Try to load repository-specific configuration for agent tools
     eprintln!("🔍 Checking for repository-specific configuration...");
@@ -1871,7 +1872,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         } else {
             agent_config.cli.clone()
         };
-        let agent_model = if agent_config.model.is_empty() {
+        // User-provided model takes priority, then agent config, then platform default
+        let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
             model.clone()
         } else {
             agent_config.model.clone()
@@ -1973,7 +1975,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.cli.clone()
             };
-            let agent_model = if agent_config.model.is_empty() {
+            // User-provided model takes priority, then agent config, then platform default
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
                 model.clone()
             } else {
                 agent_config.model.clone()
@@ -2060,7 +2063,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.cli.clone()
             };
-            let agent_model = if agent_config.model.is_empty() {
+            // User-provided model takes priority, then agent config, then platform default
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
                 model.clone()
             } else {
                 agent_config.model.clone()
@@ -2147,7 +2151,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.cli.clone()
             };
-            let agent_model = if agent_config.model.is_empty() {
+            // User-provided model takes priority, then agent config, then platform default
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
                 model.clone()
             } else {
                 agent_config.model.clone()
@@ -2234,7 +2239,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.cli.clone()
             };
-            let agent_model = if agent_config.model.is_empty() {
+            // User-provided model takes priority, then agent config, then platform default
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
                 model.clone()
             } else {
                 agent_config.model.clone()
@@ -2458,6 +2464,28 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Final task parameter - indicates this is the last task requiring deployment verification
     let final_task = parse_bool_argument(arguments, "final_task").unwrap_or(false);
     params.push(format!("final-task={final_task}"));
+
+    // Linear integration parameters (enables sidecar for activity updates)
+    let linear_session_id = arguments
+        .get("linear_session_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let linear_issue_id = arguments
+        .get("linear_issue_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let linear_team_id = arguments
+        .get("linear_team_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    params.push(format!("linear-session-id={linear_session_id}"));
+    params.push(format!("linear-issue-id={linear_issue_id}"));
+    params.push(format!("linear-team-id={linear_team_id}"));
+
+    if !linear_session_id.is_empty() {
+        eprintln!("✅ Linear integration enabled (session: {linear_session_id})");
+    }
 
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {

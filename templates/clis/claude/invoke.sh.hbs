@@ -110,14 +110,21 @@ rm -f "$STREAM_OUTPUT" 2>/dev/null || true
 touch "$STREAM_OUTPUT"
 chmod 666 "$STREAM_OUTPUT" || true
 
-echo "✓ Claude stream output: $STREAM_OUTPUT"
+# Agent log file for sidecar to stream to Linear
+AGENT_LOG="${LOG_FILE_PATH:-/workspace/agent.log}"
+rm -f "$AGENT_LOG" 2>/dev/null || true
+touch "$AGENT_LOG"
+chmod 666 "$AGENT_LOG" || true
 
-# Start Claude (reader) in background, tee output to stream file
+echo "✓ Claude stream output: $STREAM_OUTPUT"
+echo "✓ Agent log file: $AGENT_LOG"
+
+# Start Claude (reader) in background, tee output to both stream file and log file
 # Note: busybox tee doesn't support -u, use stdbuf or plain tee
 if command -v stdbuf >/dev/null 2>&1; then
-    $CLAUDE_CMD < "$FIFO_PATH" | stdbuf -oL tee "$STREAM_OUTPUT" &
+    $CLAUDE_CMD < "$FIFO_PATH" | stdbuf -oL tee "$STREAM_OUTPUT" "$AGENT_LOG" &
 else
-    $CLAUDE_CMD < "$FIFO_PATH" | tee "$STREAM_OUTPUT" &
+    $CLAUDE_CMD < "$FIFO_PATH" | tee "$STREAM_OUTPUT" "$AGENT_LOG" &
 fi
 CLAUDE_PID=$!
 
