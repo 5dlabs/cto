@@ -43,13 +43,20 @@ CLAUDE_CMD="$CLAUDE_CMD --input-format stream-json"
 # Verbose mode for debugging
 CLAUDE_CMD="$CLAUDE_CMD --verbose"
 
-# MCP configuration
-MCP_CONFIG="${mcp_config_path:-/workspace/.mcp.json}"
-if [ -f "$MCP_CONFIG" ]; then
+# MCP configuration (check multiple locations)
+MCP_CONFIG=""
+for mcp_path in "${mcp_config_path:-}" "/task-files/mcp.json" "/workspace/.mcp.json" "$CLI_WORK_DIR/.mcp.json"; do
+    if [ -n "$mcp_path" ] && [ -f "$mcp_path" ]; then
+        MCP_CONFIG="$mcp_path"
+        break
+    fi
+done
+
+if [ -n "$MCP_CONFIG" ]; then
     echo "✓ Adding MCP configuration: $MCP_CONFIG"
     CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG"
 else
-    echo "⚠️ No MCP configuration found at $MCP_CONFIG"
+    echo "ℹ️ No MCP configuration found (checked /task-files/mcp.json, /workspace/.mcp.json)"
 fi
 
 # System prompt handling
@@ -114,14 +121,19 @@ else
 fi
 CLAUDE_PID=$!
 
-# Determine prompt source
+# Determine prompt source (prefer XML format for better Claude results)
 if [ -n "${PROMPT_CONTENT:-}" ]; then
     USER_PROMPT="$PROMPT_CONTENT"
+    echo "✓ Using prompt from PROMPT_CONTENT env var"
+elif [ -f "$CLAUDE_WORK_DIR/task/prompt.xml" ]; then
+    USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.xml")
+    echo "✓ Using XML prompt from task/prompt.xml"
 elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
     USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.md")
     echo "✓ Using prompt from task/prompt.md"
 else
     echo "❌ ERROR: No prompt content available"
+    echo "   Checked: \$PROMPT_CONTENT, task/prompt.xml, task/prompt.md"
     kill "$CLAUDE_PID" 2>/dev/null || true
     exit 1
 fi
