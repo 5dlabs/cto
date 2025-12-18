@@ -56,37 +56,22 @@ impl McpClient {
         })
     }
 
-    /// Load new client configuration from environment variable or default location
+    /// Load client configuration from environment variable or default location
     fn load_client_config(working_dir: &Option<String>) -> Result<Option<ClientConfig>> {
-        // Check both env vars for backwards compatibility
-        let config_path = if let Ok(config_path) = std::env::var("MCP_CLIENT_CONFIG") {
-            PathBuf::from(config_path)
-        } else if let Ok(config_path) = std::env::var("MCP_TOOLS_CONFIG") {
-            // Legacy env var name
+        // Priority: MCP_TOOLS_CONFIG env var > working_dir/tools-config.json > ./tools-config.json
+        let config_path = if let Ok(config_path) = std::env::var("MCP_TOOLS_CONFIG") {
             PathBuf::from(config_path)
         } else if let Some(dir) = working_dir {
-            // Try both filenames
-            let client_config = PathBuf::from(dir).join("client-config.json");
-            if client_config.exists() {
-                client_config
-            } else {
-                PathBuf::from(dir).join("tools-config.json")
-            }
+            PathBuf::from(dir).join("tools-config.json")
         } else {
-            // Try both filenames in current dir
-            let client_config = PathBuf::from("client-config.json");
-            if client_config.exists() {
-                client_config
-            } else {
-                PathBuf::from("tools-config.json")
-            }
+            PathBuf::from("tools-config.json")
         };
 
         if config_path.exists() {
             let content = std::fs::read_to_string(&config_path)?;
             let config: ClientConfig = serde_json::from_str(&content)?;
             tracing::debug!(
-                "[Bridge] Loaded client config from: {}",
+                "[Bridge] Loaded tools config from: {}",
                 config_path.display()
             );
             tracing::debug!("[Bridge] Remote tools: {:?}", config.remote_tools);
@@ -97,7 +82,7 @@ impl McpClient {
             Ok(Some(config))
         } else {
             tracing::debug!(
-                "[Bridge] No client config found at {}, using legacy mode",
+                "[Bridge] No tools config found at {}, all remote tools will be available",
                 config_path.display()
             );
             Ok(None)
