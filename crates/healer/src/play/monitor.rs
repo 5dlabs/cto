@@ -297,7 +297,7 @@ impl PlayMonitor {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("kubectl failed: {}", stderr);
+            anyhow::bail!("kubectl failed: {stderr}");
         }
 
         let json: serde_json::Value =
@@ -460,7 +460,7 @@ impl PlayMonitor {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("kubectl logs failed: {}", stderr);
+            anyhow::bail!("kubectl logs failed: {stderr}");
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
