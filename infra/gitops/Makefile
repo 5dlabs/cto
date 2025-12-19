@@ -77,7 +77,7 @@ install-tools: ## Install required testing tools
 	@if [ "$$(uname)" = "Darwin" ]; then \
 		brew install yq || echo "Failed to install yq"; \
 	else \
-		wget -qO /tmp/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && \
+		curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq && \
 		chmod +x /tmp/yq && \
 		sudo mv /tmp/yq /usr/local/bin/yq || echo "Failed to install yq"; \
 	fi
@@ -86,7 +86,7 @@ install-tools: ## Install required testing tools
 	@if [ "$$(uname)" = "Darwin" ]; then \
 		brew install kubeconform || echo "Failed to install kubeconform"; \
 	else \
-		wget -qO- https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | \
+		curl -fsSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | \
 		tar xz && sudo mv kubeconform /usr/local/bin || echo "Failed to install kubeconform"; \
 	fi
 	@echo ""
