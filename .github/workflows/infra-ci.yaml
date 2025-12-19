@@ -256,38 +256,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Trivy with retry
-        run: |
-          # Install Trivy binary with retry logic to handle network timeouts
-          TRIVY_VERSION="v0.58.0"
-          MAX_RETRIES=3
-          RETRY_DELAY=10
-
-          for i in $(seq 1 $MAX_RETRIES); do
-            echo "Attempt $i of $MAX_RETRIES: Installing Trivy ${TRIVY_VERSION}..."
-            # Use curl with proper timeout flags: -m for max time, --connect-timeout for connection
-            if curl -sfL --max-time 120 --connect-timeout 30 \
-               https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
-               sh -s -- -b /usr/local/bin ${TRIVY_VERSION}; then
-              echo "✅ Trivy installed successfully"
-              trivy --version
-              break
-            fi
-            if [ $i -eq $MAX_RETRIES ]; then
-              echo "❌ Failed to install Trivy after $MAX_RETRIES attempts"
-              exit 1
-            fi
-            echo "⚠️ Attempt $i failed, retrying in ${RETRY_DELAY}s..."
-            sleep $RETRY_DELAY
-            RETRY_DELAY=$((RETRY_DELAY * 2))
-          done
-
       - name: Run Trivy security scanner
-        run: |
-          trivy config \
-            --format sarif \
-            --output trivy-results.sarif \
-            infra/gitops
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # master
+        with:
+          scan-type: 'config'
+          scan-ref: 'infra/gitops'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
