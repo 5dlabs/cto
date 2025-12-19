@@ -367,3 +367,6 @@ fn op_item_get_field(item: &str, vault: Option<&str>, field: &str) -> Result<Str
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
+
+
+
