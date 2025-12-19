@@ -164,24 +164,3 @@ podDisruptionBudget:
 # Enable debug if needed
 debug:
   enabled: false
-
-# Explicitly configure devices for Cilium to avoid conflicts with Kilo's
-# flannel.1 VXLAN interface. Kilo is deprecated (see kilo.yaml) but still
-# creates flannel.1 with --compatibility=flannel. This causes Cilium's
-# neighbor-link-updater to fail with:
-#   "unable to determine next hop IPv4 address for flannel.1: remote node IP is non-routable"
-#
-# Fix: Explicitly list the devices Cilium should use, excluding flannel.1.
-# - eno1: Primary physical interface for node-to-node traffic
-# - cilium_wg0: Cilium's WireGuard interface for encrypted pod traffic
-# Note: kilo0 is managed by Kilo and should not be used by Cilium
-#
-# TODO: Remove Kilo entirely and rely on Cilium ClusterMesh + WireGuard
-# See: docs/architecture/decisions/0001-cilium-clustermesh-networking.md
-devices:
-  - eno1
-
-# Disable L2 neighbor discovery since we're using tunnel mode (VXLAN)
-# and don't need ARP probing for cross-node traffic
-l2NeighDiscovery:
-  enabled: false
