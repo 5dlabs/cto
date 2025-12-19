@@ -56,7 +56,7 @@ spec:
               arguments:
                 parameters:
                   - name: scan-output
-                    value: "{{steps.scan-logs.outputs.result}}"
+                    value: "{{steps.scan-logs.outputs.parameters.scan-json}}"
 
           # Step 3: Trigger remediation if recommended
           - - name: trigger-remediation
@@ -64,22 +64,39 @@ spec:
               arguments:
                 parameters:
                   - name: scan-output
-                    value: "{{steps.scan-logs.outputs.result}}"
-              when: "{{steps.scan-logs.outputs.result}} != ''"
+                    value: "{{steps.scan-logs.outputs.parameters.scan-json}}"
+              when: "{{steps.scan-logs.outputs.parameters.remediation-needed}} == true"
 
       - name: healer-scan
-        container:
+        # Use script template to capture output as parameter
+        script:
           image: ghcr.io/5dlabs/healer:latest
           imagePullPolicy: Always
-          command: ["healer"]
-          args:
-            - "scan-logs"
-            - "--window=1h"
-            - "--namespaces=cto,automation,argocd,infra,observability"
-            - "--error-threshold=5"
-            - "--warn-threshold=20"
-            - "--output=json"
-            - "--show-candidates"
+          command: ["/bin/sh"]
+          source: |
+            #!/bin/sh
+            # Run healer scan-logs and write JSON to output parameter file
+            healer scan-logs \
+              --window=1h \
+              --namespaces=cto,automation,argocd,infra,observability \
+              --error-threshold=5 \
+              --warn-threshold=20 \
+              --output=json \
+              --show-candidates > /tmp/scan-result.json
+
+            # Output JSON to parameter file (Argo reads from this)
+            cat /tmp/scan-result.json > /tmp/scan-json
+
+            # Extract remediation_recommended value for conditional step
+            # Use grep since jq isn't available in healer image
+            if grep -q '"remediation_recommended"[[:space:]]*:[[:space:]]*true' /tmp/scan-result.json; then
+              echo "true" > /tmp/remediation-needed
+            else
+              echo "false" > /tmp/remediation-needed
+            fi
+
+            # Also output to stdout for visibility in logs
+            cat /tmp/scan-result.json
           env:
             - name: LOKI_URL
               value: "http://loki-gateway.observability.svc.cluster.local:80"
@@ -92,6 +109,14 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "500m"
+        outputs:
+          parameters:
+            - name: scan-json
+              valueFrom:
+                path: /tmp/scan-json
+            - name: remediation-needed
+              valueFrom:
+                path: /tmp/remediation-needed
 
       - name: report
         inputs:
@@ -105,16 +130,20 @@ spec:
             #!/bin/sh
             set -e
 
-            # Extract JSON from scan output (may contain banner text before JSON)
-            SCAN_JSON=$(echo '{{inputs.parameters.scan-output}}' | grep -o '{.*}' | tail -1)
+            # The scan output is passed as a parameter - write to file to handle multi-line JSON
+            cat > /tmp/scan-result.json << 'SCAN_JSON_EOF'
+            {{inputs.parameters.scan-output}}
+            SCAN_JSON_EOF
 
-            if [ -z "$SCAN_JSON" ]; then
-              echo "Error: No JSON found in scan output"
+            # Validate JSON
+            if ! jq -e . /tmp/scan-result.json > /dev/null 2>&1; then
+              echo "Error: Invalid JSON in scan result"
+              cat /tmp/scan-result.json
               exit 1
             fi
 
             echo "=== Log Scan Results ==="
-            echo "$SCAN_JSON" | jq -r '
+            jq -r '
               "Scan Time: \(.scan_time)",
               "Window: \(.window_minutes) minutes",
               "Total Errors: \(.total_errors)",
@@ -123,10 +152,10 @@ spec:
               "",
               "Remediation Recommended: \(.remediation_recommended)",
               if .recommendation_reason then "Reason: \(.recommendation_reason)" else "" end
-            '
+            ' /tmp/scan-result.json
 
             # Check if remediation is recommended
-            REMEDIATION=$(echo "$SCAN_JSON" | jq -r '.remediation_recommended')
+            REMEDIATION=$(jq -r '.remediation_recommended' /tmp/scan-result.json)
 
             if [ "$REMEDIATION" = "true" ]; then
               echo ""
@@ -135,10 +164,10 @@ spec:
               # Extract services needing attention
               echo ""
               echo "Services needing attention:"
-              echo "$SCAN_JSON" | jq -r '
+              jq -r '
                 .services_with_issues[] |
                 "  - \(.namespace)/\(.service): \(.error_count) errors, \(.warn_count) warnings"
-              '
+              ' /tmp/scan-result.json
             else
               echo ""
               echo "✓ No remediation needed at this time"
@@ -162,12 +191,14 @@ spec:
             #!/bin/sh
             set -e
 
-            # Extract JSON from scan output (may contain banner text before JSON)
-            SCAN_JSON=$(echo '{{inputs.parameters.scan-output}}' | grep -o '{.*}' | tail -1)
+            # The scan output is passed as a parameter - write to file to handle multi-line JSON
+            cat > /tmp/scan-result.json << 'SCAN_JSON_EOF'
+            {{inputs.parameters.scan-output}}
+            SCAN_JSON_EOF
 
             # Check if scan output contains remediation_recommended:true
             # Use grep instead of jq since jq isn't available in healer image
-            if ! echo "$SCAN_JSON" | grep -q '"remediation_recommended":true'; then
+            if ! grep -q '"remediation_recommended"[[:space:]]*:[[:space:]]*true' /tmp/scan-result.json; then
               echo "✓ No remediation needed, skipping CodeRun creation"
               exit 0
             fi
@@ -177,7 +208,7 @@ spec:
 
             # Pipe scan JSON to healer remediate-from-scan
             # --max-coderuns=3 limits concurrent remediations
-            echo "$SCAN_JSON" | healer remediate-from-scan \
+            cat /tmp/scan-result.json | healer remediate-from-scan \
               --max-coderuns=3
 
             echo ""
