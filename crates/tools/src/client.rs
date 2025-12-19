@@ -590,7 +590,10 @@ impl McpClient {
 
         // Log PATH for debugging
         if let Ok(path) = std::env::var("PATH") {
-            tracing::debug!("[Bridge] PATH environment: {}", &path[..path.len().min(200)]);
+            tracing::debug!(
+                "[Bridge] PATH environment: {}",
+                &path[..path.len().min(200)]
+            );
         } else {
             tracing::debug!("[Bridge] PATH environment not set!");
         }
