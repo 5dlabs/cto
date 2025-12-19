@@ -4,7 +4,7 @@
 //! if the underlying condition has been resolved. If resolved, closes the issue
 //! with an auto-close comment.
 //!
-//! This runs as a CronJob every 5 minutes to keep issues up-to-date.
+//! This runs as a `CronJob` every 5 minutes to keep issues up-to-date.
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -385,7 +385,7 @@ impl IssueReconciler {
         ready_statuses.split_whitespace().all(|s| s == "true")
     }
 
-    /// Check CodeRun status for A9 alerts.
+    /// Check `CodeRun` status for A9 alerts.
     fn check_coderun_status(&self, coderun_name: &str) -> ReconcileResult {
         let output = Command::new("kubectl")
             .args([

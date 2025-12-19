@@ -102,7 +102,7 @@ enum Commands {
         #[arg(long)]
         id: String,
 
-        /// Action: power_on, power_off, or reboot.
+        /// Action: `power_on`, `power_off`, or `reboot`.
         #[arg(long)]
         action: String,
     },
@@ -120,6 +120,7 @@ enum Commands {
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -230,7 +231,10 @@ async fn main() -> Result<()> {
             println!("   ID:     {}", vm.id);
             println!("   Name:   {}", vm.name);
             println!("   Status: {}", vm.status);
-            println!("\n💡 Run `gpu wait --id {}` to wait for it to be ready", vm.id);
+            println!(
+                "\n💡 Run `gpu wait --id {}` to wait for it to be ready",
+                vm.id
+            );
         }
 
         Commands::Get { id } => {
@@ -242,15 +246,16 @@ async fn main() -> Result<()> {
             println!("   Plan:     {}", vm.plan_id);
 
             if let Some(specs) = &vm.specs {
-                println!(
-                    "   GPU:      {} x{}",
-                    specs.gpu_model, specs.gpu_count
-                );
+                println!("   GPU:      {} x{}", specs.gpu_model, specs.gpu_count);
                 println!("   vCPUs:    {}", specs.vcpus);
             }
 
             if let Some(host) = &vm.host {
-                println!("\n   📡 SSH: {}@{}", vm.username.as_deref().unwrap_or("root"), host);
+                println!(
+                    "\n   📡 SSH: {}@{}",
+                    vm.username.as_deref().unwrap_or("root"),
+                    host
+                );
             }
 
             if let Some(created) = &vm.created_at {
@@ -260,7 +265,7 @@ async fn main() -> Result<()> {
 
         Commands::Delete { id, yes } => {
             if !yes {
-                println!("⚠️  Are you sure you want to delete GPU VM {}?", id);
+                println!("⚠️  Are you sure you want to delete GPU VM {id}?");
                 println!("   This action cannot be undone.");
                 println!("   Use --yes to skip this prompt.");
                 return Ok(());
@@ -268,17 +273,17 @@ async fn main() -> Result<()> {
 
             info!(vm_id = %id, "Deleting GPU VM");
             provider.delete_gpu_vm(&id).await?;
-            println!("\n✅ GPU VM {} deleted successfully!", id);
+            println!("\n✅ GPU VM {id} deleted successfully!");
         }
 
         Commands::Action { id, action } => {
             info!(vm_id = %id, action = %action, "Running GPU VM action");
             provider.gpu_vm_action(&id, &action).await?;
-            println!("\n✅ Action '{}' executed on GPU VM {}", action, id);
+            println!("\n✅ Action '{action}' executed on GPU VM {id}");
         }
 
         Commands::Wait { id, timeout } => {
-            println!("⏳ Waiting for GPU VM {} to be ready...", id);
+            println!("⏳ Waiting for GPU VM {id} to be ready...");
             let vm = provider.wait_ready(&id, timeout).await?;
             println!("\n✅ GPU VM is ready!");
             let host = vm.host.as_deref().unwrap_or("N/A");
@@ -361,8 +366,3 @@ fn op_item_get_field(item: &str, vault: Option<&str>, field: &str) -> Result<Str
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
-
-
-
-
-

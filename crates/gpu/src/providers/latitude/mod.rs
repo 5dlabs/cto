@@ -32,8 +32,3 @@ mod models;
 
 pub use client::Latitude;
 pub use models::*;
-
-
-
-
-

@@ -470,7 +470,7 @@ enum Commands {
     },
     /// [PLAY-MONITOR] Monitor running plays with real-time log analysis and anomaly detection
     PlayMonitor {
-        /// Kubernetes namespace for CodeRuns
+        /// Kubernetes namespace for `CodeRuns`
         #[arg(long, default_value = "cto")]
         namespace: String,
 
@@ -8223,24 +8223,21 @@ fn run_reconcile_issues(
     let report = reconciler.reconcile()?;
 
     // Output based on format
-    match output_format {
-        "json" => {
-            let json = serde_json::to_string_pretty(&report)?;
-            println!("{json}");
-        }
-        _ => {
-            println!("{}", format_report_text(&report));
+    if output_format == "json" {
+        let json = serde_json::to_string_pretty(&report)?;
+        println!("{json}");
+    } else {
+        println!("{}", format_report_text(&report));
 
-            // Summary
-            println!();
-            if report.issues_closed > 0 {
-                println!(
-                    "{}",
-                    format!("✅ Closed {} resolved issues", report.issues_closed).green()
-                );
-            } else {
-                println!("{}", "ℹ️  No issues to close".dimmed());
-            }
+        // Summary
+        println!();
+        if report.issues_closed > 0 {
+            println!(
+                "{}",
+                format!("✅ Closed {} resolved issues", report.issues_closed).green()
+            );
+        } else {
+            println!("{}", "ℹ️  No issues to close".dimmed());
         }
     }
 

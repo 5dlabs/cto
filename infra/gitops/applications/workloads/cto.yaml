@@ -141,7 +141,7 @@ spec:
           config:
             insecureRegistries:
               # TODO: Update for Latitude cluster node IPs
-              - "192.168.1.72:30500"  # Simple cluster worker (update per cluster)
+              - "192.168.1.77:30500"  # Simple cluster worker (update per cluster)
               - "192.168.1.77:30500"  # Simple cluster control plane (update per cluster)
 
   destination:

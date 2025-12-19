@@ -37,7 +37,7 @@ impl GitHubClient {
     ///
     /// # Errors
     /// Returns an error if the `gh` CLI command fails.
-    pub async fn create_issue(&self, title: &str, body: &str, labels: &[&str]) -> Result<String> {
+    pub fn create_issue(&self, title: &str, body: &str, labels: &[&str]) -> Result<String> {
         let labels_str = labels.join(",");
 
         debug!(
@@ -78,7 +78,7 @@ impl GitHubClient {
     ///
     /// # Errors
     /// Returns an error if the `gh` CLI command fails.
-    pub async fn add_issue_comment(&self, issue_number: u32, body: &str) -> Result<()> {
+    pub fn add_issue_comment(&self, issue_number: u32, body: &str) -> Result<()> {
         let output = Command::new("gh")
             .args([
                 "issue",
@@ -104,7 +104,7 @@ impl GitHubClient {
     ///
     /// # Errors
     /// Returns an error if the `gh` CLI command fails.
-    pub async fn close_issue(&self, issue_number: u32, reason: Option<&str>) -> Result<()> {
+    pub fn close_issue(&self, issue_number: u32, reason: Option<&str>) -> Result<()> {
         let mut args = vec![
             "issue".to_string(),
             "close".to_string(),
