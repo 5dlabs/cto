@@ -164,3 +164,13 @@ podDisruptionBudget:
 # Enable debug if needed
 debug:
   enabled: false
+
+# NOTE: Do NOT set `devices` explicitly - nodes have different interface names
+# (eno1 vs enp3s0f0). Let Cilium auto-detect devices with runtime detection.
+#
+# The neighbor-link-updater warnings about flannel.1 are non-fatal and caused
+# by Kilo's --compatibility=flannel creating a VXLAN interface. These warnings
+# do not affect cluster operation.
+#
+# TODO: Remove Kilo entirely to eliminate flannel.1 interface
+# See: docs/architecture/decisions/0001-cilium-clustermesh-networking.md
