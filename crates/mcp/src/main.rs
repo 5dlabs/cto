@@ -1826,7 +1826,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Handle model - use provided value or config default (needed for agent resolution)
     // Track if user explicitly provided a model to override agent-specific configs
-    let user_provided_model = arguments.get("model").and_then(|v| v.as_str()).map(String::from);
+    let user_provided_model = arguments
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     let model = user_provided_model
         .clone()
         .unwrap_or_else(|| config.defaults.play.model.clone());

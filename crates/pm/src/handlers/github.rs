@@ -254,14 +254,8 @@ pub async fn handle_github_webhook(
             }
 
             // Trigger play workflow for the project
-            let play_result = trigger_play_workflow(
-                &state,
-                client,
-                &payload,
-                &metadata,
-                &result,
-            )
-            .await;
+            let play_result =
+                trigger_play_workflow(&state, client, &payload, &metadata, &result).await;
 
             let workflow_info = match &play_result {
                 Ok(wf) => {
