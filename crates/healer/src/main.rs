@@ -1175,6 +1175,75 @@ struct FailureContext {
 // Remediation Functions - Self-healing loop support
 // =============================================================================
 
+/// Generate acceptance criteria for workflow remediation.
+///
+/// The acceptance criteria uses checkbox format that the acceptance probe can verify.
+/// Each checkbox item should be checkable by the agent after completing the fix.
+fn generate_remediation_acceptance_criteria(failure: &FailureContext) -> String {
+    use std::fmt::Write as _;
+
+    let mut criteria = String::new();
+    let _ = writeln!(criteria, "# Acceptance Criteria - Workflow Remediation\n");
+    let _ = writeln!(criteria, "## Definition of Done\n");
+
+    let _ = writeln!(criteria, "### Root Cause Analysis");
+    let _ = writeln!(criteria, "- [ ] Failure root cause identified");
+    let _ = writeln!(criteria, "- [ ] Error message analyzed and understood");
+    let _ = writeln!(criteria, "- [ ] Affected code/configuration located");
+
+    let _ = writeln!(criteria);
+    let _ = writeln!(criteria, "### Code Fix");
+
+    // Add failure-type-specific criteria
+    match failure.resource_type.as_str() {
+        "Pod" | "Container" => {
+            let _ = writeln!(criteria, "- [ ] Pod/container crash cause fixed");
+            let _ = writeln!(criteria, "- [ ] Resource limits reviewed if OOM");
+            let _ = writeln!(criteria, "- [ ] Configuration errors corrected");
+        }
+        "Workflow" => {
+            let _ = writeln!(criteria, "- [ ] Workflow step failure addressed");
+            let _ = writeln!(criteria, "- [ ] Template errors corrected");
+            let _ = writeln!(criteria, "- [ ] Dependency issues resolved");
+        }
+        "CodeRun" => {
+            let _ = writeln!(criteria, "- [ ] Agent execution issue resolved");
+            let _ = writeln!(criteria, "- [ ] Prompt/task file issues fixed");
+            let _ = writeln!(criteria, "- [ ] Tool routing errors corrected");
+        }
+        _ => {
+            let _ = writeln!(criteria, "- [ ] Primary issue fixed");
+            let _ = writeln!(criteria, "- [ ] Related issues addressed");
+        }
+    }
+
+    let _ = writeln!(criteria, "- [ ] Minimal, targeted fix applied");
+    let _ = writeln!(criteria, "- [ ] No unrelated changes introduced");
+
+    let _ = writeln!(criteria);
+    let _ = writeln!(criteria, "### Verification");
+    let _ = writeln!(criteria, "- [ ] Code compiles/builds without errors");
+    let _ = writeln!(criteria, "- [ ] Tests pass (if applicable)");
+    let _ = writeln!(criteria, "- [ ] Changes pushed to repository");
+    let _ = writeln!(criteria, "- [ ] PR created with clear description");
+
+    let _ = writeln!(criteria);
+    let _ = writeln!(criteria, "### Deployment");
+    let _ = writeln!(
+        criteria,
+        "- [ ] Workflow {} can complete successfully",
+        failure.workflow_name
+    );
+    let _ = writeln!(
+        criteria,
+        "- [ ] Resource {} no longer in failed state",
+        failure.failed_resource
+    );
+    let _ = writeln!(criteria, "- [ ] No new failures introduced");
+
+    criteria
+}
+
 /// Trigger remediation by creating a `CodeRun` for the remediation agent
 ///
 /// Returns the name of the created `CodeRun`
@@ -1200,6 +1269,15 @@ fn trigger_remediation(
     // Serialize failure context to JSON for the agent
     let failure_json =
         serde_json::to_string(failure).context("Failed to serialize failure context")?;
+
+    // Generate acceptance criteria for the probe to verify
+    let acceptance_criteria = generate_remediation_acceptance_criteria(failure);
+    // Indent acceptance criteria by 4 spaces for YAML literal block
+    let acceptance_yaml: String = acceptance_criteria
+        .lines()
+        .map(|line| format!("    {line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
 
     // Convert repository to URL format (CRD expects repositoryUrl)
     let repository_url = format!("https://github.com/{}", config.repository);
@@ -1250,6 +1328,8 @@ spec:
     settings:
       template: "{template}"
       watchRole: "remediation"
+  acceptanceCriteria: |
+{acceptance_yaml}
   env:
     REMEDIATION_MODE: "true"
     FAILURE_CONTEXT: {failure_json_escaped}
@@ -1269,6 +1349,7 @@ spec:
         docs_repository_url = docs_repository_url,
         docs_dir = docs_dir,
         template = template,
+        acceptance_yaml = acceptance_yaml,
         failure_json_escaped = serde_json::to_string(&failure_json)?,
         workflow_name = failure.workflow_name,
         failure_type = failure.resource_type,

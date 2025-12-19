@@ -197,6 +197,12 @@ pub struct CodeRunSpec {
     /// When set, this content is written to prompt.md in the task ConfigMap
     #[serde(default, rename = "promptModification")]
     pub prompt_modification: Option<String>,
+
+    /// Direct acceptance criteria content (used by healer CI runs)
+    /// When set, this content is written to acceptance-criteria.md in the task ConfigMap
+    /// The acceptance criteria probe will verify these checkboxes after task completion
+    #[serde(default, rename = "acceptanceCriteria")]
+    pub acceptance_criteria: Option<String>,
 }
 
 /// Status of the `CodeRun`

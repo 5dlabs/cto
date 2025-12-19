@@ -584,6 +584,7 @@ fn create_code_run_with_scenario(agent: &AgentDef, cli_type: CLIType) -> CodeRun
             service_account_name: None,
             linear_integration: None,
             prompt_modification: None,
+            acceptance_criteria: None,
         },
         status: None,
     }
@@ -634,6 +635,7 @@ fn create_test_code_run(github_app: &str, cli_type: CLIType) -> CodeRun {
             service_account_name: None,
             linear_integration: None,
             prompt_modification: None,
+            acceptance_criteria: None,
         },
         status: None,
     }

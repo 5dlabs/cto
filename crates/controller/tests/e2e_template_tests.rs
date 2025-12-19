@@ -485,6 +485,7 @@ mod rendering_tests {
                 service_account_name: None,
                 linear_integration: None,
                 prompt_modification: None,
+                acceptance_criteria: None,
             },
             status: None,
         }

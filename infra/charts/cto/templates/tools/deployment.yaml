@@ -10,6 +10,11 @@ metadata:
     platform.5dlabs.io/log-collection: enabled
 spec:
   replicas: {{ .Values.tools.replicaCount }}
+  {{- if .Values.tools.persistence.enabled }}
+  # Use Recreate strategy for RWO volumes to avoid Multi-Attach errors
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "cto.tools.selectorLabels" . | nindent 6 }}

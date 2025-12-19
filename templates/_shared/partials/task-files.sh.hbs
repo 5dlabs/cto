@@ -6,8 +6,9 @@ mkdir -p "$CLI_WORK_DIR/task"
 
 # Copy task files from ConfigMap first (these are templates and agent files)
 # Use . to copy hidden files and ensure we copy the content of the directory
+# Gracefully handle missing ConfigMap - task files from repository are the primary source
 echo "📂 Copying task files from ConfigMap..."
-cp -R /task-files/. "$CLI_WORK_DIR/task/"
+cp -R /task-files/. "$CLI_WORK_DIR/task/" 2>/dev/null || true
 ls -la "$CLI_WORK_DIR/task/"
 
 # Fetch task-specific files from the repository's .tasks directory
@@ -118,9 +119,9 @@ if [ -f "$CLI_WORK_DIR/task/tools-guide.md" ]; then
     echo "  ✓ tools-guide.md"
 fi
 
-# Agent guidelines
+# Agent guidelines (gracefully handle missing ConfigMap)
 if [ -f /task-files/AGENTS.md ]; then
-    cp /task-files/AGENTS.md "$CLI_WORK_DIR/"
+    cp /task-files/AGENTS.md "$CLI_WORK_DIR/" 2>/dev/null || true
     echo "  ✓ AGENTS.md"
 fi
 
