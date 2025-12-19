@@ -61,21 +61,36 @@ impl CodeTemplateGenerator {
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
         // Check run_type first for review/remediate tasks
-        match code_run.spec.run_type.as_str() {
-            "review" => return Self::generate_review_templates(code_run, config),
-            "remediate" => return Self::generate_remediate_templates(code_run, config),
-            _ => {}
+        let mut templates = match code_run.spec.run_type.as_str() {
+            "review" => Self::generate_review_templates(code_run, config)?,
+            "remediate" => Self::generate_remediate_templates(code_run, config)?,
+            _ => {
+                // Fall through to CLI-based dispatch for other run types
+                match Self::determine_cli_type(code_run) {
+                    CLIType::Codex => Self::generate_codex_templates(code_run, config)?,
+                    CLIType::Cursor => Self::generate_cursor_templates(code_run, config)?,
+                    CLIType::Factory => Self::generate_factory_templates(code_run, config)?,
+                    CLIType::OpenCode => Self::generate_opencode_templates(code_run, config)?,
+                    CLIType::Gemini => Self::generate_gemini_templates(code_run, config)?,
+                    _ => Self::generate_claude_templates(code_run, config)?,
+                }
+            }
+        };
+
+        // If prompt_modification is set, write it to prompt.md
+        // This is critical for healer CI runs and other cases where the prompt
+        // is provided directly in the CodeRun spec rather than from task files
+        if let Some(ref prompt_content) = code_run.spec.prompt_modification {
+            if !prompt_content.trim().is_empty() {
+                debug!(
+                    "Writing prompt_modification to prompt.md ({} bytes)",
+                    prompt_content.len()
+                );
+                templates.insert("prompt.md".to_string(), prompt_content.clone());
+            }
         }
 
-        // Fall through to CLI-based dispatch for other run types
-        match Self::determine_cli_type(code_run) {
-            CLIType::Codex => Self::generate_codex_templates(code_run, config),
-            CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
-            CLIType::Factory => Self::generate_factory_templates(code_run, config),
-            CLIType::OpenCode => Self::generate_opencode_templates(code_run, config),
-            CLIType::Gemini => Self::generate_gemini_templates(code_run, config),
-            _ => Self::generate_claude_templates(code_run, config),
-        }
+        Ok(templates)
     }
 
     fn determine_cli_type(code_run: &CodeRun) -> CLIType {
@@ -3987,6 +4002,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }

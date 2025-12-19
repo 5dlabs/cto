@@ -401,6 +401,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }
@@ -440,6 +441,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }
@@ -478,6 +480,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }
@@ -557,6 +560,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         };
@@ -679,6 +683,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }
@@ -718,6 +723,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }
@@ -859,6 +865,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         }
@@ -916,6 +923,7 @@ mod tests {
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         };

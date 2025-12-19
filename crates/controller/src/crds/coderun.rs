@@ -192,6 +192,11 @@ pub struct CodeRunSpec {
     /// Linear integration configuration for status sync sidecar
     #[serde(default, rename = "linearIntegration")]
     pub linear_integration: Option<LinearIntegration>,
+
+    /// Direct prompt modification content (used by healer CI runs)
+    /// When set, this content is written to prompt.md in the task ConfigMap
+    #[serde(default, rename = "promptModification")]
+    pub prompt_modification: Option<String>,
 }
 
 /// Status of the `CodeRun`
