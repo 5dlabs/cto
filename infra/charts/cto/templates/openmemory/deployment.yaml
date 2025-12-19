@@ -8,6 +8,11 @@ metadata:
     {{- include "cto.openmemory.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.openmemory.replicaCount }}
+  {{- if .Values.openmemory.persistence.enabled }}
+  # Use Recreate strategy for RWO volumes to avoid Multi-Attach errors
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "cto.openmemory.selectorLabels" . | nindent 6 }}

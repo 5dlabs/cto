@@ -48,10 +48,18 @@ fi
 # Android SDK (for local Android builds)
 # -------------------------------------------------------------------------
 # Use ${VAR:-} to handle unset variables with set -u
-if [ -n "${ANDROID_HOME:-}" ] || [ -n "${ANDROID_SDK_ROOT:-}" ]; then
-  export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-  export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-  export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+# Note: Avoid nested parameter expansion to not confuse Handlebars brace counting
+_ANDROID_SDK=""
+if [ -n "${ANDROID_HOME:-}" ]; then
+  _ANDROID_SDK="$ANDROID_HOME"
+elif [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+  _ANDROID_SDK="$ANDROID_SDK_ROOT"
+fi
+
+if [ -n "$_ANDROID_SDK" ]; then
+  export ANDROID_HOME="$_ANDROID_SDK"
+  export ANDROID_SDK_ROOT="$_ANDROID_SDK"
+  export PATH="${ANDROID_HOME}/emulator:${ANDROID_HOME}/platform-tools:$PATH"
   echo "Android SDK: $ANDROID_HOME"
   
   # Check for adb

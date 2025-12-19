@@ -45,7 +45,7 @@ pub struct Config {
 
     // Argo workflow external URL (shown in Linear UI)
     pub argo_workflow_url: Option<String>,
-    
+
     // Task info for plan updates
     pub task_id: Option<String>,
     pub task_description: Option<String>,
@@ -82,12 +82,12 @@ impl Config {
                 .ok()
                 .filter(|s| !s.is_empty()),
             workflow_name: std::env::var("WORKFLOW_NAME").unwrap_or_else(|_| "unknown".to_string()),
-            
+
             // Argo workflow URL for external link in Linear
             argo_workflow_url: std::env::var("ARGO_WORKFLOW_URL")
                 .ok()
                 .filter(|s| !s.is_empty()),
-            
+
             // Task info for plan updates
             task_id: std::env::var("TASK_ID").ok().filter(|s| !s.is_empty()),
             task_description: std::env::var("TASK_DESCRIPTION")
@@ -302,6 +302,10 @@ impl LinearApiClient {
     }
 
     /// Emit a thought to the Linear agent session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_thought(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -316,6 +320,10 @@ impl LinearApiClient {
     }
 
     /// Emit an ephemeral thought (replaced by next activity).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_ephemeral_thought(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -330,6 +338,10 @@ impl LinearApiClient {
     }
 
     /// Emit an action activity (tool invocation in progress).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_action(&self, session_id: &str, action: &str, parameter: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -346,6 +358,10 @@ impl LinearApiClient {
     }
 
     /// Emit an action activity with result (completed tool call).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_action_complete(
         &self,
         session_id: &str,
@@ -368,6 +384,10 @@ impl LinearApiClient {
     }
 
     /// Emit an error activity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_error(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -382,6 +402,10 @@ impl LinearApiClient {
     }
 
     /// Emit a response activity (final completion).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_response(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -396,6 +420,10 @@ impl LinearApiClient {
     }
 
     /// Update the agent session plan (visual checklist in Linear UI).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn update_plan(&self, session_id: &str, steps: &[PlanStep]) -> Result<()> {
         #[derive(Serialize)]
         struct Variables {
@@ -450,6 +478,10 @@ impl LinearApiClient {
     }
 
     /// Set the session external URL (links to Argo workflow in Linear UI).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn set_external_url(&self, session_id: &str, url: &str) -> Result<()> {
         #[derive(Serialize)]
         struct Variables {
@@ -968,9 +1000,10 @@ struct ToolState {
 /// Maps Claude events to proper Linear Agent API activity types:
 /// - Tool invocations → `action` activities
 /// - Tool completions → `action` with result
-/// - Errors → `error` activities  
+/// - Errors → `error` activities
 /// - Completion → `response` activities
 /// - Transient status → ephemeral `thought` activities
+#[allow(clippy::too_many_lines)]
 async fn process_stream_event(
     client: &LinearApiClient,
     session_id: &str,
@@ -993,10 +1026,9 @@ async fn process_stream_event(
                     match content {
                         ContentBlock::ToolUse { name, input, .. } => {
                             // Tool invocation → emit as ACTION (not thought)
-                            let input_summary = input.as_ref().map_or_else(
-                                String::new,
-                                |v| truncate_chars(&v.to_string(), 150),
-                            );
+                            let input_summary = input
+                                .as_ref()
+                                .map_or_else(String::new, |v| truncate_chars(&v.to_string(), 150));
 
                             // Store state for pairing with result
                             tool_state.current_tool = Some(name.clone());
@@ -1040,15 +1072,12 @@ async fn process_stream_event(
                 .current_tool
                 .take()
                 .unwrap_or_else(|| "Tool".to_string());
-            let tool_input = tool_state
-                .current_input
-                .take()
-                .unwrap_or_default();
+            let tool_input = tool_state.current_input.take().unwrap_or_default();
 
             if let Some(result) = tool_use_result {
                 let is_error = result.contains("error") || result.contains("Error");
                 let result_str = format_result(is_error, result);
-                
+
                 if is_error {
                     // Error result → emit as ERROR activity
                     let msg = format!("**{tool_name}** failed: {result_str}");
@@ -1068,13 +1097,18 @@ async fn process_stream_event(
                         let result_text = content.as_deref().unwrap_or("completed");
                         let error = is_error.unwrap_or(false);
                         let result_str = format_result(error, result_text);
-                        
+
                         if error {
                             let msg = format!("**{tool_name}** failed: {result_str}");
                             client.emit_error(session_id, &msg).await?;
                         } else {
                             client
-                                .emit_action_complete(session_id, &tool_name, &tool_input, &result_str)
+                                .emit_action_complete(
+                                    session_id,
+                                    &tool_name,
+                                    &tool_input,
+                                    &result_str,
+                                )
                                 .await?;
                         }
                     }
@@ -1095,13 +1129,13 @@ async fn process_stream_event(
             let turns = num_turns.unwrap_or(0);
 
             let is_error = subtype.as_deref() == Some("error");
-            
+
             // Completion → emit as RESPONSE (final activity) or ERROR
             let summary = format!(
                 "**Completed** | {duration_secs:.1}s | ${:.4} | {turns} turns",
                 *total_cost
             );
-            
+
             if is_error {
                 client.emit_error(session_id, &summary).await?;
             } else {
@@ -1425,10 +1459,7 @@ async fn main() -> Result<()> {
         }
 
         // Emit initial thought to indicate sidecar is active
-        let init_msg = format!(
-            "🚀 Sidecar connected | Workflow: {}",
-            config.workflow_name
-        );
+        let init_msg = format!("🚀 Sidecar connected | Workflow: {}", config.workflow_name);
         if let Err(e) = client
             .emit_ephemeral_thought(&config.linear_session_id, &init_msg)
             .await

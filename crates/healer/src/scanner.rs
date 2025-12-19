@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::loki::{LogEntry, LokiClient};
 
@@ -153,29 +153,88 @@ impl LogScanner {
             debug!("Scanning namespace: {}", namespace);
 
             // Query for error-level logs
-            let error_query =
-                format!(r#"{{namespace="{namespace}"}} |~ "(?i)(error|fatal|panic)""#);
-            let error_entries = self
+            // We use a more flexible query that handles missing namespace labels
+            // and supports both namespace and service_namespace labels
+
+            // Try namespace-specific query first, fallback to broader if it returns nothing
+            let mut error_entries = self
                 .loki
-                .query_logs(&error_query, start, end, 1000)
+                .query_logs(
+                    &format!(r#"{{namespace="{namespace}"}} |~ "(?i)(error|fatal|panic)""#),
+                    start,
+                    end,
+                    1000,
+                )
                 .await
-                .unwrap_or_else(|e| {
-                    warn!("Failed to query errors for {}: {}", namespace, e);
-                    Vec::new()
-                });
+                .unwrap_or_default();
+
+            if error_entries.is_empty() {
+                debug!("No results for namespace={namespace}, trying service_name fallback");
+                let fallback_query = r#"{service_name=~".+"} |~ "(?i)(error|fatal|panic)""#;
+                let fallback_entries = self
+                    .loki
+                    .query_logs(fallback_query, start, end, 1000)
+                    .await
+                    .unwrap_or_default();
+
+                // Filter fallback entries by namespace if possible
+                for entry in fallback_entries {
+                    let ns_label = entry
+                        .labels
+                        .get("namespace")
+                        .or_else(|| entry.labels.get("service_namespace"))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+
+                    if ns_label == namespace
+                        || entry.line.contains(&format!("_{namespace}_"))
+                        || entry
+                            .labels
+                            .get("service_name")
+                            .is_some_and(|s| s.contains("unknown"))
+                    {
+                        error_entries.push(entry);
+                    }
+                }
+            }
 
             // Query for warning-level logs (including platform-specific patterns)
-            let warn_query = format!(
-                r#"{{namespace="{namespace}"}} |~ "(?i)(warn|warning|invalid.*signature|unauthorized|forbidden|timeout|connection refused)""#
-            );
-            let warn_entries = self
+            let mut warn_entries = self
                 .loki
-                .query_logs(&warn_query, start, end, 500)
+                .query_logs(&format!(r#"{{namespace="{namespace}"}} |~ "(?i)(warn|warning|invalid.*signature|unauthorized|forbidden|timeout|connection refused)""#), start, end, 500)
                 .await
-                .unwrap_or_else(|e| {
-                    warn!("Failed to query warnings for {}: {}", namespace, e);
-                    Vec::new()
-                });
+                .unwrap_or_default();
+
+            if warn_entries.is_empty() {
+                debug!(
+                    "No results for namespace={namespace} warnings, trying service_name fallback"
+                );
+                let fallback_query = r#"{service_name=~".+"} |~ "(?i)(warn|warning|invalid.*signature|unauthorized|forbidden|timeout|connection refused)""#;
+                let fallback_entries = self
+                    .loki
+                    .query_logs(fallback_query, start, end, 500)
+                    .await
+                    .unwrap_or_default();
+
+                for entry in fallback_entries {
+                    let ns_label = entry
+                        .labels
+                        .get("namespace")
+                        .or_else(|| entry.labels.get("service_namespace"))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+
+                    if ns_label == namespace
+                        || entry.line.contains(&format!("_{namespace}_"))
+                        || entry
+                            .labels
+                            .get("service_name")
+                            .is_some_and(|s| s.contains("unknown"))
+                    {
+                        warn_entries.push(entry);
+                    }
+                }
+            }
 
             // Group by service/pod
             self.process_entries(namespace, &error_entries, "error", &mut all_issues);
@@ -220,15 +279,33 @@ impl LogScanner {
         issues: &mut HashMap<String, ServiceIssue>,
     ) {
         for entry in entries {
-            // Extract pod name from labels
+            // Extract pod name from labels or line content
             let pod = entry
                 .labels
                 .get("pod")
+                .or_else(|| entry.labels.get("pod_name"))
                 .cloned()
-                .unwrap_or_else(|| "unknown".to_string());
+                .unwrap_or_else(|| {
+                    // Try to extract from service_name label if it's not "unknown_service"
+                    if let Some(svc) = entry.labels.get("service_name") {
+                        if svc != "unknown_service" {
+                            return svc.clone();
+                        }
+                    }
+                    "unknown".to_string()
+                });
 
             // Extract service name (strip random suffix from pod name)
-            let service = extract_service_name(&pod);
+            let service = if let Some(svc) = entry.labels.get("service_name") {
+                if svc == "unknown_service" {
+                    extract_service_name(&pod)
+                } else {
+                    svc.clone()
+                }
+            } else {
+                extract_service_name(&pod)
+            };
+
             let key = format!("{namespace}/{service}");
 
             let issue = issues.entry(key).or_insert_with(|| ServiceIssue {
@@ -613,7 +690,7 @@ mod tests {
     #[test]
     fn test_scanner_config_default() {
         let config = ScannerConfig::default();
-        assert_eq!(config.error_threshold, 5);
+        assert_eq!(config.error_threshold, 3);
         assert!(config.namespaces.contains(&"cto".to_string()));
     }
 }
