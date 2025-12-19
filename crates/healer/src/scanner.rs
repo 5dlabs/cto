@@ -183,15 +183,13 @@ impl LogScanner {
                         .labels
                         .get("namespace")
                         .or_else(|| entry.labels.get("service_namespace"))
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
+                        .map_or("", String::as_str);
 
                     let pod_name = entry
                         .labels
                         .get("pod")
                         .or_else(|| entry.labels.get("pod_name"))
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
+                        .map_or("", String::as_str);
 
                     let is_match = ns_label == namespace
                         || entry.line.contains(&format!("_{namespace}_"))
@@ -233,15 +231,13 @@ impl LogScanner {
                         .labels
                         .get("namespace")
                         .or_else(|| entry.labels.get("service_namespace"))
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
+                        .map_or("", String::as_str);
 
                     let pod_name = entry
                         .labels
                         .get("pod")
                         .or_else(|| entry.labels.get("pod_name"))
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
+                        .map_or("", String::as_str);
 
                     let is_match = ns_label == namespace
                         || entry.line.contains(&format!("_{namespace}_"))
