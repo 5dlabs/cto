@@ -34,8 +34,9 @@ impl Default for ScannerConfig {
                 .iter()
                 .map(|s| (*s).to_string())
                 .collect(),
-            error_threshold: 5,
-            warn_threshold: 20,
+            // Lower thresholds to catch platform issues early
+            error_threshold: 3,
+            warn_threshold: 5,
             include_info: false,
         }
     }
@@ -163,8 +164,10 @@ impl LogScanner {
                     Vec::new()
                 });
 
-            // Query for warning-level logs
-            let warn_query = format!(r#"{{namespace="{namespace}"}} |~ "(?i)(warn|warning)""#);
+            // Query for warning-level logs (including platform-specific patterns)
+            let warn_query = format!(
+                r#"{{namespace="{namespace}"}} |~ "(?i)(warn|warning|invalid.*signature|unauthorized|forbidden|timeout|connection refused)""#
+            );
             let warn_entries = self
                 .loki
                 .query_logs(&warn_query, start, end, 500)
@@ -279,7 +282,17 @@ impl LogScanner {
         }
 
         // Check for critical services with errors
-        let critical_services = ["controller", "healer", "pm", "argo-workflows"];
+        // Platform services that require immediate attention
+        let critical_services = [
+            "controller",
+            "healer",
+            "pm",
+            "cto-pm",
+            "tools",
+            "cto-tools",
+            "argo-workflows",
+            "argocd",
+        ];
         for issue in issues {
             if critical_services.iter().any(|s| issue.service.contains(s))
                 && issue.error_count >= 10

@@ -172,6 +172,7 @@ impl BehaviorAnalyzer {
     fn load_builtin_patterns(&mut self) {
         // Global failure patterns (apply to all agents)
         self.global_failure_patterns = vec![
+            // Critical system errors
             pattern("panic", r"(?i)panic(ked)?( at)?", false, "critical"),
             pattern("fatal error", r"(?i)fatal:", false, "critical"),
             pattern("segfault", r"(?i)segmentation fault", false, "critical"),
@@ -181,6 +182,7 @@ impl BehaviorAnalyzer {
                 false,
                 "critical",
             ),
+            // Authentication/Authorization
             pattern("permission denied", r"(?i)permission denied", false, "high"),
             pattern(
                 "authentication failed",
@@ -189,12 +191,58 @@ impl BehaviorAnalyzer {
                 "high",
             ),
             pattern(
+                "invalid signature",
+                r"(?i)invalid.*(signature|token|key)|signature.*invalid",
+                false,
+                "high",
+            ),
+            pattern("unauthorized", r"(?i)unauthorized|401", false, "high"),
+            pattern("forbidden", r"(?i)forbidden|403", false, "high"),
+            // Network errors
+            pattern(
                 "connection refused",
                 r"(?i)connection refused",
                 false,
                 "medium",
             ),
-            pattern("timeout", r"(?i)timed? ?out|timeout", false, "medium"),
+            pattern("timeout", r"(?i)timed? ?out|timeout|i/o timeout", false, "medium"),
+            pattern(
+                "network error",
+                r"(?i)dial tcp.*failed|couldn't connect|connection reset",
+                false,
+                "medium",
+            ),
+            // Platform-specific errors (PM, Controller, Tools)
+            pattern(
+                "webhook error",
+                r"(?i)webhook.*(failed|error)|failed.*webhook",
+                false,
+                "high",
+            ),
+            pattern(
+                "linear api error",
+                r"(?i)linear.*(error|failed)|error.*linear",
+                false,
+                "high",
+            ),
+            pattern(
+                "github api error",
+                r"(?i)github.*(error|rate limit)|api\.github\.com.*error",
+                false,
+                "high",
+            ),
+            pattern(
+                "mcp tool error",
+                r"(?i)tool.*not found|mcp.*error|routing.*failed",
+                false,
+                "medium",
+            ),
+            pattern(
+                "secret missing",
+                r"(?i)secret.*not found|missing.*secret|env.*not set",
+                false,
+                "high",
+            ),
         ];
 
         // Rex (Implementation Agent)
