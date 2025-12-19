@@ -361,6 +361,7 @@ mod tests {
                 github_user: None,
                 github_app: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         };
@@ -399,6 +400,7 @@ mod tests {
                 github_user: None,
                 github_app: None,
                 linear_integration: None,
+                prompt_modification: None,
             },
             status: None,
         };
