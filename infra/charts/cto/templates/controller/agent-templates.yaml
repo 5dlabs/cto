@@ -283,8 +283,33 @@ data:
         
         REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
         
-        # Check if webhook already exists
-        EXISTING_WEBHOOK=$(gh api "repos/${REPO_PATH}/hooks" 2>/dev/null | jq -r ".[] | select(.config.url == \"${WEBHOOK_CALLBACK_URL}\") | .id" || echo "")
+        # Retry wrapper for gh api (if not already defined)
+        retry_gh_webhook() {
+            local max_attempts=3
+            local attempt=1
+            local delay=5
+            local exit_code=0
+            local result=""
+            while [ $attempt -le $max_attempts ]; do
+                set +e
+                result=$(gh api "$@" 2>&1)
+                exit_code=$?
+                set -e
+                if [ $exit_code -eq 0 ]; then
+                    echo "$result"
+                    return 0
+                fi
+                echo "  ⚠️ gh api attempt $attempt/$max_attempts failed, retrying in ${delay}s..." >&2
+                sleep $delay
+                delay=$((delay * 2))
+                attempt=$((attempt + 1))
+            done
+            echo "$result"
+            return $exit_code
+        }
+        
+        # Check if webhook already exists (with retry)
+        EXISTING_WEBHOOK=$(retry_gh_webhook "repos/${REPO_PATH}/hooks" 2>/dev/null | jq -r ".[] | select(.config.url == \"${WEBHOOK_CALLBACK_URL}\") | .id" || echo "")
         
         if [ -n "$EXISTING_WEBHOOK" ]; then
             echo "  ⚠️ Webhook already exists (ID: $EXISTING_WEBHOOK)"
@@ -293,7 +318,7 @@ data:
             # Create webhook using JSON input (ensures correct types for booleans)
             printf '{"name":"web","active":true,"events":["push","pull_request","check_run","check_suite"],"config":{"url":"%s","content_type":"json"}}' "${WEBHOOK_CALLBACK_URL}" > /tmp/webhook-input.json
 
-            if OUT=$(gh api --method POST "repos/${REPO_PATH}/hooks" --input /tmp/webhook-input.json 2>&1); then
+            if OUT=$(retry_gh_webhook --method POST "repos/${REPO_PATH}/hooks" --input /tmp/webhook-input.json 2>&1); then
                 echo "  ✅ Webhook created"
                 activity_action_complete "Webhook configured" "${REPO_PATH}" "Created webhook for ${WEBHOOK_CALLBACK_URL}"
             else
@@ -308,6 +333,31 @@ data:
     # Branch Protection (Optional but recommended)
     # =========================================================================
 
+    # Retry wrapper for gh api with exponential backoff
+    retry_gh_api() {
+        local max_attempts=3
+        local attempt=1
+        local delay=5
+        local exit_code=0
+        local result=""
+        while [ $attempt -le $max_attempts ]; do
+            set +e
+            result=$(gh api "$@" 2>&1)
+            exit_code=$?
+            set -e
+            if [ $exit_code -eq 0 ]; then
+                echo "$result"
+                return 0
+            fi
+            echo "  ⚠️ gh api attempt $attempt/$max_attempts failed, retrying in ${delay}s..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+        done
+        echo "$result"
+        return $exit_code
+    }
+
     REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
     BRANCH_NAME="main"
 
@@ -315,8 +365,8 @@ data:
     echo "🔒 Ensuring branch protection on ${BRANCH_NAME}..."
     activity_action "Protect branch" "${REPO_PATH}:${BRANCH_NAME}"
 
-    # Check if protection already exists
-    if gh api "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" >/tmp/branch-protection.json 2>/dev/null; then
+    # Check if protection already exists (with retry)
+    if retry_gh_api "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" >/tmp/branch-protection.json 2>/dev/null; then
         echo "  ✅ Branch protection already enabled"
         SUMMARY=$(jq -r '"- requiredApprovingReviews: \(.required_pull_request_reviews.required_approving_review_count // 0)\n- requireCodeOwnerReviews: \(.required_pull_request_reviews.require_code_owner_reviews // false)\n- allowForcePushes: \(.allow_force_pushes.enabled // false)\n- allowDeletions: \(.allow_deletions.enabled // false)"' /tmp/branch-protection.json 2>/dev/null || echo "- existing protection detected")
         activity_action_complete "Branch protected" "${REPO_PATH}:${BRANCH_NAME}" "Already enabled.\n\n${SUMMARY}"
@@ -324,7 +374,7 @@ data:
         # Apply branch protection using JSON input (ensures correct types)
         printf '{"required_status_checks":null,"enforce_admins":false,"required_pull_request_reviews":{"dismiss_stale_reviews":true,"require_code_owner_reviews":false,"required_approving_review_count":1},"restrictions":null,"required_linear_history":true,"allow_force_pushes":false,"allow_deletions":false}' > /tmp/branch-protection-input.json
 
-        if OUT=$(gh api --method PUT "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" \
+        if OUT=$(retry_gh_api --method PUT "repos/${REPO_PATH}/branches/${BRANCH_NAME}/protection" \
             -H "Accept: application/vnd.github+json" \
             --input /tmp/branch-protection-input.json 2>&1); then
             echo "  ✅ Branch protection applied"

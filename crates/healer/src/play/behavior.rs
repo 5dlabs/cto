@@ -294,14 +294,24 @@ impl BehaviorAnalyzer {
                         false,
                         "high",
                     ),
-                    pattern("go compile error", r"(?i)go: cannot|cannot find package", false, "high"),
+                    pattern(
+                        "go compile error",
+                        r"(?i)go: cannot|cannot find package",
+                        false,
+                        "high",
+                    ),
                     pattern(
                         "go build failed",
                         r"(?i)build failed|compilation failed",
                         false,
                         "high",
                     ),
-                    pattern("golangci-lint error", r"(?i)golangci-lint.*error", false, "medium"),
+                    pattern(
+                        "golangci-lint error",
+                        r"(?i)golangci-lint.*error",
+                        false,
+                        "medium",
+                    ),
                 ],
                 anomaly_patterns: vec![
                     pattern(
