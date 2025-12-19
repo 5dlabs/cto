@@ -714,6 +714,7 @@ mod tests {
     #[test]
     fn test_scanner_config_default() {
         let config = ScannerConfig::default();
+        // Lower threshold (3) to catch platform issues early
         assert_eq!(config.error_threshold, 3);
         assert!(config.namespaces.contains(&"cto".to_string()));
     }
