@@ -205,7 +205,12 @@ impl BehaviorAnalyzer {
                 false,
                 "medium",
             ),
-            pattern("timeout", r"(?i)timed? ?out|timeout|i/o timeout", false, "medium"),
+            pattern(
+                "timeout",
+                r"(?i)timed? ?out|timeout|i/o timeout",
+                false,
+                "medium",
+            ),
             pattern(
                 "network error",
                 r"(?i)dial tcp.*failed|couldn't connect|connection reset",

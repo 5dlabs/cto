@@ -169,7 +169,12 @@ impl GitHubActionsSensor {
         let mut delay_ms = INITIAL_RETRY_DELAY_MS;
 
         for attempt in 1..=MAX_RETRIES {
-            debug!("Executing gh command (attempt {}/{}): gh {}", attempt, MAX_RETRIES, args.join(" "));
+            debug!(
+                "Executing gh command (attempt {}/{}): gh {}",
+                attempt,
+                MAX_RETRIES,
+                args.join(" ")
+            );
 
             match Command::new("gh").args(args).output() {
                 Ok(output) => {
@@ -210,10 +215,7 @@ impl GitHubActionsSensor {
                 }
                 Err(e) => {
                     if attempt < MAX_RETRIES {
-                        warn!(
-                            "gh command execution failed (attempt {}): {}",
-                            attempt, e
-                        );
+                        warn!("gh command execution failed (attempt {}): {}", attempt, e);
                         thread::sleep(Duration::from_millis(delay_ms));
                         delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
                         last_error = Some(format!("Failed to execute gh: {e}"));
@@ -225,7 +227,11 @@ impl GitHubActionsSensor {
         }
 
         // Should not reach here, but handle gracefully
-        anyhow::bail!("gh command failed after {} retries: {}", MAX_RETRIES, last_error.unwrap_or_default())
+        anyhow::bail!(
+            "gh command failed after {} retries: {}",
+            MAX_RETRIES,
+            last_error.unwrap_or_default()
+        )
     }
 
     /// Check if an error is retryable (network-related).
@@ -245,7 +251,9 @@ impl GitHubActionsSensor {
         ];
 
         let stderr_lower = stderr.to_lowercase();
-        retryable_patterns.iter().any(|pattern| stderr_lower.contains(&pattern.to_lowercase()))
+        retryable_patterns
+            .iter()
+            .any(|pattern| stderr_lower.contains(&pattern.to_lowercase()))
     }
 
     /// Run the sensor in a continuous loop.
@@ -723,14 +731,26 @@ mod tests {
         assert!(GitHubActionsSensor::is_retryable_error(
             "Get \"https://api.github.com/zen\": dial tcp 140.82.113.5:443: i/o timeout"
         ));
-        assert!(GitHubActionsSensor::is_retryable_error("connection refused"));
-        assert!(GitHubActionsSensor::is_retryable_error("connection reset by peer"));
-        assert!(GitHubActionsSensor::is_retryable_error("network is unreachable"));
-        assert!(GitHubActionsSensor::is_retryable_error("TLS handshake timeout"));
-        assert!(GitHubActionsSensor::is_retryable_error("temporary failure in name resolution"));
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "connection refused"
+        ));
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "connection reset by peer"
+        ));
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "network is unreachable"
+        ));
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "TLS handshake timeout"
+        ));
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "temporary failure in name resolution"
+        ));
 
         // Non-retryable errors
-        assert!(!GitHubActionsSensor::is_retryable_error("permission denied"));
+        assert!(!GitHubActionsSensor::is_retryable_error(
+            "permission denied"
+        ));
         assert!(!GitHubActionsSensor::is_retryable_error("not found"));
         assert!(!GitHubActionsSensor::is_retryable_error("invalid argument"));
         assert!(!GitHubActionsSensor::is_retryable_error(
