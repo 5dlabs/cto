@@ -138,14 +138,22 @@ data:
         local attempt=1
         local delay=2
         local result=""
+        local exit_code=0
         while [ $attempt -le $max_attempts ]; do
-            result=$(curl "$@" 2>&1) && break
-            echo "  ⚠️ Attempt $attempt/$max_attempts failed, retrying in ${delay}s..."
+            set +e  # Temporarily disable exit on error
+            result=$(curl "$@" 2>&1)
+            exit_code=$?
+            set -e
+            if [ $exit_code -eq 0 ]; then
+                break
+            fi
+            echo "  ⚠️ Attempt $attempt/$max_attempts failed (exit code $exit_code), retrying in ${delay}s..." >&2
             sleep $delay
             delay=$((delay * 2))
             attempt=$((attempt + 1))
         done
         echo "$result"
+        return $exit_code
     }
 
     echo "🔐 Setting up GitHub App authentication..."
