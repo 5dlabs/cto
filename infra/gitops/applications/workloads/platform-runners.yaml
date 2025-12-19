@@ -41,6 +41,15 @@ spec:
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds
+        # KNOWN ISSUE: Docker bridge network inside DinD may have intermittent
+        # connectivity to GHCR/GitHub due to MTU mismatch with Cilium WireGuard (1420)
+        # and Flannel VXLAN (1450). The Docker bridge defaults to MTU 1500.
+        #
+        # WORKAROUND: Use --network=host in buildx build commands, or configure
+        # the buildx builder with --driver-opt network=host
+        #
+        # PERMANENT FIX: Clean up the network stack - remove Kilo (deprecated)
+        # and Flannel remnants, ensure consistent MTU throughout.
         containerMode:
           type: "dind"
 
