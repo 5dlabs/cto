@@ -148,11 +148,11 @@ data:
         JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
         
         # Get installation token
-        INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+        INSTALLATIONS=$(curl -s --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
         INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
         
         if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
-            TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+            TOKEN_RESPONSE=$(curl -s --max-time 30 -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
             GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
             
             if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
@@ -471,11 +471,11 @@ data:
         JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
         
         # Get installation token
-        INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+        INSTALLATIONS=$(curl -s --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
         INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
         
         if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
-            TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+            TOKEN_RESPONSE=$(curl -s --max-time 30 -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
             GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
             
             if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
