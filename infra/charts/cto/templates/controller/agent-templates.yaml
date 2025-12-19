@@ -525,11 +525,33 @@ data:
     echo "📦 Phase 2: Repository Clone and Setup"
     echo "======================================="
 
+    # Retry wrapper for git with exponential backoff
+    retry_git() {
+        local max_attempts=3
+        local attempt=1
+        local delay=5
+        local exit_code=0
+        while [ $attempt -le $max_attempts ]; do
+            set +e
+            git "$@"
+            exit_code=$?
+            set -e
+            if [ $exit_code -eq 0 ]; then
+                return 0
+            fi
+            echo "  ⚠️ Git attempt $attempt/$max_attempts failed (exit code $exit_code), retrying in ${delay}s..." >&2
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+        done
+        return $exit_code
+    }
+
     CLONE_DIR="/tmp/repo-$(date +%s)"
     echo "📂 Cloning repository to: $CLONE_DIR"
     activity_action "Clone repository" "$REPOSITORY_URL"
 
-    git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
+    retry_git clone "$REPOSITORY_URL" "$CLONE_DIR" || exit 1
     cd "$CLONE_DIR" || exit 1
     activity_action_complete "Cloned repository" "$REPOSITORY_URL" "Clone complete"
 
