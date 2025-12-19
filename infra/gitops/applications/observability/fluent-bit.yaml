@@ -75,27 +75,69 @@ spec:
                 Add                 platform.name       cto
                 Add                 platform.version    v1
 
+            # --- Catch-all namespace filters ---
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_cto_*
+                Add                 service.namespace   cto
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_automation_*
+                Add                 service.namespace   automation
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_argocd_*
+                Add                 service.namespace   argocd
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_infra_*
+                Add                 service.namespace   infra
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*_observability_*
+                Add                 service.namespace   observability
+
+            # --- Specific service overrides ---
             # Enrich logs from CTO namespace with service details
             [FILTER]
                 Name                modify
-                Match               kube.var.log.containers.controller-*_cto_*
+                Match               kube.var.log.containers.*controller-*_cto_*
                 Add                 service.name        agent-controller
                 Add                 service.component   controller
-                Add                 service.namespace   cto
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*tools*_cto_*
                 Add                 service.name        tools-mcp
                 Add                 service.component   tools
-                Add                 service.namespace   cto
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*openmemory*_cto_*
                 Add                 service.name        openmemory
                 Add                 service.component   memory
-                Add                 service.namespace   cto
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*healer*_cto_*
+                Add                 service.name        healer
+                Add                 service.component   remediation
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*pm*_cto_*
+                Add                 service.name        pm-server
+                Add                 service.component   project-management
+
+            [FILTER]
+                Name                modify
+                Match               kube.var.log.containers.*research*_cto_*
+                Add                 service.name        research
+                Add                 service.component   research-pipeline
 
             # Enrich logs from observability namespace
             [FILTER]
@@ -103,35 +145,30 @@ spec:
                 Match               kube.var.log.containers.*victoria-logs*_observability_*
                 Add                 service.name        victoria-logs
                 Add                 service.component   logging
-                Add                 service.namespace   observability
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*victoria-metrics*_observability_*
                 Add                 service.name        victoria-metrics
                 Add                 service.component   metrics
-                Add                 service.namespace   observability
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*otel-collector*_observability_*
                 Add                 service.name        otel-collector
                 Add                 service.component   telemetry
-                Add                 service.namespace   observability
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*grafana*_observability_*
                 Add                 service.name        grafana
                 Add                 service.component   visualization
-                Add                 service.namespace   observability
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*kube-state-metrics*_observability_*
                 Add                 service.name        kube-state-metrics
                 Add                 service.component   metrics-exporter
-                Add                 service.namespace   observability
 
             # Enrich logs from automation namespace (Argo)
             [FILTER]
@@ -139,14 +176,12 @@ spec:
                 Match               kube.var.log.containers.*argo-workflows*_automation_*
                 Add                 service.name        argo-workflows
                 Add                 service.component   workflow-engine
-                Add                 service.namespace   automation
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*argo-events*_automation_*
                 Add                 service.name        argo-events
                 Add                 service.component   event-bus
-                Add                 service.namespace   automation
 
             # Enrich logs from argocd namespace
             [FILTER]
@@ -154,7 +189,6 @@ spec:
                 Match               kube.var.log.containers.*argocd*_argocd_*
                 Add                 service.name        argocd
                 Add                 service.component   gitops
-                Add                 service.namespace   argocd
 
             # Enrich logs from vault namespace
             [FILTER]
@@ -162,7 +196,6 @@ spec:
                 Match               kube.var.log.containers.*vault*_vault_*
                 Add                 service.name        vault
                 Add                 service.component   secrets
-                Add                 service.namespace   vault
 
             # Enrich logs from infra namespace
             [FILTER]
@@ -170,49 +203,42 @@ spec:
                 Match               kube.var.log.containers.*ingress-nginx*_infra_*
                 Add                 service.name        ingress-nginx
                 Add                 service.component   ingress
-                Add                 service.namespace   infra
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*cert-manager*_infra_*
                 Add                 service.name        cert-manager
                 Add                 service.component   certificates
-                Add                 service.namespace   infra
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*arc*controller*_infra_*
                 Add                 service.name        arc-controller
                 Add                 service.component   runner-controller
-                Add                 service.namespace   infra
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*external-dns*_infra_*
                 Add                 service.name        external-dns
                 Add                 service.component   dns
-                Add                 service.namespace   infra
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*cloudnative-pg*_infra_*
                 Add                 service.name        cloudnative-pg-operator
                 Add                 service.component   postgres-operator
-                Add                 service.namespace   infra
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*redis-operator*_infra_*
                 Add                 service.name        redis-operator
                 Add                 service.component   redis-operator
-                Add                 service.namespace   infra
 
             [FILTER]
                 Name                modify
                 Match               kube.var.log.containers.*vault-secrets*_infra_*
                 Add                 service.name        vault-secrets-operator
                 Add                 service.component   secrets-operator
-                Add                 service.namespace   infra
 
             # Enrich logs from cloudflare-operator-system namespace
             [FILTER]

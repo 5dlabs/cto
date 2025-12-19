@@ -152,8 +152,18 @@ impl BookmarkPoller {
         use futures::StreamExt;
 
         let config = BrowserConfig::builder()
+            // Container compatibility
             .arg("--no-sandbox") // Required for containerized environments
             .arg("--disable-dev-shm-usage") // Avoid /dev/shm size issues in containers
+            // Anti-detection: Remove automation signals
+            .arg("--disable-blink-features=AutomationControlled") // Hide navigator.webdriver
+            .arg("--disable-features=IsolateOrigins,site-per-process") // Reduce fingerprinting
+            // Realistic browser setup
+            .arg("--window-size=1920,1080") // Standard desktop resolution
+            .arg("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            // Performance
+            .arg("--disable-gpu") // Not needed for headless
+            .arg("--disable-software-rasterizer")
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to build browser config: {e}"))?;
         let (mut browser, mut handler) = Browser::launch(config).await?;
@@ -171,8 +181,8 @@ impl BookmarkPoller {
         tracing::debug!("Navigating to x.com to set cookies");
         let page = browser.new_page("https://x.com").await?;
 
-        // Wait briefly for initial page load
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        // Wait for initial page load
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
         // Set auth cookies
         tracing::debug!("Setting Twitter auth cookies");
@@ -205,19 +215,40 @@ impl BookmarkPoller {
         tracing::debug!("Navigating to bookmarks page");
         page.goto("https://x.com/i/bookmarks").await?;
 
-        // Wait for content to load (Twitter is JS-heavy)
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        // Wait for content to load (Twitter is JS-heavy, needs extra time)
+        tokio::time::sleep(tokio::time::Duration::from_secs(8)).await;
 
         // Nudge the timeline to render by scrolling once (helps when content is virtualized)
-        let _: serde_json::Value = page
+        match page
             .evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            .await?
-            .into_value()?;
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            .await
+        {
+            Ok(result) => {
+                if let Err(e) = result.into_value::<serde_json::Value>() {
+                    tracing::warn!(error = %e, "Failed to convert scroll result to value, continuing anyway");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to execute scroll - page may not be fully loaded");
+            }
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
         // Check if we got redirected to login
-        let url = page.url().await?.unwrap_or_default();
-        if url.contains("login") || url.contains("flow") {
+        let url = match page.url().await {
+            Ok(Some(u)) => u,
+            Ok(None) => {
+                tracing::warn!("Page URL is None - page may not have loaded properly");
+                String::new()
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to get page URL - this may indicate browser/page issues");
+                // Try to get HTML anyway - the page might still have content
+                String::new()
+            }
+        };
+
+        if !url.is_empty() && (url.contains("login") || url.contains("flow")) {
             tracing::error!(
                 url,
                 "Redirected to login - auth cookies are invalid or expired"
