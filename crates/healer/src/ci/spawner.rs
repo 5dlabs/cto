@@ -485,19 +485,20 @@ impl CodeRunSpawner {
         }
 
         prompt.push_str("\n## Failure Logs\n```\n");
-        // Truncate logs if too long (UTF-8 safe)
+        // Strip control characters and truncate logs if too long (UTF-8 safe)
+        let sanitized_logs = strip_control_chars(&ctx.workflow_logs);
         let max_log_bytes = 10000;
-        if ctx.workflow_logs.len() > max_log_bytes {
+        if sanitized_logs.len() > max_log_bytes {
             // Find a safe UTF-8 boundary to truncate at
-            let truncated = truncate_utf8_safe(&ctx.workflow_logs, max_log_bytes);
+            let truncated = truncate_utf8_safe(&sanitized_logs, max_log_bytes);
             let _ = writeln!(
                 prompt,
                 "{}...\n(truncated, {} total bytes)",
                 truncated,
-                ctx.workflow_logs.len()
+                sanitized_logs.len()
             );
         } else {
-            prompt.push_str(&ctx.workflow_logs);
+            prompt.push_str(&sanitized_logs);
         }
         prompt.push_str("\n```\n\n");
 
