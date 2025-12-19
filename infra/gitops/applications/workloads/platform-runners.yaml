@@ -37,7 +37,7 @@ spec:
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
         minRunners: 2
-        maxRunners: 6  # Increased for faster CI throughput
+        maxRunners: 8  # Increased for faster CI throughput
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds

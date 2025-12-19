@@ -43,7 +43,7 @@ jobs:
       - name: Setup tools
         run: |
           # Install yq for YAML parsing
-          wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O yq
+          curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o yq
           chmod +x yq
           sudo mv yq /usr/local/bin/
 
