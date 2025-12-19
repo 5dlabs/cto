@@ -7,6 +7,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
 use crate::ci::{self, types::CiFailure, CiRouter, CodeRunSpawner};
@@ -141,6 +143,11 @@ pub struct GitHubActionsSensor {
     last_poll: Option<DateTime<Utc>>,
 }
 
+/// Configuration for retry behavior.
+const MAX_RETRIES: u32 = 3;
+const INITIAL_RETRY_DELAY_MS: u64 = 1000;
+const MAX_RETRY_DELAY_MS: u64 = 10000;
+
 impl GitHubActionsSensor {
     /// Create a new sensor with the given configuration.
     #[must_use]
@@ -151,6 +158,81 @@ impl GitHubActionsSensor {
             processed_runs: HashSet::new(),
             last_poll: None,
         }
+    }
+
+    /// Execute a command with retry logic and exponential backoff.
+    ///
+    /// Retries the command up to `MAX_RETRIES` times if it fails with a
+    /// network-related error (timeout, connection refused, etc.).
+    fn execute_with_retry(args: &[&str]) -> Result<std::process::Output> {
+        let mut last_error = None;
+        let mut delay_ms = INITIAL_RETRY_DELAY_MS;
+
+        for attempt in 1..=MAX_RETRIES {
+            debug!("Executing gh command (attempt {}/{}): gh {}", attempt, MAX_RETRIES, args.join(" "));
+
+            match Command::new("gh").args(args).output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        return Ok(output);
+                    }
+
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+
+                    // Check for retryable errors (network timeouts, connection issues)
+                    if Self::is_retryable_error(&stderr) && attempt < MAX_RETRIES {
+                        warn!(
+                            "gh command failed with retryable error (attempt {}): {}",
+                            attempt,
+                            stderr.trim()
+                        );
+                        thread::sleep(Duration::from_millis(delay_ms));
+                        delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
+                        last_error = Some(format!("gh command failed: {stderr}"));
+                        continue;
+                    }
+
+                    // Non-retryable error or max retries reached
+                    return Ok(output);
+                }
+                Err(e) => {
+                    if attempt < MAX_RETRIES {
+                        warn!(
+                            "gh command execution failed (attempt {}): {}",
+                            attempt, e
+                        );
+                        thread::sleep(Duration::from_millis(delay_ms));
+                        delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
+                        last_error = Some(format!("Failed to execute gh: {e}"));
+                        continue;
+                    }
+                    return Err(e).context("Failed to execute gh command after retries");
+                }
+            }
+        }
+
+        // Should not reach here, but handle gracefully
+        anyhow::bail!("gh command failed after {} retries: {}", MAX_RETRIES, last_error.unwrap_or_default())
+    }
+
+    /// Check if an error is retryable (network-related).
+    fn is_retryable_error(stderr: &str) -> bool {
+        let retryable_patterns = [
+            "i/o timeout",
+            "connection refused",
+            "connection reset",
+            "dial tcp",
+            "network is unreachable",
+            "no such host",
+            "temporary failure",
+            "timed out",
+            "EOF",
+            "connection timed out",
+            "TLS handshake timeout",
+        ];
+
+        let stderr_lower = stderr.to_lowercase();
+        retryable_patterns.iter().any(|pattern| stderr_lower.contains(&pattern.to_lowercase()))
     }
 
     /// Run the sensor in a continuous loop.
@@ -220,23 +302,20 @@ impl GitHubActionsSensor {
     fn poll_repository(&mut self, repository: &str) -> Result<Vec<WorkflowFailure>> {
         debug!("Polling repository: {}", repository);
 
-        // Use `gh` CLI to list workflow runs
+        // Use `gh` CLI to list workflow runs with retry logic
         // Note: actor field is not available in `gh run list`, we'll fetch it separately
-        let output = Command::new("gh")
-            .args([
-                "run",
-                "list",
-                "--repo",
-                repository,
-                "--status",
-                "failure",
-                "--json",
-                "databaseId,name,headBranch,headSha,url,conclusion,createdAt,workflowName,event",
-                "--limit",
-                "50",
-            ])
-            .output()
-            .context("Failed to execute gh run list")?;
+        let output = Self::execute_with_retry(&[
+            "run",
+            "list",
+            "--repo",
+            repository,
+            "--status",
+            "failure",
+            "--json",
+            "databaseId,name,headBranch,headSha,url,conclusion,createdAt,workflowName,event",
+            "--limit",
+            "50",
+        ])?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -380,18 +459,16 @@ impl GitHubActionsSensor {
     fn fetch_failed_job_details(
         failure: &WorkflowFailure,
     ) -> Result<(Option<String>, Option<u64>, Option<String>, Option<String>)> {
-        let output = Command::new("gh")
-            .args([
-                "run",
-                "view",
-                &failure.run_id.to_string(),
-                "--repo",
-                &failure.repository,
-                "--json",
-                "jobs,actor",
-            ])
-            .output()
-            .context("Failed to execute gh run view")?;
+        let run_id_str = failure.run_id.to_string();
+        let output = Self::execute_with_retry(&[
+            "run",
+            "view",
+            &run_id_str,
+            "--repo",
+            &failure.repository,
+            "--json",
+            "jobs,actor",
+        ])?;
 
         if !output.status.success() {
             return Ok((None, None, None, None));
@@ -425,33 +502,28 @@ impl GitHubActionsSensor {
 
     /// Fetch workflow logs.
     fn fetch_workflow_logs(failure: &WorkflowFailure) -> Result<String> {
-        let output = Command::new("gh")
-            .args([
-                "run",
-                "view",
-                &failure.run_id.to_string(),
-                "--repo",
-                &failure.repository,
-                "--log-failed",
-            ])
-            .output()
-            .context("Failed to fetch workflow logs")?;
+        let run_id_str = failure.run_id.to_string();
+        let output = Self::execute_with_retry(&[
+            "run",
+            "view",
+            &run_id_str,
+            "--repo",
+            &failure.repository,
+            "--log-failed",
+        ])?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
             // Try fetching all logs if --log-failed doesn't work
-            let output = Command::new("gh")
-                .args([
-                    "run",
-                    "view",
-                    &failure.run_id.to_string(),
-                    "--repo",
-                    &failure.repository,
-                    "--log",
-                ])
-                .output()
-                .context("Failed to fetch workflow logs")?;
+            let output = Self::execute_with_retry(&[
+                "run",
+                "view",
+                &run_id_str,
+                "--repo",
+                &failure.repository,
+                "--log",
+            ])?;
 
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         }
@@ -475,21 +547,18 @@ impl GitHubActionsSensor {
 
         let labels = self.config.issue_labels.join(",");
 
-        let output = Command::new("gh")
-            .args([
-                "issue",
-                "create",
-                "--repo",
-                &failure.repository,
-                "--title",
-                &title,
-                "--body",
-                &body,
-                "--label",
-                &labels,
-            ])
-            .output()
-            .context("Failed to create GitHub issue")?;
+        let output = Self::execute_with_retry(&[
+            "issue",
+            "create",
+            "--repo",
+            &failure.repository,
+            "--title",
+            &title,
+            "--body",
+            &body,
+            "--label",
+            &labels,
+        ])?;
 
         if output.status.success() {
             let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -630,5 +699,29 @@ mod tests {
         assert!(body.contains("build"));
         assert!(body.contains("main"));
         assert!(body.contains("testuser"));
+    }
+
+    #[test]
+    fn test_is_retryable_error() {
+        // Network timeout errors should be retryable
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "dial tcp 140.82.112.5:443: i/o timeout"
+        ));
+        assert!(GitHubActionsSensor::is_retryable_error(
+            "Get \"https://api.github.com/zen\": dial tcp 140.82.113.5:443: i/o timeout"
+        ));
+        assert!(GitHubActionsSensor::is_retryable_error("connection refused"));
+        assert!(GitHubActionsSensor::is_retryable_error("connection reset by peer"));
+        assert!(GitHubActionsSensor::is_retryable_error("network is unreachable"));
+        assert!(GitHubActionsSensor::is_retryable_error("TLS handshake timeout"));
+        assert!(GitHubActionsSensor::is_retryable_error("temporary failure in name resolution"));
+
+        // Non-retryable errors
+        assert!(!GitHubActionsSensor::is_retryable_error("permission denied"));
+        assert!(!GitHubActionsSensor::is_retryable_error("not found"));
+        assert!(!GitHubActionsSensor::is_retryable_error("invalid argument"));
+        assert!(!GitHubActionsSensor::is_retryable_error(
+            "Resource not accessible by integration"
+        ));
     }
 }
