@@ -180,19 +180,32 @@ impl GitHubActionsSensor {
                     let stderr = String::from_utf8_lossy(&output.stderr);
 
                     // Check for retryable errors (network timeouts, connection issues)
-                    if Self::is_retryable_error(&stderr) && attempt < MAX_RETRIES {
-                        warn!(
-                            "gh command failed with retryable error (attempt {}): {}",
-                            attempt,
+                    if Self::is_retryable_error(&stderr) {
+                        if attempt < MAX_RETRIES {
+                            warn!(
+                                "gh command failed with retryable error (attempt {}): {}",
+                                attempt,
+                                stderr.trim()
+                            );
+                            thread::sleep(Duration::from_millis(delay_ms));
+                            delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
+                            last_error = Some(format!("gh command failed: {stderr}"));
+                            continue;
+                        }
+                        // Retryable error but max retries exhausted - return error
+                        error!(
+                            "gh command failed after {} retries: {}",
+                            MAX_RETRIES,
                             stderr.trim()
                         );
-                        thread::sleep(Duration::from_millis(delay_ms));
-                        delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
-                        last_error = Some(format!("gh command failed: {stderr}"));
-                        continue;
+                        anyhow::bail!(
+                            "gh command failed after {} retries: {}",
+                            MAX_RETRIES,
+                            stderr.trim()
+                        );
                     }
 
-                    // Non-retryable error or max retries reached
+                    // Non-retryable error - return Ok and let caller check exit status
                     return Ok(output);
                 }
                 Err(e) => {
