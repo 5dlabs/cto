@@ -128,6 +128,21 @@ impl CodeTemplateGenerator {
             }
         }
 
+        // If acceptance_criteria is set, write it to acceptance-criteria.md
+        // This allows the acceptance probe to verify checkboxes after task completion
+        if let Some(ref criteria_content) = code_run.spec.acceptance_criteria {
+            if !criteria_content.trim().is_empty() {
+                debug!(
+                    "Writing acceptance_criteria to acceptance-criteria.md ({} bytes)",
+                    criteria_content.len()
+                );
+                templates.insert(
+                    "acceptance-criteria.md".to_string(),
+                    criteria_content.clone(),
+                );
+            }
+        }
+
         Ok(templates)
     }
 
@@ -4149,6 +4164,7 @@ mod tests {
                 service_account_name: None,
                 linear_integration: None,
                 prompt_modification: None,
+                acceptance_criteria: None,
             },
             status: None,
         }

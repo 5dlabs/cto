@@ -359,10 +359,12 @@ impl CodeRunSpawner {
             }
         }
 
-        // Logs
-        data.insert("logs".into(), json!(&ctx.workflow_logs));
-        data.insert("workflow_logs".into(), json!(&ctx.workflow_logs));
-        data.insert("recent_error_logs".into(), json!(&ctx.recent_logs));
+        // Logs - strip control characters to prevent YAML parsing issues
+        let sanitized_logs = strip_control_chars(&ctx.workflow_logs);
+        let sanitized_recent = strip_control_chars(&ctx.recent_logs);
+        data.insert("logs".into(), json!(&sanitized_logs));
+        data.insert("workflow_logs".into(), json!(&sanitized_logs));
+        data.insert("recent_error_logs".into(), json!(&sanitized_recent));
 
         // PR context
         if let Some(pr) = &ctx.pr {
@@ -626,6 +628,25 @@ spec:
     }
 }
 
+/// Strip control characters from a string.
+///
+/// Removes ANSI escape codes, null bytes, and other control characters
+/// that would break YAML parsing. Preserves newlines and tabs.
+fn strip_control_chars(s: &str) -> String {
+    // First, strip ANSI escape sequences (e.g., \x1b[31m for colors)
+    let ansi_regex = regex::Regex::new(r"\x1b\[[0-9;]*[A-Za-z]").unwrap_or_else(|_| {
+        // Fallback: should never fail but be safe
+        regex::Regex::new(r"^\b$").unwrap()
+    });
+    let without_ansi = ansi_regex.replace_all(s, "");
+
+    // Then remove remaining control characters except newline (\n), carriage return (\r), and tab (\t)
+    without_ansi
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\r' || *c == '\t')
+        .collect()
+}
+
 /// Truncate a UTF-8 string at a safe byte boundary.
 ///
 /// This avoids panicking when slicing in the middle of a multi-byte character.
@@ -668,6 +689,37 @@ fn sanitize_label(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_strip_control_chars() {
+        // Test ANSI escape codes removal
+        assert_eq!(
+            strip_control_chars("\x1b[31mError:\x1b[0m failed"),
+            "Error: failed"
+        );
+
+        // Test multiple ANSI codes
+        assert_eq!(
+            strip_control_chars("\x1b[1;32mSuccess\x1b[0m and \x1b[1;31mFailure\x1b[0m"),
+            "Success and Failure"
+        );
+
+        // Test null byte removal
+        assert_eq!(strip_control_chars("hello\x00world"), "helloworld");
+
+        // Test preserves newlines and tabs
+        assert_eq!(strip_control_chars("line1\nline2\ttab"), "line1\nline2\ttab");
+
+        // Test complex GitHub Actions log output
+        let gh_log = "\x1b[32m✓\x1b[0m Test passed\n\x1b[31m✗\x1b[0m Test failed";
+        assert_eq!(strip_control_chars(gh_log), "✓ Test passed\n✗ Test failed");
+
+        // Test empty string
+        assert_eq!(strip_control_chars(""), "");
+
+        // Test string with only control chars
+        assert_eq!(strip_control_chars("\x1b[0m\x00\x01\x02"), "");
+    }
 
     #[test]
     fn test_sanitize_label() {

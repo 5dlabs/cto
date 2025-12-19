@@ -186,13 +186,25 @@ impl LogScanner {
                         .map(|s| s.as_str())
                         .unwrap_or("");
 
-                    if ns_label == namespace
+                    let pod_name = entry
+                        .labels
+                        .get("pod")
+                        .or_else(|| entry.labels.get("pod_name"))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+
+                    let is_match = ns_label == namespace
                         || entry.line.contains(&format!("_{namespace}_"))
-                        || entry
-                            .labels
-                            .get("service_name")
-                            .is_some_and(|s| s.contains("unknown"))
-                    {
+                        || pod_name.contains(&format!("-{namespace}-"))
+                        || pod_name.contains(&format!("_{namespace}_"))
+                        || (ns_label.is_empty()
+                            && (pod_name.contains(namespace)
+                                || entry
+                                    .labels
+                                    .get("service_name")
+                                    .is_some_and(|s| s.contains("unknown"))));
+
+                    if is_match {
                         error_entries.push(entry);
                     }
                 }
@@ -224,13 +236,25 @@ impl LogScanner {
                         .map(|s| s.as_str())
                         .unwrap_or("");
 
-                    if ns_label == namespace
+                    let pod_name = entry
+                        .labels
+                        .get("pod")
+                        .or_else(|| entry.labels.get("pod_name"))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+
+                    let is_match = ns_label == namespace
                         || entry.line.contains(&format!("_{namespace}_"))
-                        || entry
-                            .labels
-                            .get("service_name")
-                            .is_some_and(|s| s.contains("unknown"))
-                    {
+                        || pod_name.contains(&format!("-{namespace}-"))
+                        || pod_name.contains(&format!("_{namespace}_"))
+                        || (ns_label.is_empty()
+                            && (pod_name.contains(namespace)
+                                || entry
+                                    .labels
+                                    .get("service_name")
+                                    .is_some_and(|s| s.contains("unknown"))));
+
+                    if is_match {
                         warn_entries.push(entry);
                     }
                 }
