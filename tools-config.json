@@ -8,22 +8,23 @@
   ],
   "localServers": {
     "postgres": {
-      "command": "npx",
+      "command": "/opt/homebrew/bin/node",
       "args": [
+        "/opt/homebrew/bin/npx",
         "-y",
-        "@modelcontextprotocol/server-postgres"
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://user:password@host:port/database"
       ],
       "tools": [
         "query"
       ],
       "workingDirectory": "project_root",
-      "env": {
-        "POSTGRES_URL": "${POSTGRES_URL:-postgresql://localhost:5432/postgres}"
-      }
+      "env": {}
     },
     "filesystem": {
-      "command": "npx",
+      "command": "/opt/homebrew/bin/node",
       "args": [
+        "/opt/homebrew/bin/npx",
         "-y",
         "@modelcontextprotocol/server-filesystem",
         "."
@@ -45,8 +46,9 @@
       "env": {}
     },
     "memory": {
-      "command": "npx",
+      "command": "/opt/homebrew/bin/node",
       "args": [
+        "/opt/homebrew/bin/npx",
         "-y",
         "@modelcontextprotocol/server-memory"
       ],

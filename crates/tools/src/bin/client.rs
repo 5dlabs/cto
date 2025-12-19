@@ -6,6 +6,7 @@
 use anyhow::Result;
 use clap::Parser;
 use tools::client::McpClient;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 /// Tools MCP Client
 ///
@@ -43,6 +44,12 @@ struct Args {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize tracing subscriber for debug logging (outputs to stderr)
+    tracing_subscriber::registry()
+        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(EnvFilter::from_default_env())
+        .init();
+
     let args = Args::parse();
 
     // Log environment variables for debugging workspace detection

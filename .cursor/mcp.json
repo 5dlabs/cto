@@ -2,7 +2,10 @@
   "mcpServers": {
     "morph-mcp": {
       "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "@morphllm/morphmcp@latest"],
+      "args": [
+        "-y",
+        "@morphllm/morphmcp@latest"
+      ],
       "env": {
         "MORPH_API_KEY": "${MORPH_API_KEY}",
         "ENABLED_TOOLS": "all",
@@ -22,7 +25,10 @@
     },
     "tools": {
       "command": "tools-client",
-      "args": [],
+      "args": [
+        "--working-dir",
+        "/Users/jonathonfritz/code/work-projects/5dlabs/cto"
+      ],
       "env": {
         "TOOLS_SERVER_URL": "http://localhost:3001/mcp"
       }
@@ -33,22 +39,34 @@
     },
     "context7": {
       "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "@upstash/context7-mcp"],
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
       "env": {
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       }
     },
     "shadcn": {
       "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "@jpisnice/shadcn-ui-mcp-server"]
+      "args": [
+        "-y",
+        "@jpisnice/shadcn-ui-mcp-server"
+      ]
     },
     "ai-elements": {
       "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "mcp-remote", "https://registry.ai-sdk.dev/api/mcp"]
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://registry.ai-sdk.dev/api/mcp"
+      ]
     },
     "docker": {
       "command": "uvx",
-      "args": ["mcp-server-docker"]
+      "args": [
+        "mcp-server-docker"
+      ]
     },
     "linear": {
       "url": "https://mcp.linear.app/sse",
@@ -59,9 +77,13 @@
     "prometheus": {
       "command": "docker",
       "args": [
-        "run", "--rm", "-i",
-        "--network", "kind",
-        "-e", "PROMETHEUS_URL",
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "kind",
+        "-e",
+        "PROMETHEUS_URL",
         "ghcr.io/pab1it0/prometheus-mcp-server:latest"
       ],
       "env": {
@@ -71,22 +93,33 @@
     "loki": {
       "command": "docker",
       "args": [
-        "run", "--rm", "-i",
-        "--network", "kind",
-        "-e", "LOKI_URL=http://172.18.0.2:30100",
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "kind",
+        "-e",
+        "LOKI_URL=http://172.18.0.2:30100",
         "loki-mcp-server:latest"
       ]
     },
     "grafana": {
       "command": "docker",
       "args": [
-        "run", "--rm", "-i",
-        "--network", "kind",
-        "-e", "GRAFANA_URL",
-        "-e", "GRAFANA_USERNAME",
-        "-e", "GRAFANA_PASSWORD",
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "kind",
+        "-e",
+        "GRAFANA_URL",
+        "-e",
+        "GRAFANA_USERNAME",
+        "-e",
+        "GRAFANA_PASSWORD",
         "mcp/grafana",
-        "-t", "stdio"
+        "-t",
+        "stdio"
       ],
       "env": {
         "GRAFANA_URL": "http://172.18.0.2:30030",
@@ -97,18 +130,28 @@
     "argo-workflows": {
       "command": "docker",
       "args": [
-        "run", "-i", "--rm",
-        "--network", "kind",
-        "-e", "ARGO_BASE_URL=http://172.18.0.2:30081",
-        "-e", "ARGO_NAMESPACE=cto",
-        "-e", "MCP_ALLOW_MUTATIONS=true",
-        "-e", "MCP_ALLOW_DESTRUCTIVE=false",
+        "run",
+        "-i",
+        "--rm",
+        "--network",
+        "kind",
+        "-e",
+        "ARGO_BASE_URL=http://172.18.0.2:30081",
+        "-e",
+        "ARGO_NAMESPACE=cto",
+        "-e",
+        "MCP_ALLOW_MUTATIONS=true",
+        "-e",
+        "MCP_ALLOW_DESTRUCTIVE=false",
         "ghcr.io/heapy/argo-workflows-mcp:main"
       ]
     },
     "argocd-home": {
       "command": "/opt/homebrew/bin/npx",
-      "args": ["argocd-mcp@latest", "stdio"],
+      "args": [
+        "argocd-mcp@latest",
+        "stdio"
+      ],
       "env": {
         "ARGOCD_BASE_URL": "http://192.168.1.77:30080",
         "ARGOCD_API_TOKEN": "${ARGOCD_API_TOKEN}"
