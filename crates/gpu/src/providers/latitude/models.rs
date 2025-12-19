@@ -225,7 +225,3 @@ pub struct VmPlanPrice {
     /// Yearly price.
     pub year: Option<f64>,
 }
-
-
-
-
