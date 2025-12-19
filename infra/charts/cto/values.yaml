@@ -217,7 +217,7 @@ tools:
         name: "OpenMemory"
         description: "Long-term memory system for AI agents"
         transport: "http"
-        url: "http://cto-openmemory.cto.svc.cluster.local:3000/mcp"
+        url: "http://cto-openmemory.cto.svc.cluster.local:8080/mcp"
 
       context7:
         name: "Context7"
@@ -466,7 +466,7 @@ openmemory:
 
   service:
     type: ClusterIP
-    port: 3000
+    port: 8080
 
   resources:
     limits:
