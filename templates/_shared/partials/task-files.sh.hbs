@@ -5,7 +5,10 @@
 mkdir -p "$CLI_WORK_DIR/task"
 
 # Copy task files from ConfigMap first (these are templates and agent files)
-cp -R /task-files/* "$CLI_WORK_DIR/task/" 2>/dev/null || true
+# Use . to copy hidden files and ensure we copy the content of the directory
+echo "📂 Copying task files from ConfigMap..."
+cp -R /task-files/. "$CLI_WORK_DIR/task/"
+ls -la "$CLI_WORK_DIR/task/"
 
 # Fetch task-specific files from the repository's .tasks directory
 # The task files are located at .tasks/docs/task-{TASK_ID}/ in the repo
