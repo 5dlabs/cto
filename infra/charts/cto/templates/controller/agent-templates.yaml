@@ -132,6 +132,22 @@ data:
     # GitHub Authentication
     # =========================================================================
 
+    # Retry wrapper for curl with exponential backoff
+    retry_curl() {
+        local max_attempts=3
+        local attempt=1
+        local delay=2
+        local result=""
+        while [ $attempt -le $max_attempts ]; do
+            result=$(curl "$@" 2>&1) && break
+            echo "  ⚠️ Attempt $attempt/$max_attempts failed, retrying in ${delay}s..."
+            sleep $delay
+            delay=$((delay * 2))
+            attempt=$((attempt + 1))
+        done
+        echo "$result"
+    }
+
     echo "🔐 Setting up GitHub App authentication..."
     activity_action "GitHub auth" "${GITHUB_DEFAULT_ORG}/${REPO_NAME:-repo}"
 
@@ -147,12 +163,12 @@ data:
         SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
         JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
         
-        # Get installation token
-        INSTALLATIONS=$(curl -s --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
+        # Get installation token with retries
+        INSTALLATIONS=$(retry_curl -s --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations")
         INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id')
         
         if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
-            TOKEN_RESPONSE=$(curl -s --max-time 30 -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
+            TOKEN_RESPONSE=$(retry_curl -s --max-time 30 -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
             GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
             
             if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
