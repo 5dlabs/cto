@@ -22,7 +22,7 @@ AlertHub is a comprehensive notification platform that routes alerts across web,
 │  │  Notification  │  │  Integration   │  │    Admin       │        │
 │  │    Router      │  │    Service     │  │     API        │        │
 │  │    (Rex)       │  │    (Nova)      │  │   (Grizz)      │        │
-│  │   Rust/Axum    │  │  Node/Fastify  │  │    Go/gRPC     │        │
+│  │   Rust/Axum    │  │ Bun/Elysia+Eff │  │    Go/gRPC     │        │
 │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘        │
 │          │                   │                   │                  │
 ├──────────┴───────────────────┴───────────────────┴──────────────────┤
@@ -93,14 +93,16 @@ enum NotificationStatus {
 
 ---
 
-### 2. Integration Service (Node.js/Fastify)
+### 2. Integration Service (Bun/Elysia + Effect)
 
 **Agent**: Nova  
 **Priority**: High  
-**Language**: Node.js 20+  
-**Framework**: Fastify 4.x with TypeScript
+**Runtime**: Bun 1.1+  
+**Framework**: Elysia 1.x with Effect TypeScript
 
-Handles delivery to external channels (Slack, Discord, email, webhooks).
+Handles delivery to external channels (Slack, Discord, email, webhooks). Built with **Effect** for type-safe error handling, composable services, and robust retry logic.
+
+**AI Documentation**: Reference `https://effect.website/llms.txt` for Effect patterns.
 
 **Endpoints**:
 - `POST /api/v1/integrations` - Create new integration
@@ -118,47 +120,113 @@ Handles delivery to external channels (Slack, Discord, email, webhooks).
 - **Webhook**: Custom HTTP endpoints
 
 **Core Features**:
-- Retry logic with exponential backoff
-- Template rendering (Handlebars)
-- Rate limiting per channel
-- OAuth2 token refresh for Slack/Discord
+- **Effect Services** for channel integrations (SlackService, DiscordService, EmailService)
+- **Effect.retry** with exponential backoff schedule for delivery
+- **Effect Schema** for request/response validation (replaces Zod)
+- **@effect/platform** HttpClient for outbound requests
+- Template rendering with Effect error handling
+- Rate limiting per channel via Effect Semaphore
+- OAuth2 token refresh with Effect.cached
 - Webhook signature verification
 
-**Data Models**:
-```typescript
-interface Integration {
-  id: string;
-  tenantId: string;
-  channel: 'slack' | 'discord' | 'email' | 'push' | 'webhook';
-  name: string;
-  config: ChannelConfig;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+**Technology Stack**:
+| Component | Technology |
+|-----------|------------|
+| Runtime | Bun 1.1+ |
+| Framework | Elysia 1.x |
+| Type System | Effect + TypeScript 5.x |
+| Validation | Effect Schema |
+| HTTP Client | @effect/platform |
+| Database | Drizzle ORM (MongoDB) |
+| Queue Consumer | Effect Stream + kafkajs |
 
-interface ChannelConfig {
-  // Slack
-  webhookUrl?: string;
-  botToken?: string;
-  channel?: string;
-  
-  // Email
-  smtpHost?: string;
-  smtpPort?: number;
-  fromAddress?: string;
-  
-  // Webhook
-  url?: string;
-  headers?: Record<string, string>;
-  secret?: string;
-}
+**Data Models** (Effect Schema):
+```typescript
+import { Schema } from "effect"
+
+// Channel types as literal union
+const Channel = Schema.Literal("slack", "discord", "email", "push", "webhook")
+
+// Integration schema with Effect
+const Integration = Schema.Struct({
+  id: Schema.String,
+  tenantId: Schema.String,
+  channel: Channel,
+  name: Schema.String,
+  config: Schema.Union(
+    Schema.Struct({ webhookUrl: Schema.String, channel: Schema.optional(Schema.String) }), // Slack
+    Schema.Struct({ webhookUrl: Schema.String }), // Discord
+    Schema.Struct({ smtpHost: Schema.String, smtpPort: Schema.Number, fromAddress: Schema.String }), // Email
+    Schema.Struct({ url: Schema.String, headers: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })), secret: Schema.optional(Schema.String) }) // Webhook
+  ),
+  enabled: Schema.Boolean,
+  createdAt: Schema.Date,
+  updatedAt: Schema.Date,
+})
+type Integration = Schema.Schema.Type<typeof Integration>
+
+// Error types as tagged unions
+class SlackDeliveryError extends Schema.TaggedError<SlackDeliveryError>("SlackDeliveryError")({
+  message: Schema.String,
+  statusCode: Schema.optional(Schema.Number),
+}) {}
+
+class RateLimitError extends Schema.TaggedError<RateLimitError>("RateLimitError")({
+  retryAfter: Schema.Number,
+}) {}
+```
+
+**Effect Service Pattern**:
+```typescript
+import { Context, Effect, Layer, Schedule } from "effect"
+import { HttpClient } from "@effect/platform"
+
+// Define service interface
+class SlackService extends Context.Tag("SlackService")<
+  SlackService,
+  {
+    deliver: (integration: Integration, message: Message) => Effect.Effect<DeliveryResult, SlackDeliveryError>
+  }
+>() {}
+
+// Implement with retry logic
+const SlackServiceLive = Layer.succeed(
+  SlackService,
+  SlackService.of({
+    deliver: (integration, message) =>
+      HttpClient.request.post(integration.config.webhookUrl).pipe(
+        HttpClient.request.jsonBody(message),
+        HttpClient.client.fetchOk,
+        Effect.retry(Schedule.exponential("1 second").pipe(Schedule.compose(Schedule.recurs(3)))),
+        Effect.mapError((e) => new SlackDeliveryError({ message: e.message }))
+      )
+  })
+)
+```
+
+**Elysia Route Handler**:
+```typescript
+import { Elysia } from "elysia"
+import { Effect, Layer } from "effect"
+
+const app = new Elysia()
+  .post("/api/v1/integrations/:id/deliver", async ({ params, body }) => {
+    const program = Effect.gen(function* () {
+      const slack = yield* SlackService
+      const result = yield* slack.deliver(integration, body)
+      return result
+    })
+    
+    return Effect.runPromise(
+      program.pipe(Effect.provide(SlackServiceLive))
+    )
+  })
 ```
 
 **Infrastructure Dependencies**:
 - MongoDB: Integration configs, templates (flexible schema)
-- RabbitMQ: Task queue for delivery jobs
-- Kafka: Consume notification events
+- RabbitMQ: Task queue for delivery jobs (consumed via Effect Stream)
+- Kafka: Consume notification events (Effect Stream adapter)
 
 ---
 
@@ -250,13 +318,15 @@ type RuleCondition struct {
 
 ---
 
-### 4. Web Console (React/Next.js)
+### 4. Web Console (React/Next.js + Effect)
 
 **Agent**: Blaze  
 **Priority**: High  
-**Stack**: Next.js 14+ App Router, React 18, shadcn/ui, TailwindCSS
+**Stack**: Next.js 15 App Router, React 19, shadcn/ui, TailwindCSS, Effect
 
-The primary configuration interface for AlertHub.
+The primary configuration interface for AlertHub. Built with **Effect** for type-safe data fetching, error handling, and schema validation.
+
+**AI Documentation**: Reference `https://effect.website/llms.txt` for Effect patterns.
 
 **Pages**:
 - `/` - Dashboard with notification overview
@@ -268,22 +338,125 @@ The primary configuration interface for AlertHub.
 
 **Core Features**:
 - Dark/light theme support
-- Real-time notification feed (WebSocket)
+- Real-time notification feed (WebSocket with Effect Stream)
 - Drag-and-drop rule builder
 - Integration wizard with OAuth flows
 - Responsive design (mobile-friendly)
-- Toast notifications for actions
+- Toast notifications for actions (Effect error mapping)
+
+**Technology Stack**:
+| Component | Technology |
+|-----------|------------|
+| Framework | Next.js 15 App Router |
+| UI Library | React 19 |
+| Components | shadcn/ui |
+| Styling | TailwindCSS 4 |
+| Type System | Effect + TypeScript 5.x |
+| Validation | Effect Schema |
+| Data Fetching | TanStack Query + Effect |
+| Forms | React Hook Form + Effect Schema resolvers |
+| Animations | anime.js |
 
 **Key Components**:
-- `<NotificationFeed />` - Real-time notification list
+- `<NotificationFeed />` - Real-time notification list (Effect Stream for WebSocket)
 - `<IntegrationCard />` - Integration status and actions
 - `<RuleBuilder />` - Visual rule configuration
-- `<AnalyticsChart />` - Delivery metrics visualization
-- `<SettingsForm />` - User/tenant preferences
+- `<AnalyticsChart />` - Delivery metrics visualization (recharts)
+- `<SettingsForm />` - User/tenant preferences with Effect Schema validation
+
+**Effect Integration Patterns**:
+
+**Schema Validation** (replaces Zod):
+```typescript
+import { Schema } from "effect"
+
+// API response schema
+const NotificationSchema = Schema.Struct({
+  id: Schema.String,
+  status: Schema.Literal("pending", "processing", "delivered", "failed"),
+  channel: Schema.Literal("slack", "discord", "email", "push", "webhook"),
+  priority: Schema.Literal("critical", "high", "normal", "low"),
+  payload: Schema.Struct({
+    title: Schema.String,
+    body: Schema.String,
+    metadata: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  }),
+  createdAt: Schema.Date,
+})
+type Notification = Schema.Schema.Type<typeof NotificationSchema>
+
+// Form validation schema
+const CreateIntegrationSchema = Schema.Struct({
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  channel: Schema.Literal("slack", "discord", "email", "push", "webhook"),
+  webhookUrl: Schema.optional(Schema.String.pipe(Schema.pattern(/^https?:\/\//))),
+  enabled: Schema.Boolean,
+})
+```
+
+**Data Fetching with Effect + TanStack Query**:
+```typescript
+import { Effect, Schema } from "effect"
+import { useQuery } from "@tanstack/react-query"
+
+// Effect-powered fetch with validation
+const fetchNotifications = Effect.tryPromise({
+  try: () => fetch("/api/notifications").then((r) => r.json()),
+  catch: () => new ApiError({ message: "Failed to fetch notifications" }),
+}).pipe(
+  Effect.flatMap(Schema.decodeUnknown(Schema.Array(NotificationSchema))),
+  Effect.catchTag("ParseError", (e) => Effect.fail(new ValidationError({ message: e.message })))
+)
+
+// React hook wrapping Effect
+function useNotifications() {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => Effect.runPromise(fetchNotifications),
+  })
+}
+```
+
+**Form Validation with Effect Schema**:
+```typescript
+import { useForm } from "react-hook-form"
+import { effectResolver } from "@hookform/resolvers/effect-ts"
+
+function CreateIntegrationForm() {
+  const form = useForm({
+    resolver: effectResolver(CreateIntegrationSchema),
+    defaultValues: { name: "", channel: "slack", enabled: true },
+  })
+  
+  // Form submission with Effect error handling
+  const onSubmit = (data: CreateIntegration) =>
+    Effect.runPromise(
+      createIntegration(data).pipe(
+        Effect.tap(() => toast.success("Integration created")),
+        Effect.catchAll((e) => Effect.sync(() => toast.error(e.message)))
+      )
+    )
+}
+```
+
+**WebSocket with Effect Stream**:
+```typescript
+import { Effect, Stream } from "effect"
+
+const notificationStream = Stream.async<Notification, WebSocketError>((emit) => {
+  const ws = new WebSocket("/api/ws")
+  ws.onmessage = (event) => {
+    const result = Schema.decodeUnknownSync(NotificationSchema)(JSON.parse(event.data))
+    emit.single(result)
+  }
+  ws.onerror = () => emit.fail(new WebSocketError({ message: "Connection failed" }))
+  return Effect.sync(() => ws.close())
+})
+```
 
 **State Management**:
-- TanStack Query for server state
-- React Hook Form for forms
+- TanStack Query + Effect for server state
+- React Hook Form + Effect Schema for forms
 - Zustand for UI state
 
 ---
@@ -436,9 +609,9 @@ spec:
 | Component | Technology | Version |
 |-----------|------------|---------|
 | Notification Router | Rust, Axum, tokio, sqlx | Rust 1.75+, Axum 0.7 |
-| Integration Service | Node.js, Fastify, Prisma | Node 20+, Fastify 4 |
+| Integration Service | Bun, Elysia, Effect, Drizzle | Bun 1.1+, Elysia 1.x, Effect 3.x |
 | Admin API | Go, gRPC, grpc-gateway | Go 1.22+ |
-| Web Console | Next.js, React, shadcn/ui | Next.js 14+ |
+| Web Console | Next.js, React, shadcn/ui, Effect | Next.js 15, React 19, Effect 3.x |
 | Mobile App | Expo, React Native, NativeWind | Expo SDK 50+ |
 | Desktop Client | Electron, React | Electron 28+ |
 | Database | PostgreSQL (CloudNative-PG) | PostgreSQL 15 |

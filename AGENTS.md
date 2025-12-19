@@ -496,23 +496,703 @@ kubectl port-forward svc/grafana -n observability 3000:80 &
 
 ---
 
-## Context7 for Rust Best Practices
+## Available MCP Tools in Cursor
 
-Before implementing significant Rust code, use Context7 to get current documentation.
+The following MCP servers and tools are available in this Cursor workspace for testing and implementation:
 
-### Two-Step Workflow
+### 1. Morph MCP (Code Editing & Search)
 
+**Purpose:** Advanced code editing and semantic search capabilities
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_morph-mcp_edit_file` | Fast, accurate file editing with placeholders | Edit files without reading entire contents |
+| `mcp_morph-mcp_warpgrep_codebase_search` | AI-powered codebase search subagent | Find code by semantic meaning across repo |
+| `mcp_morph-mcp_codebase_search` | Semantic code search with embeddings | Search by natural language queries |
+
+**Best Practices:**
+- Use `edit_file` for large files (>1000 lines) instead of read/write
+- Use `warpgrep_codebase_search` for exploratory searches
+- Use `codebase_search` when you know what you're looking for
+
+### 2. Browser Automation (cursor-ide-browser)
+
+**Purpose:** Browser testing and web automation
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_cursor-ide-browser_browser_navigate` | Navigate to URL | Open web pages |
+| `mcp_cursor-ide-browser_browser_snapshot` | Capture accessibility snapshot | Read page structure |
+| `mcp_cursor-ide-browser_browser_click` | Click elements | Interact with UI |
+| `mcp_cursor-ide-browser_browser_type` | Type text into inputs | Fill forms |
+| `mcp_cursor-ide-browser_browser_take_screenshot` | Capture screenshots | Visual verification |
+| `mcp_cursor-ide-browser_browser_console_messages` | Get console logs | Debug JavaScript |
+| `mcp_cursor-ide-browser_browser_network_requests` | Get network activity | Debug API calls |
+
+**Best Practices:**
+- Always snapshot before interacting with elements
+- Use screenshots for visual inspection
+- Check console messages for JavaScript errors
+
+### 3. Firecrawl MCP (Web Scraping)
+
+**Purpose:** Web scraping and content extraction
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_firecrawl-mcp_firecrawl_scrape` | Scrape single URL | Extract content from one page |
+| `mcp_firecrawl-mcp_firecrawl_search` | Search web and scrape results | Find information across multiple sites |
+| `mcp_firecrawl-mcp_firecrawl_map` | Map website URLs | Discover site structure |
+| `mcp_firecrawl-mcp_firecrawl_crawl` | Crawl multiple pages | Extract content from entire site |
+| `mcp_firecrawl-mcp_firecrawl_extract` | Extract structured data with LLM | Parse specific fields from pages |
+
+**Best Practices:**
+- Use `search` without formats first, then scrape specific URLs
+- Set `maxAge` parameter for 500% faster cached scrapes
+- Use `map` before `crawl` to understand site structure
+
+### 4. OpenMemory (Agent Memory)
+
+**Purpose:** Persistent long-term memory for agents
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_tools_openmemory_openmemory_query` | Semantic search memories | Find relevant past experiences |
+| `mcp_tools_openmemory_openmemory_store` | Store new memory | Save important information |
+| `mcp_tools_openmemory_openmemory_list` | List recent memories | Browse memory history |
+| `mcp_tools_openmemory_openmemory_get` | Get specific memory | Retrieve by ID |
+| `mcp_tools_openmemory_openmemory_reinforce` | Boost memory salience | Mark important memories |
+
+**Best Practices:**
+- Store episodic memories for task history
+- Store semantic memories for learned patterns
+- Reinforce important memories to prevent decay
+
+### 5. Context7 (Library Documentation)
+
+**Purpose:** Up-to-date library documentation and best practices
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_context7_resolve-library-id` | Resolve library name to ID | Find Context7-compatible library ID |
+| `mcp_context7_get-library-docs` | Get library documentation | Fetch API docs and examples |
+
+**Two-Step Workflow:**
 1. **Resolve library:** `resolve_library_id({ libraryName: "tokio rust" })`
 2. **Get docs:** `get_library_docs({ context7CompatibleLibraryID: "/websites/rs_tokio_tokio", topic: "error handling async" })`
 
-### Key Rust Library IDs
-
+**Key Rust Library IDs:**
 - **Tokio:** `/websites/rs_tokio_tokio` (async runtime, 93.8 score)
 - **Serde:** `/websites/serde_rs` (serialization)
 - **Clippy:** `/rust-lang/rust-clippy` (lints)
 - **Anyhow:** `/dtolnay/anyhow` (app errors, 89.3 score)
 - **Thiserror:** `/dtolnay/thiserror` (custom errors, 83.1 score)
 - **Tracing:** `/tokio-rs/tracing` (logging)
+
+**Best Practices:**
+- Always resolve library names first
+- Query focused topics: "error handling context" not "documentation"
+- Use `mode='code'` for API references, `mode='info'` for guides
+
+### 6. shadcn/ui Components
+
+**Purpose:** Access shadcn/ui v4 component source and demos
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_shadcn_get_component` | Get component source code | Implement shadcn components |
+| `mcp_shadcn_get_component_demo` | Get component demo code | See usage examples |
+| `mcp_shadcn_list_components` | List all components | Discover available components |
+| `mcp_shadcn_get_component_metadata` | Get component metadata | Check dependencies and props |
+
+**Best Practices:**
+- Use for Blaze (React/TypeScript) implementations
+- Get both source and demo for complete understanding
+- Check metadata for required dependencies
+
+### 7. Talos MCP (Node Management)
+
+**Purpose:** Manage Talos Kubernetes nodes
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_talos-mcp_containers` | List containers | Check running workloads |
+| `mcp_talos-mcp_stats` | Get resource usage | Monitor CPU/memory |
+| `mcp_talos-mcp_get_logs` | Get service logs | Debug services |
+| `mcp_talos-mcp_list` | List files | Browse filesystem |
+| `mcp_talos-mcp_read` | Read file | View config files |
+| `mcp_talos-mcp_get_health` | Check cluster health | Verify cluster status |
+
+**Best Practices:**
+- Use for infrastructure debugging
+- Check logs when services fail
+- Monitor resource usage for capacity planning
+
+### 8. CTO Platform Tools
+
+**Purpose:** Platform-specific workflow management
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_cto_intake` | Process PRD to tasks | Generate task breakdown |
+| `mcp_cto_play` | Submit multi-agent workflow | Execute task implementation |
+| `mcp_cto_play_status` | Query workflow status | Check progress |
+| `mcp_cto_jobs` | List running workflows | Monitor active jobs |
+| `mcp_cto_stop_job` | Stop workflow | Cancel running job |
+| `mcp_cto_input` | Send message to running job | Provide live feedback |
+
+**Best Practices:**
+- Use `intake` for PRD processing
+- Use `play` with `parallel_execution: true` for speed
+- Monitor with `play_status` and `jobs`
+
+### 9. Filesystem & Knowledge Graph
+
+**Purpose:** File operations and knowledge management
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_tools_read_file` | Read file contents | View single file |
+| `mcp_tools_read_multiple_files` | Read multiple files | Batch file reading |
+| `mcp_tools_write_file` | Write file | Create/overwrite file |
+| `mcp_tools_edit_file` | Edit file with line-based changes | Precise edits |
+| `mcp_tools_list_directory` | List directory contents | Browse directories |
+| `mcp_tools_directory_tree` | Get recursive tree | Understand structure |
+| `mcp_tools_search_files` | Search by glob pattern | Find files by name |
+| `mcp_tools_create_entities` | Create knowledge graph entities | Store structured knowledge |
+| `mcp_tools_create_relations` | Create entity relations | Link knowledge |
+| `mcp_tools_search_nodes` | Search knowledge graph | Query stored knowledge |
+
+**Best Practices:**
+- Use `read_multiple_files` for batch operations
+- Use `edit_file` for precise line-based changes
+- Use knowledge graph for structured information
+
+### 10. Grafana MCP (Observability & Monitoring)
+
+**Purpose:** Comprehensive observability for metrics, logs, traces, and alerts
+
+**Prerequisites:** Requires port-forwards to cluster services:
+```bash
+kubectl port-forward svc/prometheus-server -n observability 9090:80
+kubectl port-forward svc/loki-gateway -n observability 3100:80
+kubectl port-forward svc/grafana -n observability 3000:80
+```
+
+| Tool Category | Tools | Use Case |
+|---------------|-------|----------|
+| **Dashboards** | `grafana_search_dashboards`, `grafana_get_dashboard`, `grafana_create_dashboard` | Visualize metrics and logs |
+| **Prometheus** | `grafana_query_prometheus`, `grafana_get_prometheus_labels`, `grafana_get_prometheus_metadata` | Query metrics, check service health |
+| **Loki** | `grafana_query_loki_logs`, `grafana_get_loki_labels`, `grafana_get_loki_label_values` | Search logs, debug issues |
+| **Alerts** | `grafana_list_alert_rules`, `grafana_get_alert_rule` | Monitor alert status |
+| **Datasources** | `grafana_list_datasources`, `grafana_get_datasource` | Check data source configuration |
+| **Navigation** | `grafana_generate_explore_url` | Create deeplinks to Grafana UI |
+
+**Best Practices:**
+- Use Prometheus queries for service health checks: `up{job="cto-controller"}`
+- Use Loki for debugging: `{namespace="cto"} |~ "error|ERROR"`
+- Check dashboards for visual verification of deployments
+- Use alert rules to verify monitoring is active
+
+### 11. ArgoCD & Argo Workflows (GitOps & Orchestration)
+
+**Purpose:** Manage GitOps deployments and workflow executions
+
+**Prerequisites:** Port-forwards required:
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
+```
+
+| Tool Category | Tools | Use Case |
+|---------------|-------|----------|
+| **ArgoCD Apps** | `argocd_list_applications`, `argocd_get_application`, `argocd_sync_application` | Verify deployments |
+| **ArgoCD Resources** | `argocd_get_application_resource_tree`, `argocd_get_application_events` | Debug sync issues |
+| **Workflows** | `argo_workflows_list_workflows`, `argo_workflows_get_workflow`, `argo_workflows_get_workflow_logs` | Monitor Play tasks |
+| **Workflow Templates** | `argo_workflows_list_workflow_templates`, `argo_workflows_list_cron_workflows` | Check available templates |
+| **Workflow Control** | `argo_workflows_retry_workflow` | Retry failed tasks |
+
+**Best Practices:**
+- Check ArgoCD sync status before and after deployments
+- Monitor workflow logs for agent CLI output
+- Use workflow status to track Play execution progress
+- Check resource tree for deployment issues
+
+### 12. MCP Add/Remove/Update Tools
+
+**Purpose:** Manage MCP servers in the platform
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_cto_add_mcp_server` | Add MCP server from GitHub | Install new MCP server |
+| `mcp_cto_remove_mcp_server` | Remove MCP server | Uninstall MCP server |
+| `mcp_cto_update_mcp_server` | Update MCP server config | Refresh server configuration |
+
+**Best Practices:**
+- Add servers by GitHub URL
+- Use `skip_merge: true` for manual review
+- Update servers when README changes
+
+---
+
+## CTO Lifecycle Verification with MCP Tools
+
+This section describes how to use MCP tools to verify each stage of the CTO workflow from PRD to deployed feature.
+
+### Phase 1: Pre-Intake Verification
+
+**Goal:** Ensure platform is ready for intake
+
+```bash
+# 1. Check cluster health
+mcp_talos-mcp_get_health({ control_planes: ["192.168.1.77"] })
+
+# 2. Verify core services are up
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "up{job=~\"cto-.*\"}",
+  queryType: "instant"
+})
+
+# 3. Check ArgoCD sync status
+argocd_list_applications()
+argocd_get_application({ applicationName: "cto-controller" })
+argocd_get_application({ applicationName: "cto-tools" })
+argocd_get_application({ applicationName: "cto-pm-server" })
+
+# 4. Verify no stuck workflows
+argo_workflows_list_workflows({ 
+  namespace: "cto", 
+  status: "Running",
+  limit: 10 
+})
+
+# 5. Check for errors in logs
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"error|ERROR\" | json",
+  limit: 20
+})
+```
+
+### Phase 2: Intake Monitoring
+
+**Goal:** Verify intake workflow is processing correctly
+
+```bash
+# 1. Find intake workflow
+argo_workflows_list_workflows({
+  namespace: "cto",
+  status: "Running",
+  limit: 5
+})
+
+# 2. Monitor workflow progress
+argo_workflows_get_workflow({ 
+  namespace: "cto", 
+  name: "intake-workflow-name" 
+})
+
+# 3. Check Morgan's logs
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", container=\"agent\"} | json | task_id=\"intake\"",
+  limit: 100
+})
+
+# 4. Monitor resource usage
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "container_memory_usage_bytes{namespace=\"cto\",pod=~\"intake.*\"}",
+  queryType: "instant"
+})
+
+# 5. Verify Firecrawl usage (URL scraping)
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"firecrawl|scrape\"",
+  limit: 50
+})
+
+# 6. Check Context7 lookups
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"context7|library\"",
+  limit: 50
+})
+```
+
+### Phase 3: Infrastructure Setup (Bolt)
+
+**Goal:** Verify Task 1 infrastructure deployment
+
+```bash
+# 1. Monitor Bolt workflow
+argo_workflows_get_workflow({ 
+  namespace: "cto", 
+  name: "play-task-1-bolt" 
+})
+
+# 2. Check for created databases/services
+mcp_talos-mcp_containers({
+  node: "192.168.1.77",
+  kubernetes: true
+})
+
+# 3. Verify PostgreSQL operator
+argocd_get_application({ applicationName: "cloudnative-pg" })
+
+# 4. Check Redis operator
+argocd_get_application({ applicationName: "redis-operator" })
+
+# 5. Verify ConfigMap creation
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"infra-config|ConfigMap\"",
+  limit: 20
+})
+
+# 6. Check operator logs
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=~\"postgres-operator|redis-operator\"} |~ \"error|ERROR\"",
+  limit: 50
+})
+```
+
+### Phase 4: Implementation (Rex/Blaze/etc)
+
+**Goal:** Monitor agent implementations and PR creation
+
+```bash
+# 1. List active implementation workflows
+argo_workflows_list_workflows({
+  namespace: "cto",
+  status: "Running",
+  limit: 10
+})
+
+# 2. Monitor specific agent (e.g., Rex)
+argo_workflows_get_workflow_logs({
+  namespace: "cto",
+  workflow_name: "play-task-2-rex"
+})
+
+# 3. Check agent CLI output
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"rex\"} | json",
+  limit: 200
+})
+
+# 4. Verify GitHub PR creation
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"pull_request|PR created\"",
+  limit: 20
+})
+
+# 5. Check for build errors
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"build failed|compilation error|cargo.*error\"",
+  limit: 50
+})
+
+# 6. Monitor resource usage per agent
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "container_cpu_usage_seconds_total{namespace=\"cto\",pod=~\"play-task.*\"}",
+  queryType: "instant"
+})
+```
+
+### Phase 5: Quality Review (Cleo)
+
+**Goal:** Verify code quality checks pass
+
+```bash
+# 1. Monitor Cleo workflow
+argo_workflows_get_workflow({ 
+  namespace: "cto", 
+  name: "play-task-8-cleo" 
+})
+
+# 2. Check linter output
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"cleo\"} |~ \"clippy|rustfmt|eslint\"",
+  limit: 100
+})
+
+# 3. Verify no critical issues
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"cleo\"} |~ \"error|warning|WARN\"",
+  limit: 50
+})
+```
+
+### Phase 6: Security Audit (Cipher)
+
+**Goal:** Verify security analysis completes
+
+```bash
+# 1. Monitor Cipher workflow
+argo_workflows_get_workflow({ 
+  namespace: "cto", 
+  name: "play-task-11-cipher" 
+})
+
+# 2. Check for vulnerabilities
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"cipher\"} |~ \"vulnerability|CVE|security\"",
+  limit: 100
+})
+
+# 3. Verify audit passes
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"cipher\"} |~ \"audit.*pass|security.*ok\"",
+  limit: 20
+})
+```
+
+### Phase 7: Testing (Tess)
+
+**Goal:** Verify tests pass and coverage meets requirements
+
+```bash
+# 1. Monitor Tess workflow
+argo_workflows_get_workflow({ 
+  namespace: "cto", 
+  name: "play-task-14-tess" 
+})
+
+# 2. Check test results
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"tess\"} |~ \"test.*pass|test.*fail|cargo test\"",
+  limit: 200
+})
+
+# 3. Verify coverage
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"tess\"} |~ \"coverage|%\"",
+  limit: 20
+})
+
+# 4. Check for test failures
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"tess\"} |~ \"FAILED|test failed\"",
+  limit: 50
+})
+```
+
+### Phase 8: Integration (Atlas)
+
+**Goal:** Verify PRs merge successfully without conflicts
+
+```bash
+# 1. Monitor Atlas workflow
+argo_workflows_get_workflow({ 
+  namespace: "cto", 
+  name: "play-task-17-atlas" 
+})
+
+# 2. Check merge status
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"atlas\"} |~ \"merge|merged|conflict\"",
+  limit: 100
+})
+
+# 3. Verify CI passes
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"atlas\"} |~ \"CI.*pass|checks.*pass\"",
+  limit: 50
+})
+
+# 4. Check for merge conflicts
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", agent=\"atlas\"} |~ \"conflict|merge.*fail\"",
+  limit: 20
+})
+```
+
+### Phase 9: Deployment Verification
+
+**Goal:** Verify feature deploys successfully
+
+```bash
+# 1. Check ArgoCD sync after merge
+argocd_get_application({ applicationName: "target-service" })
+
+# 2. Verify pods are running
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "kube_pod_status_phase{namespace=\"target-namespace\",phase=\"Running\"}",
+  queryType: "instant"
+})
+
+# 3. Check for deployment errors
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"target-namespace\"} |~ \"error|ERROR|crash|panic\"",
+  limit: 100
+})
+
+# 4. Verify service health
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "up{job=\"target-service\"}",
+  queryType: "instant"
+})
+
+# 5. Check application logs
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"target-namespace\"} | json",
+  limit: 50
+})
+```
+
+### Phase 10: Post-Deployment Monitoring
+
+**Goal:** Verify feature works in production
+
+```bash
+# 1. Check request rate
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "rate(http_requests_total{job=\"target-service\"}[5m])",
+  queryType: "instant"
+})
+
+# 2. Check error rate
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "rate(http_requests_total{job=\"target-service\",status=~\"5..\"}[5m])",
+  queryType: "instant"
+})
+
+# 3. Check latency
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"target-service\"}[5m]))",
+  queryType: "instant"
+})
+
+# 4. Monitor for alerts
+grafana_list_alert_rules()
+
+# 5. Check dashboard
+grafana_search_dashboards({ query: "target-service" })
+grafana_generate_explore_url({
+  datasourceUid: "prometheus",
+  queries: [{
+    expr: "up{job=\"target-service\"}",
+    refId: "A"
+  }]
+})
+```
+
+### Healer Verification
+
+**Goal:** Verify Healer is monitoring and can remediate issues
+
+```bash
+# 1. Check Healer is running
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "up{job=\"healer\"}",
+  queryType: "instant"
+})
+
+# 2. Monitor Healer logs
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", app=\"healer\"} | json",
+  limit: 100
+})
+
+# 3. Check for remediation actions
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", app=\"healer\"} |~ \"remediation|fixing|retry\"",
+  limit: 50
+})
+
+# 4. Verify acceptance criteria checks
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\", app=\"healer\"} |~ \"acceptance.*criteria|verify\"",
+  limit: 50
+})
+```
+
+### Browser Testing for Frontend Features
+
+**Goal:** Verify frontend features work end-to-end
+
+```bash
+# 1. Navigate to deployed app
+mcp_cursor-ide-browser_browser_navigate({ url: "https://app.example.com" })
+
+# 2. Take accessibility snapshot
+mcp_cursor-ide-browser_browser_snapshot()
+
+# 3. Test user interactions
+mcp_cursor-ide-browser_browser_click({ element: "login button", ref: "ref-123" })
+mcp_cursor-ide-browser_browser_type({ 
+  element: "username input", 
+  ref: "ref-456", 
+  text: "testuser" 
+})
+
+# 4. Capture screenshot for verification
+mcp_cursor-ide-browser_browser_take_screenshot({ fullPage: true })
+
+# 5. Check console for errors
+mcp_cursor-ide-browser_browser_console_messages()
+
+# 6. Verify network requests
+mcp_cursor-ide-browser_browser_network_requests()
+```
+
+### Cost & Token Tracking
+
+**Goal:** Monitor resource usage and costs across workflow
+
+```bash
+# 1. Track workflow duration
+argo_workflows_get_workflow({ namespace: "cto", name: "workflow-name" })
+
+# 2. Monitor CPU/memory costs
+grafana_query_prometheus({
+  datasourceUid: "prometheus",
+  expr: "sum(rate(container_cpu_usage_seconds_total{namespace=\"cto\"}[5m])) by (pod)",
+  queryType: "instant"
+})
+
+# 3. Check token usage in logs
+grafana_query_loki_logs({
+  datasourceUid: "loki",
+  logql: "{namespace=\"cto\"} |~ \"tokens|cost|USD\"",
+  limit: 50
+})
+```
+
+---
+
+## Context7 for Rust Best Practices
+
+Before implementing significant Rust code, use Context7 to get current documentation.
 
 ### When to Query
 
@@ -522,13 +1202,6 @@ Always consult Context7 when:
 - Using serde attributes or custom serialization
 - Configuring Clippy pedantic lints
 - Writing HTTP handlers or database queries
-
-### Best Practices
-
-- **Resolve first** - Always resolve library names to get current IDs
-- **Be specific** - Query focused topics: "error handling context" not "documentation"
-- **High scores win** - Prefer libraries with higher benchmark scores
-- **Single topic** - One focused topic per query for best results
 
 ## Project Structure & Module Organization
 - `mcp/` — Rust MCP server (`cto-mcp`).

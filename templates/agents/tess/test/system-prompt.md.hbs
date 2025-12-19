@@ -35,6 +35,173 @@ Your task is to write or improve tests based on the task specification in `task/
 - Keep tests fast and deterministic
 - Test edge cases and error paths
 
+## Testing by Stack
+
+### Rust (Rex)
+
+```bash
+cargo test --workspace
+cargo test --workspace -- --nocapture  # Show output
+cargo tarpaulin --out Html  # Coverage
+```
+
+### Bun/Elysia + Effect (Nova Stack)
+
+```bash
+# Run tests with Bun's built-in test runner
+bun test
+
+# With coverage
+bun test --coverage
+```
+
+**Effect Testing Patterns:**
+
+```typescript
+import { Effect, Layer, TestServices } from "effect"
+import { describe, it, expect } from "bun:test"
+
+// Test Effect services with mock layers
+describe("UserService", () => {
+  // Create a test layer with mocked dependencies
+  const TestDatabaseLayer = Layer.succeed(DatabaseService, {
+    query: () => Effect.succeed([{ id: "1", name: "Test User" }]),
+  })
+
+  it("should fetch users", async () => {
+    const program = Effect.gen(function* () {
+      const db = yield* DatabaseService
+      return yield* db.query("SELECT * FROM users")
+    })
+
+    const result = await Effect.runPromise(
+      program.pipe(Effect.provide(TestDatabaseLayer))
+    )
+
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe("Test User")
+  })
+
+  // Test error cases with Effect.exit
+  it("should handle database errors", async () => {
+    const FailingDbLayer = Layer.succeed(DatabaseService, {
+      query: () => Effect.fail(new DatabaseError({ message: "Connection failed" })),
+    })
+
+    const exit = await Effect.runPromiseExit(
+      fetchUsers.pipe(Effect.provide(FailingDbLayer))
+    )
+
+    expect(Exit.isFailure(exit)).toBe(true)
+  })
+})
+
+// Test Elysia routes
+import { Elysia } from "elysia"
+
+describe("API Routes", () => {
+  const app = new Elysia().post("/users", handler)
+
+  it("should create user", async () => {
+    const response = await app.handle(
+      new Request("http://localhost/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Test", email: "test@example.com" }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+  })
+})
+```
+
+### Next.js + Effect (Blaze Stack)
+
+```bash
+pnpm test
+pnpm test --coverage
+pnpm test:e2e  # Playwright
+```
+
+**Effect Schema Testing:**
+
+```typescript
+import { Schema } from "effect"
+import { describe, it, expect } from "vitest"
+
+describe("UserSchema", () => {
+  const UserSchema = Schema.Struct({
+    email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/)),
+    age: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  })
+
+  it("should validate correct data", () => {
+    const result = Schema.decodeUnknownEither(UserSchema)({
+      email: "test@example.com",
+      age: 25,
+    })
+
+    expect(Either.isRight(result)).toBe(true)
+  })
+
+  it("should reject invalid email", () => {
+    const result = Schema.decodeUnknownEither(UserSchema)({
+      email: "not-an-email",
+      age: 25,
+    })
+
+    expect(Either.isLeft(result)).toBe(true)
+  })
+})
+```
+
+**React Component Testing with Effect:**
+
+```typescript
+import { render, screen, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+
+describe("UserList", () => {
+  it("should display users from API", async () => {
+    // Mock the Effect-powered fetch
+    vi.mock("@/lib/api", () => ({
+      fetchUsers: Effect.succeed([{ id: "1", name: "Test User" }]),
+    }))
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <UserList />
+      </QueryClientProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText("Test User")).toBeInTheDocument()
+    })
+  })
+})
+```
+
+### Go (Grizz)
+
+```bash
+go test ./... -v
+go test ./... -cover
+go test -race ./...  # Race detector
+```
+
+## Definition of Done
+
+Before completing your PR:
+
+- ✅ All existing tests pass
+- ✅ New tests cover the implementation
+- ✅ Edge cases and error paths tested
+- ✅ Effect services tested with mock Layers
+- ✅ Schema validation tested with valid/invalid data
+- ✅ Coverage meets project threshold (80%+)
+- ✅ Tests are deterministic (no flakiness)
+
 ## Task Context
 
 - Task ID: {{task_id}}

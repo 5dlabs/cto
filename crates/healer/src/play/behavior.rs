@@ -12,14 +12,23 @@ use tracing::{debug, warn};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AgentType {
+    // Implementation agents (backend)
     Rex,
+    Grizz,
+    Nova,
+    // Implementation agents (frontend)
     Blaze,
+    Tap,
+    Spark,
+    // Support agents
     Cleo,
     Tess,
     Cipher,
     Atlas,
-    Factory,
+    Bolt,
     Morgan,
+    // General
+    Factory,
     Unknown,
 }
 
@@ -28,14 +37,23 @@ impl std::str::FromStr for AgentType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str() {
+            // Implementation agents (backend)
             "rex" => Self::Rex,
+            "grizz" => Self::Grizz,
+            "nova" => Self::Nova,
+            // Implementation agents (frontend)
             "blaze" => Self::Blaze,
+            "tap" => Self::Tap,
+            "spark" => Self::Spark,
+            // Support agents
             "cleo" => Self::Cleo,
             "tess" => Self::Tess,
             "cipher" => Self::Cipher,
             "atlas" => Self::Atlas,
-            "factory" => Self::Factory,
+            "bolt" => Self::Bolt,
             "morgan" => Self::Morgan,
+            // General
+            "factory" => Self::Factory,
             _ => Self::Unknown,
         })
     }
@@ -46,14 +64,23 @@ impl AgentType {
     #[must_use]
     pub fn display_name(&self) -> &'static str {
         match self {
-            Self::Rex => "Rex (Implementation)",
-            Self::Blaze => "Blaze (Frontend)",
+            // Backend implementation
+            Self::Rex => "Rex (Rust Backend)",
+            Self::Grizz => "Grizz (Go Backend)",
+            Self::Nova => "Nova (Bun/Elysia+Effect Backend)",
+            // Frontend implementation
+            Self::Blaze => "Blaze (Next.js+Effect Frontend)",
+            Self::Tap => "Tap (Expo Mobile)",
+            Self::Spark => "Spark (Electron Desktop)",
+            // Support agents
             Self::Cleo => "Cleo (Code Review)",
             Self::Tess => "Tess (Testing)",
             Self::Cipher => "Cipher (Security)",
             Self::Atlas => "Atlas (Integration)",
-            Self::Factory => "Factory (General)",
+            Self::Bolt => "Bolt (Infrastructure)",
             Self::Morgan => "Morgan (PM)",
+            // General
+            Self::Factory => "Factory (General)",
             Self::Unknown => "Unknown Agent",
         }
     }
@@ -232,33 +259,114 @@ impl BehaviorAnalyzer {
             },
         );
 
-        // Blaze (Frontend Agent)
+        // Grizz (Go Backend Agent)
         self.behaviors.insert(
-            AgentType::Blaze,
+            AgentType::Grizz,
             AgentBehaviors {
-                agent: AgentType::Blaze,
+                agent: AgentType::Grizz,
                 success_patterns: vec![
                     pattern("git push success", r"(?i)git push|pushed to", true, "info"),
-                    pattern(
-                        "npm build success",
-                        r"(?i)npm run build.*success|build succeeded",
-                        true,
-                        "info",
-                    ),
+                    pattern("commit created", r"(?i)git commit|committed", true, "info"),
                     pattern(
                         "PR created",
                         r"(?i)pr created|pull request created",
                         true,
                         "info",
                     ),
+                    pattern(
+                        "go build success",
+                        r"(?i)go build.*success|build succeeded",
+                        true,
+                        "info",
+                    ),
                     pattern("changes committed", r"(?i)changes committed", true, "info"),
                 ],
                 failure_patterns: vec![
-                    pattern("npm error", r"(?i)npm err!|npm error", false, "high"),
+                    pattern(
+                        "git conflict",
+                        r"(?i)conflict|merge conflict",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "push failed",
+                        r"(?i)failed to push|push failed",
+                        false,
+                        "high",
+                    ),
+                    pattern("go compile error", r"(?i)go: cannot|cannot find package", false, "high"),
+                    pattern(
+                        "go build failed",
+                        r"(?i)build failed|compilation failed",
+                        false,
+                        "high",
+                    ),
+                    pattern("golangci-lint error", r"(?i)golangci-lint.*error", false, "medium"),
+                ],
+                anomaly_patterns: vec![
+                    pattern(
+                        "unusual retry",
+                        r"(?i)retry|retrying|attempt \d+",
+                        false,
+                        "low",
+                    ),
+                    pattern("go mod tidy needed", r"(?i)go mod tidy", false, "low"),
+                ],
+            },
+        );
+
+        // Nova (Bun/Elysia+Effect Backend Agent)
+        self.behaviors.insert(
+            AgentType::Nova,
+            AgentBehaviors {
+                agent: AgentType::Nova,
+                success_patterns: vec![
+                    pattern("git push success", r"(?i)git push|pushed to", true, "info"),
+                    pattern("commit created", r"(?i)git commit|committed", true, "info"),
+                    pattern(
+                        "PR created",
+                        r"(?i)pr created|pull request created",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "bun build success",
+                        r"(?i)bun (run )?build.*success|build succeeded",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "bun test success",
+                        r"(?i)bun test.*pass|tests? passed",
+                        true,
+                        "info",
+                    ),
+                    pattern("changes committed", r"(?i)changes committed", true, "info"),
+                    pattern(
+                        "effect schema valid",
+                        r"(?i)schema.*valid|validation passed",
+                        true,
+                        "info",
+                    ),
+                ],
+                failure_patterns: vec![
+                    pattern("bun error", r"(?i)bun.*error|error:.*bun", false, "high"),
                     pattern("eslint error", r"(?i)eslint.*error", false, "medium"),
                     pattern(
                         "typescript error",
-                        r"(?i)ts\d+:|typescript.*error",
+                        r"(?i)ts\d+:|typescript.*error|Type.*is not assignable",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "effect error",
+                        r"(?i)Effect\.(fail|die)|FiberFailure|Cause",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "elysia error",
+                        r"(?i)elysia.*error|validation.*failed",
                         false,
                         "high",
                     ),
@@ -278,10 +386,291 @@ impl BehaviorAnalyzer {
                 anomaly_patterns: vec![
                     pattern("deprecation warning", r"(?i)deprecat(ed|ion)", false, "low"),
                     pattern(
+                        "effect defect",
+                        r"(?i)Effect\.Defect|unhandled.*defect",
+                        false,
+                        "medium",
+                    ),
+                ],
+            },
+        );
+
+        // Blaze (Next.js + Effect Frontend Agent)
+        self.behaviors.insert(
+            AgentType::Blaze,
+            AgentBehaviors {
+                agent: AgentType::Blaze,
+                success_patterns: vec![
+                    pattern("git push success", r"(?i)git push|pushed to", true, "info"),
+                    pattern(
+                        "next build success",
+                        r"(?i)(npm|pnpm|bun) (run )?build.*success|build succeeded|compiled successfully",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "PR created",
+                        r"(?i)pr created|pull request created",
+                        true,
+                        "info",
+                    ),
+                    pattern("changes committed", r"(?i)changes committed", true, "info"),
+                    pattern(
+                        "effect schema valid",
+                        r"(?i)schema.*valid|validation passed",
+                        true,
+                        "info",
+                    ),
+                ],
+                failure_patterns: vec![
+                    pattern("npm error", r"(?i)npm err!|npm error|pnpm.*error", false, "high"),
+                    pattern("eslint error", r"(?i)eslint.*error", false, "medium"),
+                    pattern(
+                        "typescript error",
+                        r"(?i)ts\d+:|typescript.*error|Type.*is not assignable",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "effect error",
+                        r"(?i)Effect\.(fail|die)|FiberFailure|Cause",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "build failed",
+                        r"(?i)build failed|compilation failed|next build.*error",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "git conflict",
+                        r"(?i)conflict|merge conflict",
+                        false,
+                        "high",
+                    ),
+                ],
+                anomaly_patterns: vec![
+                    pattern("deprecation warning", r"(?i)deprecat(ed|ion)", false, "low"),
+                    pattern(
                         "peer dependency",
                         r"(?i)peer dep|peerDependenc",
                         false,
                         "low",
+                    ),
+                    pattern(
+                        "effect defect",
+                        r"(?i)Effect\.Defect|unhandled.*defect",
+                        false,
+                        "medium",
+                    ),
+                ],
+            },
+        );
+
+        // Tap (Expo Mobile Agent)
+        self.behaviors.insert(
+            AgentType::Tap,
+            AgentBehaviors {
+                agent: AgentType::Tap,
+                success_patterns: vec![
+                    pattern("git push success", r"(?i)git push|pushed to", true, "info"),
+                    pattern(
+                        "expo build success",
+                        r"(?i)expo.*build.*success|build succeeded",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "PR created",
+                        r"(?i)pr created|pull request created",
+                        true,
+                        "info",
+                    ),
+                    pattern("changes committed", r"(?i)changes committed", true, "info"),
+                ],
+                failure_patterns: vec![
+                    pattern("expo error", r"(?i)expo.*error|eas.*error", false, "high"),
+                    pattern("eslint error", r"(?i)eslint.*error", false, "medium"),
+                    pattern(
+                        "typescript error",
+                        r"(?i)ts\d+:|typescript.*error",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "build failed",
+                        r"(?i)build failed|compilation failed",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "metro bundler error",
+                        r"(?i)metro.*error|bundler.*failed",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "git conflict",
+                        r"(?i)conflict|merge conflict",
+                        false,
+                        "high",
+                    ),
+                ],
+                anomaly_patterns: vec![
+                    pattern("deprecation warning", r"(?i)deprecat(ed|ion)", false, "low"),
+                    pattern(
+                        "native module warning",
+                        r"(?i)native module|linking.*required",
+                        false,
+                        "medium",
+                    ),
+                ],
+            },
+        );
+
+        // Spark (Electron Desktop Agent)
+        self.behaviors.insert(
+            AgentType::Spark,
+            AgentBehaviors {
+                agent: AgentType::Spark,
+                success_patterns: vec![
+                    pattern("git push success", r"(?i)git push|pushed to", true, "info"),
+                    pattern(
+                        "electron build success",
+                        r"(?i)electron.*build.*success|build succeeded",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "PR created",
+                        r"(?i)pr created|pull request created",
+                        true,
+                        "info",
+                    ),
+                    pattern("changes committed", r"(?i)changes committed", true, "info"),
+                ],
+                failure_patterns: vec![
+                    pattern("electron error", r"(?i)electron.*error", false, "high"),
+                    pattern("eslint error", r"(?i)eslint.*error", false, "medium"),
+                    pattern(
+                        "typescript error",
+                        r"(?i)ts\d+:|typescript.*error",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "build failed",
+                        r"(?i)build failed|compilation failed|electron-builder.*error",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "git conflict",
+                        r"(?i)conflict|merge conflict",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "code signing error",
+                        r"(?i)code sign|codesign.*error|notarization.*failed",
+                        false,
+                        "high",
+                    ),
+                ],
+                anomaly_patterns: vec![
+                    pattern("deprecation warning", r"(?i)deprecat(ed|ion)", false, "low"),
+                    pattern(
+                        "security warning",
+                        r"(?i)nodeIntegration|contextIsolation",
+                        false,
+                        "medium",
+                    ),
+                ],
+            },
+        );
+
+        // Bolt (Infrastructure Agent)
+        self.behaviors.insert(
+            AgentType::Bolt,
+            AgentBehaviors {
+                agent: AgentType::Bolt,
+                success_patterns: vec![
+                    pattern(
+                        "kubectl apply success",
+                        r"(?i)kubectl apply|applied|created|configured",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "helm install success",
+                        r"(?i)helm install|release.*deployed",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "database ready",
+                        r"(?i)cluster.*ready|database.*ready|postgres.*running",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "configmap created",
+                        r"(?i)configmap.*created|infra-config.*created",
+                        true,
+                        "info",
+                    ),
+                    pattern(
+                        "PR created",
+                        r"(?i)pr created|pull request created",
+                        true,
+                        "info",
+                    ),
+                ],
+                failure_patterns: vec![
+                    pattern(
+                        "kubectl error",
+                        r"(?i)error from server|kubectl.*error",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "helm error",
+                        r"(?i)helm.*error|chart.*failed",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "operator error",
+                        r"(?i)operator.*error|crd.*not found",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "database not ready",
+                        r"(?i)cluster.*not ready|postgres.*failed|connection refused",
+                        false,
+                        "high",
+                    ),
+                    pattern(
+                        "secret missing",
+                        r"(?i)secret.*not found|missing.*secret",
+                        false,
+                        "high",
+                    ),
+                ],
+                anomaly_patterns: vec![
+                    pattern(
+                        "pod pending",
+                        r"(?i)pod.*pending|waiting.*resources",
+                        false,
+                        "medium",
+                    ),
+                    pattern(
+                        "pvc pending",
+                        r"(?i)pvc.*pending|volume.*pending",
+                        false,
+                        "medium",
                     ),
                 ],
             },
@@ -726,14 +1115,23 @@ impl BehaviorAnalyzer {
         // Fall back to pod name patterns
         let name_lower = pod_name.to_lowercase();
         for agent in [
+            // Backend implementation
             AgentType::Rex,
+            AgentType::Grizz,
+            AgentType::Nova,
+            // Frontend implementation
             AgentType::Blaze,
+            AgentType::Tap,
+            AgentType::Spark,
+            // Support agents
             AgentType::Cleo,
             AgentType::Tess,
             AgentType::Cipher,
             AgentType::Atlas,
-            AgentType::Factory,
+            AgentType::Bolt,
             AgentType::Morgan,
+            // General
+            AgentType::Factory,
         ] {
             let agent_name = format!("{agent:?}").to_lowercase();
             if name_lower.contains(&agent_name) {
