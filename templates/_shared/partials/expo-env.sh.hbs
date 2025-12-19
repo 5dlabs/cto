@@ -49,8 +49,11 @@ fi
 # -------------------------------------------------------------------------
 # Use ${VAR:-} to handle unset variables with set -u
 if [ -n "${ANDROID_HOME:-}" ] || [ -n "${ANDROID_SDK_ROOT:-}" ]; then
-  export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-  export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  # Avoid nested parameter expansion ending with double-braces (confuses Handlebars)
+  _android_sdk="${ANDROID_SDK_ROOT:-}"
+  _android_home="${ANDROID_HOME:-}"
+  export ANDROID_HOME="${_android_home:-$_android_sdk}"
+  export ANDROID_SDK_ROOT="${_android_sdk:-$_android_home}"
   export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
   echo "Android SDK: $ANDROID_HOME"
   
