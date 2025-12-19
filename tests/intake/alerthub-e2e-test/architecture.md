@@ -36,7 +36,7 @@ AlertHub is a multi-platform notification system built as a microservices archit
 │                                                                                                        │
 │  ┌─────────────────────────────────┐  ┌─────────────────────────────────┐  ┌────────────────────────┐ │
 │  │     Notification Router         │  │      Admin API                  │  │   Integration Service  │ │
-│  │         (Rust/Axum)             │  │       (Go/gRPC)                 │  │    (Node.js/Fastify)   │ │
+│  │         (Rust/Axum)             │  │       (Go/gRPC)                 │  │   (Bun/Elysia+Effect)  │ │
 │  │            Rex                  │  │         Grizz                   │  │          Nova          │ │
 │  │                                 │  │                                 │  │                        │ │
 │  │  • POST /api/v1/notifications   │  │  • gRPC TenantService          │  │  • CRUD Integrations   │ │
@@ -126,26 +126,36 @@ GET    /metrics                        # Prometheus metrics
 
 ---
 
-### Integration Service (Nova - Node.js/Fastify)
+### Integration Service (Nova - Bun/Elysia + Effect)
 
 **Responsibilities**:
 - Manage channel integrations (Slack, Discord, email, webhooks)
-- Consume notification events from Kafka
-- Deliver notifications to external channels
-- Handle retries with exponential backoff
-- Render notification templates
+- Consume notification events from Kafka via Effect Stream
+- Deliver notifications to external channels with type-safe error handling
+- Handle retries with Effect.retry and exponential backoff schedules
+- Render notification templates with composable Effect pipelines
 
 **Technology Stack**:
 | Component | Technology |
 |-----------|------------|
-| Language | Node.js 20+ |
-| Framework | Fastify 4.x |
-| TypeScript | 5.x |
-| Database ORM | Prisma or Mongoose |
-| Queue Consumer | kafkajs |
-| Template Engine | Handlebars |
-| HTTP Client | undici |
-| Validation | Zod |
+| Runtime | Bun 1.1+ |
+| Framework | Elysia 1.x |
+| Type System | Effect 3.x + TypeScript 5.x |
+| Validation | Effect Schema |
+| HTTP Client | @effect/platform HttpClient |
+| Database ORM | Drizzle ORM (MongoDB) |
+| Queue Consumer | kafkajs + Effect Stream |
+| Template Engine | Handlebars (with Effect error handling) |
+
+**Effect Architecture**:
+| Pattern | Usage |
+|---------|-------|
+| `Effect.Service` | SlackService, DiscordService, EmailService, WebhookService |
+| `Effect.retry` | Exponential backoff delivery (3 attempts, 1s → 2s → 4s) |
+| `Effect.Schema` | Request/response validation (replaces Zod) |
+| `Effect.Layer` | Dependency injection for channel services |
+| `Effect.Stream` | Kafka consumer with backpressure |
+| `Effect.Semaphore` | Rate limiting per channel |
 
 **API Endpoints**:
 ```
@@ -155,22 +165,32 @@ GET    /api/v1/integrations/:id        # Get integration
 PATCH  /api/v1/integrations/:id        # Update integration
 DELETE /api/v1/integrations/:id        # Delete integration
 POST   /api/v1/integrations/:id/test   # Test connectivity
+POST   /api/v1/integrations/:id/deliver# Deliver notification (Effect handler)
 GET    /health                         # Health check
 ```
 
 **Supported Channels**:
-| Channel | Integration Type | Auth Method |
-|---------|-----------------|-------------|
-| Slack | Webhook, Bot API | OAuth2, Webhook URL |
-| Discord | Webhook | Webhook URL |
-| Email | SMTP | API Key, SMTP Auth |
-| Push | FCM | Service Account |
-| Webhook | HTTP | HMAC Signature |
+| Channel | Integration Type | Auth Method | Effect Service |
+|---------|-----------------|-------------|----------------|
+| Slack | Webhook, Bot API | OAuth2, Webhook URL | `SlackService` |
+| Discord | Webhook | Webhook URL | `DiscordService` |
+| Email | SMTP | API Key, SMTP Auth | `EmailService` |
+| Push | FCM | Service Account | `PushService` |
+| Webhook | HTTP | HMAC Signature | `WebhookService` |
+
+**Error Types** (Effect TaggedError):
+| Error | Cause | Recovery |
+|-------|-------|----------|
+| `SlackDeliveryError` | Slack API failure | Retry with backoff |
+| `DiscordDeliveryError` | Discord webhook failure | Retry with backoff |
+| `EmailDeliveryError` | SMTP failure | Retry with backoff |
+| `RateLimitError` | Channel rate limited | Wait `retryAfter` seconds |
+| `ConfigurationError` | Invalid integration config | Fail immediately |
 
 **Dependencies**:
 - MongoDB (integration configs, templates)
-- RabbitMQ (delivery task queue)
-- Kafka (event consumption)
+- RabbitMQ (delivery task queue, consumed via Effect Stream)
+- Kafka (event consumption via Effect Stream adapter)
 
 ---
 
@@ -258,27 +278,47 @@ GET    /api/v1/analytics/metrics       # Get metrics
 
 ## Frontend Applications
 
-### Web Console (Blaze - Next.js)
+### Web Console (Blaze - Next.js + Effect)
 
 **Technology Stack**:
 | Component | Technology |
 |-----------|------------|
-| Framework | Next.js 14+ (App Router) |
-| UI Library | shadcn/ui |
-| Styling | TailwindCSS |
-| State | TanStack Query |
-| Forms | React Hook Form + Zod |
+| Framework | Next.js 15 (App Router) |
+| UI Library | React 19 |
+| Components | shadcn/ui |
+| Styling | TailwindCSS 4 |
+| Type System | Effect 3.x + TypeScript 5.x |
+| Validation | Effect Schema |
+| State | TanStack Query + Effect |
+| Forms | React Hook Form + Effect Schema resolver |
 | Charts | Recharts |
+| Animations | anime.js |
+
+**Effect Integration**:
+| Pattern | Usage |
+|---------|-------|
+| `Effect.Schema` | API response validation, form validation |
+| `Effect.tryPromise` | Type-safe fetch with error handling |
+| `Effect.Stream` | WebSocket real-time updates |
+| `@effect/rpc` (optional) | Type-safe API client |
 
 **Pages**:
-| Route | Purpose |
-|-------|---------|
-| `/` | Dashboard overview |
-| `/notifications` | Notification history |
-| `/integrations` | Manage channels |
-| `/rules` | Configure rules |
-| `/settings` | User/tenant settings |
-| `/analytics` | Metrics & charts |
+| Route | Purpose | Effect Usage |
+|-------|---------|--------------|
+| `/` | Dashboard overview | Effect data fetching |
+| `/notifications` | Notification history | Effect Schema validation |
+| `/integrations` | Manage channels | Effect form validation |
+| `/rules` | Configure rules | Effect error handling |
+| `/settings` | User/tenant settings | Effect Schema |
+| `/analytics` | Metrics & charts | Effect data transforms |
+
+**Key Components with Effect**:
+| Component | Effect Pattern |
+|-----------|---------------|
+| `<NotificationFeed />` | Effect.Stream for WebSocket |
+| `<IntegrationForm />` | Effect Schema validation |
+| `<RuleBuilder />` | Effect error boundaries |
+| `<AnalyticsChart />` | Effect data transforms |
 
 ---
 
