@@ -1255,6 +1255,7 @@ fn generate_remediation_acceptance_criteria(failure: &FailureContext) -> String 
 ///
 /// This ensures the remediation pod shares the `healer-workspace` PVC with the
 /// healer monitor deployment, allowing access to prompts and logs.
+#[allow(clippy::too_many_lines)] // 102 lines - complex YAML template generation
 fn trigger_remediation(
     config: &RemediationConfig,
     failure: &FailureContext,
