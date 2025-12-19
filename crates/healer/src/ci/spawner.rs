@@ -578,7 +578,8 @@ spec:
             model = self.config.model,
             repository = self.repository,
             // Indent prompt by 4 spaces for YAML literal block
-            prompt_yaml = prompt
+            // Strip control characters to prevent YAML parsing errors
+            prompt_yaml = strip_control_chars(prompt)
                 .lines()
                 .map(|line| format!("    {line}"))
                 .collect::<Vec<_>>()
