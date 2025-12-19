@@ -302,6 +302,10 @@ impl LinearApiClient {
     }
 
     /// Emit a thought to the Linear agent session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_thought(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -316,6 +320,10 @@ impl LinearApiClient {
     }
 
     /// Emit an ephemeral thought (replaced by next activity).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_ephemeral_thought(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -330,6 +338,10 @@ impl LinearApiClient {
     }
 
     /// Emit an action activity (tool invocation in progress).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_action(&self, session_id: &str, action: &str, parameter: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -346,6 +358,10 @@ impl LinearApiClient {
     }
 
     /// Emit an action activity with result (completed tool call).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_action_complete(
         &self,
         session_id: &str,
@@ -368,6 +384,10 @@ impl LinearApiClient {
     }
 
     /// Emit an error activity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_error(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -382,6 +402,10 @@ impl LinearApiClient {
     }
 
     /// Emit a response activity (final completion).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn emit_response(&self, session_id: &str, body: &str) -> Result<()> {
         self.emit_activity(
             session_id,
@@ -396,6 +420,10 @@ impl LinearApiClient {
     }
 
     /// Update the agent session plan (visual checklist in Linear UI).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn update_plan(&self, session_id: &str, steps: &[PlanStep]) -> Result<()> {
         #[derive(Serialize)]
         struct Variables {
@@ -450,6 +478,10 @@ impl LinearApiClient {
     }
 
     /// Set the session external URL (links to Argo workflow in Linear UI).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL request fails.
     pub async fn set_external_url(&self, session_id: &str, url: &str) -> Result<()> {
         #[derive(Serialize)]
         struct Variables {
@@ -968,9 +1000,10 @@ struct ToolState {
 /// Maps Claude events to proper Linear Agent API activity types:
 /// - Tool invocations → `action` activities
 /// - Tool completions → `action` with result
-/// - Errors → `error` activities  
+/// - Errors → `error` activities
 /// - Completion → `response` activities
 /// - Transient status → ephemeral `thought` activities
+#[allow(clippy::too_many_lines)]
 async fn process_stream_event(
     client: &LinearApiClient,
     session_id: &str,

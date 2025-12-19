@@ -12,7 +12,7 @@ use crate::tasks::template_paths::{
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
 use crate::tasks::workflow::extract_workflow_name;
-use handlebars::Handlebars;
+use handlebars::{handlebars_helper, Handlebars};
 
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
@@ -55,6 +55,44 @@ struct CliRenderSettings {
 pub struct CodeTemplateGenerator;
 
 impl CodeTemplateGenerator {
+    /// Register common Handlebars helpers for template conditionals
+    /// This enables `eq` and `or` helpers used in templates like:
+    /// `{{#if (eq github_app "tap")}}` and `{{#if (or (eq a "x") (eq b "y"))}}`
+    fn register_template_helpers(handlebars: &mut Handlebars) {
+        // Helper for equality comparison: {{#if (eq var "value")}}
+        // Returns a boolean that can be used in conditionals
+        handlebars_helper!(eq: |left: str, right: str| left == right);
+        handlebars.register_helper("eq", Box::new(eq));
+
+        // Helper for logical OR: {{#if (or cond1 cond2 ...)}}
+        // Returns true if any argument is truthy
+        handlebars.register_helper(
+            "or",
+            Box::new(
+                |h: &handlebars::Helper,
+                 _: &Handlebars,
+                 _: &handlebars::Context,
+                 _: &mut handlebars::RenderContext,
+                 out: &mut dyn handlebars::Output|
+                 -> handlebars::HelperResult {
+                    let any_truthy = h.params().iter().any(|p| {
+                        let val = p.value();
+                        // Check if value is truthy: non-empty string, true bool, or non-null
+                        match val {
+                            serde_json::Value::Bool(b) => *b,
+                            serde_json::Value::String(s) => !s.is_empty(),
+                            serde_json::Value::Null => false,
+                            _ => true,
+                        }
+                    });
+                    // Write "true" or empty string - Handlebars treats non-empty as truthy
+                    out.write(if any_truthy { "true" } else { "" })?;
+                    Ok(())
+                },
+            ),
+        );
+    }
+
     /// Generate all template files for a code task
     pub fn generate_all_templates(
         code_run: &CodeRun,
@@ -87,6 +125,21 @@ impl CodeTemplateGenerator {
                     prompt_content.len()
                 );
                 templates.insert("prompt.md".to_string(), prompt_content.clone());
+            }
+        }
+
+        // If acceptance_criteria is set, write it to acceptance-criteria.md
+        // This allows the acceptance probe to verify checkboxes after task completion
+        if let Some(ref criteria_content) = code_run.spec.acceptance_criteria {
+            if !criteria_content.trim().is_empty() {
+                debug!(
+                    "Writing acceptance_criteria to acceptance-criteria.md ({} bytes)",
+                    criteria_content.len()
+                );
+                templates.insert(
+                    "acceptance-criteria.md".to_string(),
+                    criteria_content.clone(),
+                );
             }
         }
 
@@ -411,6 +464,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
@@ -451,6 +505,10 @@ impl CodeTemplateGenerator {
             format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0))
         });
 
+        let job_type = Self::determine_job_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let default_retries = Self::get_default_retries(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -471,6 +529,10 @@ impl CodeTemplateGenerator {
             "model": model.clone(),
             "cli_type": cli_type,
             "enable_docker": code_run.spec.enable_docker,
+            // Required template context variables
+            "job_type": job_type,
+            "agent_name": agent_name,
+            "default_retries": default_retries,
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -495,6 +557,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
@@ -767,6 +830,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
@@ -826,6 +890,11 @@ impl CodeTemplateGenerator {
             .unwrap_or_default();
         let namespace = code_run.metadata.namespace.as_deref().unwrap_or("cto");
 
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let job_type = Self::determine_job_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let default_retries = Self::get_default_retries(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -848,13 +917,18 @@ impl CodeTemplateGenerator {
             "model_rotation": render_settings.model_rotation,
             "list_tools_on_start": render_settings.list_tools_on_start,
             "enable_docker": code_run.spec.enable_docker,
+            // Required template context variables
+            "cli_type": cli_type,
+            "job_type": job_type,
+            "agent_name": agent_name,
+            "default_retries": default_retries,
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
             "target_repository": target_repository,
             "namespace": namespace,
             "cli": {
-                "type": Self::determine_cli_type(code_run).to_string(),
+                "type": cli_type,
                 "model": render_settings.model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
@@ -877,6 +951,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
@@ -1065,6 +1140,7 @@ impl CodeTemplateGenerator {
     fn generate_container_script(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
@@ -1104,6 +1180,11 @@ impl CodeTemplateGenerator {
             .and_then(|s| s.retry_count)
             .unwrap_or(0);
 
+        let cli_type_str = cli_type.to_string();
+        let job_type = Self::determine_job_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let default_retries = Self::get_default_retries(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1120,6 +1201,11 @@ impl CodeTemplateGenerator {
             "model": code_run.spec.model,
             "cli_config": cli_config,
             "enable_docker": code_run.spec.enable_docker,
+            // Required template context variables
+            "cli_type": cli_type_str,
+            "job_type": job_type,
+            "agent_name": agent_name,
+            "default_retries": default_retries,
         });
 
         handlebars
@@ -1139,6 +1225,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
@@ -1366,6 +1453,7 @@ impl CodeTemplateGenerator {
     fn generate_mcp_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         let template = Self::load_template(CODE_MCP_CONFIG_TEMPLATE)?;
 
@@ -1412,6 +1500,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
@@ -1454,6 +1543,11 @@ impl CodeTemplateGenerator {
             .as_ref()
             .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
 
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let job_type = Self::determine_job_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let default_retries = Self::get_default_retries(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1471,8 +1565,13 @@ impl CodeTemplateGenerator {
                 .unwrap_or(""),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "workflow_name": workflow_name,
+            // Required template context variables
+            "cli_type": cli_type,
+            "job_type": job_type,
+            "agent_name": agent_name,
+            "default_retries": default_retries,
             "cli": {
-                "type": Self::determine_cli_type(code_run).to_string(),
+                "type": cli_type,
                 "model": cli_model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
@@ -1493,6 +1592,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
@@ -2038,6 +2138,7 @@ impl CodeTemplateGenerator {
         let mut templates = BTreeMap::new();
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Determine CLI type (default to Factory for review tasks)
         let cli_type = Self::determine_cli_type(code_run);
@@ -2192,6 +2293,7 @@ impl CodeTemplateGenerator {
         let mut templates = BTreeMap::new();
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Determine CLI type (default to Factory for remediate tasks)
         let cli_type = Self::determine_cli_type(code_run);
@@ -2703,6 +2805,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
@@ -2741,6 +2844,11 @@ impl CodeTemplateGenerator {
             format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0))
         });
 
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let job_type = Self::determine_job_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let default_retries = Self::get_default_retries(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -2758,8 +2866,13 @@ impl CodeTemplateGenerator {
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "workflow_name": workflow_name,
             "model": render_settings.model,
+            // Required template context variables
+            "cli_type": cli_type,
+            "job_type": job_type,
+            "agent_name": agent_name,
+            "default_retries": default_retries,
             "cli": {
-                "type": Self::determine_cli_type(code_run).to_string(),
+                "type": cli_type,
                 "model": render_settings.model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
@@ -2782,6 +2895,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
@@ -2978,6 +3092,7 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared partials for CLI-agnostic building blocks
         Self::register_shared_partials(&mut handlebars)?;
@@ -3028,6 +3143,11 @@ impl CodeTemplateGenerator {
             .and_then(|s| s.retry_count)
             .unwrap_or(0);
 
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let job_type = Self::determine_job_type(code_run);
+        let agent_name = Self::get_agent_name(code_run);
+        let default_retries = Self::get_default_retries(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -3038,11 +3158,17 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "workflow_name": workflow_name,
+            "model": code_run.spec.model,
             "remote_tools": remote_tools,
             "settings": cli_settings,
             "continue_session": continue_session,
             "overwrite_memory": code_run.spec.overwrite_memory,
             "attempts": retry_count + 1,
+            // Required template context variables
+            "cli_type": cli_type,
+            "job_type": job_type,
+            "agent_name": agent_name,
+            "default_retries": default_retries,
         });
 
         handlebars
@@ -3065,6 +3191,7 @@ impl CodeTemplateGenerator {
 
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
@@ -3207,6 +3334,7 @@ impl CodeTemplateGenerator {
     fn generate_coding_guidelines(code_run: &CodeRun) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         let template = Self::load_template(CODE_CODING_GUIDELINES_TEMPLATE)?;
 
@@ -3235,6 +3363,7 @@ impl CodeTemplateGenerator {
     fn generate_github_guidelines(code_run: &CodeRun) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+        Self::register_template_helpers(&mut handlebars);
 
         let template = Self::load_template(CODE_GITHUB_GUIDELINES_TEMPLATE)?;
 
@@ -3384,6 +3513,38 @@ impl CodeTemplateGenerator {
             .as_ref()
             .map_or(0, |s| s.retry_count.unwrap_or(0));
         retry_count > 0 || code_run.spec.continue_session
+    }
+
+    /// Get the friendly agent name from the github_app field.
+    /// Returns capitalized agent name (e.g., "5DLabs-Rex" -> "Rex", "rex" -> "Rex")
+    #[allow(dead_code)]
+    fn get_agent_name(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("agent");
+
+        // Extract agent name from 5DLabs-AgentName pattern or use as-is
+        let agent_lower = github_app
+            .strip_prefix("5DLabs-")
+            .unwrap_or(github_app)
+            .to_lowercase();
+
+        // Capitalize first letter
+        let mut chars = agent_lower.chars();
+        match chars.next() {
+            None => "Agent".to_string(),
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
+
+    /// Get default retries from environment or use platform default
+    #[allow(dead_code)]
+    fn get_default_retries(code_run: &CodeRun) -> u32 {
+        code_run
+            .spec
+            .env
+            .get("EXECUTION_MAX_RETRIES")
+            .or_else(|| code_run.spec.env.get("MAX_RETRIES"))
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(10) // Platform default
     }
 
     /// Determine the job type from a CodeRun based on run_type, service, and template settings.
@@ -4003,6 +4164,7 @@ mod tests {
                 service_account_name: None,
                 linear_integration: None,
                 prompt_modification: None,
+                acceptance_criteria: None,
             },
             status: None,
         }
@@ -4064,6 +4226,103 @@ mod tests {
             template_path, "agents/morgan/intake/container.sh.hbs",
             "Documentation run should use Morgan intake container"
         );
+    }
+
+    // ========================================================================
+    // Handlebars helper tests
+    // Tests for eq and or helpers used in template conditionals
+    // ========================================================================
+
+    #[test]
+    fn test_handlebars_eq_helper_returns_true_for_matching_strings() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string("test", "{{#if (eq name \"tap\")}}yes{{else}}no{{/if}}")
+            .unwrap();
+        let result = hb.render("test", &json!({"name": "tap"})).unwrap();
+        assert_eq!(
+            result, "yes",
+            "eq helper should return true for matching strings"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_eq_helper_returns_false_for_non_matching_strings() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string("test", "{{#if (eq name \"tap\")}}yes{{else}}no{{/if}}")
+            .unwrap();
+        let result = hb.render("test", &json!({"name": "rex"})).unwrap();
+        assert_eq!(
+            result, "no",
+            "eq helper should return false for non-matching strings"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_or_helper_returns_true_when_any_truthy() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string(
+            "test",
+            "{{#if (or (eq name \"blaze\") (eq name \"tap\"))}}yes{{else}}no{{/if}}",
+        )
+        .unwrap();
+
+        // Should be true when name is "tap"
+        let result = hb.render("test", &json!({"name": "tap"})).unwrap();
+        assert_eq!(
+            result, "yes",
+            "or helper should return true when second condition matches"
+        );
+
+        // Should be true when name is "blaze"
+        let result = hb.render("test", &json!({"name": "blaze"})).unwrap();
+        assert_eq!(
+            result, "yes",
+            "or helper should return true when first condition matches"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_or_helper_returns_false_when_all_falsy() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string(
+            "test",
+            "{{#if (or (eq name \"blaze\") (eq name \"tap\"))}}yes{{else}}no{{/if}}",
+        )
+        .unwrap();
+
+        // Should be false when name is neither "blaze" nor "tap"
+        let result = hb.render("test", &json!({"name": "rex"})).unwrap();
+        assert_eq!(
+            result, "no",
+            "or helper should return false when no condition matches"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_expo_condition_only_matches_tap() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string("test", "{{#if (eq github_app \"tap\")}}EXPO{{/if}}")
+            .unwrap();
+
+        // Only tap should include EXPO
+        assert_eq!(
+            hb.render("test", &json!({"github_app": "tap"})).unwrap(),
+            "EXPO",
+            "tap agent should get Expo environment"
+        );
+
+        // Other agents should NOT include EXPO
+        for agent in [
+            "rex", "blaze", "atlas", "spark", "cleo", "tess", "cipher", "bolt",
+        ] {
+            let result = hb.render("test", &json!({"github_app": agent})).unwrap();
+            assert_eq!(result, "", "Agent {agent} should NOT get Expo environment");
+        }
     }
 
     // ========================================================================

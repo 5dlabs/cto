@@ -104,6 +104,7 @@ fn get_intake_schema() -> Value {
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "play",

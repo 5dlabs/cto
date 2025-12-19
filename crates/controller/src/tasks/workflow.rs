@@ -362,6 +362,7 @@ mod tests {
                 github_app: None,
                 linear_integration: None,
                 prompt_modification: None,
+                acceptance_criteria: None,
             },
             status: None,
         };
@@ -401,6 +402,7 @@ mod tests {
                 github_app: None,
                 linear_integration: None,
                 prompt_modification: None,
+                acceptance_criteria: None,
             },
             status: None,
         };

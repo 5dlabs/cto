@@ -27,10 +27,12 @@ impl EmailSender {
 
     /// Send an email with HTML and plain-text content.
     pub async fn send(&self, subject: &str, html_body: &str, text_body: &str) -> Result<()> {
+        // Try parsing as-is first, then try with angle brackets if it fails
         let from: Mailbox = self
             .config
             .from_email
             .parse()
+            .or_else(|_| format!("<{}>", self.config.from_email).parse())
             .context("Invalid from email address")?;
 
         let to: Mailbox = self
