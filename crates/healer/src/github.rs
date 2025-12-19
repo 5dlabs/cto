@@ -64,7 +64,7 @@ impl GitHubClient {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("gh issue create failed: {}", stderr);
+            anyhow::bail!("gh issue create failed: {stderr}");
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -94,7 +94,7 @@ impl GitHubClient {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("gh issue comment failed: {}", stderr);
+            anyhow::bail!("gh issue comment failed: {stderr}");
         }
 
         Ok(())
@@ -125,7 +125,7 @@ impl GitHubClient {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("gh issue close failed: {}", stderr);
+            anyhow::bail!("gh issue close failed: {stderr}");
         }
 
         Ok(())

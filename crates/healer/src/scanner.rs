@@ -133,7 +133,7 @@ impl LogScanner {
     ///
     /// # Errors
     /// Returns an error if Loki queries fail.
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_sign_loss, clippy::too_many_lines)]
     pub async fn scan(&self, window: Duration) -> Result<ScanReport> {
         let end = Utc::now();
         let start = end - window;
