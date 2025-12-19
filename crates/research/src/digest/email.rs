@@ -131,5 +131,3 @@ Sent from CTO Research Pipeline
         self.send(subject, html_body, text_body).await
     }
 }
-
-

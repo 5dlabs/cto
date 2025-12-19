@@ -1,0 +1,182 @@
+---
+# Cloudflare DDNS updater for VPN endpoint
+# Updates vpn.5dlabs.ai with the current public IP every 5 minutes
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cloudflare-ddns-vpn
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cloudflare-ddns
+    app.kubernetes.io/part-of: kilo
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cloudflare-ddns
+            platform.5dlabs.io/log-collection: enabled
+          annotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: cloudflare-ddns
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ddns
+              image: curlimages/curl:8.5.0
+              env:
+                - name: CF_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-api-credentials
+                      key: api-key
+                - name: CF_API_EMAIL
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-api-credentials
+                      key: email
+                - name: CF_ZONE_NAME
+                  value: "5dlabs.ai"
+                - name: CF_RECORD_NAME
+                  value: "vpn.5dlabs.ai"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  echo "🔍 Getting current public IP..."
+                  PUBLIC_IP=$(curl -4 -s ifconfig.me || curl -4 -s ipinfo.io/ip)
+                  echo "   Current IP: ${PUBLIC_IP}"
+
+                  if [ -z "${PUBLIC_IP}" ]; then
+                    echo "❌ Failed to get public IP"
+                    exit 1
+                  fi
+
+                  echo "🔍 Getting Cloudflare Zone ID for ${CF_ZONE_NAME}..."
+                  ZONE_RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=${CF_ZONE_NAME}" \
+                    -H "X-Auth-Email: ${CF_API_EMAIL}" \
+                    -H "X-Auth-Key: ${CF_API_KEY}" \
+                    -H "Content-Type: application/json")
+
+                  ZONE_ID=$(echo "${ZONE_RESPONSE}" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+                  if [ -z "${ZONE_ID}" ]; then
+                    echo "❌ Failed to get Zone ID"
+                    echo "${ZONE_RESPONSE}"
+                    exit 1
+                  fi
+                  echo "   Zone ID: ${ZONE_ID}"
+
+                  echo "🔍 Checking existing DNS record for ${CF_RECORD_NAME}..."
+                  RECORD_RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?name=${CF_RECORD_NAME}&type=A" \
+                    -H "X-Auth-Email: ${CF_API_EMAIL}" \
+                    -H "X-Auth-Key: ${CF_API_KEY}" \
+                    -H "Content-Type: application/json")
+
+                  RECORD_ID=$(echo "${RECORD_RESPONSE}" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+                  CURRENT_IP=$(echo "${RECORD_RESPONSE}" | grep -o '"content":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+                  echo "   Current DNS IP: ${CURRENT_IP:-none}"
+
+                  if [ "${CURRENT_IP}" = "${PUBLIC_IP}" ]; then
+                    echo "✅ IP unchanged, no update needed"
+                    exit 0
+                  fi
+
+                  if [ -z "${RECORD_ID}" ]; then
+                    echo "📝 Creating new A record..."
+                    RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records" \
+                      -H "X-Auth-Email: ${CF_API_EMAIL}" \
+                      -H "X-Auth-Key: ${CF_API_KEY}" \
+                      -H "Content-Type: application/json" \
+                      --data "{\"type\":\"A\",\"name\":\"${CF_RECORD_NAME}\",\"content\":\"${PUBLIC_IP}\",\"ttl\":300,\"proxied\":false}")
+                  else
+                    echo "📝 Updating existing A record..."
+                    RESULT=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}" \
+                      -H "X-Auth-Email: ${CF_API_EMAIL}" \
+                      -H "X-Auth-Key: ${CF_API_KEY}" \
+                      -H "Content-Type: application/json" \
+                      --data "{\"type\":\"A\",\"name\":\"${CF_RECORD_NAME}\",\"content\":\"${PUBLIC_IP}\",\"ttl\":300,\"proxied\":false}")
+                  fi
+
+                  if echo "${RESULT}" | grep -q '"success":true'; then
+                    echo "✅ DNS updated successfully: ${CF_RECORD_NAME} -> ${PUBLIC_IP}"
+                  else
+                    echo "❌ DNS update failed:"
+                    echo "${RESULT}"
+                    exit 1
+                  fi
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+---
+# ExternalSecret to sync Cloudflare credentials from external-dns namespace
+# This allows the DDNS job to use the same credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare-api-credentials
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cloudflare-ddns
+    app.kubernetes.io/part-of: kilo
+type: Opaque
+stringData:
+  # These will be populated by copying from external-dns namespace
+  # For now, we'll reference the existing secret via a Job
+---
+# One-time job to copy the secret from external-dns to kube-system
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: copy-cloudflare-secret
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cloudflare-ddns
+    app.kubernetes.io/part-of: kilo
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 60
+  template:
+    spec:
+      serviceAccountName: kilo
+      restartPolicy: OnFailure
+      containers:
+        - name: copy-secret
+          image: bitnami/kubectl:1.29
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "📋 Copying Cloudflare credentials from external-dns namespace..."
+
+              # Get the secret from external-dns namespace
+              kubectl get secret cloudflare-api-credentials -n external-dns -o json | \
+                jq 'del(.metadata.namespace, .metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])' | \
+                jq '.metadata.namespace = "kube-system"' | \
+                kubectl apply -f -
+
+              echo "✅ Secret copied successfully"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+

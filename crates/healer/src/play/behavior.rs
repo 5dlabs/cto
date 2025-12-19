@@ -141,6 +141,7 @@ impl BehaviorAnalyzer {
     }
 
     /// Load built-in behavior patterns for all agents
+    #[allow(clippy::too_many_lines)]
     fn load_builtin_patterns(&mut self) {
         // Global failure patterns (apply to all agents)
         self.global_failure_patterns = vec![
@@ -695,6 +696,7 @@ impl BehaviorAnalyzer {
     }
 
     /// Analyze multiple log lines and return only significant detections
+    #[must_use]
     pub fn analyze_logs(&self, lines: &[String], agent: AgentType) -> Vec<LogAnalysis> {
         lines
             .iter()
@@ -827,5 +829,3 @@ mod tests {
         assert_eq!(agent, AgentType::Rex);
     }
 }
-
-

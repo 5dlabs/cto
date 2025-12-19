@@ -60,10 +60,7 @@ impl Latitude {
     }
 
     /// Make an authenticated GET request.
-    async fn get<T: serde::de::DeserializeOwned>(
-        &self,
-        path: &str,
-    ) -> Result<T, GpuProviderError> {
+    async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, GpuProviderError> {
         let url = format!("{API_BASE_URL}{path}");
         debug!(url = %url, "GET request");
 
@@ -419,8 +416,3 @@ mod tests {
         );
     }
 }
-
-
-
-
-

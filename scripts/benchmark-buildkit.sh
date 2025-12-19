@@ -18,7 +18,7 @@ ITERATIONS="${1:-3}"
 NAMESPACE="${NAMESPACE:-cto}"
 BUILDKIT_STATEFULSET="buildkit"
 TEST_IMAGE="benchmark-test"
-REGISTRY="${REGISTRY:-192.168.1.72:30500}"
+REGISTRY="${REGISTRY:-192.168.1.77:30500}"
 
 # Colors (RED used in log_error if added later)
 # shellcheck disable=SC2034
@@ -320,7 +320,7 @@ case "${1:-}" in
         echo ""
         echo "Environment:"
         echo "  NAMESPACE   Kubernetes namespace (default: cto)"
-        echo "  REGISTRY    Container registry URL (default: 192.168.1.72:30500)"
+        echo "  REGISTRY    Container registry URL (default: 192.168.1.77:30500)"
         exit 0
         ;;
     --iterations)

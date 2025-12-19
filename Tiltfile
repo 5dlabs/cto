@@ -27,7 +27,7 @@ allow_k8s_contexts([
 # =============================================================================
 # Configuration
 # =============================================================================
-LOCAL_REGISTRY = os.getenv('LOCAL_REGISTRY', '192.168.1.72:30500')
+LOCAL_REGISTRY = os.getenv('LOCAL_REGISTRY', '192.168.1.77:30500')
 NAMESPACE = 'cto'
 DEV_TAG = 'tilt-dev'
 

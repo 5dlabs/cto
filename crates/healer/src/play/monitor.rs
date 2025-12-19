@@ -1,7 +1,7 @@
 //! Real-time play monitoring with log streaming and anomaly detection.
 //!
 //! This module provides continuous monitoring of running play workflows by:
-//! - Detecting active plays via CodeRun CRDs
+//! - Detecting active plays via `CodeRun` CRDs
 //! - Streaming logs from all agent pods
 //! - Analyzing logs against expected behaviors
 //! - Creating GitHub issues when anomalies are detected
@@ -22,7 +22,7 @@ use super::behavior::{AgentType, BehaviorAnalyzer, DetectionType, LogAnalysis};
 /// Configuration for play monitoring
 #[derive(Debug, Clone)]
 pub struct MonitorConfig {
-    /// Namespace to monitor for CodeRuns
+    /// Namespace to monitor for `CodeRuns`
     pub namespace: String,
     /// Poll interval for log queries (seconds)
     pub poll_interval_secs: u64,
@@ -64,7 +64,7 @@ pub struct MonitoredPlay {
     pub service: Option<String>,
     /// When monitoring started
     pub started_at: DateTime<Utc>,
-    /// Active CodeRuns in this play
+    /// Active `CodeRuns` in this play
     pub active_coderuns: Vec<ActiveCodeRun>,
     /// Issues created for this play
     pub issues_created: Vec<String>,
@@ -74,10 +74,10 @@ pub struct MonitoredPlay {
     pub anomalies: Vec<DetectedAnomaly>,
 }
 
-/// An active CodeRun being monitored
+/// An active `CodeRun` being monitored
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveCodeRun {
-    /// CodeRun name
+    /// `CodeRun` name
     pub name: String,
     /// Agent type
     pub agent: AgentType,
@@ -96,7 +96,7 @@ pub struct DetectedAnomaly {
     pub detected_at: DateTime<Utc>,
     /// The log analysis result
     pub analysis: LogAnalysis,
-    /// CodeRun that produced this
+    /// `CodeRun` that produced this
     pub coderun_name: String,
     /// Whether an issue was created
     pub issue_created: Option<String>,
@@ -124,9 +124,9 @@ pub enum MonitorEventType {
     PlayDetected,
     /// Play completed
     PlayCompleted,
-    /// CodeRun started
+    /// `CodeRun` started
     CodeRunStarted,
-    /// CodeRun completed
+    /// `CodeRun` completed
     CodeRunCompleted,
     /// Anomaly detected
     AnomalyDetected,
@@ -219,7 +219,7 @@ impl PlayMonitor {
     /// Returns an error if kubectl or Loki queries fail.
     pub async fn poll_once(&mut self) -> Result<()> {
         // 1. Discover active CodeRuns
-        let active_coderuns = self.discover_active_coderuns().await?;
+        let active_coderuns = self.discover_active_coderuns()?;
 
         // 2. Group by play_id (task-id label)
         let mut plays_by_id: HashMap<String, Vec<ActiveCodeRun>> = HashMap::new();
@@ -281,8 +281,8 @@ impl PlayMonitor {
         Ok(())
     }
 
-    /// Discover active CodeRuns in the namespace
-    async fn discover_active_coderuns(&self) -> Result<Vec<ActiveCodeRun>> {
+    /// Discover active `CodeRuns` in the namespace
+    fn discover_active_coderuns(&self) -> Result<Vec<ActiveCodeRun>> {
         let output = Command::new("kubectl")
             .args([
                 "get",
@@ -407,9 +407,7 @@ impl PlayMonitor {
 
         // If Loki didn't return logs, try kubectl
         let log_lines: Vec<String> = if entries.is_empty() {
-            self.get_kubectl_logs(pod_name, 100)
-                .await
-                .unwrap_or_default()
+            self.get_kubectl_logs(pod_name, 100).unwrap_or_default()
         } else {
             entries.iter().map(|e| e.line.clone()).collect()
         };
@@ -447,7 +445,7 @@ impl PlayMonitor {
     }
 
     /// Get logs via kubectl as fallback
-    async fn get_kubectl_logs(&self, pod_name: &str, tail: u32) -> Result<Vec<String>> {
+    fn get_kubectl_logs(&self, pod_name: &str, tail: u32) -> Result<Vec<String>> {
         let output = Command::new("kubectl")
             .args([
                 "logs",
@@ -559,12 +557,9 @@ impl PlayMonitor {
         coderun_name: &str,
         analysis: &LogAnalysis,
     ) -> Result<()> {
-        let github = match &self.github {
-            Some(g) => g,
-            None => {
-                debug!("GitHub client not configured, skipping issue creation");
-                return Ok(());
-            }
+        let Some(github) = &self.github else {
+            debug!("GitHub client not configured, skipping issue creation");
+            return Ok(());
         };
 
         let title = format!(
@@ -614,10 +609,7 @@ impl PlayMonitor {
             detected_at = Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
         );
 
-        match github
-            .create_issue(&title, &body, &["heal", "monitor", &analysis.severity])
-            .await
-        {
+        match github.create_issue(&title, &body, &["heal", "monitor", &analysis.severity]) {
             Ok(issue_url) => {
                 info!(issue = %issue_url, "Created GitHub issue for anomaly");
 
@@ -719,7 +711,7 @@ impl PlayMonitor {
 pub struct MonitorStatus {
     /// Number of active plays being monitored
     pub active_plays: usize,
-    /// Total active CodeRuns across all plays
+    /// Total active `CodeRuns` across all plays
     pub total_coderuns: usize,
     /// Total anomalies detected
     pub total_anomalies: usize,
@@ -762,5 +754,3 @@ mod tests {
         assert!(severity_order("medium") > severity_order(&config.min_severity));
     }
 }
-
-

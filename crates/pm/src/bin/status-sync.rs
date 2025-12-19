@@ -43,6 +43,13 @@ pub struct Config {
     pub linear_oauth_token: Option<String>,
     pub workflow_name: String,
 
+    // Argo workflow external URL (shown in Linear UI)
+    pub argo_workflow_url: Option<String>,
+    
+    // Task info for plan updates
+    pub task_id: Option<String>,
+    pub task_description: Option<String>,
+
     // File paths
     pub status_file: String,
     pub log_file: String,
@@ -75,6 +82,17 @@ impl Config {
                 .ok()
                 .filter(|s| !s.is_empty()),
             workflow_name: std::env::var("WORKFLOW_NAME").unwrap_or_else(|_| "unknown".to_string()),
+            
+            // Argo workflow URL for external link in Linear
+            argo_workflow_url: std::env::var("ARGO_WORKFLOW_URL")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            
+            // Task info for plan updates
+            task_id: std::env::var("TASK_ID").ok().filter(|s| !s.is_empty()),
+            task_description: std::env::var("TASK_DESCRIPTION")
+                .ok()
+                .filter(|s| !s.is_empty()),
 
             status_file: std::env::var("STATUS_FILE")
                 .unwrap_or_else(|_| "/workspace/status.json".to_string()),
@@ -131,7 +149,55 @@ impl Config {
 // Linear API Client (Lightweight)
 // =============================================================================
 
+/// Activity content types for Linear Agent API.
+/// Follows Linear's agent activity specification.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum LinearActivityContent {
+    /// A thought or internal note
+    Thought { thought: ThoughtBody },
+    /// A tool invocation or action
+    Action { action: ActionBody },
+    /// Request for user input
+    Elicitation { elicitation: ThoughtBody },
+    /// Final response/completion
+    Response { response: ThoughtBody },
+    /// Error report
+    Error { error: ThoughtBody },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ThoughtBody {
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ActionBody {
+    pub action: String,
+    pub parameter: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+}
+
+/// Agent plan step status (per Linear API)
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PlanStepStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Canceled,
+}
+
+/// Agent plan step
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanStep {
+    pub content: String,
+    pub status: PlanStepStatus,
+}
+
 /// Lightweight Linear API client for sidecar operations.
+/// Implements the full Linear Agent Activity API.
 #[derive(Clone)]
 pub struct LinearApiClient {
     client: reqwest::Client,
@@ -172,38 +238,31 @@ impl LinearApiClient {
         })
     }
 
-    /// Emit a thought to the Linear agent session.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the GraphQL request fails.
-    pub async fn emit_thought(&self, session_id: &str, body: &str) -> Result<()> {
+    /// Generic activity emission helper
+    async fn emit_activity(
+        &self,
+        session_id: &str,
+        content: LinearActivityContent,
+        ephemeral: bool,
+    ) -> Result<()> {
         #[derive(Serialize)]
-        struct Variables<'a> {
-            input: ActivityInput<'a>,
+        struct Variables {
+            input: ActivityInput,
         }
 
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
-        struct ActivityInput<'a> {
-            agent_session_id: &'a str,
-            content: ActivityContent<'a>,
+        struct ActivityInput {
+            agent_session_id: String,
+            content: LinearActivityContent,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            ephemeral: Option<bool>,
         }
 
         #[derive(Serialize)]
-        struct ActivityContent<'a> {
-            thought: ThoughtContent<'a>,
-        }
-
-        #[derive(Serialize)]
-        struct ThoughtContent<'a> {
-            body: &'a str,
-        }
-
-        #[derive(Serialize)]
-        struct Request<'a> {
+        struct Request {
             query: &'static str,
-            variables: Variables<'a>,
+            variables: Variables,
         }
 
         const MUTATION: &str = r"
@@ -218,10 +277,9 @@ impl LinearApiClient {
             query: MUTATION,
             variables: Variables {
                 input: ActivityInput {
-                    agent_session_id: session_id,
-                    content: ActivityContent {
-                        thought: ThoughtContent { body },
-                    },
+                    agent_session_id: session_id.to_string(),
+                    content,
+                    ephemeral: if ephemeral { Some(true) } else { None },
                 },
             },
         };
@@ -232,12 +290,215 @@ impl LinearApiClient {
             .json(&request)
             .send()
             .await
-            .context("Failed to send emit_thought request")?;
+            .context("Failed to send activity request")?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            warn!(status = %status, body = %body, "Linear API emit_thought failed");
+            warn!(status = %status, body = %body, "Linear API activity emission failed");
+        }
+
+        Ok(())
+    }
+
+    /// Emit a thought to the Linear agent session.
+    pub async fn emit_thought(&self, session_id: &str, body: &str) -> Result<()> {
+        self.emit_activity(
+            session_id,
+            LinearActivityContent::Thought {
+                thought: ThoughtBody {
+                    body: body.to_string(),
+                },
+            },
+            false,
+        )
+        .await
+    }
+
+    /// Emit an ephemeral thought (replaced by next activity).
+    pub async fn emit_ephemeral_thought(&self, session_id: &str, body: &str) -> Result<()> {
+        self.emit_activity(
+            session_id,
+            LinearActivityContent::Thought {
+                thought: ThoughtBody {
+                    body: body.to_string(),
+                },
+            },
+            true,
+        )
+        .await
+    }
+
+    /// Emit an action activity (tool invocation in progress).
+    pub async fn emit_action(&self, session_id: &str, action: &str, parameter: &str) -> Result<()> {
+        self.emit_activity(
+            session_id,
+            LinearActivityContent::Action {
+                action: ActionBody {
+                    action: action.to_string(),
+                    parameter: parameter.to_string(),
+                    result: None,
+                },
+            },
+            false,
+        )
+        .await
+    }
+
+    /// Emit an action activity with result (completed tool call).
+    pub async fn emit_action_complete(
+        &self,
+        session_id: &str,
+        action: &str,
+        parameter: &str,
+        result: &str,
+    ) -> Result<()> {
+        self.emit_activity(
+            session_id,
+            LinearActivityContent::Action {
+                action: ActionBody {
+                    action: action.to_string(),
+                    parameter: parameter.to_string(),
+                    result: Some(result.to_string()),
+                },
+            },
+            false,
+        )
+        .await
+    }
+
+    /// Emit an error activity.
+    pub async fn emit_error(&self, session_id: &str, body: &str) -> Result<()> {
+        self.emit_activity(
+            session_id,
+            LinearActivityContent::Error {
+                error: ThoughtBody {
+                    body: body.to_string(),
+                },
+            },
+            false,
+        )
+        .await
+    }
+
+    /// Emit a response activity (final completion).
+    pub async fn emit_response(&self, session_id: &str, body: &str) -> Result<()> {
+        self.emit_activity(
+            session_id,
+            LinearActivityContent::Response {
+                response: ThoughtBody {
+                    body: body.to_string(),
+                },
+            },
+            false,
+        )
+        .await
+    }
+
+    /// Update the agent session plan (visual checklist in Linear UI).
+    pub async fn update_plan(&self, session_id: &str, steps: &[PlanStep]) -> Result<()> {
+        #[derive(Serialize)]
+        struct Variables {
+            id: String,
+            input: SessionUpdateInput,
+        }
+
+        #[derive(Serialize)]
+        struct SessionUpdateInput {
+            plan: Vec<PlanStep>,
+        }
+
+        #[derive(Serialize)]
+        struct Request {
+            query: &'static str,
+            variables: Variables,
+        }
+
+        const MUTATION: &str = r"
+            mutation UpdatePlan($id: String!, $input: AgentSessionUpdateInput!) {
+                agentSessionUpdate(id: $id, input: $input) {
+                    success
+                }
+            }
+        ";
+
+        let request = Request {
+            query: MUTATION,
+            variables: Variables {
+                id: session_id.to_string(),
+                input: SessionUpdateInput {
+                    plan: steps.to_vec(),
+                },
+            },
+        };
+
+        let response = self
+            .client
+            .post(&self.api_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to update plan")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!(status = %status, body = %body, "Linear API plan update failed");
+        }
+
+        Ok(())
+    }
+
+    /// Set the session external URL (links to Argo workflow in Linear UI).
+    pub async fn set_external_url(&self, session_id: &str, url: &str) -> Result<()> {
+        #[derive(Serialize)]
+        struct Variables {
+            id: String,
+            input: SessionUpdateInput,
+        }
+
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct SessionUpdateInput {
+            external_url: String,
+        }
+
+        #[derive(Serialize)]
+        struct Request {
+            query: &'static str,
+            variables: Variables,
+        }
+
+        const MUTATION: &str = r"
+            mutation SetExternalUrl($id: String!, $input: AgentSessionUpdateInput!) {
+                agentSessionUpdate(id: $id, input: $input) {
+                    success
+                }
+            }
+        ";
+
+        let request = Request {
+            query: MUTATION,
+            variables: Variables {
+                id: session_id.to_string(),
+                input: SessionUpdateInput {
+                    external_url: url.to_string(),
+                },
+            },
+        };
+
+        let response = self
+            .client
+            .post(&self.api_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to set external URL")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            warn!(status = %status, body = %body, "Linear API set external URL failed");
         }
 
         Ok(())
@@ -622,6 +883,7 @@ pub struct UsageInfo {
 }
 
 /// Claude stream parsing task - reads stream-json and emits structured activities.
+/// Maps Claude CLI output to proper Linear Agent API activity types.
 async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApiClient>) {
     let Some(client) = linear_client else {
         info!("Linear API not configured, Claude stream parsing disabled");
@@ -650,7 +912,7 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
 
     let mut reader = BufReader::new(file);
     let mut processed_lines = 0u64;
-    let mut last_tool_name: Option<String> = None;
+    let mut tool_state = ToolState::default();
     let mut total_cost: f64 = 0.0;
 
     loop {
@@ -674,7 +936,7 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
                             &client,
                             &config.linear_session_id,
                             &event,
-                            &mut last_tool_name,
+                            &mut tool_state,
                             &mut total_cost,
                         )
                         .await
@@ -695,16 +957,30 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
     }
 }
 
+/// Track tool invocation state for proper action activities
+#[derive(Default)]
+struct ToolState {
+    current_tool: Option<String>,
+    current_input: Option<String>,
+}
+
 /// Process a single Claude stream event and emit appropriate Linear activity.
+/// Maps Claude events to proper Linear Agent API activity types:
+/// - Tool invocations → `action` activities
+/// - Tool completions → `action` with result
+/// - Errors → `error` activities  
+/// - Completion → `response` activities
+/// - Transient status → ephemeral `thought` activities
 async fn process_stream_event(
     client: &LinearApiClient,
     session_id: &str,
     event: &ClaudeStreamEvent,
-    last_tool_name: &mut Option<String>,
+    tool_state: &mut ToolState,
     total_cost: &mut f64,
 ) -> Result<()> {
     match event {
         ClaudeStreamEvent::System { model, tools, .. } => {
+            // System init - emit as thought (it's informational, not an action)
             let tool_count = tools.as_ref().map_or(0, Vec::len);
             let model_name = model.as_deref().unwrap_or("unknown");
             let msg = format!("🚀 Starting with **{model_name}** | {tool_count} tools available");
@@ -716,23 +992,27 @@ async fn process_stream_event(
                 for content in msg.content.as_ref().unwrap_or(&vec![]) {
                     match content {
                         ContentBlock::ToolUse { name, input, .. } => {
-                            // Format tool input summary (truncate if long, Unicode-safe)
+                            // Tool invocation → emit as ACTION (not thought)
                             let input_summary = input.as_ref().map_or_else(
-                                || "()".to_string(),
-                                |v| truncate_chars(&v.to_string(), 100),
+                                String::new,
+                                |v| truncate_chars(&v.to_string(), 150),
                             );
 
-                            let activity = format!("🔧 **{name}** → `{input_summary}`");
-                            client.emit_thought(session_id, &activity).await?;
-                            *last_tool_name = Some(name.clone());
+                            // Store state for pairing with result
+                            tool_state.current_tool = Some(name.clone());
+                            tool_state.current_input = Some(input_summary.clone());
+
+                            // Emit action activity (tool in progress)
+                            client.emit_action(session_id, name, &input_summary).await?;
                         }
                         ContentBlock::Text { text } => {
-                            // Only emit significant text (not single words/confirmations)
+                            // Significant text → thought activity
+                            // Skip boilerplate phrases
                             if text.chars().count() > 50
                                 && !text.starts_with("I'll")
                                 && !text.starts_with("Let me")
+                                && !text.starts_with("Now I")
                             {
-                                // Truncate very long text (Unicode-safe)
                                 let display_text = truncate_chars(text, 500);
                                 client.emit_thought(session_id, &display_text).await?;
                             }
@@ -748,37 +1028,55 @@ async fn process_stream_event(
             message,
             ..
         } => {
-            // Tool result - show success/error status
+            // Helper function to format result
+            fn format_result(is_error: bool, result_text: &str) -> String {
+                let status_emoji = if is_error { "❌" } else { "✅" };
+                let result_preview = truncate_chars(result_text, 200);
+                format!("{status_emoji} {result_preview}")
+            }
+
+            // Get tool info before consuming state
+            let tool_name = tool_state
+                .current_tool
+                .take()
+                .unwrap_or_else(|| "Tool".to_string());
+            let tool_input = tool_state
+                .current_input
+                .take()
+                .unwrap_or_default();
+
             if let Some(result) = tool_use_result {
-                let tool_name = last_tool_name.as_deref().unwrap_or("Tool");
                 let is_error = result.contains("error") || result.contains("Error");
-                let status = if is_error { "❌" } else { "✅" };
-
-                // Truncate result (Unicode-safe)
-                let result_preview = truncate_chars(result, 200);
-
-                let activity = format!("{status} **{tool_name}** → {result_preview}");
-                client.emit_thought(session_id, &activity).await?;
+                let result_str = format_result(is_error, result);
+                
+                if is_error {
+                    // Error result → emit as ERROR activity
+                    let msg = format!("**{tool_name}** failed: {result_str}");
+                    client.emit_error(session_id, &msg).await?;
+                } else {
+                    // Success → emit ACTION with result
+                    client
+                        .emit_action_complete(session_id, &tool_name, &tool_input, &result_str)
+                        .await?;
+                }
             } else if let Some(msg) = message {
-                // Check for tool_result in content blocks
                 for content in msg.content.as_ref().unwrap_or(&vec![]) {
                     if let ContentBlock::ToolResult {
                         content, is_error, ..
                     } = content
                     {
-                        let tool_name = last_tool_name.as_deref().unwrap_or("Tool");
-                        let status = if is_error.unwrap_or(false) {
-                            "❌"
-                        } else {
-                            "✅"
-                        };
                         let result_text = content.as_deref().unwrap_or("completed");
-
-                        // Truncate result (Unicode-safe)
-                        let result_preview = truncate_chars(result_text, 200);
-
-                        let activity = format!("{status} **{tool_name}** → {result_preview}");
-                        client.emit_thought(session_id, &activity).await?;
+                        let error = is_error.unwrap_or(false);
+                        let result_str = format_result(error, result_text);
+                        
+                        if error {
+                            let msg = format!("**{tool_name}** failed: {result_str}");
+                            client.emit_error(session_id, &msg).await?;
+                        } else {
+                            client
+                                .emit_action_complete(session_id, &tool_name, &tool_input, &result_str)
+                                .await?;
+                        }
                     }
                 }
             }
@@ -796,18 +1094,19 @@ async fn process_stream_event(
             let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
             let turns = num_turns.unwrap_or(0);
 
-            let status = match subtype.as_deref() {
-                Some("success") => "✅",
-                Some("error") => "❌",
-                _ => "ℹ️",
-            };
-
-            // Use accumulated total_cost, not just this result's cost
+            let is_error = subtype.as_deref() == Some("error");
+            
+            // Completion → emit as RESPONSE (final activity) or ERROR
             let summary = format!(
-                "{status} **Completed** | {duration_secs:.1}s | ${:.4} | {turns} turns",
+                "**Completed** | {duration_secs:.1}s | ${:.4} | {turns} turns",
                 *total_cost
             );
-            client.emit_thought(session_id, &summary).await?;
+            
+            if is_error {
+                client.emit_error(session_id, &summary).await?;
+            } else {
+                client.emit_response(session_id, &summary).await?;
+            }
         }
     }
 
@@ -1056,6 +1355,8 @@ async fn main() -> Result<()> {
         claude_stream_file = %config.claude_stream_file,
         input_fifo = %config.input_fifo,
         http_port = config.http_port,
+        argo_url = ?config.argo_workflow_url,
+        task_id = ?config.task_id,
         "Sidecar configured"
     );
 
@@ -1077,6 +1378,64 @@ async fn main() -> Result<()> {
             }
         }
     });
+
+    // Initialize session with external URL and plan (if Linear API available)
+    if let Some(ref client) = linear_client {
+        // Set external URL to Argo workflow
+        if let Some(ref url) = config.argo_workflow_url {
+            info!(url = %url, "Setting session external URL to Argo workflow");
+            if let Err(e) = client
+                .set_external_url(&config.linear_session_id, url)
+                .await
+            {
+                warn!(error = %e, "Failed to set session external URL");
+            }
+        }
+
+        // Set initial plan based on task
+        let task_desc = config
+            .task_description
+            .as_deref()
+            .unwrap_or("Implementing task");
+        let initial_plan = vec![
+            PlanStep {
+                content: format!("📋 {task_desc}"),
+                status: PlanStepStatus::InProgress,
+            },
+            PlanStep {
+                content: "🔧 Execute implementation".to_string(),
+                status: PlanStepStatus::Pending,
+            },
+            PlanStep {
+                content: "✅ Verify acceptance criteria".to_string(),
+                status: PlanStepStatus::Pending,
+            },
+            PlanStep {
+                content: "📤 Create pull request".to_string(),
+                status: PlanStepStatus::Pending,
+            },
+        ];
+
+        info!(steps = initial_plan.len(), "Setting initial agent plan");
+        if let Err(e) = client
+            .update_plan(&config.linear_session_id, &initial_plan)
+            .await
+        {
+            warn!(error = %e, "Failed to set initial plan");
+        }
+
+        // Emit initial thought to indicate sidecar is active
+        let init_msg = format!(
+            "🚀 Sidecar connected | Workflow: {}",
+            config.workflow_name
+        );
+        if let Err(e) = client
+            .emit_ephemeral_thought(&config.linear_session_id, &init_msg)
+            .await
+        {
+            warn!(error = %e, "Failed to emit init thought");
+        }
+    }
 
     // Create channels and shared state
     let (fifo_tx, fifo_rx) = mpsc::channel::<String>(100);

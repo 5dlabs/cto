@@ -156,69 +156,69 @@ spec:
     - name: orchestrate-project
       dag:
         tasks:
-        # Check play state first to determine where to resume
-        - name: check-play-state
-          template: play-state-checker
+          # Check play state first to determine where to resume
+          - name: check-play-state
+            template: play-state-checker
 
-        # Morgan PM runs as daemon throughout workflow (no dependencies, starts immediately)
-        - name: launch-morgan-pm
-          template: morgan-project-manager
+          # Morgan PM runs as daemon throughout workflow (no dependencies, starts immediately)
+          - name: launch-morgan-pm
+            template: morgan-project-manager
 
-        # Discover all tasks (depends on state check to get correct start-from value)
-        - name: discover-tasks
-          dependencies: [check-play-state]
-          template: task-discovery
-          arguments:
-            parameters:
-            - name: docs-directory
-              value: "{{workflow.parameters.docs-project-directory}}"
-            - name: start-from
-              value: "{{tasks.check-play-state.outputs.parameters.next-task-id}}"
-            - name: max-tasks
-              value: "{{workflow.parameters.max-tasks}}"
+          # Discover all tasks (depends on state check to get correct start-from value)
+          - name: discover-tasks
+            dependencies: [check-play-state]
+            template: task-discovery
+            arguments:
+              parameters:
+                - name: docs-directory
+                  value: "{{workflow.parameters.docs-project-directory}}"
+                - name: start-from
+                  value: "{{tasks.check-play-state.outputs.parameters.next-task-id}}"
+                - name: max-tasks
+                  value: "{{workflow.parameters.max-tasks}}"
 
-        # Build dependency graph (depends on discover-tasks, only if parallel execution enabled)
-        - name: build-dependency-graph
-          dependencies: [discover-tasks]
-          template: dependency-graph-builder
-          arguments:
-            parameters:
-            - name: docs-directory
-              value: "{{workflow.parameters.docs-project-directory}}"
-          when: "{{workflow.parameters.parallel-execution}}"
+          # Build dependency graph (depends on discover-tasks, only if parallel execution enabled)
+          - name: build-dependency-graph
+            dependencies: [discover-tasks]
+            template: dependency-graph-builder
+            arguments:
+              parameters:
+                - name: docs-directory
+                  value: "{{workflow.parameters.docs-project-directory}}"
+            when: "{{workflow.parameters.parallel-execution}}"
 
-        # Process tasks in parallel (depends on build-dependency-graph)
-        - name: process-tasks-parallel
-          dependencies: [build-dependency-graph]
-          template: parallel-task-processor
-          arguments:
-            parameters:
-            - name: execution-levels
-              value: "{{tasks.build-dependency-graph.outputs.parameters.execution-levels}}"
-            - name: task-count
-              value: "{{tasks.discover-tasks.outputs.parameters.task-count}}"
-          when: "{{workflow.parameters.parallel-execution}}"
+          # Process tasks in parallel (depends on build-dependency-graph)
+          - name: process-tasks-parallel
+            dependencies: [build-dependency-graph]
+            template: parallel-task-processor
+            arguments:
+              parameters:
+                - name: execution-levels
+                  value: "{{tasks.build-dependency-graph.outputs.parameters.execution-levels}}"
+                - name: task-count
+                  value: "{{tasks.discover-tasks.outputs.parameters.task-count}}"
+            when: "{{workflow.parameters.parallel-execution}}"
 
-        # Process tasks sequentially (depends on discover-tasks)
-        - name: process-tasks-sequential
-          dependencies: [discover-tasks]
-          template: sequential-task-processor
-          arguments:
-            parameters:
-            - name: task-list
-              value: "{{tasks.discover-tasks.outputs.parameters.task-list}}"
-            - name: task-count
-              value: "{{tasks.discover-tasks.outputs.parameters.task-count}}"
-          when: "!{{workflow.parameters.parallel-execution}}"
+          # Process tasks sequentially (depends on discover-tasks)
+          - name: process-tasks-sequential
+            dependencies: [discover-tasks]
+            template: sequential-task-processor
+            arguments:
+              parameters:
+                - name: task-list
+                  value: "{{tasks.discover-tasks.outputs.parameters.task-list}}"
+                - name: task-count
+                  value: "{{tasks.discover-tasks.outputs.parameters.task-count}}"
+            when: "!{{workflow.parameters.parallel-execution}}"
 
     # Play state checker - reads persisted state to determine next task
     - name: play-state-checker
       outputs:
         parameters:
-        - name: next-task-id
-          valueFrom:
-            path: /tmp/next-task-id.txt
-            default: "1"  # Fallback if script fails before writing output
+          - name: next-task-id
+            valueFrom:
+              path: /tmp/next-task-id.txt
+              default: "1"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         command: [sh]
@@ -333,32 +333,32 @@ spec:
     - name: task-discovery
       inputs:
         parameters:
-        - name: docs-directory
-        - name: start-from
-        - name: max-tasks
+          - name: docs-directory
+          - name: start-from
+          - name: max-tasks
       outputs:
         parameters:
-        - name: task-list
-          valueFrom:
-            path: /tmp/task-list.txt
-            default: ""  # Fallback if script fails before writing output
-        - name: task-count
-          valueFrom:
-            path: /tmp/task-count.txt
-            default: "0"  # Fallback if script fails before writing output
+          - name: task-list
+            valueFrom:
+              path: /tmp/task-list.txt
+              default: ""  # Fallback if script fails before writing output
+          - name: task-count
+            valueFrom:
+              path: /tmp/task-count.txt
+              default: "0"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         env:
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: private-key
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
         command: [sh]
         source: |
           #!/bin/sh
@@ -550,30 +550,30 @@ spec:
     - name: dependency-graph-builder
       inputs:
         parameters:
-        - name: docs-directory
+          - name: docs-directory
       outputs:
         parameters:
-        - name: execution-levels
-          valueFrom:
-            path: /tmp/execution-levels.json
-            default: "[[]]"  # Fallback if script fails before writing output
-        - name: parallelism-stats
-          valueFrom:
-            path: /tmp/parallelism-stats.json
-            default: "{}"  # Fallback if script fails before writing output
+          - name: execution-levels
+            valueFrom:
+              path: /tmp/execution-levels.json
+              default: "[[]]"  # Fallback if script fails before writing output
+          - name: parallelism-stats
+            valueFrom:
+              path: /tmp/parallelism-stats.json
+              default: "{}"  # Fallback if script fails before writing output
       script:
         image: alpine/k8s:1.31.0
         env:
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: private-key
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
         command: [sh]
         source: |
           #!/bin/sh
@@ -797,21 +797,21 @@ spec:
     - name: parallel-task-processor
       inputs:
         parameters:
-        - name: execution-levels
-        - name: task-count
+          - name: execution-levels
+          - name: task-count
       script:
         image: alpine/k8s:1.31.0
         env:
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: private-key
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
         command: [sh]
         source: |
           #!/bin/sh
@@ -1523,21 +1523,21 @@ spec:
     - name: sequential-task-processor
       inputs:
         parameters:
-        - name: task-list
-        - name: task-count
+          - name: task-list
+          - name: task-count
       script:
         image: alpine/k8s:1.31.0
         env:
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: private-key
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
         command: [sh]
         source: |
           #!/bin/sh
