@@ -1,0 +1,13 @@
+{
+  "models": {},
+  "global": {
+    "logLevel": "info",
+    "debug": false,
+    "defaultNumTasks": 10,
+    "defaultSubtasks": 5,
+    "defaultPriority": "medium",
+    "defaultTag": "master",
+    "projectName": "alerthub-e2e-test",
+    "responseLanguage": "English"
+  }
+}

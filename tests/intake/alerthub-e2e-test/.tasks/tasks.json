@@ -1,0 +1,145 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Infrastructure Setup with Kubernetes Operators",
+      "description": "Set up infrastructure using Kubernetes operators: PostgreSQL (CloudNative-PG), Redis/Valkey, Kafka (Strimzi), MongoDB (Percona), RabbitMQ",
+      "status": "pending",
+      "priority": "high",
+      "agent": "bolt",
+      "dependencies": []
+    },
+    {
+      "id": "2",
+      "title": "Notification Router Service (Rust/Axum)",
+      "description": "High-performance notification routing service with REST API, WebSocket support, rate limiting, priority queues, and deduplication. Endpoints: POST /api/v1/notifications, GET /api/v1/notifications/:id, WS /api/v1/ws",
+      "status": "pending",
+      "priority": "high",
+      "agent": "rex",
+      "dependencies": ["1"]
+    },
+    {
+      "id": "3",
+      "title": "Admin API Service (Go/gRPC)",
+      "description": "Management API for tenants, users, rules, and analytics using gRPC with grpc-gateway for REST. Services: TenantService, UserService, RuleService, AnalyticsService",
+      "status": "pending",
+      "priority": "high",
+      "agent": "grizz",
+      "dependencies": ["1"]
+    },
+    {
+      "id": "4",
+      "title": "Integration Service (Bun/Elysia + Effect)",
+      "description": "Channel delivery service for Slack, Discord, Email, Push, and Webhooks using Effect TypeScript for type-safe error handling. Endpoints for integration CRUD and testing",
+      "status": "pending",
+      "priority": "high",
+      "agent": "nova",
+      "dependencies": ["1"]
+    },
+    {
+      "id": "5",
+      "title": "Web Console (Next.js + Effect)",
+      "description": "Primary configuration interface with dashboard, notification history, integrations management, rules builder, and analytics. Using Next.js 15 App Router, React 19, shadcn/ui, TailwindCSS, Effect",
+      "status": "pending",
+      "priority": "high",
+      "agent": "blaze",
+      "dependencies": ["2", "3", "4"]
+    },
+    {
+      "id": "6",
+      "title": "Mobile App (Expo/React Native)",
+      "description": "Mobile app for push notifications and preferences using Expo SDK 50+, NativeWind. Screens: Home, NotificationDetail, Integrations, Settings, Profile. Features: biometric auth, offline caching",
+      "status": "pending",
+      "priority": "medium",
+      "agent": "tap",
+      "dependencies": ["2", "3"]
+    },
+    {
+      "id": "7",
+      "title": "Desktop Client (Electron)",
+      "description": "System tray application for desktop notifications using Electron 28+, React, TailwindCSS. Features: tray icon with badge, native notifications, keyboard shortcuts, auto-start",
+      "status": "pending",
+      "priority": "medium",
+      "agent": "spark",
+      "dependencies": ["2", "3"]
+    },
+    {
+      "id": "8",
+      "title": "Quality Review - Backend Services",
+      "description": "Code review and quality checks for Rex (Rust), Grizz (Go), and Nova (Bun) backend services",
+      "status": "pending",
+      "priority": "high",
+      "agent": "cleo",
+      "dependencies": ["2", "3", "4"]
+    },
+    {
+      "id": "9",
+      "title": "Quality Review - Frontend Applications",
+      "description": "Code review and quality checks for Blaze (Next.js), Tap (Expo), and Spark (Electron) frontend applications",
+      "status": "pending",
+      "priority": "high",
+      "agent": "cleo",
+      "dependencies": ["5", "6", "7"]
+    },
+    {
+      "id": "10",
+      "title": "Security Audit - Backend Services",
+      "description": "Security scan and vulnerability check for Rex, Grizz, and Nova backend services",
+      "status": "pending",
+      "priority": "high",
+      "agent": "cipher",
+      "dependencies": ["8"]
+    },
+    {
+      "id": "11",
+      "title": "Security Audit - Frontend Applications",
+      "description": "Security scan for Blaze, Tap, and Spark frontend applications including XSS, CSP, CORS checks",
+      "status": "pending",
+      "priority": "high",
+      "agent": "cipher",
+      "dependencies": ["9"]
+    },
+    {
+      "id": "12",
+      "title": "Testing - Backend Services",
+      "description": "Write unit and integration tests for Rex, Grizz, and Nova backend services",
+      "status": "pending",
+      "priority": "high",
+      "agent": "tess",
+      "dependencies": ["10"]
+    },
+    {
+      "id": "13",
+      "title": "Testing - Frontend Applications",
+      "description": "Write tests for Blaze (Playwright E2E), Tap (Jest/Detox), and Spark (Jest) frontend applications",
+      "status": "pending",
+      "priority": "high",
+      "agent": "tess",
+      "dependencies": ["11"]
+    },
+    {
+      "id": "14",
+      "title": "Integration - Backend Services",
+      "description": "Resolve conflicts and merge PRs for Rex, Grizz, and Nova backend services",
+      "status": "pending",
+      "priority": "high",
+      "agent": "atlas",
+      "dependencies": ["12"]
+    },
+    {
+      "id": "15",
+      "title": "Integration - Frontend Applications",
+      "description": "Resolve conflicts and merge PRs for Blaze, Tap, and Spark frontend applications",
+      "status": "pending",
+      "priority": "high",
+      "agent": "atlas",
+      "dependencies": ["13"]
+    }
+  ],
+  "metadata": {
+    "projectName": "alerthub-e2e-test",
+    "createdAt": "2025-12-20T13:55:00Z",
+    "version": "1.0.0"
+  }
+}
+
