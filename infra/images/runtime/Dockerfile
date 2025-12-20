@@ -583,3 +583,4 @@ RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HO
 
 
 # Trigger rebuild for tasks CLI v0.1.0
+# Rebuild to include tasks CLI
