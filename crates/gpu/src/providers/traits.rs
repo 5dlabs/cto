@@ -170,7 +170,3 @@ pub trait GpuProvider: Send + Sync {
     async fn wait_ready(&self, id: &str, timeout_secs: u64) -> Result<GpuVm, GpuProviderError>;
 }
 
-
-
-
-
