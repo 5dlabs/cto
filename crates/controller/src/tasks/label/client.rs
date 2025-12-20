@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::time::sleep;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// GitHub API client for label operations
 #[derive(Clone)]
