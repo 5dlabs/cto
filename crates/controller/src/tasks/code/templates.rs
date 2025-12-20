@@ -3515,24 +3515,19 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
-    /// Get the friendly agent name from the github_app field.
-    /// Returns capitalized agent name (e.g., "5DLabs-Rex" -> "Rex", "rex" -> "Rex")
+    /// Get the lowercase agent name from the github_app field.
+    /// Returns lowercase agent name (e.g., "5DLabs-Rex" -> "rex", "5DLabs-Tap" -> "tap")
+    /// Templates use lowercase names for agent-specific conditionals.
     #[allow(dead_code)]
     fn get_agent_name(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("agent");
 
         // Extract agent name from 5DLabs-AgentName pattern or use as-is
-        let agent_lower = github_app
+        // Return lowercase for consistent template matching
+        github_app
             .strip_prefix("5DLabs-")
             .unwrap_or(github_app)
-            .to_lowercase();
-
-        // Capitalize first letter
-        let mut chars = agent_lower.chars();
-        match chars.next() {
-            None => "Agent".to_string(),
-            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-        }
+            .to_lowercase()
     }
 
     /// Get default retries from environment or use platform default
