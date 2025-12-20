@@ -78,6 +78,10 @@ jobs:
             echo "- **Publishing:** $PUBLISHING"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Install dependencies (xz required for cargo-dist)
+        run: |
+          sudo apt-get update && sudo apt-get install -y xz-utils
+
       - name: Install cargo-dist
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
