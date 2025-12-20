@@ -91,6 +91,21 @@ Task 17: Atlas integrates all PRs
 
 This architecture exercises **all 12 agents** across the workflow.
 
+### Play Workflow Stages
+
+Each task goes through multiple stages with dedicated agents. The workflow suspends between stages for human review if needed.
+
+| Stage | Agent | Purpose | Timeout |
+|-------|-------|---------|---------|
+| **Pending** | - | Workflow initialized, ready to start | - |
+| **Infrastructure** | Bolt | Task 1: Provision databases, caches, storage using operators | 15 min |
+| **Implementation** | Rex / Blaze / etc. | Write code, create PR | 30 min |
+| **Quality** | Cleo | Code review, style enforcement | 30 min |
+| **Security** | Cipher | Security scan, vulnerability check | 30 min |
+| **Testing** | Tess | Write tests, validate coverage | 30 min |
+| **Integration** | Atlas | Resolve conflicts, prepare merge | 30 min |
+| **Merged** | - | PR merged to main | - |
+
 ### Acceptance Criteria (Per Stage)
 
 1. **Intake**: Tasks are atomic, dependencies correct, acceptance criteria defined
@@ -99,6 +114,60 @@ This architecture exercises **all 12 agents** across the workflow.
 4. **Security**: No vulnerabilities, input validated, auth correct
 5. **Testing**: Unit + integration tests, edge cases covered
 6. **Integration**: No conflicts, CI passes, PR merged
+
+### End-to-End Workflow Criteria
+
+For a play workflow to be considered successful:
+
+- [ ] **Workflow Starts** - Play workflow is submitted and reaches "Running" status
+- [ ] **Task Discovery** - Tasks are loaded from docs repository successfully
+- [ ] **Implementation** - Rex/Blaze creates working code and opens a PR
+- [ ] **Quality** - Cleo reviews and code passes quality checks
+- [ ] **Security** - Cipher scans and no critical vulnerabilities found
+- [ ] **Testing** - Tess writes tests and all tests pass
+- [ ] **Integration** - Atlas merges PR without conflicts
+- [ ] **Completion** - Workflow reaches "Completed" status
+
+### Per-Stage Acceptance Criteria
+
+**Implementation Stage (Rex/Blaze):**
+- CodeRun resource is created successfully
+- Agent pod starts and reaches Running state
+- GitHub authentication works (token generated from App credentials)
+- Repository is cloned successfully
+- Task files are loaded and parsed
+- CLI (claude/cursor/code) executes without crash
+- Code changes are committed to feature branch
+- Pull request is created with proper description
+- CI checks pass on the PR
+
+**Quality Stage (Cleo):**
+- PR code is reviewed for style and conventions
+- Code complexity is within acceptable bounds
+- No obvious code duplication detected
+- Documentation is present where needed
+- Suggested improvements are applied or documented
+
+**Security Stage (Cipher):**
+- Security scan completes without errors
+- No critical or high vulnerabilities in code
+- No vulnerable dependencies introduced
+- Input validation is present for user data
+- Authentication/authorization properly implemented
+
+**Testing Stage (Tess):**
+- Unit tests added for new functions
+- Integration tests for API endpoints (if applicable)
+- Edge cases and error paths tested
+- Test coverage meets threshold (if configured)
+- All existing tests still pass
+
+**Integration Stage (Atlas):**
+- Branch is rebased on latest main
+- Merge conflicts (if any) are resolved correctly
+- All CI checks pass after rebase
+- PR is approved (or auto-merge enabled)
+- PR is merged to main branch
 
 ### Intake via Linear Agent
 
@@ -221,6 +290,112 @@ The agent's CLI stdout streams as activities. Watch the agent work in real-time 
 
 **Play does NOT start automatically** - human must merge the docs branch to trigger it.
 
+### Using MCP Tool: `intake`
+
+```json
+{
+  "name": "intake",
+  "arguments": {
+    "project_name": "my-project",
+    "num_tasks": 15,
+    "expand": true,
+    "analyze": true,
+    "enrich_context": true
+  }
+}
+```
+
+**Parameters:**
+- `project_name` - Required. Directory containing prd.md
+- `num_tasks` - Target number of tasks (default: 15)
+- `expand` - Expand complex tasks into subtasks (default: true)
+- `analyze` - Analyze task complexity (default: true)
+- `enrich_context` - Use Firecrawl to scrape URLs in PRD (default: true)
+- `local` - Run locally without Argo (default: false)
+
+### Intake Output Structure
+
+```
+project-name/
+├── prd.md                    # Input PRD
+├── architecture.md           # Optional architecture doc
+├── cto-config.json           # Generated agent config (stored in repo)
+└── .tasks/
+    ├── tasks.json            # All tasks with dependencies
+    ├── execution-levels.json # Parallel execution order
+    └── tasks/
+        ├── task-1/
+        │   ├── prompt.xml            # Structured XML prompt
+        │   ├── prompt.md             # Markdown prompt
+        │   └── acceptance_criteria.md
+        ├── task-2/
+        │   └── ...
+        └── ...
+```
+
+### Using MCP Tool: `play`
+
+```json
+{
+  "name": "play",
+  "arguments": {
+    "task_id": 1,
+    "repository": "5dlabs/my-project",
+    "service": "my-service",
+    "docs_repository": "5dlabs/my-project",
+    "docs_project_directory": "my-project",
+    "parallel_execution": true
+  }
+}
+```
+
+**Key Parameters:**
+- `task_id` - Task to implement (auto-detects if not provided)
+- `repository` - GitHub repo for code
+- `service` - Service identifier for workspace persistence
+- `parallel_execution` - Run independent tasks in parallel
+
+### Using MCP Tool: `play_status`
+
+```json
+{
+  "name": "play_status",
+  "arguments": {
+    "repository": "5dlabs/my-project"
+  }
+}
+```
+
+Returns current workflow status, active tasks, and blocked tasks.
+
+### Parallel vs Sequential Execution
+
+| Mode | Use Case | Parameter |
+|------|----------|-----------|
+| **Sequential** | Default - one task at a time, simpler debugging | `parallel_execution: false` |
+| **Parallel** | Faster PRs - run independent tasks simultaneously | `parallel_execution: true` |
+
+### CLI Progress Matrix
+
+Track which CLIs have been tested for each agent workflow:
+
+| Agent | claude | code | gemini | opencode | cursor | dexter |
+|-------|--------|------|--------|----------|--------|--------|
+| **Morgan (Intake)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Rex (Backend)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Blaze (Frontend)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Grizz (Go)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Nova (Node)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Tap (Expo)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Spark (Electron)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned | ⬜ Planned |
+| **Cleo (Quality)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | - | - |
+| **Cipher (Security)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | - | - |
+| **Tess (Testing)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | - | - |
+| **Atlas (Integration)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | - | - |
+| **Bolt (Infra)** | ✅ Primary | ⬜ Planned | ⬜ Planned | ⬜ Planned | - | - |
+
+**Legend:** ✅ Tested & Working | 🔄 In Progress | ⬜ Planned | ❌ Issues
+
 ### Token Usage & Cost Tracking
 
 For CLIs that support it, track token usage and estimated cost per PR:
@@ -269,6 +444,56 @@ Each agent CLI runs with a **status-sync sidecar** that provides full [Linear Ag
 | **External URL** | Links Linear session to Argo workflow for full logs |
 | **Input REST Endpoint** | HTTP POST `/input` → FIFO → CLI stdin |
 | **Status Sync** | Monitors `/workspace/status.json` → PM service |
+
+### Two-Way Communication Flow
+
+```
+Linear User Comment
+        │
+        ▼
+┌───────────────┐     Poll API     ┌──────────────┐
+│  PM Service   │ ◄───────────────►│  Linear API  │
+│  (pm-svc)     │                  └──────────────┘
+└───────┬───────┘
+        │ kubectl exec / HTTP
+        ▼
+┌───────────────┐     FIFO         ┌──────────────┐
+│   Sidecar     │ ─────────────────►│  Agent CLI   │
+│ (status-sync) │                  │ (claude/etc) │
+└───────────────┘                  └──────────────┘
+        ▲                                 │
+        │ stream-json                     │ stdout
+        └─────────────────────────────────┘
+```
+
+### Log Collection Pipeline
+
+```
+Kubernetes Pods              Observability Stack
+┌──────────────┐            ┌──────────────────┐
+│   stdout     │            │   Fluent-Bit     │
+│   stderr     │───────────►│   (DaemonSet)    │
+│ /var/log/    │  tail      │  + K8s metadata  │
+│ containers/  │            └────────┬─────────┘
+└──────────────┘                     │ OTLP/HTTP
+                                     ▼
+                            ┌──────────────────┐
+                            │  OTEL Collector  │
+                            │  batch, enrich   │
+                            └────────┬─────────┘
+                                     │ OTLP/HTTP
+                                     ▼
+                            ┌──────────────────┐
+                            │      Loki        │
+                            │  TSDB (7 days)   │
+                            └────────┬─────────┘
+                                     │ LogQL
+                                     ▼
+                            ┌──────────────────┐
+                            │     Grafana      │
+                            │    (UI + API)    │
+                            └──────────────────┘
+```
 
 **Linear Agent API Activity Types:**
 | Type | Use Case | Example |
@@ -337,10 +562,13 @@ Complete inventory of deployed infrastructure, operators, and services.
 | Prometheus | Metrics & alerting | `prometheus-server:80` |
 | Loki | Log aggregation | `loki-gateway:80` |
 | Grafana | Visualization | `grafana:80` |
-| Alertmanager | Alert routing | `alertmanager:9093` |
+| Alertmanager | Alert routing (Discord) | `alertmanager:9093` |
 | OTEL Collector | Telemetry ingestion | `:4317` (gRPC), `:4318` (HTTP) |
-| Fluent-bit | Log collection | DaemonSet |
-| Jaeger Operator | Distributed tracing | Per-namespace |
+| Fluent-bit | Log collection | DaemonSet (all nodes) |
+| Kube-state-metrics | K8s resource metrics | `kube-state-metrics:8080` |
+| Blackbox Exporter | External endpoint probing | `blackbox-exporter:9115` |
+| Metrics Server | HPA/VPA metrics | `metrics-server:443` |
+| Jaeger Operator | Distributed tracing | Per-namespace instances |
 | OpenTelemetry Operator | Auto-instrumentation | Instrumentation CRs |
 
 ### Log Collection Pipeline
@@ -460,14 +688,16 @@ kubectl port-forward svc/grafana -n observability 3000:80 &
 | Component | Purpose | Namespace |
 |-----------|---------|-----------|
 | ArgoCD | GitOps deployment | `argocd` |
+| ArgoCD Image Updater | Auto image updates | `argocd` |
 | Argo Workflows | Workflow orchestration | `automation` |
 | Argo Events | Event-driven triggers | `automation` |
 | External Secrets | Secret sync from Bao | `external-secrets` |
-| OpenBao | Secrets management | `openbao` |
+| OpenBao | Secrets management (Vault) | `openbao` |
 | Cert-Manager | TLS certificates | `cert-manager` |
-| External DNS | DNS management | `external-dns` |
+| External DNS | DNS record management | `external-dns` |
 | Cloudflare Operator | Tunnel management | `operators` |
 | Ingress NGINX | Ingress controller | `ingress-nginx` |
+| Gateway API | Gateway resources (CRDs) | Cluster-wide |
 | Cilium | CNI & network policies | `kube-system` |
 | Kilo | WireGuard VPN mesh | `kube-system` |
 
@@ -1405,9 +1635,60 @@ Configure in `cto-config.json`:
 The tools server uses `tools-config.json` to configure which MCP tools are available to each agent. The controller renders this config based on `cto-config.json`:
 
 ```
-Intake → Generate cto-config.json → Store in repo
-Play → Controller reads agent config → Render tools-config.json → Mount in pod
+Intake Workflow                    Play Workflow
+┌──────────────┐                  ┌──────────────┐
+│  PRD Input   │                  │  Controller  │
+└──────┬───────┘                  └──────┬───────┘
+       │ Analyze requirements            │ Read agent config
+       ▼                                 ▼
+┌──────────────┐                  ┌──────────────┐
+│ Generate     │                  │ Render       │
+│ cto-config   │─────stored──────►│ tools-config │
+│ .json        │   in repo        │ .json        │
+└──────────────┘                  └──────┬───────┘
+                                         │ Mount in pod
+                                         ▼
+                                  ┌──────────────┐
+                                  │ MCP Client   │
+                                  │ (tools-mcp)  │
+                                  └──────────────┘
 ```
+
+**cto-config.json Generated During Intake:**
+
+The intake workflow analyzes the PRD and generates `cto-config.json` with:
+- **Required agents** based on languages detected in PRD
+- **Remote tools** for each agent (context7, github, openmemory, etc.)
+- **Local servers** only when project needs specific URLs (PostgreSQL, Redis)
+
+```json
+// Generated cto-config.json
+{
+  "agents": {
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "claude-opus-4-5-20251101",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "github_create_pull_request",
+          "openmemory_openmemory_query"
+        ],
+        "localServers": {}  // Empty - no project-specific services
+      }
+    }
+  }
+}
+```
+
+**Remote vs Local Servers:**
+
+| Type | When to Use | Examples |
+|------|-------------|----------|
+| **Remote** | Most use cases - platform-provided tools | context7, github, openmemory, brave_search, kubernetes |
+| **Local** | Project-specific URLs that differ per project | PostgreSQL (custom host), Redis (custom port), custom APIs |
 
 **tools-config.json Format:**
 ```json
@@ -1466,6 +1747,124 @@ Each CLI supports non-interactive (headless) execution for agent workflows:
 | **code** | `code --no-approval "query"` | `--model`, `--sandbox`, `--config`, `--read-only` |
 | **gemini** | `gemini -p "query"` | `--output-format stream-json`, `-m model` |
 | **opencode** | `opencode -p "query"` | `--output-format stream-json`, provider-agnostic |
+| **cursor** | `cursor -p "query"` | Uses Cursor auth, IDE integration |
+| **dexter** | `dexter -p "query"` | Agentic workflows |
+
+### Detailed CLI Reference
+
+#### Claude Code CLI
+
+**Installation:** `npm install -g @anthropic-ai/claude-code`
+
+| Flag | Description |
+|------|-------------|
+| `-p, --print` | Non-interactive mode, prints response and exits |
+| `--output-format json\|stream-json` | Structured output for parsing |
+| `--mcp-config` | Load MCP servers from JSON config |
+| `--dangerously-skip-permissions` | Skip tool permission prompts (agent mode) |
+| `--max-turns` | Limit agentic turns in non-interactive mode |
+| `--model` | Model alias: `sonnet` or `opus` |
+
+```bash
+# Non-interactive execution for agents
+claude -p "Implement the feature" \
+  --output-format stream-json \
+  --dangerously-skip-permissions \
+  --mcp-config ./tools-config.json
+```
+
+#### Every Code CLI
+
+**Installation:** `git clone https://github.com/just-every/code.git && cd code && ./build-fast.sh`
+
+| Command/Flag | Description |
+|--------------|-------------|
+| `code --no-approval "query"` | Non-interactive mode for agents |
+| `/plan` | Claude + Gemini + GPT-5 consensus for planning |
+| `/solve` | Fastest-first race for problem solving |
+| `/code` | Multi-worktree implementation with consensus |
+| `/auto` | Auto Drive for multi-step task orchestration |
+| `--model` | Override model (e.g., `gpt-5.1`, `gpt-5.2`) |
+| `--sandbox` | read-only \| workspace-write \| danger-full-access |
+| `--read-only` | Restrict to read-only operations |
+
+```bash
+# Non-interactive execution for agents
+code --no-approval "Implement the feature" \
+  --model gpt-5.1 \
+  --sandbox workspace-write
+```
+
+#### Google Gemini CLI
+
+**Installation:** `npm install -g @google/gemini-cli`
+
+| Flag | Description |
+|------|-------------|
+| `-p` | Non-interactive mode (print mode) |
+| `--output-format json\|stream-json` | Structured output for parsing |
+| `-m` | Model selection (e.g., `gemini-2.5-flash`) |
+| `--include-directories` | Add additional working directories |
+
+```bash
+# Non-interactive execution for agents
+gemini -p "Implement the feature" \
+  --output-format stream-json
+
+# Authentication via environment
+export GOOGLE_API_KEY="YOUR_API_KEY"
+# or for Vertex AI:
+export GOOGLE_GENAI_USE_VERTEXAI=true
+```
+
+#### OpenCode CLI (SST)
+
+**Installation:** `npm install -g opencode-ai`
+
+| Feature | Description |
+|---------|-------------|
+| `build` agent | Default, full access for development work |
+| `plan` agent | Read-only for analysis and planning |
+| Client/server | Can run server locally, drive from mobile app |
+| MCP support | Configure in `~/.opencode/settings.json` |
+| Provider-agnostic | Claude, OpenAI, Google, or local models |
+
+```bash
+# Non-interactive execution
+opencode -p "Implement the feature" \
+  --output-format stream-json
+
+# Uses ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY
+```
+
+#### Factory CLI (Droid)
+
+**Installation:** Built into `ghcr.io/5dlabs/factory` image
+
+Factory Droid is a multi-CLI image that includes all supported CLIs. The container script selects which CLI to invoke based on the `CLI` environment variable.
+
+```bash
+# Container startup script selects CLI
+case "$CLI" in
+  claude)   claude -p "$PROMPT" --output-format stream-json ... ;;
+  code)     code --no-approval "$PROMPT" --model gpt-5.1 ... ;;
+  gemini)   gemini -p "$PROMPT" --output-format stream-json ... ;;
+  opencode) opencode -p "$PROMPT" --output-format stream-json ... ;;
+  cursor)   cursor -p "$PROMPT" ... ;;
+  dexter)   dexter -p "$PROMPT" ... ;;
+esac
+```
+
+### Supported CLIs with Input Methods
+
+| CLI | Input Method | Flag |
+|-----|--------------|------|
+| claude | stream-json FIFO | `--input-format stream-json` |
+| code | JSONL file | `--input-file` |
+| cursor | Not supported | N/A |
+| dexter | FIFO | `--input` |
+| opencode | JSONL file | `--input` |
+| gemini | Not supported | N/A |
 
 **Every Code (Recommended):**
 
@@ -1954,4 +2353,173 @@ When investigating issues:
 2. **Logs** - `loki_query({ query: "{pod=~\"...\"}|~\"error\"" })`
 3. **Deployment** - `argocd_get_application({ applicationName: "..." })`
 4. **Workflows** - `argo_workflows_list_workflows({ status: "Failed" })`
+
+### Common Debugging Scenarios
+
+**Workflow Not Starting:**
+```bash
+# Check workflow status
+kubectl get workflow -n cto -l workflow-type=play-orchestration
+
+# Check for errors
+kubectl describe workflow <workflow-name> -n cto
+```
+Common causes: Missing required parameters (repository, service), invalid agent configuration, RBAC permissions missing.
+
+**GitHub Authentication Failing:**
+Error: `could not read Username for 'https://github.com': terminal prompts disabled`
+```bash
+# Check secrets
+kubectl get secret github-app-rex -n cto -o yaml
+```
+Common causes: GitHub App credentials not configured, secret not mounted in pod, app not installed on target repository.
+
+**CodeRun Pod Not Starting:**
+```bash
+# Check CodeRun status
+kubectl get coderuns -n cto
+kubectl describe coderun <name> -n cto
+
+# Check controller logs
+kubectl logs -n cto -l app.kubernetes.io/name=controller --tail=100
+```
+Common causes: Image pull errors, PVC mounting issues, resource limits exceeded.
+
+**Agent Timeout (30 min default):**
+```bash
+# Check pod logs
+kubectl logs <pod-name> -n cto --all-containers
+```
+Common causes: AI rate limiting, complex task taking too long, agent stuck in loop.
+
+**Useful Commands:**
+```bash
+# List all play workflows
+kubectl get workflow -n cto -l workflow-type=play-orchestration
+
+# Watch CodeRuns
+kubectl get coderuns -n cto -w
+
+# Get pod logs
+kubectl logs <pod-name> -n cto --all-containers
+
+# Check progress ConfigMap
+kubectl get configmap -n cto -l play-tracking=true
+
+# Delete stuck workflow
+kubectl delete workflow <name> -n cto
+
+# Retry failed workflow
+argo retry <workflow-name> -n cto
+```
+
+---
+
+## Known Issues & Fixes
+
+### Issue: Sidecar Doesn't Terminate
+
+**Symptoms:** Pod stays in `Running` state after CLI completes. Sidecar container keeps running.
+
+**Root Cause:** Sidecar's `tokio::select!` waits for tasks that never complete (HTTP server, FIFO writer).
+
+**Fix:**
+- Watch for `/workspace/.agent_done` sentinel file
+- Set shutdown flag when detected → all tasks exit gracefully
+- Add timeout after agent completion (e.g., 30s grace period)
+
+```rust
+// In status_sync main loop
+if fs::metadata("/workspace/.agent_done").await.is_ok() {
+    info!("Agent completed, initiating shutdown");
+    shutdown.store(true, Ordering::SeqCst);
+}
+```
+
+### Issue: Docker Sidecar Doesn't Terminate
+
+**Symptoms:** Docker-in-Docker sidecar keeps running after build completes.
+
+**Root Cause:** Docker daemon process doesn't receive SIGTERM propagation.
+
+**Fix:**
+- Use `shareProcessNamespace: true` in pod spec
+- Add preStop hook to signal Docker daemon
+- Set `terminationGracePeriodSeconds` appropriately
+
+### Issue: Agent CLI Doesn't Exit
+
+**Symptoms:** CLI process hangs after completing work, never returns exit code.
+
+**Root Cause:** Some CLIs wait for stdin EOF or explicit quit signal.
+
+**Fix:**
+- Use `--print` or non-interactive flags where available
+- Close stdin after sending prompt (`stdin(Stdio::null())`)
+- Send explicit `/exit` command for interactive CLIs
+- Add timeout with SIGTERM → SIGKILL escalation
+
+```bash
+# In container script
+timeout --signal=TERM --kill-after=60s 3600s claude --print "$PROMPT"
+```
+
+---
+
+## Healer Monitoring Details
+
+### Acceptance Criteria Verification
+
+Healer probes each stage's acceptance criteria:
+
+- **Intake** - Tasks created? Dependencies valid? Linear project exists?
+- **Implementation** - Code compiles? Tests pass? PR created?
+- **Quality** - Lints pass? No code smells? Documented?
+- **Security** - No vulnerabilities? Input validated?
+- **Testing** - Tests written? Coverage acceptable?
+- **Integration** - No conflicts? CI passes? PR merged?
+
+### Common Issues to Detect
+
+**Workspace Location Issues:**
+```
+Symptoms: Tools can't find files, relative paths resolve incorrectly
+Log patterns: WORKING_DIRECTORY not set, cwd: /workspace (should be /workspace/repo)
+Fix: Ensure MCP_CLIENT_CONFIG points to correct working directory
+```
+
+**MCP Tools Not Available:**
+```
+Symptoms: "Tool not found" errors, tools list empty, handshake failures
+Log patterns: [Bridge] Filtering out remote tool, Tool.*not available, handshake failed
+Fix: Check tools-config.json, verify tools-server is running
+```
+
+**Prompt Loading Failures:**
+```
+Symptoms: Agent doesn't understand task, generic responses, missing context
+Log patterns: prompt.xml not found, template rendering failed
+Fix: Verify .tasks/ directory exists, check prompt files are valid
+```
+
+**Permission Denied:**
+```
+Symptoms: Can't push to GitHub, can't create K8s resources
+Log patterns: permission denied, 403 Forbidden, EACCES
+Fix: Check GitHub App installation, verify ServiceAccount RBAC
+```
+
+**Sidecar Not Terminating:**
+```
+Symptoms: Pod stuck in "Running" after agent completes
+Log patterns: sidecar waiting for, status.json not found
+Fix: Ensure CLI writes completion status, check sidecar shutdown handling
+```
+
+**CLI Not Exiting:**
+```
+Symptoms: Agent appears stuck, no new output but process running
+Log patterns: waiting for input, interactive mode, stdin blocked
+Fix: Ensure --dangerously-skip-permissions flag, use -p flag
+```
 
