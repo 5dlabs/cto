@@ -14,6 +14,48 @@ data:
       "max_attempts": {{ .Values.healer.config.maxAttempts }},
       "time_window_mins": {{ .Values.healer.config.timeWindowMins }},
       "memory_url": {{ .Values.healer.config.memoryUrl | quote }},
-      "memory_enabled": {{ .Values.healer.config.memoryEnabled }}
+      "memory_enabled": {{ .Values.healer.config.memoryEnabled }},
+      "server": {
+        "model": {{ .Values.healer.config.server.model | quote }},
+        "autoLevel": {{ .Values.healer.config.server.autoLevel | quote }},
+        "outputFormat": {{ .Values.healer.config.server.outputFormat | quote }},
+        "remoteTools": {{ .Values.healer.config.server.remoteTools | toJson }},
+        "memory": {
+          "enabled": {{ .Values.healer.config.server.memory.enabled }},
+          "agentName": {{ .Values.healer.config.server.memory.agentName | quote }},
+          "sessionPrefix": {{ .Values.healer.config.server.memory.sessionPrefix | quote }},
+          "retrieveOnStart": {{ .Values.healer.config.server.memory.retrieveOnStart }},
+          "persistOnComplete": {{ .Values.healer.config.server.memory.persistOnComplete }}
+        }
+      },
+      "coderun": {
+        "namespace": {{ .Values.healer.config.coderun.namespace | quote }},
+        "githubApp": {{ .Values.healer.config.coderun.githubApp | quote }},
+        "model": {{ .Values.healer.config.coderun.model | quote }},
+        "repositoryUrl": {{ .Values.healer.config.coderun.repositoryUrl | quote }},
+        "docsRepositoryUrl": {{ .Values.healer.config.coderun.docsRepositoryUrl | quote }},
+        "docsProjectDirectory": {{ .Values.healer.config.coderun.docsProjectDirectory | quote }},
+        "docsBranch": {{ .Values.healer.config.coderun.docsBranch | quote }},
+        "workingDirectory": {{ .Values.healer.config.coderun.workingDirectory | quote }},
+        "service": {{ .Values.healer.config.coderun.service | quote }},
+        "runType": {{ .Values.healer.config.coderun.runType | quote }},
+        "enableDocker": {{ .Values.healer.config.coderun.enableDocker }},
+        "remoteTools": {{ .Values.healer.config.coderun.remoteTools | toJson }},
+        "localTools": {{ .Values.healer.config.coderun.localTools | toJson }},
+        "cliConfig": {
+          "cliType": {{ .Values.healer.config.coderun.cliConfig.cliType | quote }},
+          "model": {{ .Values.healer.config.coderun.cliConfig.model | quote }},
+          "settings": {
+            "template": {{ .Values.healer.config.coderun.cliConfig.settings.template | quote }}
+          }
+        },
+        "memory": {
+          "enabled": {{ .Values.healer.config.coderun.memory.enabled }},
+          "agentName": {{ .Values.healer.config.coderun.memory.agentName | quote }},
+          "sessionPrefix": {{ .Values.healer.config.coderun.memory.sessionPrefix | quote }},
+          "retrieveOnStart": {{ .Values.healer.config.coderun.memory.retrieveOnStart }},
+          "persistOnComplete": {{ .Values.healer.config.coderun.memory.persistOnComplete }}
+        }
+      }
     }
 {{- end }}
