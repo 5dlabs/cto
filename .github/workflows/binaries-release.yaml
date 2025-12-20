@@ -277,9 +277,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache,mode=max
-          cache-to: |
-            type=local,dest=/cache/buildx/tools,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache,mode=max
 
       - name: Docker summary
         run: |
@@ -341,9 +338,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache,mode=max
-          cache-to: |
-            type=local,dest=/cache/buildx/controller,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache,mode=max
 
       - name: Docker summary
         run: |
@@ -405,9 +399,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache,mode=max
-          cache-to: |
-            type=local,dest=/cache/buildx/healer,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache,mode=max
 
       - name: Docker summary
         run: |
