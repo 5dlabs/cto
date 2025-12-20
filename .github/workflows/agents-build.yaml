@@ -75,6 +75,7 @@ jobs:
 
           TOOLS_VERSION=""
           MONITOR_VERSION=""
+          TASKS_VERSION=""
 
           for TAG in $RELEASES; do
             VERSION="${TAG#v}"  # Strip leading 'v'
@@ -97,8 +98,17 @@ jobs:
               fi
             fi
 
-            # Exit early if both found
-            if [ -n "$TOOLS_VERSION" ] && [ -n "$MONITOR_VERSION" ]; then
+            # Check for tasks CLI if not yet found
+            if [ -z "$TASKS_VERSION" ]; then
+              TASKS_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/tasks-linux-x86_64"
+              if curl -L --output /dev/null --silent --head --fail "$TASKS_URL"; then
+                echo "📦 Found tasks in release: $VERSION"
+                TASKS_VERSION="$VERSION"
+              fi
+            fi
+
+            # Exit early if all found
+            if [ -n "$TOOLS_VERSION" ] && [ -n "$MONITOR_VERSION" ] && [ -n "$TASKS_VERSION" ]; then
               break
             fi
           done
@@ -121,15 +131,25 @@ jobs:
             echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
+          # Output tasks version
+          if [ -n "$TASKS_VERSION" ]; then
+            echo "✅ Using tasks version: $TASKS_VERSION"
+            echo "tasks_version=$TASKS_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "⚠️ No release with tasks found, skipping tasks"
+            echo "tasks_version=skip" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute base tag (Dockerfile hash + binary versions)
         id: tag
         run: |
           set -euo pipefail
           # Include Dockerfile hash and binary versions in tag to ensure rebuilds
-          # when tools-client or play-monitor becomes available or version changes
+          # when tools-client, play-monitor, or tasks becomes available or version changes
           DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/runtime/Dockerfile)
           TOOLS_VER="${{ steps.binaries-version.outputs.tools_version }}"
           MONITOR_VER="${{ steps.binaries-version.outputs.play_monitor_version }}"
+          TASKS_VER="${{ steps.binaries-version.outputs.tasks_version }}"
 
           # Build version suffix from available binaries
           VERSION_SUFFIX=""
@@ -138,6 +158,9 @@ jobs:
           fi
           if [ "$MONITOR_VER" != "skip" ] && [ -n "$MONITOR_VER" ]; then
             VERSION_SUFFIX="${VERSION_SUFFIX}-m$(echo "$MONITOR_VER" | tr '.' '-')"
+          fi
+          if [ "$TASKS_VER" != "skip" ] && [ -n "$TASKS_VER" ]; then
+            VERSION_SUFFIX="${VERSION_SUFFIX}-tk$(echo "$TASKS_VER" | tr '.' '-')"
           fi
 
           # Fallback if no binaries available
@@ -184,6 +207,7 @@ jobs:
           build-args: |
             TOOLS_VERSION=${{ steps.binaries-version.outputs.tools_version }}
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
+            TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
             TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
           # Use GHA cache (built-in, fast) and registry cache (persistent fallback)
           cache-from: |
