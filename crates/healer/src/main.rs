@@ -1113,7 +1113,7 @@ impl Default for HealerConfig {
             server: ServerConfig::default(),
             coderun: CodeRunConfig {
                 namespace: "cto".to_string(),
-                github_app: "rex".to_string(),
+                github_app: "5DLabs-Rex".to_string(),
                 model: "claude-opus-4-5-20251101".to_string(),
                 repository_url: "https://github.com/5dlabs/cto".to_string(),
                 docs_repository_url: "https://github.com/5dlabs/cto".to_string(),

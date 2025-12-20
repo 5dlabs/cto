@@ -1,0 +1,108 @@
+{
+  "servers": {
+    "openmemory": {
+      "name": "OpenMemory",
+      "description": "Long-term memory system for AI agents",
+      "transport": "http",
+      "url": "http://localhost:8765/mcp",
+      "env": {}
+    },
+    "context7": {
+      "name": "Context7",
+      "description": "Up-to-date library documentation and code examples",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "github": {
+      "name": "GitHub",
+      "description": "GitHub API operations for repositories, issues, and pull requests",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "workingDirectory": "/tmp",
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "shadcn": {
+      "name": "shadcn/ui",
+      "description": "Official shadcn/ui MCP server - browse, search, and install components",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "firecrawl": {
+      "name": "Firecrawl",
+      "description": "Web scraping, crawling, and content extraction with search capabilities",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "workingDirectory": "/tmp",
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      }
+    },
+    "filesystem": {
+      "name": "Filesystem",
+      "description": "File system operations for reading and writing files",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "workingDirectory": "project_root",
+      "env": {}
+    },
+    "memory": {
+      "name": "Memory",
+      "description": "Knowledge graph memory for storing and querying entities",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "playwright": {
+      "name": "Playwright Browser",
+      "description": "Headless browser automation for visual testing",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    },
+    "solana": {
+      "name": "Solana",
+      "description": "Solana blockchain development tools",
+      "transport": "http",
+      "url": "https://mcp.solana.com/mcp",
+      "env": {}
+    },
+    "cloudflare": {
+      "name": "Cloudflare",
+      "description": "Cloudflare Workers, DNS, security, and edge computing management",
+      "transport": "http",
+      "url": "https://bindings.mcp.cloudflare.com/mcp",
+      "env": {}
+    },
+    "ai-elements": {
+      "name": "AI Elements",
+      "description": "AI-native UI component library for chat interfaces and streaming UIs",
+      "transport": "http",
+      "url": "https://registry.ai-sdk.dev/api/mcp",
+      "env": {}
+    },
+    "pg-aiguide": {
+      "name": "PostgreSQL AI Guide",
+      "description": "AI-optimized PostgreSQL expertise with semantic search over official docs",
+      "transport": "http",
+      "url": "https://mcp.tigerdata.com/docs",
+      "env": {}
+    }
+  }
+}
+
+

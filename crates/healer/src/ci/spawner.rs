@@ -710,7 +710,10 @@ mod tests {
         assert_eq!(strip_control_chars("hello\x00world"), "helloworld");
 
         // Test preserves newlines and tabs
-        assert_eq!(strip_control_chars("line1\nline2\ttab"), "line1\nline2\ttab");
+        assert_eq!(
+            strip_control_chars("line1\nline2\ttab"),
+            "line1\nline2\ttab"
+        );
 
         // Test complex GitHub Actions log output
         let gh_log = "\x1b[32m✓\x1b[0m Test passed\n\x1b[31m✗\x1b[0m Test failed";

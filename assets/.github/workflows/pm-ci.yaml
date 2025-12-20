@@ -1,0 +1,205 @@
+---
+name: PM CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/integrations/**'
+      - 'infra/images/pm-server/**'
+      - 'infra/charts/pm/**'
+      - '.github/workflows/pm-ci.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/integrations/**'
+      - 'infra/images/pm-server/**'
+      - 'infra/charts/pm/**'
+      - '.github/workflows/pm-ci.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job (lightweight - stays on ubuntu)
+  changes:
+    runs-on: [k8s-runner]
+    outputs:
+      integrations: ${{ steps.filter.outputs.integrations }}
+      docker: ${{ steps.filter.outputs.docker }}
+      helm: ${{ steps.filter.outputs.helm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            integrations:
+              - 'crates/integrations/**'
+              - '!crates/integrations/**/*.md'
+            docker:
+              - 'infra/images/pm-server/**'
+            helm:
+              - 'infra/charts/pm/**'
+
+  # Rust linting using composite action
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    outputs:
+      format-needed: ${{ steps.lint.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          components: rustfmt, clippy
+          sccache-size: '50G'
+
+      - name: Lint integrations
+        id: lint
+        uses: ./.github/actions/rust-lint
+        with:
+          package: integrations
+          use-sccache: 'true'
+
+  # Run tests using composite action
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Test integrations
+        uses: ./.github/actions/rust-test
+        with:
+          package: integrations
+          use-sccache: 'true'
+
+  # Build check using composite action
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build linear binary (pm-server)
+        uses: ./.github/actions/rust-build
+        with:
+          package: integrations
+          binary: linear
+          use-sccache: 'true'
+
+  # Helm chart validation
+  helm-lint:
+    needs: changes
+    if: needs.changes.outputs.helm == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        with:
+          version: 'latest'
+
+      - name: Lint Helm chart
+        run: |
+          echo "🔍 Linting PM Helm chart..."
+          helm lint infra/charts/pm
+          echo "✅ Helm lint passed"
+
+      - name: Template Helm chart
+        run: |
+          echo "📋 Testing Helm template rendering..."
+          helm template pm infra/charts/pm > /dev/null
+          echo "✅ Helm template passed"
+
+  # Security audit (non-blocking)
+  security-audit:
+    needs: changes
+    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+
+      - name: Run security audit
+        run: |
+          cargo install cargo-audit --version 0.21.2 2>/dev/null || true
+          cargo audit || true
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/images/pm-server/Dockerfile
+          failure-threshold: warning
+
+  # Build and push Docker image (only on push to main)
+  build-docker:
+    needs: [lint-rust, test-rust, build-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build linear binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: integrations
+          binary: linear
+          output-path: pm-server
+          use-sccache: 'true'
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/integrations/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "integrations") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: pm-server
+          context: .
+          dockerfile: ./infra/images/pm-server/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

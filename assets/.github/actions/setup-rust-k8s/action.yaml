@@ -1,0 +1,160 @@
+---
+# Composite action for setting up Rust environment on k8s-runner
+# Includes sccache configuration for fast incremental builds
+name: Setup Rust (k8s-runner)
+description: |
+  Setup optimized Rust environment on k8s-runner with sccache.
+  This action configures the Rust toolchain, sccache, and optionally mold linker
+  for maximum build performance on self-hosted runners.
+
+inputs:
+  components:
+    description: 'Additional rustup components to install (comma-separated)'
+    required: false
+    default: ''
+  sccache-size:
+    description: 'sccache cache size'
+    required: false
+    default: '50G'
+
+outputs:
+  rustc-version:
+    description: 'Installed rustc version'
+    value: ${{ steps.version.outputs.rustc }}
+  cargo-version:
+    description: 'Installed cargo version'
+    value: ${{ steps.version.outputs.cargo }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: |
+        echo "🔧 Checking build dependencies..."
+        # Check if we have a C compiler
+        if ! command -v cc &> /dev/null && ! command -v gcc &> /dev/null; then
+          echo "📥 Installing build-essential..."
+          if command -v apt-get &> /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq build-essential pkg-config libssl-dev
+          elif command -v apk &> /dev/null; then
+            sudo apk add --no-cache build-base pkgconfig openssl-dev
+          else
+            echo "⚠️ No package manager found, skipping build dependencies"
+          fi
+        else
+          echo "✅ C compiler already available"
+        fi
+
+    - name: Clean rustup cache
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up stale rustup cache files..."
+        # Remove partial downloads that can cause rename failures
+        rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+        # Remove stray update hashes that cause conflicts
+        rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
+        # Remove any lock files from crashed processes
+        rm -f /cache/rustup/.lock 2>/dev/null || true
+        rm -f /cache/cargo/.package-cache-lock 2>/dev/null || true
+        echo "✅ Cache cleanup complete"
+
+    - name: Setup Rust toolchain
+      shell: bash
+      run: |
+        echo "🚀 Setting up optimized Rust build environment..."
+        # Ensure cargo bin directory exists
+        mkdir -p "$HOME/.cargo/bin"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
+
+        # Install rustup if not present
+        if ! command -v rustup &> /dev/null; then
+          echo "📥 Installing rustup..."
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          # Source the env file to get PATH updates
+          if [ -f "$HOME/.cargo/env" ]; then
+            source "$HOME/.cargo/env"
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+        fi
+
+        # Check if both rustc and cargo are available and working
+        if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+          echo "✅ Rust toolchain ready: $(rustc --version)"
+        else
+          echo "🔧 Installing/repairing Rust toolchain..."
+          # Full cleanup for fresh install
+          rustup toolchain uninstall stable 2>/dev/null || true
+          rm -rf /cache/rustup/toolchains/stable-* 2>/dev/null || true
+
+          for attempt in 1 2 3; do
+            # Clean before each attempt
+            rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+            rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
+
+            if rustup toolchain install stable && rustup default stable; then
+              echo "✅ Toolchain installed on attempt $attempt"
+              break
+            fi
+            echo "⚠️ Rustup attempt $attempt failed, retrying..."
+            sleep $((attempt * 5))
+          done
+        fi
+
+        # Install additional components if specified
+        COMPONENTS="${{ inputs.components }}"
+        if [ -n "$COMPONENTS" ]; then
+          echo "📦 Installing components: $COMPONENTS"
+          IFS=',' read -ra COMP_ARRAY <<< "$COMPONENTS"
+          for comp in "${COMP_ARRAY[@]}"; do
+            rustup component add "$(echo "$comp" | xargs)" 2>/dev/null || true
+          done
+        fi
+
+    - name: Setup sccache
+      shell: bash
+      env:
+        SCCACHE_CACHE_SIZE: ${{ inputs.sccache-size }}
+        SCCACHE_IDLE_TIMEOUT: '0'
+      run: |
+        # Ensure cargo bin directory exists
+        mkdir -p "$HOME/.cargo/bin"
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+        # Install sccache if not present (use pre-built binary, much faster)
+        if ! command -v sccache &> /dev/null; then
+          echo "📥 Installing sccache (pre-built binary)..."
+          SCCACHE_VERSION="v0.10.0"
+          curl -fsSL "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar -xz
+          mv "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" "$HOME/.cargo/bin/"
+          rm -rf "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
+          chmod +x "$HOME/.cargo/bin/sccache"
+        fi
+
+        # Stop any existing sccache server
+        sccache --stop-server 2>/dev/null || true
+
+        # Start fresh sccache server
+        sccache --start-server
+
+        echo "📊 sccache stats:"
+        sccache --show-stats
+
+    - name: Get version info
+      id: version
+      shell: bash
+      run: |
+        export PATH="/home/runner/.cargo/bin:$PATH"
+        echo "rustc=$(rustc --version)" >> "$GITHUB_OUTPUT"
+        echo "cargo=$(cargo --version)" >> "$GITHUB_OUTPUT"
+
+        # Log available tools
+        echo "🔧 Build tools:"
+        rustc --version
+        cargo --version
+        sccache --version || echo "⚠️ sccache not found"
+        mold --version 2>/dev/null || echo "ℹ️ mold linker not available"
+
