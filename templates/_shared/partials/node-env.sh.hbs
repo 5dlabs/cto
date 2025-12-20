@@ -26,8 +26,9 @@ else
 fi
 
 # Enable corepack for pnpm/yarn if available
+# Suppress errors when symlinks already exist or can't be created
 if command -v corepack >/dev/null 2>&1; then
-  corepack enable 2>/dev/null || true
+  corepack enable 2>&1 | grep -v "EINVAL\|readlink\|already exists" || true
 fi
 
 
