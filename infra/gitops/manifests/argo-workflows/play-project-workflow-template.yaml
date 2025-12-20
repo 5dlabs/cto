@@ -699,10 +699,10 @@ spec:
 
           cd /workspace/"{{inputs.parameters.docs-directory}}"
 
-          # Check for .tasks/tasks/tasks.json
-          TASKS_JSON=".tasks/tasks/tasks.json"
+          # Check for .tasks/tasks.json
+          TASKS_JSON=".tasks/tasks.json"
           if [ ! -f "$TASKS_JSON" ]; then
-            echo "❌ tasks tasks.json not found: $TASKS_JSON"
+            echo "❌ tasks.json not found: $TASKS_JSON"
             exit 1
           fi
 
