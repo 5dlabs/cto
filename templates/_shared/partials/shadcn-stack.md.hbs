@@ -10,7 +10,7 @@ You are building with the **shadcn stack**—a modern Next.js architecture optim
 | shadcn/ui | Accessible UI components | `npx shadcn@latest add [component]` |
 | React Query | Client-side data caching | `@tanstack/react-query` |
 | React Hook Form | Form state management | `react-hook-form` |
-| Zod | Schema validation | `zod` |
+| Effect | Type-safe validation & errors | `effect`, `@hookform/resolvers` |
 | Tailwind CSS | Utility-first styling | `tailwindcss` |
 
 ---
@@ -91,17 +91,17 @@ export function UserSearch({ onSearch }: { onSearch: (query: string) => void }) 
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
+import { Schema, Effect } from 'effect';
 import { db } from '@/lib/db';
 
-const createUserSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  role: z.enum(['admin', 'user', 'guest']),
+const CreateUserSchema = Schema.Struct({
+  name: Schema.String.pipe(Schema.minLength(2)),
+  email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/)),
+  role: Schema.Literal('admin', 'user', 'guest'),
 });
 
 export async function createUser(formData: FormData) {
-  const validated = createUserSchema.parse({
+  const validated = Schema.decodeUnknownSync(CreateUserSchema)({
     name: formData.get('name'),
     email: formData.get('email'),
     role: formData.get('role'),
@@ -236,14 +236,14 @@ export function CreateUserDialog() {
 
 ---
 
-### React Hook Form + Zod
+### React Hook Form + Effect Schema
 
 ```typescript
 'use client';
 
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { effectTsResolver } from '@hookform/resolvers/effect-ts';
+import { Schema } from 'effect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -255,16 +255,16 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
-const formSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
+const formSchema = Schema.Struct({
+  name: Schema.String.pipe(Schema.minLength(2, { message: () => 'Name must be at least 2 characters' })),
+  email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/, { message: () => 'Invalid email address' })),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = Schema.Schema.Type<typeof formSchema>;
 
 export function CreateUserForm({ onSuccess }: { onSuccess: () => void }) {
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: effectTsResolver(formSchema),
     defaultValues: { name: '', email: '' },
   });
 
@@ -546,13 +546,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 2. **Server Actions for mutations** - Avoid API routes for form submissions
 3. **Co-locate components** - Keep page-specific components in route folders
 4. **Use shadcn primitives** - Build on top of existing components
-5. **Zod everywhere** - Validate on both client and server
+5. **Effect Schema everywhere** - Validate on both client and server
 6. **Streaming with Suspense** - Wrap slow components for progressive loading
 7. **Revalidate strategically** - Use revalidatePath/revalidateTag after mutations
 
 **Documentation**:
 - https://nextjs.org/docs
 - https://ui.shadcn.com
+- https://effect.website/docs
 - https://react-hook-form.com
 - https://tanstack.com/query/latest
 

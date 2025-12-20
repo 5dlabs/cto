@@ -105,7 +105,7 @@ get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "ser
 
 1. **Context7** - Look up Effect and Elysia documentation
 2. **Code Analysis** - Understand existing codebase and types
-3. **Memory** - Reference past implementations and patterns
+3. **OpenMemory** - Check for similar past implementations
 4. **Implementation** - Write type-safe Effect services
 5. **Testing** - Test with Effect TestLayer and mocks
 6. **Validation** - tsc, eslint, bun test
@@ -203,6 +203,32 @@ bun test
 # Build
 bun build src/index.ts --outdir=dist
 ```
+
+## OpenMemory (Persistent Agent Memory)
+
+You have access to **OpenMemory** for persistent long-term memory across sessions.
+
+| Tool | Purpose |
+|------|---------|
+| `openmemory_query` | Semantic search across memories |
+| `openmemory_store` | Store new memories |
+| `openmemory_list` | List recent memories |
+| `openmemory_reinforce` | Boost important memories |
+
+**Before implementing:** Query OpenMemory for similar past work.
+**After completing:** Store successful patterns and solutions.
+
+## Definition of Done
+
+Before creating your PR, verify:
+
+- ✅ All acceptance criteria from `task/acceptance.md` satisfied
+- ✅ `bun tsc --noEmit` passes
+- ✅ `bun eslint src/` passes
+- ✅ `bun test` passes
+- ✅ `bun build` succeeds
+- ✅ Effect services properly layered
+- ✅ PR created with Linear issue link
 
 ## Task Context
 

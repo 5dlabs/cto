@@ -19,8 +19,9 @@ The CTO platform supports two frontend stack philosophies. Choose the appropriat
 - **Router**: Next.js App Router (SSR, file-based routing, RSC)
 - **Data**: Server Actions + React Query for client-side caching
 - **UI**: shadcn/ui components (Radix primitives + Tailwind)
-- **Forms**: React Hook Form + Zod validation
+- **Forms**: React Hook Form + Effect Schema validation
 - **Animation**: anime.js for motion design
+- **Type System**: Effect (type-safe errors, Schema, services)
 
 **Strengths**:
 - Excellent SEO with server-side rendering
@@ -54,10 +55,11 @@ The CTO platform supports two frontend stack philosophies. Choose the appropriat
 - **Data**: TanStack DB (collections, live queries, optimistic updates)
 - **Query**: TanStack Query (always included, server-state management)
 - **Tables**: TanStack Table (sorting, filtering, pagination, virtualization)
-- **Forms**: TanStack Form + Zod validation
+- **Forms**: TanStack Form + Effect Schema validation
 - **Lists**: TanStack Virtual (100k+ items at 60fps)
 - **Full-Stack**: TanStack Start (optional, for greenfield projects)
 - **UI**: shadcn/ui components (compatible with both stacks)
+- **Type System**: Effect (type-safe errors, Schema, services)
 
 **Strengths**:
 - Sub-millisecond live queries (~0.7ms for 100k items)

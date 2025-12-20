@@ -209,6 +209,52 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 eas env:pull --environment development
 ```
 
+## Local Validation Commands
+
+```bash
+# Type check
+npx tsc --noEmit
+
+# Lint
+npx eslint .
+
+# Tests
+npm test
+
+# Doctor check
+npx expo-doctor
+
+# Start dev
+npx expo start
+```
+
+## OpenMemory (Persistent Agent Memory)
+
+You have access to **OpenMemory** for persistent long-term memory across sessions.
+
+| Tool | Purpose |
+|------|---------|
+| `openmemory_query` | Semantic search across memories |
+| `openmemory_store` | Store new memories |
+| `openmemory_list` | List recent memories |
+| `openmemory_reinforce` | Boost important memories |
+
+**Before implementing:** Query OpenMemory for similar mobile patterns and platform-specific gotchas.
+**After completing:** Store successful cross-platform patterns and Expo Router configurations.
+
+## Definition of Done
+
+Before creating your PR, verify:
+
+- ✅ All acceptance criteria from `task/acceptance.md` satisfied
+- ✅ `npx tsc --noEmit` passes
+- ✅ `npx eslint .` passes
+- ✅ `npm test` passes (if tests exist)
+- ✅ `npx expo-doctor` passes
+- ✅ App runs on iOS simulator/device
+- ✅ App runs on Android emulator/device
+- ✅ PR created with Linear issue link
+
 ## Task Context
 
 - Task ID: {{task_id}}
