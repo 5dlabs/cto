@@ -581,3 +581,5 @@ RUN printf '%s\n' '# Add Cargo bin to PATH for interactive shells' 'if [ -d "$HO
 RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HOME/.cargo/env" ]; then\n    . "$HOME/.cargo/env"\nfi\nif [ -f "/root/.cargo/env" ]; then\n    . "/root/.cargo/env"\nfi\nrustup default stable 2>/dev/null || true' > /usr/local/bin/setup-rust-env \
   && chmod +x /usr/local/bin/setup-rust-env
 
+
+# Trigger rebuild for tasks CLI v0.1.0
