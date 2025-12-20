@@ -391,12 +391,63 @@ healer:
       memory: 256Mi
 
   config:
+    # CI Remediation config
     cli: "Factory"
     model: "claude-opus-4-5-20250929"
     maxAttempts: 3
     timeWindowMins: 10
     memoryUrl: "http://openmemory.cto.svc:3000"
     memoryEnabled: true
+    # Server config for healer's inline Factory usage (alert analysis/triage)
+    server:
+      model: "claude-opus-4-5-20251101"
+      autoLevel: "high"
+      outputFormat: "text"
+      remoteTools:
+        - "mcp_tools_kubernetes_*"
+        - "mcp_tools_argocd_*"
+        - "mcp_tools_grafana_*"
+        - "mcp_tools_openmemory_*"
+      memory:
+        enabled: true
+        agentName: "healer-server"
+        sessionPrefix: "heal-session"
+        retrieveOnStart: true
+        persistOnComplete: true
+    # CodeRun config for spawning remediation agents
+    coderun:
+      namespace: "cto"
+      githubApp: "5DLabs-Rex"
+      model: "claude-opus-4-5-20251101"
+      repositoryUrl: "https://github.com/5dlabs/cto"
+      docsRepositoryUrl: "https://github.com/5dlabs/cto"
+      docsProjectDirectory: "docs"
+      docsBranch: "main"
+      workingDirectory: "."
+      service: "heal"
+      runType: "implementation"
+      enableDocker: true
+      remoteTools:
+        - "mcp_tools_github_*"
+        - "mcp_tools_kubernetes_*"
+        - "mcp_tools_argocd_*"
+        - "mcp_tools_cto_*"
+        - "mcp_tools_context7_*"
+        - "mcp_tools_firecrawl_*"
+        - "mcp_tools_grafana_*"
+        - "mcp_tools_openmemory_*"
+      localTools: []
+      cliConfig:
+        cliType: "factory"
+        model: "claude-opus-4-5-20251101"
+        settings:
+          template: "heal/factory"
+      memory:
+        enabled: true
+        agentName: "healer-remediation"
+        sessionPrefix: "heal-remediation"
+        retrieveOnStart: true
+        persistOnComplete: true
 
   persistence:
     enabled: true
