@@ -186,7 +186,7 @@ jobs:
         run: | # pragma: allowlist secret
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
 
-      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2 # pragma: allowlist secret
         with:
           workspaces: ". -> target"
           shared-key: "binaries-${{ matrix.target.triple }}"

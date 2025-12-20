@@ -1,0 +1,26 @@
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  # Increase kubelet timeouts for CI stability
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-status-update-frequency: "10s"
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        "audit-log-maxage": "1"
+        "audit-log-maxbackup": "1"
+        "audit-log-maxsize": "10"
+  - |
+    kind: KubeletConfiguration
+    evictionHard:
+      memory.available: "100Mi"
+      nodefs.available: "10%"
+      nodefs.inodesFree: "5%"
+      imagefs.available: "15%"

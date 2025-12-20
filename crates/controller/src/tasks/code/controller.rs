@@ -50,7 +50,9 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
         code_run.clone(),
         |event| async {
             match event {
-                FinalizerEvent::Apply(cr) => reconcile_code_create_or_update(cr, &ctx).await,
+                FinalizerEvent::Apply(cr) => {
+                    Box::pin(reconcile_code_create_or_update(cr, &ctx)).await
+                }
                 FinalizerEvent::Cleanup(cr) => cleanup_code_resources(cr, &ctx).await,
             }
         },
