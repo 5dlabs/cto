@@ -23,21 +23,22 @@ TanStack DB provides sub-millisecond reactive queries over normalized collection
 
 ```typescript
 import { createCollection } from '@tanstack/db';
-import { z } from 'zod';
+import { Schema } from 'effect';
 
-// Define schema with Zod
-const userSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().email(),
-  role: z.enum(['admin', 'user', 'guest']),
-  createdAt: z.date(),
+// Define schema with Effect Schema
+const UserSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/)),
+  role: Schema.Literal('admin', 'user', 'guest'),
+  createdAt: Schema.Date,
 });
+type User = Schema.Schema.Type<typeof UserSchema>;
 
 // Create collection with QueryCollection (TanStack Query backend)
 export const usersCollection = createCollection({
   id: 'users',
-  schema: userSchema,
+  schema: UserSchema,
   backend: new QueryCollection({
     queryFn: () => fetch('/api/users').then(r => r.json()),
     getId: (user) => user.id,
@@ -283,21 +284,21 @@ function LiveUsersTable() {
 
 ```typescript
 import { useForm } from '@tanstack/react-form';
-import { zodValidator } from '@tanstack/zod-form-adapter';
-import { z } from 'zod';
+import { effectValidator } from '@tanstack/effect-form-adapter';
+import { Schema } from 'effect';
 
-const userSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  role: z.enum(['admin', 'user', 'guest']),
+const UserSchema = Schema.Struct({
+  name: Schema.String.pipe(Schema.minLength(2, { message: () => 'Name must be at least 2 characters' })),
+  email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/, { message: () => 'Invalid email address' })),
+  role: Schema.Literal('admin', 'user', 'guest'),
 });
 
 function CreateUserForm() {
   const form = useForm({
     defaultValues: { name: '', email: '', role: 'user' as const },
-    validatorAdapter: zodValidator(),
+    validatorAdapter: effectValidator(),
     validators: {
-      onChange: userSchema,
+      onChange: UserSchema,
     },
     onSubmit: async ({ value }) => {
       await createUser(value);
@@ -456,7 +457,7 @@ Start includes:
 1. **Use collections for all server data** - Normalize at the collection level
 2. **Leverage live queries** - Let TanStack DB handle reactivity, don't poll
 3. **Optimistic by default** - Use onMutate for instant UI feedback
-4. **Type everything** - Use Zod schemas for runtime + TypeScript validation
+4. **Type everything** - Use Effect Schema for runtime + TypeScript validation
 5. **Virtualize large lists** - TanStack Virtual for 1000+ items
 6. **Search params as state** - Use TanStack Router search params for shareable UI state
 7. **Co-locate loaders** - Keep data fetching close to route components
@@ -468,4 +469,5 @@ Start includes:
 - https://tanstack.com/table/latest
 - https://tanstack.com/form/latest
 - https://tanstack.com/virtual/latest
+- https://effect.website/docs
 

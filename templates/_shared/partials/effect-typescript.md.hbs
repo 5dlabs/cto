@@ -1,0 +1,173 @@
+## Effect TypeScript
+
+**Effect** ([effect.website](https://effect.website)) is the missing standard library for TypeScript. Use it for:
+
+- Type-safe error handling (errors as values, not exceptions)
+- Composable, reusable service patterns
+- Built-in concurrency (fibers, queues, semaphores)
+- Schema validation and transformation (replaces Zod)
+- Observability (tracing, metrics, logging)
+- AI integrations (`@effect/ai` for LLM interactions)
+
+### Effect Documentation
+
+**IMPORTANT**: Before implementing any Effect code, consult:
+
+- **AI Documentation**: `https://effect.website/llms.txt`
+- **Main Docs**: `https://effect.website/docs`
+
+Use Context7 to look up Effect patterns:
+
+```
+resolve_library_id({ libraryName: "effect typescript" })
+get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "schema validation" })
+```
+
+### Context7 Effect Topics
+
+```
+get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "schema validation" })
+get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "error handling tagged errors" })
+get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "services layers context" })
+get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "stream async" })
+```
+
+---
+
+### Effect Schema (Replaces Zod)
+
+```typescript
+import { Schema } from "effect"
+
+// Define schemas
+const UserSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/)),
+  role: Schema.Literal("admin", "user", "guest"),
+  createdAt: Schema.Date,
+})
+type User = Schema.Schema.Type<typeof UserSchema>
+
+// Form validation schema
+const CreateUserSchema = Schema.Struct({
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/)),
+  password: Schema.String.pipe(Schema.minLength(8)),
+})
+
+// Validate unknown data
+const parseUser = Schema.decodeUnknown(UserSchema)
+```
+
+---
+
+### Tagged Errors
+
+```typescript
+import { Schema } from "effect"
+
+// Define typed errors using TaggedError
+class UserNotFoundError extends Schema.TaggedError<UserNotFoundError>("UserNotFoundError")({
+  userId: Schema.String,
+}) {}
+
+class ValidationError extends Schema.TaggedError<ValidationError>("ValidationError")({
+  message: Schema.String,
+  field: Schema.String,
+}) {}
+
+class ApiError extends Schema.TaggedError<ApiError>("ApiError")({
+  message: Schema.String,
+  statusCode: Schema.Number,
+}) {}
+```
+
+---
+
+### Services & Layers (Dependency Injection)
+
+```typescript
+import { Effect, Context, Layer } from "effect"
+
+// Define service interface with Context.Tag
+class UserRepository extends Context.Tag("UserRepository")<
+  UserRepository,
+  {
+    findById: (id: string) => Effect.Effect<User, UserNotFoundError>
+    create: (data: CreateUser) => Effect.Effect<User, ValidationError>
+    delete: (id: string) => Effect.Effect<void, UserNotFoundError>
+  }
+>() {}
+
+// Implement with Layer
+const UserRepositoryLive = Layer.succeed(
+  UserRepository,
+  UserRepository.of({
+    findById: (id) => Effect.tryPromise({
+      try: () => db.user.findUnique({ where: { id } }),
+      catch: () => new UserNotFoundError({ userId: id })
+    }).pipe(Effect.flatMap((u) => u ? Effect.succeed(u) : Effect.fail(new UserNotFoundError({ userId: id })))),
+    create: (data) => Effect.tryPromise({
+      try: () => db.user.create({ data }),
+      catch: (e) => new ValidationError({ message: String(e), field: "unknown" })
+    }),
+    delete: (id) => Effect.tryPromise({
+      try: () => db.user.delete({ where: { id } }),
+      catch: () => new UserNotFoundError({ userId: id })
+    }).pipe(Effect.asVoid),
+  })
+)
+```
+
+---
+
+### Effect.gen for Composition
+
+```typescript
+import { Effect } from "effect"
+
+// Compose effects with generator syntax
+const getUser = (id: string) =>
+  Effect.gen(function* () {
+    const repo = yield* UserRepository
+    const user = yield* repo.findById(id)
+    return user
+  })
+
+// Pattern match on errors
+const result = await Effect.runPromise(
+  program.pipe(
+    Effect.catchTags({
+      UserNotFoundError: (e) => Effect.succeed({ error: `User ${e.userId} not found` }),
+      ValidationError: (e) => Effect.succeed({ error: `Invalid ${e.field}: ${e.message}` }),
+    })
+  )
+)
+```
+
+---
+
+### Retry with Schedule
+
+```typescript
+import { Effect, Schedule } from "effect"
+
+// Retry with exponential backoff
+const fetchWithRetry = Effect.retry(
+  fetchExternalApi,
+  Schedule.exponential("1 second").pipe(
+    Schedule.compose(Schedule.recurs(3))
+  )
+)
+
+// Retry only on specific errors
+const fetchSelectively = Effect.retry(
+  fetchExternalApi,
+  Schedule.exponential("500 millis").pipe(
+    Schedule.whileInput((error) => error._tag === "NetworkError")
+  )
+)
+```
+
+
