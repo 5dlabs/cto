@@ -275,9 +275,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
-          cache-from: |
-            type=local,src=/cache/buildx/tools
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache,mode=max
           cache-to: |
             type=local,dest=/cache/buildx/tools,mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:buildcache,mode=max
@@ -340,9 +339,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
-          cache-from: |
-            type=local,src=/cache/buildx/controller
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache,mode=max
           cache-to: |
             type=local,dest=/cache/buildx/controller,mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:buildcache,mode=max
@@ -405,9 +403,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
-          cache-from: |
-            type=local,src=/cache/buildx/healer
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache,mode=max
           cache-to: |
             type=local,dest=/cache/buildx/healer,mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:buildcache,mode=max
@@ -429,6 +426,13 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
 
       - name: Download all binary artifacts
         uses: actions/download-artifact@v4
