@@ -1,12 +1,13 @@
 {{> header }}
 
-{{!-- Node.js environment for JavaScript/TypeScript agents (Blaze, Spark, Tap) --}}
-{{#if (or (eq github_app "blaze") (eq github_app "spark") (eq github_app "tap") (eq task_language "typescript") (eq task_language "javascript"))}}
+{{!-- Node.js environment for JavaScript/TypeScript agents (Blaze, Spark, Tap, Nova) --}}
+{{!-- agent_name is the lowercase extracted name (e.g., "rex", "blaze", "tap") --}}
+{{#if (or (eq agent_name "blaze") (eq agent_name "spark") (eq agent_name "tap") (eq agent_name "nova") (eq task_language "typescript") (eq task_language "javascript"))}}
 {{> node-env }}
 {{/if}}
 
 {{!-- Expo environment only for Tap (Expo/React Native mobile agent) --}}
-{{#if (eq github_app "tap")}}
+{{#if (eq agent_name "tap")}}
 {{> expo-env }}
 {{/if}}
 
