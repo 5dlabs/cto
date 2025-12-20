@@ -68,10 +68,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+
+          # Debug: Check if gh CLI is available
+          echo "📍 Checking gh CLI..."
+          if ! command -v gh &> /dev/null; then
+            echo "⚠️ gh CLI not found, installing..."
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update && sudo apt-get install -y gh
+          fi
+          echo "✅ gh version: $(gh --version | head -1)"
+
           # Query GitHub API for recent unified releases (tags matching v*.*.*)
           # Iterate through releases to find the first one with actual assets
           # (new releases may not have binaries uploaded yet)
-          RELEASES=$(gh release list --limit 20 | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+          echo "📍 Fetching releases..."
+          RAW_RELEASES=$(gh release list --limit 20 || echo "")
+          echo "Raw release output:"
+          echo "$RAW_RELEASES"
+          RELEASES=$(echo "$RAW_RELEASES" | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+          echo "Parsed releases: $RELEASES"
 
           TOOLS_VERSION=""
           MONITOR_VERSION=""
