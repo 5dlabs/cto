@@ -180,6 +180,7 @@ impl CLITextGenerator {
             CLIType::Grok => "grok",
             CLIType::OpenHands => "openhands",
             CLIType::Qwen => "qwen",
+            CLIType::Dexter => "dexter-agent",
         };
 
         // Try to find the executable in PATH
@@ -212,6 +213,7 @@ impl CLITextGenerator {
             CLIType::Grok => "grok",
             CLIType::OpenHands => "openhands",
             CLIType::Qwen => "qwen",
+            CLIType::Dexter => "dexter-agent",
         };
 
         // Try to find in PATH first
@@ -378,6 +380,11 @@ impl CLITextGenerator {
 
                 args.push("--model".to_string());
                 args.push(model.to_string());
+            }
+            CLIType::Dexter => {
+                // Dexter: dexter-agent "prompt"
+                // Dexter accepts prompts directly as the command argument
+                args.push(prompt.to_string());
             }
             CLIType::Grok | CLIType::OpenHands | CLIType::Qwen => {
                 // Generic fallback
@@ -722,6 +729,23 @@ impl CLITextGenerator {
                 "openhands-default",
             ],
             CLIType::Qwen => vec!["qwen-max", "qwen-plus", "qwen-turbo"],
+            CLIType::Dexter => vec![
+                // Claude models
+                "claude-opus-4-5-20251101",
+                "claude-sonnet-4-5-20250929",
+                "claude-sonnet-4-20250514",
+                // GPT models
+                "gpt-5.1",
+                "gpt-4-turbo",
+                "gpt-4",
+                // Gemini models
+                "gemini-2.5-pro",
+                "gemini-2.5-flash",
+                // Reasoning models
+                "o3",
+                "o1",
+                "o4-mini",
+            ],
         }
     }
 }
@@ -739,13 +763,16 @@ impl AIProvider for CLITextGenerator {
             CLIType::Grok => "cli-grok",
             CLIType::OpenHands => "cli-openhands",
             CLIType::Qwen => "cli-qwen",
+            CLIType::Dexter => "cli-dexter",
         }
     }
 
     fn api_key_env_var(&self) -> &'static str {
         // CLI tools manage their own authentication
+        // Note: Dexter supports multiple API keys (Anthropic, OpenAI, Google)
+        // but we return Anthropic as the primary since Claude is commonly used
         match self.cli_type {
-            CLIType::Claude => "ANTHROPIC_API_KEY",
+            CLIType::Claude | CLIType::Dexter => "ANTHROPIC_API_KEY",
             CLIType::Codex | CLIType::Factory | CLIType::OpenCode => "OPENAI_API_KEY",
             CLIType::Cursor => "CURSOR_API_KEY",
             CLIType::Gemini => "GOOGLE_API_KEY",

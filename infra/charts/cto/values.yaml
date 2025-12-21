@@ -44,6 +44,136 @@ global:
     componentTags: {}
 
 # =============================================================================
+# Secrets - External Secrets Operator Configuration
+# =============================================================================
+# Generates ExternalSecret resources that sync from OpenBao.
+# Replaces manually maintained secrets in infra/gitops/manifests/external-secrets/
+secrets:
+  enabled: true
+  refreshInterval: "1h"
+
+  # Secret store reference (ClusterSecretStore or SecretStore)
+  secretStore:
+    name: openbao
+    kind: ClusterSecretStore
+
+  # GHCR Docker registry credentials
+  ghcr:
+    enabled: true
+    baoKey: ghcr-secret
+
+  # GitHub App credentials for each agent
+  # Each agent has its own GitHub App for repository access
+  githubApps:
+    - name: morgan
+      baoKey: github-app-morgan
+      includeClientSecret: true  # Morgan needs client secret for OAuth
+    - name: rex
+      baoKey: github-app-rex
+    - name: blaze
+      baoKey: github-app-blaze
+    - name: bolt
+      baoKey: github-app-bolt
+    - name: cleo
+      baoKey: github-app-cleo
+    - name: tess
+      baoKey: github-app-tess
+    - name: atlas
+      baoKey: github-app-atlas
+    - name: cipher
+      baoKey: github-app-cipher
+    - name: spark
+      baoKey: github-app-spark
+    - name: grizz
+      baoKey: github-app-grizz
+    - name: nova
+      baoKey: github-app-nova
+    - name: tap
+      baoKey: github-app-tap
+    - name: stitch
+      baoKey: github-app-stitch
+
+  # API keys for agent CLIs (used by Argo Workflow pods)
+  agentPlatformKeys:
+    - key: ANTHROPIC_API_KEY
+      baoKey: api-keys
+    - key: OPENAI_API_KEY
+      baoKey: api-keys
+    - key: GEMINI_API_KEY
+      baoKey: api-keys
+    - key: GOOGLE_API_KEY
+      baoKey: api-keys
+    - key: CURSOR_API_KEY
+      baoKey: api-keys
+    - key: CONTEXT7_API_KEY
+      baoKey: api-keys
+    - key: PERPLEXITY_API_KEY
+      baoKey: api-keys
+    - key: XAI_API_KEY
+      baoKey: api-keys
+    - key: FACTORY_API_KEY
+      baoKey: api-keys
+    - key: BRAVE_API_KEY
+      baoKey: api-keys
+
+  # Core platform API keys (cto-secrets)
+  ctoKeys:
+    - key: ANTHROPIC_API_KEY
+      baoKey: api-keys
+    - key: OPENAI_API_KEY
+      baoKey: api-keys
+    - key: GEMINI_API_KEY
+      baoKey: api-keys
+    - key: GOOGLE_API_KEY
+      baoKey: api-keys
+    - key: CURSOR_API_KEY
+      baoKey: api-keys
+    - key: CONTEXT7_API_KEY
+      baoKey: api-keys
+    - key: PERPLEXITY_API_KEY
+      baoKey: api-keys
+    - key: XAI_API_KEY
+      baoKey: api-keys
+    - key: FACTORY_API_KEY
+      baoKey: api-keys
+
+  # Linear integration secrets
+  linear:
+    enabled: true
+    keys:
+      - key: LINEAR_API_KEY
+        baoKey: linear-sync
+      - key: LINEAR_CLIENT_ID
+        baoKey: linear-sync
+      - key: LINEAR_CLIENT_SECRET
+        baoKey: linear-sync
+      - key: LINEAR_OAUTH_TOKEN
+        baoKey: linear-sync
+      - key: LINEAR_WEBHOOK_SECRET
+        baoKey: linear-sync
+
+  # Tools MCP server secrets
+  tools:
+    github:
+      enabled: true
+      baoKey: tools-github
+    firecrawl:
+      enabled: true
+      baoKey: tools-firecrawl
+    kubernetes:
+      enabled: true
+      baoKey: tools-kubernetes
+
+  # Research pipeline secrets
+  research:
+    twitter:
+      enabled: true
+      baoKey: research-twitter
+    digest:
+      enabled: true
+      baoKey: research-digest
+
+# =============================================================================
 # Controller - Agent Orchestration
 # =============================================================================
 controller:

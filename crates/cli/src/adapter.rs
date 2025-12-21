@@ -414,6 +414,13 @@ impl CLIExecutionAdapter {
                 "Requires FACTORY_API_KEY environment variable".to_string(),
                 "Supports droid exec auto-run levels for headless workflows".to_string(),
             ],
+            CLIType::Dexter => vec![
+                "Dexter is an autonomous financial research agent".to_string(),
+                "Requires API key: ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY"
+                    .to_string(),
+                "Optionally uses FINANCIAL_DATASETS_API_KEY for market data".to_string(),
+                "Supports TAVILY_API_KEY for web search capabilities".to_string(),
+            ],
             _ => vec!["CLI execution will use default settings".to_string()],
         }
     }
@@ -486,6 +493,9 @@ impl CommandBuilder {
             CLIType::OpenHands => {
                 vec!["openhands".to_string(), task.to_string()]
             }
+            CLIType::Dexter => {
+                vec!["dexter-agent".to_string(), task.to_string()]
+            }
         }
     }
 
@@ -502,6 +512,7 @@ impl CommandBuilder {
             CLIType::Grok => vec!["grok".to_string(), "--version".to_string()],
             CLIType::Qwen => vec!["qwen".to_string(), "--version".to_string()],
             CLIType::OpenHands => vec!["openhands".to_string(), "--version".to_string()],
+            CLIType::Dexter => vec!["dexter-agent".to_string(), "--version".to_string()],
         }
     }
 
@@ -518,6 +529,7 @@ impl CommandBuilder {
             CLIType::Grok => vec!["grok".to_string(), "--help".to_string()],
             CLIType::Qwen => vec!["qwen".to_string(), "--help".to_string()],
             CLIType::OpenHands => vec!["openhands".to_string(), "--help".to_string()],
+            CLIType::Dexter => vec!["dexter-agent".to_string(), "--help".to_string()],
         }
     }
 }

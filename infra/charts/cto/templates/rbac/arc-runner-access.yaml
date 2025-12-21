@@ -1,0 +1,60 @@
+{{- /*
+RBAC for GitHub Actions Runner (ARC) CTO Namespace Access
+
+This template creates Role and RoleBinding that allow GitHub Actions runners
+from the arc-runners namespace to manage resources in the cto namespace.
+
+SECURITY NOTE: Uses Role (namespace-scoped) instead of ClusterRole (cluster-wide)
+This follows the principle of least privilege and prevents runners from accessing
+resources outside the cto namespace.
+
+Scope verification:
+- Runners are deployed in arc-runners namespace
+- Runners manage CodeRun resources in cto namespace
+- ConfigMaps, Deployments, Pods accessed are all in cto namespace
+- No documented use case requires cross-namespace access
+*/ -}}
+
+{{- if .Values.controller.enabled }}
+{{- $namespace := include "cto.namespace" . }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: arc-runner-cto-writer
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+rules:
+  # ConfigMap management for workflow state
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Deployment/ReplicaSet access for CI operations
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  # Pod access for debugging
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arc-runner-cto-writer
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: arc-runner-cto-writer
+subjects:
+  - kind: ServiceAccount
+    name: k8s-runner-gha-rs-no-permission
+    namespace: arc-runners
+{{- end }}
+

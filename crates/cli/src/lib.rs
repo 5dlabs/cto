@@ -95,7 +95,8 @@ pub use adapter::{
     ParsedResponse, ResponseMetadata, StreamingDelta, ToolCall, ToolConfiguration,
 };
 pub use adapters::{
-    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
+    ClaudeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter, GeminiAdapter,
+    OpenCodeAdapter,
 };
 pub use base_adapter::{AdapterConfig, BaseAdapter};
 pub use factory::AdapterFactory;

@@ -4,7 +4,8 @@
 
 use crate::adapter::{AdapterError, AdapterResult, CliAdapter};
 use crate::adapters::{
-    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
+    ClaudeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter, GeminiAdapter,
+    OpenCodeAdapter,
 };
 use crate::base_adapter::AdapterConfig;
 use crate::types::CLIType;
@@ -31,6 +32,7 @@ impl AdapterFactory {
             CLIType::Claude => Arc::new(ClaudeAdapter::with_config(config)?),
             CLIType::Codex => Arc::new(CodexAdapter::with_config(config)?),
             CLIType::Cursor => Arc::new(CursorAdapter::with_config(config)?),
+            CLIType::Dexter => Arc::new(DexterAdapter::with_config(config)?),
             CLIType::Factory => Arc::new(FactoryAdapter::with_config(config)?),
             CLIType::Gemini => Arc::new(GeminiAdapter::with_config(config)?),
             CLIType::OpenCode => Arc::new(OpenCodeAdapter::with_config(config)?),
@@ -51,6 +53,7 @@ impl AdapterFactory {
             CLIType::Claude,
             CLIType::Codex,
             CLIType::Cursor,
+            CLIType::Dexter,
             CLIType::Factory,
             CLIType::Gemini,
             CLIType::OpenCode,

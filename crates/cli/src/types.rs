@@ -14,6 +14,7 @@ const CLI_TYPE_VARIANTS: &[&str] = &[
     "grok",
     "gemini",
     "qwen",
+    "dexter",
 ];
 
 /// Supported CLI types
@@ -39,6 +40,8 @@ pub enum CLIType {
     Gemini,
     /// Alibaba Qwen CLI
     Qwen,
+    /// Dexter Financial Research Agent
+    Dexter,
 }
 
 impl std::fmt::Display for CLIType {
@@ -53,6 +56,7 @@ impl std::fmt::Display for CLIType {
             CLIType::Grok => write!(f, "grok"),
             CLIType::Gemini => write!(f, "gemini"),
             CLIType::Qwen => write!(f, "qwen"),
+            CLIType::Dexter => write!(f, "dexter"),
         }
     }
 }
@@ -73,6 +77,7 @@ impl CLIType {
             "grok" => Some(CLIType::Grok),
             "gemini" => Some(CLIType::Gemini),
             "qwen" => Some(CLIType::Qwen),
+            "dexter" => Some(CLIType::Dexter),
             _ => None,
         }
     }

@@ -5,6 +5,7 @@
 pub mod claude;
 pub mod codex;
 pub mod cursor;
+pub mod dexter;
 pub mod factory;
 pub mod gemini;
 pub mod opencode;
@@ -13,6 +14,7 @@ pub mod opencode;
 pub use claude::ClaudeAdapter;
 pub use codex::CodexAdapter;
 pub use cursor::CursorAdapter;
+pub use dexter::DexterAdapter;
 pub use factory::FactoryAdapter;
 pub use gemini::GeminiAdapter;
 pub use opencode::OpenCodeAdapter;

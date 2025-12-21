@@ -1,0 +1,89 @@
+{{- /*
+RBAC for Argo Workflows Cross-Namespace Access
+
+This template creates RoleBindings that allow the argo-workflow ServiceAccount
+from the automation namespace to manage workflows and resources in the cto namespace.
+
+Required for:
+- Play workflow resumption (patching workflows in cto namespace)
+- CodeRun creation from Argo sensors
+*/ -}}
+
+{{- if .Values.controller.enabled }}
+{{- $namespace := include "cto.namespace" . }}
+---
+# Allow argo-workflow SA from automation namespace to patch workflows in cto namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-cto-binding
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+  annotations:
+    description: "Allows argo-workflow ServiceAccount from automation namespace to patch workflows in cto namespace for Play workflow resumption"
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow
+    namespace: automation
+roleRef:
+  kind: Role
+  name: argo-events-workflows-cto
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role with permissions for argo-workflow operations in cto namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-workflows-cto
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+rules:
+  # Workflow management
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ConfigMap access for workflow state
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Pod access for workflow execution
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # Secret access for workflow credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  # CodeRun management
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns/status"]
+    verbs: ["get", "update", "patch"]
+---
+# Also allow argo-workflow SA in cto namespace to create CodeRuns locally
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-local-binding
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+  annotations:
+    description: "Allows argo-workflow ServiceAccount in cto namespace to create CodeRuns"
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow
+    namespace: {{ $namespace }}
+roleRef:
+  kind: Role
+  name: argo-events-workflows-cto
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+
