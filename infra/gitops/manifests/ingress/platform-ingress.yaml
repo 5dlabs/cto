@@ -1,0 +1,163 @@
+---
+# Platform Ingress Configuration
+# Exposes ArgoCD, Argo Workflows, and Headscale via ingress-nginx
+# DNS records are managed automatically by external-dns via Cloudflare
+
+# ArgoCD Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-ingress
+    app.kubernetes.io/part-of: platform
+  annotations:
+    # external-dns will create DNS record
+    external-dns.alpha.kubernetes.io/hostname: argocd.5dlabs.ai
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    # NGINX ingress configuration
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Increase timeouts for git operations
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: argocd.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443
+  tls:
+    - hosts:
+        - argocd.5dlabs.ai
+      secretName: argocd-server-tls
+---
+# Argo Workflows Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argo-workflows-server
+  namespace: argo
+  labels:
+    app.kubernetes.io/name: argo-workflows-ingress
+    app.kubernetes.io/part-of: platform
+  annotations:
+    # external-dns will create DNS record
+    external-dns.alpha.kubernetes.io/hostname: workflows.5dlabs.ai
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    # NGINX ingress configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Auth mode (if using SSO)
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: workflows.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argo-workflows-server
+                port:
+                  number: 2746
+  tls:
+    - hosts:
+        - workflows.5dlabs.ai
+      secretName: argo-workflows-server-tls
+---
+# Headscale Ingress (for web UI and HTTPS connections)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: headscale
+  namespace: headscale
+  labels:
+    app.kubernetes.io/name: headscale-ingress
+    app.kubernetes.io/part-of: platform
+  annotations:
+    # external-dns will create DNS record
+    external-dns.alpha.kubernetes.io/hostname: headscale.5dlabs.ai
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"  # Direct connection for WireGuard
+    # NGINX ingress configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # WebSocket support for Tailscale control protocol
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "headscale/nginx-headers"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    # Increase timeouts for long-polling
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: headscale.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: headscale
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - headscale.5dlabs.ai
+      secretName: headscale-tls
+---
+# NGINX headers ConfigMap for Headscale WebSocket support
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-headers
+  namespace: headscale
+data:
+  Upgrade: "$http_upgrade"
+  Connection: "upgrade"
+---
+# Hubble UI Ingress (Cilium observability)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: hubble-ui-ingress
+    app.kubernetes.io/part-of: platform
+  annotations:
+    # external-dns will create DNS record
+    external-dns.alpha.kubernetes.io/hostname: hubble.5dlabs.ai
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    # NGINX ingress configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hubble.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hubble-ui
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - hubble.5dlabs.ai
+      secretName: hubble-ui-tls
+

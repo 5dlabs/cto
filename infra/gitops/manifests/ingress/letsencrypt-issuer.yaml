@@ -1,0 +1,42 @@
+---
+# Let's Encrypt ClusterIssuer for production certificates
+# Uses HTTP-01 challenge via ingress-nginx
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Production Let's Encrypt server
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Email for certificate notifications
+    email: admin@5dlabs.ai
+    # Store ACME account key in this secret
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    # HTTP-01 challenge solver using ingress-nginx
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+---
+# Let's Encrypt Staging ClusterIssuer for testing
+# Use this first to avoid rate limits
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Staging Let's Encrypt server (for testing)
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@5dlabs.ai
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+
