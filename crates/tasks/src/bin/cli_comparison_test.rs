@@ -147,6 +147,8 @@ fn get_default_model(cli_type: CLIType) -> &'static str {
         CLIType::Gemini => "gemini-2.5-flash",
         // Qwen: Use Qwen Max
         CLIType::Qwen => "qwen-max",
+        // Dexter: Use Claude Sonnet 4
+        CLIType::Dexter => "claude-sonnet-4-20250514",
     }
 }
 
@@ -162,6 +164,7 @@ fn check_cli_available(cli_type: CLIType) -> bool {
         CLIType::Grok => "grok",
         CLIType::OpenHands => "openhands",
         CLIType::Qwen => "qwen",
+        CLIType::Dexter => "dexter-agent",
     };
 
     // Check PATH
