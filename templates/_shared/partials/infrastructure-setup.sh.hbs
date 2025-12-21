@@ -1,0 +1,127 @@
+# =========================================================================
+# Infrastructure Provisioning Pre-checks
+# =========================================================================
+
+echo ""
+echo "🔧 Infrastructure Provisioning Mode"
+echo "===================================="
+
+# Verify kubectl access
+if ! kubectl auth can-i get pods -n databases &>/dev/null; then
+    echo "⚠️ Limited kubectl access - some verification steps may fail"
+fi
+
+# Check operator availability
+echo "📦 Checking available operators..."
+OPERATORS_AVAILABLE=""
+
+if kubectl get crd clusters.postgresql.cnpg.io &>/dev/null; then
+    echo "  ✓ CloudNative-PG (PostgreSQL)"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}postgresql,"
+fi
+
+if kubectl get crd redis.redis.opstreelabs.in &>/dev/null; then
+    echo "  ✓ Redis Operator (Valkey/Redis)"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}redis,"
+fi
+
+if kubectl get crd kafkas.kafka.strimzi.io &>/dev/null; then
+    echo "  ✓ Strimzi (Kafka)"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}kafka,"
+fi
+
+if kubectl get crd perconaservermongodbs.psmdb.percona.com &>/dev/null; then
+    echo "  ✓ Percona (MongoDB)"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}mongodb,"
+fi
+
+if kubectl get crd rabbitmqclusters.rabbitmq.com &>/dev/null; then
+    echo "  ✓ RabbitMQ Operator"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}rabbitmq,"
+fi
+
+# Check SeaweedFS availability (not a CRD, it's a Helm deployment)
+if kubectl get pods -n seaweedfs -l app.kubernetes.io/name=seaweedfs 2>/dev/null | grep -q Running; then
+    echo "  ✓ SeaweedFS (S3 Storage)"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}seaweedfs,"
+fi
+
+# Check NATS availability
+if kubectl get pods -n nats -l app.kubernetes.io/name=nats 2>/dev/null | grep -q Running; then
+    echo "  ✓ NATS (Messaging)"
+    OPERATORS_AVAILABLE="${OPERATORS_AVAILABLE}nats,"
+fi
+
+export OPERATORS_AVAILABLE
+echo ""
+echo "Available operators: ${OPERATORS_AVAILABLE:-none detected}"
+echo ""
+
+# =========================================================================
+# Infrastructure Verification Functions
+# =========================================================================
+
+verify_postgresql() {
+    local name="$1"
+    local namespace="${2:-databases}"
+    local timeout="${3:-300}"
+    
+    echo "⏳ Waiting for PostgreSQL cluster '$name' to be ready..."
+    if kubectl wait --for=condition=Ready "cluster/${name}" -n "$namespace" --timeout="${timeout}s" 2>/dev/null; then
+        echo "✅ PostgreSQL cluster '$name' is ready"
+        
+        # Output connection info
+        local rw_service="${name}-rw"
+        echo "   Connection: postgresql://<user>:<password>@${rw_service}.${namespace}.svc:5432/<database>"
+        echo "   Secret: ${name}-app"
+        return 0
+    else
+        echo "❌ PostgreSQL cluster '$name' not ready within ${timeout}s"
+        kubectl describe "cluster/${name}" -n "$namespace" 2>/dev/null | tail -20
+        return 1
+    fi
+}
+
+verify_valkey() {
+    local name="$1"
+    local namespace="${2:-databases}"
+    local timeout="${3:-180}"
+    
+    echo "⏳ Waiting for Valkey instance '$name' to be ready..."
+    
+    # The Redis operator doesn't have a standard Ready condition, check pod status
+    local end_time=$(($(date +%s) + timeout))
+    while [ $(date +%s) -lt $end_time ]; do
+        local pod_status=$(kubectl get pods -n "$namespace" -l redis_setup_type=standalone,app="${name}" -o jsonpath='{.items[0].status.phase}' 2>/dev/null)
+        if [ "$pod_status" = "Running" ]; then
+            echo "✅ Valkey instance '$name' is ready"
+            echo "   Connection: redis://${name}.${namespace}.svc:6379"
+            return 0
+        fi
+        sleep 5
+    done
+    
+    echo "❌ Valkey instance '$name' not ready within ${timeout}s"
+    kubectl describe "redis/${name}" -n "$namespace" 2>/dev/null | tail -20
+    return 1
+}
+
+verify_s3_bucket() {
+    local bucket="$1"
+    local endpoint="${2:-http://seaweedfs-filer.seaweedfs.svc:8333}"
+    
+    echo "⏳ Verifying S3 bucket '$bucket'..."
+    
+    # Try to list the bucket (will fail if doesn't exist)
+    if aws s3 ls "s3://${bucket}" --endpoint-url "$endpoint" &>/dev/null; then
+        echo "✅ S3 bucket '$bucket' exists and is accessible"
+        echo "   Endpoint: $endpoint"
+        return 0
+    else
+        echo "⚠️ S3 bucket '$bucket' may not exist yet (will be created by workflow)"
+        return 0  # Non-fatal - bucket might be created during task
+    fi
+}
+
+export -f verify_postgresql verify_valkey verify_s3_bucket
+

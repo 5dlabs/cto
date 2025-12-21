@@ -1,0 +1,17 @@
+# =========================================================================
+# Post-Execution Infrastructure Verification
+# =========================================================================
+
+echo ""
+echo "🔍 Verifying provisioned infrastructure..."
+
+# Check for infra directory and apply if exists
+if [ -d "infra" ]; then
+    echo "  Found infra/ directory with manifests"
+    
+    # List what was created
+    find infra -name "*.yaml" -o -name "*.yml" 2>/dev/null | while read -r manifest; do
+        echo "    - $manifest"
+    done
+fi
+
