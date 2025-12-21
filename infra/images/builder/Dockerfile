@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Rust builder image for fast CI builds
 # Based on official GitHub Actions Runner Controller (ARC) image
 FROM ghcr.io/actions/actions-runner:2.328.0
@@ -176,28 +177,26 @@ RUN mkdir -p /home/runner/.cargo/bin && \
     }
 
 # Set up optimized Cargo config (stay as runner user)
-RUN mkdir -p /home/runner/.cargo && cat > /home/runner/.cargo/config.toml << 'EOF'
+RUN mkdir -p /home/runner/.cargo
+COPY --chown=runner:runner <<EOF /home/runner/.cargo/config.toml
 [build]
 rustc-wrapper = "sccache"
-jobs = 16  # Use all cores
+jobs = 16
 
 [target.x86_64-unknown-linux-gnu]
-# Use mold linker for faster linking
 linker = "/usr/local/bin/clang-mold"
 rustflags = [
-    "-C", "link-arg=-Wl,--threads=16",  # Parallel linking with mold
-    "-C", "target-cpu=x86-64-v2",  # Modern baseline CPU
+    "-C", "link-arg=-Wl,--threads=16",
+    "-C", "target-cpu=x86-64-v2",
 ]
 
-# Fast release profile
 [profile.release]
-codegen-units = 16  # Good parallelism
-lto = false  # Disable LTO for faster builds
+codegen-units = 16
+lto = false
 debug = false
 strip = true
-opt-level = 2  # Good balance of speed and performance
+opt-level = 2
 
-# Fast dev builds
 [profile.dev]
 debug = 0
 strip = "debuginfo"

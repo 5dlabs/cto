@@ -9,7 +9,7 @@
 //! - **CRITICAL**: All nodes MUST be in the same region for cluster networking to work
 //! - Pods on nodes in different regions cannot reach the Kubernetes API (10.96.0.1:443)
 //! - The private VLAN (10.8.0.0/24) only works within a single Latitude.sh site
-//! - If multi-region is needed, use ClusterMesh or configure public API endpoints
+//! - If multi-region is needed, use `ClusterMesh` or configure public API endpoints
 //!
 //! ### Cilium CNI
 //! - The `tunnel` Helm option was removed in Cilium 1.15+
@@ -17,22 +17,38 @@
 //! - Explicit device detection required for bare metal: `devices=eth0,enp+,eno+`
 //! - Without explicit devices, Cilium fails with "unable to determine direct routing device"
 //!
-//! ### ArgoCD Deployment
+//! ### `ArgoCD` Deployment
 //! - The `argocd-redis` init container checks for a pre-existing secret
-//! - Create `argocd-redis` secret manually BEFORE installing ArgoCD, OR
+//! - Create `argocd-redis` secret manually BEFORE installing `ArgoCD`, OR
 //! - Patch the deployment to remove the init container after install
-//! - ArgoCD pods should run on control plane nodes to avoid cross-region API issues
+//! - `ArgoCD` pods should run on control plane nodes to avoid cross-region API issues
 //!
 //! ### Latitude.sh Server Issues
 //! - Servers can get stuck in "off" state indefinitely after provisioning
 //! - Implement stuck server detection (>10min in deploying/off state) with auto-delete+recreate
 //! - Stock availability changes rapidly - check availability before provisioning
-//! - c2-medium-x86 and c2-large-x86 have NVMe disks (/dev/nvme0n1), not SATA (/dev/sda)
+//! - c2-medium-x86 and c2-large-x86 have `NVMe` disks (/dev/nvme0n1), not SATA (/dev/sda)
 //!
 //! ### Talos Configuration
 //! - Worker configs must NOT contain etcd configuration
 //! - Use `talosctl gen config --output-types worker` to generate worker-only configs
 //! - The control plane endpoint should use public IP for multi-region compatibility
+//!
+//! ### local-path-provisioner (Storage)
+//! - Install for clusters without dedicated storage (no Mayastor/dedicated `NVMe` disks)
+//! - MUST run on control plane node in multi-region setups (API access required)
+//! - Namespace `local-path-storage` MUST be labeled `pod-security.kubernetes.io/enforce=privileged`
+//! - Without privileged label, helper pods fail with "hostPath volumes" `PodSecurity` violation
+//! - Set as default `StorageClass`: `storageclass.kubernetes.io/is-default-class=true`
+//!
+//! ### Multi-Region Workarounds (if unavoidable)
+//! - Schedule ALL control plane components on CP node with nodeSelector + tolerations:
+//!   - `ArgoCD` (all deployments and statefulsets)
+//!   - Hubble Relay
+//!   - local-path-provisioner
+//!   - Any pod that needs to reach the K8s API
+//! - Use `internalTrafficPolicy: Local` on services to avoid cross-region routing
+//! - Consider disabling non-critical components (Hubble Relay) in multi-region setups
 
 use anyhow::{Context, Result};
 use std::fs;
@@ -162,10 +178,24 @@ data:
 /// configures the provisioner to use `/var/lib/local-path-provisioner`
 /// instead of the default `/opt/local-path-provisioner` (which is read-only on Talos).
 ///
+/// **LESSON LEARNED (Dec 2024)**: In multi-region setups, the provisioner
+/// must run on the control plane node because it needs to access the K8s API.
+/// Set `schedule_on_control_plane=true` for multi-region clusters.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `schedule_on_control_plane` - If true, schedules provisioner on control plane
+///   with appropriate nodeSelector and tolerations. Use this for multi-region clusters.
+///
 /// # Errors
 ///
 /// Returns an error if kubectl commands fail.
-pub fn deploy_local_path_provisioner(kubeconfig: &Path) -> Result<()> {
+#[allow(clippy::too_many_lines)]
+pub fn deploy_local_path_provisioner(
+    kubeconfig: &Path,
+    schedule_on_control_plane: bool,
+) -> Result<()> {
     println!("   Deploying local-path-provisioner...");
 
     // Step 1: Deploy the base local-path-provisioner
@@ -252,6 +282,39 @@ pub fn deploy_local_path_provisioner(kubeconfig: &Path) -> Result<()> {
             r#"{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}"#,
         ],
     )?;
+
+    // Step 7: Schedule on control plane if multi-region (LESSON LEARNED Dec 2024)
+    // In multi-region setups, the provisioner must run on CP to access the K8s API
+    if schedule_on_control_plane {
+        println!("   Scheduling local-path-provisioner on control plane (multi-region)...");
+        let patch = r#"{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/control-plane":""},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}"#;
+        kubectl(
+            kubeconfig,
+            &[
+                "patch",
+                "deployment",
+                "local-path-provisioner",
+                "-n",
+                "local-path-storage",
+                "--type=strategic",
+                "-p",
+                patch,
+            ],
+        )?;
+
+        // Wait for the patched deployment to roll out
+        let _ = kubectl(
+            kubeconfig,
+            &[
+                "rollout",
+                "status",
+                "deployment/local-path-provisioner",
+                "-n",
+                "local-path-storage",
+                "--timeout=60s",
+            ],
+        );
+    }
 
     println!("   ✅ local-path-provisioner deployed with Talos config");
     Ok(())
@@ -496,11 +559,11 @@ pub fn deploy_cert_manager(kubeconfig: &Path) -> Result<()> {
 ///
 /// # Implementation Notes (Lessons Learned Dec 2024)
 ///
-/// 1. **Redis Init Container Issue**: ArgoCD v2.13+ has an init container that
+/// 1. **Redis Init Container Issue**: `ArgoCD` v2.13+ has an init container that
 ///    checks for a pre-existing `argocd-redis` secret. We pre-create this secret
 ///    to avoid the init container hanging.
 ///
-/// 2. **Control Plane Scheduling**: In multi-region clusters, ArgoCD pods must
+/// 2. **Control Plane Scheduling**: In multi-region clusters, `ArgoCD` pods must
 ///    run on the control plane to access the Kubernetes API. We add tolerations
 ///    and node selectors to ensure this.
 ///
@@ -522,8 +585,10 @@ pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
     let random_password = std::process::Command::new("openssl")
         .args(["rand", "-base64", "32"])
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_else(|_| "default-redis-password".to_string());
+        .map_or_else(
+            |_| "default-redis-password".to_string(),
+            |o| String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        );
 
     let _ = kubectl(
         kubeconfig,

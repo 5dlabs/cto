@@ -1307,8 +1307,9 @@ async fn main() -> Result<()> {
                 );
 
                 // Install local-path-provisioner for bare metal PVCs
+                // Note: Pass `true` for multi-region clusters where provisioner needs CP scheduling
                 println!("\n   Installing local-path-provisioner (for bare metal storage)...");
-                stack::deploy_local_path_provisioner(&kubeconfig_path)?;
+                stack::deploy_local_path_provisioner(&kubeconfig_path, false)?;
 
                 // Deploy core components
                 println!("\n   Deploying Cert-Manager...");
