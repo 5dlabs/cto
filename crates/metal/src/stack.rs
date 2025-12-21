@@ -799,8 +799,11 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "--set",
             "devices=eth0\\,enp+\\,eno+",
             // LESSON LEARNED: Use VXLAN tunnel mode for better bare metal compatibility
+            // Note: 'tunnel' option was removed in Cilium 1.15, replaced with routingMode + tunnelProtocol
             "--set",
-            "tunnel=vxlan",
+            "routingMode=tunnel",
+            "--set",
+            "tunnelProtocol=vxlan",
             // Cluster identity for ClusterMesh
             "--set",
             &cluster_name_arg,

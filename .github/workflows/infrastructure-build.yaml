@@ -76,7 +76,7 @@ jobs:
             version: "1.0.0"
             description: "Visual theme editor for shadcn/ui components"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Check if should build this image
         id: should-build
@@ -160,7 +160,7 @@ jobs:
     runs-on: [k8s-runner]
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 2  # Need HEAD~1 for git diff
 
