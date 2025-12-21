@@ -59,7 +59,7 @@ kubectl apply -f infra/gitops/app-of-apps.yaml
 
 ### Controller
 
-- **Chart**: `infra/charts/controller`
+- **Chart**: `infra/charts/cto`
 - **Namespace**: `cto`
 - **Image Updater**: Enabled
 

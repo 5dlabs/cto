@@ -54,6 +54,14 @@ inputs:
     description: 'Cache destinations'
     required: false
     default: ''
+  provenance:
+    description: 'Enable SLSA provenance attestations (requires id-token: write permission)'
+    required: false
+    default: 'false'
+  sbom:
+    description: 'Enable SBOM attestations (requires id-token: write permission)'
+    required: false
+    default: 'false'
 
 outputs:
   image-tags:
@@ -108,6 +116,10 @@ runs:
         file: ${{ inputs.dockerfile }}
         platforms: ${{ inputs.platforms }}
         push: ${{ inputs.push }}
+        # Attestations disabled by default - avoids GHCR permission issues
+        # Enable with provenance: true if id-token: write permission is available
+        provenance: ${{ inputs.provenance }}
+        sbom: ${{ inputs.sbom }}
         tags: ${{ steps.meta.outputs.tags }}
         build-args: ${{ inputs.build-args }}
         cache-from: ${{ inputs.cache-from }}

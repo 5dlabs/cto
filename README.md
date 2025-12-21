@@ -1394,32 +1394,34 @@ The platform uses a template system to customize agent behavior, settings, and p
 
 ### Template Architecture
 
-All templates live under `infra/charts/controller/agent-templates/` with CLI-specific subdirectories:
+All templates live under `templates/` with agent and CLI-specific subdirectories:
 
-**Intake Templates (Multi-CLI Support)**
+**Agent Templates**
 
-`intake()` handles all project onboarding and documentation generation. Templates are CLI-specific:
+Each agent has workflow-specific templates in `templates/agents/{agent}/{workflow}/`:
 
-- **Prompts**: Rendered from `intake/{cli}/prompt.md.hbs` into the ConfigMap
-- **Settings**: `intake/{cli}/settings.json.hbs` controls model, permissions, tools
-- **Container Script**: `intake/{cli}/container.sh.hbs` handles Git workflow and CLI execution
+- **System Prompts**: `templates/agents/{agent}/{workflow}/system-prompt.md.hbs`
+- **Container Scripts**: `templates/agents/{agent}/{workflow}/container.sh.hbs`
 
-**Play Templates (Multi-CLI)**
+Examples:
+- Morgan intake: `templates/agents/morgan/intake/`
+- Rex coder: `templates/agents/rex/coder/`
+- Blaze coder: `templates/agents/blaze/coder/`
 
-`play()` orchestrates a series of agent runs through multiple phases. Each phase uses CLI-specific templates:
+**CLI Templates**
 
-- **Claude**: `play/claude/**`
-  - Settings: `play/claude/settings.json.hbs`
-  - Container: `play/claude/container.sh.hbs`
-- **Codex**: `play/codex/**`
-  - Agents memory: `play/codex/agents.md.hbs`
-  - Config: `play/codex/config.toml.hbs`
-  - Container scripts: `play/codex/container*.sh.hbs`
-- **Factory**: `play/factory/**`
-  - Agents memory: `play/factory/agents*.md.hbs`
-  - Config: `play/factory/factory-cli-config.json.hbs`
-  - Container scripts: `play/factory/container*.sh.hbs`
-- **Shared assets**: `play/mcp.json.hbs`, `play/coding-guidelines.md.hbs`, and `play/github-guidelines.md.hbs`
+Each CLI has an invoke script in `templates/clis/{cli}/`:
+
+- **Claude**: `templates/clis/claude/invoke.sh.hbs`
+- **Codex**: `templates/clis/codex/invoke.sh.hbs`
+- **Factory**: `templates/clis/factory/invoke.sh.hbs`
+- **Gemini**: `templates/clis/gemini/invoke.sh.hbs`
+
+**Shared Templates**
+
+Shared partials and utilities in `templates/_shared/`:
+- Container base: `templates/_shared/container.sh.hbs`
+- Partials: `templates/_shared/partials/` (git-setup, tools-config, etc.)
 
 **Play Workflow Orchestration**
 
@@ -1434,17 +1436,18 @@ All templates live under `infra/charts/controller/agent-templates/` with CLI-spe
 Edit the settings template files for your chosen CLI:
 
 ```bash
-# For intake agents (Claude Code example)
-vim infra/charts/controller/agent-templates/intake/claude/settings.json.hbs
+# For Morgan intake agent
+vim templates/agents/morgan/intake/system-prompt.md.hbs
 
-# For play agents (Claude Code example)
-vim infra/charts/controller/agent-templates/play/claude/settings.json.hbs
+# For Rex coder agent
+vim templates/agents/rex/coder/system-prompt.md.hbs
 
-# For play agents (Codex example)
-vim infra/charts/controller/agent-templates/play/codex/config.toml.hbs
+# For Blaze coder agent
+vim templates/agents/blaze/coder/system-prompt.md.hbs
 
-# For play agents (Factory example)
-vim infra/charts/controller/agent-templates/play/factory/factory-cli-config.json.hbs
+# For CLI invoke scripts
+vim templates/clis/claude/invoke.sh.hbs
+vim templates/clis/factory/invoke.sh.hbs
 ```
 
 Settings control:
@@ -1466,12 +1469,12 @@ Refer to your CLI's documentation for complete configuration options:
 **For intake templates** (affects project onboarding — `intake()` handles all documentation):
 
 ```bash
-# Edit the intake prompt template for your CLI
-vim infra/charts/controller/agent-templates/intake/{cli}/prompt.md.hbs
+# Edit the intake system prompt template
+vim templates/agents/morgan/intake/system-prompt.md.hbs
 
-# Examples:
-vim infra/charts/controller/agent-templates/intake/claude/prompt.md.hbs
-vim infra/charts/controller/agent-templates/intake/cursor/prompt.md.hbs
+# Edit shared partials used across templates
+vim templates/_shared/partials/git-setup.sh.hbs
+vim templates/_shared/partials/tools-config.sh.hbs
 ```
 
 **For play templates** (affects task implementation via `play()`):
@@ -1489,7 +1492,7 @@ vim {docs_project_directory}/tasks/task-{id}/acceptance-criteria.md
 
 ```bash
 # Edit the play workflow template
-vim infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml
+vim infra/charts/cto/templates/controller/workflow-rbac.yaml
 ```
 
 The play workflow template controls:
@@ -1504,9 +1507,9 @@ After editing any template files, redeploy the cto:
 
 ```bash
 # Deploy template changes
-helm upgrade cto infra/charts/controller -n cto
+helm upgrade cto infra/charts/cto -n cto
 
-# Verify ConfigMap was updated (fullname = <release>-controller)
+# Verify ConfigMap was updated
 kubectl get configmap cto-controller-agent-templates -n cto -o yaml
 ```
 

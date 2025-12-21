@@ -272,6 +272,9 @@ jobs:
           file: ./infra/images/tools/Dockerfile
           platforms: linux/amd64
           push: true
+          # Disable attestations - avoids GHCR permission issues
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
@@ -333,6 +336,9 @@ jobs:
           file: ./infra/images/controller/Dockerfile
           platforms: linux/amd64
           push: true
+          # Disable attestations - avoids GHCR permission issues
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
@@ -394,6 +400,9 @@ jobs:
           file: ./infra/images/healer/Dockerfile
           platforms: linux/amd64
           push: true
+          # Disable attestations - avoids GHCR permission issues
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:v${{ needs.plan.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest

@@ -25,10 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize handlebars engine
     let mut handlebars = Handlebars::new();
 
-    // Template directory - relative path from controller directory to infra/charts/controller/templates
+    // Template directory - relative path from controller directory to infra/charts/cto/templates
     // Navigate from CARGO_MANIFEST_DIR (crates/controller) up to workspace root
     let template_dir =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../infra/charts/controller/templates");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../infra/charts/cto/templates");
 
     // Register shared partials first (these are used by CLI-specific templates)
     register_shared_partials(&mut handlebars, &template_dir)?;

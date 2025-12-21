@@ -8,7 +8,7 @@ Introduce a deliberate git error into Rex's container template to test the alert
 
 1. Create a new branch: `test/rex-git-failure-simulation`
 
-2. Edit the file: `infra/charts/controller/agent-templates/code/factory/container-rex.sh.hbs`
+2. Edit the file: `templates/agents/rex/container.sh.hbs`
 
 3. Add the following BEFORE the `factory_container_base` partial include:
 
