@@ -1,5 +1,21 @@
 # Repository Guidelines
 
+## Git Workflow
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **Base Branch** | `develop` | All PRs should target `develop`, not `main` |
+| **Release Branch** | `main` | Protected, releases only |
+| **Feature Branches** | `feat/<name>` | Branch from `develop` |
+| **Bugfix Branches** | `fix/<name>` | Branch from `develop` |
+
+**Important:** Always create new branches from `develop`:
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feat/my-feature
+```
+
 ## Play Workflow Overview
 
 The CTO platform uses a multi-agent orchestration system called **Play** to take PRDs to shipped features.

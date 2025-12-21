@@ -1,0 +1,144 @@
+---
+# Tailscale Subnet Router Deployment
+# Runs Tailscale client connected to Headscale, advertising cluster networks
+#
+# Prerequisites:
+# 1. Headscale must be running
+# 2. Create auth key: kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable
+# 3. Store auth key in secret: kubectl create secret generic tailscale-auth -n headscale --from-literal=TS_AUTHKEY=<key>
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tailscale-subnet-router
+  namespace: headscale
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tailscale-subnet-router
+  namespace: headscale
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tailscale-subnet-router
+  namespace: headscale
+subjects:
+  - kind: ServiceAccount
+    name: tailscale-subnet-router
+    namespace: headscale
+roleRef:
+  kind: Role
+  name: tailscale-subnet-router
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tailscale-subnet-router
+  namespace: headscale
+  labels:
+    app.kubernetes.io/name: tailscale-subnet-router
+    app.kubernetes.io/component: networking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale-subnet-router
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tailscale-subnet-router
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: tailscale-subnet-router
+    spec:
+      serviceAccountName: tailscale-subnet-router
+      
+      # Schedule on control plane for reliable connectivity
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+      
+      containers:
+        - name: tailscale
+          image: tailscale/tailscale:v1.76.6
+          imagePullPolicy: IfNotPresent
+          
+          env:
+            # Connect to our Headscale server
+            - name: TS_CONTROL_URL
+              value: "https://headscale.5dlabs.ai"
+            
+            # Auth key from secret (created manually after Headscale is up)
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tailscale-auth
+                  key: TS_AUTHKEY
+                  optional: true
+            
+            # Subnet routes to advertise
+            # - 10.96.0.0/12: Kubernetes service CIDR
+            # - 10.244.0.0/16: Pod CIDR (adjust based on your cluster config)
+            - name: TS_ROUTES
+              value: "10.96.0.0/12,10.244.0.0/16"
+            
+            # Accept routes from other nodes
+            - name: TS_ACCEPT_ROUTES
+              value: "true"
+            
+            # Run as subnet router
+            - name: TS_USERSPACE
+              value: "false"
+            
+            # State directory
+            - name: TS_STATE_DIR
+              value: "/var/lib/tailscale"
+            
+            # Hostname in Tailscale network
+            - name: TS_HOSTNAME
+              value: "k8s-subnet-router"
+            
+            # Extra args for subnet routing
+            - name: TS_EXTRA_ARGS
+              value: "--advertise-exit-node=false"
+          
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+            privileged: false
+          
+          volumeMounts:
+            - name: tailscale-state
+              mountPath: /var/lib/tailscale
+            - name: dev-net-tun
+              mountPath: /dev/net/tun
+          
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      
+      volumes:
+        - name: tailscale-state
+          emptyDir: {}
+        - name: dev-net-tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
+

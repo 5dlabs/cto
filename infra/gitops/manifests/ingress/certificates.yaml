@@ -1,0 +1,68 @@
+---
+# TLS Certificates for Platform Ingresses
+# Uses cert-manager with Let's Encrypt (or self-signed for internal)
+
+# ArgoCD Server Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-server-tls
+  namespace: argocd
+spec:
+  secretName: argocd-server-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - argocd.5dlabs.ai
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # 15 days
+---
+# Argo Workflows Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argo-workflows-server-tls
+  namespace: argo
+spec:
+  secretName: argo-workflows-server-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - workflows.5dlabs.ai
+  duration: 2160h
+  renewBefore: 360h
+---
+# Headscale Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: headscale-tls
+  namespace: headscale
+spec:
+  secretName: headscale-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - headscale.5dlabs.ai
+  duration: 2160h
+  renewBefore: 360h
+---
+# Hubble UI Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hubble-ui-tls
+  namespace: kube-system
+spec:
+  secretName: hubble-ui-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - hubble.5dlabs.ai
+  duration: 2160h
+  renewBefore: 360h
+
