@@ -1,0 +1,52 @@
+---
+# Platform Ingress Application
+# Deploys ingress resources for ArgoCD, Argo Workflows, Headscale, and Hubble UI
+# DNS records are automatically created via external-dns
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-ingress
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: platform-ingress
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: networking
+  annotations:
+    # Deploy after ingress-nginx and external-dns are ready
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    path: infra/gitops/manifests/ingress
+    targetRevision: develop
+
+  destination:
+    server: https://kubernetes.default.svc
+    # Resources are deployed to their respective namespaces (argocd, argo, headscale, kube-system)
+    namespace: default
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+
+  revisionHistoryLimit: 5
+

@@ -1,0 +1,129 @@
+---
+# Headscale - Self-hosted Tailscale control server
+# Provides WireGuard-based VPN access to the cluster
+#
+# After deployment:
+# 1. Create a user: kubectl exec -n headscale deploy/headscale -- headscale users create admin
+# 2. Create a preauth key: kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable --expiration 24h
+# 3. Install Tailscale client on your machine and connect using the preauth key
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: headscale
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: headscale
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: networking
+  annotations:
+    # Deploy after ingress is ready
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://charts.gabe565.com
+    chart: headscale
+    targetRevision: 0.16.0
+    helm:
+      values: |
+        image:
+          repository: ghcr.io/juanfont/headscale
+          tag: v0.25.0
+
+        args: ["serve"]
+
+        env:
+          # Server URL - clients connect here (via Cloudflare)
+          HEADSCALE_SERVER_URL: "https://headscale.5dlabs.ai"
+          
+          # MagicDNS base domain (must be different from server_url)
+          HEADSCALE_DNS_BASE_DOMAIN: "vpn.5dlabs.ai"
+          
+          # Node IP prefixes (Tailscale default range)
+          HEADSCALE_PREFIXES_V4: "100.64.0.0/10"
+          HEADSCALE_PREFIXES_V6: "fd7a:115c:a1e0::/48"
+          
+          # DNS servers
+          HEADSCALE_DNS_NAMESERVERS_GLOBAL: "1.1.1.1 8.8.8.8"
+          HEADSCALE_DNS_MAGIC_DNS: "true"
+          
+          # Use public Tailscale DERP servers for NAT traversal
+          HEADSCALE_DERP_URLS: "https://controlplane.tailscale.com/derpmap/default"
+          HEADSCALE_DERP_AUTO_UPDATE_ENABLED: "true"
+          
+          # Logging
+          HEADSCALE_LOG_LEVEL: "info"
+          
+          # Database - SQLite for simplicity
+          HEADSCALE_DATABASE_TYPE: "sqlite"
+          HEADSCALE_DATABASE_SQLITE_PATH: "/var/lib/headscale/db.sqlite"
+
+        service:
+          main:
+            type: ClusterIP
+            ports:
+              http:
+                port: 8080
+              metrics:
+                port: 9090
+
+        # Persistence for SQLite database
+        persistence:
+          config:
+            enabled: true
+            mountPath: /var/lib/headscale
+            storageClass: "local-path"
+            accessMode: ReadWriteOnce
+            size: 1Gi
+
+        # Schedule on control plane for reliable API access
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+
+        tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+
+        # Pod labels for observability
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: headscale
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: headscale
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5
