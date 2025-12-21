@@ -23,9 +23,10 @@ pub struct InstallCommand {
     #[arg(long)]
     cluster_name: String,
 
-    /// Region/site for server provisioning (e.g., "MIA2", "DAL").
+    /// Region/site for server provisioning (e.g., "DAL", "MIA2").
     /// If --auto-region is set, this is ignored.
-    #[arg(long, default_value = "MIA2")]
+    /// LESSON LEARNED: DAL has excellent value with c2-large-x86 (20 cores, 128GB @ $0.39/hr)
+    #[arg(long, default_value = "DAL")]
     region: String,
 
     /// Automatically select the best available region based on stock.
@@ -33,15 +34,19 @@ pub struct InstallCommand {
     auto_region: bool,
 
     /// Fallback regions to try if --auto-region is set (comma-separated).
-    #[arg(long, value_delimiter = ',', default_value = "MIA2,DAL,ASH,LAX")]
+    /// LESSON LEARNED: DAL first for best value, then MIA2 for c1-tiny availability.
+    #[arg(long, value_delimiter = ',', default_value = "DAL,MIA2,LAX,ASH")]
     fallback_regions: Vec<String>,
 
     /// Control plane server plan.
+    /// For production, c2-small-x86 (4 cores, 32GB) is sufficient for control plane.
     #[arg(long, default_value = "c2-small-x86")]
     cp_plan: String,
 
     /// Worker server plan.
-    #[arg(long, default_value = "c2-small-x86")]
+    /// LESSON LEARNED: c2-large-x86 in DAL is excellent value (20 cores, 128GB @ $0.39/hr).
+    /// Use smaller plans like c1-tiny-x86 or c2-small-x86 for dev clusters.
+    #[arg(long, default_value = "c2-large-x86")]
     worker_plan: String,
 
     /// Total node count (1 control plane + N-1 workers).

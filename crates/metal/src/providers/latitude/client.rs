@@ -30,6 +30,10 @@ const POLL_INTERVAL_SECS: u64 = 10;
 /// This gives the Latitude API time to fully register the server as ready.
 const POST_READY_BUFFER_SECS: u64 = 15;
 
+/// Maximum time a server can stay in "off" or "deploying" state before considered stuck.
+/// LESSON LEARNED: Servers can get permanently stuck in "off" state (Dec 2024).
+const SERVER_STUCK_TIMEOUT_SECS: u64 = 600; // 10 minutes
+
 /// Maximum retries for reinstall when server reports "still provisioning".
 const REINSTALL_MAX_RETRIES: u32 = 6;
 
@@ -268,6 +272,10 @@ impl Provider for Latitude {
         let start = std::time::Instant::now();
         let timeout = Duration::from_secs(timeout_secs);
 
+        // Track time spent in each status to detect stuck servers
+        let mut status_start = std::time::Instant::now();
+        let mut last_status = ServerStatus::Unknown;
+
         loop {
             let server = self.get_server(id).await?;
 
@@ -277,6 +285,18 @@ impl Provider for Latitude {
                 elapsed_secs = start.elapsed().as_secs(),
                 "Polling server status via API"
             );
+
+            // Track status changes for stuck detection
+            if server.status != last_status {
+                info!(
+                    server_id = %id,
+                    old_status = %last_status,
+                    new_status = %server.status,
+                    "Server status changed"
+                );
+                last_status = server.status.clone();
+                status_start = std::time::Instant::now();
+            }
 
             if server.status == ServerStatus::On {
                 info!(
@@ -290,6 +310,25 @@ impl Provider for Latitude {
                 tokio::time::sleep(Duration::from_secs(POST_READY_BUFFER_SECS)).await;
                 info!(server_id = %id, "Server is ready");
                 return Ok(server);
+            }
+
+            // LESSON LEARNED (Dec 2024): Servers can get stuck in "off" or "deploying"
+            // state indefinitely. Detect this condition and return a specific error.
+            let status_duration = status_start.elapsed();
+            if (server.status == ServerStatus::Off || server.status == ServerStatus::Deploying)
+                && status_duration.as_secs() > SERVER_STUCK_TIMEOUT_SECS
+            {
+                warn!(
+                    server_id = %id,
+                    status = %server.status,
+                    stuck_duration_secs = status_duration.as_secs(),
+                    "Server appears stuck - may need to be deleted and recreated"
+                );
+                return Err(ProviderError::ServerStuck {
+                    id: id.to_string(),
+                    status: server.status.to_string(),
+                    duration_secs: status_duration.as_secs(),
+                });
             }
 
             if start.elapsed() > timeout {

@@ -747,6 +747,14 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
     helm(kubeconfig, &["repo", "update"])?;
 
     // Install Cilium with ClusterMesh-ready configuration and Talos-specific settings
+    //
+    // LESSONS LEARNED from bare metal deployment (Dec 2024):
+    // 1. Cilium may fail with "unable to determine direct routing device" on bare metal
+    //    - Fixed by explicit device detection regex: eth0, enp*, eno*
+    // 2. BPF filesystem must NOT be auto-mounted (Talos has it read-only at /sys/fs/bpf)
+    //    - Fixed by setting bpf.autoMount.enabled=false
+    // 3. VXLAN tunnel mode is more reliable than native routing on bare metal
+    //    - Explicit tunnel=vxlan setting
     let cluster_name_arg = format!("cluster.name={cluster_name}");
     let cluster_id_arg = format!("cluster.id={cluster_id}");
 
@@ -760,7 +768,7 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "--namespace",
             "kube-system",
             "--version",
-            "1.15.6",
+            "1.16.4",
             // IPAM mode
             "--set",
             "ipam.mode=kubernetes",
@@ -781,6 +789,18 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "cgroup.autoMount.enabled=false",
             "--set",
             "cgroup.hostRoot=/sys/fs/cgroup",
+            // LESSON LEARNED: BPF filesystem must not be auto-mounted on Talos
+            // Talos has /sys/fs/bpf as read-only, Cilium must use existing mount
+            "--set",
+            "bpf.autoMount.enabled=false",
+            // LESSON LEARNED: Explicit device detection for bare metal
+            // Without this, Cilium may fail with "unable to determine direct routing device"
+            // Common NIC patterns: eth0 (generic), enp* (systemd predictable), eno* (onboard)
+            "--set",
+            "devices=eth0\\,enp+\\,eno+",
+            // LESSON LEARNED: Use VXLAN tunnel mode for better bare metal compatibility
+            "--set",
+            "tunnel=vxlan",
             // Cluster identity for ClusterMesh
             "--set",
             &cluster_name_arg,
@@ -799,6 +819,8 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "--set",
             "hubble.ui.enabled=true",
             "--wait",
+            "--timeout",
+            "10m",
         ],
     )?;
 

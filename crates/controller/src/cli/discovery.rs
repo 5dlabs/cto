@@ -206,7 +206,9 @@ impl DiscoveryService {
     fn get_version_command(cli_type: CLIType) -> (&'static str, Vec<&'static str>) {
         match cli_type {
             CLIType::Claude => ("claude-code", vec!["--version"]),
+            CLIType::Code => ("code", vec!["--version"]),
             CLIType::Codex => ("codex", vec!["--version"]),
+            CLIType::Dexter => ("dexter-agent", vec!["--help"]),
             CLIType::OpenCode => ("opencode", vec!["--version"]),
             CLIType::Cursor => ("cursor-agent", vec!["--version"]),
             CLIType::Factory => ("droid", vec!["--version"]),

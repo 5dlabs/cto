@@ -24,6 +24,17 @@ pub enum ProviderError {
     #[error("Operation timed out after {0} seconds")]
     Timeout(u64),
 
+    /// Server is stuck in a non-responsive state.
+    /// LESSON LEARNED (Dec 2024): Servers can get stuck in "off" or "deploying"
+    /// state indefinitely. When this happens, the server must be deleted and
+    /// recreated.
+    #[error("Server {id} stuck in '{status}' state for {duration_secs}s - delete and recreate")]
+    ServerStuck {
+        id: String,
+        status: String,
+        duration_secs: u64,
+    },
+
     /// Invalid configuration.
     #[error("Invalid configuration: {0}")]
     Config(String),
