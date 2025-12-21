@@ -100,6 +100,17 @@ pub struct InstallConfig {
     /// Talos Linux version (e.g., "v1.9.0").
     pub talos_version: String,
     /// Install disk path (e.g., "/dev/sda", "/dev/nvme0n1").
+    ///
+    /// ## LESSON LEARNED (Dec 2024)
+    /// Different Latitude.sh server plans have different disk types:
+    /// - **c1-tiny-x86**: SATA SSD → `/dev/sda`
+    /// - **c2-small-x86**: SATA SSD → `/dev/sda`
+    /// - **c2-medium-x86**: 2x NVMe SSD → `/dev/nvme0n1`
+    /// - **c2-large-x86**: 2x NVMe SSD → `/dev/nvme0n1`
+    /// - **c3-***: NVMe SSD → `/dev/nvme0n1`
+    /// - **m4-***: NVMe SSD → `/dev/nvme0n1`
+    ///
+    /// Use `detect_install_disk()` to auto-detect based on plan type.
     pub install_disk: String,
 
     // Storage
@@ -206,6 +217,41 @@ impl InstallConfig {
     #[must_use]
     pub fn talosconfig_path(&self) -> PathBuf {
         self.output_dir.join("talosconfig")
+    }
+
+    /// Detect the correct install disk based on server plan type.
+    ///
+    /// ## LESSON LEARNED (Dec 2024)
+    /// Latitude.sh server plans use different disk types:
+    /// - c1-*/c2-small-x86: SATA SSD → /dev/sda
+    /// - c2-medium-x86, c2-large-x86, c3-*, m4-*, s3-*: NVMe → /dev/nvme0n1
+    ///
+    /// Using the wrong disk path causes Talos installation to fail silently
+    /// or the server to become unreachable after config apply.
+    #[must_use]
+    #[allow(dead_code)] // Utility function for future use
+    pub fn detect_install_disk(plan: &str) -> String {
+        // Plans that use NVMe storage
+        let nvme_plans = [
+            "c2-medium",
+            "c2-large",
+            "c3-",
+            "m4-",
+            "s2-",
+            "s3-",
+            "f4-",
+            "rs4-",
+            "g3-",
+        ];
+
+        for prefix in nvme_plans {
+            if plan.starts_with(prefix) {
+                return "/dev/nvme0n1".into();
+            }
+        }
+
+        // Default to SATA for c1-tiny, c2-small, and unknown plans
+        "/dev/sda".into()
     }
 }
 
