@@ -1,0 +1,196 @@
+# =========================================================================
+# Every Code CLI Invocation Partial
+#
+# This partial handles ONLY the Every Code CLI command building and execution.
+# Every Code is a fork of OpenAI Codex with multi-agent support, browser
+# integration, and enhanced reasoning controls.
+# https://github.com/just-every/code
+#
+# Required context variables:
+#   - CLAUDE_WORK_DIR: Working directory for execution (uses CODE_WORK_DIR internally)
+#   - PROMPT_CONTENT: The prompt to send (or read from task/prompt.md)
+#
+# Optional context variables:
+#   - model: Model to use (gpt-5.1, claude-opus, gemini-2.5-pro, etc.)
+#   - sandbox_mode: read-only, workspace-write, danger-full-access (default: workspace-write)
+#   - no_approval: If true, skip approval prompts (default: true for CI)
+#   - reasoning_effort: low, medium, high (default: medium)
+#   - multi_agent_mode: plan, solve, code, auto (optional, for multi-agent workflows)
+#   - profile: Config profile to use (planning, implementation, quickfix, review)
+#   - read_only: If true, prevent file modifications
+#   - debug: If true, enable API request logging
+#   - browser_cdp_port: Chrome DevTools Protocol port for browser integration
+#
+# Multi-Agent Modes (Every Code's killer feature):
+#   /plan  - Claude + Gemini + GPT-5 create consolidated plan (consensus)
+#   /solve - Fastest-first race between models (arxiv.org/abs/2505.17813)
+#   /code  - Multi-worktree implementation with consensus review
+#   /auto  - Auto Drive: multi-step task orchestration
+#
+# CTO Integration Recommendations:
+#   - Planning tasks (Morgan intake): Use /plan for task breakdown
+#   - Implementation (Rex/Blaze): Use default or /code for features
+#   - Bug fixes/debugging: Use /solve for fastest resolution
+#   - Multi-step orchestration: Use /auto for autonomous sequences
+# =========================================================================
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "║              EVERY CODE CLI INVOCATION                       ║"
+echo "║       https://github.com/just-every/code                     ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Build Every Code command
+CODE_CMD=("code")
+
+# Working directory
+CODE_WORK_DIR="${CLAUDE_WORK_DIR:-/workspace}"
+cd "$CODE_WORK_DIR"
+echo "✓ Working directory: $CODE_WORK_DIR"
+
+# Model selection (supports multiple providers: OpenAI, Anthropic, Google, Qwen)
+{{#if model}}
+CODE_CMD+=("--model" "{{model}}")
+echo "✓ Model: {{model}}"
+{{else}}
+# Default to GPT-5.1 (Every Code default)
+CODE_CMD+=("--model" "gpt-5.1")
+echo "✓ Model: gpt-5.1 (default)"
+{{/if}}
+
+# Config profile activation (planning, implementation, quickfix, review)
+{{#if profile}}
+CODE_CMD+=("--config" "profile={{profile}}")
+echo "✓ Profile: {{profile}}"
+{{/if}}
+
+# Sandbox mode
+{{#if sandbox_mode}}
+CODE_CMD+=("--sandbox" "{{sandbox_mode}}")
+echo "✓ Sandbox mode: {{sandbox_mode}}"
+{{else}}
+CODE_CMD+=("--sandbox" "workspace-write")
+echo "✓ Sandbox mode: workspace-write (default)"
+{{/if}}
+
+# Approval mode - default to no-approval for CI/automation
+{{#if no_approval}}
+CODE_CMD+=("--no-approval")
+echo "✓ Approval prompts: disabled"
+{{else}}
+{{#unless interactive}}
+CODE_CMD+=("--no-approval")
+echo "✓ Approval prompts: disabled (non-interactive)"
+{{/unless}}
+{{/if}}
+
+# Read-only mode (for review/analysis tasks)
+{{#if read_only}}
+CODE_CMD+=("--read-only")
+echo "✓ Read-only mode: enabled"
+{{/if}}
+
+# Debug mode for API logging (useful for troubleshooting agent runs)
+{{#if debug}}
+CODE_CMD+=("--debug")
+echo "✓ Debug mode: enabled (API requests will be logged)"
+{{/if}}
+
+# OSS mode for local open source models (via Ollama, KubeAI, etc.)
+{{#if oss_mode}}
+CODE_CMD+=("--oss")
+echo "✓ OSS mode: enabled (using local models)"
+{{/if}}
+
+# Browser integration via Chrome DevTools Protocol
+# Enables UI testing and browser automation during play workflow
+{{#if browser_cdp_port}}
+echo "✓ Browser CDP enabled on port {{browser_cdp_port}}"
+# Note: Browser connection is done via /chrome command in prompt
+BROWSER_INIT="/chrome {{browser_cdp_port}}\n"
+{{else}}
+BROWSER_INIT=""
+{{/if}}
+
+# Determine prompt source
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    PROMPT_TEXT="$PROMPT_CONTENT"
+elif [ -f "$CODE_WORK_DIR/task/prompt.md" ]; then
+    PROMPT_TEXT=$(cat "$CODE_WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+elif [ -f "$CODE_WORK_DIR/task/prompt.xml" ]; then
+    PROMPT_TEXT=$(cat "$CODE_WORK_DIR/task/prompt.xml")
+    echo "✓ Using prompt from task/prompt.xml"
+else
+    echo "❌ ERROR: No prompt content available"
+    exit 1
+fi
+
+# Multi-agent mode handling
+# Every Code supports: /plan, /solve, /code, /auto
+{{#if multi_agent_mode}}
+{{#eq multi_agent_mode "plan"}}
+# Plan mode: Claude + Gemini + GPT-5 consensus for planning
+# Best for: Morgan intake, complex task breakdown, architecture decisions
+PROMPT_TEXT="/plan $PROMPT_TEXT"
+echo "✓ Multi-agent mode: /plan (consensus planning)"
+echo "  → Claude, Gemini, and GPT-5 will review and create consolidated plan"
+{{/eq}}
+{{#eq multi_agent_mode "solve"}}
+# Solve mode: Fastest-first race for problem solving
+# Best for: Bug fixes, debugging, quick problems (see arxiv.org/abs/2505.17813)
+PROMPT_TEXT="/solve $PROMPT_TEXT"
+echo "✓ Multi-agent mode: /solve (fastest-first race)"
+echo "  → Multiple models race; first successful solution wins"
+{{/eq}}
+{{#eq multi_agent_mode "code"}}
+# Code mode: Multi-worktree implementation with consensus
+# Best for: Complex features, cross-file changes, major implementations
+PROMPT_TEXT="/code $PROMPT_TEXT"
+echo "✓ Multi-agent mode: /code (consensus implementation)"
+echo "  → Multiple worktrees with consensus review of best solution"
+{{/eq}}
+{{#eq multi_agent_mode "auto"}}
+# Auto Drive: Multi-step task orchestration
+# Best for: Play workflow, autonomous multi-step tasks
+PROMPT_TEXT="/auto $PROMPT_TEXT"
+echo "✓ Multi-agent mode: /auto (Auto Drive)"
+echo "  → Agent will coordinate approvals and multi-step execution"
+{{/eq}}
+{{/if}}
+
+# Prepend browser initialization if needed
+if [ -n "$BROWSER_INIT" ]; then
+    PROMPT_TEXT="${BROWSER_INIT}${PROMPT_TEXT}"
+fi
+
+# Add prompt as the final argument
+CODE_CMD+=("$PROMPT_TEXT")
+
+echo ""
+echo "🚀 Every Code Command:"
+echo "   code [options] \"<prompt>\""
+echo ""
+echo "📋 Configuration Summary:"
+echo "   Model: ${CODE_CMD[2]:-gpt-5.1}"
+{{#if multi_agent_mode}}
+echo "   Multi-agent: {{multi_agent_mode}}"
+{{/if}}
+{{#if profile}}
+echo "   Profile: {{profile}}"
+{{/if}}
+echo ""
+
+# Execute Every Code
+echo "Starting Every Code execution..."
+"${CODE_CMD[@]}"
+CODE_EXIT_CODE=$?
+
+echo ""
+if [ $CODE_EXIT_CODE -eq 0 ]; then
+    echo "✓ Every Code execution completed successfully"
+else
+    echo "❌ Every Code execution failed (exit code: $CODE_EXIT_CODE)"
+fi
+
+exit $CODE_EXIT_CODE
+

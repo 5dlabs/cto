@@ -156,6 +156,19 @@
         "ARGOCD_BASE_URL": "http://192.168.1.77:30080",
         "ARGOCD_API_TOKEN": "${ARGOCD_API_TOKEN}"
       }
+    },
+    "latitudesh": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": [
+        "-y",
+        "latitudesh",
+        "start",
+        "--bearer",
+        "${LATITUDE_API_KEY}"
+      ],
+      "env": {
+        "LATITUDE_API_KEY": "${LATITUDE_API_KEY}"
+      }
     }
   }
 }

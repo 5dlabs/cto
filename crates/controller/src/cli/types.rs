@@ -6,7 +6,9 @@ use std::collections::HashMap;
 
 const CLI_TYPE_VARIANTS: &[&str] = &[
     "claude",
+    "code",
     "codex",
+    "dexter",
     "opencode",
     "cursor",
     "factory",
@@ -22,8 +24,12 @@ const CLI_TYPE_VARIANTS: &[&str] = &[
 pub enum CLIType {
     /// Anthropic Claude Code CLI
     Claude,
+    /// Every Code CLI (just-every/code fork of Codex)
+    Code,
     /// `OpenAI` Codex CLI
     Codex,
+    /// Dexter Agent CLI (financial research)
+    Dexter,
     /// `OpenCode` AI CLI
     OpenCode,
     /// Cursor Agent
@@ -44,7 +50,9 @@ impl std::fmt::Display for CLIType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CLIType::Claude => write!(f, "claude"),
+            CLIType::Code => write!(f, "code"),
             CLIType::Codex => write!(f, "codex"),
+            CLIType::Dexter => write!(f, "dexter"),
             CLIType::OpenCode => write!(f, "opencode"),
             CLIType::Cursor => write!(f, "cursor"),
             CLIType::Factory => write!(f, "factory"),
@@ -64,7 +72,9 @@ impl CLIType {
 
         match normalized.as_str() {
             "" | "claude" => Some(CLIType::Claude),
+            "code" | "every-code" | "everycode" => Some(CLIType::Code),
             "codex" => Some(CLIType::Codex),
+            "dexter" => Some(CLIType::Dexter),
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),
             "factory" => Some(CLIType::Factory),

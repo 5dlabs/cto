@@ -5,7 +5,8 @@
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
 use crate::cli::adapters::{
-    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
+    ClaudeAdapter, CodeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter,
+    GeminiAdapter, OpenCodeAdapter,
 };
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
@@ -174,16 +175,24 @@ impl AdapterFactory {
     }
 
     /// Register built-in adapters that are always available
+    #[allow(clippy::similar_names)] // code_adapter and codex_adapter are intentionally similar
     async fn register_default_adapters(&self) -> AdapterResult<()> {
         let claude_adapter = Arc::new(ClaudeAdapter::new()?);
         self.register_adapter(CLIType::Claude, claude_adapter)
             .await?;
+
+        let code_adapter = Arc::new(CodeAdapter::new()?);
+        self.register_adapter(CLIType::Code, code_adapter).await?;
 
         let codex_adapter = Arc::new(CodexAdapter::new()?);
         self.register_adapter(CLIType::Codex, codex_adapter).await?;
 
         let cursor_adapter = Arc::new(CursorAdapter::new()?);
         self.register_adapter(CLIType::Cursor, cursor_adapter)
+            .await?;
+
+        let dexter_adapter = Arc::new(DexterAdapter::new()?);
+        self.register_adapter(CLIType::Dexter, dexter_adapter)
             .await?;
 
         let factory_adapter = Arc::new(FactoryAdapter::new()?);
@@ -610,10 +619,12 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 6);
+        assert_eq!(factory.get_supported_clis().len(), 8);
         assert!(factory.supports_cli(CLIType::Claude));
+        assert!(factory.supports_cli(CLIType::Code));
         assert!(factory.supports_cli(CLIType::Codex));
         assert!(factory.supports_cli(CLIType::Cursor));
+        assert!(factory.supports_cli(CLIType::Dexter));
         assert!(factory.supports_cli(CLIType::Factory));
         assert!(factory.supports_cli(CLIType::Gemini));
         assert!(factory.supports_cli(CLIType::OpenCode));
@@ -633,7 +644,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 6);
+        assert_eq!(factory.get_supported_clis().len(), 8);
     }
 
     #[tokio::test]
@@ -691,7 +702,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 6);
+        assert_eq!(health_summary.len(), 8);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -700,7 +711,9 @@ mod tests {
             health_summary[&CLIType::Codex].status,
             HealthState::Unhealthy
         );
+        assert!(health_summary.contains_key(&CLIType::Code));
         assert!(health_summary.contains_key(&CLIType::Cursor));
+        assert!(health_summary.contains_key(&CLIType::Dexter));
         assert!(health_summary.contains_key(&CLIType::OpenCode));
     }
 
@@ -720,9 +733,10 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 6);
-        assert_eq!(stats.healthy_adapters, 6);
-        assert_eq!(stats.warning_adapters, 0);
+        assert_eq!(stats.total_adapters, 8);
+        // Note: Dexter adapter may report warning status when no API key is found
+        // so we check total instead of exact healthy count
+        assert!(stats.healthy_adapters + stats.warning_adapters >= 7);
         assert_eq!(stats.unhealthy_adapters, 0);
     }
 

@@ -160,6 +160,10 @@ jobs:
     runs-on: [k8s-runner]
     if: github.ref == 'refs/heads/main'
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need HEAD~1 for git diff
+
       - name: Check if rust-builder was built
         id: check-rust-builder
         run: |

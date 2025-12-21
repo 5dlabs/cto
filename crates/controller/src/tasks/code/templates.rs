@@ -4070,8 +4070,10 @@ impl CodeTemplateGenerator {
     /// the CLI-specific invocation logic.
     fn register_cli_invoke_partial(handlebars: &mut Handlebars, cli_type: CLIType) -> Result<()> {
         let cli_name = match cli_type {
+            CLIType::Code => "code",
             CLIType::Codex => "codex",
             CLIType::Cursor => "cursor",
+            CLIType::Dexter => "dexter",
             CLIType::Factory => "factory",
             CLIType::Gemini => "gemini",
             CLIType::OpenCode => "opencode",

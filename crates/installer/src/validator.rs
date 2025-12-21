@@ -76,11 +76,12 @@ impl PrerequisitesValidator {
         });
 
         // cilium CLI (required for CNI deployment and health checks)
+        // Note: Use `--client` flag because `cilium version` without it tries to connect to k8s
         requirements.push(Requirement {
             name: "cilium CLI".to_string(),
             check: Box::new(|| {
                 Command::new("cilium")
-                    .arg("version")
+                    .args(["version", "--client"])
                     .output()
                     .map(|output| output.status.success())
                     .context("cilium CLI not found")
