@@ -1,6 +1,33 @@
 # syntax=docker/dockerfile:1.7-labs
-## Optimized runtime base with BuildKit caching for faster CI builds
-FROM ubuntu:24.04
+# =============================================================================
+# Runtime Base Image - Unified Dockerfile
+# =============================================================================
+#
+# Supports both CI (download binaries) and local (build from source) builds:
+#
+#   CI/GHCR build (default - downloads binaries from releases):
+#     docker build -t ghcr.io/5dlabs/runtime .
+#
+#   Local/Kind build (compiles tasks/pm-activity from source):
+#     docker build --target local -t ghcr.io/5dlabs/runtime:local .
+#
+# =============================================================================
+
+# =============================================================================
+# BUILD STAGES (used only for local development builds with --target local)
+# =============================================================================
+FROM rust:latest AS tasks-builder
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo build --release --package tasks --bin tasks && \
+    cargo build --release --package pm --bin pm-activity
+
+# =============================================================================
+# MAIN RUNTIME IMAGE
+# =============================================================================
+FROM ubuntu:24.04 AS production
 
 # Use bash for complex RUN steps
 SHELL ["/bin/bash", "-lc"]
@@ -582,5 +609,16 @@ RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HO
   && chmod +x /usr/local/bin/setup-rust-env
 
 
-# Trigger rebuild for tasks CLI v0.1.0
-# Rebuild to include tasks CLI
+# =============================================================================
+# LOCAL BUILD TARGET (compiles tasks/pm-activity from source)
+# =============================================================================
+FROM production AS local
+
+# Copy locally-built binaries from builder stage
+COPY --from=tasks-builder /build/target/release/tasks /usr/local/bin/tasks
+COPY --from=tasks-builder /build/target/release/pm-activity /usr/local/bin/pm-activity
+RUN chmod +x /usr/local/bin/tasks /usr/local/bin/pm-activity
+
+# Verify installation
+RUN tasks --version 2>&1 || tasks --help 2>&1 | head -5
+RUN pm-activity --help 2>&1 | head -5

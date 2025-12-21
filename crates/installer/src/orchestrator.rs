@@ -782,7 +782,8 @@ impl Installer {
             .context("Kubeconfig not found in state")?;
 
         ui::print_info("Deploying local-path-provisioner...");
-        metal::stack::deploy_local_path_provisioner(kubeconfig_path)?;
+        // Single-region by default; pass true for multi-region clusters
+        metal::stack::deploy_local_path_provisioner(kubeconfig_path, false)?;
 
         Ok(())
     }
