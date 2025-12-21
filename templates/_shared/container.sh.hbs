@@ -11,6 +11,11 @@
 {{> expo-env }}
 {{/if}}
 
+{{!-- Go environment for Grizz (Go backend agent) --}}
+{{#if (or (eq agent_name "grizz") (eq task_language "go"))}}
+{{> go-env }}
+{{/if}}
+
 {{> config }}
 
 {{> github-auth }}
@@ -21,6 +26,11 @@
 
 {{> tools-config }}
 
+{{!-- Infrastructure pre-checks for Bolt infra jobs --}}
+{{#if (eq job_type "infra")}}
+{{> infrastructure-setup }}
+{{/if}}
+
 {{> acceptance-probe }}
 
 # =========================================================================
@@ -30,7 +40,12 @@
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
+{{#if (eq job_type "infra")}}
+echo "║ Executing {{cli_type}} CLI - Infrastructure Mode"
+echo "║ Attempt ${CURRENT_ATTEMPT:-1} of ${EXECUTION_MAX_RETRIES:-{{default_retries}}}"
+{{else}}
 echo "║ Executing {{cli_type}} CLI (Attempt ${CURRENT_ATTEMPT:-1} of ${EXECUTION_MAX_RETRIES:-{{default_retries}}})"
+{{/if}}
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -44,6 +59,10 @@ CLI_EXIT_CODE=$?
 if [ $CLI_EXIT_CODE -eq 0 ]; then
     echo ""
     echo "✓ CLI execution completed successfully"
+    
+{{#if (eq job_type "infra")}}
+{{> infrastructure-verify }}
+{{/if}}
     
     # Run acceptance criteria probe
     if type probe_acceptance_criteria >/dev/null 2>&1; then
