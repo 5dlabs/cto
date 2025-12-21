@@ -123,6 +123,9 @@ jobs:
           platforms: linux/amd64
           pull: true
           push: true
+          # Disable attestations - avoids GHCR permission issues for new packages
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:${{ matrix.version }}

@@ -92,14 +92,14 @@ jobs:
       - name: Test Helm Chart Structure
         run: |
           helm version
-          helm lint ./infra/charts/controller
-          helm template controller ./infra/charts/controller --set argo.enabled=false > /tmp/default.yaml
+          helm lint ./infra/charts/cto
+          helm template cto ./infra/charts/cto --set argo.enabled=false > /tmp/default.yaml
           kubectl --dry-run=client apply -f /tmp/default.yaml
 
       - name: Validate CRD definitions
         run: |
           echo "🏗️ Validating CRD definitions..."
-          kubectl --dry-run=client apply -f infra/charts/controller/crds/
+          kubectl --dry-run=client apply -f infra/charts/cto/crds/
           echo "✅ CRD validation passed"
 
   # Security scanning (non-blocking)

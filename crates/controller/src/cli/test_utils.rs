@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[must_use]
 pub fn templates_root() -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../infra/charts/controller/templates")
+        .join("../../infra/charts/cto/templates")
         .to_string_lossy()
         .into_owned()
 }

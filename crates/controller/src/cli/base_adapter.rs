@@ -63,7 +63,7 @@ impl AdapterConfig {
 
             let repo_relative = manifest_dir
                 .map(PathBuf::from)
-                .map(|dir| dir.join("../../infra/charts/controller/templates"))
+                .map(|dir| dir.join("../../infra/charts/cto/templates"))
                 .filter(|path| path.exists());
 
             if let Some(path) = repo_relative {
