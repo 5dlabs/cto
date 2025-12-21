@@ -2,6 +2,37 @@
 //!
 //! This module provides functions to deploy the CTO platform stack components
 //! using Helm charts and kubectl.
+//!
+//! ## Lessons Learned (Dec 2024 Latitude.sh Deployment)
+//!
+//! ### Multi-Region Clusters
+//! - **CRITICAL**: All nodes MUST be in the same region for cluster networking to work
+//! - Pods on nodes in different regions cannot reach the Kubernetes API (10.96.0.1:443)
+//! - The private VLAN (10.8.0.0/24) only works within a single Latitude.sh site
+//! - If multi-region is needed, use ClusterMesh or configure public API endpoints
+//!
+//! ### Cilium CNI
+//! - The `tunnel` Helm option was removed in Cilium 1.15+
+//! - Use `routingMode=tunnel` + `tunnelProtocol=vxlan` instead
+//! - Explicit device detection required for bare metal: `devices=eth0,enp+,eno+`
+//! - Without explicit devices, Cilium fails with "unable to determine direct routing device"
+//!
+//! ### ArgoCD Deployment
+//! - The `argocd-redis` init container checks for a pre-existing secret
+//! - Create `argocd-redis` secret manually BEFORE installing ArgoCD, OR
+//! - Patch the deployment to remove the init container after install
+//! - ArgoCD pods should run on control plane nodes to avoid cross-region API issues
+//!
+//! ### Latitude.sh Server Issues
+//! - Servers can get stuck in "off" state indefinitely after provisioning
+//! - Implement stuck server detection (>10min in deploying/off state) with auto-delete+recreate
+//! - Stock availability changes rapidly - check availability before provisioning
+//! - c2-medium-x86 and c2-large-x86 have NVMe disks (/dev/nvme0n1), not SATA (/dev/sda)
+//!
+//! ### Talos Configuration
+//! - Worker configs must NOT contain etcd configuration
+//! - Use `talosctl gen config --output-types worker` to generate worker-only configs
+//! - The control plane endpoint should use public IP for multi-region compatibility
 
 use anyhow::{Context, Result};
 use std::fs;
@@ -463,36 +494,132 @@ pub fn deploy_cert_manager(kubeconfig: &Path) -> Result<()> {
 
 /// Deploy `ArgoCD` for `GitOps`.
 ///
+/// # Implementation Notes (Lessons Learned Dec 2024)
+///
+/// 1. **Redis Init Container Issue**: ArgoCD v2.13+ has an init container that
+///    checks for a pre-existing `argocd-redis` secret. We pre-create this secret
+///    to avoid the init container hanging.
+///
+/// 2. **Control Plane Scheduling**: In multi-region clusters, ArgoCD pods must
+///    run on the control plane to access the Kubernetes API. We add tolerations
+///    and node selectors to ensure this.
+///
+/// 3. **Manifest vs Helm**: Using the official manifests is more reliable than
+///    the Helm chart for the initial install due to the redis secret issue.
+///
 /// # Errors
 ///
-/// Returns an error if helm commands fail.
+/// Returns an error if kubectl/helm commands fail.
 pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
     println!("   Deploying ArgoCD...");
 
-    // Add argo repo
-    let _ = helm(
+    // Create namespace first
+    let _ = kubectl(kubeconfig, &["create", "namespace", "argocd"]);
+
+    // LESSON LEARNED: Pre-create the redis secret to avoid init container hang
+    // The ArgoCD redis deployment has an init container that waits for this secret
+    println!("   Creating ArgoCD redis secret...");
+    let random_password = std::process::Command::new("openssl")
+        .args(["rand", "-base64", "32"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|_| "default-redis-password".to_string());
+
+    let _ = kubectl(
         kubeconfig,
         &[
-            "repo",
-            "add",
-            "argo",
-            "https://argoproj.github.io/argo-helm",
+            "create",
+            "secret",
+            "generic",
+            "argocd-redis",
+            "-n",
+            "argocd",
+            &format!("--from-literal=auth={random_password}"),
         ],
     );
-    helm(kubeconfig, &["repo", "update"])?;
 
-    // Install ArgoCD
-    helm(
+    // Install ArgoCD using official manifests (more reliable than Helm)
+    println!("   Installing ArgoCD manifests...");
+    kubectl(
         kubeconfig,
         &[
-            "upgrade",
-            "--install",
+            "apply",
+            "-n",
             "argocd",
-            "argo/argo-cd",
-            "--namespace",
+            "-f",
+            "https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.3/manifests/install.yaml",
+        ],
+    )?;
+
+    // LESSON LEARNED: Remove the redis init container that checks for the secret
+    // (it can still hang even with the secret pre-created in some cases)
+    println!("   Patching ArgoCD redis deployment...");
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "patch",
+            "deployment",
+            "argocd-redis",
+            "-n",
             "argocd",
-            "--create-namespace",
-            "--wait",
+            "--type=json",
+            "-p=[{\"op\": \"remove\", \"path\": \"/spec/template/spec/initContainers\"}]",
+        ],
+    );
+
+    // LESSON LEARNED: Schedule ArgoCD on control plane to avoid cross-region API issues
+    println!("   Configuring ArgoCD for control plane scheduling...");
+    let deployments = [
+        "argocd-server",
+        "argocd-repo-server",
+        "argocd-redis",
+        "argocd-dex-server",
+        "argocd-notifications-controller",
+        "argocd-applicationset-controller",
+    ];
+
+    for deployment in deployments {
+        let _ = kubectl(
+            kubeconfig,
+            &[
+                "patch",
+                "deployment",
+                deployment,
+                "-n",
+                "argocd",
+                "--type=json",
+                "-p=[{\"op\": \"add\", \"path\": \"/spec/template/spec/tolerations\", \"value\": [{\"key\": \"node-role.kubernetes.io/control-plane\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]}, {\"op\": \"add\", \"path\": \"/spec/template/spec/nodeSelector\", \"value\": {\"node-role.kubernetes.io/control-plane\": \"\"}}]",
+            ],
+        );
+    }
+
+    // Patch the statefulset too
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "patch",
+            "statefulset",
+            "argocd-application-controller",
+            "-n",
+            "argocd",
+            "--type=json",
+            "-p=[{\"op\": \"add\", \"path\": \"/spec/template/spec/tolerations\", \"value\": [{\"key\": \"node-role.kubernetes.io/control-plane\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]}, {\"op\": \"add\", \"path\": \"/spec/template/spec/nodeSelector\", \"value\": {\"node-role.kubernetes.io/control-plane\": \"\"}}]",
+        ],
+    );
+
+    // Wait for ArgoCD to be ready
+    println!("   Waiting for ArgoCD pods...");
+    kubectl(
+        kubeconfig,
+        &[
+            "wait",
+            "--for=condition=Ready",
+            "pods",
+            "-l",
+            "app.kubernetes.io/part-of=argocd",
+            "-n",
+            "argocd",
+            "--timeout=300s",
         ],
     )?;
 
