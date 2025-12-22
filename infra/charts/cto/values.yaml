@@ -851,6 +851,19 @@ cloudflare:
       hostname: pm.5dlabs.ai
     webhooks:
       hostname: github-webhooks.5dlabs.ai
+    # Platform services (external to CTO namespace)
+    argocd:
+      hostname: argocd.5dlabs.ai
+      target: https://argocd-server.argocd.svc:443
+      # ArgoCD uses HTTPS backend
+      originRequest:
+        noTLSVerify: true
+    workflows:
+      hostname: workflows.5dlabs.ai
+      target: http://argo-workflows-server.argo.svc:2746
+    grafana:
+      hostname: grafana.5dlabs.ai
+      target: http://grafana.observability.svc:80
 
 # =============================================================================
 # BuildKit - Remote Build Infrastructure

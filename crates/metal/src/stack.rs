@@ -201,6 +201,46 @@
 //!   - Control plane has 10.8.0.x IP but worker has a different public IP
 //! - Detection: Check `kubectl get nodes -o wide` - all nodes should have 10.8.0.x IPs
 //! - Fix: Delete cross-site worker, reprovision in correct site with VLAN config
+//!
+//! ### VLAN Connectivity Verification
+//! - **After cluster setup, verify VLAN connectivity with Cilium health check:**
+//!   ```bash
+//!   kubectl exec -n kube-system <cilium-agent-pod> -- cilium-health status
+//!   ```
+//! - All nodes should show "ICMP to stack: OK" and "HTTP to agent: OK"
+//! - If connectivity fails (timeout/no route), check:
+//!   1. VLAN interface configured on both nodes (same VLAN ID)
+//!   2. Both servers in same Latitude.sh site (VLANs are site-local)
+//!   3. Talos config has correct VLAN settings on correct interface (usually enp1s0f1)
+//!
+//! ### NATS StatefulSet + local-path Storage
+//! - NATS uses StatefulSet with PVCs for JetStream persistence
+//! - `local-path` PVCs are bound to specific nodes via node affinity
+//! - **Cannot move NATS to different node without deleting PVCs**
+//! - When moving NATS to control plane:
+//!   1. Scale StatefulSet to 0: `kubectl scale statefulset -n nats nats --replicas=0`
+//!   2. Delete PVCs: `kubectl delete pvc -n nats --all`
+//!   3. Add nodeSelector for control plane
+//!   4. Scale back up - new PVCs will be created on control plane node
+//! - Disable ArgoCD sync to prevent override: `kubectl patch application -n argocd nats --type=merge -p='{"spec":{"syncPolicy":null}}'`
+//!
+//! ### Hubble Relay + VLAN Issues
+//! - Hubble Relay requires connectivity to ALL Cilium agents across nodes
+//! - Has podAffinity to run on same node as cilium-agent
+//! - **Cannot work if VLAN connectivity between nodes is broken**
+//! - Workaround: Scale to 0 until VLAN is fixed
+//!   ```bash
+//!   kubectl scale deployment -n kube-system hubble-relay --replicas=0
+//!   kubectl patch application -n argocd cilium --type=merge -p='{"spec":{"syncPolicy":null}}'
+//!   ```
+//! - Not critical for cluster operations (only affects Hubble observability)
+//!
+//! ### Talos Config Recovery
+//! - Talosctl requires valid client credentials to access cluster
+//! - Credentials are generated during `talosctl gen config` and stored in talosconfig
+//! - **If talosconfig is lost, cannot access Talos API without regeneration**
+//! - Keep talosconfig backed up securely (contains admin credentials)
+//! - Worker public IP can be retrieved from Latitude.sh API if needed
 
 use anyhow::{Context, Result};
 use std::fs;

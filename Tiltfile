@@ -62,11 +62,16 @@ if DEV_MODE:
     print('║  🔧 DEV MODE - Local builds enabled                               ║')
     print('║                                                                   ║')
     print('║  Branch: %-55s ║' % BRANCH)
-    print('║  Registry: Local (192.168.1.77:30500)                             ║')
-    print('║  Tag: tilt-dev                                                    ║')
+    print('║  Context: %-54s ║' % KUBE_CONTEXT)
+    print('║  Registry: %-53s ║' % LOCAL_REGISTRY)
+    print('║  Tag: %-58s ║' % DEV_TAG)
     print('║                                                                   ║')
-    print('║  Make sure dev registry is enabled:                               ║')
-    print('║    ./scripts/argocd-dev-mode.sh enable                            ║')
+    if 'cto-dal' in KUBE_CONTEXT:
+        print('║  For Latitude.sh, start port-forward first:                       ║')
+        print('║    kubectl port-forward -n registry svc/registry 30500:5000       ║')
+    else:
+        print('║  Make sure dev registry is enabled:                               ║')
+        print('║    ./scripts/argocd-dev-mode.sh enable                            ║')
     print('╚═══════════════════════════════════════════════════════════════════╝')
     print('')
 else:
@@ -87,7 +92,31 @@ else:
 # =============================================================================
 # Configuration
 # =============================================================================
-LOCAL_REGISTRY = os.getenv('LOCAL_REGISTRY', '192.168.1.77:30500')
+# Registry selection based on cluster context:
+#   - Home cluster (talos-home): 192.168.1.77:30500
+#   - Latitude.sh (admin@cto-dal): localhost:30500 (via port-forward)
+#   - KIND: localhost:5001
+#
+# For Latitude.sh, start port-forward first:
+#   kubectl port-forward -n registry svc/registry 30500:5000
+
+def get_kube_context():
+    """Get the current kubectl context."""
+    result = local('kubectl config current-context 2>/dev/null || echo "unknown"', quiet=True)
+    return str(result).strip()
+
+KUBE_CONTEXT = get_kube_context()
+
+# Auto-detect registry based on context
+def get_default_registry():
+    if 'cto-dal' in KUBE_CONTEXT:
+        return 'localhost:30500'  # Latitude.sh via port-forward
+    elif 'kind' in KUBE_CONTEXT:
+        return 'localhost:5001'
+    else:
+        return '192.168.1.77:30500'  # Home cluster
+
+LOCAL_REGISTRY = os.getenv('LOCAL_REGISTRY', get_default_registry())
 NAMESPACE = 'cto'
 DEV_TAG = os.getenv('DEV_TAG', 'tilt-dev')
 
