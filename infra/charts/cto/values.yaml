@@ -219,6 +219,11 @@ controller:
     serverPort: "8080"
     rustLog: "debug"
 
+  # Linear sidecar configuration (whip cracking enabled)
+  linear:
+    sidecarImage: ghcr.io/5dlabs/linear-sidecar:latest
+    serviceUrl: http://pm-server:8080
+
 # =============================================================================
 # Agent Configuration - CodeRun/Workflow Defaults
 # =============================================================================
