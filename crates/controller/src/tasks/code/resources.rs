@@ -1894,6 +1894,7 @@ mod tests {
     }
 
     /// Create a test CodeRun with optional linear integration for sidecar testing
+    /// Note: enable_docker defaults to true (matching production behavior)
     fn create_test_code_run_with_linear(
         github_app: &str,
         cli_type: CLIType,
@@ -1947,7 +1948,7 @@ mod tests {
                 docs_branch: "main".to_string(),
                 env: HashMap::new(),
                 env_from_secrets: Vec::new(),
-                enable_docker: false,
+                enable_docker: true, // Default: Docker enabled for all agents/CLIs
                 task_requirements: None,
                 service_account_name: None,
                 linear_integration,
@@ -2153,6 +2154,210 @@ mod tests {
             tested_combinations, 72,
             "Should test all 72 agent×CLI combinations"
         );
+    }
+
+    // =========================================================================
+    // Docker-in-Docker (DinD) Sidecar Tests
+    // =========================================================================
+
+    /// Verify Docker is enabled by default (matching production behavior)
+    #[test]
+    fn test_docker_enabled_by_default() {
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        assert!(
+            code_run.spec.enable_docker,
+            "Docker should be enabled by default"
+        );
+    }
+
+    /// Verify Docker is enabled for ALL implementation agents
+    #[test]
+    fn test_docker_enabled_for_all_implementation_agents() {
+        let agents = vec![
+            "5DLabs-Rex",   // Rust
+            "5DLabs-Blaze", // React
+            "5DLabs-Grizz", // Go
+            "5DLabs-Nova",  // Node.js
+            "5DLabs-Tap",   // Expo
+            "5DLabs-Spark", // Electron
+        ];
+
+        for agent in agents {
+            let code_run = create_test_code_run_with_linear(agent, CLIType::Claude, false);
+            assert!(
+                code_run.spec.enable_docker,
+                "Implementation agent {agent} should have Docker enabled by default"
+            );
+        }
+    }
+
+    /// Verify Docker is enabled for ALL support agents
+    #[test]
+    fn test_docker_enabled_for_all_support_agents() {
+        let agents = vec![
+            "5DLabs-Cleo",   // Quality
+            "5DLabs-Cipher", // Security
+            "5DLabs-Tess",   // Testing
+            "5DLabs-Atlas",  // Integration
+            "5DLabs-Bolt",   // Infrastructure
+            "5DLabs-Morgan", // PM/Docs
+        ];
+
+        for agent in agents {
+            let code_run = create_test_code_run_with_linear(agent, CLIType::Claude, false);
+            assert!(
+                code_run.spec.enable_docker,
+                "Support agent {agent} should have Docker enabled by default"
+            );
+        }
+    }
+
+    /// Verify Docker is enabled for ALL CLI types
+    #[test]
+    fn test_docker_enabled_for_all_cli_types() {
+        let cli_types = vec![
+            CLIType::Claude,
+            CLIType::Codex,
+            CLIType::Cursor,
+            CLIType::Factory,
+            CLIType::Gemini,
+            CLIType::OpenCode,
+        ];
+
+        for cli_type in cli_types {
+            let code_run = create_test_code_run_with_linear("5DLabs-Rex", cli_type, false);
+            assert!(
+                code_run.spec.enable_docker,
+                "CLI {:?} should have Docker enabled by default",
+                cli_type
+            );
+        }
+    }
+
+    /// Verify the complete agent × CLI matrix for Docker enablement
+    #[test]
+    fn test_docker_agent_cli_matrix() {
+        let agents = vec![
+            "5DLabs-Rex",
+            "5DLabs-Blaze",
+            "5DLabs-Grizz",
+            "5DLabs-Nova",
+            "5DLabs-Tap",
+            "5DLabs-Spark",
+            "5DLabs-Cleo",
+            "5DLabs-Cipher",
+            "5DLabs-Tess",
+            "5DLabs-Atlas",
+            "5DLabs-Bolt",
+            "5DLabs-Morgan",
+        ];
+
+        let cli_types = vec![
+            CLIType::Claude,
+            CLIType::Codex,
+            CLIType::Cursor,
+            CLIType::Factory,
+            CLIType::Gemini,
+            CLIType::OpenCode,
+        ];
+
+        let mut tested_combinations = 0;
+
+        for agent in &agents {
+            for cli_type in &cli_types {
+                let code_run = create_test_code_run_with_linear(agent, *cli_type, false);
+                assert!(
+                    code_run.spec.enable_docker,
+                    "Combination {agent} + {:?} should have Docker enabled by default",
+                    cli_type
+                );
+                tested_combinations += 1;
+            }
+        }
+
+        // Verify we tested all 12 agents × 6 CLIs = 72 combinations
+        assert_eq!(
+            tested_combinations, 72,
+            "Should test all 72 agent×CLI combinations for Docker"
+        );
+    }
+
+    /// Verify both Docker and Linear sidecar can be enabled together
+    #[test]
+    fn test_docker_and_linear_sidecar_together() {
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, true);
+
+        // Both should be enabled
+        assert!(
+            code_run.spec.enable_docker,
+            "Docker should be enabled by default"
+        );
+        assert!(
+            code_run.spec.linear_integration.is_some(),
+            "Linear integration should be present"
+        );
+        assert!(
+            code_run.spec.linear_integration.as_ref().unwrap().enabled,
+            "Linear integration should be enabled"
+        );
+    }
+
+    /// Verify the full container matrix for a Play workflow CodeRun
+    /// A typical Play workflow has: Main Agent + Docker Daemon + Linear Sidecar
+    #[test]
+    fn test_full_container_matrix_play_workflow() {
+        let agents = vec![
+            "5DLabs-Rex",
+            "5DLabs-Blaze",
+            "5DLabs-Grizz",
+            "5DLabs-Nova",
+            "5DLabs-Tap",
+            "5DLabs-Spark",
+            "5DLabs-Cleo",
+            "5DLabs-Cipher",
+            "5DLabs-Tess",
+            "5DLabs-Atlas",
+            "5DLabs-Bolt",
+            "5DLabs-Morgan",
+        ];
+
+        let cli_types = vec![
+            CLIType::Claude,
+            CLIType::Codex,
+            CLIType::Cursor,
+            CLIType::Factory,
+            CLIType::Gemini,
+            CLIType::OpenCode,
+        ];
+
+        let mut tested = 0;
+
+        for agent in &agents {
+            for cli_type in &cli_types {
+                // Create CodeRun with both Docker and Linear enabled (like Play workflow)
+                let code_run = create_test_code_run_with_linear(agent, *cli_type, true);
+
+                // Verify Docker daemon sidecar will be added
+                assert!(
+                    code_run.spec.enable_docker,
+                    "{agent} + {:?}: Docker daemon should be enabled",
+                    cli_type
+                );
+
+                // Verify Linear sidecar will be added
+                let linear = code_run.spec.linear_integration.as_ref();
+                assert!(
+                    linear.is_some() && linear.unwrap().enabled,
+                    "{agent} + {:?}: Linear sidecar should be enabled",
+                    cli_type
+                );
+
+                tested += 1;
+            }
+        }
+
+        // All 72 combinations should have both sidecars enabled
+        assert_eq!(tested, 72, "Should verify all 72 combinations");
     }
 
     #[test]

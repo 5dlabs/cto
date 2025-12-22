@@ -4,6 +4,11 @@ name: Docker Build & Push
 description: |
   Build and push Docker images to GitHub Container Registry.
   Handles login, buildx setup, and multi-tag pushes.
+  
+  Supports branch-based tagging:
+  - main branch: tagged as 'latest'
+  - develop branch: tagged as 'develop'
+  - other branches: tagged with branch name (sanitized)
 
 inputs:
   image-name:
@@ -62,6 +67,15 @@ inputs:
     description: 'Enable SBOM attestations (requires id-token: write permission)'
     required: false
     default: 'false'
+  # New inputs for branch-based tagging
+  branch-tag:
+    description: 'Branch-based tag (e.g., develop, feature-xyz). If empty, uses latest for main.'
+    required: false
+    default: ''
+  tag-latest:
+    description: 'Whether to tag as latest (default: true for main branch builds)'
+    required: false
+    default: 'auto'
 
 outputs:
   image-tags:
@@ -93,18 +107,48 @@ runs:
         IMAGE="${{ inputs.image-name }}"
         VERSION="${{ inputs.version }}"
         SHA="${{ inputs.short-sha }}"
-
-        TAGS="${REGISTRY}/${BASE}/${IMAGE}:latest"
+        BRANCH_TAG="${{ inputs.branch-tag }}"
+        TAG_LATEST="${{ inputs.tag-latest }}"
+        
+        # Determine branch from github context
+        GITHUB_REF="${{ github.ref }}"
+        GITHUB_REF_NAME="${{ github.ref_name }}"
+        
+        TAGS=""
+        
+        # Branch-based primary tag
+        if [ -n "$BRANCH_TAG" ]; then
+          # Explicit branch tag provided
+          TAGS="${REGISTRY}/${BASE}/${IMAGE}:${BRANCH_TAG}"
+        elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
+          # Main branch - use 'latest'
+          TAGS="${REGISTRY}/${BASE}/${IMAGE}:latest"
+        elif [ "$GITHUB_REF" = "refs/heads/develop" ]; then
+          # Develop branch - use 'develop'
+          TAGS="${REGISTRY}/${BASE}/${IMAGE}:develop"
+        else
+          # Other branches - sanitize branch name and use as tag
+          SANITIZED_BRANCH=$(echo "$GITHUB_REF_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | cut -c1-128)
+          TAGS="${REGISTRY}/${BASE}/${IMAGE}:${SANITIZED_BRANCH}"
+        fi
+        
+        # Add version tag
         TAGS+=$'\n'"${REGISTRY}/${BASE}/${IMAGE}:v${VERSION}"
-
+        
+        # Add SHA tag if provided
         if [ -n "$SHA" ]; then
           TAGS+=$'\n'"${REGISTRY}/${BASE}/${IMAGE}:${SHA}"
         fi
-
+        
+        # Optionally add 'latest' tag for non-main branches if explicitly requested
+        if [ "$TAG_LATEST" = "true" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+          TAGS+=$'\n'"${REGISTRY}/${BASE}/${IMAGE}:latest"
+        fi
+        
         echo "tags<<EOF" >> "$GITHUB_OUTPUT"
         echo "$TAGS" >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
-
+        
         echo "📦 Image tags:"
         echo "$TAGS"
 
@@ -138,4 +182,3 @@ runs:
             [ -n "$tag" ] && echo "- \`$tag\`"
           done
         } >> "$GITHUB_STEP_SUMMARY"
-

@@ -3,7 +3,7 @@ name: Tools CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'crates/tools/**'
       - 'crates/mcp/**'
@@ -11,7 +11,7 @@ on:
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'crates/tools/**'
       - 'crates/mcp/**'
@@ -187,10 +187,10 @@ jobs:
           cargo install cargo-audit --version 0.21.2 2>/dev/null || true
           cargo audit || true
 
-  # Build and push Docker image (only on push to main)
+  # Build and push Docker image (on push to main or develop)
   build-docker:
     needs: [lint-rust, test-rust, build-check]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: [k8s-runner]
     permissions:
       contents: read
