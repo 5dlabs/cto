@@ -171,6 +171,10 @@ secrets:
     kubernetes:
       enabled: true
       baoKey: tools-kubernetes
+    appstoreConnect:
+      enabled: true
+      baoKey: tools-appstore-connect
+      # Keys: APP_STORE_KEY_ID, APP_STORE_ISSUER_ID, APP_STORE_P8_KEY (base64 encoded .p8)
 
   # Research pipeline secrets
   research:
@@ -510,6 +514,33 @@ tools:
         env:
           MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
           MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
+
+      # --- Apple Development ---
+      xcodebuild:
+        name: "XcodeBuildMCP"
+        description: "Xcode builds, iOS/macOS development, simulator control, device deployment, UI testing"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "xcodebuildmcp@latest"]
+        workingDirectory: "/workspace"
+        env:
+          # Session-aware mode (recommended) - set defaults once, reuse everywhere
+          # Set XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS=true for explicit parameters
+          XCODEBUILDMCP_DYNAMIC_TOOLS: "false"
+          # Enable specific workflows to reduce context window
+          XCODEBUILDMCP_ENABLED_WORKFLOWS: "simulator,device,macos,swift-package,project-discovery,ui-testing"
+
+      appstore-connect:
+        name: "App Store Connect"
+        description: "App Store Connect API - manage apps, beta testers, bundle IDs, releases, and TestFlight"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "app-store-connect-mcp-server"]
+        workingDirectory: "/workspace"
+        env:
+          APP_STORE_KEY_ID: "${APP_STORE_KEY_ID}"
+          APP_STORE_ISSUER_ID: "${APP_STORE_ISSUER_ID}"
+          APP_STORE_P8_PATH: "${APP_STORE_P8_PATH:-/secrets/appstore/AuthKey.p8}"
 
       # --- Local Servers (run in agent containers, not proxied) ---
       rust-tools:

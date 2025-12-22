@@ -1398,24 +1398,28 @@ All templates live under `templates/` with agent and CLI-specific subdirectories
 
 **Agent Templates**
 
-Each agent has workflow-specific templates in `templates/agents/{agent}/{workflow}/`:
+Each agent has flat job-type templates in `templates/agents/{agent}/`:
 
-- **System Prompts**: `templates/agents/{agent}/{workflow}/system-prompt.md.hbs`
-- **Container Scripts**: `templates/agents/{agent}/{workflow}/container.sh.hbs`
+- **System Prompts**: `templates/agents/{agent}/{job}.md.hbs`
+- **Container Scripts**: Use shared `templates/_shared/container.sh.hbs` (except `morgan/intake.sh.hbs`)
 
 Examples:
-- Morgan intake: `templates/agents/morgan/intake/`
-- Rex coder: `templates/agents/rex/coder/`
-- Blaze coder: `templates/agents/blaze/coder/`
+- Morgan intake: `templates/agents/morgan/intake.md.hbs` (+ `intake.sh.hbs`)
+- Rex coder: `templates/agents/rex/coder.md.hbs`
+- Blaze coder: `templates/agents/blaze/coder.md.hbs`
 
 **CLI Templates**
 
-Each CLI has an invoke script in `templates/clis/{cli}/`:
+Each CLI has an invoke script in `templates/clis/` (flat structure: `{cli}.sh.hbs`):
 
-- **Claude**: `templates/clis/claude/invoke.sh.hbs`
-- **Codex**: `templates/clis/codex/invoke.sh.hbs`
-- **Factory**: `templates/clis/factory/invoke.sh.hbs`
-- **Gemini**: `templates/clis/gemini/invoke.sh.hbs`
+- **Claude**: `templates/clis/claude.sh.hbs`
+- **Code (Every Code)**: `templates/clis/code.sh.hbs`
+- **Codex**: `templates/clis/codex.sh.hbs`
+- **Cursor**: `templates/clis/cursor.sh.hbs`
+- **Dexter**: `templates/clis/dexter.sh.hbs`
+- **Factory**: `templates/clis/factory.sh.hbs`
+- **Gemini**: `templates/clis/gemini.sh.hbs`
+- **OpenCode**: `templates/clis/opencode.sh.hbs`
 
 **Shared Templates**
 
@@ -1436,18 +1440,18 @@ Shared partials and utilities in `templates/_shared/`:
 Edit the settings template files for your chosen CLI:
 
 ```bash
-# For Morgan intake agent
-vim templates/agents/morgan/intake/system-prompt.md.hbs
+# For Morgan intake agent (flat structure: {job}.md.hbs)
+vim templates/agents/morgan/intake.md.hbs
 
 # For Rex coder agent
-vim templates/agents/rex/coder/system-prompt.md.hbs
+vim templates/agents/rex/coder.md.hbs
 
 # For Blaze coder agent
-vim templates/agents/blaze/coder/system-prompt.md.hbs
+vim templates/agents/blaze/coder.md.hbs
 
-# For CLI invoke scripts
-vim templates/clis/claude/invoke.sh.hbs
-vim templates/clis/factory/invoke.sh.hbs
+# For CLI invoke scripts (flat structure: {cli}.sh.hbs)
+vim templates/clis/claude.sh.hbs
+vim templates/clis/factory.sh.hbs
 ```
 
 Settings control:
@@ -1469,8 +1473,8 @@ Refer to your CLI's documentation for complete configuration options:
 **For intake templates** (affects project onboarding — `intake()` handles all documentation):
 
 ```bash
-# Edit the intake system prompt template
-vim templates/agents/morgan/intake/system-prompt.md.hbs
+# Edit the intake system prompt template (flat structure: {job}.md.hbs)
+vim templates/agents/morgan/intake.md.hbs
 
 # Edit shared partials used across templates
 vim templates/_shared/partials/git-setup.sh.hbs

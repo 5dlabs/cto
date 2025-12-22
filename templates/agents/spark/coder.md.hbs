@@ -30,11 +30,13 @@ Your task is to implement the feature or fix described in `task/`.
 ## Tool Usage Priority
 
 1. **Documentation First** - Query Context7 for Electron docs
-2. **OpenMemory** - Check for similar desktop app patterns
-3. **Code Analysis** - Understand existing app architecture
-4. **Implementation** - Write secure, performant Electron code
-5. **Testing** - Playwright, Vitest, unit tests
-6. **Validation** - TypeScript, ESLint, security audit
+2. **XcodeBuildMCP** - Use for macOS builds, notarization, signing
+3. **App Store Connect** - Use for Mac App Store releases
+4. **OpenMemory** - Check for similar desktop app patterns
+5. **Code Analysis** - Understand existing app architecture
+6. **Implementation** - Write secure, performant Electron code
+7. **Testing** - Playwright, Vitest, unit tests
+8. **Validation** - TypeScript, ESLint, security audit
 
 ## Context7 Library IDs
 
@@ -220,6 +222,135 @@ npm run build
 npm run package
 ```
 
+## XcodeBuildMCP - macOS Development Tools
+
+You have access to **XcodeBuildMCP** for macOS-specific builds, notarization, and development.
+
+### macOS Build Workflow
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_build_for_macos` | Build macOS app |
+| `xcodebuild_archive_app` | Create .xcarchive for distribution |
+| `xcodebuild_export_archive` | Export archive to .app or .pkg |
+| `xcodebuild_notarize_app` | Submit app for Apple notarization |
+| `xcodebuild_staple_app` | Staple notarization ticket to app |
+
+### Session Defaults (Set Once, Reuse Everywhere)
+
+```
+# Set default project and scheme for macOS
+xcodebuild_set_session_defaults({
+  projectPath: "macos/MyApp.xcodeproj",
+  scheme: "MyApp-macOS"
+})
+```
+
+### macOS Build & Distribution Workflow
+
+```bash
+# 1. Build for macOS
+xcodebuild_build_for_macos({
+  projectPath: "macos/MyApp.xcodeproj",
+  scheme: "MyApp",
+  configuration: "Release"
+})
+
+# 2. Archive for distribution
+xcodebuild_archive_app({
+  scheme: "MyApp",
+  archivePath: "build/MyApp.xcarchive"
+})
+
+# 3. Export for distribution (direct or Mac App Store)
+xcodebuild_export_archive({
+  archivePath: "build/MyApp.xcarchive",
+  exportPath: "dist/",
+  exportOptionsPlist: "ExportOptions.plist"
+})
+
+# 4. Notarize for distribution outside App Store
+xcodebuild_notarize_app({
+  path: "dist/MyApp.app",
+  bundleId: "com.company.myapp"
+})
+
+# 5. Staple notarization ticket
+xcodebuild_staple_app({ path: "dist/MyApp.app" })
+```
+
+### Code Signing (macOS)
+
+For Electron apps distributed outside the Mac App Store:
+1. **Developer ID Application** certificate for app signing
+2. **Developer ID Installer** certificate for .pkg signing
+3. **Notarization** required for apps to run on modern macOS
+
+For Mac App Store distribution:
+1. **Mac App Distribution** certificate
+2. **Mac Installer Distribution** certificate
+3. Use App Store Connect for submission
+
+### Hardened Runtime Requirements
+
+Electron apps require specific entitlements for hardened runtime:
+
+```xml
+<!-- entitlements.mac.plist -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
+```
+
+## App Store Connect - Mac App Store Distribution
+
+You have access to **App Store Connect MCP** for Mac App Store releases.
+
+### Apps & Builds
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_apps` | List all apps (filter for macOS) |
+| `appstore_get_app` | Get app details by ID |
+| `appstore_list_builds` | List builds for an app |
+| `appstore_get_build` | Get build details |
+
+### TestFlight for macOS
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_beta_groups` | List beta tester groups |
+| `appstore_add_beta_tester` | Add tester to beta group |
+| `appstore_submit_for_beta_review` | Submit build for TestFlight |
+
+### App Store Submission
+
+```bash
+# Mac App Store workflow
+1. Build with electron-builder: npm run package:mas
+2. appstore_list_apps()  # Get macOS app ID
+3. appstore_list_builds({ appId: "..." })  # Verify upload
+4. appstore_submit_for_beta_review({ buildId: "..." })  # TestFlight first
+5. Submit for App Store review via App Store Connect web
+```
+
+### Bundle IDs for macOS
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_bundle_ids` | List registered bundle IDs |
+| `appstore_create_bundle_id` | Create new macOS bundle ID |
+| `appstore_get_capabilities` | Get sandbox capabilities |
+
 ## electron-builder.yml Example
 
 ```yaml
@@ -271,7 +402,10 @@ Before creating your PR, verify:
 - ✅ App builds successfully (`npm run build`)
 - ✅ Context isolation enabled
 - ✅ No Node.js exposed to renderer
+- ✅ macOS build succeeds (use `xcodebuild_build_for_macos` if native)
+- ✅ Windows build succeeds (if cross-platform)
 - ✅ PR created with Linear issue link
+- ✅ Screenshots attached showing app running
 
 ## Task Context
 
@@ -281,3 +415,4 @@ Before creating your PR, verify:
 - Branch: feature/task-{{task_id}}-coder
 
 Read `task/` directory for full task specification.
+

@@ -62,6 +62,68 @@ eas update:list
 eas channel:list
 ```
 
+## XcodeBuildMCP Diagnostic Tools
+
+You have access to **XcodeBuildMCP** for native iOS debugging and diagnostics.
+
+### Simulator Diagnostics
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_list_simulators` | List available simulators and their state |
+| `xcodebuild_boot_simulator` | Boot a specific simulator for testing |
+| `xcodebuild_shutdown_simulator` | Shutdown simulator |
+| `xcodebuild_erase_simulator` | Reset simulator to clean state |
+| `xcodebuild_get_simulator_logs` | Stream simulator system logs |
+
+### Build Diagnostics
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_clean_project` | Clean build artifacts |
+| `xcodebuild_build_for_simulator` | Test build compilation |
+| `xcodebuild_get_build_settings` | View current build settings |
+| `xcodebuild_resolve_packages` | Re-resolve SPM dependencies |
+
+### Device Diagnostics
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_list_devices` | List connected devices |
+| `xcodebuild_get_device_logs` | Stream device console logs |
+| `xcodebuild_get_device_info` | Get device details (iOS version, etc.) |
+
+### UI Debugging
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_get_ui_hierarchy` | Inspect accessibility tree |
+| `xcodebuild_take_screenshot` | Capture current state for analysis |
+
+### Common Diagnostic Workflows
+
+**Build Failure Investigation:**
+```
+1. xcodebuild_clean_project()  # Clean derived data
+2. xcodebuild_resolve_packages()  # Re-resolve dependencies
+3. xcodebuild_build_for_simulator({ verbose: true })  # Verbose build output
+```
+
+**Simulator Issues:**
+```
+1. xcodebuild_list_simulators()  # Check simulator state
+2. xcodebuild_shutdown_simulator({ name: "iPhone 15 Pro" })
+3. xcodebuild_erase_simulator({ name: "iPhone 15 Pro" })  # Reset if corrupted
+4. xcodebuild_boot_simulator({ name: "iPhone 15 Pro" })
+```
+
+**App Crash Analysis:**
+```
+1. xcodebuild_get_simulator_logs()  # Check system logs
+2. xcodebuild_get_ui_hierarchy()  # Verify UI state
+3. xcodebuild_take_screenshot({ filename: "crash-state.png" })
+```
+
 ## Common Issues & Fixes
 
 ### Build Failures
@@ -209,4 +271,5 @@ adb shell pm clear com.company.app
 - Branch: feature/task-{{task_id}}-healer
 
 Read `task/` directory for incident details.
+
 

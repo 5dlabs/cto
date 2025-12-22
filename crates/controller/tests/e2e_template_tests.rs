@@ -124,7 +124,8 @@ fn test_all_system_prompts_exist() {
 
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
-            let prompt = base.join(agent).join(job).join("system-prompt.md.hbs");
+            // New flat structure: agents/{agent}/{job}.md.hbs
+            let prompt = base.join(agent).join(format!("{job}.md.hbs"));
             assert!(
                 prompt.exists(),
                 "System prompt should exist for {}/{} at {}",
@@ -156,10 +157,11 @@ fn test_container_templates_consolidated() {
     // Agent-specific behavior is handled via:
     //   1. job_type conditionals in the shared template (e.g., infra setup for bolt)
     //   2. Agent-specific system prompts
+    // Flat structure: agents/{agent}/{job}.sh.hbs for container templates
     let base = agents_dir();
 
-    // Verify the only agent-specific container template is morgan/intake
-    let morgan_intake_container = base.join("morgan/intake/container.sh.hbs");
+    // Verify the only agent-specific container template is morgan/intake.sh.hbs
+    let morgan_intake_container = base.join("morgan/intake.sh.hbs");
     assert!(
         morgan_intake_container.exists(),
         "Morgan intake container should exist at {}",
@@ -174,13 +176,22 @@ fn test_container_templates_consolidated() {
                 continue;
             }
 
-            let container = base.join(agent).join(job).join("container.sh.hbs");
+            // Check both old nested format and new flat format don't exist
+            let container_old = base.join(agent).join(job).join("container.sh.hbs");
+            let container_new = base.join(agent).join(format!("{job}.sh.hbs"));
             assert!(
-                !container.exists() && !container.is_symlink(),
+                !container_old.exists() && !container_old.is_symlink(),
+                "Old container template should NOT exist for {}/{} at {}",
+                agent,
+                job,
+                container_old.display()
+            );
+            assert!(
+                !container_new.exists() && !container_new.is_symlink(),
                 "Container template should NOT exist for {}/{} - use shared template instead. Found at {}",
                 agent,
                 job,
-                container.display()
+                container_new.display()
             );
         }
     }
@@ -267,7 +278,8 @@ fn test_system_prompts_contain_role_context() {
 
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
-            let prompt_path = base.join(agent).join(job).join("system-prompt.md.hbs");
+            // Flat structure: agents/{agent}/{job}.md.hbs
+            let prompt_path = base.join(agent).join(format!("{job}.md.hbs"));
             let content = fs::read_to_string(&prompt_path)
                 .expect("Should read prompt")
                 .to_lowercase();
@@ -287,8 +299,8 @@ fn test_system_prompts_contain_role_context() {
 fn test_agent_specialization_in_prompts() {
     let base = templates_dir();
 
-    // Rex should mention Rust
-    let rex_prompt = fs::read_to_string(base.join("agents/rex/coder/system-prompt.md.hbs"))
+    // Rex should mention Rust (flat structure: agents/{agent}/{job}.md.hbs)
+    let rex_prompt = fs::read_to_string(base.join("agents/rex/coder.md.hbs"))
         .expect("Should read rex prompt")
         .to_lowercase();
     assert!(
@@ -297,7 +309,7 @@ fn test_agent_specialization_in_prompts() {
     );
 
     // Blaze should mention frontend/react
-    let blaze_prompt = fs::read_to_string(base.join("agents/blaze/coder/system-prompt.md.hbs"))
+    let blaze_prompt = fs::read_to_string(base.join("agents/blaze/coder.md.hbs"))
         .expect("Should read blaze prompt")
         .to_lowercase();
     assert!(
@@ -308,7 +320,7 @@ fn test_agent_specialization_in_prompts() {
     );
 
     // Grizz should mention Go
-    let grizz_prompt = fs::read_to_string(base.join("agents/grizz/coder/system-prompt.md.hbs"))
+    let grizz_prompt = fs::read_to_string(base.join("agents/grizz/coder.md.hbs"))
         .expect("Should read grizz prompt")
         .to_lowercase();
     assert!(
@@ -317,7 +329,7 @@ fn test_agent_specialization_in_prompts() {
     );
 
     // Nova should mention Node/TypeScript
-    let nova_prompt = fs::read_to_string(base.join("agents/nova/coder/system-prompt.md.hbs"))
+    let nova_prompt = fs::read_to_string(base.join("agents/nova/coder.md.hbs"))
         .expect("Should read nova prompt")
         .to_lowercase();
     assert!(
@@ -386,7 +398,8 @@ fn test_template_count_matches_expected() {
 
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
-            let prompt = base.join(agent).join(job).join("system-prompt.md.hbs");
+            // Flat structure: agents/{agent}/{job}.md.hbs
+            let prompt = base.join(agent).join(format!("{job}.md.hbs"));
 
             if prompt.exists() {
                 total_prompts += 1;
@@ -409,8 +422,8 @@ fn test_template_count_matches_expected() {
         "Shared container template should exist"
     );
 
-    // Verify the only unique container (morgan/intake) exists
-    let morgan_container = base.join("morgan/intake/container.sh.hbs");
+    // Verify the only unique container (morgan/intake.sh.hbs) exists
+    let morgan_container = base.join("morgan/intake.sh.hbs");
     assert!(
         morgan_container.exists(),
         "Morgan intake container should exist"
