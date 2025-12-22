@@ -37,13 +37,13 @@ fn agent_job_matrix() -> Vec<(&'static str, Vec<&'static str>)> {
         ("nova", vec!["coder", "healer", "docs"]),
         ("tap", vec!["coder", "healer"]),
         ("spark", vec!["coder", "healer"]),
-        ("bolt", vec!["deploy", "healer"]),
+        ("bolt", vec!["infra", "deploy", "healer"]),
         ("cipher", vec!["security", "healer"]),
         ("cleo", vec!["quality"]),
         ("tess", vec!["test"]),
         ("stitch", vec!["review"]),
-        ("morgan", vec!["pm", "docs"]),
-        ("atlas", vec!["integration"]),
+        ("morgan", vec!["pm", "docs", "intake"]),
+        ("atlas", vec!["integration", "intake"]),
     ]
 }
 
@@ -150,32 +150,38 @@ fn test_all_system_prompts_exist() {
 }
 
 #[test]
-fn test_all_container_templates_exist() {
+fn test_container_templates_consolidated() {
+    // After consolidation, only morgan/intake has a unique container template.
+    // All other agents use the shared _shared/container.sh.hbs template.
+    // Agent-specific behavior is handled via:
+    //   1. job_type conditionals in the shared template (e.g., infra setup for bolt)
+    //   2. Agent-specific system prompts
     let base = agents_dir();
 
+    // Verify the only agent-specific container template is morgan/intake
+    let morgan_intake_container = base.join("morgan/intake/container.sh.hbs");
+    assert!(
+        morgan_intake_container.exists(),
+        "Morgan intake container should exist at {}",
+        morgan_intake_container.display()
+    );
+
+    // Verify no other container templates exist (they were consolidated)
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
+            // Skip morgan/intake which is the only exception
+            if agent == "morgan" && job == "intake" {
+                continue;
+            }
+
             let container = base.join(agent).join(job).join("container.sh.hbs");
             assert!(
-                container.exists() || container.is_symlink(),
-                "Container template should exist for {}/{} at {}",
+                !container.exists() && !container.is_symlink(),
+                "Container template should NOT exist for {}/{} - use shared template instead. Found at {}",
                 agent,
                 job,
                 container.display()
             );
-
-            // If it's a symlink, verify target exists
-            if container.is_symlink() {
-                let target = fs::read_link(&container).expect("Should read symlink");
-                let resolved = container.parent().unwrap().join(&target);
-                assert!(
-                    resolved.exists(),
-                    "Container symlink for {}/{} should point to existing file, got {}",
-                    agent,
-                    job,
-                    target.display()
-                );
-            }
         }
     }
 }
@@ -377,30 +383,37 @@ fn test_github_auth_partial_security() {
 fn test_template_count_matches_expected() {
     let base = agents_dir();
     let mut total_prompts = 0;
-    let mut total_containers = 0;
 
     for (agent, jobs) in agent_job_matrix() {
         for job in jobs {
             let prompt = base.join(agent).join(job).join("system-prompt.md.hbs");
-            let container = base.join(agent).join(job).join("container.sh.hbs");
 
             if prompt.exists() {
                 total_prompts += 1;
             }
-            if container.exists() || container.is_symlink() {
-                total_containers += 1;
-            }
         }
     }
 
-    // Expected: 13 agents * avg ~1.8 jobs = ~23 prompts/containers
+    // Expected: 13 agents * avg ~2 jobs = ~26 system prompts
+    // Container templates are consolidated to _shared/container.sh.hbs
+    // (only morgan/intake has a unique container template)
     assert!(
         total_prompts >= 20,
         "Should have at least 20 system prompts, found {total_prompts}"
     );
+
+    // Verify the shared container template exists
+    let shared_container = templates_dir().join("_shared/container.sh.hbs");
     assert!(
-        total_containers >= 20,
-        "Should have at least 20 container templates, found {total_containers}"
+        shared_container.exists(),
+        "Shared container template should exist"
+    );
+
+    // Verify the only unique container (morgan/intake) exists
+    let morgan_container = base.join("morgan/intake/container.sh.hbs");
+    assert!(
+        morgan_container.exists(),
+        "Morgan intake container should exist"
     );
 }
 

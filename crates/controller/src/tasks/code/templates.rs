@@ -3855,6 +3855,7 @@ impl CodeTemplateGenerator {
 
     /// Register shared function and bootstrap partials
     /// These partials provide CLI-agnostic building blocks for container scripts
+    #[allow(clippy::too_many_lines)]
     fn register_shared_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
             // New templates partials
@@ -3868,6 +3869,8 @@ impl CodeTemplateGenerator {
             PARTIAL_GO_ENV,
             PARTIAL_HEADER,
             PARTIAL_INFRASTRUCTURE_OPERATORS,
+            PARTIAL_INFRASTRUCTURE_SETUP,
+            PARTIAL_INFRASTRUCTURE_VERIFY,
             PARTIAL_NODE_ENV,
             PARTIAL_RETRY_LOOP,
             PARTIAL_RUST_ENV,
@@ -3906,8 +3909,10 @@ impl CodeTemplateGenerator {
             ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
             ("tanstack-stack", PARTIAL_TANSTACK_STACK),
             ("shadcn-stack", PARTIAL_SHADCN_STACK),
-            // Infrastructure operators partial (for Bolt/Morgan)
+            // Infrastructure partials (for Bolt)
             ("infrastructure-operators", PARTIAL_INFRASTRUCTURE_OPERATORS),
+            ("infrastructure-setup", PARTIAL_INFRASTRUCTURE_SETUP),
+            ("infrastructure-verify", PARTIAL_INFRASTRUCTURE_VERIFY),
         ];
 
         // Legacy partials (for backwards compatibility)

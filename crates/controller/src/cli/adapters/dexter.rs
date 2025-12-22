@@ -106,7 +106,9 @@ impl CliAdapter for DexterAdapter {
     async fn validate_model(&self, model: &str) -> Result<bool> {
         // Dexter supports Claude, GPT, and Gemini models
         let valid_prefixes = ["claude", "gpt", "gemini", "o1", "o3", "o4"];
-        Ok(valid_prefixes.iter().any(|prefix| model.starts_with(prefix)))
+        Ok(valid_prefixes
+            .iter()
+            .any(|prefix| model.starts_with(prefix)))
     }
 
     async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
@@ -262,17 +264,18 @@ export DEXTER_MAX_STEPS_PER_TASK="{max_steps_per_task}"
 
         // Verify response parsing works
         let parse_result = self.parse_response("{}").await;
-        health.details.insert(
-            "response_parsing".to_string(),
-            json!(parse_result.is_ok()),
-        );
+        health
+            .details
+            .insert("response_parsing".to_string(), json!(parse_result.is_ok()));
 
         // Check for required API key environment variables
         let has_api_key = std::env::var("ANTHROPIC_API_KEY").is_ok()
             || std::env::var("OPENAI_API_KEY").is_ok()
             || std::env::var("GOOGLE_API_KEY").is_ok();
 
-        health.details.insert("has_api_key".to_string(), json!(has_api_key));
+        health
+            .details
+            .insert("has_api_key".to_string(), json!(has_api_key));
 
         if !has_api_key {
             health.status = HealthState::Warning;
@@ -328,7 +331,10 @@ mod tests {
     async fn test_validate_model() {
         let adapter = DexterAdapter::new().unwrap();
 
-        assert!(adapter.validate_model("claude-sonnet-4-20250514").await.unwrap());
+        assert!(adapter
+            .validate_model("claude-sonnet-4-20250514")
+            .await
+            .unwrap());
         assert!(adapter.validate_model("gpt-4").await.unwrap());
         assert!(adapter.validate_model("gemini-2.5-pro").await.unwrap());
         assert!(!adapter.validate_model("llama-3").await.unwrap());
@@ -369,4 +375,3 @@ mod tests {
         assert_eq!(parsed.tool_calls[0].name, "get_stock_price");
     }
 }
-

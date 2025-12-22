@@ -36,9 +36,11 @@ pub const PARTIAL_FRONTEND_TOOLKITS: &str = "_shared/partials/frontend-toolkits.
 pub const PARTIAL_TANSTACK_STACK: &str = "_shared/partials/tanstack-stack.md.hbs";
 pub const PARTIAL_SHADCN_STACK: &str = "_shared/partials/shadcn-stack.md.hbs";
 
-// Infrastructure operators partial (for Bolt/Morgan agents)
+// Infrastructure partials (for Bolt agent)
 pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
     "_shared/partials/infrastructure-operators.md.hbs";
+pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "_shared/partials/infrastructure-setup.sh.hbs";
+pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure-verify.sh.hbs";
 
 // ============================================================================
 // CLI-specific templates (invocation scripts, settings)
@@ -102,11 +104,12 @@ pub const CODE_OPENCODE_CONTAINER_BASE_TEMPLATE: &str = "_shared/container.sh.hb
 pub const CODE_GEMINI_CONTAINER_BASE_TEMPLATE: &str = "_shared/container.sh.hbs";
 pub const CODE_GEMINI_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs";
 
-// Review/Remediate container templates (agent-specific)
-pub const REVIEW_FACTORY_CONTAINER_TEMPLATE: &str = "agents/stitch/review/container.sh.hbs";
-pub const REVIEW_CLAUDE_CONTAINER_TEMPLATE: &str = "agents/stitch/review/container.sh.hbs";
-pub const REMEDIATE_FACTORY_CONTAINER_TEMPLATE: &str = "agents/rex/healer/container.sh.hbs";
-pub const REMEDIATE_CLAUDE_CONTAINER_TEMPLATE: &str = "agents/rex/healer/container.sh.hbs";
+// Review/Remediate container templates (all use shared container)
+// Agent-specific behavior is handled via job_type conditionals in the shared template
+pub const REVIEW_FACTORY_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs";
+pub const REVIEW_CLAUDE_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs";
+pub const REMEDIATE_FACTORY_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs";
+pub const REMEDIATE_CLAUDE_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs";
 
 // ============================================================================
 // Memory/System-prompt templates (default fallbacks for health checks)
