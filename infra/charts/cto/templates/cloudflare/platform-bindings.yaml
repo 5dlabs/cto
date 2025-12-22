@@ -1,0 +1,81 @@
+{{- if .Values.cloudflare.enabled }}
+{{- $tunnelName := .Values.cloudflare.tunnel.name }}
+{{- $bindings := .Values.cloudflare.bindings }}
+
+{{- /* ArgoCD Binding */ -}}
+{{- if $bindings.argocd }}
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: argocd-tunnel
+  namespace: argocd
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ $tunnelName }}
+subjects:
+  - name: argocd-server
+    spec:
+      fqdn: {{ $bindings.argocd.hostname }}
+      target: {{ $bindings.argocd.target }}
+      {{- if $bindings.argocd.originRequest }}
+      originRequest:
+        {{- toYaml $bindings.argocd.originRequest | nindent 8 }}
+      {{- end }}
+{{- end }}
+
+{{- /* Argo Workflows Binding */ -}}
+{{- if $bindings.workflows }}
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: workflows-tunnel
+  namespace: argo
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ $tunnelName }}
+subjects:
+  - name: argo-workflows-server
+    spec:
+      fqdn: {{ $bindings.workflows.hostname }}
+      target: {{ $bindings.workflows.target }}
+      {{- if $bindings.workflows.originRequest }}
+      originRequest:
+        {{- toYaml $bindings.workflows.originRequest | nindent 8 }}
+      {{- end }}
+{{- end }}
+
+{{- /* Grafana Binding */ -}}
+{{- if $bindings.grafana }}
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: grafana-tunnel
+  namespace: observability
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ $tunnelName }}
+subjects:
+  - name: grafana
+    spec:
+      fqdn: {{ $bindings.grafana.hostname }}
+      target: {{ $bindings.grafana.target }}
+      {{- if $bindings.grafana.originRequest }}
+      originRequest:
+        {{- toYaml $bindings.grafana.originRequest | nindent 8 }}
+      {{- end }}
+{{- end }}
+
+{{- end }}
+
