@@ -57,16 +57,54 @@
 //! - Use Helm values file for complex configs (listenerTemplate, template.spec)
 //! - Create `github-pat` secret in `arc-runners` namespace BEFORE deploying runner scale set
 //! - Session conflicts: If listener fails with "already has active session", delete AutoScalingRunnerSet
-//! - Key Helm values for control plane scheduling:
+//! - **Docker-in-Docker (DinD)**: Runners need DinD for docker/setup-buildx-action
+//!   - Add `docker:dind` sidecar container with `securityContext.privileged: true`
+//!   - Mount shared volumes: `/var/run` (docker.sock), `/home/runner/_work` (workspace)
+//!   - Set runner env: `DOCKER_HOST=unix:///var/run/docker.sock`
+//!   - Label namespace: `pod-security.kubernetes.io/enforce=privileged`
+//! - **Version matching**: ARC controller version MUST match runner scale set version
+//!   - If mismatch, controller logs: "build version doesn't match autoscalingRunnerSetVersion"
+//!   - Upgrade controller first, then install matching runner scale set
+//! - Key Helm values for control plane scheduling + DinD:
 //!   ```yaml
 //!   listenerTemplate:
 //!     spec:
+//!       containers:
+//!       - name: listener  # Required even if empty
 //!       nodeSelector:
 //!         node-role.kubernetes.io/control-plane: ""
 //!       tolerations:
 //!         - key: node-role.kubernetes.io/control-plane
 //!           operator: Exists
 //!           effect: NoSchedule
+//!   template:
+//!     spec:
+//!       containers:
+//!       - name: runner
+//!         image: ghcr.io/actions/actions-runner:latest
+//!         command: ["/home/runner/run.sh"]
+//!         env:
+//!         - name: DOCKER_HOST
+//!           value: unix:///var/run/docker.sock
+//!         volumeMounts:
+//!         - name: work
+//!           mountPath: /home/runner/_work
+//!         - name: dind-sock
+//!           mountPath: /var/run
+//!       - name: dind
+//!         image: docker:dind
+//!         securityContext:
+//!           privileged: true
+//!         volumeMounts:
+//!         - name: work
+//!           mountPath: /home/runner/_work
+//!         - name: dind-sock
+//!           mountPath: /var/run
+//!       volumes:
+//!       - name: work
+//!         emptyDir: {}
+//!       - name: dind-sock
+//!         emptyDir: {}
 //!   ```
 //!
 //! ### Secrets Management (OpenBao + External Secrets)
@@ -119,6 +157,35 @@
 //! - API Key (37 chars) requires `CF_API_KEY` + `CF_API_EMAIL` env vars
 //! - API Token (variable length) requires only `CF_API_TOKEN` env var
 //! - Cannot mix both methods - will fail with "Invalid request headers (6003)"
+//!
+//! ### Metrics-Server + Talos Kubelet Access
+//! - Metrics-server scrapes `/metrics/resource` from kubelet on port 10250
+//! - **Talos Linux restricts kubelet API access by default**
+//! - Symptoms: "no route to host" or "context deadline exceeded" to 10.8.0.x:10250
+//! - Fix: Update Talos machine config to allow pod network access to kubelet
+//! - Alternative: Scale metrics-server to 0 if not needed
+//! - Required machine config patch:
+//!   ```yaml
+//!   machine:
+//!     kubelet:
+//!       extraArgs:
+//!         authentication-token-webhook: "true"
+//!         authorization-mode: "Webhook"
+//!   ```
+//!
+//! ### ArgoCD Auto-Sync Management
+//! - ArgoCD will recreate scaled-down deployments if auto-sync is enabled
+//! - To temporarily disable a service, FIRST disable sync policy:
+//!   ```bash
+//!   kubectl patch application -n argocd <app> --type=merge -p='{"spec":{"syncPolicy":null}}'
+//!   ```
+//! - Then scale down: `kubectl scale deployment -n <ns> <deploy> --replicas=0`
+//! - Services that may need disabling in constrained clusters:
+//!   - `hubble-relay` (Cilium observability)
+//!   - `metrics-server` (if kubelet access not configured)
+//!   - `external-dns` (if Cloudflare auth not configured)
+//!   - `kubeai`, `ollama-models`, `llamastack-*` (AI models)
+//!   - `fluent-bit`, `loki` (logging stack)
 //!
 //! ### Cross-Site Cluster Prevention (CRITICAL)
 //! - **All cluster nodes MUST be in the same Latitude.sh site**
