@@ -115,6 +115,10 @@ secrets:
       baoKey: api-keys
     - key: BRAVE_API_KEY
       baoKey: api-keys
+    - key: MINIMAX_API_KEY
+      baoKey: api-keys
+    - key: MINIMAX_GROUP_ID
+      baoKey: api-keys
 
   # Core platform API keys (cto-secrets)
   ctoKeys:
@@ -135,6 +139,10 @@ secrets:
     - key: XAI_API_KEY
       baoKey: api-keys
     - key: FACTORY_API_KEY
+      baoKey: api-keys
+    - key: MINIMAX_API_KEY
+      baoKey: api-keys
+    - key: MINIMAX_GROUP_ID
       baoKey: api-keys
 
   # Linear integration secrets
@@ -485,6 +493,18 @@ tools:
         transport: "http"
         url: "https://bindings.mcp.cloudflare.com/mcp"
         workingDirectory: "/tmp"
+
+      # --- AI Generation ---
+      minimax:
+        name: "MiniMax"
+        description: "MiniMax AI suite - text (M2 200k context), video (Hailuo), speech (40 languages), and music generation"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@5dlabs/minimax-mcp"]
+        workingDirectory: "/tmp"
+        env:
+          MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
+          MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
 
       # --- Local Servers (run in agent containers, not proxied) ---
       rust-tools:

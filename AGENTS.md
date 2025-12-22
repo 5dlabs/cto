@@ -251,6 +251,7 @@ PRD can specify which CLIs to use. Morgan populates `cto-config.json`:
 | **code** | gpt-5.1 | o3, o4-mini | Multi-agent consensus, full-auto |
 | **gemini** | gemini-2.5-pro | gemini-2.5-pro (thinking enabled) | Reasoning, multi-step problems |
 | **opencode** | claude-opus-4-5-20250929 | claude-opus-4-5-20250929 | Provider-agnostic |
+| **minimax** | MiniMax-M2 | MiniMax-M2 | 200k context, video/speech/music generation |
 
 **Every Code Multi-Agent Modes:**
 - `/plan` - Claude + Gemini + GPT-5 consensus for planning
@@ -280,6 +281,10 @@ claude (opus-4-5) → code (gpt-5.1) → gemini (2.5-pro) → code (/solve) → 
 | OpenAI | o4-mini | `o4-mini` | Fast reasoning |
 | Google | Gemini 2.5 Pro | `gemini-2.5-pro` | Thinking mode available |
 | Google | Gemini 2.5 Flash | `gemini-2.5-flash` | Fast inference |
+| MiniMax | M2 | `MiniMax-M2` | 200k context, 128k output |
+| MiniMax | Hailuo 2.3 | `video-01` | Video generation (1080p, 6-10s) |
+| MiniMax | Speech 2.6 HD | `speech-2.6-hd` | TTS, 40 languages, 7 emotions |
+| MiniMax | Music 2.0 | `music-01` | Music generation with vocals |
 
 **CLI Rotation & Acceptance Probing:**
 - Rotate CLIs **only if acceptance criteria not met**
@@ -964,7 +969,53 @@ kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
 - Use workflow status to track Play execution progress
 - Check resource tree for deployment issues
 
-### 12. MCP Add/Remove/Update Tools
+### 12. MiniMax MCP (AI Generation Suite)
+
+**Purpose:** MiniMax AI suite for text, video, speech, and music generation
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `mcp_minimax_chat` | Generate text with MiniMax-M2 | 200k context, advanced reasoning |
+| `mcp_minimax_generate_video` | Generate video with Hailuo 2.3 | Text/image to video (1080p, 6-10s) |
+| `mcp_minimax_text_to_speech` | Convert text to speech | 40 languages, 7 emotions |
+| `mcp_minimax_generate_music` | Generate music from text | AI vocals, instrumental |
+| `mcp_minimax_check_task` | Check async task status | Poll video/music generation |
+| `mcp_minimax_download_file` | Download generated files | Retrieve video/music by file_id |
+
+**Best Practices:**
+- Use `minimax_chat` for text generation with large context windows
+- Video/music generation is async - use `check_task` to poll for completion
+- Speech generation returns base64 audio directly (synchronous)
+- MiniMax-M2 is OpenAI API compatible - can be used as model rotation fallback
+
+**Example Video Generation:**
+```json
+{
+  "name": "minimax_generate_video",
+  "arguments": {
+    "prompt": "A serene mountain landscape with flowing rivers",
+    "resolution": "1080p",
+    "duration": 6
+  }
+}
+// Returns task_id, then poll with minimax_check_task
+```
+
+**Example Text-to-Speech:**
+```json
+{
+  "name": "minimax_text_to_speech",
+  "arguments": {
+    "text": "Welcome to our platform!",
+    "language": "en",
+    "emotion": "happy",
+    "model": "speech-2.6-hd"
+  }
+}
+// Returns base64-encoded MP3 audio
+```
+
+### 13. MCP Add/Remove/Update Tools
 
 **Purpose:** Manage MCP servers in the platform
 
@@ -2028,6 +2079,7 @@ op item list --vault="5DLabs"
 | **dexter** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-sonnet-4-20250514 |
 | **opencode** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-opus-4-5-20250929 |
 | **cursor** | N/A (uses Cursor auth) | N/A | claude-sonnet-4-20250514 |
+| **minimax** | `MINIMAX_API_KEY` | `MiniMax API Key` | MiniMax-M2 |
 
 **Note:** Every Code (`code`) also supports ChatGPT Plus sign-in as an alternative to API keys.
 
@@ -2152,6 +2204,7 @@ bao kv list /
 | `github-pat` | `GITHUB_TOKEN` | GitHub MCP operations |
 | `tools-kubernetes` | `KUBECONFIG` | K8s MCP tools |
 | `cloudflare-api` | `CF_API_KEY` | Cloudflare operations |
+| `minimax-api` | `MINIMAX_API_KEY`, `MINIMAX_GROUP_ID` | MiniMax AI suite |
 
 #### Syncing Secrets from 1Password to Bao
 

@@ -353,6 +353,135 @@ impl InventoryManager {
     pub fn clear_cache(&mut self) {
         self.cache.clear();
     }
+
+    /// Select a single region that has stock for ALL requested plans.
+    ///
+    /// This is critical for cluster provisioning - all nodes MUST be in the same
+    /// Latitude.sh site for VLAN networking to work. Cross-site clusters will have
+    /// broken networking because VLANs are site-local.
+    ///
+    /// # Arguments
+    ///
+    /// * `plans` - List of plan slugs that must all be available in the same region
+    /// * `preferred` - Preferred regions to try first (in order)
+    /// * `allow_fallback` - If true, falls back to any region with all plans; if false,
+    ///   returns an error if no preferred region has all plans
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no single region has stock for all requested plans.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Find a region that has both control plane and worker plans
+    /// let region = manager.select_same_site_region(
+    ///     &["c2-small-x86", "c2-medium-x86"],
+    ///     &["DAL", "MIA2", "ASH"],
+    ///     true,
+    /// ).await?;
+    /// ```
+    pub async fn select_same_site_region(
+        &mut self,
+        plans: &[&str],
+        preferred: &[&str],
+        allow_fallback: bool,
+    ) -> Result<String> {
+        if plans.is_empty() {
+            anyhow::bail!("At least one plan must be specified");
+        }
+
+        // Collect availability for all plans
+        let mut plan_regions: Vec<Vec<String>> = Vec::new();
+        for plan in plans {
+            let availability = self.get_plan_availability(plan).await?;
+            let regions: Vec<String> = availability
+                .regions
+                .iter()
+                .filter(|r| r.stock_level.is_available())
+                .map(|r| r.region.clone())
+                .collect();
+
+            if regions.is_empty() {
+                anyhow::bail!("No regions have stock for plan: {plan}");
+            }
+
+            plan_regions.push(regions);
+        }
+
+        // Find regions that have ALL plans (intersection)
+        let common_regions: Vec<String> = plan_regions
+            .iter()
+            .skip(1)
+            .fold(plan_regions[0].clone(), |acc, regions| {
+                acc.into_iter()
+                    .filter(|r| regions.iter().any(|r2| r2.eq_ignore_ascii_case(r)))
+                    .collect()
+            });
+
+        if common_regions.is_empty() {
+            anyhow::bail!(
+                "No single site has stock for all plans: {:?}.\n\
+                 This would create a cross-site cluster with broken VLAN networking.\n\
+                 Consider using different plans or waiting for stock.",
+                plans
+            );
+        }
+
+        info!(
+            "Found {} regions with stock for all plans {:?}: {:?}",
+            common_regions.len(),
+            plans,
+            common_regions
+        );
+
+        // Try preferred regions first (case-insensitive match)
+        for pref in preferred {
+            if common_regions
+                .iter()
+                .any(|r| r.eq_ignore_ascii_case(pref))
+            {
+                info!(
+                    "Selected preferred region {} for same-site cluster with plans {:?}",
+                    pref, plans
+                );
+                return Ok(pref.to_uppercase());
+            }
+            debug!("Preferred region {} not available for all plans", pref);
+        }
+
+        // Fallback to any common region
+        if allow_fallback {
+            let region = common_regions.first().expect("checked non-empty above");
+            warn!(
+                "No preferred regions ({}) available for all plans {:?}, falling back to {}",
+                preferred.join(", "),
+                plans,
+                region
+            );
+            Ok(region.clone())
+        } else {
+            anyhow::bail!(
+                "No preferred regions ({}) have stock for all plans {:?}.\n\
+                 Available regions with all plans: {:?}",
+                preferred.join(", "),
+                plans,
+                common_regions
+            );
+        }
+    }
+
+    /// Check if a specific region has stock for a plan.
+    ///
+    /// This is a quick check without detailed stock level info.
+    pub async fn has_stock(&mut self, plan: &str, region: &str) -> bool {
+        match self.get_plan_availability(plan).await {
+            Ok(availability) => availability.regions.iter().any(|r| {
+                r.region.eq_ignore_ascii_case(region) && r.stock_level.is_available()
+            }),
+            Err(_) => false,
+        }
+    }
 }
 
 /// Region selection strategy for cluster provisioning.

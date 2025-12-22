@@ -93,6 +93,47 @@
 //! - `tools-github-secrets` must contain `GITHUB_PERSONAL_ACCESS_TOKEN` key
 //! - Images that don't exist (e.g., `pm-server:latest`) should be scaled to 0
 //! - Most CTO services can run on worker nodes EXCEPT in multi-region setups
+//!
+//! ### VolumeSnapshot CRDs
+//! - Some operators (QuestDB, etc.) require `VolumeSnapshot` CRDs
+//! - Install from external-snapshotter repo BEFORE deploying operators:
+//!   ```bash
+//!   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+//!   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+//!   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+//!   ```
+//!
+//! ### Ollama / KubeAI Models
+//! - Model pods need external network access to pull models from `registry.ollama.ai`
+//! - In multi-region clusters, models on worker nodes fail with DNS timeout
+//! - Patch `Model` CRDs or deployments to run on control plane, or scale to 0
+//! - Ollama operator recreates model deployments from `Model` CRs - scale the CR replicas, not deployment
+//!
+//! ### Loki Gateway
+//! - Uses nginx with dynamic DNS resolution to Loki backends
+//! - Fails in multi-region if it can't resolve `kube-dns.kube-system.svc.cluster.local`
+//! - Must run on control plane in multi-region clusters
+//!
+//! ### External-DNS + Cloudflare
+//! - Cloudflare supports two auth methods: API Key + Email, or API Token
+//! - API Key (37 chars) requires `CF_API_KEY` + `CF_API_EMAIL` env vars
+//! - API Token (variable length) requires only `CF_API_TOKEN` env var
+//! - Cannot mix both methods - will fail with "Invalid request headers (6003)"
+//!
+//! ### Cross-Site Cluster Prevention (CRITICAL)
+//! - **All cluster nodes MUST be in the same Latitude.sh site**
+//! - VLANs are site-local and cannot span sites (e.g., Dallas VLAN != Miami VLAN)
+//! - When creating servers via MCP tools, ensure the SAME region is used for all nodes
+//! - The `metal cluster` CLI enforces this by using ONE region parameter
+//! - When using `metal join`, pass `--control-plane-id` to validate same-site
+//! - Use `InventoryManager::select_same_site_region()` when provisioning multi-node clusters
+//! - Symptoms of cross-site clusters:
+//!   - Worker node has PUBLIC IP instead of private VLAN IP
+//!   - Pods on worker can't reach Kubernetes API (10.96.0.1:443)
+//!   - DNS timeouts, service routing failures, NATS can't cluster
+//!   - Control plane has 10.8.0.x IP but worker has a different public IP
+//! - Detection: Check `kubectl get nodes -o wide` - all nodes should have 10.8.0.x IPs
+//! - Fix: Delete cross-site worker, reprovision in correct site with VLAN config
 
 use anyhow::{Context, Result};
 use std::fs;

@@ -4083,7 +4083,7 @@ impl CodeTemplateGenerator {
             CLIType::Gemini => "gemini",
             CLIType::OpenCode => "opencode",
             // Claude and types without dedicated invoke templates fall back to claude
-            CLIType::Claude | CLIType::OpenHands | CLIType::Grok | CLIType::Qwen => "claude",
+            CLIType::Claude | CLIType::OpenHands | CLIType::Grok | CLIType::Qwen | CLIType::MiniMax => "claude",
         };
 
         let invoke_template_path = format!("clis/{cli_name}/invoke.sh.hbs");
