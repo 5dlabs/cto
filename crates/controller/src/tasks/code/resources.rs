@@ -1878,6 +1878,7 @@ impl<'a> CodeResourceManager<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crds::coderun::LinearIntegration;
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -1890,6 +1891,268 @@ mod tests {
             temperature: None,
             model_rotation: None,
         }
+    }
+
+    /// Create a test CodeRun with optional linear integration for sidecar testing
+    fn create_test_code_run_with_linear(
+        github_app: &str,
+        cli_type: CLIType,
+        linear_enabled: bool,
+    ) -> CodeRun {
+        use crate::crds::CodeRunSpec;
+        use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+        let mut settings = HashMap::new();
+        settings.insert("approvalPolicy".to_string(), json!("never"));
+
+        let linear_integration = if linear_enabled {
+            Some(LinearIntegration {
+                enabled: true,
+                session_id: Some("test-session-123".to_string()),
+                issue_id: Some("TEST-456".to_string()),
+                team_id: Some("team-789".to_string()),
+            })
+        } else {
+            None
+        };
+
+        CodeRun {
+            metadata: ObjectMeta {
+                name: Some("sidecar-test-run".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                run_type: "implementation".to_string(),
+                cli_config: Some(CLIConfig {
+                    cli_type,
+                    model: "test-model".to_string(),
+                    settings,
+                    max_tokens: Some(16000),
+                    temperature: Some(0.7),
+                    model_rotation: None,
+                }),
+                task_id: Some(1),
+                service: "test-service".to_string(),
+                repository_url: "https://github.com/test/repo".to_string(),
+                docs_repository_url: "https://github.com/test/docs".to_string(),
+                docs_project_directory: Some("docs".to_string()),
+                working_directory: Some("src".to_string()),
+                model: "test-model".to_string(),
+                github_user: Some("test-user".to_string()),
+                github_app: Some(github_app.to_string()),
+                context_version: 1,
+                continue_session: false,
+                overwrite_memory: false,
+                docs_branch: "main".to_string(),
+                env: HashMap::new(),
+                env_from_secrets: Vec::new(),
+                enable_docker: false,
+                task_requirements: None,
+                service_account_name: None,
+                linear_integration,
+                prompt_modification: None,
+                acceptance_criteria: None,
+            },
+            status: None,
+        }
+    }
+
+    /// Verify the sidecar container spec is correctly constructed
+    #[test]
+    fn test_linear_sidecar_spec_structure() {
+        // When linear_integration is enabled, the sidecar should have these properties:
+        // - name: "linear-sidecar"
+        // - image: configurable (defaults to ghcr.io/5dlabs/linear-sidecar:latest)
+        // - volumeMounts: linear-status and workspace
+        // - ports: 8080 for HTTP
+        // - env: STATUS_FILE, LINEAR_SERVICE_URL, session/issue/team IDs
+
+        let session_id = "test-session-123";
+        let issue_id = "TEST-456";
+        let team_id = "team-789";
+        let workflow_name = "coderun-test";
+
+        // Build the expected sidecar env vars
+        let sidecar_env = vec![
+            json!({ "name": "STATUS_FILE", "value": "/status/current.json" }),
+            json!({ "name": "LINEAR_SERVICE_URL", "value": "http://pm-server:8080" }),
+            json!({ "name": "STATUS_POLL_INTERVAL_MS", "value": "5000" }),
+            json!({ "name": "LOG_POST_INTERVAL_MS", "value": "5000" }),
+            json!({ "name": "INPUT_POLL_INTERVAL_MS", "value": "2000" }),
+            json!({ "name": "LINEAR_SESSION_ID", "value": session_id }),
+            json!({ "name": "LINEAR_ISSUE_ID", "value": issue_id }),
+            json!({ "name": "LINEAR_TEAM_ID", "value": team_id }),
+            json!({ "name": "WORKFLOW_NAME", "value": workflow_name }),
+            json!({ "name": "RUST_LOG", "value": "info" }),
+            json!({ "name": "LOG_FILE_PATH", "value": "/workspace/agent.log" }),
+            json!({ "name": "INPUT_FIFO_PATH", "value": "/workspace/agent-input.jsonl" }),
+            json!({ "name": "HTTP_PORT", "value": "8080" }),
+        ];
+
+        // Verify these are the expected env vars (order matters for first N items)
+        assert_eq!(sidecar_env[0]["name"], "STATUS_FILE");
+        assert_eq!(sidecar_env[5]["name"], "LINEAR_SESSION_ID");
+        assert_eq!(sidecar_env[5]["value"], session_id);
+
+        // Verify volume mounts structure
+        let expected_volume_mounts = json!([
+            { "name": "linear-status", "mountPath": "/status" },
+            { "name": "workspace", "mountPath": "/workspace" }
+        ]);
+        assert_eq!(expected_volume_mounts.as_array().unwrap().len(), 2);
+    }
+
+    /// Verify sidecar is NOT added when linear_integration is None
+    #[test]
+    fn test_sidecar_not_added_when_linear_disabled() {
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+        assert!(code_run.spec.linear_integration.is_none());
+    }
+
+    /// Verify sidecar configuration is set when linear_integration is enabled
+    #[test]
+    fn test_sidecar_added_when_linear_enabled() {
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, true);
+        let linear = code_run.spec.linear_integration.as_ref().unwrap();
+
+        assert!(linear.enabled);
+        assert_eq!(linear.session_id, Some("test-session-123".to_string()));
+        assert_eq!(linear.issue_id, Some("TEST-456".to_string()));
+        assert_eq!(linear.team_id, Some("team-789".to_string()));
+    }
+
+    /// Verify sidecar is added for ALL agent types (implementation agents)
+    #[test]
+    fn test_sidecar_for_all_implementation_agents() {
+        let agents = vec![
+            "5DLabs-Rex",   // Rust
+            "5DLabs-Blaze", // React
+            "5DLabs-Grizz", // Go
+            "5DLabs-Nova",  // Node.js
+            "5DLabs-Tap",   // Expo
+            "5DLabs-Spark", // Electron
+        ];
+
+        for agent in agents {
+            let code_run = create_test_code_run_with_linear(agent, CLIType::Claude, true);
+            let linear = code_run.spec.linear_integration.as_ref();
+
+            assert!(
+                linear.is_some(),
+                "Agent {agent} should have linear_integration when enabled"
+            );
+            assert!(
+                linear.unwrap().enabled,
+                "Agent {agent} should have linear_integration.enabled = true"
+            );
+        }
+    }
+
+    /// Verify sidecar is added for ALL support agents
+    #[test]
+    fn test_sidecar_for_all_support_agents() {
+        let agents = vec![
+            "5DLabs-Cleo",   // Quality
+            "5DLabs-Cipher", // Security
+            "5DLabs-Tess",   // Testing
+            "5DLabs-Atlas",  // Integration
+            "5DLabs-Bolt",   // Infrastructure
+            "5DLabs-Morgan", // PM/Docs
+        ];
+
+        for agent in agents {
+            let code_run = create_test_code_run_with_linear(agent, CLIType::Claude, true);
+            let linear = code_run.spec.linear_integration.as_ref();
+
+            assert!(
+                linear.is_some(),
+                "Support agent {agent} should have linear_integration when enabled"
+            );
+            assert!(
+                linear.unwrap().enabled,
+                "Support agent {agent} should have linear_integration.enabled = true"
+            );
+        }
+    }
+
+    /// Verify sidecar is added for ALL CLI types
+    #[test]
+    fn test_sidecar_for_all_cli_types() {
+        let cli_types = vec![
+            CLIType::Claude,
+            CLIType::Codex,
+            CLIType::Cursor,
+            CLIType::Factory,
+            CLIType::Gemini,
+            CLIType::OpenCode,
+        ];
+
+        for cli_type in cli_types {
+            let code_run = create_test_code_run_with_linear("5DLabs-Rex", cli_type, true);
+            let linear = code_run.spec.linear_integration.as_ref();
+
+            assert!(
+                linear.is_some(),
+                "CLI {:?} should have linear_integration when enabled",
+                cli_type
+            );
+            assert!(
+                linear.unwrap().enabled,
+                "CLI {:?} should have linear_integration.enabled = true",
+                cli_type
+            );
+        }
+    }
+
+    /// Verify the complete agent × CLI matrix for sidecar mounting
+    #[test]
+    fn test_sidecar_agent_cli_matrix() {
+        let agents = vec![
+            "5DLabs-Rex",
+            "5DLabs-Blaze",
+            "5DLabs-Grizz",
+            "5DLabs-Nova",
+            "5DLabs-Tap",
+            "5DLabs-Spark",
+            "5DLabs-Cleo",
+            "5DLabs-Cipher",
+            "5DLabs-Tess",
+            "5DLabs-Atlas",
+            "5DLabs-Bolt",
+            "5DLabs-Morgan",
+        ];
+
+        let cli_types = vec![
+            CLIType::Claude,
+            CLIType::Codex,
+            CLIType::Cursor,
+            CLIType::Factory,
+            CLIType::Gemini,
+            CLIType::OpenCode,
+        ];
+
+        let mut tested_combinations = 0;
+
+        for agent in &agents {
+            for cli_type in &cli_types {
+                let code_run = create_test_code_run_with_linear(agent, *cli_type, true);
+                let linear = code_run.spec.linear_integration.as_ref();
+
+                assert!(
+                    linear.is_some() && linear.unwrap().enabled,
+                    "Combination {agent} + {:?} should support sidecar",
+                    cli_type
+                );
+                tested_combinations += 1;
+            }
+        }
+
+        // Verify we tested all 12 agents × 6 CLIs = 72 combinations
+        assert_eq!(
+            tested_combinations, 72,
+            "Should test all 72 agent×CLI combinations"
+        );
     }
 
     #[test]

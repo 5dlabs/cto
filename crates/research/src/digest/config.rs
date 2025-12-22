@@ -134,4 +134,3 @@ mod tests {
         assert!(config.has_enough_for_digest(10));
     }
 }
-

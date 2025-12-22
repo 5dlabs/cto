@@ -145,9 +145,7 @@ impl CodeAdapter {
 
         // Generate TOML configuration for Every Code (~/.code/config.toml)
         let model = context["model"].as_str().unwrap_or("gpt-5.1");
-        let model_provider = context["model_provider_name"]
-            .as_str()
-            .unwrap_or("openai");
+        let model_provider = context["model_provider_name"].as_str().unwrap_or("openai");
         let approval_policy = context["approval_policy"].as_str().unwrap_or("never");
         let sandbox_mode = context["sandbox_mode"]
             .as_str()
@@ -396,7 +394,10 @@ impl CliAdapter for CodeAdapter {
     }
 
     async fn parse_response(&self, response: &str) -> Result<ParsedResponse> {
-        debug!(response_length = response.len(), "Parsing Every Code response");
+        debug!(
+            response_length = response.len(),
+            "Parsing Every Code response"
+        );
 
         let tool_calls = self.extract_tool_calls(response).await?;
         let finish_reason = if tool_calls.is_empty() {
@@ -495,16 +496,14 @@ impl CliAdapter for CodeAdapter {
         );
 
         let memory_result = self.render_memory_file(&mock_config);
-        health.details.insert(
-            "memory_render".to_string(),
-            json!(memory_result.is_ok()),
-        );
+        health
+            .details
+            .insert("memory_render".to_string(), json!(memory_result.is_ok()));
 
         let parse_result = self.parse_response("{}").await;
-        health.details.insert(
-            "response_parsing".to_string(),
-            json!(parse_result.is_ok()),
-        );
+        health
+            .details
+            .insert("response_parsing".to_string(), json!(parse_result.is_ok()));
 
         Ok(health)
     }
@@ -621,4 +620,3 @@ mod tests {
         assert!(config.contains("model_provider = \"google\""));
     }
 }
-
