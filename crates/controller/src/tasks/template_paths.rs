@@ -3,8 +3,8 @@
 //! Templates are embedded in the Docker image and accessed via AGENT_TEMPLATES_PATH env var.
 //! Structure:
 //!   - `_shared/` - Shared partials and container base
-//!   - `clis/{cli}/` - CLI-specific config templates
-//!   - `agents/{agent}/{job}/` - Agent + job type templates
+//!   - `clis/` - CLI invocation templates (flat: {cli}.sh.hbs)
+//!   - `agents/{agent}/` - Agent templates (flat: {job}.md.hbs, {job}.sh.hbs)
 
 // ============================================================================
 // Shared partials (CLI-agnostic building blocks)
@@ -43,27 +43,18 @@ pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "_shared/partials/infrastructure-
 pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure-verify.sh.hbs";
 
 // ============================================================================
-// CLI-specific templates (invocation scripts, settings)
-// Config templates removed - adapters now serialize directly
+// CLI-specific templates (invocation scripts)
+// Flat structure: clis/{cli}.sh.hbs
 // ============================================================================
 
-// Claude CLI
-pub const CLI_CLAUDE_INVOKE: &str = "clis/claude/invoke.sh.hbs";
-
-// Codex CLI
-pub const CLI_CODEX_INVOKE: &str = "clis/codex/invoke.sh.hbs";
-
-// Cursor CLI
-pub const CLI_CURSOR_INVOKE: &str = "clis/cursor/invoke.sh.hbs";
-
-// Factory CLI
-pub const CLI_FACTORY_INVOKE: &str = "clis/factory/invoke.sh.hbs";
-
-// Gemini CLI
-pub const CLI_GEMINI_INVOKE: &str = "clis/gemini/invoke.sh.hbs";
-
-// OpenCode CLI
-pub const CLI_OPENCODE_INVOKE: &str = "clis/opencode/invoke.sh.hbs";
+pub const CLI_CLAUDE_INVOKE: &str = "clis/claude.sh.hbs";
+pub const CLI_CODE_INVOKE: &str = "clis/code.sh.hbs"; // Every Code
+pub const CLI_CODEX_INVOKE: &str = "clis/codex.sh.hbs";
+pub const CLI_CURSOR_INVOKE: &str = "clis/cursor.sh.hbs";
+pub const CLI_DEXTER_INVOKE: &str = "clis/dexter.sh.hbs";
+pub const CLI_FACTORY_INVOKE: &str = "clis/factory.sh.hbs";
+pub const CLI_GEMINI_INVOKE: &str = "clis/gemini.sh.hbs";
+pub const CLI_OPENCODE_INVOKE: &str = "clis/opencode.sh.hbs";
 
 // ============================================================================
 // Agent identity templates
@@ -74,19 +65,20 @@ pub const AGENT_TOOLS_TEMPLATE: &str = "agents/{agent}/tools.hbs";
 
 // ============================================================================
 // Job-type templates (agent + job combinations)
+// Flat structure: agents/{agent}/{job}.md.hbs, agents/{agent}/{job}.sh.hbs
 // ============================================================================
 
 /// Get container template path for an agent/job combination
 /// Falls back to shared container if agent-specific doesn't exist
 #[must_use]
 pub fn agent_container_template(agent: &str, job: &str) -> String {
-    format!("{agent}/{job}/container.sh.hbs")
+    format!("{agent}/{job}.sh.hbs")
 }
 
 /// Get system prompt path for an agent/job combination
 #[must_use]
 pub fn agent_system_prompt(agent: &str, job: &str) -> String {
-    format!("{agent}/{job}/system-prompt.md.hbs")
+    format!("{agent}/{job}.md.hbs")
 }
 
 // ============================================================================
@@ -114,27 +106,29 @@ pub const REMEDIATE_CLAUDE_CONTAINER_TEMPLATE: &str = "_shared/container.sh.hbs"
 // ============================================================================
 // Memory/System-prompt templates (default fallbacks for health checks)
 // Production code uses CodeTemplateGenerator.get_agent_system_prompt_template()
+// Flat structure: agents/{agent}/{job}.md.hbs
 // ============================================================================
 
-pub const CODE_CLAUDE_MEMORY_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const CODE_CODEX_AGENTS_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const CODE_CURSOR_AGENTS_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const CODE_FACTORY_AGENTS_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const CODE_OPENCODE_MEMORY_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const CODE_GEMINI_MEMORY_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const REVIEW_FACTORY_AGENTS_TEMPLATE: &str = "agents/stitch/review/system-prompt.md.hbs";
-pub const REVIEW_CLAUDE_AGENTS_TEMPLATE: &str = "agents/stitch/review/system-prompt.md.hbs";
-pub const REMEDIATE_FACTORY_AGENTS_TEMPLATE: &str = "agents/rex/healer/system-prompt.md.hbs";
-pub const REMEDIATE_CLAUDE_AGENTS_TEMPLATE: &str = "agents/rex/healer/system-prompt.md.hbs";
+pub const CODE_CLAUDE_MEMORY_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const CODE_CODEX_AGENTS_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const CODE_CURSOR_AGENTS_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const CODE_FACTORY_AGENTS_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const CODE_OPENCODE_MEMORY_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const CODE_GEMINI_MEMORY_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const REVIEW_FACTORY_AGENTS_TEMPLATE: &str = "agents/stitch/review.md.hbs";
+pub const REVIEW_CLAUDE_AGENTS_TEMPLATE: &str = "agents/stitch/review.md.hbs";
+pub const REMEDIATE_FACTORY_AGENTS_TEMPLATE: &str = "agents/rex/healer.md.hbs";
+pub const REMEDIATE_CLAUDE_AGENTS_TEMPLATE: &str = "agents/rex/healer.md.hbs";
 
 // ============================================================================
 // Shared code templates
 // ============================================================================
 
-pub const CODE_MCP_CONFIG_TEMPLATE: &str = "code/mcp.json.hbs";
-pub const CODE_CODING_GUIDELINES_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const CODE_GITHUB_GUIDELINES_TEMPLATE: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const REVIEW_FACTORY_POST_REVIEW_TEMPLATE: &str = "agents/stitch/review/system-prompt.md.hbs";
+// Note: MCP config is now generated programmatically in templates.rs
+// (CODE_MCP_CONFIG_TEMPLATE removed - was "code/mcp.json.hbs")
+pub const CODE_CODING_GUIDELINES_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const CODE_GITHUB_GUIDELINES_TEMPLATE: &str = "agents/rex/coder.md.hbs";
+pub const REVIEW_FACTORY_POST_REVIEW_TEMPLATE: &str = "agents/stitch/review.md.hbs";
 
 // ============================================================================
 // Shared partials (legacy names mapped to new locations)
@@ -148,6 +142,6 @@ pub const SHARED_FUNCTIONS_GITHUB_AUTH: &str = "_shared/partials/github-auth.sh.
 pub const SHARED_FUNCTIONS_COMPLETION_MARKER: &str = "_shared/partials/completion.sh.hbs";
 pub const SHARED_FUNCTIONS_GIT_OPERATIONS: &str = "_shared/partials/git-setup.sh.hbs";
 pub const SHARED_FUNCTIONS_QUALITY_GATES: &str = "_shared/partials/acceptance-probe.sh.hbs";
-pub const SHARED_PROMPTS_CONTEXT7: &str = "agents/rex/coder/system-prompt.md.hbs";
-pub const SHARED_PROMPTS_DESIGN_SYSTEM: &str = "agents/blaze/coder/system-prompt.md.hbs";
+pub const SHARED_PROMPTS_CONTEXT7: &str = "agents/rex/coder.md.hbs";
+pub const SHARED_PROMPTS_DESIGN_SYSTEM: &str = "agents/blaze/coder.md.hbs";
 pub const SHARED_CONTAINER_CORE: &str = "_shared/container.sh.hbs";

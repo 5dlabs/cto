@@ -6,8 +6,7 @@ use crate::tasks::template_paths::{
     CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
-    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
-    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -1450,22 +1449,12 @@ impl CodeTemplateGenerator {
         })
     }
 
+    /// Generate MCP configuration JSON for CLIs that support `--mcp-config`.
+    ///
+    /// This builds the config programmatically (same approach as `generate_cursor_mcp_config`)
+    /// rather than using a Handlebars template, since the structure is simple and consistent.
     fn generate_mcp_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-        Self::register_template_helpers(&mut handlebars);
-
-        let template = Self::load_template(CODE_MCP_CONFIG_TEMPLATE)?;
-
-        handlebars
-            .register_template_string("mcp_config", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register MCP config template: {e}"
-                ))
-            })?;
-
-        // Get CLI config to extract tools URL and tools
+        // Get CLI config to extract tools URL
         let cli_config_value = code_run
             .spec
             .cli_config
@@ -1475,20 +1464,36 @@ impl CodeTemplateGenerator {
 
         let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
 
-        // Generate client config and extract remote tools (same pattern as other functions)
+        // Generate client config and extract remote tools
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
-        let context = json!({
-            "tools_url": render_settings.tools_url,
-            "tools_tools": remote_tools,
+        // Build MCP servers config (serialize directly, no template needed)
+        let mut mcp_servers = json!({});
+
+        if !render_settings.tools_url.is_empty() {
+            let mut tools_server = json!({
+                "command": "tools",
+                "args": ["--url", render_settings.tools_url, "--working-dir", "/workspace"],
+                "env": {
+                    "TOOLS_SERVER_URL": render_settings.tools_url
+                }
+            });
+            if !remote_tools.is_empty() {
+                tools_server["availableTools"] = json!(remote_tools);
+            }
+            mcp_servers["tools"] = tools_server;
+        }
+
+        let mcp_config = json!({
+            "mcpServers": mcp_servers
         });
 
-        handlebars.render("mcp_config", &context).map_err(|e| {
+        serde_json::to_string_pretty(&mcp_config).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to render MCP config template: {e}"
+                "Failed to serialize MCP config: {e}"
             ))
         })
     }
@@ -3579,7 +3584,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Get the system prompt template path for an agent based on github_app and job type.
-    /// Returns path in format: agents/{agent}/{job}/system-prompt.md.hbs
+    /// Returns path in format: agents/{agent}/{job}.md.hbs
     fn get_agent_system_prompt_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
         let job_type = Self::determine_job_type(code_run);
@@ -3631,7 +3636,7 @@ impl CodeTemplateGenerator {
             _ => job_type,
         };
 
-        format!("agents/{agent}/{job}/system-prompt.md.hbs")
+        format!("agents/{agent}/{job}.md.hbs")
     }
 
     /// Select the container template for Claude CLI.
@@ -3643,7 +3648,7 @@ impl CodeTemplateGenerator {
         // Intake runs have a specialized container
         if run_type == "documentation" || run_type == "intake" {
             debug!("Using intake container template for run_type: {}", run_type);
-            return "agents/morgan/intake/container.sh.hbs".to_string();
+            return "agents/morgan/intake.sh.hbs".to_string();
         }
 
         // All other runs use the shared container template
@@ -3658,7 +3663,7 @@ impl CodeTemplateGenerator {
 
         // Intake runs have a specialized container
         if run_type == "documentation" || run_type == "intake" {
-            return "agents/morgan/intake/container.sh.hbs".to_string();
+            return "agents/morgan/intake.sh.hbs".to_string();
         }
 
         // All other runs use the shared container template
@@ -3701,7 +3706,7 @@ impl CodeTemplateGenerator {
 
         // Intake runs have a specialized container
         if run_type == "documentation" || run_type == "intake" {
-            return "agents/morgan/intake/container.sh.hbs".to_string();
+            return "agents/morgan/intake.sh.hbs".to_string();
         }
 
         // All other runs use the shared container template
@@ -4213,7 +4218,7 @@ mod tests {
         code_run.spec.run_type = "intake".to_string();
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(
-            template_path, "agents/morgan/intake/container.sh.hbs",
+            template_path, "agents/morgan/intake.sh.hbs",
             "Intake run should use Morgan intake container"
         );
     }
@@ -4225,7 +4230,7 @@ mod tests {
         code_run.spec.run_type = "documentation".to_string();
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(
-            template_path, "agents/morgan/intake/container.sh.hbs",
+            template_path, "agents/morgan/intake.sh.hbs",
             "Documentation run should use Morgan intake container"
         );
     }
@@ -4329,14 +4334,14 @@ mod tests {
 
     // ========================================================================
     // System prompt template selection tests
-    // All agents use agents/{agent}/{job}/system-prompt.md.hbs
+    // All agents use agents/{agent}/{job}.md.hbs
     // ========================================================================
 
     #[test]
     fn test_system_prompt_template_rex_coder() {
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
-        assert_eq!(template_path, "agents/rex/coder/system-prompt.md.hbs");
+        assert_eq!(template_path, "agents/rex/coder.md.hbs");
     }
 
     #[test]
@@ -4344,7 +4349,7 @@ mod tests {
         // Cleo always uses quality job type (quality assurance specialist)
         let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
-        assert_eq!(template_path, "agents/cleo/quality/system-prompt.md.hbs");
+        assert_eq!(template_path, "agents/cleo/quality.md.hbs");
     }
 
     #[test]
@@ -4366,7 +4371,7 @@ mod tests {
         });
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(
-            template_path, "agents/rex/healer/system-prompt.md.hbs",
+            template_path, "agents/rex/healer.md.hbs",
             "Heal template setting should map to healer job"
         );
     }
@@ -4377,7 +4382,7 @@ mod tests {
         code_run.spec.run_type = "intake".to_string();
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(
-            template_path, "agents/morgan/intake/system-prompt.md.hbs",
+            template_path, "agents/morgan/intake.md.hbs",
             "Morgan intake run should use intake prompt"
         );
     }
@@ -4389,7 +4394,7 @@ mod tests {
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
         assert_eq!(
             template_path,
-            "agents/atlas/integration/system-prompt.md.hbs"
+            "agents/atlas/integration.md.hbs"
         );
     }
 
@@ -4548,7 +4553,7 @@ mod tests {
         // Rex doing default (coder) work
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let template_path = CodeTemplateGenerator::get_cursor_memory_template(&code_run);
-        assert_eq!(template_path, "agents/rex/coder/system-prompt.md.hbs");
+        assert_eq!(template_path, "agents/rex/coder.md.hbs");
     }
 
     #[test]

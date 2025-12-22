@@ -38,10 +38,12 @@ Your task is to implement the feature or fix described in `task/`.
 ## Tool Usage Priority
 
 1. **Expo Docs** - Check https://docs.expo.dev/llms-full.txt for latest patterns
-2. **Code Analysis** - Understand existing app structure and conventions
-3. **Memory** - Reference platform patterns and gotchas
-4. **Implementation** - Write cross-platform code that feels native
-5. **Validation** - TypeScript, ESLint, `npx expo-doctor`
+2. **XcodeBuildMCP** - Use for iOS builds, simulator control, device deployment
+3. **App Store Connect** - Use for TestFlight, beta testing, releases
+4. **Code Analysis** - Understand existing app structure and conventions
+5. **Memory** - Reference platform patterns and gotchas
+6. **Implementation** - Write cross-platform code that feels native
+7. **Validation** - TypeScript, ESLint, `npx expo-doctor`
 
 ## Expo Router Patterns
 
@@ -196,6 +198,125 @@ SplashScreen.hideAsync();
 - **Deep linking** - automatic with Expo Router
 - **OTA updates** - use EAS Update for instant bug fixes
 
+## XcodeBuildMCP - Native iOS Development Tools
+
+You have access to **XcodeBuildMCP** for native iOS builds, simulator control, and device deployment.
+
+### Session Defaults (Set Once, Reuse Everywhere)
+
+Before building, set session defaults to avoid repeating parameters:
+
+```
+# Set default simulator
+xcodebuild_set_session_defaults({
+  simulatorId: "iPhone 15 Pro"
+})
+
+# Set default project/workspace and scheme
+xcodebuild_set_session_defaults({
+  projectPath: "ios/MyApp.xcworkspace",
+  scheme: "MyApp"
+})
+```
+
+### iOS Simulator Workflow
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_list_simulators` | List available iOS simulators |
+| `xcodebuild_boot_simulator` | Boot a simulator by name or UDID |
+| `xcodebuild_build_for_simulator` | Build app for simulator |
+| `xcodebuild_install_app` | Install app on simulator |
+| `xcodebuild_launch_app` | Launch app with optional arguments |
+| `xcodebuild_take_screenshot` | Capture simulator screenshot |
+| `xcodebuild_record_video` | Record simulator session |
+
+```bash
+# Typical simulator workflow
+1. xcodebuild_list_simulators()  # Find target simulator
+2. xcodebuild_boot_simulator({ name: "iPhone 15 Pro" })
+3. xcodebuild_build_for_simulator({ projectPath: "ios/MyApp.xcworkspace", scheme: "MyApp" })
+4. xcodebuild_install_app({ appPath: "build/MyApp.app" })
+5. xcodebuild_launch_app({ bundleId: "com.company.myapp" })
+6. xcodebuild_take_screenshot({ filename: "home-screen.png" })
+```
+
+### Physical Device Deployment
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_list_devices` | List connected iOS devices |
+| `xcodebuild_build_for_device` | Build and sign for device |
+| `xcodebuild_install_on_device` | Install app on physical device |
+| `xcodebuild_get_device_logs` | Stream device logs |
+
+**Note**: Requires code signing configured in Xcode first!
+
+### UI Testing & Automation
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_tap_element` | Tap UI element by accessibility ID |
+| `xcodebuild_type_text` | Enter text in focused field |
+| `xcodebuild_swipe` | Swipe gesture (up/down/left/right) |
+| `xcodebuild_get_ui_hierarchy` | Get accessibility tree for debugging |
+
+### Swift Package Manager
+
+| Tool | Purpose |
+|------|---------|
+| `xcodebuild_resolve_packages` | Resolve SPM dependencies |
+| `xcodebuild_update_packages` | Update SPM packages |
+| `xcodebuild_build_package` | Build Swift package |
+| `xcodebuild_test_package` | Run package tests |
+
+## App Store Connect - Release Management
+
+You have access to **App Store Connect MCP** for managing TestFlight and App Store releases.
+
+### Apps & Builds
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_apps` | List all apps in account |
+| `appstore_get_app` | Get app details by ID |
+| `appstore_list_builds` | List builds for an app |
+| `appstore_get_build` | Get build details |
+
+### TestFlight Beta Testing
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_beta_groups` | List beta tester groups |
+| `appstore_add_beta_tester` | Add tester to beta group |
+| `appstore_remove_beta_tester` | Remove tester from group |
+| `appstore_submit_for_beta_review` | Submit build for TestFlight review |
+
+```bash
+# TestFlight workflow
+1. appstore_list_apps()  # Get app ID
+2. appstore_list_builds({ appId: "..." })  # Find latest build
+3. appstore_list_beta_groups({ appId: "..." })  # Get group IDs
+4. appstore_submit_for_beta_review({ buildId: "..." })
+5. appstore_add_beta_tester({ groupId: "...", email: "tester@example.com" })
+```
+
+### Bundle IDs & Capabilities
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_bundle_ids` | List registered bundle IDs |
+| `appstore_create_bundle_id` | Create new bundle ID |
+| `appstore_get_capabilities` | Get app capabilities |
+| `appstore_enable_capability` | Enable a capability (push, sign-in, etc.) |
+
+### Devices (for Ad Hoc Distribution)
+
+| Tool | Purpose |
+|------|---------|
+| `appstore_list_devices` | List registered devices |
+| `appstore_register_device` | Register new device UDID |
+
 ## Environment Variables
 
 ```bash
@@ -251,9 +372,11 @@ Before creating your PR, verify:
 - ✅ `npx eslint .` passes
 - ✅ `npm test` passes (if tests exist)
 - ✅ `npx expo-doctor` passes
-- ✅ App runs on iOS simulator/device
+- ✅ App runs on iOS simulator (use `xcodebuild_take_screenshot` for verification)
 - ✅ App runs on Android emulator/device
+- ✅ iOS build succeeds via `xcodebuild_build_for_simulator`
 - ✅ PR created with Linear issue link
+- ✅ Screenshots attached showing app on both platforms
 
 ## Task Context
 
@@ -263,4 +386,5 @@ Before creating your PR, verify:
 - Branch: feature/task-{{task_id}}-implementation
 
 Read `task/` directory for requirements.
+
 
