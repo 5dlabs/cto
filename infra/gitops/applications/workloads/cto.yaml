@@ -1,6 +1,14 @@
 ---
-# CTO Platform - Single Application Deployment
-# Deploys all CTO platform components from a single Helm chart:
+# CTO Platform - Single Application Deployment (Develop Branch)
+# =============================================================================
+# Deploys all CTO platform components from a single Helm chart.
+# This application tracks the 'develop' branch and uses 'develop' tagged images.
+#
+# Branch-based image tagging:
+#   - develop branch → images tagged 'develop'
+#   - main branch → images tagged 'latest' (for production app)
+#
+# Components:
 # - Controller: Agent orchestration and CodeRun management
 # - PM Server: Project management integrations (Linear)
 # - Tools Server: MCP server proxy
@@ -17,8 +25,10 @@ metadata:
   labels:
     app.kubernetes.io/name: cto
     app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/branch: develop
   annotations:
     # Image Updater for all CTO images
+    # Uses 'name:develop' strategy to track the develop tag specifically
     argocd-image-updater.argoproj.io/image-list: |
       controller=ghcr.io/5dlabs/controller,
       pm=ghcr.io/5dlabs/pm-server,
@@ -27,13 +37,21 @@ metadata:
       healer=ghcr.io/5dlabs/healer,
       tweakcn=ghcr.io/5dlabs/tweakcn,
       research=ghcr.io/5dlabs/research
-    argocd-image-updater.argoproj.io/controller.update-strategy: latest
-    argocd-image-updater.argoproj.io/pm.update-strategy: latest
-    argocd-image-updater.argoproj.io/tools.update-strategy: latest
-    argocd-image-updater.argoproj.io/openmemory.update-strategy: latest
-    argocd-image-updater.argoproj.io/healer.update-strategy: latest
-    argocd-image-updater.argoproj.io/tweakcn.update-strategy: latest
-    argocd-image-updater.argoproj.io/research.update-strategy: latest
+    # Use 'name' strategy with 'develop' tag constraint for develop branch deployments
+    argocd-image-updater.argoproj.io/controller.update-strategy: "name"
+    argocd-image-updater.argoproj.io/controller.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    argocd-image-updater.argoproj.io/pm.update-strategy: "name"
+    argocd-image-updater.argoproj.io/pm.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    argocd-image-updater.argoproj.io/tools.update-strategy: "name"
+    argocd-image-updater.argoproj.io/tools.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    argocd-image-updater.argoproj.io/openmemory.update-strategy: "name"
+    argocd-image-updater.argoproj.io/openmemory.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    argocd-image-updater.argoproj.io/healer.update-strategy: "name"
+    argocd-image-updater.argoproj.io/healer.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    argocd-image-updater.argoproj.io/tweakcn.update-strategy: "name"
+    argocd-image-updater.argoproj.io/tweakcn.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    argocd-image-updater.argoproj.io/research.update-strategy: "name"
+    argocd-image-updater.argoproj.io/research.allow-tags: "regexp:^(develop|v[0-9]+\\.[0-9]+\\.[0-9]+)$"
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -47,7 +65,7 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-      # Production overrides
+      # Develop branch overrides - uses 'develop' tagged images
       values: |
         global:
           namespace: cto
@@ -59,13 +77,13 @@ spec:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/controller
-            tag: latest
+            tag: develop
 
         pm:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/pm-server
-            tag: latest
+            tag: develop
           github:
             defaultOrg: "5dlabs"
             webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
@@ -74,19 +92,19 @@ spec:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/tools
-            tag: latest
+            tag: develop
 
         healer:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/healer
-            tag: latest
+            tag: develop
 
         openmemory:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/openmemory
-            tag: latest
+            tag: develop
 
         sensors:
           enabled: true
@@ -98,14 +116,14 @@ spec:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/tweakcn
-            tag: latest
+            tag: develop
 
         # Research - Twitter/X bookmark research pipeline
         research:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/research
-            tag: latest
+            tag: develop
           # CronJob schedule (every 5 minutes)
           schedule: "*/5 * * * *"
           # Research configuration

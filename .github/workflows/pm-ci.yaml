@@ -3,14 +3,14 @@ name: PM CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'crates/integrations/**'
       - 'infra/images/pm-server/**'
       - 'infra/charts/pm/**'
       - '.github/workflows/pm-ci.yaml'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'crates/integrations/**'
       - 'infra/images/pm-server/**'
@@ -162,10 +162,10 @@ jobs:
           dockerfile: infra/images/pm-server/Dockerfile
           failure-threshold: warning
 
-  # Build and push Docker image (only on push to main)
+  # Build and push Docker image (on push to main or develop)
   build-docker:
     needs: [lint-rust, test-rust, build-check]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: [k8s-runner]
     permissions:
       contents: read

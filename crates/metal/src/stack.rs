@@ -49,6 +49,50 @@
 //!   - Any pod that needs to reach the K8s API
 //! - Use `internalTrafficPolicy: Local` on services to avoid cross-region routing
 //! - Consider disabling non-critical components (Hubble Relay) in multi-region setups
+//!
+//! ### GitHub Actions Runners (ARC)
+//! - Deploy ARC controller FIRST, then runner scale sets
+//! - ARC controller must run on control plane (API access)
+//! - Listener pods must also run on control plane for GitHub API connectivity
+//! - Use Helm values file for complex configs (listenerTemplate, template.spec)
+//! - Create `github-pat` secret in `arc-runners` namespace BEFORE deploying runner scale set
+//! - Session conflicts: If listener fails with "already has active session", delete AutoScalingRunnerSet
+//! - Key Helm values for control plane scheduling:
+//!   ```yaml
+//!   listenerTemplate:
+//!     spec:
+//!       nodeSelector:
+//!         node-role.kubernetes.io/control-plane: ""
+//!       tolerations:
+//!         - key: node-role.kubernetes.io/control-plane
+//!           operator: Exists
+//!           effect: NoSchedule
+//!   ```
+//!
+//! ### Secrets Management (OpenBao + External Secrets)
+//! - Initialize `OpenBao` with proper key shares and threshold
+//! - Configure Kubernetes auth for service account access
+//! - CA certificate MUST be provided when configuring K8s auth (`kubernetes_ca_cert`)
+//! - External Secrets Operator must run on control plane for API access
+//! - Webhook validation can fail immediately after patching - wait for pods to be ready
+//! - Secret key names in `ExternalSecret` must match exactly what deployments expect
+//! - Example: `external-dns` expects `api-key` and `email`, not `cloudflare_api_token`
+//!
+//! ### Headscale VPN (Alternative to Tailscale)
+//! - Self-hosted Tailscale control server - no external dependency
+//! - Requires SQLite database (PVC) for state
+//! - Use public Tailscale DERP servers to avoid TLS issues with self-hosted DERP
+//! - Subnet router must run on control plane with proper routes enabled
+//! - Create users and auth keys via: `headscale users create`, `headscale preauthkeys create`
+//! - Enable routes via: `headscale routes enable -r <route-id>`
+//! - Client setup: `tailscale up --login-server=https://headscale.domain --authkey=<key>`
+//!
+//! ### CTO Platform Services
+//! - Deployments using `mayastor` storage class will fail without Mayastor installed
+//! - Delete pending PVCs and recreate with `local-path` storage class
+//! - `tools-github-secrets` must contain `GITHUB_PERSONAL_ACCESS_TOKEN` key
+//! - Images that don't exist (e.g., `pm-server:latest`) should be scaled to 0
+//! - Most CTO services can run on worker nodes EXCEPT in multi-region setups
 
 use anyhow::{Context, Result};
 use std::fs;
@@ -1053,5 +1097,333 @@ pub fn enable_clustermesh(kubeconfig: &Path) -> Result<()> {
     }
 
     println!("   ClusterMesh enabled successfully");
+    Ok(())
+}
+
+/// Deploy GitHub Actions Runner Controller (ARC) for self-hosted runners.
+///
+/// **LESSON LEARNED (Dec 2024)**: The ARC controller and listener pods must run
+/// on the control plane node in multi-region setups to access the Kubernetes API
+/// and external GitHub API.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `schedule_on_control_plane` - If true, schedules ARC on control plane
+///
+/// # Errors
+///
+/// Returns an error if helm commands fail.
+pub fn deploy_arc_controller(kubeconfig: &Path, schedule_on_control_plane: bool) -> Result<()> {
+    println!("   Deploying GitHub Actions Runner Controller (ARC)...");
+
+    // Create arc-systems namespace
+    let _ = kubectl(kubeconfig, &["create", "namespace", "arc-systems"]);
+
+    // Add Pod Security labels (ARC needs some privileges)
+    let _ = kubectl(
+        kubeconfig,
+        &[
+            "label",
+            "namespace",
+            "arc-systems",
+            "pod-security.kubernetes.io/enforce=privileged",
+            "--overwrite",
+        ],
+    );
+
+    // Build helm args
+    let mut helm_args = vec![
+        "upgrade",
+        "--install",
+        "arc",
+        "oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller",
+        "--namespace",
+        "arc-systems",
+        "--version",
+        "0.12.1",
+        "--wait",
+        "--timeout",
+        "5m",
+    ];
+
+    // Add control plane scheduling if needed
+    if schedule_on_control_plane {
+        helm_args.extend([
+            "--set",
+            "nodeSelector.node-role\\.kubernetes\\.io/control-plane=",
+            "--set",
+            "tolerations[0].key=node-role.kubernetes.io/control-plane",
+            "--set",
+            "tolerations[0].operator=Exists",
+            "--set",
+            "tolerations[0].effect=NoSchedule",
+        ]);
+    }
+
+    helm(kubeconfig, &helm_args)?;
+
+    println!("   ✅ ARC controller deployed");
+    Ok(())
+}
+
+/// Create the github-pat secret for ARC runners.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `github_pat` - GitHub Personal Access Token with actions scope
+///
+/// # Errors
+///
+/// Returns an error if kubectl commands fail.
+pub fn create_github_pat_secret(kubeconfig: &Path, github_pat: &str) -> Result<()> {
+    println!("   Creating github-pat secret for ARC runners...");
+
+    // Create arc-runners namespace
+    let _ = kubectl(kubeconfig, &["create", "namespace", "arc-runners"]);
+
+    // Create the secret
+    kubectl(
+        kubeconfig,
+        &[
+            "create",
+            "secret",
+            "generic",
+            "github-pat",
+            "--namespace",
+            "arc-runners",
+            &format!("--from-literal=github_token={github_pat}"),
+        ],
+    )?;
+
+    println!("   ✅ github-pat secret created");
+    Ok(())
+}
+
+/// Deploy GitHub Actions Runner Scale Set.
+///
+/// **LESSON LEARNED (Dec 2024)**: Use a values file for complex configurations.
+/// The listener and runner pods must run on control plane in multi-region setups.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `github_org` - GitHub organization URL (e.g., "https://github.com/5dlabs")
+/// * `runner_name` - Name for the runner scale set (e.g., "k8s-runner")
+/// * `min_runners` - Minimum number of runners to keep
+/// * `max_runners` - Maximum number of runners to scale to
+/// * `schedule_on_control_plane` - If true, schedules runners on control plane
+///
+/// # Errors
+///
+/// Returns an error if helm commands fail.
+pub fn deploy_arc_runner_scale_set(
+    kubeconfig: &Path,
+    github_org: &str,
+    runner_name: &str,
+    min_runners: u32,
+    max_runners: u32,
+    schedule_on_control_plane: bool,
+) -> Result<()> {
+    println!("   Deploying GitHub Actions Runner Scale Set '{runner_name}'...");
+
+    // Generate values YAML
+    let values = if schedule_on_control_plane {
+        format!(
+            r#"githubConfigUrl: "{github_org}"
+githubConfigSecret: github-pat
+runnerScaleSetName: "{runner_name}"
+minRunners: {min_runners}
+maxRunners: {max_runners}
+
+listenerTemplate:
+  spec:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    containers:
+      - name: listener
+        resources:
+          requests:
+            cpu: "150m"
+            memory: "256Mi"
+
+template:
+  spec:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "12Gi"
+"#
+        )
+    } else {
+        format!(
+            r#"githubConfigUrl: "{github_org}"
+githubConfigSecret: github-pat
+runnerScaleSetName: "{runner_name}"
+minRunners: {min_runners}
+maxRunners: {max_runners}
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "12Gi"
+"#
+        )
+    };
+
+    // Write values to temp file
+    let values_path = write_temp_yaml("arc-runner-values", &values)?;
+
+    // Install the runner scale set
+    let result = helm(
+        kubeconfig,
+        &[
+            "upgrade",
+            "--install",
+            runner_name,
+            "oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set",
+            "--namespace",
+            "arc-runners",
+            "-f",
+            values_path.to_string_lossy().as_ref(),
+            "--version",
+            "0.12.1",
+            "--wait",
+            "--timeout",
+            "5m",
+        ],
+    );
+
+    // Cleanup temp file
+    let _ = fs::remove_file(&values_path);
+
+    result?;
+
+    println!("   ✅ Runner scale set '{runner_name}' deployed");
+    Ok(())
+}
+
+/// Configure External Secrets Operator with OpenBao backend.
+///
+/// **LESSON LEARNED (Dec 2024)**: External Secrets pods must run on control plane
+/// in multi-region setups. Webhook validation can fail immediately after patching -
+/// wait for pods to be ready before creating ClusterSecretStore.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `openbao_addr` - OpenBao address (e.g., "http://openbao.openbao.svc.cluster.local:8200")
+/// * `root_token` - OpenBao root token for initial setup
+/// * `schedule_on_control_plane` - If true, patches ESO to run on control plane
+///
+/// # Errors
+///
+/// Returns an error if kubectl commands fail.
+pub fn configure_external_secrets(
+    kubeconfig: &Path,
+    openbao_addr: &str,
+    root_token: &str,
+    schedule_on_control_plane: bool,
+) -> Result<()> {
+    println!("   Configuring External Secrets Operator...");
+
+    // Patch ESO deployments to run on control plane if needed
+    if schedule_on_control_plane {
+        let patch = r#"{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/control-plane":""},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}"#;
+
+        for deployment in [
+            "external-secrets",
+            "external-secrets-cert-controller",
+            "external-secrets-webhook",
+        ] {
+            let _ = kubectl(
+                kubeconfig,
+                &[
+                    "patch",
+                    "deployment",
+                    deployment,
+                    "-n",
+                    "external-secrets",
+                    "--type=strategic",
+                    "-p",
+                    patch,
+                ],
+            );
+        }
+
+        // Wait for pods to be ready
+        let _ = kubectl(
+            kubeconfig,
+            &[
+                "wait",
+                "--for=condition=available",
+                "deployment",
+                "-l",
+                "app.kubernetes.io/instance=external-secrets",
+                "-n",
+                "external-secrets",
+                "--timeout=120s",
+            ],
+        );
+    }
+
+    // Create the ClusterSecretStore
+    let cluster_secret_store = format!(
+        r#"---
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: openbao
+spec:
+  provider:
+    vault:
+      server: "{openbao_addr}"
+      path: "kv"
+      version: "v2"
+      auth:
+        tokenSecretRef:
+          name: openbao-token
+          namespace: external-secrets
+          key: token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openbao-token
+  namespace: external-secrets
+type: Opaque
+stringData:
+  token: "{root_token}"
+"#
+    );
+
+    kubectl_apply_yaml(kubeconfig, &cluster_secret_store)?;
+
+    println!("   ✅ External Secrets configured with OpenBao backend");
     Ok(())
 }

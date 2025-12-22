@@ -3,9 +3,9 @@ name: Controller CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 env:
@@ -131,11 +131,12 @@ jobs:
           cargo install cargo-audit --version 0.21.2 2>/dev/null || true
           cd crates/controller && cargo audit || true
 
-  # Docker Build & Push (main branch only)
+  # Docker Build & Push (main and develop branches)
   build-and-push:
     needs: [changes, lint-rust, test-rust]
     if: |
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' && 
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
       needs.changes.outputs.controller == 'true'
     runs-on: [k8s-runner]
     permissions:
