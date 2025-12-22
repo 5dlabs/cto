@@ -198,6 +198,29 @@ if DEV_MODE:
         labels=['build'],
     )
 
+    # Linear Sidecar (status-sync with whip cracking)
+    # Uses --target local to compile from source instead of expecting pre-built binary
+    local_resource(
+        'build-linear-sidecar',
+        cmd='''
+            set -e
+            echo "🔨 Building linear-sidecar..."
+            DOCKER_BUILDKIT=1 docker build \
+                --platform linux/amd64 \
+                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                --target local \
+                -t %s/linear-sidecar:%s \
+                -f infra/images/linear-sidecar/Dockerfile \
+                . && \
+            echo "📤 Pushing linear-sidecar..." && \
+            docker push %s/linear-sidecar:%s && \
+            echo "✅ linear-sidecar complete"
+        ''' % (LOCAL_REGISTRY, DEV_TAG, LOCAL_REGISTRY, DEV_TAG),
+        deps=['crates/pm/src/bin/status-sync.rs', 'crates/pm/Cargo.toml', 'Cargo.toml', 'Cargo.lock'],
+        ignore=['**/target/'],
+        labels=['build'],
+    )
+
 # =============================================================================
 # Deploys
 # =============================================================================
