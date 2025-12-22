@@ -16,6 +16,7 @@ const CLI_TYPE_VARIANTS: &[&str] = &[
     "grok",
     "gemini",
     "qwen",
+    "minimax",
 ];
 
 /// Supported CLI types
@@ -44,6 +45,8 @@ pub enum CLIType {
     Gemini,
     /// Alibaba Qwen CLI
     Qwen,
+    /// MiniMax AI CLI (M2 text, Hailuo video, Speech, Music)
+    MiniMax,
 }
 
 impl std::fmt::Display for CLIType {
@@ -60,6 +63,7 @@ impl std::fmt::Display for CLIType {
             CLIType::Grok => write!(f, "grok"),
             CLIType::Gemini => write!(f, "gemini"),
             CLIType::Qwen => write!(f, "qwen"),
+            CLIType::MiniMax => write!(f, "minimax"),
         }
     }
 }
@@ -82,6 +86,7 @@ impl CLIType {
             "grok" => Some(CLIType::Grok),
             "gemini" => Some(CLIType::Gemini),
             "qwen" => Some(CLIType::Qwen),
+            "minimax" | "mini-max" => Some(CLIType::MiniMax),
             _ => None,
         }
     }

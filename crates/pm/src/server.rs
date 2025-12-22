@@ -86,6 +86,8 @@ pub fn build_router(state: AppState) -> Router {
         )
         // Manual trigger endpoints for testing
         .route("/trigger/intake", post(trigger_intake))
+        // Input routing endpoint - send messages to running agents
+        .route("/api/sessions/:session_id/input", post(send_session_input))
         // Health check
         .route("/health", axum::routing::get(health_check))
         .route("/ready", axum::routing::get(readiness_check))
@@ -101,6 +103,72 @@ struct TriggerIntakeRequest {
     /// Optional session ID for activity updates (generates one if not provided)
     #[serde(default)]
     session_id: Option<String>,
+}
+
+/// Request body for sending input to a session.
+#[derive(Debug, Deserialize)]
+struct SessionInputRequest {
+    /// Message text to send to the agent.
+    text: String,
+    /// Optional issue identifier for context.
+    #[serde(default)]
+    issue_identifier: Option<String>,
+}
+
+/// Send input to a running agent session.
+///
+/// POST /api/sessions/:session_id/input
+///
+/// Routes the message to the agent's sidecar via HTTP.
+async fn send_session_input(
+    State(state): State<AppState>,
+    axum::extract::Path(session_id): axum::extract::Path<String>,
+    Json(request): Json<SessionInputRequest>,
+) -> Result<Json<Value>, StatusCode> {
+    use crate::handlers::agent_comms::broadcast_to_session;
+
+    info!(
+        session_id = %session_id,
+        text_len = request.text.len(),
+        "Received input for session"
+    );
+
+    // Try to send to running agents
+    match broadcast_to_session(
+        &state.kube_client,
+        &state.config.namespace,
+        &session_id,
+        &request.text,
+        request.issue_identifier.as_deref(),
+    )
+    .await
+    {
+        Ok(sent_count) => {
+            info!(
+                session_id = %session_id,
+                sent_count = sent_count,
+                "Message routed to agents"
+            );
+            Ok(Json(json!({
+                "status": "ok",
+                "session_id": session_id,
+                "agents_notified": sent_count,
+                "message": "Message sent successfully"
+            })))
+        }
+        Err(e) => {
+            warn!(
+                session_id = %session_id,
+                error = %e,
+                "Failed to route message"
+            );
+            Ok(Json(json!({
+                "status": "error",
+                "session_id": session_id,
+                "error": format!("Failed to route message: {e}")
+            })))
+        }
+    }
 }
 
 /// Manually trigger intake workflow for an issue.

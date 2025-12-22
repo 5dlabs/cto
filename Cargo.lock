@@ -2873,6 +2873,7 @@ dependencies = [
  "hmac",
  "k8s-openapi",
  "kube",
+ "lazy_static",
  "regex",
  "reqwest",
  "serde",

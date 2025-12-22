@@ -63,6 +63,9 @@ regex = "1"
 # YAML frontmatter parsing
 serde_yaml = "0.9"
 
+# Lazy initialization for global singletons
+lazy_static = "1.4"
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
 wiremock.workspace = true

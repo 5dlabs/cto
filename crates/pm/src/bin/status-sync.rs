@@ -5,6 +5,7 @@
 //! - Log file streaming to Linear agent dialog (`emit_thought`)
 //! - Input polling from Linear and forwarding to agent FIFO
 //! - HTTP server for local input injection
+//! - **Whip Cracking**: Progress monitoring with escalating nudges when agents stall
 
 use anyhow::{Context, Result};
 use axum::{
@@ -68,6 +69,13 @@ pub struct Config {
 
     // HTTP server
     pub http_port: u16,
+
+    // Whip cracking (progress monitoring with escalating nudges)
+    pub whip_crack_enabled: bool,
+    pub stall_threshold_secs: u64,
+    pub nudge_interval_secs: u64,
+    pub max_nudge_level: u8,
+    pub nudge_messages: Vec<String>,
 }
 
 impl Config {
@@ -129,7 +137,48 @@ impl Config {
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
                 .unwrap_or(8080),
+
+            // Whip cracking configuration
+            whip_crack_enabled: std::env::var("WHIP_CRACK_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(false),
+            stall_threshold_secs: std::env::var("STALL_THRESHOLD_SECS")
+                .unwrap_or_else(|_| "120".to_string())
+                .parse()
+                .unwrap_or(120),
+            nudge_interval_secs: std::env::var("NUDGE_INTERVAL_SECS")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .unwrap_or(60),
+            max_nudge_level: std::env::var("MAX_NUDGE_LEVEL")
+                .unwrap_or_else(|_| "3".to_string())
+                .parse()
+                .unwrap_or(3),
+            nudge_messages: Self::parse_nudge_messages(),
         }
+    }
+
+    /// Parse nudge messages from environment or use defaults.
+    fn parse_nudge_messages() -> Vec<String> {
+        if let Ok(json) = std::env::var("NUDGE_MESSAGES") {
+            if let Ok(messages) = serde_json::from_str::<Vec<String>>(&json) {
+                if !messages.is_empty() {
+                    return messages;
+                }
+            }
+        }
+
+        // Default escalating messages (based on "whip cracking" concept)
+        vec![
+            "📊 Checking in - how's progress? Let me know if you need clarification on the task."
+                .to_string(),
+            "⏰ I notice things have slowed down. Please focus on completing the current step. What's blocking you?"
+                .to_string(),
+            "⚠️ FOCUS: Stop exploring and execute the next concrete action NOW. We need results, not investigation."
+                .to_string(),
+            "🚨 CRITICAL: You appear stuck. Complete the current task immediately or report what's blocking you. Time is limited."
+                .to_string(),
+        ]
     }
 
     /// Check if Linear session is configured.
@@ -1282,6 +1331,172 @@ async fn fifo_writer_task(config: Arc<Config>, mut fifo_rx: mpsc::Receiver<Strin
 }
 
 // =============================================================================
+// Whip Cracking (Progress Monitoring)
+// =============================================================================
+
+/// Progress monitor task - detects when agents stall and sends escalating nudges.
+///
+/// This implements the "whip cracking" pattern where an orchestrator monitors
+/// a worker agent's progress and sends increasingly urgent prompts when the
+/// agent appears stuck or slow.
+///
+/// The escalation levels are:
+/// 0. Gentle check-in after initial stall threshold
+/// 1. Firm reminder to focus
+/// 2. Sharp directive to execute NOW
+/// 3. Critical warning with timeout threat
+async fn progress_monitor_task(
+    config: Arc<Config>,
+    fifo_tx: mpsc::Sender<String>,
+    shutdown: Arc<AtomicBool>,
+    linear_client: Option<LinearApiClient>,
+) {
+    if !config.whip_crack_enabled {
+        info!("Whip cracking disabled, progress monitor not starting");
+        return;
+    }
+
+    info!(
+        stall_threshold = config.stall_threshold_secs,
+        nudge_interval = config.nudge_interval_secs,
+        max_level = config.max_nudge_level,
+        "🔥 Whip cracker starting - monitoring agent progress"
+    );
+
+    let mut last_activity_time = Instant::now();
+    let mut last_file_size: u64 = 0;
+    let mut current_nudge_level: u8 = 0;
+    let mut nudge_sent_at: Option<Instant> = None;
+
+    let stall_threshold = Duration::from_secs(config.stall_threshold_secs);
+    let nudge_interval = Duration::from_secs(config.nudge_interval_secs);
+
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            info!("Whip cracker shutting down");
+            break;
+        }
+
+        sleep(Duration::from_secs(10)).await;
+
+        // Check if stream file has new content (indicates agent activity)
+        let has_activity = match fs::metadata(&config.claude_stream_file).await {
+            Ok(metadata) => {
+                let current_size = metadata.len();
+                if current_size > last_file_size {
+                    last_file_size = current_size;
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(_) => {
+                // File doesn't exist yet, agent might not have started
+                continue;
+            }
+        };
+
+        if has_activity {
+            // Agent is active - reset tracking
+            if current_nudge_level > 0 {
+                info!(
+                    previous_level = current_nudge_level,
+                    "✅ Agent activity detected, resetting nudge level"
+                );
+
+                // Optionally emit a positive acknowledgment
+                if let Some(ref client) = linear_client {
+                    let _ = client
+                        .emit_ephemeral_thought(
+                            &config.linear_session_id,
+                            "✅ Progress detected, continuing to monitor",
+                        )
+                        .await;
+                }
+            }
+            last_activity_time = Instant::now();
+            current_nudge_level = 0;
+            nudge_sent_at = None;
+            continue;
+        }
+
+        // Check if we've exceeded the stall threshold
+        let time_since_activity = last_activity_time.elapsed();
+        if time_since_activity < stall_threshold {
+            continue;
+        }
+
+        // Check if enough time has passed since last nudge
+        if let Some(last_nudge) = nudge_sent_at {
+            if last_nudge.elapsed() < nudge_interval {
+                continue;
+            }
+        }
+
+        // Don't exceed max nudge level
+        if current_nudge_level > config.max_nudge_level {
+            debug!("Max nudge level reached, not sending more nudges");
+            continue;
+        }
+
+        // Get the appropriate nudge message
+        let nudge_idx = current_nudge_level as usize;
+        let nudge_message = config
+            .nudge_messages
+            .get(nudge_idx)
+            .cloned()
+            .unwrap_or_else(|| {
+                format!(
+                    "⚠️ Agent appears stalled (level {}). Please continue with the task.",
+                    current_nudge_level
+                )
+            });
+
+        warn!(
+            level = current_nudge_level,
+            stall_secs = time_since_activity.as_secs(),
+            "🔥 WHIP CRACK: Agent stalled, sending nudge"
+        );
+
+        // Format as Claude input JSON
+        let input = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": nudge_message}]
+            }
+        });
+
+        if let Ok(json) = serde_json::to_string(&input) {
+            if fifo_tx.send(json).await.is_err() {
+                warn!("FIFO channel closed, stopping progress monitor");
+                break;
+            }
+        }
+
+        // Also emit to Linear so user can see the nudge
+        if let Some(ref client) = linear_client {
+            let linear_msg = format!(
+                "🔥 **Nudge (level {})**: {}",
+                current_nudge_level, nudge_message
+            );
+            let _ = client
+                .emit_thought(&config.linear_session_id, &linear_msg)
+                .await;
+        }
+
+        // Escalate for next time
+        current_nudge_level = current_nudge_level.saturating_add(1);
+        nudge_sent_at = Some(Instant::now());
+
+        info!(
+            next_level = current_nudge_level,
+            "Nudge sent, escalated to next level"
+        );
+    }
+}
+
+// =============================================================================
 // HTTP Server
 // =============================================================================
 
@@ -1391,6 +1606,7 @@ async fn main() -> Result<()> {
         http_port = config.http_port,
         argo_url = ?config.argo_workflow_url,
         task_id = ?config.task_id,
+        whip_crack_enabled = config.whip_crack_enabled,
         "Sidecar configured"
     );
 
@@ -1505,12 +1721,25 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Clone fifo_tx for both input polling and progress monitor
+    let fifo_tx_for_input = fifo_tx.clone();
+    let fifo_tx_for_whip = fifo_tx;
+
     let config_clone = config.clone();
     let linear_client_clone = linear_client.clone();
     let input_handle = tokio::spawn(async move {
         if config_clone.has_linear_api() {
-            input_poll_task(config_clone, linear_client_clone, fifo_tx).await;
+            input_poll_task(config_clone, linear_client_clone, fifo_tx_for_input).await;
         }
+    });
+
+    // Whip cracking (progress monitor with escalating nudges)
+    let config_clone = config.clone();
+    let linear_client_clone = linear_client.clone();
+    let shutdown_clone = shutdown.clone();
+    let whip_handle = tokio::spawn(async move {
+        progress_monitor_task(config_clone, fifo_tx_for_whip, shutdown_clone, linear_client_clone)
+            .await;
     });
 
     let config_clone = config.clone();
@@ -1558,6 +1787,12 @@ async fn main() -> Result<()> {
                 warn!(error = %e, "Input poll task panicked");
             }
             warn!("Input poll task exited");
+        }
+        result = whip_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Whip cracker task panicked");
+            }
+            info!("Whip cracker task exited");
         }
         result = fifo_handle => {
             if let Err(e) = result {

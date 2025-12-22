@@ -423,6 +423,14 @@ enum Commands {
         /// Timeout in seconds to wait for each step.
         #[arg(long, default_value = "900")]
         timeout: u64,
+
+        /// Control plane server ID for same-site validation.
+        ///
+        /// If provided, verifies that the worker region matches the control plane's
+        /// site before creating the server. This prevents cross-site clusters which
+        /// break VLAN networking.
+        #[arg(long)]
+        control_plane_id: Option<String>,
     },
 
     /// Deploy the CTO platform stack to an existing cluster.
@@ -1394,6 +1402,7 @@ async fn main() -> Result<()> {
             talosconfig,
             kubeconfig,
             timeout,
+            control_plane_id,
         } => {
             info!("Joining worker node: {hostname}");
 
@@ -1403,6 +1412,37 @@ async fn main() -> Result<()> {
             }
             if !talosconfig.exists() {
                 anyhow::bail!("Talosconfig not found: {}", talosconfig.display());
+            }
+
+            // Validate same-site if control plane ID is provided
+            if let Some(ref cp_id) = control_plane_id {
+                println!("\n🔍 Validating same-site configuration...");
+                let cp_server = provider
+                    .get_server(cp_id)
+                    .await
+                    .context("Failed to get control plane server info")?;
+
+                // Extract site slug from control plane's region
+                let cp_site = cp_server.region.to_uppercase();
+                let worker_site = region.to_uppercase();
+
+                if cp_site != worker_site {
+                    anyhow::bail!(
+                        "❌ Site mismatch! Worker region '{}' does not match control plane site '{}'.\n\n\
+                         VLAN networking requires all cluster nodes to be in the SAME site.\n\
+                         Cross-site clusters will have broken networking:\n\
+                         - Worker won't have access to the private VLAN\n\
+                         - DNS resolution will fail\n\
+                         - Service routing will be unreliable\n\n\
+                         Please use --region {} to create the worker in the same site.",
+                        region, cp_site, cp_site
+                    );
+                }
+
+                println!("   ✅ Site validation passed: both nodes will be in {}", cp_site);
+            } else {
+                println!("\n⚠️  Warning: --control-plane-id not provided, skipping same-site validation.");
+                println!("   For VLAN networking, ensure worker is in the same site as control plane.");
             }
 
             // Step 1: Create server with Ubuntu

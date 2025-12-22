@@ -1028,6 +1028,11 @@ impl<'a> CodeResourceManager<'a> {
                     json!({ "name": "LOG_FILE_PATH", "value": "/workspace/agent.log" }),
                     json!({ "name": "INPUT_FIFO_PATH", "value": "/workspace/agent-input.jsonl" }),
                     json!({ "name": "HTTP_PORT", "value": "8080" }),
+                    // Whip cracking - progress monitoring with escalating nudges
+                    json!({ "name": "WHIP_CRACK_ENABLED", "value": "true" }),
+                    json!({ "name": "STALL_THRESHOLD_SECS", "value": "120" }),
+                    json!({ "name": "NUDGE_INTERVAL_SECS", "value": "60" }),
+                    json!({ "name": "MAX_NUDGE_LEVEL", "value": "3" }),
                 ];
 
                 // Add LINEAR_OAUTH_TOKEN from secret if available
@@ -1059,7 +1064,7 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 });
                 containers.push(sidecar_spec);
-                info!("Added Linear sidecar for session {} (status sync + log streaming + 2-way comms)", session_id);
+                info!("Added Linear sidecar for session {} (status sync + log streaming + 2-way comms + whip cracking)", session_id);
             }
         }
 
@@ -1377,6 +1382,33 @@ impl<'a> CodeResourceManager<'a> {
             "cli-container".to_string(),
             Self::sanitize_label_value(&container_label),
         );
+
+        // Add Linear session labels for pod discovery (used by PM server for routing input)
+        if let Some(linear) = &code_run.spec.linear_integration {
+            if linear.enabled {
+                if let Some(session_id) = &linear.session_id {
+                    labels.insert(
+                        "linear-session".to_string(),
+                        Self::sanitize_label_value(session_id),
+                    );
+                }
+                if let Some(issue_id) = &linear.issue_id {
+                    labels.insert(
+                        "cto.5dlabs.io/linear-issue".to_string(),
+                        Self::sanitize_label_value(issue_id),
+                    );
+                }
+                // Add agent type label for better observability
+                if let Some(github_app) = &code_run.spec.github_app {
+                    if let Ok(agent_name) = AgentClassifier::new().extract_agent_name(github_app) {
+                        labels.insert(
+                            "cto.5dlabs.io/agent-type".to_string(),
+                            Self::sanitize_label_value(&agent_name.to_lowercase()),
+                        );
+                    }
+                }
+            }
+        }
 
         labels
     }
@@ -1989,12 +2021,20 @@ mod tests {
             json!({ "name": "LOG_FILE_PATH", "value": "/workspace/agent.log" }),
             json!({ "name": "INPUT_FIFO_PATH", "value": "/workspace/agent-input.jsonl" }),
             json!({ "name": "HTTP_PORT", "value": "8080" }),
+            // Whip cracking configuration
+            json!({ "name": "WHIP_CRACK_ENABLED", "value": "true" }),
+            json!({ "name": "STALL_THRESHOLD_SECS", "value": "120" }),
+            json!({ "name": "NUDGE_INTERVAL_SECS", "value": "60" }),
+            json!({ "name": "MAX_NUDGE_LEVEL", "value": "3" }),
         ];
 
         // Verify these are the expected env vars (order matters for first N items)
         assert_eq!(sidecar_env[0]["name"], "STATUS_FILE");
         assert_eq!(sidecar_env[5]["name"], "LINEAR_SESSION_ID");
         assert_eq!(sidecar_env[5]["value"], session_id);
+        // Verify whip cracking is enabled
+        assert_eq!(sidecar_env[13]["name"], "WHIP_CRACK_ENABLED");
+        assert_eq!(sidecar_env[13]["value"], "true");
 
         // Verify volume mounts structure
         let expected_volume_mounts = json!([
@@ -2467,5 +2507,125 @@ mod tests {
             existing_with_rotation.model_rotation,
             Some(json!(["existing-model"]))
         );
+    }
+
+    // ==========================================================================
+    // Linear Session Labels Tests (for pod discovery)
+    // ==========================================================================
+
+    /// Verify that Linear session labels are added to pods when Linear integration is enabled.
+    /// These labels are used by PM server to discover and route messages to running agents.
+    #[test]
+    fn test_linear_session_labels_added_when_enabled() {
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, true);
+
+        // Create labels using the same function the controller uses
+        let labels = CodeResourceManager::create_task_labels(&code_run);
+
+        // Verify the linear-session label is present
+        assert!(
+            labels.contains_key("linear-session"),
+            "linear-session label should be added when Linear integration is enabled"
+        );
+        assert_eq!(
+            labels.get("linear-session"),
+            Some(&"test-session-123".to_string()),
+            "linear-session label should contain the session ID"
+        );
+
+        // Verify the linear-issue label is present (sanitized to lowercase)
+        assert!(
+            labels.contains_key("cto.5dlabs.io/linear-issue"),
+            "cto.5dlabs.io/linear-issue label should be added when Linear integration is enabled"
+        );
+        assert_eq!(
+            labels.get("cto.5dlabs.io/linear-issue"),
+            Some(&"test-456".to_string()),  // Note: sanitized to lowercase
+            "linear-issue label should contain the sanitized issue ID"
+        );
+
+        // Verify agent-type label is present
+        assert!(
+            labels.contains_key("cto.5dlabs.io/agent-type"),
+            "cto.5dlabs.io/agent-type label should be added"
+        );
+        assert_eq!(
+            labels.get("cto.5dlabs.io/agent-type"),
+            Some(&"rex".to_string()),
+            "agent-type label should contain the agent name in lowercase"
+        );
+    }
+
+    /// Verify that Linear session labels are NOT added when Linear integration is disabled.
+    #[test]
+    fn test_linear_session_labels_not_added_when_disabled() {
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, false);
+
+        let labels = CodeResourceManager::create_task_labels(&code_run);
+
+        // Verify no Linear-related labels are present
+        assert!(
+            !labels.contains_key("linear-session"),
+            "linear-session label should NOT be added when Linear integration is disabled"
+        );
+        assert!(
+            !labels.contains_key("cto.5dlabs.io/linear-issue"),
+            "linear-issue label should NOT be added when Linear integration is disabled"
+        );
+    }
+
+    /// Verify Linear labels work for all agents (for PM server routing).
+    #[test]
+    fn test_linear_labels_for_all_agents() {
+        let agents_and_expected_types = vec![
+            ("5DLabs-Rex", "rex"),
+            ("5DLabs-Blaze", "blaze"),
+            ("5DLabs-Grizz", "grizz"),
+            ("5DLabs-Nova", "nova"),
+            ("5DLabs-Cleo", "cleo"),
+            ("5DLabs-Cipher", "cipher"),
+            ("5DLabs-Tess", "tess"),
+            ("5DLabs-Atlas", "atlas"),
+            ("5DLabs-Bolt", "bolt"),
+            ("5DLabs-Morgan", "morgan"),
+        ];
+
+        for (agent, expected_type) in agents_and_expected_types {
+            let code_run = create_test_code_run_with_linear(agent, CLIType::Claude, true);
+            let labels = CodeResourceManager::create_task_labels(&code_run);
+
+            assert!(
+                labels.contains_key("linear-session"),
+                "Agent {agent} should have linear-session label"
+            );
+            assert_eq!(
+                labels.get("cto.5dlabs.io/agent-type"),
+                Some(&expected_type.to_string()),
+                "Agent {agent} should have agent-type={expected_type}"
+            );
+        }
+    }
+
+    /// End-to-end test: Verify the complete label set for a typical Play workflow CodeRun.
+    /// This simulates what PM server will see when looking up pods.
+    #[test]
+    fn test_play_workflow_labels_end_to_end() {
+        // Simulate a typical Play workflow CodeRun
+        let code_run = create_test_code_run_with_linear("5DLabs-Rex", CLIType::Claude, true);
+        let labels = CodeResourceManager::create_task_labels(&code_run);
+
+        // These labels are required for PM server pod discovery:
+        assert!(labels.contains_key("linear-session"), "PM server needs linear-session for routing");
+        assert!(labels.contains_key("cto.5dlabs.io/linear-issue"), "PM server needs linear-issue for issue-based lookup");
+        assert!(labels.contains_key("cto.5dlabs.io/agent-type"), "Observability needs agent-type");
+
+        // Standard labels should also be present
+        assert_eq!(labels.get("app"), Some(&"controller".to_string()));
+        assert_eq!(labels.get("component"), Some(&"code-runner".to_string()));
+        assert_eq!(labels.get("job-type"), Some(&"code".to_string()));
+
+        // CLI labels
+        assert!(labels.contains_key("cli-type"));
+        assert!(labels.contains_key("cli-container"));
     }
 }

@@ -19,6 +19,7 @@
 # =============================================================================
 
 allow_k8s_contexts([
+    'admin@cto-dal',
     'talos-home',
     'admin@simple-cluster',
     'kind-kind',

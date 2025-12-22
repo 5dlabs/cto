@@ -101,6 +101,18 @@
       "transport": "http",
       "url": "https://mcp.tigerdata.com/docs",
       "env": {}
+    },
+    "minimax": {
+      "name": "MiniMax",
+      "description": "MiniMax AI suite - text (M2 200k context), video (Hailuo), speech (40 languages), and music generation",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@5dlabs/minimax-mcp"],
+      "workingDirectory": "/tmp",
+      "env": {
+        "MINIMAX_API_KEY": "${MINIMAX_API_KEY}",
+        "MINIMAX_GROUP_ID": "${MINIMAX_GROUP_ID}"
+      }
     }
   }
 }
