@@ -66,12 +66,24 @@ spec:
       valueFiles:
         - values.yaml
       # Develop branch overrides - uses 'develop' tagged images
+      # =======================================================================
+      # CLUSTER: Latitude.sh (cto-dal)
+      # Worker: hardware-219s058355, Control: hardware-21bs002557
+      # Registry: 10.8.0.2:30500 (internal VPN IP)
+      # Storage: local-path (no mayastor on Latitude)
+      # =======================================================================
       values: |
         global:
           namespace: cto
           imagePullSecrets:
             - name: ghcr-secret
-          storageClass: "mayastor"  # High-performance NVMe storage
+          storageClass: "local-path"  # Latitude uses local-path (no mayastor)
+          # Dev registry for local development builds
+          devRegistry:
+            enabled: true
+            url: "10.8.0.2:30500"
+            tag: "tilt-dev"
+            pullPolicy: Always
 
         controller:
           enabled: true
@@ -142,24 +154,17 @@ spec:
         cloudflare:
           enabled: true
 
-        # BuildKit - Remote build infrastructure
-        # NOTE: BuildKit config is cluster-specific and must be updated per deployment
-        # To find worker nodes: kubectl get nodes -l node-role.kubernetes.io/control-plane!=
-        # To find node IPs: kubectl get nodes -o wide
-        # For Latitude clusters, update nodeSelector and insecureRegistries after provisioning
+        # BuildKit - Remote build infrastructure for Latitude cluster
         buildkit:
           enabled: true
-          # Schedule on a worker node with sufficient resources
-          # Update this to match your cluster's worker node hostname
+          # Schedule on Latitude worker node
           nodeSelector:
-            # TODO: Update for Latitude cluster worker node
-            kubernetes.io/hostname: talos-a43-ee1  # Simple cluster (update per cluster)
+            kubernetes.io/hostname: hardware-219s058355
           # Allow pushing to local in-cluster registry (HTTP)
-          # Update IPs to match your cluster's node IPs
           config:
             insecureRegistries:
-              # TODO: Update for Latitude cluster node IPs
-              - "192.168.1.77:30500"  # Simple cluster (update per cluster)
+              - "10.8.0.2:30500"
+              - "10.8.0.1:30500"
 
   destination:
     server: https://kubernetes.default.svc
