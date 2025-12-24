@@ -105,7 +105,7 @@ impl PrerequisitesValidator {
                     .ok_or_else(|| anyhow::anyhow!("op not found"))
             }),
             install_instructions:
-                "Install 1Password CLI from https://1password.com/downloads/command-line/"
+                "Install 1Password CLI: brew install 1password-cli (macOS) or visit https://1password.com/downloads/command-line/"
                     .to_string(),
             critical: true,
         });

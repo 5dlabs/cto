@@ -1,34 +1,9 @@
 {
-  "remoteTools": [
-    "openmemory_openmemory_query",
-    "openmemory_openmemory_store",
-    "openmemory_openmemory_list",
-    "openmemory_openmemory_reinforce",
-    "openmemory_openmemory_get"
-  ],
+  "remoteTools": [],
   "localServers": {
-    "postgres": {
-      "command": "/opt/homebrew/bin/node",
-      "args": [
-        "/opt/homebrew/bin/npx",
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://user:password@host:port/database"
-      ],
-      "tools": [
-        "query"
-      ],
-      "workingDirectory": "project_root",
-      "env": {}
-    },
     "filesystem": {
-      "command": "/opt/homebrew/bin/node",
-      "args": [
-        "/opt/homebrew/bin/npx",
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "."
-      ],
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
       "tools": [
         "read_file",
         "read_multiple_files",
@@ -46,12 +21,8 @@
       "env": {}
     },
     "memory": {
-      "command": "/opt/homebrew/bin/node",
-      "args": [
-        "/opt/homebrew/bin/npx",
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
       "tools": [
         "create_entities",
         "create_relations",

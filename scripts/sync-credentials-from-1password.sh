@@ -34,6 +34,7 @@ echo ""
 # Check prerequisites
 if ! command -v op &> /dev/null; then
     echo -e "${RED}Error: 1Password CLI (op) not found${NC}"
+    echo "Install with: brew install 1password-cli"
     exit 1
 fi
 
@@ -140,7 +141,7 @@ fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo "4. Firecrawl API"
+echo "4. Firecrawl API (MCP Server)"
 echo "═══════════════════════════════════════════════════════════════"
 
 FIRECRAWL_KEY=$(op item get "Firecrawl API Key" --fields credential --reveal 2>/dev/null || echo "")
@@ -152,6 +153,49 @@ if [[ -n "$FIRECRAWL_KEY" ]]; then
     refresh_externalsecret "cto" "tools-firecrawl-secrets"
 else
     echo -e "${YELLOW}⚠ Firecrawl API key not found in 1Password${NC}"
+    echo "   Expected: Item 'Firecrawl API Key' with field 'credential'"
+fi
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "5. MiniMax API (MCP Server)"
+echo "═══════════════════════════════════════════════════════════════"
+
+MINIMAX_KEY=$(op item get "MiniMax API Key" --fields credential --reveal 2>/dev/null || echo "")
+MINIMAX_GROUP_ID=$(op item get "MiniMax API Key" --fields "Group ID" --reveal 2>/dev/null || echo "")
+
+if [[ -n "$MINIMAX_KEY" ]]; then
+    echo "📥 Found in 1Password: MiniMax API Key"
+    echo "  Key length: ${#MINIMAX_KEY}"
+    if [[ -n "$MINIMAX_GROUP_ID" ]]; then
+        echo "  Group ID: $MINIMAX_GROUP_ID"
+        update_openbao "tools-minimax" "MINIMAX_API_KEY='$MINIMAX_KEY' MINIMAX_GROUP_ID='$MINIMAX_GROUP_ID'"
+    else
+        echo "  Group ID: (not found, optional)"
+        update_openbao "tools-minimax" "MINIMAX_API_KEY='$MINIMAX_KEY'"
+    fi
+    refresh_externalsecret "cto" "tools-minimax-secrets"
+else
+    echo -e "${YELLOW}⚠ MiniMax API key not found in 1Password${NC}"
+    echo "   Expected: Item 'MiniMax API Key' with field 'credential'"
+    echo "   Optional: Field 'Group ID' for organization scoping"
+fi
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "6. Latitude.sh API (MCP Server)"
+echo "═══════════════════════════════════════════════════════════════"
+
+LATITUDE_KEY=$(op item get "Latitude.sh API" --fields credential --reveal 2>/dev/null || echo "")
+
+if [[ -n "$LATITUDE_KEY" ]]; then
+    echo "📥 Found in 1Password: Latitude.sh API"
+    echo "  Key length: ${#LATITUDE_KEY}"
+    update_openbao "tools-latitude" "LATITUDE_API_KEY='$LATITUDE_KEY'"
+    refresh_externalsecret "cto" "tools-latitude-secrets"
+else
+    echo -e "${YELLOW}⚠ Latitude API key not found in 1Password${NC}"
+    echo "   Expected: Item 'Latitude.sh API' with field 'credential'"
 fi
 
 echo ""

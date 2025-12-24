@@ -2009,7 +2009,7 @@ fn resolve_latitude_creds(cli: &Cli) -> Result<(String, String)> {
 fn ensure_op_ready() -> Result<()> {
     let version = Command::new("op").arg("--version").output();
     if version.is_err() {
-        anyhow::bail!("1Password CLI `op` not found. Install it and run: `eval $(op signin)`");
+        anyhow::bail!("1Password CLI `op` not found. Install with: brew install 1password-cli, then run: eval $(op signin)");
     }
 
     // Verify auth (do not attempt signin automatically because it requires shell eval).

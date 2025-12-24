@@ -175,6 +175,10 @@ secrets:
       enabled: true
       baoKey: tools-appstore-connect
       # Keys: APP_STORE_KEY_ID, APP_STORE_ISSUER_ID, APP_STORE_P8_KEY (base64 encoded .p8)
+    latitude:
+      enabled: true
+      baoKey: tools-latitude
+      # Keys: LATITUDE_API_KEY
 
   # Research pipeline secrets
   research:
@@ -514,6 +518,17 @@ tools:
         env:
           MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
           MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
+
+      # --- Bare Metal Cloud ---
+      latitudesh:
+        name: "Latitude.sh"
+        description: "Latitude.sh bare metal cloud - manage servers, plans, regions, VLANs, API keys, and billing"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "latitudesh", "start", "--bearer", "${LATITUDE_API_KEY}"]
+        workingDirectory: "/tmp"
+        env:
+          LATITUDE_API_KEY: "${LATITUDE_API_KEY}"
 
       # --- Apple Development ---
       xcodebuild:
