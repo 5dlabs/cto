@@ -4,7 +4,6 @@
 //! to running agents via the sidecar's HTTP endpoint.
 
 use axum::{
-    body::Bytes,
     extract::State,
     http::StatusCode,
     response::IntoResponse,
@@ -12,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use pm::handlers::{AgentMessage, CachedPodInfo, RunningAgent, SessionCache};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -147,8 +146,8 @@ async fn test_running_agent_http_routing() {
         pod_ip: Some(addr.ip().to_string()),
     };
 
-    // Create a message
-    let message = AgentMessage::user_message("Test message from integration test");
+    // Create a message (demonstrates API, but we send raw JSON below for simplicity)
+    let _message = AgentMessage::user_message("Test message from integration test");
 
     // Manually send via HTTP (simulating what send_message_to_agent does)
     let client = reqwest::Client::new();
@@ -282,7 +281,7 @@ async fn test_complete_message_flow() {
 #[test]
 fn test_label_format_consistency() {
     // These label keys must match what the controller generates
-    let expected_labels = [
+    let _expected_labels = [
         "linear-session",
         "cto.5dlabs.io/linear-issue",
         "cto.5dlabs.io/agent-type",
