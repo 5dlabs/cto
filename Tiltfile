@@ -169,10 +169,23 @@ if DEV_MODE:
         labels=['build'],
     )
 
-    # Tools
+    # Tools (uses --target local for source builds)
     local_resource(
         'build-tools',
-        cmd=build_cmd('tools', 'infra/images/tools/Dockerfile.kind'),
+        cmd='''
+            set -e
+            echo "🔨 Building tools..."
+            DOCKER_BUILDKIT=1 docker build \
+                --platform linux/amd64 \
+                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                --target local \
+                -t %s/tools:%s \
+                -f infra/images/tools/Dockerfile \
+                . && \
+            echo "📤 Pushing tools..." && \
+            docker push %s/tools:%s && \
+            echo "✅ tools complete"
+        ''' % (LOCAL_REGISTRY, DEV_TAG, LOCAL_REGISTRY, DEV_TAG),
         deps=['crates/tools/', 'crates/mcp/', 'Cargo.toml', 'Cargo.lock'],
         ignore=['**/target/'],
         labels=['build'],

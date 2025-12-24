@@ -108,6 +108,13 @@ spec:
                   key: GITHUB_PERSONAL_ACCESS_TOKEN
                   optional: true
             {{- end }}
+            # Latitude.sh API key for bare metal server management
+            - name: LATITUDE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tools-latitude-secrets
+                  key: LATITUDE_API_KEY
+                  optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           volumeMounts:

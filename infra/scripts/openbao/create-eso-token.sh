@@ -52,7 +52,7 @@ check_prerequisites() {
     fi
     
     if ! command -v op &> /dev/null; then
-        error "1Password CLI (op) is not installed. Install from: https://1password.com/downloads/command-line/"
+        error "1Password CLI (op) is not installed. Install: brew install 1password-cli (macOS) or https://1password.com/downloads/command-line/"
     fi
     
     if ! command -v jq &> /dev/null; then
