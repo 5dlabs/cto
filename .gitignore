@@ -142,6 +142,7 @@ agent-templates/
 /docs/*
 !/docs/play-workflow-guide.html
 !/docs/MCP-SERVERS-BINARIES.md
+!/docs/HEADSCALE-CLIENT-SETUP.md
 !/docs/research/
 
 # Local scripts (development utilities, not for version control)
