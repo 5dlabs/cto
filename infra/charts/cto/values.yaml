@@ -879,6 +879,10 @@ cloudflare:
     grafana:
       hostname: grafana.5dlabs.ai
       target: http://grafana.observability.svc:80
+    # Headscale VPN control server (for remote cluster access)
+    headscale:
+      hostname: headscale.5dlabs.ai
+      target: http://headscale.headscale.svc:8080
 
 # =============================================================================
 # BuildKit - Remote Build Infrastructure
