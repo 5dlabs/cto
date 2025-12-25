@@ -498,22 +498,316 @@ export const config = {
 | `username` | Username-based auth | Built-in |
 | `admin` | Admin panel, user management | Built-in |
 
-**Adding Plugins**:
+---
+
+### Two-Factor Authentication (2FA)
+
+**Server:**
 
 ```typescript
 import { betterAuth } from "better-auth"
-import { twoFactor, organization, passkey } from "better-auth/plugins"
+import { twoFactor } from "better-auth/plugins"
 
 export const auth = betterAuth({
-  // ...base config
   plugins: [
     twoFactor({
-      issuer: "MyApp",
+      issuer: "MyApp",  // Shown in authenticator apps
+      totpOptions: {
+        digits: 6,
+        period: 30,
+      },
     }),
+  ],
+})
+```
+
+**Client:**
+
+```typescript
+import { createAuthClient } from "better-auth/react"
+import { twoFactorClient } from "better-auth/client/plugins"
+
+export const authClient = createAuthClient({
+  plugins: [
+    twoFactorClient({
+      twoFactorPage: "/two-factor",  // Redirect here for 2FA verification
+    }),
+  ],
+})
+
+// Enable 2FA
+await authClient.twoFactor.enable({ password: "user-password" })
+
+// Verify TOTP code
+await authClient.twoFactor.verifyTOTP({ 
+  code: "123456",
+  trustDevice: true,  // Skip 2FA on this device next time
+})
+
+// Generate backup codes
+const { data } = await authClient.twoFactor.generateBackupCodes()
+```
+
+---
+
+### Organization (Multi-Tenant)
+
+**Server:**
+
+```typescript
+import { betterAuth } from "better-auth"
+import { organization } from "better-auth/plugins"
+
+export const auth = betterAuth({
+  plugins: [
     organization({
       allowUserToCreateOrganization: true,
+      organizationLimit: 5,  // Max orgs per user
+      membershipLimit: 100,  // Max members per org
+      roles: {
+        owner: { permissions: ["*"] },
+        admin: { permissions: ["invite", "remove", "update"] },
+        member: { permissions: ["read"] },
+      },
     }),
-    passkey(),
+  ],
+})
+```
+
+**Client:**
+
+```typescript
+import { organizationClient } from "better-auth/client/plugins"
+
+const authClient = createAuthClient({
+  plugins: [organizationClient()],
+})
+
+// Create organization
+const { data: org } = await authClient.organization.create({
+  name: "My Company",
+  slug: "my-company",
+})
+
+// Invite member
+await authClient.organization.inviteMember({
+  organizationId: org.id,
+  email: "user@example.com",
+  role: "member",
+})
+
+// List user's organizations
+const { data: orgs } = await authClient.organization.list()
+
+// Switch active organization
+await authClient.organization.setActive({ organizationId: org.id })
+```
+
+---
+
+### Passkey (WebAuthn)
+
+**Server:**
+
+```typescript
+import { betterAuth } from "better-auth"
+import { passkey } from "better-auth/plugins"
+
+export const auth = betterAuth({
+  plugins: [
+    passkey({
+      rpID: "myapp.com",  // Relying Party ID (your domain)
+      rpName: "My App",
+      origin: "https://myapp.com",
+    }),
+  ],
+})
+```
+
+**Client:**
+
+```typescript
+import { passkeyClient } from "better-auth/client/plugins"
+
+const authClient = createAuthClient({
+  plugins: [passkeyClient()],
+})
+
+// Register passkey
+await authClient.passkey.addPasskey()
+
+// Sign in with passkey
+await authClient.signIn.passkey()
+
+// List user's passkeys
+const { data: passkeys } = await authClient.passkey.listPasskeys()
+
+// Delete passkey
+await authClient.passkey.deletePasskey({ id: passkeyId })
+```
+
+---
+
+### API Keys (Machine-to-Machine)
+
+**Server:**
+
+```typescript
+import { betterAuth } from "better-auth"
+import { apiKey } from "better-auth/plugins"
+
+export const auth = betterAuth({
+  plugins: [
+    apiKey({
+      rateLimit: {
+        window: 60,  // 60 seconds
+        max: 100,    // 100 requests per window
+      },
+    }),
+  ],
+})
+
+// Validate API key in your routes
+app.get("/api/data", async (req) => {
+  const key = req.headers["x-api-key"]
+  const result = await auth.api.verifyApiKey({ key })
+  if (!result.valid) return { error: "Invalid API key" }
+  // result.userId contains the key owner
+})
+```
+
+**Client:**
+
+```typescript
+import { apiKeyClient } from "better-auth/client/plugins"
+
+const authClient = createAuthClient({
+  plugins: [apiKeyClient()],
+})
+
+// Create API key
+const { data } = await authClient.apiKey.create({
+  name: "My Integration",
+  expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),  // 30 days
+})
+// data.key is the API key (only shown once!)
+
+// List API keys
+const { data: keys } = await authClient.apiKey.list()
+
+// Revoke API key
+await authClient.apiKey.revoke({ id: keyId })
+```
+
+---
+
+### Magic Link (Passwordless)
+
+**Server:**
+
+```typescript
+import { betterAuth } from "better-auth"
+import { magicLink } from "better-auth/plugins"
+
+export const auth = betterAuth({
+  plugins: [
+    magicLink({
+      sendMagicLink: async ({ email, url }) => {
+        await sendEmail({
+          to: email,
+          subject: "Sign in to MyApp",
+          html: `<a href="${url}">Click to sign in</a>`,
+        })
+      },
+      expiresIn: 60 * 10,  // 10 minutes
+    }),
+  ],
+})
+```
+
+**Client:**
+
+```typescript
+import { magicLinkClient } from "better-auth/client/plugins"
+
+const authClient = createAuthClient({
+  plugins: [magicLinkClient()],
+})
+
+// Send magic link
+await authClient.signIn.magicLink({
+  email: "user@example.com",
+  callbackURL: "/dashboard",
+})
+```
+
+---
+
+### Admin Plugin
+
+**Server:**
+
+```typescript
+import { betterAuth } from "better-auth"
+import { admin } from "better-auth/plugins"
+
+export const auth = betterAuth({
+  plugins: [
+    admin({
+      adminRoles: ["admin", "superadmin"],
+    }),
+  ],
+})
+```
+
+**Client:**
+
+```typescript
+import { adminClient } from "better-auth/client/plugins"
+
+const authClient = createAuthClient({
+  plugins: [adminClient()],
+})
+
+// List all users (admin only)
+const { data: users } = await authClient.admin.listUsers({
+  limit: 50,
+  offset: 0,
+})
+
+// Ban user
+await authClient.admin.banUser({ userId: "..." })
+
+// Impersonate user
+await authClient.admin.impersonateUser({ userId: "..." })
+
+// Stop impersonation
+await authClient.admin.stopImpersonation()
+```
+
+---
+
+### Combining Multiple Plugins
+
+```typescript
+import { betterAuth } from "better-auth"
+import { 
+  twoFactor, 
+  organization, 
+  passkey, 
+  apiKey,
+  admin 
+} from "better-auth/plugins"
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, { provider: "pg" }),
+  emailAndPassword: { enabled: true },
+  plugins: [
+    twoFactor({ issuer: "MyApp" }),
+    organization({ allowUserToCreateOrganization: true }),
+    passkey({ rpID: "myapp.com", rpName: "MyApp" }),
+    apiKey(),
+    admin({ adminRoles: ["admin"] }),
   ],
 })
 ```

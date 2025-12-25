@@ -20,7 +20,8 @@ use crate::loki::{LokiClient, LokiConfig};
 
 use super::behavior::{AgentType, BehaviorAnalyzer, DetectionType, LogAnalysis};
 use super::evaluator::{EvaluatorConfig, ProbeEvaluator};
-use super::types::{ArtifactTrail, EvaluationProbe, EvaluationResults, ProbeResult, ProbeType};
+use super::feedback::{FeedbackConfig, FeedbackEngine};
+use super::types::{ArtifactTrail, EvaluationProbe, EvaluationResults, ProbeType};
 
 /// Configuration for play monitoring
 #[derive(Debug, Clone)]
@@ -45,6 +46,10 @@ pub struct MonitorConfig {
     pub evaluator_config: EvaluatorConfig,
     /// Whether to use LLM for probe evaluation (false = offline mode)
     pub use_llm_evaluation: bool,
+    /// Configuration for feedback loop
+    pub feedback_config: FeedbackConfig,
+    /// Whether to generate feedback from evaluation results
+    pub enable_feedback: bool,
 }
 
 impl Default for MonitorConfig {
@@ -60,6 +65,8 @@ impl Default for MonitorConfig {
             log_window_mins: 5,
             evaluator_config: EvaluatorConfig::default(),
             use_llm_evaluation: true,
+            feedback_config: FeedbackConfig::default(),
+            enable_feedback: true,
         }
     }
 }
@@ -161,6 +168,8 @@ pub struct PlayMonitor {
     github: Option<GitHubClient>,
     /// Probe-based evaluator for context engineering quality assessment
     evaluator: ProbeEvaluator,
+    /// Feedback engine for prompt improvement suggestions
+    feedback: FeedbackEngine,
     /// Currently monitored plays
     plays: HashMap<String, MonitoredPlay>,
     /// Fingerprints of recently reported anomalies (for deduplication)
@@ -182,12 +191,16 @@ impl PlayMonitor {
                 GitHubClient::new("5dlabs", repo)
             }
         });
+        let evaluator = ProbeEvaluator::new(config.evaluator_config.clone());
+        let feedback = FeedbackEngine::new(config.feedback_config.clone());
 
         Self {
             config,
             loki,
             analyzer: BehaviorAnalyzer::new(),
             github,
+            evaluator,
+            feedback,
             plays: HashMap::new(),
             recent_fingerprints: HashSet::new(),
             event_tx: None,
@@ -851,8 +864,9 @@ impl PlayMonitor {
 
     /// Run evaluation probes for a play.
     ///
-    /// This would typically call an LLM to answer the probe questions,
-    /// but for now we just set up the framework and log the probes.
+    /// Uses the LLM-powered ProbeEvaluator to answer probe questions and
+    /// score responses. Falls back to offline evaluation if LLM is unavailable
+    /// or if `use_llm_evaluation` is disabled in config.
     pub async fn run_evaluation(&mut self, play_id: &str) -> Result<EvaluationResults> {
         let play = self
             .plays
@@ -877,15 +891,18 @@ impl PlayMonitor {
 
             // Store it in the play
             if let Some(play_mut) = self.plays.get_mut(play_id) {
-                play_mut.artifact_trail = trail.clone();
+                play_mut.artifact_trail.clone_from(&trail);
             }
 
             trail
         };
 
+        // Use default artifact trail if none available
+        let trail = artifact_trail.unwrap_or_default();
+
         // Generate probes
         let play_with_trail = MonitoredPlay {
-            artifact_trail: artifact_trail.clone(),
+            artifact_trail: Some(trail.clone()),
             ..play.clone()
         };
         let probes = self.generate_probes(&play_with_trail);
@@ -893,31 +910,54 @@ impl PlayMonitor {
         info!(
             play_id = %play_id,
             probe_count = %probes.len(),
-            "Generated evaluation probes"
+            use_llm = %self.config.use_llm_evaluation,
+            "Running probe-based evaluation"
         );
 
-        // For now, create placeholder results
-        // In a full implementation, this would call an LLM to answer each probe
-        let probe_results: Vec<ProbeResult> = probes
-            .into_iter()
-            .map(|probe| ProbeResult {
-                score: 0.5, // Placeholder - would be computed from LLM response
-                passed: false, // Placeholder
-                response: String::new(),
-                notes: Some("Evaluation pending - requires LLM integration".to_string()),
-                probe,
-            })
-            .collect();
-
-        let mut results = EvaluationResults::from_probes(probe_results);
-        if let Some(trail) = artifact_trail {
-            results = results.with_artifact_trail(trail);
-        }
+        // Run evaluation using LLM or offline mode
+        let results = if self.config.use_llm_evaluation {
+            match self.evaluator.run_evaluation(probes, &trail).await {
+                Ok(results) => results,
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        "LLM evaluation failed, falling back to offline mode"
+                    );
+                    // Regenerate probes since we consumed them
+                    let probes = self.generate_probes(&play_with_trail);
+                    self.evaluator.evaluate_offline(probes, &trail)
+                }
+            }
+        } else {
+            self.evaluator.evaluate_offline(probes, &trail)
+        };
 
         // Store results
         if let Some(play_mut) = self.plays.get_mut(play_id) {
             play_mut.evaluation_results = Some(results.clone());
         }
+
+        // Process feedback if enabled
+        let feedback_result = if self.config.enable_feedback && !results.passed {
+            match self.feedback.process_results(play_id, &results) {
+                Ok(Some(feedback)) => {
+                    info!(
+                        play_id = %play_id,
+                        suggestions = %feedback.suggestions.len(),
+                        issue = ?feedback.issue_created,
+                        "Generated feedback from evaluation"
+                    );
+                    Some(feedback)
+                }
+                Ok(None) => None,
+                Err(e) => {
+                    warn!(error = %e, "Failed to process feedback");
+                    None
+                }
+            }
+        } else {
+            None
+        };
 
         // Emit event
         self.emit_event(
@@ -928,6 +968,9 @@ impl PlayMonitor {
                 "passed": results.passed,
                 "probe_count": results.probes.len(),
                 "threshold": results.threshold,
+                "llm_evaluation": self.config.use_llm_evaluation,
+                "feedback_generated": feedback_result.is_some(),
+                "feedback_issue": feedback_result.as_ref().and_then(|f| f.issue_created.clone()),
             }),
         )
         .await;

@@ -708,13 +708,27 @@ impl Installer {
 
     async fn apply_worker_configs(&mut self) -> Result<()> {
         let worker_config_path = self.state.config.output_dir.join("worker.yaml");
+        let talosconfig = self.state.config.talosconfig_path();
+        let timeout = Duration::from_secs(600); // 10 minutes per worker
 
-        for worker in &self.state.workers {
+        for (i, worker) in self.state.workers.iter().enumerate() {
             ui::print_info(&format!(
-                "Applying config to worker {} ({})",
-                worker.hostname, worker.ip
+                "Applying config to worker {}/{} {} ({})",
+                i + 1,
+                self.state.workers.len(),
+                worker.hostname,
+                worker.ip
             ));
             metal::talos::apply_config(&worker.ip, &worker_config_path)?;
+
+            // Wait for worker to install Talos and reboot
+            // This is critical - without this, we'd check K8s node status before the worker
+            // even finishes booting Talos, causing false positives or timeouts
+            ui::print_info(&format!(
+                "Waiting for worker {} to install and reboot...",
+                worker.hostname
+            ));
+            metal::talos::wait_for_install(&worker.ip, &talosconfig, timeout)?;
         }
 
         Ok(())
@@ -729,9 +743,15 @@ impl Installer {
 
         let timeout = Duration::from_secs(600); // 10 minutes
 
+        // Total expected: 1 CP + N workers
+        let expected_nodes = 1 + self.state.workers.len();
+
         // Wait for all nodes to be ready
-        ui::print_info("Waiting for all nodes to join the cluster...");
-        metal::talos::wait_for_node_ready(kubeconfig_path, timeout)?;
+        ui::print_info(&format!(
+            "Waiting for {} node(s) to join the cluster...",
+            expected_nodes
+        ));
+        metal::talos::wait_for_node_ready(kubeconfig_path, expected_nodes, timeout)?;
 
         Ok(())
     }

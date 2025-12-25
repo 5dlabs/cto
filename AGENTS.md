@@ -53,8 +53,8 @@ PRD → Intake (Morgan) → Infrastructure (Bolt) → Implementation (Rex/Blaze)
 | Agent | Language | Keywords | Default Stack |
 |-------|----------|----------|---------------|
 | **Blaze** | React/TS | react, frontend, ui | shadcn (Next.js 15, shadcn/ui, Better Auth, TailwindCSS) |
-| **Tap** | Expo | expo, mobile, app | expo-router, react-native, Better Auth |
-| **Spark** | Electron | electron, desktop | electron-builder, react |
+| **Tap** | Expo | expo, mobile, app | expo-router, react-native, Better Auth, SecureStore |
+| **Spark** | Electron | electron, desktop | electron-builder, react, Better Auth |
 
 **Support Agents:**
 | Agent | Role | Keywords |
@@ -1727,8 +1727,8 @@ Each agent receives prompts and tools **only for their supported language**:
 | **Blaze** | React/TS | shadcn | Next.js 15, shadcn/ui, Effect, Better Auth, Tailwind, anime.js |
 | **Grizz** | Go | chi | chi, grpc, pgx, redis |
 | **Nova** | Node.js/Bun | Elysia | Elysia, Effect, Better Auth, Drizzle |
-| **Tap** | Expo | expo-router | expo, react-native, expo-router, XcodeBuildMCP |
-| **Spark** | Electron | electron | electron-builder, react, XcodeBuildMCP (macOS) |
+| **Tap** | Expo | expo-router | expo, react-native, expo-router, Better Auth, XcodeBuildMCP |
+| **Spark** | Electron | electron | electron-builder, react, Better Auth, XcodeBuildMCP (macOS) |
 
 **Effect TypeScript** ([effect.website](https://effect.website)):
 Both Nova and Blaze use **Effect** - the missing standard library for TypeScript:

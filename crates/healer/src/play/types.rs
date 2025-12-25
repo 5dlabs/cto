@@ -480,3 +480,106 @@ impl EvaluationResults {
         self
     }
 }
+
+// =============================================================================
+// Consolidated Evaluation Configuration
+// =============================================================================
+
+/// Consolidated configuration for the context engineering evaluation system.
+///
+/// This combines evaluator, feedback, and artifact tracking settings into
+/// a single configuration struct that can be serialized and passed around.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct EvaluationConfig {
+    /// Whether probe-based evaluation is enabled
+    pub enabled: bool,
+
+    /// Whether to use LLM for probe evaluation (false = offline/keyword mode)
+    pub use_llm: bool,
+
+    /// LLM endpoint for probe evaluation
+    pub llm_endpoint: String,
+
+    /// Model to use for evaluation
+    pub llm_model: String,
+
+    /// Minimum score to pass evaluation (0.0-1.0)
+    pub pass_threshold: f32,
+
+    /// Whether to generate feedback issues for failed evaluations
+    pub feedback_enabled: bool,
+
+    /// Number of consecutive failures before creating a feedback issue
+    pub feedback_threshold: u32,
+
+    /// Repository for feedback issues (owner/repo format)
+    pub feedback_repository: Option<String>,
+
+    /// Interval (in turns) between artifact summary injections
+    pub artifact_injection_interval: u32,
+
+    /// Whether artifact injection is enabled
+    pub artifact_injection_enabled: bool,
+}
+
+impl Default for EvaluationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            use_llm: true,
+            llm_endpoint: "http://tools-server:8080/v1/chat/completions".to_string(),
+            llm_model: "claude-sonnet-4-20250514".to_string(),
+            pass_threshold: 0.7,
+            feedback_enabled: true,
+            feedback_threshold: 3,
+            feedback_repository: None,
+            artifact_injection_interval: 20,
+            artifact_injection_enabled: true,
+        }
+    }
+}
+
+impl EvaluationConfig {
+    /// Create config from environment variables.
+    #[must_use]
+    pub fn from_env() -> Self {
+        Self {
+            enabled: std::env::var("EVALUATION_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true),
+            use_llm: std::env::var("EVALUATION_USE_LLM")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true),
+            llm_endpoint: std::env::var("EVALUATION_LLM_ENDPOINT")
+                .unwrap_or_else(|_| "http://tools-server:8080/v1/chat/completions".to_string()),
+            llm_model: std::env::var("EVALUATION_LLM_MODEL")
+                .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
+            pass_threshold: std::env::var("EVALUATION_PASS_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0.7),
+            feedback_enabled: std::env::var("EVALUATION_FEEDBACK_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true),
+            feedback_threshold: std::env::var("EVALUATION_FEEDBACK_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(3),
+            feedback_repository: std::env::var("EVALUATION_FEEDBACK_REPO").ok(),
+            artifact_injection_interval: std::env::var("ARTIFACT_INJECTION_INTERVAL_TURNS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20),
+            artifact_injection_enabled: std::env::var("ARTIFACT_INJECTION_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true),
+        }
+    }
+
+    /// Check if any evaluation features are enabled.
+    #[must_use]
+    pub fn has_any_enabled(&self) -> bool {
+        self.enabled || self.feedback_enabled || self.artifact_injection_enabled
+    }
+}

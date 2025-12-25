@@ -101,7 +101,9 @@ impl ProbeEvaluator {
     }
 
     /// Format the context for inclusion in a probe question.
-    fn format_context(&self, artifact_trail: &ArtifactTrail) -> String {
+    fn format_context(artifact_trail: &ArtifactTrail) -> String {
+        use std::fmt::Write;
+
         let mut context = String::new();
 
         context.push_str("## Session Context\n\n");
@@ -109,7 +111,7 @@ impl ProbeEvaluator {
         if !artifact_trail.files_created.is_empty() {
             context.push_str("### Files Created\n");
             for file in &artifact_trail.files_created {
-                context.push_str(&format!("- {file}\n"));
+                let _ = writeln!(context, "- {file}");
             }
             context.push('\n');
         }
@@ -117,7 +119,7 @@ impl ProbeEvaluator {
         if !artifact_trail.files_modified.is_empty() {
             context.push_str("### Files Modified\n");
             for (file, summary) in &artifact_trail.files_modified {
-                context.push_str(&format!("- {file}: {summary}\n"));
+                let _ = writeln!(context, "- {file}: {summary}");
             }
             context.push('\n');
         }
@@ -125,7 +127,7 @@ impl ProbeEvaluator {
         if !artifact_trail.files_read.is_empty() {
             context.push_str("### Files Read\n");
             for file in &artifact_trail.files_read {
-                context.push_str(&format!("- {file}\n"));
+                let _ = writeln!(context, "- {file}");
             }
             context.push('\n');
         }
@@ -133,7 +135,7 @@ impl ProbeEvaluator {
         if !artifact_trail.decisions_made.is_empty() {
             context.push_str("### Decisions Made\n");
             for decision in &artifact_trail.decisions_made {
-                context.push_str(&format!("- {decision}\n"));
+                let _ = writeln!(context, "- {decision}");
             }
             context.push('\n');
         }
@@ -142,9 +144,9 @@ impl ProbeEvaluator {
     }
 
     /// Build a prompt for a probe question.
-    fn build_prompt(&self, probe: &EvaluationProbe, context: &str) -> String {
+    fn build_prompt(probe: &EvaluationProbe, context: &str) -> String {
         format!(
-            r#"You are evaluating an AI agent's knowledge retention. Based on the session context provided, answer the following question concisely and accurately.
+            "You are evaluating an AI agent's knowledge retention. Based on the session context provided, answer the following question concisely and accurately.
 
 {context}
 
@@ -154,7 +156,7 @@ impl ProbeEvaluator {
 
 Answer the question based ONLY on the context provided above. Be specific and include relevant details like file names, error messages, or decision rationale as applicable.
 
-**Answer:**"#,
+**Answer:**",
             context = context,
             question = probe.question
         )
@@ -166,7 +168,7 @@ Answer the question based ONLY on the context provided above. Be specific and in
         probe: &EvaluationProbe,
         context: &str,
     ) -> Result<ProbeResult> {
-        let prompt = self.build_prompt(probe, context);
+        let prompt = Self::build_prompt(probe, context);
 
         debug!(
             probe_type = ?probe.probe_type,
@@ -246,7 +248,7 @@ Answer the question based ONLY on the context provided above. Be specific and in
         probes: Vec<EvaluationProbe>,
         artifact_trail: &ArtifactTrail,
     ) -> Result<EvaluationResults> {
-        let context = self.format_context(artifact_trail);
+        let context = Self::format_context(artifact_trail);
 
         info!(
             probe_count = %probes.len(),
@@ -294,7 +296,7 @@ Answer the question based ONLY on the context provided above. Be specific and in
         probes: Vec<EvaluationProbe>,
         artifact_trail: &ArtifactTrail,
     ) -> EvaluationResults {
-        let context = self.format_context(artifact_trail);
+        let context = Self::format_context(artifact_trail);
 
         let results: Vec<ProbeResult> = probes
             .into_iter()
@@ -421,7 +423,7 @@ mod tests {
     fn test_format_context() {
         let evaluator = ProbeEvaluator::with_defaults();
         let trail = sample_artifact_trail();
-        let context = evaluator.format_context(&trail);
+        let context = ProbeEvaluator::format_context(&trail);
 
         assert!(context.contains("src/new_module.rs"));
         assert!(context.contains("src/main.rs"));

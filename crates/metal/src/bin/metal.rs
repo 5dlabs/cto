@@ -1290,7 +1290,8 @@ async fn main() -> Result<()> {
                     &configs.talosconfig,
                     Duration::from_secs(timeout),
                 )?;
-                talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(300))?;
+                // Wait for 2 nodes: 1 CP + 1 worker
+                talos::wait_for_node_ready(&kubeconfig_path, 2, Duration::from_secs(300))?;
                 state.set_step(ProvisionStep::Complete)?;
             } else {
                 println!("\n⏭️  Step 9/{total_steps}: Skipping worker join (already complete)");
@@ -1497,9 +1498,10 @@ async fn main() -> Result<()> {
             println!("\n⏳ Step 6/6: Waiting for worker to join cluster...");
             talos::wait_for_install(&server_ip, &talosconfig, Duration::from_secs(timeout))?;
 
-            // Wait for node to appear in kubectl
+            // Wait for the new worker node to appear in kubectl
+            // Note: This waits for at least 1 node (the new worker), not counting existing nodes
             println!("\n☸️  Waiting for node to register with Kubernetes...");
-            talos::wait_for_node_ready(&kubeconfig, Duration::from_secs(300))?;
+            talos::wait_for_node_ready(&kubeconfig, 1, Duration::from_secs(300))?;
 
             println!("\n🎉 Worker node joined successfully!");
             println!("\n📊 Summary:");
@@ -1890,7 +1892,8 @@ async fn main() -> Result<()> {
                     Err(e) => anyhow::bail!("Task panicked: {e}"),
                 }
             }
-            talos::wait_for_node_ready(&kubeconfig_path, Duration::from_secs(600))?;
+            // Wait for 3 nodes: 1 CP + 2 workers
+            talos::wait_for_node_ready(&kubeconfig_path, 3, Duration::from_secs(600))?;
 
             // Step 12: Install Mayastor + pools + storageclass + fio
             println!("\n📦 Step 12/12: Installing Mayastor and running fio benchmark...");

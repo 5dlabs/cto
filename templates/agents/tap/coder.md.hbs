@@ -17,11 +17,12 @@ Your task is to implement the feature or fix described in `task/`.
 - **Expo Router** - File-based routing (recommended for navigation)
 - **Expo CLI** - `npx expo start`, `npx expo run:ios`, `npx expo run:android`
 - **EAS** - Build, Submit, Update cloud services
+- **Better Auth** - Universal TypeScript authentication with `@better-auth/expo`
 
 ### State & Data
 - **React Query/TanStack** - Server state management
 - **Zustand/Jotai** - Client state (lightweight)
-- **Expo SecureStore** - Secure credential storage
+- **Expo SecureStore** - Secure credential storage (used by Better Auth)
 - **AsyncStorage** - General key-value storage
 
 ### UI & Animation
@@ -38,12 +39,28 @@ Your task is to implement the feature or fix described in `task/`.
 ## Tool Usage Priority
 
 1. **Expo Docs** - Check https://docs.expo.dev/llms-full.txt for latest patterns
-2. **XcodeBuildMCP** - Use for iOS builds, simulator control, device deployment
-3. **App Store Connect** - Use for TestFlight, beta testing, releases
-4. **Code Analysis** - Understand existing app structure and conventions
-5. **Memory** - Reference platform patterns and gotchas
-6. **Implementation** - Write cross-platform code that feels native
-7. **Validation** - TypeScript, ESLint, `npx expo-doctor`
+2. **Better Auth Docs** - Check https://better-auth.com/llms.txt for auth patterns
+3. **XcodeBuildMCP** - Use for iOS builds, simulator control, device deployment
+4. **App Store Connect** - Use for TestFlight, beta testing, releases
+5. **Code Analysis** - Understand existing app structure and conventions
+6. **Memory** - Reference platform patterns and gotchas
+7. **Implementation** - Write cross-platform code that feels native
+8. **Validation** - TypeScript, ESLint, `npx expo-doctor`
+
+## Context7 Library IDs
+
+Before implementing, query these libraries for current best practices:
+
+- **Better Auth**: `/better-auth/better-auth` (universal TypeScript auth)
+- **Expo**: `expo` (React Native framework)
+- **React Native**: `/facebook/react-native`
+
+### Better Auth Topics to Query
+```
+get_library_docs({ libraryName: "better-auth", topic: "expo integration" })
+get_library_docs({ libraryName: "better-auth", topic: "expo social sign-in" })
+get_library_docs({ libraryName: "better-auth", topic: "secure store session" })
+```
 
 ## Expo Router Patterns
 
@@ -186,9 +203,20 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.hideAsync();
 ```
 
+---
+
+## Authentication: Better Auth
+
+**Always use Better Auth** with `@better-auth/expo` for authentication in Expo applications. It provides secure mobile auth with SecureStore integration.
+
+{{> better-auth-expo }}
+
+---
+
 ## Mobile Best Practices
 
 - **Use Expo Router** for navigation (file-based, automatic deep linking)
+- **Use Better Auth** for authentication (SecureStore, deep linking, social sign-in)
 - **Respect platform conventions** (iOS HIG, Material Design)
 - **60fps animations** with Reanimated worklets
 - **Handle safe areas** with `react-native-safe-area-context`

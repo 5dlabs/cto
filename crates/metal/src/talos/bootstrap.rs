@@ -190,6 +190,11 @@ impl BootstrapConfig {
     /// may use the public IP as the node's internal IP, which breaks
     /// Cilium VXLAN tunneling between nodes.
     ///
+    /// Note: The kubelet nodeIP configuration applies to ALL nodes, but the
+    /// etcd advertisedSubnets configuration only applies to control plane nodes
+    /// (via `--config-patch-control-plane`). This ensures worker nodes don't
+    /// receive invalid etcd configuration.
+    ///
     /// # Arguments
     ///
     /// * `subnet` - The private subnet CIDR (e.g., "10.0.0.0/8", "192.168.0.0/16")
@@ -205,20 +210,28 @@ impl BootstrapConfig {
     /// ```
     #[must_use]
     pub fn with_private_network(self, subnet: &str) -> Self {
-        // Configure kubelet to use the private IP and etcd to advertise on private network
-        let patch = format!(
+        // Kubelet nodeIP applies to ALL nodes (workers and control plane)
+        let kubelet_patch = format!(
             "machine:
   kubelet:
     nodeIP:
       validSubnets:
         - {subnet}
-cluster:
+"
+        );
+
+        // etcd advertisedSubnets only applies to control plane nodes
+        // Worker nodes cannot have etcd configuration
+        let etcd_patch = format!(
+            "cluster:
   etcd:
     advertisedSubnets:
       - {subnet}
 "
         );
-        self.with_config_patch(patch)
+
+        self.with_config_patch(kubelet_patch)
+            .with_controlplane_patch(etcd_patch)
     }
 
     /// Configure kubelet and etcd to use the 10.0.0.0/8 private subnet.
@@ -891,17 +904,32 @@ pub fn get_kubeconfig(node_ip: &str, talosconfig: &Path, output_path: &Path) -> 
 /// # Errors
 ///
 /// Returns an error if the timeout is reached before the node is Ready.
-pub fn wait_for_node_ready(kubeconfig: &Path, timeout: Duration) -> Result<()> {
+/// Wait for at least `expected_count` Kubernetes nodes to be Ready.
+///
+/// This function polls `kubectl get nodes` until the specified number of nodes
+/// report `Ready=True`, or until the timeout is exceeded.
+///
+/// # Arguments
+///
+/// * `kubeconfig` - Path to the kubeconfig file
+/// * `expected_count` - Minimum number of nodes that must be Ready
+/// * `timeout` - Maximum time to wait
+///
+/// # Errors
+///
+/// Returns an error if the timeout is exceeded before enough nodes are Ready.
+pub fn wait_for_node_ready(kubeconfig: &Path, expected_count: usize, timeout: Duration) -> Result<()> {
     let start = Instant::now();
 
     info!(
-        "Waiting for Kubernetes node to be Ready (timeout: {}s)...",
+        "Waiting for {} Kubernetes node(s) to be Ready (timeout: {}s)...",
+        expected_count,
         timeout.as_secs()
     );
 
     loop {
         if start.elapsed() > timeout {
-            bail!("Timeout waiting for node to be Ready");
+            bail!("Timeout waiting for {expected_count} node(s) to be Ready");
         }
 
         let output = Command::new("kubectl")
@@ -918,14 +946,19 @@ pub fn wait_for_node_ready(kubeconfig: &Path, timeout: Duration) -> Result<()> {
         if let Ok(out) = output {
             if out.status.success() {
                 let status = String::from_utf8_lossy(&out.stdout);
-                if status.contains("True") {
-                    info!("✅ Kubernetes node is Ready!");
+                // Count how many nodes have Ready=True
+                // The jsonpath returns space-separated statuses like "True True False"
+                let ready_count = status.split_whitespace().filter(|s| *s == "True").count();
+
+                if ready_count >= expected_count {
+                    info!("✅ {}/{} Kubernetes node(s) are Ready!", ready_count, expected_count);
                     return Ok(());
                 }
+
+                debug!("{}/{} nodes ready, waiting...", ready_count, expected_count);
             }
         }
 
-        debug!("Node not ready yet...");
         std::thread::sleep(Duration::from_secs(5));
     }
 }
@@ -1158,9 +1191,9 @@ mod tests {
             .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"])
             .with_cilium_cni();
 
-        // Common patches: VLAN, private network, firewall-common, CNI = 4
+        // Common patches: VLAN, kubelet-nodeIP, firewall-common, CNI = 4
         assert_eq!(config.config_patches.len(), 4);
-        // Control plane patches: firewall-controlplane = 1
-        assert_eq!(config.config_patches_controlplane.len(), 1);
+        // Control plane patches: etcd-advertisedSubnets (from with_private_network) + firewall-controlplane = 2
+        assert_eq!(config.config_patches_controlplane.len(), 2);
     }
 }
