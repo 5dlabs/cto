@@ -740,10 +740,9 @@ impl Installer {
         let talosconfig = self.state.config.talosconfig_path();
         let timeout = Duration::from_secs(600); // 10 minutes per worker
 
-        // Get VLAN config if enabled
-        let vlan_config = if self.state.config.enable_vlan {
-            let vlan_vid = self.state.vlan_vid.context("VLAN VID not found in state")?;
-            Some((vlan_vid, self.state.config.vlan_parent_interface.clone()))
+        // Get VLAN VID if enabled
+        let vlan_vid = if self.state.config.enable_vlan {
+            Some(self.state.vlan_vid.context("VLAN VID not found in state")?)
         } else {
             None
         };
@@ -758,7 +757,24 @@ impl Installer {
             ));
 
             // Apply config - with VLAN patch if VLAN is enabled
-            if let Some((vlan_vid, ref parent_interface)) = vlan_config {
+            if let Some(vlan_vid) = vlan_vid {
+                // Detect the VLAN interface for THIS worker (may differ from CP)
+                // Workers are still in maintenance mode at this point
+                let worker_interface = match metal::talos::detect_secondary_interface(&worker.ip) {
+                    Ok(iface) => {
+                        ui::print_info(&format!("  Detected interface '{}' for worker", iface));
+                        iface
+                    }
+                    Err(e) => {
+                        // Fall back to the interface detected from CP
+                        ui::print_warning(&format!(
+                            "  Failed to detect interface: {}. Using '{}'",
+                            e, self.state.config.vlan_parent_interface
+                        ));
+                        self.state.config.vlan_parent_interface.clone()
+                    }
+                };
+
                 // Get worker's unique private IP
                 let worker_private_ip = self
                     .state
@@ -777,13 +793,13 @@ impl Installer {
                 let private_ip_cidr = format!("{worker_private_ip}/{prefix}");
 
                 ui::print_info(&format!(
-                    "  VLAN: VID={vlan_vid}, IP={private_ip_cidr}"
+                    "  VLAN: VID={vlan_vid}, Interface={worker_interface}, IP={private_ip_cidr}"
                 ));
 
                 let vlan = metal::talos::VlanConfig {
                     vlan_id: vlan_vid,
                     private_ip_cidr,
-                    parent_interface: parent_interface.clone(),
+                    parent_interface: worker_interface,
                 };
                 metal::talos::apply_config_with_vlan(&worker.ip, &worker_config_path, &vlan)?;
             } else {
