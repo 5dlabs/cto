@@ -41,6 +41,10 @@ pub struct MonitorConfig {
     pub issue_cooldown_mins: i64,
     /// Time window for log queries (minutes)
     pub log_window_mins: i64,
+    /// Configuration for probe-based evaluation (context engineering)
+    pub evaluator_config: EvaluatorConfig,
+    /// Whether to use LLM for probe evaluation (false = offline mode)
+    pub use_llm_evaluation: bool,
 }
 
 impl Default for MonitorConfig {
@@ -54,6 +58,8 @@ impl Default for MonitorConfig {
             max_issues_per_play: 5,
             issue_cooldown_mins: 10,
             log_window_mins: 5,
+            evaluator_config: EvaluatorConfig::default(),
+            use_llm_evaluation: true,
         }
     }
 }
@@ -153,6 +159,8 @@ pub struct PlayMonitor {
     loki: LokiClient,
     analyzer: BehaviorAnalyzer,
     github: Option<GitHubClient>,
+    /// Probe-based evaluator for context engineering quality assessment
+    evaluator: ProbeEvaluator,
     /// Currently monitored plays
     plays: HashMap<String, MonitoredPlay>,
     /// Fingerprints of recently reported anomalies (for deduplication)
