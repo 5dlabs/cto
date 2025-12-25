@@ -77,5 +77,30 @@ subjects:
       {{- end }}
 {{- end }}
 
+{{- /* Headscale VPN Binding */ -}}
+{{- if $bindings.headscale }}
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: headscale-tunnel
+  namespace: headscale
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ $tunnelName }}
+subjects:
+  - name: headscale
+    spec:
+      fqdn: {{ $bindings.headscale.hostname }}
+      target: {{ $bindings.headscale.target }}
+      {{- if $bindings.headscale.originRequest }}
+      originRequest:
+        {{- toYaml $bindings.headscale.originRequest | nindent 8 }}
+      {{- end }}
+{{- end }}
+
 {{- end }}
 
