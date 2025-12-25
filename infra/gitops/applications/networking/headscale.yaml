@@ -32,7 +32,7 @@ spec:
       values: |
         image:
           repository: ghcr.io/juanfont/headscale
-          tag: v0.25.0
+          tag: "0.27.1"
 
         args: ["serve"]
 
