@@ -37,8 +37,8 @@ spec:
         args: ["serve"]
 
         env:
-          # Server URL - clients connect here (via Cloudflare)
-          HEADSCALE_SERVER_URL: "https://headscale.5dlabs.ai"
+          # Server URL - clients connect here (via Cloudflare or direct)
+          HEADSCALE_SERVER_URL: "http://headscale.5dlabs.ai:8443"
           
           # MagicDNS base domain (must be different from server_url)
           HEADSCALE_DNS_BASE_DOMAIN: "vpn.5dlabs.ai"
@@ -61,6 +61,9 @@ spec:
           # Database - SQLite for simplicity
           HEADSCALE_DATABASE_TYPE: "sqlite"
           HEADSCALE_DATABASE_SQLITE_PATH: "/etc/headscale/db.sqlite"
+          
+          # ACL Policy mode - enable policy for subnet routing
+          HEADSCALE_POLICY_MODE: "database"
 
         service:
           main:
