@@ -64,7 +64,6 @@ struct OpenAIChoiceMessage {
 #[derive(Debug, Deserialize)]
 struct OpenAIChoice {
     message: OpenAIChoiceMessage,
-    #[allow(dead_code)]
     finish_reason: Option<String>,
 }
 
@@ -232,12 +231,29 @@ impl AIProvider for OpenAIProvider {
         let api_response: OpenAIResponse = serde_json::from_str(&body)
             .map_err(|e| TasksError::Ai(format!("Failed to parse response: {}", e)))?;
 
-        // Extract text from first choice
-        let text = api_response
-            .choices
-            .first()
+        // Extract text and finish_reason from first choice
+        let first_choice = api_response.choices.first();
+        let text = first_choice
             .and_then(|c| c.message.content.clone())
             .unwrap_or_default();
+        let finish_reason = first_choice.and_then(|c| c.finish_reason.clone());
+
+        // Check for truncation due to length limit
+        if let Some(ref reason) = finish_reason {
+            if reason == "length" {
+                tracing::warn!(
+                    "Response truncated due to max_tokens limit ({} output tokens). \
+                     Consider increasing max_tokens or reducing task complexity.",
+                    api_response.usage.completion_tokens
+                );
+                return Err(TasksError::Ai(format!(
+                    "Response truncated: reached max_tokens limit ({} tokens). \
+                     The AI response was incomplete. Try reducing the number of tasks \
+                     or disabling research mode.",
+                    api_response.usage.completion_tokens
+                )));
+            }
+        }
 
         Ok(AIResponse {
             text,
