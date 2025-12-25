@@ -11,6 +11,7 @@ You implement frontend features with a focus on user experience, accessibility, 
 - **Framework**: Next.js 15+ (App Router) - NOT Remix, NOT create-react-app
 - **Language**: TypeScript 5+ (strict mode, NO any types)
 - **Type System**: Effect 3.x for type-safe error handling and data fetching
+- **Authentication**: Better Auth (universal TypeScript auth framework)
 - **Styling**: Tailwind CSS 4+ ONLY - NO Material-UI, NO CSS-in-JS
 - **Components**: shadcn/ui (Radix UI primitives + Tailwind)
 - **Validation**: Effect Schema (replaces Zod)
@@ -205,6 +206,7 @@ Your task is to implement frontend changes based on the task specification in `t
 Before implementing, query these libraries for current best practices:
 
 - **Effect**: `/effect-ts/effect` (type-safe error handling, Schema, Stream)
+- **Better Auth**: `/better-auth/better-auth` (universal TypeScript auth)
 - **React**: `/facebook/react`
 - **Next.js**: `/vercel/next.js`
 - **TanStack Query**: `/tanstack/query`
@@ -215,6 +217,13 @@ Before implementing, query these libraries for current best practices:
 get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "schema validation" })
 get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "error handling tagged errors" })
 get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "stream async" })
+```
+
+### Better Auth Topics to Query
+```
+get_library_docs({ libraryName: "better-auth", topic: "next.js integration" })
+get_library_docs({ libraryName: "better-auth", topic: "session management react" })
+get_library_docs({ libraryName: "better-auth", topic: "social sign-on providers" })
 ```
 
 ## shadcn/ui Component Reference
@@ -233,7 +242,7 @@ Install components with: `npx shadcn@latest add [component-name]`
 
 | Requirement | Components | Effect Pattern |
 |-------------|------------|----------------|
-| "Login/signup" | `Form` + `Input` + `Button` | Effect Schema validation |
+| "Login/signup" | `Form` + `Input` + `Button` + **Better Auth** | Effect Schema validation |
 | "Dashboard" | `Card` grid with stats + `Chart` | Effect data fetching |
 | "User list" | `Table` or `DataTable` with search | Effect + TanStack Query |
 | "Settings" | `Tabs` with `Form` sections | Effect Schema forms |
@@ -242,6 +251,15 @@ Install components with: `npx shadcn@latest add [component-name]`
 | "Confirmation" | `AlertDialog` | - |
 | "Search" | `Command` palette | Effect debounced search |
 | "File upload" | `Input` (type=file) + drag-drop zone | Effect error handling |
+| "Authentication" | **Better Auth** components | Session hooks |
+
+---
+
+## Authentication: Better Auth
+
+**Always use Better Auth** for authentication in Next.js applications. It provides comprehensive auth with minimal configuration.
+
+{{> better-auth is_backend=false }}
 
 ## Guidelines
 

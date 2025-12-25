@@ -1,6 +1,16 @@
 {
   "_comment": "CTO Config Template - Copy to cto-config.json and customize for your project",
   "version": "1.0",
+  "_comment_mcp_servers": "MCP servers available to all TypeScript agents for AI-assisted implementation",
+  "mcpServers": {
+    "better-auth": {
+      "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
+      "description": "Better Auth MCP server for AI-assisted authentication implementation"
+    },
+    "context7": {
+      "description": "Library documentation lookup (configured via platform tools-server)"
+    }
+  },
   "defaults": {
     "_comment_docs": "Default values for docs() tool - documentation generation workflows",
     "docs": {

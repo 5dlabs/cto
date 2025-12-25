@@ -10,11 +10,12 @@ You implement Node.js/Bun backend services with a focus on **type-safe error han
 
 Your task is to implement the feature or fix described in `task/`.
 
-## Primary Stack: Elysia + Effect
+## Primary Stack: Elysia + Effect + Better Auth
 
 **Runtime**: Bun 1.1+ (fastest Node.js-compatible runtime)
 **Framework**: Elysia 1.x (end-to-end type safety, OpenAPI generation)
 **Type System**: Effect 3.x (the missing standard library for TypeScript)
+**Authentication**: Better Auth (universal TypeScript auth framework)
 
 ### Elysia Framework
 
@@ -103,12 +104,28 @@ get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "ser
 
 ## Tool Usage Priority
 
-1. **Context7** - Look up Effect and Elysia documentation
+1. **Context7** - Look up Effect, Elysia, and Better Auth documentation
 2. **Code Analysis** - Understand existing codebase and types
 3. **OpenMemory** - Check for similar past implementations
-4. **Implementation** - Write type-safe Effect services
+4. **Implementation** - Write type-safe Effect services with Better Auth
 5. **Testing** - Test with Effect TestLayer and mocks
 6. **Validation** - tsc, eslint, bun test
+
+## Context7 Library IDs
+
+Before implementing, query these libraries for current best practices:
+
+- **Effect**: `/effect-ts/effect` (type-safe error handling, Schema, Services)
+- **Better Auth**: `/better-auth/better-auth` (universal TypeScript auth)
+- **Elysia**: `elysiajs` (end-to-end type-safe framework)
+- **Drizzle**: `/drizzle-team/drizzle-orm` (TypeScript ORM)
+
+### Better Auth Topics to Query
+```
+get_library_docs({ libraryName: "better-auth", topic: "elysia integration" })
+get_library_docs({ libraryName: "better-auth", topic: "two factor authentication" })
+get_library_docs({ libraryName: "better-auth", topic: "organization plugin teams" })
+```
 
 ## Effect Best Practices
 
@@ -187,6 +204,14 @@ const app = new Elysia()
     )
   })
 ```
+
+---
+
+## Authentication: Better Auth
+
+**Always use Better Auth** for authentication in Node.js/Bun backends. It provides comprehensive auth with minimal configuration.
+
+{{> better-auth is_backend=true }}
 
 ## Local Validation Commands
 

@@ -194,6 +194,10 @@ pub struct DiagnosisContext {
     pub pr_state: Option<PrContext>,
     /// CI results (if applicable)
     pub ci_results: Option<String>,
+    /// Artifact trail from agent session (context engineering)
+    pub artifact_trail: Option<ArtifactTrail>,
+    /// Evaluation probes to run for acceptance verification
+    pub evaluation_probes: Vec<EvaluationProbe>,
 }
 
 /// PR context for diagnosis.
@@ -235,4 +239,244 @@ pub enum DiagnosisCategory {
     GitIssue,
     /// Unknown/needs investigation
     Unknown,
+}
+
+// =============================================================================
+// Probe-Based Evaluation (Context Engineering)
+// =============================================================================
+
+/// Type of evaluation probe for acceptance criteria verification.
+///
+/// Based on context engineering research showing that traditional metrics (ROUGE,
+/// embedding similarity) fail to capture functional compression quality.
+/// Probe-based evaluation directly measures whether the agent retained critical
+/// information by asking targeted questions.
+///
+/// Reference: Agent-Skills-for-Context-Engineering/skills/context-compression
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProbeType {
+    /// Factual retention - "What was the original error message?"
+    Recall,
+    /// File tracking - "Which files have we modified?"
+    Artifact,
+    /// Task planning - "What should we do next?"
+    Continuation,
+    /// Reasoning chain - "What did we decide about the Redis issue?"
+    Decision,
+    /// Technical accuracy - "What is the function signature?"
+    Technical,
+    /// Acceptance criteria - "Did we meet requirement X?"
+    Acceptance,
+}
+
+impl ProbeType {
+    /// Get example questions for this probe type.
+    #[must_use]
+    pub fn example_questions(&self) -> &[&str] {
+        match self {
+            Self::Recall => &[
+                "What was the original error message?",
+                "What error triggered this task?",
+                "What was the initial problem description?",
+            ],
+            Self::Artifact => &[
+                "Which files have we modified?",
+                "What new files were created?",
+                "Which configuration files were changed?",
+            ],
+            Self::Continuation => &[
+                "What should we do next?",
+                "What's the next step in the plan?",
+                "What remains to be done?",
+            ],
+            Self::Decision => &[
+                "What did we decide about the architecture?",
+                "Why did we choose this approach?",
+                "What alternatives were considered?",
+            ],
+            Self::Technical => &[
+                "What is the function signature?",
+                "What parameters does the API accept?",
+                "What type does this function return?",
+            ],
+            Self::Acceptance => &[
+                "Did we meet the acceptance criteria?",
+                "Does the implementation satisfy requirement X?",
+                "Have all tests passed?",
+            ],
+        }
+    }
+
+    /// Get the weight for this probe type (higher = more important).
+    #[must_use]
+    pub fn default_weight(&self) -> f32 {
+        match self {
+            Self::Acceptance => 1.0, // Most important for Play workflow
+            Self::Artifact => 0.9,   // Critical for context compression
+            Self::Technical => 0.8,
+            Self::Recall => 0.7,
+            Self::Continuation => 0.6,
+            Self::Decision => 0.5,
+        }
+    }
+}
+
+/// An evaluation probe for testing agent knowledge retention.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvaluationProbe {
+    /// Type of probe
+    pub probe_type: ProbeType,
+    /// The question to ask
+    pub question: String,
+    /// Keywords expected in a correct answer
+    pub expected_keywords: Vec<String>,
+    /// Weight of this probe (0.0-1.0)
+    pub weight: f32,
+    /// Optional ground truth answer
+    pub ground_truth: Option<String>,
+}
+
+impl EvaluationProbe {
+    /// Create a new probe with default weight.
+    #[must_use]
+    pub fn new(probe_type: ProbeType, question: impl Into<String>) -> Self {
+        Self {
+            weight: probe_type.default_weight(),
+            probe_type,
+            question: question.into(),
+            expected_keywords: Vec::new(),
+            ground_truth: None,
+        }
+    }
+
+    /// Add expected keywords.
+    #[must_use]
+    pub fn with_keywords(mut self, keywords: Vec<String>) -> Self {
+        self.expected_keywords = keywords;
+        self
+    }
+
+    /// Set ground truth answer.
+    #[must_use]
+    pub fn with_ground_truth(mut self, truth: impl Into<String>) -> Self {
+        self.ground_truth = Some(truth.into());
+        self
+    }
+
+    /// Set custom weight.
+    #[must_use]
+    pub fn with_weight(mut self, weight: f32) -> Self {
+        self.weight = weight.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Score a response against this probe (0.0-1.0).
+    #[must_use]
+    pub fn score_response(&self, response: &str) -> f32 {
+        if self.expected_keywords.is_empty() {
+            // No keywords to check - can't score automatically
+            return 0.5;
+        }
+
+        let response_lower = response.to_lowercase();
+        let matches = self
+            .expected_keywords
+            .iter()
+            .filter(|kw| response_lower.contains(&kw.to_lowercase()))
+            .count();
+
+        #[allow(clippy::cast_precision_loss)]
+        let score = matches as f32 / self.expected_keywords.len() as f32;
+        score
+    }
+}
+
+/// Result of running a probe.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeResult {
+    /// The probe that was run
+    pub probe: EvaluationProbe,
+    /// The response from the agent
+    pub response: String,
+    /// Score (0.0-1.0)
+    pub score: f32,
+    /// Whether the probe passed (score >= threshold)
+    pub passed: bool,
+    /// Any notes about the evaluation
+    pub notes: Option<String>,
+}
+
+/// Artifact trail for tracking file operations (mirrors sidecar struct).
+///
+/// This addresses the "artifact trail problem" where file tracking scores
+/// 2.2-2.5/5.0 across all compression methods.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ArtifactTrail {
+    /// Files created during this session
+    pub files_created: Vec<String>,
+    /// Files modified with change summaries
+    pub files_modified: std::collections::HashMap<String, String>,
+    /// Files read but not modified
+    pub files_read: Vec<String>,
+    /// Key decisions made during the session
+    pub decisions_made: Vec<String>,
+    /// Last update timestamp
+    pub updated_at: Option<String>,
+}
+
+/// Evaluation results for a task or stage.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EvaluationResults {
+    /// Individual probe results
+    pub probes: Vec<ProbeResult>,
+    /// Overall score (weighted average)
+    pub overall_score: f32,
+    /// Whether evaluation passed (overall_score >= threshold)
+    pub passed: bool,
+    /// Passing threshold used
+    pub threshold: f32,
+    /// Artifact trail if available
+    pub artifact_trail: Option<ArtifactTrail>,
+    /// Timestamp of evaluation
+    pub evaluated_at: Option<String>,
+}
+
+impl EvaluationResults {
+    /// Create from probe results with default threshold.
+    #[must_use]
+    pub fn from_probes(probes: Vec<ProbeResult>) -> Self {
+        Self::from_probes_with_threshold(probes, 0.7)
+    }
+
+    /// Create from probe results with custom threshold.
+    #[must_use]
+    pub fn from_probes_with_threshold(probes: Vec<ProbeResult>, threshold: f32) -> Self {
+        let total_weight: f32 = probes.iter().map(|p| p.probe.weight).sum();
+        let weighted_score: f32 = probes
+            .iter()
+            .map(|p| p.score * p.probe.weight)
+            .sum();
+
+        let overall_score = if total_weight > 0.0 {
+            weighted_score / total_weight
+        } else {
+            0.0
+        };
+
+        Self {
+            probes,
+            overall_score,
+            passed: overall_score >= threshold,
+            threshold,
+            artifact_trail: None,
+            evaluated_at: Some(chrono::Utc::now().to_rfc3339()),
+        }
+    }
+
+    /// Attach artifact trail to results.
+    #[must_use]
+    pub fn with_artifact_trail(mut self, trail: ArtifactTrail) -> Self {
+        self.artifact_trail = Some(trail);
+        self
+    }
 }

@@ -37,5 +37,64 @@
       "workingDirectory": "project_root",
       "env": {}
     }
+  },
+  "toolGuidance": {
+    "_description": "Context engineering guidance for tool selection. Follows Agent-Skills-for-Context-Engineering principles.",
+    "filesystem": {
+      "read_file": {
+        "useWhen": ["Need to examine file content before editing", "Verify changes were applied correctly", "Understand existing code structure"],
+        "notFor": ["Listing directory contents (use list_directory)", "Searching across multiple files (use search_files)", "Checking file existence (use get_file_info)"]
+      },
+      "read_multiple_files": {
+        "useWhen": ["Need content from multiple related files", "Comparing implementations across files", "Loading context from several sources at once"],
+        "notFor": ["Single file reads (use read_file)", "Directory exploration (use directory_tree)"]
+      },
+      "write_file": {
+        "useWhen": ["Creating a new file from scratch", "Completely replacing file contents", "File doesn't exist yet"],
+        "notFor": ["Making small changes to existing files (use edit_file)", "Appending content (use edit_file)"]
+      },
+      "edit_file": {
+        "useWhen": ["Making targeted changes to existing files", "Replacing specific sections", "Adding code to specific locations"],
+        "notFor": ["Creating new files (use write_file)", "Complete rewrites (use write_file)"]
+      },
+      "list_directory": {
+        "useWhen": ["Need to see immediate contents of a directory", "Checking what files exist", "Finding specific files by name"],
+        "notFor": ["Seeing full tree structure (use directory_tree)", "Searching by content (use search_files)"]
+      },
+      "directory_tree": {
+        "useWhen": ["Understanding project structure", "Finding files in nested directories", "Getting overview of codebase layout"],
+        "notFor": ["Detailed file info (use get_file_info)", "Searching by content (use search_files)"]
+      },
+      "search_files": {
+        "useWhen": ["Finding files matching a glob pattern", "Locating files by name pattern", "Finding files by extension"],
+        "notFor": ["Searching by file content (grep/ripgrep)", "Directory listing (use list_directory)"]
+      },
+      "get_file_info": {
+        "useWhen": ["Checking if file exists", "Getting file metadata (size, modified time)", "Verifying file type"],
+        "notFor": ["Reading file content (use read_file)", "Listing directory (use list_directory)"]
+      }
+    },
+    "memory": {
+      "create_entities": {
+        "useWhen": ["Recording new concepts, people, or things", "Building knowledge graph", "Storing structured information"],
+        "notFor": ["Updating existing entities (use add_observations)", "Creating relationships (use create_relations)"]
+      },
+      "create_relations": {
+        "useWhen": ["Linking entities together", "Recording relationships between concepts", "Building graph connections"],
+        "notFor": ["Creating new entities (use create_entities)", "Adding facts to entities (use add_observations)"]
+      },
+      "add_observations": {
+        "useWhen": ["Adding facts about existing entities", "Recording new information learned", "Updating entity knowledge"],
+        "notFor": ["Creating new entities (use create_entities)", "Building relationships (use create_relations)"]
+      },
+      "search_nodes": {
+        "useWhen": ["Finding entities by semantic meaning", "Querying knowledge graph", "Retrieving relevant memories"],
+        "notFor": ["Reading all entities (use read_graph)", "Getting specific entity (use open_nodes)"]
+      },
+      "read_graph": {
+        "useWhen": ["Getting overview of all stored knowledge", "Seeing entire knowledge graph", "Checking what's been recorded"],
+        "notFor": ["Semantic search (use search_nodes)", "Opening specific entities (use open_nodes)"]
+      }
+    }
   }
 }
