@@ -711,6 +711,148 @@ pub struct TaskStatus {
     pub updated_at: Option<String>,
 }
 
+// =============================================================================
+// Artifact Trail (Context Engineering)
+// =============================================================================
+
+/// Artifact trail for tracking file operations during agent sessions.
+///
+/// This addresses the "artifact trail problem" identified in context compression research,
+/// where file tracking scores 2.2-2.5/5.0 across all compression methods. Explicit tracking
+/// ensures agents know which files were created, modified, or read.
+///
+/// Reference: Agent-Skills-for-Context-Engineering/skills/context-compression
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ArtifactTrail {
+    /// Files created during this session
+    pub files_created: Vec<String>,
+    /// Files modified with change summaries (path -> summary)
+    pub files_modified: std::collections::HashMap<String, String>,
+    /// Files read but not modified
+    pub files_read: Vec<String>,
+    /// Key decisions made during the session
+    pub decisions_made: Vec<String>,
+    /// Last update timestamp
+    pub updated_at: Option<String>,
+}
+
+impl ArtifactTrail {
+    /// Record a file creation
+    pub fn record_create(&mut self, path: &str) {
+        let path = path.to_string();
+        if !self.files_created.contains(&path) {
+            self.files_created.push(path);
+            self.update_timestamp();
+        }
+    }
+
+    /// Record a file modification with summary
+    pub fn record_modify(&mut self, path: &str, summary: &str) {
+        self.files_modified
+            .insert(path.to_string(), summary.to_string());
+        // Remove from files_read if present (it's now modified)
+        self.files_read.retain(|p| p != path);
+        self.update_timestamp();
+    }
+
+    /// Record a file read (only if not already modified)
+    pub fn record_read(&mut self, path: &str) {
+        let path = path.to_string();
+        if !self.files_modified.contains_key(&path) && !self.files_read.contains(&path) {
+            self.files_read.push(path);
+            self.update_timestamp();
+        }
+    }
+
+    /// Record a decision
+    pub fn record_decision(&mut self, decision: &str) {
+        self.decisions_made.push(decision.to_string());
+        self.update_timestamp();
+    }
+
+    fn update_timestamp(&mut self) {
+        self.updated_at = Some(chrono::Utc::now().to_rfc3339());
+    }
+
+    /// Generate a structured summary for context compression
+    #[must_use]
+    pub fn to_summary(&self) -> String {
+        let mut parts = Vec::new();
+
+        if !self.files_created.is_empty() {
+            parts.push(format!(
+                "## Files Created\n{}",
+                self.files_created
+                    .iter()
+                    .map(|f| format!("- {f}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
+        }
+
+        if !self.files_modified.is_empty() {
+            parts.push(format!(
+                "## Files Modified\n{}",
+                self.files_modified
+                    .iter()
+                    .map(|(path, summary)| format!("- {path}: {summary}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
+        }
+
+        if !self.files_read.is_empty() {
+            parts.push(format!(
+                "## Files Read\n{}",
+                self.files_read
+                    .iter()
+                    .map(|f| format!("- {f}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
+        }
+
+        if !self.decisions_made.is_empty() {
+            parts.push(format!(
+                "## Decisions Made\n{}",
+                self.decisions_made
+                    .iter()
+                    .map(|d| format!("- {d}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
+        }
+
+        parts.join("\n\n")
+    }
+}
+
+/// Extract file path from tool input JSON
+fn extract_file_path(input: &serde_json::Value) -> Option<String> {
+    // Try common field names for file paths
+    input
+        .get("path")
+        .or_else(|| input.get("file_path"))
+        .or_else(|| input.get("filepath"))
+        .or_else(|| input.get("file"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+/// Extract change summary from tool input (for edit operations)
+fn extract_change_summary(input: &serde_json::Value) -> String {
+    // Try to get a summary of the change
+    if let Some(old) = input.get("old_string").and_then(|v| v.as_str()) {
+        let preview: String = old.chars().take(30).collect();
+        return format!("replaced '{preview}...'");
+    }
+    if let Some(content) = input.get("content").and_then(|v| v.as_str()) {
+        let lines = content.lines().count();
+        return format!("{lines} lines written");
+    }
+    "modified".to_string()
+}
+
 /// Payload sent to Linear service.
 #[derive(Debug, Clone, Serialize)]
 pub struct StatusUpdate {

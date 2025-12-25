@@ -95,7 +95,7 @@ pub struct InstallCommand {
 
     /// Enable VLAN private networking for node-to-node communication.
     /// Creates a Latitude VLAN and configures Talos with private IPs.
-    #[arg(long, default_value = "true")]
+    #[arg(long, default_value_t = true)]
     enable_vlan: bool,
 
     /// Private network subnet for VLAN (e.g., "10.8.0.0/24").
@@ -108,7 +108,7 @@ pub struct InstallCommand {
     vlan_interface: String,
 
     /// Enable Talos Ingress Firewall for host-level security.
-    #[arg(long, default_value = "true")]
+    #[arg(long, default_value_t = true)]
     enable_firewall: bool,
 }
 
