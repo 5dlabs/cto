@@ -1105,8 +1105,12 @@ pub struct UsageInfo {
     pub output_tokens: Option<u64>,
 }
 
+/// Artifact trail file path
+const ARTIFACT_TRAIL_FILE: &str = "/workspace/artifact-trail.json";
+
 /// Claude stream parsing task - reads stream-json and emits structured activities.
 /// Maps Claude CLI output to proper Linear Agent API activity types.
+/// Also maintains an artifact trail for context engineering.
 async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApiClient>) {
     let Some(client) = linear_client else {
         info!("Linear API not configured, Claude stream parsing disabled");
@@ -1138,11 +1142,20 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
     let mut tool_state = ToolState::default();
     let mut total_cost: f64 = 0.0;
 
+    // Initialize artifact trail (context engineering)
+    let mut artifact_trail = ArtifactTrail::default();
+    let mut last_artifact_save = Instant::now();
+    let artifact_save_interval = Duration::from_secs(10);
+
     loop {
         let mut line = String::new();
         match reader.read_line(&mut line).await {
             Ok(0) => {
-                // No new data
+                // No new data - persist artifact trail periodically
+                if last_artifact_save.elapsed() >= artifact_save_interval {
+                    persist_artifact_trail(&artifact_trail).await;
+                    last_artifact_save = Instant::now();
+                }
                 sleep(Duration::from_millis(config.stream_poll_interval_ms)).await;
             }
             Ok(_) => {
@@ -1161,10 +1174,22 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
                             &event,
                             &mut tool_state,
                             &mut total_cost,
+                            &mut artifact_trail,
                         )
                         .await
                         {
                             warn!(error = %e, line = processed_lines, "Failed to process stream event");
+                        }
+
+                        // Persist artifact trail on completion
+                        if matches!(event, ClaudeStreamEvent::Result { .. }) {
+                            persist_artifact_trail(&artifact_trail).await;
+                            info!(
+                                files_created = artifact_trail.files_created.len(),
+                                files_modified = artifact_trail.files_modified.len(),
+                                files_read = artifact_trail.files_read.len(),
+                                "Final artifact trail saved"
+                            );
                         }
                     }
                     Err(e) => {
@@ -1180,11 +1205,29 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
     }
 }
 
+/// Persist artifact trail to file
+async fn persist_artifact_trail(trail: &ArtifactTrail) {
+    match serde_json::to_string_pretty(trail) {
+        Ok(json) => {
+            if let Err(e) = fs::write(ARTIFACT_TRAIL_FILE, json).await {
+                warn!(error = %e, "Failed to persist artifact trail");
+            } else {
+                debug!("Artifact trail persisted to {}", ARTIFACT_TRAIL_FILE);
+            }
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to serialize artifact trail");
+        }
+    }
+}
+
 /// Track tool invocation state for proper action activities
 #[derive(Default)]
 struct ToolState {
     current_tool: Option<String>,
     current_input: Option<String>,
+    /// Raw input JSON for artifact extraction
+    current_input_json: Option<serde_json::Value>,
 }
 
 /// Process a single Claude stream event and emit appropriate Linear activity.
@@ -1194,6 +1237,8 @@ struct ToolState {
 /// - Errors → `error` activities
 /// - Completion → `response` activities
 /// - Transient status → ephemeral `thought` activities
+///
+/// Also tracks file operations for the artifact trail (context engineering best practice).
 #[allow(clippy::too_many_lines)]
 async fn process_stream_event(
     client: &LinearApiClient,
@@ -1201,6 +1246,7 @@ async fn process_stream_event(
     event: &ClaudeStreamEvent,
     tool_state: &mut ToolState,
     total_cost: &mut f64,
+    artifact_trail: &mut ArtifactTrail,
 ) -> Result<()> {
     match event {
         ClaudeStreamEvent::System { model, tools, .. } => {
@@ -1224,6 +1270,7 @@ async fn process_stream_event(
                             // Store state for pairing with result
                             tool_state.current_tool = Some(name.clone());
                             tool_state.current_input = Some(input_summary.clone());
+                            tool_state.current_input_json = input.clone();
 
                             // Emit action activity (tool in progress)
                             client.emit_action(session_id, name, &input_summary).await?;
@@ -1264,6 +1311,42 @@ async fn process_stream_event(
                 .take()
                 .unwrap_or_else(|| "Tool".to_string());
             let tool_input = tool_state.current_input.take().unwrap_or_default();
+            let tool_input_json = tool_state.current_input_json.take();
+
+            // Track file operations for artifact trail (context engineering)
+            let is_success = tool_use_result
+                .as_ref()
+                .map_or(true, |r| !r.contains("error") && !r.contains("Error"));
+
+            if is_success {
+                if let Some(ref input_json) = tool_input_json {
+                    let tool_lower = tool_name.to_lowercase();
+
+                    // Track file operations based on tool name
+                    if tool_lower.contains("write_file") || tool_lower.contains("create") {
+                        if let Some(path) = extract_file_path(input_json) {
+                            artifact_trail.record_create(&path);
+                            debug!(path = %path, "Artifact: file created");
+                        }
+                    } else if tool_lower.contains("edit_file")
+                        || tool_lower.contains("str_replace")
+                        || tool_lower.contains("modify")
+                    {
+                        if let Some(path) = extract_file_path(input_json) {
+                            let summary = extract_change_summary(input_json);
+                            artifact_trail.record_modify(&path, &summary);
+                            debug!(path = %path, summary = %summary, "Artifact: file modified");
+                        }
+                    } else if tool_lower.contains("read_file")
+                        || tool_lower.contains("read_multiple")
+                    {
+                        if let Some(path) = extract_file_path(input_json) {
+                            artifact_trail.record_read(&path);
+                            debug!(path = %path, "Artifact: file read");
+                        }
+                    }
+                }
+            }
 
             if let Some(result) = tool_use_result {
                 let is_error = result.contains("error") || result.contains("Error");

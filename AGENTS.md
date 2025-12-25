@@ -47,13 +47,13 @@ PRD → Intake (Morgan) → Infrastructure (Bolt) → Implementation (Rex/Blaze)
 |-------|----------|----------|---------------|
 | **Rex** | Rust | rust, backend, api | axum, tokio, serde, sqlx |
 | **Grizz** | Go | go, backend, api | chi, grpc, pgx, redis |
-| **Nova** | Node.js/Bun | node, bun, backend, api | Elysia (or Hono, NestJS) |
+| **Nova** | Node.js/Bun | node, bun, backend, api | Elysia, Effect, Better Auth, Drizzle |
 
 **Implementation Agents (Frontend):**
 | Agent | Language | Keywords | Default Stack |
 |-------|----------|----------|---------------|
-| **Blaze** | React/TS | react, frontend, ui | shadcn (Next.js 15, shadcn/ui, TailwindCSS) |
-| **Tap** | Expo | expo, mobile, app | expo-router, react-native |
+| **Blaze** | React/TS | react, frontend, ui | shadcn (Next.js 15, shadcn/ui, Better Auth, TailwindCSS) |
+| **Tap** | Expo | expo, mobile, app | expo-router, react-native, Better Auth |
 | **Spark** | Electron | electron, desktop | electron-builder, react |
 
 **Support Agents:**
@@ -840,6 +840,12 @@ The following MCP servers and tools are available in this Cursor workspace for t
 - **Thiserror:** `/dtolnay/thiserror` (custom errors, 83.1 score)
 - **Tracing:** `/tokio-rs/tracing` (logging)
 
+**Key TypeScript Library IDs:**
+- **Effect:** `/effect-ts/effect` (type-safe error handling, Schema)
+- **Better Auth:** `/better-auth/better-auth` (universal TypeScript auth)
+- **Elysia:** `elysiajs` (Bun web framework)
+- **Drizzle:** `/drizzle-team/drizzle-orm` (TypeScript ORM)
+
 **Best Practices:**
 - Always resolve library names first
 - Query focused topics: "error handling context" not "documentation"
@@ -1015,7 +1021,55 @@ kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
 // Returns base64-encoded MP3 audio
 ```
 
-### 13. MCP Add/Remove/Update Tools
+### 13. Better Auth MCP (TypeScript Authentication)
+
+**Purpose:** AI-assisted authentication implementation for TypeScript applications
+
+**MCP Server URL:** `https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp`
+
+| Feature | Description |
+|---------|-------------|
+| **Email & Password** | Built-in secure email/password auth |
+| **Social Sign-On** | GitHub, Google, Apple, Discord, and 30+ providers |
+| **Two-Factor Auth** | TOTP, backup codes, trusted devices |
+| **Organizations** | Multi-tenant support with teams and roles |
+| **Passkeys** | WebAuthn/Passkey authentication |
+| **Session Management** | Secure session handling with refresh tokens |
+| **API Keys** | Programmatic access authentication |
+| **Magic Links** | Passwordless email authentication |
+
+**LLM Documentation:** `https://better-auth.com/llms.txt`
+
+**CLI Integration:**
+```bash
+# Add Better Auth MCP to Claude Code
+npx @better-auth/cli mcp --claude-code
+
+# Add to Cursor
+npx @better-auth/cli mcp --cursor
+
+# Add to OpenCode
+npx @better-auth/cli mcp --open-code
+```
+
+**MCP Configuration:**
+```json
+{
+  "mcpServers": {
+    "better-auth": {
+      "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp"
+    }
+  }
+}
+```
+
+**Best Practices:**
+- Use Better Auth for ALL TypeScript authentication (Nova/Blaze agents)
+- Query the MCP server for implementation patterns
+- Consult `llms.txt` for comprehensive documentation
+- Always run database migrations after adding plugins
+
+### 14. MCP Add/Remove/Update Tools
 
 **Purpose:** Manage MCP servers in the platform
 
@@ -1487,6 +1541,140 @@ grafana_query_loki_logs({
 
 ---
 
+## Context Engineering Principles
+
+Context engineering is the discipline of managing what information enters an agent's context window. Unlike prompt engineering (crafting instructions), context engineering addresses the holistic curation of all information: system prompts, tool definitions, retrieved documents, message history, and tool outputs.
+
+**Reference:** These principles are derived from [Agent-Skills-for-Context-Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering).
+
+### Context Placement Rules (Lost-in-Middle Effect)
+
+Models exhibit U-shaped attention curves. Information in the middle of context receives **10-40% lower recall accuracy** compared to the beginning or end.
+
+| Position | Attention Level | What to Place |
+|----------|-----------------|---------------|
+| **Start** | High | Task prompt, acceptance criteria, critical constraints |
+| **Middle** | Low | Supporting documentation, verbose tool outputs |
+| **End** | High | Recent state, file changes, decisions, next steps |
+
+**Practical Application:**
+- Place `[CURRENT TASK]` section at the START of agent prompts
+- Place `[KEY FINDINGS]` and recent changes at the END
+- Use explicit section headers to help agents navigate structure
+
+### Context Degradation Patterns
+
+| Pattern | Description | Mitigation |
+|---------|-------------|------------|
+| **Lost-in-Middle** | Information buried in middle gets missed | Place critical info at edges |
+| **Context Poisoning** | Errors compound through repeated reference | Validate tool outputs, restart with clean context |
+| **Context Distraction** | Irrelevant info overwhelms relevant | Filter before loading, use namespacing |
+| **Context Confusion** | Model can't determine which context applies | Explicit task segmentation, clear transitions |
+| **Context Clash** | Accumulated info directly conflicts | Version filtering, priority rules, conflict marking |
+
+**Detection Signs:**
+- Agent produces incorrect outputs on previously successful tasks
+- Agent calls wrong tools or uses wrong parameters
+- Hallucinations persist despite correction attempts
+
+### Multi-Agent Coordination
+
+**The Telephone Game Problem:** Supervisor agents paraphrasing sub-agent responses incorrectly, losing fidelity. LangGraph benchmarks showed 50% performance loss due to this effect.
+
+**Solution:** Implement direct response pass-through:
+```python
+def forward_message(message: str, to_user: bool = True):
+    """Allow sub-agents to pass responses directly to users."""
+    if to_user:
+        return {"type": "direct_response", "content": message}
+    return {"type": "supervisor_input", "content": message}
+```
+
+**Token Economics for Multi-Agent:**
+
+| Architecture | Token Multiplier | Use Case |
+|--------------|------------------|----------|
+| Single agent chat | 1x baseline | Simple queries |
+| Single agent + tools | ~4x baseline | Tool-using tasks |
+| Multi-agent system | ~15x baseline | Complex research/coordination |
+
+**Key Finding:** Token usage explains 80% of performance variance. Model upgrades often provide larger gains than doubling token budgets.
+
+### Tool Description Engineering
+
+**The Consolidation Principle:** If a human engineer cannot definitively say which tool to use in a given situation, an agent cannot be expected to do better.
+
+Every MCP tool description must answer:
+1. **What does it do?** - Specific, not vague ("Search database" → bad)
+2. **When should it be used?** - Triggers and contexts
+3. **What inputs does it accept?** - Types, constraints, defaults
+4. **What does it return?** - Format, examples, error conditions
+
+**Anti-Patterns to Avoid:**
+- Vague descriptions: "Search the database for customer information"
+- Cryptic parameter names: `x`, `val`, `param1`
+- Missing error handling guidance
+- Inconsistent naming across tools
+
+### Memory Architecture Layers
+
+| Layer | Persistence | Latency | Use Case |
+|-------|-------------|---------|----------|
+| **Working Memory** | Context window only | Zero | Active calculations, current task |
+| **Short-Term Memory** | Session-scoped | Low | Conversation state, intermediate results |
+| **Long-Term Memory** | Cross-session | Medium | User preferences, learned patterns |
+| **Entity Memory** | Permanent | Medium | Identity tracking, relationship history |
+| **Temporal KG** | Permanent + validity | Medium | Time-aware facts with `valid_from`/`valid_until` |
+
+**Benchmark:** Temporal Knowledge Graphs (Zep) achieve 94.8% accuracy vs ~60-70% for Vector RAG.
+
+### Context Compression Strategies
+
+When agent sessions exceed context limits, compress strategically:
+
+**Tokens-Per-Task vs Tokens-Per-Request:** Optimize for total tokens to complete a task, not tokens per request. Aggressive compression causing re-fetching wastes more tokens overall.
+
+**Structured Summary Sections:**
+```markdown
+## Session Intent
+[What the user is trying to accomplish]
+
+## Files Modified
+- auth.controller.ts: Fixed JWT token generation
+- config/redis.ts: Updated connection pooling
+
+## Decisions Made
+- Using Redis connection pool instead of per-request connections
+
+## Current State
+- 14 tests passing, 2 failing
+
+## Next Steps
+1. Fix remaining test failures
+2. Run full test suite
+```
+
+**The Artifact Trail Problem:** File tracking scores 2.2-2.5/5.0 across all compression methods. Coding agents need explicit tracking of:
+- Which files were created
+- Which files were modified and what changed
+- Which files were read but not changed
+- Function names, variable names, error messages
+
+### Probe-Based Evaluation
+
+Traditional metrics (ROUGE, embedding similarity) fail to capture functional compression quality. Use probe-based evaluation:
+
+| Probe Type | What It Tests | Example Question |
+|------------|---------------|------------------|
+| **Recall** | Factual retention | "What was the original error message?" |
+| **Artifact** | File tracking | "Which files have we modified?" |
+| **Continuation** | Task planning | "What should we do next?" |
+| **Decision** | Reasoning chain | "What did we decide about the Redis issue?" |
+
+If compression preserved the right information, the agent answers correctly. If not, it guesses or hallucinates.
+
+---
+
 ## Context7 for Rust Best Practices
 
 Before implementing significant Rust code, use Context7 to get current documentation.
@@ -1536,9 +1724,9 @@ Each agent receives prompts and tools **only for their supported language**:
 | Agent | Language | Default Stack | Tools/Hints |
 |-------|----------|---------------|-------------|
 | **Rex** | Rust | axum | tokio, serde, anyhow, thiserror, sqlx |
-| **Blaze** | React/TS | shadcn | Next.js 15, shadcn/ui, Effect, Tailwind, anime.js |
+| **Blaze** | React/TS | shadcn | Next.js 15, shadcn/ui, Effect, Better Auth, Tailwind, anime.js |
 | **Grizz** | Go | chi | chi, grpc, pgx, redis |
-| **Nova** | Node.js/Bun | Elysia | Elysia, Effect, Drizzle, Prisma |
+| **Nova** | Node.js/Bun | Elysia | Elysia, Effect, Better Auth, Drizzle |
 | **Tap** | Expo | expo-router | expo, react-native, expo-router, XcodeBuildMCP |
 | **Spark** | Electron | electron | electron-builder, react, XcodeBuildMCP (macOS) |
 

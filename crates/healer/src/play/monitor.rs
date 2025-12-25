@@ -5,6 +5,7 @@
 //! - Streaming logs from all agent pods
 //! - Analyzing logs against expected behaviors
 //! - Creating GitHub issues when anomalies are detected
+//! - Running probe-based evaluations for acceptance criteria (context engineering)
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
@@ -18,6 +19,8 @@ use crate::github::GitHubClient;
 use crate::loki::{LokiClient, LokiConfig};
 
 use super::behavior::{AgentType, BehaviorAnalyzer, DetectionType, LogAnalysis};
+use super::evaluator::{EvaluatorConfig, ProbeEvaluator};
+use super::types::{ArtifactTrail, EvaluationProbe, EvaluationResults, ProbeResult, ProbeType};
 
 /// Configuration for play monitoring
 #[derive(Debug, Clone)]
@@ -72,6 +75,10 @@ pub struct MonitoredPlay {
     pub last_log_check: Option<DateTime<Utc>>,
     /// Detected anomalies
     pub anomalies: Vec<DetectedAnomaly>,
+    /// Probe-based evaluation results (context engineering)
+    pub evaluation_results: Option<EvaluationResults>,
+    /// Artifact trail from agent session
+    pub artifact_trail: Option<ArtifactTrail>,
 }
 
 /// An active `CodeRun` being monitored
@@ -134,6 +141,8 @@ pub enum MonitorEventType {
     IssueCreated,
     /// Success pattern matched
     SuccessDetected,
+    /// Probe-based evaluation completed (context engineering)
+    EvaluationCompleted,
     /// Monitor error
     Error,
 }
@@ -262,6 +271,8 @@ impl PlayMonitor {
                         issues_created: Vec::new(),
                         last_log_check: None,
                         anomalies: Vec::new(),
+                        evaluation_results: None,
+                        artifact_trail: None,
                     },
                 );
             }
@@ -702,6 +713,242 @@ impl PlayMonitor {
             total_anomalies: self.plays.values().map(|p| p.anomalies.len()).sum(),
             total_issues: self.plays.values().map(|p| p.issues_created.len()).sum(),
             plays: self.plays.values().cloned().collect(),
+        }
+    }
+
+    // =========================================================================
+    // Probe-Based Evaluation (Context Engineering)
+    // =========================================================================
+
+    /// Load artifact trail from a CodeRun's workspace.
+    ///
+    /// The artifact trail is persisted by the sidecar to `/workspace/artifact-trail.json`.
+    async fn load_artifact_trail(&self, pod_name: &str) -> Option<ArtifactTrail> {
+        let output = Command::new("kubectl")
+            .args([
+                "exec",
+                pod_name,
+                "-n",
+                &self.config.namespace,
+                "--",
+                "cat",
+                "/workspace/artifact-trail.json",
+            ])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            debug!(pod = %pod_name, "No artifact trail found");
+            return None;
+        }
+
+        serde_json::from_slice(&output.stdout).ok()
+    }
+
+    /// Generate evaluation probes for a play based on its context.
+    ///
+    /// Uses the artifact trail and anomaly history to create targeted probes
+    /// that test whether the agent retained critical information.
+    #[must_use]
+    pub fn generate_probes(&self, play: &MonitoredPlay) -> Vec<EvaluationProbe> {
+        let mut probes = Vec::new();
+
+        // Artifact probes - test file tracking
+        if let Some(trail) = &play.artifact_trail {
+            if !trail.files_modified.is_empty() {
+                let files: Vec<_> = trail.files_modified.keys().cloned().collect();
+                probes.push(
+                    EvaluationProbe::new(
+                        ProbeType::Artifact,
+                        "Which files have been modified in this session?",
+                    )
+                    .with_keywords(files),
+                );
+            }
+
+            if !trail.files_created.is_empty() {
+                probes.push(
+                    EvaluationProbe::new(
+                        ProbeType::Artifact,
+                        "What new files were created?",
+                    )
+                    .with_keywords(trail.files_created.clone()),
+                );
+            }
+
+            if !trail.decisions_made.is_empty() {
+                probes.push(
+                    EvaluationProbe::new(
+                        ProbeType::Decision,
+                        "What key decisions were made during this task?",
+                    )
+                    .with_keywords(
+                        trail
+                            .decisions_made
+                            .iter()
+                            .flat_map(|d| d.split_whitespace().take(3).map(String::from))
+                            .collect(),
+                    ),
+                );
+            }
+        }
+
+        // Recall probes - test error retention if anomalies occurred
+        if !play.anomalies.is_empty() {
+            let error_keywords: Vec<_> = play
+                .anomalies
+                .iter()
+                .flat_map(|a| {
+                    a.analysis
+                        .line
+                        .split_whitespace()
+                        .filter(|w| w.len() > 4)
+                        .take(3)
+                        .map(String::from)
+                })
+                .collect();
+
+            if !error_keywords.is_empty() {
+                probes.push(
+                    EvaluationProbe::new(
+                        ProbeType::Recall,
+                        "What errors or issues were encountered?",
+                    )
+                    .with_keywords(error_keywords),
+                );
+            }
+        }
+
+        // Continuation probe - always useful
+        probes.push(EvaluationProbe::new(
+            ProbeType::Continuation,
+            "What is the next step to complete this task?",
+        ));
+
+        // Acceptance probe - critical for Play workflow
+        probes.push(
+            EvaluationProbe::new(
+                ProbeType::Acceptance,
+                "Have all acceptance criteria been met?",
+            )
+            .with_keywords(vec![
+                "complete".to_string(),
+                "pass".to_string(),
+                "success".to_string(),
+            ]),
+        );
+
+        probes
+    }
+
+    /// Run evaluation probes for a play.
+    ///
+    /// This would typically call an LLM to answer the probe questions,
+    /// but for now we just set up the framework and log the probes.
+    pub async fn run_evaluation(&mut self, play_id: &str) -> Result<EvaluationResults> {
+        let play = self
+            .plays
+            .get(play_id)
+            .ok_or_else(|| anyhow::anyhow!("Play not found: {play_id}"))?
+            .clone();
+
+        // Load artifact trail if not already loaded
+        let artifact_trail = if play.artifact_trail.is_some() {
+            play.artifact_trail.clone()
+        } else {
+            // Try to load from the first running pod
+            let trail = if let Some(coderun) = play.active_coderuns.first() {
+                if let Some(pod) = &coderun.pod_name {
+                    self.load_artifact_trail(pod).await
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            // Store it in the play
+            if let Some(play_mut) = self.plays.get_mut(play_id) {
+                play_mut.artifact_trail = trail.clone();
+            }
+
+            trail
+        };
+
+        // Generate probes
+        let play_with_trail = MonitoredPlay {
+            artifact_trail: artifact_trail.clone(),
+            ..play.clone()
+        };
+        let probes = self.generate_probes(&play_with_trail);
+
+        info!(
+            play_id = %play_id,
+            probe_count = %probes.len(),
+            "Generated evaluation probes"
+        );
+
+        // For now, create placeholder results
+        // In a full implementation, this would call an LLM to answer each probe
+        let probe_results: Vec<ProbeResult> = probes
+            .into_iter()
+            .map(|probe| ProbeResult {
+                score: 0.5, // Placeholder - would be computed from LLM response
+                passed: false, // Placeholder
+                response: String::new(),
+                notes: Some("Evaluation pending - requires LLM integration".to_string()),
+                probe,
+            })
+            .collect();
+
+        let mut results = EvaluationResults::from_probes(probe_results);
+        if let Some(trail) = artifact_trail {
+            results = results.with_artifact_trail(trail);
+        }
+
+        // Store results
+        if let Some(play_mut) = self.plays.get_mut(play_id) {
+            play_mut.evaluation_results = Some(results.clone());
+        }
+
+        // Emit event
+        self.emit_event(
+            MonitorEventType::EvaluationCompleted,
+            Some(play_id),
+            serde_json::json!({
+                "overall_score": results.overall_score,
+                "passed": results.passed,
+                "probe_count": results.probes.len(),
+                "threshold": results.threshold,
+            }),
+        )
+        .await;
+
+        Ok(results)
+    }
+
+    /// Check if a play passes acceptance criteria using probe-based evaluation.
+    ///
+    /// This is the main entry point for context engineering evaluation.
+    pub async fn verify_acceptance(&mut self, play_id: &str, threshold: f32) -> Result<bool> {
+        let results = self.run_evaluation(play_id).await?;
+
+        if results.overall_score >= threshold {
+            info!(
+                play_id = %play_id,
+                score = %results.overall_score,
+                threshold = %threshold,
+                "Play passed acceptance criteria"
+            );
+            Ok(true)
+        } else {
+            warn!(
+                play_id = %play_id,
+                score = %results.overall_score,
+                threshold = %threshold,
+                "Play failed acceptance criteria"
+            );
+            Ok(false)
         }
     }
 }

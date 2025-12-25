@@ -7,10 +7,12 @@
 //! - Gather optimization insights
 //! - Monitor running plays with real-time log analysis
 //! - Detect anomalies based on expected agent behaviors
+//! - Probe-based evaluation for context engineering quality (LLM-powered)
 
 pub mod batch;
 pub mod behavior;
 pub mod cleanup;
+pub mod evaluator;
 pub mod insights;
 pub mod monitor;
 pub mod remediate;
@@ -22,6 +24,7 @@ pub mod types;
 // Re-export primary types
 pub use batch::PlayBatch;
 pub use behavior::{AgentType, BehaviorAnalyzer, DetectionType, LogAnalysis};
+pub use evaluator::{EvaluatorConfig, ProbeEvaluator};
 pub use monitor::{MonitorConfig, MonitorEvent, MonitorStatus, PlayMonitor};
 pub use stage::Stage;
 pub use task::TaskState;
