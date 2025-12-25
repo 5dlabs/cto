@@ -60,7 +60,7 @@ spec:
           
           # Database - SQLite for simplicity
           HEADSCALE_DATABASE_TYPE: "sqlite"
-          HEADSCALE_DATABASE_SQLITE_PATH: "/var/lib/headscale/db.sqlite"
+          HEADSCALE_DATABASE_SQLITE_PATH: "/etc/headscale/db.sqlite"
 
         service:
           main:
@@ -71,11 +71,11 @@ spec:
               metrics:
                 port: 9090
 
-        # Persistence for SQLite database
+        # Persistence for config and SQLite database
         persistence:
           config:
             enabled: true
-            mountPath: /var/lib/headscale
+            mountPath: /etc/headscale
             storageClass: "local-path"
             accessMode: ReadWriteOnce
             size: 1Gi
