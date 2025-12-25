@@ -2613,6 +2613,7 @@ async fn run_play_monitor(
         max_issues_per_play: max_issues,
         issue_cooldown_mins: issue_cooldown,
         log_window_mins: log_window,
+        ..Default::default()
     };
 
     let mut monitor = PlayMonitor::new(config);

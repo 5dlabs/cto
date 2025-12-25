@@ -76,6 +76,10 @@ pub struct Config {
     pub nudge_interval_secs: u64,
     pub max_nudge_level: u8,
     pub nudge_messages: Vec<String>,
+
+    // Context engineering: artifact summary injection
+    pub artifact_injection_enabled: bool,
+    pub artifact_injection_interval_turns: u32,
 }
 
 impl Config {
@@ -155,6 +159,15 @@ impl Config {
                 .parse()
                 .unwrap_or(3),
             nudge_messages: Self::parse_nudge_messages(),
+
+            // Context engineering: artifact injection
+            artifact_injection_enabled: std::env::var("ARTIFACT_INJECTION_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true), // Enabled by default
+            artifact_injection_interval_turns: std::env::var("ARTIFACT_INJECTION_INTERVAL_TURNS")
+                .unwrap_or_else(|_| "20".to_string())
+                .parse()
+                .unwrap_or(20),
         }
     }
 
@@ -1147,6 +1160,10 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
     let mut last_artifact_save = Instant::now();
     let artifact_save_interval = Duration::from_secs(10);
 
+    // Turn counter for artifact injection
+    let mut turn_count: u32 = 0;
+    let mut last_injection_turn: u32 = 0;
+
     loop {
         let mut line = String::new();
         match reader.read_line(&mut line).await {
@@ -1168,6 +1185,28 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
                 // Parse the JSON event
                 match serde_json::from_str::<ClaudeStreamEvent>(line) {
                     Ok(event) => {
+                        // Count turns (Result events indicate turn completion)
+                        if matches!(event, ClaudeStreamEvent::Result { .. }) {
+                            turn_count += 1;
+
+                            // Check if we should inject artifact summary
+                            if config.artifact_injection_enabled
+                                && turn_count - last_injection_turn
+                                    >= config.artifact_injection_interval_turns
+                            {
+                                if inject_artifact_summary(&config.input_fifo, &artifact_trail)
+                                    .await
+                                {
+                                    last_injection_turn = turn_count;
+                                    debug!(
+                                        turn = turn_count,
+                                        interval = config.artifact_injection_interval_turns,
+                                        "Artifact summary injected"
+                                    );
+                                }
+                            }
+                        }
+
                         if let Err(e) = process_stream_event(
                             &client,
                             &config.linear_session_id,
@@ -1188,7 +1227,8 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
                                 files_created = artifact_trail.files_created.len(),
                                 files_modified = artifact_trail.files_modified.len(),
                                 files_read = artifact_trail.files_read.len(),
-                                "Final artifact trail saved"
+                                turn = turn_count,
+                                "Artifact trail saved"
                             );
                         }
                     }
@@ -1217,6 +1257,83 @@ async fn persist_artifact_trail(trail: &ArtifactTrail) {
         }
         Err(e) => {
             warn!(error = %e, "Failed to serialize artifact trail");
+        }
+    }
+}
+
+/// Generate artifact summary message for context injection.
+///
+/// This addresses the "artifact trail problem" where file tracking accuracy
+/// degrades in long sessions. Periodic injection of the summary helps
+/// maintain context accuracy.
+fn generate_artifact_summary_message(trail: &ArtifactTrail) -> String {
+    let mut summary = String::from(
+        "## Session Artifact Summary (Auto-injected for context retention)\n\n",
+    );
+
+    if !trail.files_created.is_empty() {
+        summary.push_str("### Files Created\n");
+        for file in &trail.files_created {
+            summary.push_str(&format!("- {file}\n"));
+        }
+        summary.push('\n');
+    }
+
+    if !trail.files_modified.is_empty() {
+        summary.push_str("### Files Modified\n");
+        for (file, change) in &trail.files_modified {
+            summary.push_str(&format!("- {file}: {change}\n"));
+        }
+        summary.push('\n');
+    }
+
+    if !trail.decisions_made.is_empty() {
+        summary.push_str("### Key Decisions\n");
+        for decision in &trail.decisions_made {
+            summary.push_str(&format!("- {decision}\n"));
+        }
+        summary.push('\n');
+    }
+
+    summary.push_str("---\n\nPlease continue with the task, keeping these artifacts in mind.\n");
+    summary
+}
+
+/// Inject artifact summary into the agent's input FIFO.
+///
+/// This implements context compression from the context engineering principles,
+/// helping maintain file tracking accuracy in long-running sessions.
+async fn inject_artifact_summary(input_fifo: &str, trail: &ArtifactTrail) -> bool {
+    // Don't inject if nothing to report
+    if trail.files_created.is_empty()
+        && trail.files_modified.is_empty()
+        && trail.decisions_made.is_empty()
+    {
+        debug!("No artifacts to inject, skipping");
+        return false;
+    }
+
+    let message = generate_artifact_summary_message(trail);
+
+    // Write directly to FIFO
+    match OpenOptions::new().write(true).open(input_fifo).await {
+        Ok(mut file) => {
+            let line = format!("{message}\n");
+            if let Err(e) = file.write_all(line.as_bytes()).await {
+                warn!(error = %e, "Failed to inject artifact summary");
+                false
+            } else {
+                info!(
+                    files_created = trail.files_created.len(),
+                    files_modified = trail.files_modified.len(),
+                    "Injected artifact summary into agent context"
+                );
+                true
+            }
+        }
+        Err(e) => {
+            debug!(error = %e, "FIFO not available for artifact injection");
+            false
         }
     }
 }

@@ -12,6 +12,7 @@ You implement Electron desktop applications with native desktop integration and 
 - **Build**: electron-builder, electron-forge
 - **Language**: TypeScript 5+ (strict mode)
 - **UI**: React/shadcn/ui in renderer process
+- **Authentication**: Better Auth (React client with secure IPC)
 - **Testing**: Playwright, Vitest
 - **Security**: Context isolation, sandbox, CSP
 
@@ -29,14 +30,15 @@ Your task is to implement the feature or fix described in `task/`.
 
 ## Tool Usage Priority
 
-1. **Documentation First** - Query Context7 for Electron docs
-2. **XcodeBuildMCP** - Use for macOS builds, notarization, signing
-3. **App Store Connect** - Use for Mac App Store releases
-4. **OpenMemory** - Check for similar desktop app patterns
-5. **Code Analysis** - Understand existing app architecture
-6. **Implementation** - Write secure, performant Electron code
-7. **Testing** - Playwright, Vitest, unit tests
-8. **Validation** - TypeScript, ESLint, security audit
+1. **Documentation First** - Query Context7 for Electron and Better Auth docs
+2. **Better Auth Docs** - Check https://better-auth.com/llms.txt for auth patterns
+3. **XcodeBuildMCP** - Use for macOS builds, notarization, signing
+4. **App Store Connect** - Use for Mac App Store releases
+5. **OpenMemory** - Check for similar desktop app patterns
+6. **Code Analysis** - Understand existing app architecture
+7. **Implementation** - Write secure, performant Electron code with Better Auth
+8. **Testing** - Playwright, Vitest, unit tests
+9. **Validation** - TypeScript, ESLint, security audit
 
 ## Context7 Library IDs
 
@@ -44,6 +46,14 @@ Before implementing, query these libraries for current best practices:
 
 - **Electron**: `/electron/electron`
 - **electron-builder**: `/electron-userland/electron-builder`
+- **Better Auth**: `/better-auth/better-auth` (universal TypeScript auth)
+
+### Better Auth Topics to Query
+```
+get_library_docs({ libraryName: "better-auth", topic: "react client" })
+get_library_docs({ libraryName: "better-auth", topic: "session management" })
+get_library_docs({ libraryName: "better-auth", topic: "social sign-on" })
+```
 
 ## Electron Architecture
 
@@ -202,6 +212,16 @@ autoUpdater.on('update-downloaded', () => {
   autoUpdater.quitAndInstall();
 });
 ```
+
+---
+
+## Authentication: Better Auth
+
+**Always use Better Auth** for authentication in Electron applications. Use the React client in the sandboxed renderer with secure IPC patterns.
+
+{{> better-auth-electron }}
+
+---
 
 ## Local Validation Commands
 
