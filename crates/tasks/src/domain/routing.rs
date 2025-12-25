@@ -98,6 +98,39 @@ impl std::fmt::Display for Agent {
 pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
     let content = format!("{} {}", title, description).to_lowercase();
 
+    // HIGHEST PRIORITY: Explicit agent name in parentheses (e.g., "(Nova - Bun)")
+    // This allows PRD authors to explicitly specify the agent
+    if content.contains("(nova") || content.contains("- nova") {
+        return Agent::Nova;
+    }
+    if content.contains("(grizz") || content.contains("- grizz") {
+        return Agent::Grizz;
+    }
+    if content.contains("(rex") || content.contains("- rex") {
+        return Agent::Rex;
+    }
+    if content.contains("(blaze") || content.contains("- blaze") {
+        return Agent::Blaze;
+    }
+    if content.contains("(tap") || content.contains("- tap") {
+        return Agent::Tap;
+    }
+    if content.contains("(spark") || content.contains("- spark") {
+        return Agent::Spark;
+    }
+    if content.contains("(bolt") || content.contains("- bolt") {
+        return Agent::Bolt;
+    }
+    if content.contains("(cipher") || content.contains("- cipher") {
+        return Agent::Cipher;
+    }
+    if content.contains("(tess") || content.contains("- tess") {
+        return Agent::Tess;
+    }
+    if content.contains("(atlas") || content.contains("- atlas") {
+        return Agent::Atlas;
+    }
+
     // Check in order of specificity (most specific first)
 
     // Mobile (before frontend since React Native could match "react")
@@ -146,8 +179,47 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("pipeline")
         || content.contains("gitops")
         || content.contains("containerize")
+        || content.contains("infrastructure")
     {
         return Agent::Bolt;
+    }
+
+    // Go - check BEFORE general backend since Go services are often APIs too
+    // Be more generous with Go detection patterns
+    if content.contains("golang")
+        || content.contains("goroutine")
+        || content.contains(" go ")
+        || content.contains("go/")
+        || content.contains("/go")
+        || content.contains("(go)")
+        || content.contains("gin ")
+        || content.contains("fiber")
+        || content.contains("echo ")
+        || content.contains("chi ")
+        || content.contains("grpc")
+        || content.contains("protobuf")
+    {
+        return Agent::Grizz;
+    }
+
+    // Node.js - check BEFORE general backend
+    // Include modern JS/TS runtime and framework keywords
+    if content.contains("node.js")
+        || content.contains("nodejs")
+        || content.contains("express")
+        || content.contains("fastify")
+        || content.contains("nestjs")
+        || content.contains("npm")
+        || content.contains("yarn")
+        || content.contains("bun")
+        || content.contains("deno")
+        || content.contains("elysia")
+        || content.contains("hono")
+        || content.contains("effect")
+        || content.contains("drizzle")
+        || content.contains("prisma")
+    {
+        return Agent::Nova;
     }
 
     // Frontend
@@ -167,16 +239,22 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         return Agent::Blaze;
     }
 
-    // Rust/Backend - check before Go/Node since it's more common in this codebase
+    // Rust/Backend - now checked after Go/Node to avoid overshadowing
     if content.contains("rust")
         || content.contains("cargo")
-        || content.contains("backend")
-        || content.contains("api ")
-        || content.contains(" api")
         || content.contains("actix")
         || content.contains("axum")
         || content.contains("tokio")
         || content.contains("wasm")
+        || content.contains("sqlx")
+    {
+        return Agent::Rex;
+    }
+
+    // Generic backend keywords - default to Rex for these
+    if content.contains("backend")
+        || content.contains("api ")
+        || content.contains(" api")
         || content.contains("endpoint")
         || content.contains("database")
         || content.contains("schema")
@@ -185,36 +263,10 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("profile")
         || content.contains("admin")
         || content.contains("crud")
-        || content.contains("sqlx")
         || content.contains("postgresql")
         || content.contains("redis")
     {
         return Agent::Rex;
-    }
-
-    // Go (require more specific markers - avoid false positives)
-    if content.contains("golang")
-        || content.contains("goroutine")
-        || (content.contains(" go ") && content.contains("service"))
-        || content.contains("gin framework")
-        || content.contains("fiber")
-        || content.contains("echo framework")
-    {
-        return Agent::Grizz;
-    }
-
-    // Node.js
-    if content.contains("node.js")
-        || content.contains("nodejs")
-        || content.contains("express")
-        || content.contains("fastify")
-        || content.contains("nestjs")
-        || content.contains("npm")
-        || content.contains("yarn")
-        || content.contains("bun ")
-        || content.contains("deno")
-    {
-        return Agent::Nova;
     }
 
     // Testing/QA (late - require more specific markers to avoid false positives)
@@ -232,15 +284,17 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         return Agent::Tess;
     }
 
-    // Integration/Merge
+    // Integration/Merge (LAST - these are very generic keywords)
+    // Only match if no other agent was matched
     if content.contains("merge")
         || content.contains("conflict")
-        || content.contains("integration")
         || content.contains("consolidate")
         || content.contains("combine")
     {
         return Agent::Atlas;
     }
+    // Note: "integration" removed from Atlas - too generic and conflicts with
+    // "Integration Service" which should go to a backend agent
 
     // Default to Rex (Rust/backend)
     Agent::Rex
@@ -275,6 +329,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_explicit_agent_names() {
+        // Test explicit agent names in parentheses (highest priority)
+        assert_eq!(
+            infer_agent_hint(
+                "Setup Integration Service (Nova - Bun/Elysia)",
+                "API service"
+            ),
+            Agent::Nova
+        );
+        assert_eq!(
+            infer_agent_hint("Setup Admin API (Grizz - Go/gRPC)", "Backend service"),
+            Agent::Grizz
+        );
+        assert_eq!(
+            infer_agent_hint(
+                "Router Service (Rex - Rust/Axum)",
+                "High-performance router"
+            ),
+            Agent::Rex
+        );
+        assert_eq!(
+            infer_agent_hint("Dashboard (Blaze - React)", "Admin UI"),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
     fn test_frontend_detection() {
         assert_eq!(
             infer_agent_hint("Build React component", "Create a UI form"),
@@ -289,7 +370,7 @@ mod tests {
     #[test]
     fn test_rust_detection() {
         assert_eq!(
-            infer_agent_hint("Implement API", "Rust backend service"),
+            infer_agent_hint("Implement service", "Rust axum server"),
             Agent::Rex
         );
         assert_eq!(
@@ -316,12 +397,40 @@ mod tests {
             infer_agent_hint("Go service", "Golang microservice"),
             Agent::Grizz
         );
+        // Test Go/gRPC pattern
+        assert_eq!(
+            infer_agent_hint("Admin API", "Go/gRPC backend"),
+            Agent::Grizz
+        );
+        // Test gRPC alone
+        assert_eq!(
+            infer_agent_hint("gRPC service", "Protocol buffers"),
+            Agent::Grizz
+        );
+    }
+
+    #[test]
+    fn test_nodejs_detection() {
+        // Test Elysia/Effect (modern Bun stack)
+        assert_eq!(
+            infer_agent_hint("Integration Service", "Bun with Elysia framework"),
+            Agent::Nova
+        );
+        assert_eq!(
+            infer_agent_hint("API Service", "Effect TypeScript"),
+            Agent::Nova
+        );
+        // Test traditional Node patterns
+        assert_eq!(
+            infer_agent_hint("Express API", "Node.js server"),
+            Agent::Nova
+        );
     }
 
     #[test]
     fn test_security_detection() {
         assert_eq!(
-            infer_agent_hint("Auth system", "OAuth integration"),
+            infer_agent_hint("Auth system", "OAuth provider"),
             Agent::Cipher
         );
         assert_eq!(
@@ -340,6 +449,11 @@ mod tests {
             infer_agent_hint("CI/CD setup", "GitHub Actions"),
             Agent::Bolt
         );
+        // Test infrastructure keyword
+        assert_eq!(
+            infer_agent_hint("Infrastructure setup", "Database provisioning"),
+            Agent::Bolt
+        );
     }
 
     #[test]
@@ -355,6 +469,16 @@ mod tests {
     fn test_default_to_rex() {
         assert_eq!(
             infer_agent_hint("Generic task", "No specific keywords"),
+            Agent::Rex
+        );
+    }
+
+    #[test]
+    fn test_integration_not_atlas() {
+        // "Integration Service" should NOT match Atlas (too generic)
+        // Without explicit agent hint, it should fall through to generic backend (Rex)
+        assert_eq!(
+            infer_agent_hint("Integration Service", "Connects systems together"),
             Agent::Rex
         );
     }
