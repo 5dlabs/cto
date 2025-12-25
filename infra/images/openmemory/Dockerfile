@@ -1,5 +1,8 @@
 # OpenMemory Server Container
 # Based on official Dockerfile from https://github.com/caviraoss/openmemory
+# Server now lives in packages/openmemory-js/
+
+# ===== BUILD STAGE =====
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -16,10 +19,10 @@ RUN curl -fsSL https://bun.sh/install | bash \
 # Ensure Bun is available in PATH for subsequent commands
 ENV PATH="/opt/bun/bin:${PATH}"
 
-# Clone OpenMemory repository
+# Clone OpenMemory repository and navigate to the JS server package
 RUN git clone --depth 1 https://github.com/caviraoss/openmemory.git /src
 
-WORKDIR /src/backend
+WORKDIR /src/packages/openmemory-js
 
 # Install all dependencies (including devDependencies) using Bun
 RUN bun install --concurrent-scripts=10 --network-concurrency=96
@@ -36,14 +39,17 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Install timezone data for proper TZ support
+RUN apk add --no-cache tzdata
+
 # Create a dedicated non-root user for security (use 1001 to avoid conflicts)
 RUN addgroup -g 1001 -S openmemory \
  && adduser -u 1001 -S openmemory -G openmemory
 
 # Copy only production artifacts from the builder stage
-COPY --from=builder /src/backend/node_modules ./node_modules/
-COPY --from=builder /src/backend/dist ./dist/
-COPY --from=builder /src/backend/package.json ./
+COPY --from=builder /src/packages/openmemory-js/node_modules ./node_modules/
+COPY --from=builder /src/packages/openmemory-js/dist ./dist/
+COPY --from=builder /src/packages/openmemory-js/package.json ./
 
 # Create a directory for persistent data and secure file permissions
 RUN mkdir -p /data \

@@ -87,7 +87,7 @@ pub fn build_router(state: AppState) -> Router {
         // Manual trigger endpoints for testing
         .route("/trigger/intake", post(trigger_intake))
         // Input routing endpoint - send messages to running agents
-        .route("/api/sessions/:session_id/input", post(send_session_input))
+        .route("/api/sessions/{session_id}/input", post(send_session_input))
         // Health check
         .route("/health", axum::routing::get(health_check))
         .route("/ready", axum::routing::get(readiness_check))

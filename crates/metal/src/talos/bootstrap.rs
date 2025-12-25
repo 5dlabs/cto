@@ -564,17 +564,17 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     
     // Find all ether type interfaces that are up (physical NICs)
-    // Looking for patterns like: "type": "ether" and NOT "bond", "vlan", etc.
+    // The talosctl JSON output contains multiple concatenated JSON objects
     let mut physical_interfaces: Vec<String> = Vec::new();
     
-    // Parse line by line looking for interface IDs with type "ether"
-    // Format is JSONL - one JSON object per line
-    for line in stdout.lines() {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-            if let (Some(id), Some(link_type), Some(kind)) = (
+    // Use serde_json's streaming deserializer to parse concatenated JSON objects
+    let deserializer = serde_json::Deserializer::from_str(&stdout);
+    for result in deserializer.into_iter::<serde_json::Value>() {
+        if let Ok(json) = result {
+            if let (Some(id), Some(link_type), kind) = (
                 json["metadata"]["id"].as_str(),
                 json["spec"]["type"].as_str(),
-                json["spec"]["kind"].as_str(),
+                json["spec"]["kind"].as_str().unwrap_or(""),
             ) {
                 // Physical NICs: type=ether, kind="" (empty means raw physical interface)
                 // Skip bonds, vlans, etc.
@@ -613,8 +613,10 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut primary_interface: Option<String> = None;
 
-    for line in stdout.lines() {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+    // Use serde_json's streaming deserializer for concatenated JSON objects
+    let deserializer = serde_json::Deserializer::from_str(&stdout);
+    for result in deserializer.into_iter::<serde_json::Value>() {
+        if let Ok(json) = result {
             if let (Some(link), Some(address)) = (
                 json["spec"]["linkName"].as_str(),
                 json["spec"]["address"].as_str(),
