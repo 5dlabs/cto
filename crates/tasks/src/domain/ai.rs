@@ -112,24 +112,12 @@ impl AIDomain {
 
         let messages = vec![AIMessage::system(system), AIMessage::user(user)];
 
-        // Scale max_tokens based on number of tasks (each detailed task needs ~1000-2000 tokens)
-        // Minimum 16000, scale up for large task counts
-        // Note: Claude Opus max output is 64k tokens, Sonnet is 64k
-        let task_count = num_tasks.unwrap_or(10);
-        let scaled_max_tokens = if task_count > 20 {
-            // For large task counts, use 64k tokens (Claude's max output)
-            64_000
-        } else if task_count > 10 {
-            // Medium task counts need more room
-            32_000
-        } else {
-            // Small task counts use default
-            16_000
-        };
-
+        // Use maximum output tokens to ensure complete response
+        // Claude 4.5 models support up to 64k output tokens (128k with extended thinking)
+        // We set to 64k to allow complete task generation without truncation
         let options = GenerateOptions {
             temperature: Some(0.7),
-            max_tokens: Some(scaled_max_tokens),
+            max_tokens: Some(64_000),
             json_mode: true,
             ..Default::default()
         };

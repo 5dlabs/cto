@@ -290,7 +290,9 @@ impl AIProvider for AnthropicProvider {
         let request = AnthropicRequest {
             model: normalized_model.to_string(),
             messages: converted_messages,
-            max_tokens: options.max_tokens.unwrap_or(4096),
+            // Default to 16k tokens if not specified, sufficient for most operations
+            // Callers should specify higher limits (e.g., 64k) for large outputs like PRD parsing
+            max_tokens: options.max_tokens.unwrap_or(16_000),
             system,
             temperature: options.temperature,
             stop_sequences: options.stop_sequences.clone(),
@@ -337,6 +339,7 @@ impl AIProvider for AnthropicProvider {
         let mut response_model = model.to_string();
         let mut char_count = 0usize;
         let mut last_progress = 0usize;
+        let mut stop_reason: Option<String> = None;
 
         let mut stream = response.bytes_stream();
         let mut buffer = String::new();
@@ -379,8 +382,13 @@ impl AIProvider for AnthropicProvider {
                                         }
                                     }
                                 }
-                                StreamEvent::MessageDelta { usage: Some(u), .. } => {
-                                    output_tokens = u.output_tokens;
+                                StreamEvent::MessageDelta { delta, usage } => {
+                                    if let Some(u) = usage {
+                                        output_tokens = u.output_tokens;
+                                    }
+                                    if let Some(reason) = delta.stop_reason {
+                                        stop_reason = Some(reason);
+                                    }
                                 }
                                 StreamEvent::MessageStop => {
                                     tracing::debug!(
@@ -400,6 +408,23 @@ impl AIProvider for AnthropicProvider {
                         }
                     }
                 }
+            }
+        }
+
+        // Check for truncation due to max_tokens
+        if let Some(ref reason) = stop_reason {
+            if reason == "max_tokens" {
+                tracing::warn!(
+                    "Response truncated due to max_tokens limit ({} output tokens). \
+                     Consider increasing max_tokens or reducing task complexity.",
+                    output_tokens
+                );
+                return Err(TasksError::Ai(format!(
+                    "Response truncated: reached max_tokens limit ({} tokens). \
+                     The AI response was incomplete. Try reducing the number of tasks \
+                     or disabling research mode.",
+                    output_tokens
+                )));
             }
         }
 
