@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Workflow Guide - CTO Platform</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            color: var(--primary);
+        }
+        
+        h3 {
+            font-size: 1.2rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text);
+        }
+        
+        /* Flow Diagram */
+        .flow-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0;
+            min-width: max-content;
+            padding: 1rem 0;
+        }
+        
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+        }
+        
+        .flow-node {
+            background: var(--bg);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .flow-node:hover {
+            background: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        .flow-node.active {
+            background: var(--primary);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+        
+        .flow-node .agent {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        
+        .flow-node:hover .agent,
+        .flow-node.active .agent {
+            color: var(--text);
+        }
+        
+        .flow-arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin: 0 0.5rem;
+        }
+        
+        /* Stage colors */
+        .flow-node[data-stage="intake"] { border-color: #8b5cf6; }
+        .flow-node[data-stage="intake"]:hover,
+        .flow-node[data-stage="intake"].active { background: #8b5cf6; }
+        
+        .flow-node[data-stage="infrastructure"] { border-color: #f59e0b; }
+        .flow-node[data-stage="infrastructure"]:hover,
+        .flow-node[data-stage="infrastructure"].active { background: #f59e0b; }
+        
+        .flow-node[data-stage="implementation"] { border-color: #10b981; }
+        .flow-node[data-stage="implementation"]:hover,
+        .flow-node[data-stage="implementation"].active { background: #10b981; }
+        
+        .flow-node[data-stage="quality"] { border-color: #06b6d4; }
+        .flow-node[data-stage="quality"]:hover,
+        .flow-node[data-stage="quality"].active { background: #06b6d4; }
+        
+        .flow-node[data-stage="security"] { border-color: #ef4444; }
+        .flow-node[data-stage="security"]:hover,
+        .flow-node[data-stage="security"].active { background: #ef4444; }
+        
+        .flow-node[data-stage="testing"] { border-color: #ec4899; }
+        .flow-node[data-stage="testing"]:hover,
+        .flow-node[data-stage="testing"].active { background: #ec4899; }
+        
+        .flow-node[data-stage="integration"] { border-color: #3b82f6; }
+        .flow-node[data-stage="integration"]:hover,
+        .flow-node[data-stage="integration"].active { background: #3b82f6; }
+        
+        .flow-node[data-stage="merged"] { border-color: #22c55e; }
+        .flow-node[data-stage="merged"]:hover,
+        .flow-node[data-stage="merged"].active { background: #22c55e; }
+        
+        /* Stage Details Panel */
+        .stage-details {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            display: none;
+        }
+        
+        .stage-details.visible {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .stage-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        
+        .stage-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .stage-agent {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        .criteria-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+        
+        .criteria-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+        
+        .criteria-list li::before {
+            content: "☐";
+            color: var(--text-muted);
+        }
+        
+        /* Agent Cards */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .agent-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+        }
+        
+        .agent-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .agent-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        
+        .agent-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        
+        .agent-role {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        
+        .agent-details {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .agent-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        
+        .stack-tag {
+            background: var(--bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        /* Category badges */
+        .category-backend { background: #10b981; }
+        .category-frontend { background: #3b82f6; }
+        .category-support { background: #8b5cf6; }
+        
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
+            background: var(--bg-card);
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        tr:hover {
+            background: var(--bg-hover);
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+        
+        .tab {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        .tab:hover {
+            color: var(--text);
+            background: var(--bg-hover);
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            background: var(--bg-card);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* MCP Tools */
+        .tool-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+        
+        .tool-name {
+            font-family: monospace;
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        
+        .tool-desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+        
+        /* Code blocks */
+        pre {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+        }
+        
+        code {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: var(--bg);
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        
+        /* Info boxes */
+        .info-box {
+            background: var(--bg-card);
+            border-left: 4px solid var(--primary);
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        
+        .info-box.warning {
+            border-color: var(--warning);
+        }
+        
+        .info-box.success {
+            border-color: var(--secondary);
+        }
+        
+        /* Search */
+        .search-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            max-width: 400px;
+            color: var(--text);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            z-index: 100;
+        }
+        
+        nav ul {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        
+        nav a:hover {
+            color: var(--primary);
+        }
+        
+        /* Footer */
+        footer {
+            margin-top: 4rem;
+            padding: 2rem;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+            }
+            
+            .flow-diagram {
+                flex-direction: column;
+            }
+            
+            .flow-arrow {
+                transform: rotate(90deg);
+                margin: 0.5rem 0;
+            }
+            
+            .agents-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="#workflow">Workflow</a></li>
+            <li><a href="#agents">Agents</a></li>
+            <li><a href="#stages">Stages</a></li>
+            <li><a href="#tools">MCP Tools</a></li>
+            <li><a href="#criteria">Acceptance Criteria</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>🎭 Play Workflow Guide</h1>
+            <p class="subtitle">Multi-agent orchestration from PRD to shipped feature</p>
+        </header>
+
+        <!-- Workflow Flow Diagram -->
+        <section id="workflow">
+            <h2>📊 Workflow Flow</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Click on any stage to see details and acceptance criteria.</p>
+            
+            <div class="flow-container">
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="intake" onclick="showStageDetails('intake')">
+                            PRD
+                            <div class="agent">Input</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="intake" onclick="showStageDetails('intake')">
+                            Intake
+                            <div class="agent">Morgan</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="infrastructure" onclick="showStageDetails('infrastructure')">
+                            Infrastructure
+                            <div class="agent">Bolt</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="implementation" onclick="showStageDetails('implementation')">
+                            Implementation
+                            <div class="agent">Rex / Blaze / etc.</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="quality" onclick="showStageDetails('quality')">
+                            Quality
+                            <div class="agent">Cleo</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="security" onclick="showStageDetails('security')">
+                            Security
+                            <div class="agent">Cipher</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="testing" onclick="showStageDetails('testing')">
+                            Testing
+                            <div class="agent">Tess</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="integration" onclick="showStageDetails('integration')">
+                            Integration
+                            <div class="agent">Atlas</div>
+                        </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="merged" onclick="showStageDetails('merged')">
+                            Merged
+                            <div class="agent">Complete</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stage Details Panels -->
+            <div id="stage-intake" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #8b5cf6;">📋</div>
+                    <div>
+                        <div class="stage-title">Intake Stage</div>
+                        <div class="stage-agent">Agent: Morgan (Project Management)</div>
+                    </div>
+                </div>
+                <p>Morgan processes the PRD and breaks it down into atomic tasks with dependencies.</p>
+                <h3>Process</h3>
+                <ol style="margin-left: 1.5rem; color: var(--text-muted);">
+                    <li>Create Linear Issue with <code>prd</code> or <code>intake</code> label</li>
+                    <li>Morgan reads PRD and researches using Firecrawl & Context7</li>
+                    <li>Generates task files: <code>prompt.xml</code>, <code>prompt.md</code>, <code>acceptance_criteria.md</code></li>
+                    <li>Creates Linear project with Board view</li>
+                    <li>Creates child issues for each task</li>
+                </ol>
+                <h3>Acceptance Criteria</h3>
+                <ul class="criteria-list">
+                    <li>Tasks are atomic and independently executable</li>
+                    <li>Dependencies between tasks are correctly identified</li>
+                    <li>Each task has clear acceptance criteria defined</li>
+                    <li>Linear project created with proper workflow states</li>
+                </ul>
+            </div>
+            
+            <div id="stage-infrastructure" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #f59e0b;">🏗️</div>
+                    <div>
+                        <div class="stage-title">Infrastructure Stage</div>
+                        <div class="stage-agent">Agent: Bolt (DevOps & Infrastructure) • Timeout: 15 min</div>
+                    </div>
+                </div>
+                <p>Bolt is always Task 1 - sets up databases, caches, and storage before implementation begins.</p>
+                <h3>Available Operators</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Component</th><th>Operator</th><th>CRD Kind</th><th>Use Case</th></tr>
+                        <tr><td>PostgreSQL</td><td>CloudNative-PG</td><td><code>Cluster</code></td><td>Relational data, ACID</td></tr>
+                        <tr><td>Redis/Valkey</td><td>Redis Operator</td><td><code>Redis</code></td><td>Caching, sessions</td></tr>
+                        <tr><td>S3 Storage</td><td>SeaweedFS</td><td>Helm</td><td>File uploads, artifacts</td></tr>
+                        <tr><td>Kafka</td><td>Strimzi</td><td><code>Kafka</code></td><td>Event streaming</td></tr>
+                        <tr><td>MongoDB</td><td>Percona</td><td><code>PerconaServerMongoDB</code></td><td>Document storage</td></tr>
+                        <tr><td>Temporal</td><td>Temporal Operator</td><td><code>TemporalCluster</code></td><td>Durable workflows</td></tr>
+                    </table>
+                </div>
+                <div class="info-box">
+                    <strong>Credential Handoff:</strong> Bolt creates <code>{{service}}-infra-config</code> ConfigMap. Other agents read connection strings from it.
+                </div>
+            </div>
+            
+            <div id="stage-implementation" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #10b981;">💻</div>
+                    <div>
+                        <div class="stage-title">Implementation Stage</div>
+                        <div class="stage-agent">Agents: Rex, Blaze, Grizz, Nova, Tap, Spark • Timeout: 30 min</div>
+                    </div>
+                </div>
+                <p>Implementation agents write code based on the task prompt and create pull requests.</p>
+                <h3>Acceptance Criteria</h3>
+                <ul class="criteria-list">
+                    <li>CodeRun resource is created successfully</li>
+                    <li>Agent pod starts and reaches Running state</li>
+                    <li>GitHub authentication works (token from App credentials)</li>
+                    <li>Repository is cloned successfully</li>
+                    <li>Task files are loaded and parsed</li>
+                    <li>CLI (claude/cursor/code) executes without crash</li>
+                    <li>Code changes are committed to feature branch</li>
+                    <li>Pull request is created with proper description</li>
+                    <li>CI checks pass on the PR</li>
+                </ul>
+            </div>
+            
+            <div id="stage-quality" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #06b6d4;">✨</div>
+                    <div>
+                        <div class="stage-title">Quality Stage</div>
+                        <div class="stage-agent">Agent: Cleo (Quality Assurance) • Timeout: 30 min</div>
+                    </div>
+                </div>
+                <p>Cleo reviews the PR code for style, conventions, and quality standards.</p>
+                <h3>Language-Specific Context</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Reviewing</th><th>Tools Used</th></tr>
+                        <tr><td>Rex (Rust)</td><td>clippy, rustfmt, cargo</td></tr>
+                        <tr><td>Grizz (Go)</td><td>golangci-lint, gofmt</td></tr>
+                        <tr><td>Nova (Node)</td><td>eslint, prettier</td></tr>
+                        <tr><td>Blaze (React)</td><td>eslint, biome</td></tr>
+                    </table>
+                </div>
+                <h3>Acceptance Criteria</h3>
+                <ul class="criteria-list">
+                    <li>PR code is reviewed for style and conventions</li>
+                    <li>Code complexity is within acceptable bounds</li>
+                    <li>No obvious code duplication detected</li>
+                    <li>Documentation is present where needed</li>
+                    <li>Suggested improvements are applied or documented</li>
+                </ul>
+            </div>
+            
+            <div id="stage-security" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #ef4444;">🔒</div>
+                    <div>
+                        <div class="stage-title">Security Stage</div>
+                        <div class="stage-agent">Agent: Cipher (Security Analysis) • Timeout: 30 min</div>
+                    </div>
+                </div>
+                <p>Cipher performs security analysis and vulnerability scanning.</p>
+                <h3>Language-Specific Context</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Reviewing</th><th>Focus Areas</th></tr>
+                        <tr><td>Rex (Rust)</td><td>memory safety, unsafe blocks</td></tr>
+                        <tr><td>Grizz (Go)</td><td>goroutine safety, input validation</td></tr>
+                        <tr><td>Nova (Node)</td><td>npm audit, injection</td></tr>
+                        <tr><td>Blaze (React)</td><td>XSS, CSP, CORS</td></tr>
+                    </table>
+                </div>
+                <h3>Acceptance Criteria</h3>
+                <ul class="criteria-list">
+                    <li>Security scan completes without errors</li>
+                    <li>No critical or high vulnerabilities in code</li>
+                    <li>No vulnerable dependencies introduced</li>
+                    <li>Input validation is present for user data</li>
+                    <li>Authentication/authorization properly implemented</li>
+                </ul>
+            </div>
+            
+            <div id="stage-testing" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #ec4899;">🧪</div>
+                    <div>
+                        <div class="stage-title">Testing Stage</div>
+                        <div class="stage-agent">Agent: Tess (Testing) • Timeout: 30 min</div>
+                    </div>
+                </div>
+                <p>Tess writes and validates tests, ensuring proper coverage.</p>
+                <h3>Language-Specific Context</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Reviewing</th><th>Testing Tools</th></tr>
+                        <tr><td>Rex (Rust)</td><td>cargo test, proptest</td></tr>
+                        <tr><td>Grizz (Go)</td><td>go test, testify</td></tr>
+                        <tr><td>Nova (Node)</td><td>jest, supertest</td></tr>
+                        <tr><td>Blaze (React)</td><td>vitest, playwright</td></tr>
+                    </table>
+                </div>
+                <h3>Acceptance Criteria</h3>
+                <ul class="criteria-list">
+                    <li>Unit tests added for new functions</li>
+                    <li>Integration tests for API endpoints (if applicable)</li>
+                    <li>Edge cases and error paths tested</li>
+                    <li>Test coverage meets threshold (if configured)</li>
+                    <li>All existing tests still pass</li>
+                </ul>
+            </div>
+            
+            <div id="stage-integration" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #3b82f6;">🔀</div>
+                    <div>
+                        <div class="stage-title">Integration Stage</div>
+                        <div class="stage-agent">Agent: Atlas (Integration) • Timeout: 30 min</div>
+                    </div>
+                </div>
+                <p>Atlas resolves conflicts and merges the PR to the main branch.</p>
+                <h3>Acceptance Criteria</h3>
+                <ul class="criteria-list">
+                    <li>Branch is rebased on latest main</li>
+                    <li>Merge conflicts (if any) are resolved correctly</li>
+                    <li>All CI checks pass after rebase</li>
+                    <li>PR is approved (or auto-merge enabled)</li>
+                    <li>PR is merged to main branch</li>
+                </ul>
+            </div>
+            
+            <div id="stage-merged" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #22c55e;">✅</div>
+                    <div>
+                        <div class="stage-title">Merged</div>
+                        <div class="stage-agent">Workflow Complete</div>
+                    </div>
+                </div>
+                <p>The feature has been successfully implemented, reviewed, tested, and merged!</p>
+                <h3>End-to-End Success Criteria</h3>
+                <ul class="criteria-list">
+                    <li>Workflow reached "Running" status</li>
+                    <li>Tasks loaded from docs repository successfully</li>
+                    <li>Implementation agent created working code and PR</li>
+                    <li>Quality checks passed</li>
+                    <li>No critical vulnerabilities found</li>
+                    <li>All tests pass</li>
+                    <li>PR merged without conflicts</li>
+                    <li>Workflow reached "Completed" status</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Agents Section -->
+        <section id="agents">
+            <h2>🤖 Agents</h2>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('backend')">Backend</button>
+                <button class="tab" onclick="showTab('frontend')">Frontend</button>
+                <button class="tab" onclick="showTab('support')">Support</button>
+            </div>
+            
+            <div id="tab-backend" class="tab-content active">
+                <div class="agents-grid">
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-backend">Rex</div>
+                            <div>
+                                <div class="agent-name">Rex</div>
+                                <div class="agent-role">Rust Backend</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">High-performance Rust APIs and services</div>
+                        <div class="agent-stack">
+                            <span class="stack-tag">axum</span>
+                            <span class="stack-tag">tokio</span>
+                            <span class="stack-tag">serde</span>
+                            <span class="stack-tag">sqlx</span>
+                        </div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-backend">Grizz</div>
+                            <div>
+                                <div class="agent-name">Grizz</div>
+                                <div class="agent-role">Go Backend</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Go microservices and APIs</div>
+                        <div class="agent-stack">
+                            <span class="stack-tag">chi</span>
+                            <span class="stack-tag">grpc</span>
+                            <span class="stack-tag">pgx</span>
+                            <span class="stack-tag">redis</span>
+                        </div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-backend">Nova</div>
+                            <div>
+                                <div class="agent-name">Nova</div>
+                                <div class="agent-role">Node.js/Bun Backend</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">TypeScript APIs with Effect</div>
+                        <div class="agent-stack">
+                            <span class="stack-tag">Elysia</span>
+                            <span class="stack-tag">Effect</span>
+                            <span class="stack-tag">Better Auth</span>
+                            <span class="stack-tag">Drizzle</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tab-frontend" class="tab-content">
+                <div class="agents-grid">
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-frontend">Blaze</div>
+                            <div>
+                                <div class="agent-name">Blaze</div>
+                                <div class="agent-role">React/TypeScript Frontend</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Modern web applications</div>
+                        <div class="agent-stack">
+                            <span class="stack-tag">Next.js 15</span>
+                            <span class="stack-tag">shadcn/ui</span>
+                            <span class="stack-tag">TailwindCSS</span>
+                            <span class="stack-tag">Better Auth</span>
+                        </div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-frontend">Tap</div>
+                            <div>
+                                <div class="agent-name">Tap</div>
+                                <div class="agent-role">Expo Mobile</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Cross-platform mobile apps</div>
+                        <div class="agent-stack">
+                            <span class="stack-tag">expo-router</span>
+                            <span class="stack-tag">react-native</span>
+                            <span class="stack-tag">Better Auth</span>
+                            <span class="stack-tag">SecureStore</span>
+                        </div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-frontend">Spark</div>
+                            <div>
+                                <div class="agent-name">Spark</div>
+                                <div class="agent-role">Electron Desktop</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Desktop applications</div>
+                        <div class="agent-stack">
+                            <span class="stack-tag">electron-builder</span>
+                            <span class="stack-tag">react</span>
+                            <span class="stack-tag">Better Auth</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tab-support" class="tab-content">
+                <div class="agents-grid">
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-support">Morgan</div>
+                            <div>
+                                <div class="agent-name">Morgan</div>
+                                <div class="agent-role">Project Management</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">PRD processing, task generation, intake workflow</div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-support">Bolt</div>
+                            <div>
+                                <div class="agent-name">Bolt</div>
+                                <div class="agent-role">DevOps & Infrastructure</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Database setup, K8s operators, infrastructure provisioning</div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-support">Cleo</div>
+                            <div>
+                                <div class="agent-name">Cleo</div>
+                                <div class="agent-role">Quality Assurance</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Code review, style enforcement, quality checks</div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-support">Cipher</div>
+                            <div>
+                                <div class="agent-name">Cipher</div>
+                                <div class="agent-role">Security Analysis</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Security scanning, vulnerability assessment</div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-support">Tess</div>
+                            <div>
+                                <div class="agent-name">Tess</div>
+                                <div class="agent-role">Testing</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Test writing, coverage validation, QA</div>
+                    </div>
+                    
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <div class="agent-avatar category-support">Atlas</div>
+                            <div>
+                                <div class="agent-name">Atlas</div>
+                                <div class="agent-role">Integration</div>
+                            </div>
+                        </div>
+                        <div class="agent-details">Conflict resolution, PR merging, CI management</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MCP Tools Section -->
+        <section id="tools">
+            <h2>🔧 Key MCP Tools</h2>
+            
+            <div class="agents-grid">
+                <div class="tool-card">
+                    <div class="tool-name">intake</div>
+                    <div class="tool-desc">Process PRD to generate tasks with dependencies</div>
+                </div>
+                <div class="tool-card">
+                    <div class="tool-name">play</div>
+                    <div class="tool-desc">Submit multi-agent workflow for a task</div>
+                </div>
+                <div class="tool-card">
+                    <div class="tool-name">play_status</div>
+                    <div class="tool-desc">Query workflow progress and status</div>
+                </div>
+                <div class="tool-card">
+                    <div class="tool-name">jobs</div>
+                    <div class="tool-desc">List running Argo workflows</div>
+                </div>
+                <div class="tool-card">
+                    <div class="tool-name">stop_job</div>
+                    <div class="tool-desc">Stop a running workflow</div>
+                </div>
+                <div class="tool-card">
+                    <div class="tool-name">input</div>
+                    <div class="tool-desc">Send message to running job</div>
+                </div>
+            </div>
+
+            <h3>Example: Start a Play Workflow</h3>
+            <pre>{
+  "name": "play",
+  "arguments": {
+    "task_id": 1,
+    "repository": "5dlabs/my-project",
+    "service": "my-service",
+    "docs_repository": "5dlabs/my-project",
+    "docs_project_directory": "my-project",
+    "parallel_execution": true
+  }
+}</pre>
+        </section>
+
+        <!-- Acceptance Criteria Summary -->
+        <section id="criteria">
+            <h2>✅ Acceptance Criteria Summary</h2>
+            
+            <div class="table-container">
+                <table>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Key Criteria</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Intake</strong></td>
+                        <td>Tasks atomic, dependencies correct, acceptance criteria defined</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Infrastructure</strong></td>
+                        <td>Operators deployed, ConfigMaps created, services healthy</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Implementation</strong></td>
+                        <td>Code compiles, tests pass, PR created with CI passing</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Quality</strong></td>
+                        <td>Style consistent, no code smells, documented</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Security</strong></td>
+                        <td>No vulnerabilities, input validated, auth correct</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Testing</strong></td>
+                        <td>Unit + integration tests, edge cases covered</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Integration</strong></td>
+                        <td>No conflicts, CI passes, PR merged</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="info-box success">
+                <strong>💡 Tip:</strong> Tasks run in parallel based on <code>execution-levels.json</code>. Enable with <code>parallel_execution: true</code>.
+            </div>
+        </section>
+
+        <!-- CLI & Models -->
+        <section id="cli">
+            <h2>🖥️ CLI & Model Selection</h2>
+            
+            <div class="table-container">
+                <table>
+                    <tr>
+                        <th>CLI</th>
+                        <th>Primary Model</th>
+                        <th>Thinking Model</th>
+                        <th>Use Case</th>
+                    </tr>
+                    <tr>
+                        <td><code>claude</code></td>
+                        <td>claude-opus-4-5</td>
+                        <td>claude-opus-4-5</td>
+                        <td>Planning, complex reasoning</td>
+                    </tr>
+                    <tr>
+                        <td><code>code</code></td>
+                        <td>gpt-5.1</td>
+                        <td>o3, o4-mini</td>
+                        <td>Multi-agent consensus, full-auto</td>
+                    </tr>
+                    <tr>
+                        <td><code>gemini</code></td>
+                        <td>gemini-2.5-pro</td>
+                        <td>gemini-2.5-pro</td>
+                        <td>Reasoning, multi-step problems</td>
+                    </tr>
+                    <tr>
+                        <td><code>opencode</code></td>
+                        <td>claude-opus-4-5</td>
+                        <td>claude-opus-4-5</td>
+                        <td>Provider-agnostic</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="info-box warning">
+                <strong>Model Rotation:</strong> When acceptance criteria not met:<br>
+                <code>claude → code → gemini → code (/solve) → gemini (flash)</code>
+            </div>
+        </section>
+
+        <footer>
+            <p>CTO Platform - Play Workflow Guide</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Generated from AGENTS.md and CLAUDE.md</p>
+        </footer>
+    </div>
+
+    <script>
+        function showStageDetails(stage) {
+            // Hide all stage details
+            document.querySelectorAll('.stage-details').forEach(el => {
+                el.classList.remove('visible');
+            });
+            
+            // Remove active from all nodes
+            document.querySelectorAll('.flow-node').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Show selected stage details
+            const detailsEl = document.getElementById('stage-' + stage);
+            if (detailsEl) {
+                detailsEl.classList.add('visible');
+            }
+            
+            // Add active to clicked nodes
+            document.querySelectorAll(`.flow-node[data-stage="${stage}"]`).forEach(el => {
+                el.classList.add('active');
+            });
+        }
+        
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Remove active from all tabs
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Add active to clicked tab
+            event.target.classList.add('active');
+        }
+        
+        // Show intake stage by default
+        document.addEventListener('DOMContentLoaded', () => {
+            showStageDetails('intake');
+        });
+    </script>
+</body>
+</html>
