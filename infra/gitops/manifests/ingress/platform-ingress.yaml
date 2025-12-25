@@ -4,6 +4,7 @@
 # DNS records are managed automatically by external-dns via Cloudflare
 
 # ArgoCD Ingress
+# NOTE: DNS is managed by Cloudflare Tunnel, not external-dns
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -13,9 +14,8 @@ metadata:
     app.kubernetes.io/name: argocd-ingress
     app.kubernetes.io/part-of: platform
   annotations:
-    # external-dns will create DNS record
-    external-dns.alpha.kubernetes.io/hostname: argocd.5dlabs.ai
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    # Exclude from external-dns (DNS managed by Cloudflare Tunnel)
+    external-dns.alpha.kubernetes.io/exclude: "true"
     # NGINX ingress configuration
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
     nginx.ingress.kubernetes.io/ssl-passthrough: "true"
@@ -78,6 +78,7 @@ spec:
       secretName: argo-workflows-server-tls
 ---
 # Headscale Ingress (for web UI and HTTPS connections)
+# NOTE: DNS is managed by Cloudflare Tunnel, not external-dns
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -87,9 +88,8 @@ metadata:
     app.kubernetes.io/name: headscale-ingress
     app.kubernetes.io/part-of: platform
   annotations:
-    # external-dns will create DNS record
-    external-dns.alpha.kubernetes.io/hostname: headscale.5dlabs.ai
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"  # Direct connection for WireGuard
+    # Exclude from external-dns (DNS managed by Cloudflare Tunnel)
+    external-dns.alpha.kubernetes.io/exclude: "true"
     # NGINX ingress configuration
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # WebSocket support for Tailscale control protocol
@@ -129,6 +129,7 @@ data:
   Connection: "upgrade"
 ---
 # Hubble UI Ingress (Cilium observability)
+# NOTE: DNS is managed by Cloudflare Tunnel, not external-dns
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -138,9 +139,8 @@ metadata:
     app.kubernetes.io/name: hubble-ui-ingress
     app.kubernetes.io/part-of: platform
   annotations:
-    # external-dns will create DNS record
-    external-dns.alpha.kubernetes.io/hostname: hubble.5dlabs.ai
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    # Exclude from external-dns (DNS managed by Cloudflare Tunnel)
+    external-dns.alpha.kubernetes.io/exclude: "true"
     # NGINX ingress configuration
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
