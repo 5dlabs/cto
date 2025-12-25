@@ -510,13 +510,14 @@ impl Installer {
             .as_ref()
             .context("Control plane not found in state")?;
 
+        let cp_ip = cp.ip.clone();
         let worker_ips: Vec<_> = self.state.workers.iter().map(|w| w.ip.clone()).collect();
 
         let timeout = Duration::from_secs(900); // 15 minutes
 
         // Wait for control plane
-        ui::print_info(&format!("Waiting for Talos on control plane ({})", cp.ip));
-        metal::talos::wait_for_talos(&cp.ip, timeout)?;
+        ui::print_info(&format!("Waiting for Talos on control plane ({})", cp_ip));
+        metal::talos::wait_for_talos(&cp_ip, timeout)?;
         self.state.set_cp_talos_ready()?;
 
         // Wait for workers
@@ -524,6 +525,34 @@ impl Installer {
             ui::print_info(&format!("Waiting for Talos on worker {} ({ip})", i + 1));
             metal::talos::wait_for_talos(ip, timeout)?;
             self.state.set_worker_talos_ready(i)?;
+        }
+
+        // Auto-detect VLAN parent interface if enabled
+        // This must happen while Talos is in maintenance mode (before config is applied)
+        if self.state.config.enable_vlan {
+            ui::print_info("Auto-detecting VLAN parent interface...");
+            match metal::talos::detect_secondary_interface(&cp_ip) {
+                Ok(detected_interface) => {
+                    if detected_interface != self.state.config.vlan_parent_interface {
+                        ui::print_info(&format!(
+                            "Detected interface '{}' (overriding default '{}')",
+                            detected_interface, self.state.config.vlan_parent_interface
+                        ));
+                        self.state.config.vlan_parent_interface = detected_interface;
+                    } else {
+                        ui::print_info(&format!(
+                            "Detected interface '{}' matches default",
+                            detected_interface
+                        ));
+                    }
+                }
+                Err(e) => {
+                    ui::print_warning(&format!(
+                        "Failed to auto-detect interface: {}. Using default '{}'",
+                        e, self.state.config.vlan_parent_interface
+                    ));
+                }
+            }
         }
 
         Ok(())
