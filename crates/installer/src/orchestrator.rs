@@ -711,6 +711,14 @@ impl Installer {
         let talosconfig = self.state.config.talosconfig_path();
         let timeout = Duration::from_secs(600); // 10 minutes per worker
 
+        // Get VLAN config if enabled
+        let vlan_config = if self.state.config.enable_vlan {
+            let vlan_vid = self.state.vlan_vid.context("VLAN VID not found in state")?;
+            Some((vlan_vid, self.state.config.vlan_parent_interface.clone()))
+        } else {
+            None
+        };
+
         for (i, worker) in self.state.workers.iter().enumerate() {
             ui::print_info(&format!(
                 "Applying config to worker {}/{} {} ({})",
@@ -719,7 +727,39 @@ impl Installer {
                 worker.hostname,
                 worker.ip
             ));
-            metal::talos::apply_config(&worker.ip, &worker_config_path)?;
+
+            // Apply config - with VLAN patch if VLAN is enabled
+            if let Some((vlan_vid, ref parent_interface)) = vlan_config {
+                // Get worker's unique private IP
+                let worker_private_ip = self
+                    .state
+                    .get_private_ip(&worker.id)
+                    .cloned()
+                    .context("Worker private IP not found in state")?;
+
+                // Build CIDR from subnet prefix
+                let prefix = self
+                    .state
+                    .config
+                    .vlan_subnet
+                    .split('/')
+                    .nth(1)
+                    .unwrap_or("24");
+                let private_ip_cidr = format!("{worker_private_ip}/{prefix}");
+
+                ui::print_info(&format!(
+                    "  VLAN: VID={vlan_vid}, IP={private_ip_cidr}"
+                ));
+
+                let vlan = metal::talos::VlanConfig {
+                    vlan_id: vlan_vid,
+                    private_ip_cidr,
+                    parent_interface: parent_interface.clone(),
+                };
+                metal::talos::apply_config_with_vlan(&worker.ip, &worker_config_path, &vlan)?;
+            } else {
+                metal::talos::apply_config(&worker.ip, &worker_config_path)?;
+            }
 
             // Wait for worker to install Talos and reboot
             // This is critical - without this, we'd check K8s node status before the worker

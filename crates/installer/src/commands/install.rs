@@ -103,8 +103,8 @@ pub struct InstallCommand {
     vlan_subnet: String,
 
     /// Parent NIC for VLAN interface (secondary NIC on Latitude servers).
-    /// Latitude c2/c3 servers use "enp1s0f1" as the secondary NIC.
-    #[arg(long, default_value = "enp1s0f1")]
+    /// Latitude servers use "eno2" as the secondary NIC for VLAN.
+    #[arg(long, default_value = "eno2")]
     vlan_interface: String,
 
     /// Enable Talos Ingress Firewall for host-level security.

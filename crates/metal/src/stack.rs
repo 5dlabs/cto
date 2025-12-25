@@ -1205,9 +1205,12 @@ pub fn deploy_cilium(kubeconfig: &Path, cluster_name: &str, cluster_id: u8) -> R
             "hubble.relay.enabled=true",
             "--set",
             "hubble.ui.enabled=true",
-            "--wait",
-            "--timeout",
-            "10m",
+            // NOTE: We intentionally do NOT use --wait here.
+            // The --wait flag waits for ALL deployments including hubble-relay and hubble-ui,
+            // which require worker nodes to schedule. Since workers can't join until Cilium
+            // is healthy (chicken-and-egg), using --wait causes a deadlock.
+            // The caller should use wait_for_cilium_healthy() instead, which only waits for
+            // the core Cilium daemonset to have at least one pod ready.
         ],
     )?;
 
