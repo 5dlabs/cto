@@ -138,8 +138,11 @@ agent-templates/
 # Documentation archive (private/archived docs)
 .docs-archive/
 
-# Documentation - kept locally only
-/docs/
+# Documentation - kept locally only (except specific files)
+/docs/*
+!/docs/play-workflow-guide.html
+!/docs/MCP-SERVERS-BINARIES.md
+!/docs/research/
 
 # Local scripts (development utilities, not for version control)
 /.scripts/
