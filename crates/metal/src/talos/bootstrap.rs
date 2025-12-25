@@ -529,6 +529,118 @@ pub fn wait_for_talos(ip: &str, timeout: Duration) -> Result<()> {
     }
 }
 
+/// Detect the secondary network interface for VLAN configuration.
+///
+/// This queries the Talos node in maintenance mode to find the physical
+/// interfaces and determines which one to use for VLAN (the non-primary).
+///
+/// # Arguments
+///
+/// * `ip` - The public IP of the node (also identifies the primary interface)
+///
+/// # Returns
+///
+/// The name of the secondary interface (e.g., "eno2", "enp1s0f1")
+///
+/// # Errors
+///
+/// Returns an error if the interface cannot be detected.
+pub fn detect_secondary_interface(ip: &str) -> Result<String> {
+    info!("Detecting secondary network interface on {ip}...");
+
+    // Query links via talosctl (in maintenance mode, we use --insecure)
+    // Note: --insecure must come after the command name
+    let output = Command::new("talosctl")
+        .args(["get", "links", "--insecure", "-n", ip, "-o", "json"])
+        .output()
+        .context("Failed to run talosctl get links")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Failed to get links: {stderr}");
+    }
+
+    // Parse the JSON output to find physical interfaces
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    // Find all ether type interfaces that are up (physical NICs)
+    // Looking for patterns like: "type": "ether" and NOT "bond", "vlan", etc.
+    let mut physical_interfaces: Vec<String> = Vec::new();
+    
+    // Parse line by line looking for interface IDs with type "ether"
+    // Format is JSONL - one JSON object per line
+    for line in stdout.lines() {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+            if let (Some(id), Some(link_type), Some(kind)) = (
+                json["metadata"]["id"].as_str(),
+                json["spec"]["type"].as_str(),
+                json["spec"]["kind"].as_str(),
+            ) {
+                // Physical NICs: type=ether, kind="" (empty means raw physical interface)
+                // Skip bonds, vlans, etc.
+                if link_type == "ether" && kind.is_empty() {
+                    physical_interfaces.push(id.to_string());
+                }
+            }
+        }
+    }
+
+    info!(
+        "Found {} physical interface(s): {:?}",
+        physical_interfaces.len(),
+        physical_interfaces
+    );
+
+    if physical_interfaces.len() < 2 {
+        bail!(
+            "Expected at least 2 physical interfaces, found: {:?}",
+            physical_interfaces
+        );
+    }
+
+    // Now determine which interface has the public IP (primary)
+    // Query addresses to find which interface has the IP
+    let output = Command::new("talosctl")
+        .args(["get", "addresses", "--insecure", "-n", ip, "-o", "json"])
+        .output()
+        .context("Failed to run talosctl get addresses")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Failed to get addresses: {stderr}");
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut primary_interface: Option<String> = None;
+
+    for line in stdout.lines() {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+            if let (Some(link), Some(address)) = (
+                json["spec"]["linkName"].as_str(),
+                json["spec"]["address"].as_str(),
+            ) {
+                // Check if this address matches our public IP
+                if address.starts_with(ip) || address.contains(&format!("{ip}/")) {
+                    primary_interface = Some(link.to_string());
+                    info!("Primary interface detected: {} (has IP {})", link, address);
+                    break;
+                }
+            }
+        }
+    }
+
+    let primary = primary_interface.context("Could not detect primary interface")?;
+
+    // Find the secondary interface (first physical NIC that's not the primary)
+    let secondary = physical_interfaces
+        .into_iter()
+        .find(|iface| iface != &primary)
+        .context("Could not find secondary interface")?;
+
+    info!("Secondary interface for VLAN: {}", secondary);
+    Ok(secondary)
+}
+
 /// Check if talosctl is installed.
 ///
 /// # Errors
