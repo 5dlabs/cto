@@ -684,7 +684,7 @@ mod tests {
             profile: InstallProfile::default(),
             enable_vlan: true,
             vlan_subnet: subnet.into(),
-            vlan_parent_interface: "eth1".into(),
+            vlan_parent_interface: "eno2".into(),
             enable_firewall: true,
         };
 

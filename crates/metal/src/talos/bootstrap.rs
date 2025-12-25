@@ -243,11 +243,15 @@ impl BootstrapConfig {
         self.with_private_network("10.0.0.0/8")
     }
 
-    /// Configure a VLAN interface for private networking.
+    /// Configure a VLAN interface for the control plane node.
     ///
     /// This creates a VLAN sub-interface on the specified parent interface with
     /// a static IP address. Used for Latitude.sh private networking where servers
     /// share a Layer 2 VLAN.
+    ///
+    /// **Important**: This only applies to the control plane config. Worker nodes
+    /// need their own unique VLAN IPs, which should be applied at config apply
+    /// time using `apply_config_with_vlan()`.
     ///
     /// # Arguments
     ///
@@ -284,7 +288,9 @@ impl BootstrapConfig {
             mtu: 1500
 "
         );
-        self.with_config_patch(patch)
+        // Apply VLAN config only to control plane
+        // Workers get their VLAN config at apply time with their specific IP
+        self.with_controlplane_patch(patch)
     }
 
     /// Configure Talos Ingress Firewall for secure host-level traffic control.
@@ -675,6 +681,73 @@ pub fn apply_config(node_ip: &str, config_path: &Path) -> Result<()> {
     }
 
     info!("✅ Config applied! Node will install and reboot.");
+    Ok(())
+}
+
+/// VLAN configuration for a worker node.
+#[derive(Debug, Clone)]
+pub struct VlanConfig {
+    /// VLAN ID (VID).
+    pub vlan_id: u16,
+    /// Static IP with CIDR (e.g., "10.8.0.2/24").
+    pub private_ip_cidr: String,
+    /// Parent NIC name (e.g., "enp1s0f1").
+    pub parent_interface: String,
+}
+
+/// Apply Talos machine configuration to a worker node with VLAN config.
+///
+/// This applies the base worker config plus a VLAN-specific patch for the
+/// worker's unique private IP address. Each worker needs its own IP on the
+/// shared VLAN.
+///
+/// # Arguments
+///
+/// * `node_ip` - Public IP of the node to configure
+/// * `config_path` - Path to the base worker.yaml config
+/// * `vlan` - VLAN configuration with the worker's unique private IP
+///
+/// # Errors
+///
+/// Returns an error if talosctl fails to apply the config.
+pub fn apply_config_with_vlan(node_ip: &str, config_path: &Path, vlan: &VlanConfig) -> Result<()> {
+    info!("Applying Talos config to {node_ip} with VLAN IP {}...", vlan.private_ip_cidr);
+    info!("  Config: {}", config_path.display());
+    info!("  VLAN: VID={}, Interface={}", vlan.vlan_id, vlan.parent_interface);
+
+    let vlan_patch = format!(
+        "machine:
+  network:
+    interfaces:
+      - interface: {}
+        vlans:
+          - vlanId: {}
+            addresses:
+              - {}
+            mtu: 1500
+",
+        vlan.parent_interface, vlan.vlan_id, vlan.private_ip_cidr
+    );
+
+    let output = Command::new("talosctl")
+        .args([
+            "apply-config",
+            "--insecure",
+            "--nodes",
+            node_ip,
+            "--file",
+        ])
+        .arg(config_path)
+        .args(["--config-patch", &vlan_patch])
+        .output()
+        .context("Failed to run talosctl apply-config")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Failed to apply config: {stderr}");
+    }
+
+    info!("✅ Config applied with VLAN! Node will install and reboot.");
     Ok(())
 }
 
@@ -1106,8 +1179,11 @@ mod tests {
             "eth1",
         );
 
-        assert_eq!(config.config_patches.len(), 1);
-        let patch = &config.config_patches[0];
+        // VLAN interface is now a control-plane-only patch
+        // Workers get their VLAN config at apply time via apply_config_with_vlan()
+        assert_eq!(config.config_patches.len(), 0);
+        assert_eq!(config.config_patches_controlplane.len(), 1);
+        let patch = &config.config_patches_controlplane[0];
         assert!(patch.contains("interface: eth1"));
         assert!(patch.contains("vlanId: 2063"));
         assert!(patch.contains("10.8.0.1/24"));
@@ -1191,9 +1267,10 @@ mod tests {
             .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"])
             .with_cilium_cni();
 
-        // Common patches: VLAN, kubelet-nodeIP, firewall-common, CNI = 4
-        assert_eq!(config.config_patches.len(), 4);
-        // Control plane patches: etcd-advertisedSubnets (from with_private_network) + firewall-controlplane = 2
-        assert_eq!(config.config_patches_controlplane.len(), 2);
+        // Common patches: kubelet-nodeIP, firewall-common, CNI = 3
+        // (VLAN is now control-plane-only, workers get their VLAN at apply time)
+        assert_eq!(config.config_patches.len(), 3);
+        // Control plane patches: VLAN (1) + etcd-advertisedSubnets (1) + firewall-controlplane (1) = 3
+        assert_eq!(config.config_patches_controlplane.len(), 3);
     }
 }
