@@ -76,10 +76,14 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server via internal service
-            # External URL has NAT hairpin issues from within cluster
+            # Connect to our Headscale server via internal HTTPS service
+            # Headscale now runs with TLS on port 443
             - name: TS_LOGIN_SERVER
-              value: "http://headscale.headscale.svc.cluster.local:8080"
+              value: "https://headscale.headscale.svc.cluster.local"
+            
+            # Trust the self-signed certificate from cert-manager
+            - name: SSL_CERT_FILE
+              value: "/etc/headscale-tls/tls.crt"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -115,7 +119,7 @@ spec:
             # Extra args for subnet routing
             # --login-server ensures we connect to Headscale, not public Tailscale
             - name: TS_EXTRA_ARGS
-              value: "--login-server=http://headscale.headscale.svc.cluster.local:8080 --advertise-exit-node=false"
+              value: "--login-server=https://headscale.headscale.svc.cluster.local --advertise-exit-node=false"
           
           securityContext:
             capabilities:
@@ -129,6 +133,9 @@ spec:
               mountPath: /var/lib/tailscale
             - name: dev-net-tun
               mountPath: /dev/net/tun
+            - name: headscale-tls
+              mountPath: /etc/headscale-tls
+              readOnly: true
           
           resources:
             requests:
@@ -145,4 +152,7 @@ spec:
           hostPath:
             path: /dev/net/tun
             type: CharDevice
+        - name: headscale-tls
+          secret:
+            secretName: headscale-tls
 
