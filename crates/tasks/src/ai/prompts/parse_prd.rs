@@ -123,7 +123,11 @@ Each task must follow this JSON structure:
 ## Guidelines
 1. Create {{#if (gt num_tasks 0)}}exactly {{num_tasks}}{{else}}an appropriate number of{{/if}} tasks, numbered from {{next_id}}
 2. Each task: atomic, single responsibility, following current best practices
-3. Order logically: setup → core functionality → advanced features → polish
+3. **CRITICAL ORDERING** - Tasks MUST follow this sequence:
+   - **Task 1: Infrastructure (Bolt)** - ALWAYS first. Database setup, caches, storage, K8s resources
+   - **Tasks 2-N: Backend services** - APIs, microservices (one task per service/language)
+   - **Next: Frontend apps** - Web, mobile, desktop applications
+   - **Last: Integration** - Only if explicitly needed for merging/consolidation
 4. Dependencies can only reference lower IDs (including existing tasks < {{next_id}})
 5. Priority based on criticality and dependency chain position
 6. Details field: include implementation guidance{{#if research}}, specific library versions{{/if}}
@@ -131,6 +135,14 @@ Each task must follow this JSON structure:
 8. Fill gaps in PRD while preserving all explicit requirements
 9. Avoid over-engineering; prefer direct implementation paths{{#if research}}
 10. Include actionable guidance based on researched best practices{{/if}}
+11. Include agent hint in task title using format: "Title (AgentName - Stack)"
+    - Infrastructure: (Bolt - Kubernetes)
+    - Rust backend: (Rex - Rust/Axum)
+    - Go backend: (Grizz - Go/gRPC)
+    - Node.js backend: (Nova - Bun/Elysia)
+    - React frontend: (Blaze - React/Next.js)
+    - Mobile app: (Tap - Expo)
+    - Desktop app: (Spark - Electron)
 
 ## Self-Critique Checklist
 Before finalizing, verify:
@@ -160,20 +172,34 @@ Your response MUST be a JSON object with this exact structure:
   "tasks": [
     {
       "id": {{next_id}},
-      "title": "Setup project foundation",
-      "description": "Initialize the project with required dependencies and configuration",
+      "title": "Setup Infrastructure (Bolt - Kubernetes)",
+      "description": "Provision databases, caches, and storage required by all services",
       "status": "pending",
       "dependencies": [],
       "priority": "high",
-      "details": "1. Create project structure\n2. Install dependencies\n3. Configure build system",
-      "testStrategy": "Verify project builds and runs successfully"
+      "details": "1. Deploy PostgreSQL cluster using CloudNative-PG operator\n2. Deploy Redis using Redis Operator\n3. Create ConfigMap with connection strings for other services",
+      "testStrategy": "Verify all infrastructure resources are running and accessible"
+    },
+    {
+      "id": {{next_id}} + 1,
+      "title": "Setup Backend API (Rex - Rust/Axum)",
+      "description": "Implement the core API service",
+      "status": "pending",
+      "dependencies": [{{next_id}}],
+      "priority": "high",
+      "details": "1. Create Axum router\n2. Add database connection pool\n3. Implement endpoints",
+      "testStrategy": "Unit tests for handlers, integration tests for API"
     }
   ],
   "metadata": {
-    "totalTasks": 1,
+    "totalTasks": 2,
     "analyzedAt": "ISO timestamp"
   }
 }
 ```
 
-IMPORTANT: Return ONLY the JSON object. No markdown formatting, no explanatory text before or after. The "metadata" object is optional."#;
+IMPORTANT:
+- Return ONLY the JSON object. No markdown formatting, no explanatory text before or after.
+- Task 1 MUST be infrastructure setup (Bolt) if the project requires any databases, caches, or storage.
+- Include agent hint in task titles: "(AgentName - Stack)"
+- The "metadata" object is optional."#;
