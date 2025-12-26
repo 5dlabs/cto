@@ -34,6 +34,10 @@ spec:
             externalIPs:
               - 192.168.1.77
 
+          # Enable SSL passthrough for ArgoCD and other services
+          extraArgs:
+            enable-ssl-passthrough: "true"
+
           # Pod labels for log collection
           # Note: Don't override app.kubernetes.io/component - it's part of the
           # selector and can't be changed on existing Deployments
