@@ -4,7 +4,7 @@
 #
 # Prerequisites:
 # 1. Headscale must be running
-# 2. Create auth key: kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable --expiration 8760h
+# 2. Create auth key: kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user 1 --reusable --expiration 8760h
 # 3. Store auth key in OpenBao: bao kv put secret/tailscale-auth TS_AUTHKEY=<key>
 # 4. ExternalSecret will sync the secret automatically (see external-secrets/headscale-secrets.yaml)
 
@@ -76,14 +76,9 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server via internal HTTPS service
-            # Headscale now runs with TLS on port 443
+            # Connect to our Headscale server via internal service
             - name: TS_LOGIN_SERVER
-              value: "https://headscale.headscale.svc.cluster.local"
-            
-            # Trust the self-signed certificate from cert-manager
-            - name: SSL_CERT_FILE
-              value: "/etc/headscale-tls/tls.crt"
+              value: "http://headscale.headscale.svc.cluster.local:8080"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -119,7 +114,7 @@ spec:
             # Extra args for subnet routing
             # --login-server ensures we connect to Headscale, not public Tailscale
             - name: TS_EXTRA_ARGS
-              value: "--login-server=https://headscale.headscale.svc.cluster.local --advertise-exit-node=false"
+              value: "--login-server=http://headscale.headscale.svc.cluster.local:8080 --advertise-exit-node=false"
           
           securityContext:
             capabilities:
@@ -133,9 +128,6 @@ spec:
               mountPath: /var/lib/tailscale
             - name: dev-net-tun
               mountPath: /dev/net/tun
-            - name: headscale-tls
-              mountPath: /etc/headscale-tls
-              readOnly: true
           
           resources:
             requests:
@@ -152,7 +144,3 @@ spec:
           hostPath:
             path: /dev/net/tun
             type: CharDevice
-        - name: headscale-tls
-          secret:
-            secretName: headscale-tls
-
