@@ -109,9 +109,11 @@ Once connected via VPN, you can access:
 │                     Kubernetes Cluster                           │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │ ingress-    │  │  Headscale  │  │ Tailscale Subnet Router │  │
-│  │   nginx     │  │   Server    │  │  (advertises 10.96/12,  │  │
-│  │             │  │             │  │   10.244/16)            │  │
+│  │   nginx     │  │  (HTTPS/443)│  │  (advertises 10.96/12,  │  │
+│  │             │  │  + TLS cert │  │   10.244/16, 192.168/24)│  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                          │                    │                  │
+│                          └──────HTTPS─────────┘                  │
 │                                              │                    │
 │                                              ▼                    │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -122,6 +124,15 @@ Once connected via VPN, you can access:
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### TLS Configuration
+
+Headscale uses a self-signed certificate managed by cert-manager for internal HTTPS:
+- **Certificate**: `headscale-tls` in `headscale` namespace
+- **DNS Names**: `headscale.5dlabs.ai`, `headscale.headscale.svc.cluster.local`
+- **Issuer**: `selfsigned-issuer` (ClusterIssuer)
+
+The subnet router trusts this certificate via the mounted TLS secret.
 
 ## Troubleshooting
 
