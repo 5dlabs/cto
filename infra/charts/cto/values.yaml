@@ -890,7 +890,7 @@ cloudflare:
       target: http://argocd-server.argocd.svc:80
     workflows:
       hostname: workflows.5dlabs.ai
-      target: http://argo-workflows-server.argo.svc:2746
+      target: http://argo-workflows-server.automation.svc:2746
     grafana:
       hostname: grafana.5dlabs.ai
       target: http://grafana.observability.svc:80
