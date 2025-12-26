@@ -46,10 +46,12 @@ global:
 # =============================================================================
 # Secrets - External Secrets Operator Configuration
 # =============================================================================
-# Generates ExternalSecret resources that sync from OpenBao.
-# Replaces manually maintained secrets in infra/gitops/manifests/external-secrets/
+# NOTE: ExternalSecrets are managed by the external-secrets-config ArgoCD application
+# located at infra/gitops/manifests/external-secrets/cto-secrets.yaml
+# This Helm chart no longer generates ExternalSecrets to avoid SharedResourceWarnings.
+# The values below are kept for reference only.
 secrets:
-  enabled: true
+  enabled: false  # Disabled - managed by external-secrets-config app
   refreshInterval: "1h"
 
   # Secret store reference (ClusterSecretStore or SecretStore)
