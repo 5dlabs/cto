@@ -4,8 +4,9 @@
 #
 # Prerequisites:
 # 1. Headscale must be running
-# 2. Create auth key: kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable
-# 3. Store auth key in secret: kubectl create secret generic tailscale-auth -n headscale --from-literal=TS_AUTHKEY=<key>
+# 2. Create auth key: kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable --expiration 8760h
+# 3. Store auth key in OpenBao: bao kv put secret/tailscale-auth TS_AUTHKEY=<key>
+# 4. ExternalSecret will sync the secret automatically (see external-secrets/headscale-secrets.yaml)
 
 apiVersion: v1
 kind: ServiceAccount
@@ -75,17 +76,17 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server
-            - name: TS_CONTROL_URL
+            # Connect to our Headscale server (TS_LOGIN_SERVER is the correct env var)
+            - name: TS_LOGIN_SERVER
               value: "https://headscale.5dlabs.ai"
             
-            # Auth key from secret (created manually after Headscale is up)
+            # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
               valueFrom:
                 secretKeyRef:
                   name: tailscale-auth
                   key: TS_AUTHKEY
-                  optional: true
+                  optional: false
             
             # Subnet routes to advertise
             # - 10.96.0.0/12: Kubernetes service CIDR
