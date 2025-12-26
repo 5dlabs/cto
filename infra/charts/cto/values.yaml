@@ -886,10 +886,8 @@ cloudflare:
     # Platform services (external to CTO namespace)
     argocd:
       hostname: argocd.5dlabs.ai
-      target: https://argocd-server.argocd.svc:443
-      # ArgoCD uses HTTPS backend
-      originRequest:
-        noTLSVerify: true
+      # Use in-cluster HTTP to avoid TLS schema incompatibilities on TunnelBinding
+      target: http://argocd-server.argocd.svc:80
     workflows:
       hostname: workflows.5dlabs.ai
       target: http://argo-workflows-server.argo.svc:2746
