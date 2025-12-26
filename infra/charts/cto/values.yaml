@@ -308,9 +308,15 @@ pm:
 
   # Intake workflow configuration
   intake:
-    # Image for intake workflows (must have `tasks` CLI)
-    # Uses runtime image by default (smaller, has tasks CLI)
-    # Set to factory if you need AI CLIs in intake
+    # Intake mode: "api" (direct API calls) or "cli" (use AI CLI)
+    # - api: Uses `tasks intake` binary (faster, default)
+    # - cli: Uses AI CLI (claude, codex, etc.) for intake
+    mode: api
+    # CLI to use when mode=cli (claude, codex, gemini, opencode)
+    cli: claude
+    # Image for intake workflows
+    # - api mode: use "runtime" (smaller, has tasks CLI)
+    # - cli mode: use "factory" (has all AI CLIs)
     image:
       repository: ghcr.io/5dlabs/runtime
       tag: latest

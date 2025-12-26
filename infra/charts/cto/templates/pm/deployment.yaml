@@ -43,7 +43,11 @@ spec:
               value: {{ .Values.pm.maxTimestampAgeMs | quote }}
             {{- end }}
             {{- end }}
-            # Intake workflow image (must have `tasks` CLI)
+            # Intake workflow configuration
+            - name: INTAKE_MODE
+              value: {{ .Values.pm.intake.mode | default "api" | quote }}
+            - name: INTAKE_CLI
+              value: {{ .Values.pm.intake.cli | default "claude" | quote }}
             - name: RUNTIME_IMAGE
               value: "{{ include "cto.imageRef" (dict "component" "runtime" "image" .Values.pm.intake.image "global" .Values.global) }}"
             {{- if .Values.pm.github }}

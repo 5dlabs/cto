@@ -84,8 +84,11 @@ spec:
         description: "Whether to include codebase context"
         value: "false"
       - name: cli
-        description: "CLI tool to use"
+        description: "CLI tool to use (when mode=cli)"
         value: "claude"
+      - name: intake-mode
+        description: "Intake mode: api (direct API calls) or cli (use AI CLI)"
+        value: "api"
       # Linear callback parameters
       - name: linear-session-id
         description: "Linear session ID for callbacks"
@@ -332,6 +335,11 @@ spec:
             value: "{{workflow.parameters.expand-tasks}}"
           - name: ANALYZE_COMPLEXITY
             value: "{{workflow.parameters.analyze-complexity}}"
+          # Intake mode configuration
+          - name: INTAKE_MODE
+            value: "{{workflow.parameters.intake-mode}}"
+          - name: INTAKE_CLI
+            value: "{{workflow.parameters.cli}}"
           # Pass repository URL from github-prep step
           - name: REPOSITORY_URL
             value: "{{inputs.parameters.repository-url}}"

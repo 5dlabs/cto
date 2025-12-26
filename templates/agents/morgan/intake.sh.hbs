@@ -67,30 +67,110 @@ cp "$PRD_FILE" ".tasks/docs/prd.txt"
 [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && cp "$ARCH_FILE" ".tasks/docs/architecture.md"
 
 # =========================================================================
-# Run Intake (unified command)
+# Run Intake (supports API mode or CLI mode)
 # =========================================================================
 
 echo ""
 echo "🚀 Running intake workflow..."
 
-# Build intake command with options
-INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
+# Check intake mode from environment (default: api)
+INTAKE_MODE="${INTAKE_MODE:-api}"
+INTAKE_CLI="${INTAKE_CLI:-claude}"
 
-# Add architecture if present
-[ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
+echo "  ℹ️  Mode: $INTAKE_MODE"
 
-# Add model if specified
-[ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
+if [ "$INTAKE_MODE" = "cli" ]; then
+    # =========================================================================
+    # CLI Mode: Use AI CLI (claude, codex, etc.) to run intake
+    # =========================================================================
+    echo "  ℹ️  CLI: $INTAKE_CLI"
+    
+    # Build the prompt for the CLI
+    PRD_CONTENT=$(cat .tasks/docs/prd.txt)
+    ARCH_CONTENT=""
+    [ -f ".tasks/docs/architecture.md" ] && ARCH_CONTENT=$(cat .tasks/docs/architecture.md)
+    
+    PROMPT="You are Morgan, a project management AI agent. Your task is to analyze a PRD (Product Requirements Document) and generate a structured task breakdown.
 
-# Add research flag for better results
-INTAKE_CMD="$INTAKE_CMD --research"
+## PRD Content
+$PRD_CONTENT
+"
+    
+    if [ -n "$ARCH_CONTENT" ]; then
+        PROMPT="$PROMPT
+## Architecture Document
+$ARCH_CONTENT
+"
+    fi
+    
+    PROMPT="$PROMPT
+## Instructions
+1. Analyze the PRD and architecture (if provided)
+2. Generate approximately $NUM_TASKS implementation tasks
+3. For each task, determine the appropriate agent:
+   - bolt: Infrastructure/DevOps (databases, k8s, storage)
+   - rex: Rust backend development
+   - grizz: Go backend development
+   - nova: Node.js/Bun backend development
+   - blaze: React/TypeScript frontend
+   - tap: Expo/React Native mobile
+   - spark: Electron desktop
+4. Create task files in .tasks/ directory:
+   - .tasks/tasks/tasks.json (main task list)
+   - .tasks/tasks/task-N/ directories with prompt.xml, prompt.md, acceptance_criteria.md
+5. Ensure tasks have proper dependencies (no circular deps)
+6. Add complexity analysis if useful
 
-# Optionally skip expansion/analysis
-[ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
-[ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
+Use the available tools to create the files. Start by creating the tasks.json file.
+"
 
-echo "  → $INTAKE_CMD"
-eval "$INTAKE_CMD" || exit 1
+    # Run the specified CLI
+    case "$INTAKE_CLI" in
+        claude)
+            echo "  → Running claude CLI..."
+            claude -p "$PROMPT" --dangerously-skip-permissions --output-format stream-json || exit 1
+            ;;
+        codex|code)
+            echo "  → Running code CLI..."
+            code --no-approval "$PROMPT" --sandbox workspace-write || exit 1
+            ;;
+        gemini)
+            echo "  → Running gemini CLI..."
+            gemini -p "$PROMPT" --output-format stream-json || exit 1
+            ;;
+        opencode)
+            echo "  → Running opencode CLI..."
+            opencode -p "$PROMPT" --output-format stream-json || exit 1
+            ;;
+        *)
+            echo "❌ Unknown CLI: $INTAKE_CLI"
+            exit 1
+            ;;
+    esac
+else
+    # =========================================================================
+    # API Mode: Use tasks CLI directly (faster, default)
+    # =========================================================================
+    
+    # Build intake command with options
+    INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
+
+    # Add architecture if present
+    [ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
+
+    # Add model if specified
+    [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
+
+    # Add research flag for better results
+    INTAKE_CMD="$INTAKE_CMD --research"
+
+    # Optionally skip expansion/analysis
+    [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
+    [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
+
+    echo "  → $INTAKE_CMD"
+    eval "$INTAKE_CMD" || exit 1
+fi
 
 # Verify tasks were generated
 TASKS_FILE=".tasks/tasks/tasks.json"
