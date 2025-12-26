@@ -306,6 +306,15 @@ pm:
     defaultOrg: "5dlabs"
     webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
 
+  # Intake workflow configuration
+  intake:
+    # Image for intake workflows (must have `tasks` CLI)
+    # Uses runtime image by default (smaller, has tasks CLI)
+    # Set to factory if you need AI CLIs in intake
+    image:
+      repository: ghcr.io/5dlabs/runtime
+      tag: latest
+
   # Secrets
   secrets:
     secretName: linear-secrets

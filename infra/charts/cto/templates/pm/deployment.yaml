@@ -43,6 +43,13 @@ spec:
               value: {{ .Values.pm.maxTimestampAgeMs | quote }}
             {{- end }}
             {{- end }}
+            # Intake workflow image (must have `tasks` CLI)
+            - name: RUNTIME_IMAGE
+              value: "{{ include "cto.imageRef" (dict "component" "runtime" "image" .Values.pm.intake.image "global" .Values.global) }}"
+            {{- if .Values.pm.github }}
+            - name: WEBHOOK_CALLBACK_URL
+              value: {{ .Values.pm.github.webhookCallbackUrl | quote }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.pm.secrets.secretName }}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://5dlabs.ai/schemas/platform-config.json",
+  "version": "1.0",
+
+  "intake": {
+    "mode": "api",
+    "cli": "claude",
+    "image": "ghcr.io/5dlabs/runtime:latest",
+    "primaryModel": {
+      "model": "claude-opus-4-5-20250929",
+      "provider": "anthropic"
+    },
+    "researchModel": {
+      "model": "claude-opus-4-5-20250929",
+      "provider": "anthropic"
+    },
+    "fallbackModel": {
+      "model": "claude-sonnet-4-20250514",
+      "provider": "anthropic"
+    },
+    "maxRetries": 3,
+    "enableResearch": true
+  },
+
+  "play": {
+    "cli": "claude",
+    "image": "ghcr.io/5dlabs/factory:latest",
+    "model": "claude-sonnet-4-20250514",
+    "parallelExecution": true,
+    "autoMerge": false,
+    "maxRetries": 10
+  }
+}
