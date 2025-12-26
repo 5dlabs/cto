@@ -1,0 +1,21 @@
+---
+# ArgoCD ConfigMap Patch
+# This configures ArgoCD to use annotation-based resource tracking
+# which prevents SharedResourceWarning when multiple apps deploy to the same namespace
+#
+# Resources are tracked by the argocd.argoproj.io/tracking-id annotation
+# instead of namespace + kind + name. This allows multiple apps to share
+# a namespace without warnings, as long as each resource has the correct
+# tracking annotation pointing to its owning app.
+#
+# Apply with: kubectl patch configmap argocd-cm -n argocd --patch-file argocd-cm-patch.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  # Use annotation-based tracking to prevent SharedResourceWarning
+  # when multiple apps deploy resources to the same namespace
+  # Resources must have: argocd.argoproj.io/tracking-id: <app-name>:<group/kind:namespace/name>
+  application.resourceTrackingMethod: annotation
