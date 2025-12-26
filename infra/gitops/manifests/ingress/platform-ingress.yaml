@@ -4,7 +4,7 @@
 # DNS records are managed automatically by external-dns via Cloudflare
 
 # ArgoCD Ingress
-# For LAN access - uses self-signed certificate, terminates TLS at ingress
+# For LAN access - TLS terminated at ingress, HTTP to backend (ArgoCD runs --insecure)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -16,8 +16,7 @@ metadata:
   annotations:
     # Exclude from external-dns (LAN access only)
     external-dns.alpha.kubernetes.io/exclude: "true"
-    # NGINX ingress configuration - terminate TLS at ingress, re-encrypt to backend
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    # NGINX ingress configuration - TLS terminates at ingress, plain HTTP to backend
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # Increase timeouts for git operations
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
@@ -37,7 +36,7 @@ spec:
               service:
                 name: argocd-server
                 port:
-                  number: 443
+                  number: 80
   tls:
     - hosts:
         - argocd.5dlabs.ai
