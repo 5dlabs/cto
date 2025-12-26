@@ -80,8 +80,10 @@ kubectl exec -n headscale deploy/headscale -- headscale routes enable -r <route-
 
 Once connected via VPN, you can access:
 
-- **Kubernetes Services**: `curl http://10.96.x.x:port`
-- **Pod IPs**: `curl http://10.244.x.x:port`
+- **Kubernetes API**: `kubectl --server=https://192.168.1.77:6443` (control plane node)
+- **Kubernetes Services**: `curl http://10.96.x.x:port` (ClusterIP services)
+- **Pod IPs**: `curl http://10.244.x.x:port` (direct pod access)
+- **Node IPs**: `ssh 192.168.1.77` (SSH to nodes, NodePort services)
 - **MagicDNS**: `curl http://service.namespace.svc.cluster.local` (if DNS is configured)
 
 ## Architecture
@@ -116,6 +118,7 @@ Once connected via VPN, you can access:
 │  │              Cluster Network Access                       │   │
 │  │  - Pod CIDR: 10.244.0.0/16                               │   │
 │  │  - Service CIDR: 10.96.0.0/12                            │   │
+│  │  - Node Network: 192.168.1.0/24 (K8s API, SSH, NodePort) │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
