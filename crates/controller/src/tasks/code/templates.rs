@@ -506,6 +506,7 @@ impl CodeTemplateGenerator {
 
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
         let context = json!({
@@ -531,6 +532,7 @@ impl CodeTemplateGenerator {
             // Required template context variables
             "job_type": job_type,
             "agent_name": agent_name,
+            "task_language": task_language,
             "default_retries": default_retries,
             "cli": {
                 "type": cli_type,
@@ -892,6 +894,7 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run).to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
         let context = json!({
@@ -920,6 +923,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             "job_type": job_type,
             "agent_name": agent_name,
+            "task_language": task_language,
             "default_retries": default_retries,
             // Watch-specific context
             "iteration": iteration,
@@ -1182,6 +1186,7 @@ impl CodeTemplateGenerator {
         let cli_type_str = cli_type.to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
         let context = json!({
@@ -1204,6 +1209,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type_str,
             "job_type": job_type,
             "agent_name": agent_name,
+            "task_language": task_language,
             "default_retries": default_retries,
         });
 
@@ -1492,9 +1498,7 @@ impl CodeTemplateGenerator {
         });
 
         serde_json::to_string_pretty(&mcp_config).map_err(|e| {
-            crate::tasks::types::Error::ConfigError(format!(
-                "Failed to serialize MCP config: {e}"
-            ))
+            crate::tasks::types::Error::ConfigError(format!("Failed to serialize MCP config: {e}"))
         })
     }
 
@@ -1551,6 +1555,7 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run).to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
         let context = json!({
@@ -1574,6 +1579,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             "job_type": job_type,
             "agent_name": agent_name,
+            "task_language": task_language,
             "default_retries": default_retries,
             "cli": {
                 "type": cli_type,
@@ -2852,6 +2858,7 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run).to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
         let context = json!({
@@ -2875,6 +2882,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             "job_type": job_type,
             "agent_name": agent_name,
+            "task_language": task_language,
             "default_retries": default_retries,
             "cli": {
                 "type": cli_type,
@@ -3151,6 +3159,7 @@ impl CodeTemplateGenerator {
         let cli_type = Self::determine_cli_type(code_run).to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
+        let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
         let context = json!({
@@ -3173,6 +3182,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             "job_type": job_type,
             "agent_name": agent_name,
+            "task_language": task_language,
             "default_retries": default_retries,
         });
 
@@ -3533,6 +3543,26 @@ impl CodeTemplateGenerator {
             .strip_prefix("5DLabs-")
             .unwrap_or(github_app)
             .to_lowercase()
+    }
+
+    /// Get the task language based on agent type.
+    /// Used for language-specific conditionals in templates (e.g., node-env, go-env).
+    /// Returns lowercase language identifier.
+    #[allow(dead_code)]
+    fn get_task_language(code_run: &CodeRun) -> &'static str {
+        let agent_name = Self::get_agent_name(code_run);
+        match agent_name.as_str() {
+            // Rust agents
+            "rex" => "rust",
+            // TypeScript/JavaScript agents
+            "blaze" | "nova" | "tap" | "spark" => "typescript",
+            // Go agents
+            "grizz" => "go",
+            // Support agents (no specific language)
+            "cleo" | "tess" | "cipher" | "atlas" | "bolt" | "morgan" | "stitch" => "",
+            // Default to empty (no language-specific setup)
+            _ => "",
+        }
     }
 
     /// Get default retries from environment or use platform default
@@ -4088,7 +4118,11 @@ impl CodeTemplateGenerator {
             CLIType::Gemini => "gemini",
             CLIType::OpenCode => "opencode",
             // Claude and types without dedicated invoke templates fall back to claude
-            CLIType::Claude | CLIType::OpenHands | CLIType::Grok | CLIType::Qwen | CLIType::MiniMax => "claude",
+            CLIType::Claude
+            | CLIType::OpenHands
+            | CLIType::Grok
+            | CLIType::Qwen
+            | CLIType::MiniMax => "claude",
         };
 
         let invoke_template_path = format!("clis/{cli_name}/invoke.sh.hbs");
@@ -4313,23 +4347,94 @@ mod tests {
     fn test_handlebars_expo_condition_only_matches_tap() {
         let mut hb = Handlebars::new();
         CodeTemplateGenerator::register_template_helpers(&mut hb);
-        hb.register_template_string("test", "{{#if (eq github_app \"tap\")}}EXPO{{/if}}")
+        // Note: The actual template uses `agent_name` not `github_app`
+        // This matches templates/_shared/container.sh.hbs line 10:
+        // {{#if (eq agent_name "tap")}}{{> expo-env }}{{/if}}
+        hb.register_template_string("test", "{{#if (eq agent_name \"tap\")}}EXPO{{/if}}")
             .unwrap();
 
         // Only tap should include EXPO
         assert_eq!(
-            hb.render("test", &json!({"github_app": "tap"})).unwrap(),
+            hb.render("test", &json!({"agent_name": "tap"})).unwrap(),
             "EXPO",
             "tap agent should get Expo environment"
         );
 
         // Other agents should NOT include EXPO
+        // This is the critical test - Atlas running expo-env is the reported bug
         for agent in [
-            "rex", "blaze", "atlas", "spark", "cleo", "tess", "cipher", "bolt",
+            "rex", "blaze", "atlas", "spark", "cleo", "tess", "cipher", "bolt", "nova", "grizz",
+            "morgan", "stitch",
         ] {
-            let result = hb.render("test", &json!({"github_app": agent})).unwrap();
+            let result = hb.render("test", &json!({"agent_name": agent})).unwrap();
             assert_eq!(result, "", "Agent {agent} should NOT get Expo environment");
         }
+
+        // Empty string should NOT include EXPO
+        let result = hb.render("test", &json!({"agent_name": ""})).unwrap();
+        assert_eq!(
+            result, "",
+            "Empty agent_name should NOT get Expo environment"
+        );
+
+        // Note: Missing agent_name causes RenderError due to type mismatch in eq helper
+        // This is OK because get_agent_name() always provides a value in production
+    }
+
+    /// Verify that Atlas container.sh does NOT include Expo environment setup.
+    /// This is a regression test for the issue where expo-env was being included
+    /// for all agents instead of just Tap.
+    #[test]
+    fn test_atlas_container_does_not_include_expo() {
+        // Skip if templates not available
+        let templates_path = match std::env::var("AGENT_TEMPLATES_PATH") {
+            Ok(p)
+                if std::path::PathBuf::from(&p)
+                    .join("_shared/container.sh.hbs")
+                    .exists() =>
+            {
+                p
+            }
+            _ => {
+                eprintln!("AGENT_TEMPLATES_PATH not set or templates not found, skipping test");
+                return;
+            }
+        };
+
+        // Create a test CodeRun for Atlas
+        let code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
+
+        // Verify agent_name extraction
+        let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
+        assert_eq!(agent_name, "atlas", "Agent name should be 'atlas'");
+
+        // Generate templates using Factory CLI (what the log shows)
+        let config = ControllerConfig::default();
+        let templates = CodeTemplateGenerator::generate_factory_templates(&code_run, &config)
+            .expect("Should generate Factory templates for Atlas");
+
+        let container_script = templates
+            .get("container.sh")
+            .expect("container.sh should be generated");
+
+        // CRITICAL: Verify expo-env content is NOT included
+        assert!(
+            !container_script.contains("Setting up Expo environment"),
+            "Atlas container.sh should NOT contain 'Setting up Expo environment'. \
+             Got container.sh of {} bytes. AGENT_TEMPLATES_PATH={}",
+            container_script.len(),
+            templates_path
+        );
+
+        // Additional verification - no EAS CLI references
+        assert!(
+            !container_script.contains("eas-cli"),
+            "Atlas container.sh should NOT contain 'eas-cli'"
+        );
+        assert!(
+            !container_script.contains("EXPO_TOKEN"),
+            "Atlas container.sh should NOT contain 'EXPO_TOKEN'"
+        );
     }
 
     // ========================================================================
@@ -4392,10 +4497,7 @@ mod tests {
         let mut code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
         code_run.spec.run_type = "integration".to_string();
         let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
-        assert_eq!(
-            template_path,
-            "agents/atlas/integration.md.hbs"
-        );
+        assert_eq!(template_path, "agents/atlas/integration.md.hbs");
     }
 
     #[test]
