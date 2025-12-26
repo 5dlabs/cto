@@ -20,6 +20,7 @@ spec:
   renewBefore: 360h  # 15 days
 ---
 # Argo Workflows Certificate
+# Uses self-signed - external access via Cloudflare Tunnel (Cloudflare handles TLS)
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -28,7 +29,7 @@ metadata:
 spec:
   secretName: argo-workflows-server-tls
   issuerRef:
-    name: letsencrypt-prod
+    name: selfsigned-issuer
     kind: ClusterIssuer
   dnsNames:
     - workflows.5dlabs.ai
@@ -36,6 +37,7 @@ spec:
   renewBefore: 360h
 ---
 # Headscale Certificate
+# Uses self-signed - external access via Cloudflare Tunnel (Cloudflare handles TLS)
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -44,7 +46,7 @@ metadata:
 spec:
   secretName: headscale-tls
   issuerRef:
-    name: letsencrypt-prod
+    name: selfsigned-issuer
     kind: ClusterIssuer
   dnsNames:
     - headscale.5dlabs.ai
@@ -52,6 +54,7 @@ spec:
   renewBefore: 360h
 ---
 # Hubble UI Certificate
+# Uses self-signed for LAN-only access (excluded from external-dns)
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -60,7 +63,7 @@ metadata:
 spec:
   secretName: hubble-ui-tls
   issuerRef:
-    name: letsencrypt-prod
+    name: selfsigned-issuer
     kind: ClusterIssuer
   dnsNames:
     - hubble.5dlabs.ai
