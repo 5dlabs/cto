@@ -895,9 +895,12 @@ cloudflare:
       hostname: grafana.5dlabs.ai
       target: http://grafana.observability.svc:80
     # Headscale VPN control server (for remote cluster access)
+    # Uses HTTPS internally with self-signed cert from cert-manager
     headscale:
       hostname: headscale.5dlabs.ai
-      target: http://headscale.headscale.svc:8080
+      target: https://headscale.headscale.svc:443
+      originRequest:
+        noTlsVerify: true
 
 # =============================================================================
 # BuildKit - Remote Build Infrastructure
