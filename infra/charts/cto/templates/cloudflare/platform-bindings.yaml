@@ -34,7 +34,7 @@ apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
   name: workflows-tunnel
-  namespace: argo
+  namespace: automation
   labels:
     {{- include "cto.labels" . | nindent 4 }}
     app.kubernetes.io/component: cloudflare-binding

@@ -1,4 +1,37 @@
 ---
+# Role with permissions for argo-workflow operations in cto namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-workflows-cto
+  namespace: cto
+  labels:
+    app.kubernetes.io/component: rbac
+rules:
+  # Workflow management
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ConfigMap access for workflow state
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Pod access for workflow execution
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # Secret access for workflow credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  # CodeRun management
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns/status"]
+    verbs: ["get", "update", "patch"]
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
