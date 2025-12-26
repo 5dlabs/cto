@@ -91,9 +91,10 @@ spec:
             
             # Subnet routes to advertise
             # - 10.96.0.0/12: Kubernetes service CIDR
-            # - 10.244.0.0/16: Pod CIDR (adjust based on your cluster config)
+            # - 10.244.0.0/16: Pod CIDR
+            # - 192.168.1.0/24: Node network (for K8s API, SSH, NodePort services)
             - name: TS_ROUTES
-              value: "10.96.0.0/12,10.244.0.0/16"
+              value: "10.96.0.0/12,10.244.0.0/16,192.168.1.0/24"
             
             # Accept routes from other nodes
             - name: TS_ACCEPT_ROUTES
