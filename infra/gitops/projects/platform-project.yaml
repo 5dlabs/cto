@@ -86,6 +86,8 @@ spec:
     - 'https://opensearch-project.github.io/opensearch-k8s-operator/'
     # Cilium CNI
     - 'https://helm.cilium.io/'
+    # Headscale (self-hosted Tailscale control server)
+    - 'https://charts.gabe565.com'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -138,6 +140,9 @@ spec:
       server: https://kubernetes.default.svc
     # Mayastor distributed storage
     - namespace: mayastor
+      server: https://kubernetes.default.svc
+    # Headscale VPN control server
+    - namespace: headscale
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
