@@ -38,7 +38,14 @@ spec:
 
         env:
           # Server URL - clients connect here (via Cloudflare or direct)
-          HEADSCALE_SERVER_URL: "http://headscale.5dlabs.ai:8443"
+          HEADSCALE_SERVER_URL: "https://headscale.5dlabs.ai"
+          
+          # TLS configuration - use cert-manager provisioned certificate
+          HEADSCALE_TLS_CERT_PATH: "/etc/headscale/tls/tls.crt"
+          HEADSCALE_TLS_KEY_PATH: "/etc/headscale/tls/tls.key"
+          
+          # Listen on HTTPS port
+          HEADSCALE_LISTEN_ADDR: "0.0.0.0:443"
           
           # MagicDNS base domain (must be different from server_url)
           HEADSCALE_DNS_BASE_DOMAIN: "vpn.5dlabs.ai"
@@ -69,8 +76,8 @@ spec:
           main:
             type: ClusterIP
             ports:
-              http:
-                port: 8080
+              https:
+                port: 443
               metrics:
                 port: 9090
 
@@ -82,6 +89,13 @@ spec:
             storageClass: "local-path"
             accessMode: ReadWriteOnce
             size: 1Gi
+          # TLS certificate from cert-manager
+          tls:
+            enabled: true
+            type: secret
+            name: headscale-tls
+            mountPath: /etc/headscale/tls
+            readOnly: true
 
         # Schedule on control plane for reliable API access
         nodeSelector:
