@@ -76,10 +76,13 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server via internal service (external URL has connectivity issues)
-            # Using HTTP since it's internal cluster traffic
+            # Connect to our Headscale server via HTTPS (internal service with TLS)
             - name: TS_LOGIN_SERVER
-              value: "http://headscale.headscale.svc.cluster.local:8080"
+              value: "https://headscale.headscale.svc.cluster.local"
+            
+            # Trust the self-signed certificate
+            - name: SSL_CERT_FILE
+              value: "/etc/headscale-tls/tls.crt"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -112,9 +115,9 @@ spec:
             - name: TS_HOSTNAME
               value: "k8s-subnet-router"
             
-            # Extra args for subnet routing - include login-server to use internal service
+            # Extra args for subnet routing
             - name: TS_EXTRA_ARGS
-              value: "--login-server=http://headscale.headscale.svc.cluster.local:8080 --advertise-exit-node=false"
+              value: "--advertise-exit-node=false"
           
           securityContext:
             capabilities:
@@ -128,6 +131,9 @@ spec:
               mountPath: /var/lib/tailscale
             - name: dev-net-tun
               mountPath: /dev/net/tun
+            - name: headscale-tls
+              mountPath: /etc/headscale-tls
+              readOnly: true
           
           resources:
             requests:
@@ -144,4 +150,7 @@ spec:
           hostPath:
             path: /dev/net/tun
             type: CharDevice
+        - name: headscale-tls
+          secret:
+            secretName: headscale-tls
 
