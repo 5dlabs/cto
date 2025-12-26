@@ -115,6 +115,36 @@ spec:
             cpu: 500m
             memory: 256Mi
 
+        # Health probes - must use HTTPS port since we're running TLS
+        probes:
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 443
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              failureThreshold: 3
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 443
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              failureThreshold: 3
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              tcpSocket:
+                port: 443
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              failureThreshold: 30
+
         # Pod labels for observability
         podLabels:
           platform.5dlabs.io/log-collection: enabled
