@@ -113,8 +113,9 @@ spec:
             
             # Extra args for subnet routing
             # --reset clears any persisted state from previous configurations
+            # --login-server must be specified with --reset to ensure correct control server
             - name: TS_EXTRA_ARGS
-              value: "--reset --advertise-exit-node=false"
+              value: "--reset --login-server=http://headscale.headscale.svc.cluster.local:8080 --advertise-exit-node=false"
           
           securityContext:
             capabilities:
