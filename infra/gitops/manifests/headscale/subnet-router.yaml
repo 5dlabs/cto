@@ -76,13 +76,10 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server via HTTPS (internal service with TLS)
+            # Connect to our Headscale server via external URL
+            # Note: Internal HTTP doesn't work due to Tailscale noise protocol requiring HTTPS
             - name: TS_LOGIN_SERVER
-              value: "https://headscale.headscale.svc.cluster.local"
-            
-            # Trust the self-signed certificate
-            - name: SSL_CERT_FILE
-              value: "/etc/headscale-tls/tls.crt"
+              value: "https://headscale.5dlabs.ai"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -131,9 +128,6 @@ spec:
               mountPath: /var/lib/tailscale
             - name: dev-net-tun
               mountPath: /dev/net/tun
-            - name: headscale-tls
-              mountPath: /etc/headscale-tls
-              readOnly: true
           
           resources:
             requests:
@@ -150,7 +144,4 @@ spec:
           hostPath:
             path: /dev/net/tun
             type: CharDevice
-        - name: headscale-tls
-          secret:
-            secretName: headscale-tls
 
