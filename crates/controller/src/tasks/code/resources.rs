@@ -2540,7 +2540,7 @@ mod tests {
         );
         assert_eq!(
             labels.get("cto.5dlabs.io/linear-issue"),
-            Some(&"test-456".to_string()),  // Note: sanitized to lowercase
+            Some(&"test-456".to_string()), // Note: sanitized to lowercase
             "linear-issue label should contain the sanitized issue ID"
         );
 
@@ -2615,9 +2615,18 @@ mod tests {
         let labels = CodeResourceManager::create_task_labels(&code_run);
 
         // These labels are required for PM server pod discovery:
-        assert!(labels.contains_key("linear-session"), "PM server needs linear-session for routing");
-        assert!(labels.contains_key("cto.5dlabs.io/linear-issue"), "PM server needs linear-issue for issue-based lookup");
-        assert!(labels.contains_key("cto.5dlabs.io/agent-type"), "Observability needs agent-type");
+        assert!(
+            labels.contains_key("linear-session"),
+            "PM server needs linear-session for routing"
+        );
+        assert!(
+            labels.contains_key("cto.5dlabs.io/linear-issue"),
+            "PM server needs linear-issue for issue-based lookup"
+        );
+        assert!(
+            labels.contains_key("cto.5dlabs.io/agent-type"),
+            "Observability needs agent-type"
+        );
 
         // Standard labels should also be present
         assert_eq!(labels.get("app"), Some(&"controller".to_string()));
