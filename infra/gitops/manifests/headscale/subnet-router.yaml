@@ -76,10 +76,10 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server via external URL (has proper TLS from Cloudflare)
-            # Internal HTTP URL doesn't work because Tailscale noise protocol requires HTTPS
+            # Connect to our Headscale server via internal service
+            # External URL has NAT hairpin issues from within cluster
             - name: TS_LOGIN_SERVER
-              value: "https://headscale.5dlabs.ai"
+              value: "http://headscale.headscale.svc.cluster.local:8080"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -113,10 +113,9 @@ spec:
               value: "k8s-subnet-router"
             
             # Extra args for subnet routing
-            # --reset clears any persisted state from previous configurations
-            # --login-server must be specified with --reset to ensure correct control server
+            # --login-server ensures we connect to Headscale, not public Tailscale
             - name: TS_EXTRA_ARGS
-              value: "--reset --login-server=https://headscale.5dlabs.ai --advertise-exit-node=false"
+              value: "--login-server=http://headscale.headscale.svc.cluster.local:8080 --advertise-exit-node=false"
           
           securityContext:
             capabilities:
