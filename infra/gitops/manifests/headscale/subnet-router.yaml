@@ -110,9 +110,9 @@ spec:
             - name: TS_HOSTNAME
               value: "k8s-subnet-router"
             
-            # Extra args for subnet routing
+            # Extra args for subnet routing - include login-server to override default
             - name: TS_EXTRA_ARGS
-              value: "--advertise-exit-node=false"
+              value: "--login-server=https://headscale.5dlabs.ai --advertise-exit-node=false"
           
           securityContext:
             capabilities:
