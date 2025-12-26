@@ -1,0 +1,18 @@
+---
+# Headscale Namespace
+# Requires privileged PodSecurity for Tailscale subnet router
+# which needs NET_ADMIN, NET_RAW capabilities and /dev/net/tun hostPath
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headscale
+  labels:
+    app.kubernetes.io/name: headscale
+    app.kubernetes.io/part-of: platform
+    # PodSecurity: allow privileged workloads for Tailscale subnet router
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
