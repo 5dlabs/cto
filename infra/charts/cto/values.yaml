@@ -815,7 +815,7 @@ research:
   researchDir: "docs/research"
 
   persistence:
-    size: 5Gi
+    size: 10Gi
     storageClass: ""  # Uses global.storageClass if empty
 
   resources:
