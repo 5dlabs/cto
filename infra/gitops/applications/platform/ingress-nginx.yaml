@@ -27,10 +27,12 @@ spec:
     helm:
       values: |
         controller:
-          # Use NodePort for bare-metal clusters (let K8s assign ports)
+          # Use NodePort with externalIPs for direct LAN access on standard ports
           service:
             type: NodePort
-            # Don't specify nodePorts - use existing allocated ports
+            # Expose on control-plane node IP for direct LAN access
+            externalIPs:
+              - 192.168.1.77
 
           # Pod labels for log collection
           # Note: Don't override app.kubernetes.io/component - it's part of the
