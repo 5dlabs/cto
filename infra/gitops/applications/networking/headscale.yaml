@@ -37,8 +37,8 @@ spec:
         args: ["serve"]
 
         env:
-          # Server URL - clients connect here (via Cloudflare or direct)
-          HEADSCALE_SERVER_URL: "http://headscale.5dlabs.ai:8443"
+          # Server URL - clients connect here via Cloudflare tunnel (TLS terminated by CF)
+          HEADSCALE_SERVER_URL: "https://headscale.5dlabs.ai"
           
           # MagicDNS base domain (must be different from server_url)
           HEADSCALE_DNS_BASE_DOMAIN: "vpn.5dlabs.ai"
