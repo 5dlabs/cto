@@ -36,13 +36,17 @@ The following DNS records are automatically created by external-dns:
 # Create a user
 kubectl exec -n headscale deploy/headscale -- headscale users create admin
 
-# Create a reusable auth key (for subnet router)
-kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable --expiration 720h
+# Create a reusable auth key (for subnet router) - 1 year expiration
+kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user admin --reusable --expiration 8760h
 
-# Store the auth key for subnet router
-kubectl create secret generic tailscale-auth -n headscale --from-literal=TS_AUTHKEY=<key-from-above>
+# Store the auth key in OpenBao (synced to K8s via ExternalSecret)
+bao kv put secret/tailscale-auth TS_AUTHKEY=<key-from-above>
 
-# Restart subnet router to pick up the key
+# The ExternalSecret will sync the secret to headscale namespace automatically
+# Verify the secret was created:
+kubectl get secret tailscale-auth -n headscale
+
+# Restart subnet router if needed
 kubectl rollout restart deployment/tailscale-subnet-router -n headscale
 
 # Approve the subnet routes in Headscale
@@ -123,7 +127,10 @@ Check logs: `kubectl logs -n headscale deploy/headscale`
 
 ### Subnet router not connecting
 1. Check if auth key is set: `kubectl get secret tailscale-auth -n headscale`
-2. Check logs: `kubectl logs -n headscale deploy/tailscale-subnet-router`
+2. Check ExternalSecret status: `kubectl get externalsecret tailscale-auth -n headscale`
+3. Verify Bao has the key: `bao kv get secret/tailscale-auth`
+4. Check logs: `kubectl logs -n headscale deploy/tailscale-subnet-router`
+5. If logs show "connecting to controlplane.tailscale.com" - the TS_LOGIN_SERVER env var is not being used
 
 ### DNS not resolving
 Ensure external-dns has the correct Cloudflare credentials:

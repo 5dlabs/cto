@@ -32,7 +32,8 @@ spec:
       include: "{applications/*/*.yaml,projects/*.yaml}"
       # yamllint disable-line rule:line-length
       # Exclude: docs, nested CRD directories, and networking apps managed by networking-apps.yaml
-      exclude: "{*.md,**/ingress/*,**/llamastack-distributions/*,**/ollama-model-crds/*,**/kubeai-models/*,**/networking/headscale*.yaml,**/networking/platform-ingress.yaml,**/networking/tailscale*.yaml}"
+      # Note: Use explicit paths relative to source.path (infra/gitops) to match include pattern
+      exclude: "{*.md,applications/ai-models/ingress/*,applications/ai-models/llamastack-distributions/*,applications/ai-models/ollama-model-crds/*,applications/networking/headscale.yaml,applications/networking/headscale-namespace.yaml,applications/networking/platform-ingress.yaml,applications/networking/tailscale-subnet-router.yaml}"
 
   # Destination configuration
   destination:
