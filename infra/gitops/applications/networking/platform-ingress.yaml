@@ -27,7 +27,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    # Resources are deployed to their respective namespaces (argocd, argo, headscale, kube-system)
+    # Resources are deployed to their respective namespaces (argocd, automation, headscale, kube-system)
     namespace: default
 
   syncPolicy:
