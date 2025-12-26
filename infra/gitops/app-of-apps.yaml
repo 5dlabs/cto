@@ -31,7 +31,8 @@ spec:
       recurse: true
       include: "{applications/*/*.yaml,projects/*.yaml}"
       # yamllint disable-line rule:line-length
-      exclude: "{*.md,**/ingress/*,**/llamastack-distributions/*,**/ollama-model-crds/*,**/kubeai-models/*}"
+      # Exclude: docs, nested CRD directories, and networking apps managed by networking-apps.yaml
+      exclude: "{*.md,**/ingress/*,**/llamastack-distributions/*,**/ollama-model-crds/*,**/kubeai-models/*,**/networking/headscale*.yaml,**/networking/platform-ingress.yaml,**/networking/tailscale*.yaml}"
 
   # Destination configuration
   destination:
