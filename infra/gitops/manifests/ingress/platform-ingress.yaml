@@ -54,7 +54,8 @@ metadata:
   annotations:
     # external-dns will create DNS record
     external-dns.alpha.kubernetes.io/hostname: workflows.5dlabs.ai
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    # DNS-only mode (no proxy) - required for private IP targets
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     # NGINX ingress configuration
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # Auth mode (if using SSO)
