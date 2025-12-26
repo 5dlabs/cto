@@ -1,11 +1,24 @@
 #!/bin/bash
 # Connect to Headscale VPN
-# Usage: sudo ./tailscale-connect.sh
+# Usage: sudo ./tailscale-connect.sh [--local]
+#
+# By default, connects via Cloudflare tunnel (works from anywhere)
+# Use --local to connect via internal NodePort (home LAN only)
 
 set -e
 
-HEADSCALE_SERVER="http://192.168.1.64:30880"
-AUTH_KEY="a41c69117af424f07308e834f01397989a73f4839d642194"
+# Default to Cloudflare tunnel for remote access
+if [ "$1" = "--local" ]; then
+    HEADSCALE_SERVER="http://192.168.1.77:30880"
+    echo "Using local NodePort (home LAN only)"
+else
+    HEADSCALE_SERVER="https://headscale.5dlabs.ai"
+    echo "Using Cloudflare tunnel (works from anywhere)"
+fi
+
+# Auth key - generate new one if expired:
+# kubectl exec -n headscale deploy/headscale -- headscale preauthkeys create --user 1 --reusable --expiration 720h
+AUTH_KEY="${HEADSCALE_AUTH_KEY:-9c89bbe40cc457b6381abb301eb362cafb7020aeff4300ad}"
 SOCKET="/var/run/tailscale/tailscaled.sock"
 STATE="/var/lib/tailscale/tailscaled.state"
 
