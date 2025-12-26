@@ -76,10 +76,9 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server via external URL
-            # Note: Internal HTTP doesn't work due to Tailscale noise protocol requiring HTTPS
+            # Connect to our Headscale server via internal service
             - name: TS_LOGIN_SERVER
-              value: "https://headscale.5dlabs.ai"
+              value: "http://headscale.headscale.svc.cluster.local:8080"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -113,8 +112,9 @@ spec:
               value: "k8s-subnet-router"
             
             # Extra args for subnet routing
+            # --reset clears any persisted state from previous configurations
             - name: TS_EXTRA_ARGS
-              value: "--advertise-exit-node=false"
+              value: "--reset --advertise-exit-node=false"
           
           securityContext:
             capabilities:
