@@ -1,0 +1,24 @@
+---
+# Patch the Argo CD application controller readiness probe to allow more startup time.
+# Apply with:
+#   kubectl -n argocd patch statefulset argocd-application-controller --patch-file argocd-application-controller-readiness.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: argocd-application-controller
+  namespace: argocd
+spec:
+  template:
+    spec:
+      containers:
+        - name: application-controller
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+            successThreshold: 1
