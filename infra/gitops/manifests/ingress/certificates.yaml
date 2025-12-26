@@ -37,7 +37,8 @@ spec:
   renewBefore: 360h
 ---
 # Headscale Certificate
-# Uses self-signed - external access via Cloudflare Tunnel (Cloudflare handles TLS)
+# Uses self-signed - includes both external and internal DNS names
+# Internal names needed for Tailscale subnet router to connect via HTTPS
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -50,6 +51,9 @@ spec:
     kind: ClusterIssuer
   dnsNames:
     - headscale.5dlabs.ai
+    - headscale.headscale.svc.cluster.local
+    - headscale.headscale.svc
+    - headscale
   duration: 2160h
   renewBefore: 360h
 ---
