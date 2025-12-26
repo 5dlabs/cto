@@ -76,9 +76,10 @@ spec:
           imagePullPolicy: IfNotPresent
           
           env:
-            # Connect to our Headscale server (TS_LOGIN_SERVER is the correct env var)
+            # Connect to our Headscale server via internal service (external URL has connectivity issues)
+            # Using HTTP since it's internal cluster traffic
             - name: TS_LOGIN_SERVER
-              value: "https://headscale.5dlabs.ai"
+              value: "http://headscale.headscale.svc.cluster.local:8080"
             
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
@@ -110,9 +111,9 @@ spec:
             - name: TS_HOSTNAME
               value: "k8s-subnet-router"
             
-            # Extra args for subnet routing - include login-server to override default
+            # Extra args for subnet routing - include login-server to use internal service
             - name: TS_EXTRA_ARGS
-              value: "--login-server=https://headscale.5dlabs.ai --advertise-exit-node=false"
+              value: "--login-server=http://headscale.headscale.svc.cluster.local:8080 --advertise-exit-node=false"
           
           securityContext:
             capabilities:
