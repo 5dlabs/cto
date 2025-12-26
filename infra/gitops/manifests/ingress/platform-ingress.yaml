@@ -43,6 +43,7 @@ spec:
       secretName: argocd-server-tls
 ---
 # Argo Workflows Ingress
+# NOTE: DNS is managed by Cloudflare Tunnel for remote access, not external-dns
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -52,10 +53,8 @@ metadata:
     app.kubernetes.io/name: argo-workflows-ingress
     app.kubernetes.io/part-of: platform
   annotations:
-    # external-dns will create DNS record
-    external-dns.alpha.kubernetes.io/hostname: workflows.5dlabs.ai
-    # DNS-only mode (no proxy) - required for private IP targets
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    # Exclude from external-dns (DNS managed by Cloudflare Tunnel for remote access)
+    external-dns.alpha.kubernetes.io/exclude: "true"
     # NGINX ingress configuration
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # Auth mode (if using SSO)
