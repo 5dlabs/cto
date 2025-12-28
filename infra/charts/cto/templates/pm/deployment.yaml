@@ -48,8 +48,19 @@ spec:
               value: {{ .Values.pm.intake.mode | default "api" | quote }}
             - name: INTAKE_CLI
               value: {{ .Values.pm.intake.cli | default "claude" | quote }}
+            # RUNTIME_IMAGE: Resolve from agent.cliImages based on CLI selection
+            # - API mode: uses pm.intake.runtimeImage (smaller, has tasks CLI)
+            # - CLI mode: uses agent.cliImages[cli] (has the specified AI CLI)
+            {{- $isCliMode := eq (.Values.pm.intake.mode | default "api") "cli" }}
+            {{- $intakeCli := .Values.pm.intake.cli | default "claude" }}
+            {{- if $isCliMode }}
+            {{- $cliImage := index .Values.agent.cliImages $intakeCli }}
             - name: RUNTIME_IMAGE
-              value: "{{ include "cto.imageRef" (dict "component" "runtime" "image" .Values.pm.intake.image "global" .Values.global) }}"
+              value: "{{ include "cto.imageRef" (dict "component" $intakeCli "image" $cliImage "global" .Values.global) }}"
+            {{- else }}
+            - name: RUNTIME_IMAGE
+              value: "{{ include "cto.imageRef" (dict "component" "runtime" "image" .Values.pm.intake.runtimeImage "global" .Values.global) }}"
+            {{- end }}
             {{- if .Values.pm.github }}
             - name: WEBHOOK_CALLBACK_URL
               value: {{ .Values.pm.github.webhookCallbackUrl | quote }}
