@@ -51,9 +51,13 @@ spec:
             # RUNTIME_IMAGE: Resolve from agent.cliImages based on CLI selection
             # - API mode: uses pm.intake.runtimeImage (smaller, has tasks CLI)
             # - CLI mode: uses agent.cliImages[cli] (has the specified AI CLI)
+            # - If pm.intake.image is set, use it directly (bypasses devRegistry)
             {{- $isCliMode := eq (.Values.pm.intake.mode | default "api") "cli" }}
             {{- $intakeCli := .Values.pm.intake.cli | default "claude" }}
-            {{- if $isCliMode }}
+            {{- if .Values.pm.intake.image }}
+            - name: RUNTIME_IMAGE
+              value: "{{ .Values.pm.intake.image }}"
+            {{- else if $isCliMode }}
             {{- $cliImage := index .Values.agent.cliImages $intakeCli }}
             - name: RUNTIME_IMAGE
               value: "{{ include "cto.imageRef" (dict "component" $intakeCli "image" $cliImage "global" .Values.global) }}"

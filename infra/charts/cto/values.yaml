@@ -317,6 +317,9 @@ pm:
     # CLI to use when mode=cli - image is resolved from agent.cliImages[cli]
     # Options: claude, cursor, codex, gemini, opencode, factory, dexter
     cli: claude
+    # Direct image override (bypasses devRegistry for intake)
+    # Use GHCR since cluster can pull from it with ghcr-secret
+    image: "ghcr.io/5dlabs/factory:latest"
     # Runtime image: Used in api mode (smaller, has tasks CLI)
     runtimeImage:
       repository: ghcr.io/5dlabs/runtime
