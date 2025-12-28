@@ -20,21 +20,5 @@ spec:
       protocol: TCP
   selector:
     app.kubernetes.io/name: ntfy
----
-# ServiceMonitor for Prometheus
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: ntfy
-  namespace: messaging
-  labels:
-    app.kubernetes.io/name: ntfy
-    app.kubernetes.io/component: push-server
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: ntfy
-  endpoints:
-    - port: metrics
-      interval: 30s
-      path: /metrics
+# Note: ServiceMonitor removed - add back when Prometheus Operator CRDs are installed
+# Metrics available at :9090/metrics for Prometheus scrape config
