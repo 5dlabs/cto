@@ -9,7 +9,7 @@ AlertHub is a multi-platform notification system built as a microservices archit
 ```
                                     ┌─────────────────────────────────────────┐
                                     │              Load Balancer              │
-                                    │         (Cloudflare Tunnel)             │
+                                    │          (Ingress NGINX)                │
                                     └────────────────────┬────────────────────┘
                                                          │
                     ┌────────────────────────────────────┼────────────────────────────────────┐
@@ -24,8 +24,8 @@ AlertHub is a multi-platform notification system built as a microservices archit
                    │              WebSocket             │              Push                  │
                    │                 ▼                  │                ▼                   │
                    │         ┌──────────────┐          │         ┌──────────────┐          │
-                   │         │   Real-time  │          │         │     FCM      │          │
-                   │         │   Updates    │          │         │    Service   │          │
+                   │         │   Real-time  │          │         │  ntfy/APNs   │          │
+                   │         │   Updates    │          │         │ (Self-hosted)│          │
                    │         └──────────────┘          │         └──────────────┘          │
                    │                                    │                                    │
                    └────────────────────────────────────┼────────────────────────────────────┘
@@ -174,8 +174,10 @@ GET    /health                         # Health check
 |---------|-----------------|-------------|----------------|
 | Slack | Webhook, Bot API | OAuth2, Webhook URL | `SlackService` |
 | Discord | Webhook | Webhook URL | `DiscordService` |
-| Email | SMTP | API Key, SMTP Auth | `EmailService` |
-| Push | FCM | Service Account | `PushService` |
+| Email | SMTP (Postal/Mailpit) | SMTP Auth | `EmailService` |
+| Push (Android) | ntfy (UnifiedPush) | HMAC Token | `NtfyPushService` |
+| Push (iOS) | APNs Direct | JWT/Certificate | `ApnsPushService` |
+| Push (Web) | Web Push API | VAPID Keys | `WebPushService` |
 | Webhook | HTTP | HMAC Signature | `WebhookService` |
 
 **Error Types** (Effect TaggedError):
@@ -589,6 +591,124 @@ aws s3 mb s3://alerthub-media --endpoint-url http://seaweedfs-filer.seaweedfs.sv
 
 ---
 
+### Keycloak (Identity Provider)
+
+**Purpose**: Self-hosted identity and access management
+
+**Features**:
+- OAuth2 / OpenID Connect
+- User federation
+- Social identity providers (self-hosted)
+- Multi-factor authentication
+- Admin console
+
+**Configuration**:
+```yaml
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: alerthub-keycloak
+  namespace: identity
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    host: alerthub-postgres-rw.databases.svc
+    database: keycloak
+  http:
+    httpEnabled: true
+  hostname:
+    hostname: auth.alerthub.local
+```
+
+**Endpoint**: `https://auth.alerthub.local`
+
+---
+
+### ntfy (Push Notifications - Android/Web)
+
+**Purpose**: Self-hosted push notification server with UnifiedPush support
+
+**Features**:
+- UnifiedPush protocol for Android
+- Web Push via VAPID
+- HTTP/WebSocket subscription
+- Rate limiting
+- Access control
+
+**Configuration**:
+```yaml
+# Deploy via Helm
+# helm repo add ntfy https://binwiederhier.github.io/ntfy-charts
+# helm install ntfy ntfy/ntfy --set config.base-url=https://push.alerthub.local
+
+# Or direct deployment:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ntfy
+  namespace: messaging
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: ntfy
+          image: binwiederhier/ntfy:latest
+          args: ["serve"]
+          env:
+            - name: NTFY_BASE_URL
+              value: "https://push.alerthub.local"
+            - name: NTFY_CACHE_FILE
+              value: "/var/lib/ntfy/cache.db"
+            - name: NTFY_AUTH_DEFAULT_ACCESS
+              value: "deny-all"
+```
+
+**Endpoint**: `https://push.alerthub.local`
+
+---
+
+### Postal / Mailpit (Email)
+
+**Purpose**: Self-hosted email delivery
+
+**Development (Mailpit)**:
+- Simple SMTP testing server
+- Web UI for viewing emails
+- No external dependencies
+
+**Production (Postal)**:
+- Full-featured mail server
+- Delivery tracking
+- Bounce handling
+- Webhook notifications
+
+**Configuration**:
+```yaml
+# Mailpit for development
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: email
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:latest
+          ports:
+            - containerPort: 1025  # SMTP
+            - containerPort: 8025  # Web UI
+```
+
+**SMTP Endpoint**: `mailpit.email.svc:1025`
+**Web UI**: `http://mailpit.email.svc:8025`
+
+---
+
 ## Data Flow
 
 ### Notification Submission Flow
@@ -642,9 +762,12 @@ sequenceDiagram
 ## Security Considerations
 
 ### Authentication
-- JWT tokens with RS256 signing
+- **Better Auth** for TypeScript applications (Web Console, Integration Service)
+- **Keycloak** for centralized identity management
+- JWT tokens with RS256 signing (issued by Keycloak or Better Auth)
 - Refresh token rotation
 - API key authentication for service-to-service
+- OAuth2 flows handled by self-hosted Keycloak
 
 ### Authorization
 - RBAC with roles: owner, admin, member, viewer

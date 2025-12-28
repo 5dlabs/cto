@@ -1,0 +1,53 @@
+---
+# ntfy server configuration
+# See: https://docs.ntfy.sh/config/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: ntfy
+    app.kubernetes.io/component: push-server
+data:
+  server.yml: |
+    # Base URL for the server (used in notification URLs)
+    base-url: "https://push.5dlabs.ai"
+
+    # Listen address for HTTP
+    listen-http: ":80"
+
+    # Cache settings for offline delivery
+    cache-file: "/var/lib/ntfy/cache.db"
+    cache-duration: "24h"
+    cache-batch-size: 10
+    cache-batch-timeout: "1s"
+
+    # Authentication - deny by default, require tokens
+    auth-default-access: "deny-all"
+    auth-file: "/var/lib/ntfy/user.db"
+
+    # Attachment storage
+    attachment-cache-dir: "/var/lib/ntfy/attachments"
+    attachment-total-size-limit: "1G"
+    attachment-file-size-limit: "15M"
+    attachment-expiry-duration: "24h"
+
+    # Rate limiting
+    visitor-request-limit-burst: 60
+    visitor-request-limit-replenish: "10s"
+    visitor-email-limit-burst: 16
+    visitor-email-limit-replenish: "1h"
+    visitor-attachment-total-size-limit: "100M"
+    visitor-attachment-daily-bandwidth-limit: "500M"
+
+    # Metrics for Prometheus
+    enable-metrics: true
+    metrics-listen-http: ":9090"
+
+    # WebSocket keepalive
+    keepalive-interval: "45s"
+
+    # Logging
+    log-level: "info"
+    log-format: "json"

@@ -115,8 +115,6 @@ fn should_use_extended_thinking(cli_type: CLIType) -> bool {
         CLIType::Claude => true,
         // Cursor with Sonnet 4.5 supports thinking
         CLIType::Cursor => true,
-        // OpenHands with Opus supports thinking
-        CLIType::OpenHands => true,
         // Factory with Claude Opus 4.5 supports reasoning via --reasoning-effort
         CLIType::Factory => true,
         // Codex/OpenCode with o3 has built-in reasoning
@@ -139,14 +137,8 @@ fn get_default_model(cli_type: CLIType) -> &'static str {
         CLIType::Cursor => "opus-4.5-thinking",
         // Factory: Use Claude Opus 4.5 via droid (their default)
         CLIType::Factory => "claude-opus-4-5-20251101",
-        // OpenHands: Default model
-        CLIType::OpenHands => "claude-opus-4-5-20251101",
-        // Grok: Use Grok 3
-        CLIType::Grok => "grok-3",
         // Gemini: Use Gemini 2.5 Flash (better quota availability)
         CLIType::Gemini => "gemini-2.5-flash",
-        // Qwen: Use Qwen Max
-        CLIType::Qwen => "qwen-max",
         // Dexter: Use Claude Sonnet 4
         CLIType::Dexter => "claude-sonnet-4-20250514",
     }
@@ -161,9 +153,6 @@ fn check_cli_available(cli_type: CLIType) -> bool {
         CLIType::Factory => "droid",
         CLIType::OpenCode => "opencode",
         CLIType::Gemini => "gemini",
-        CLIType::Grok => "grok",
-        CLIType::OpenHands => "openhands",
-        CLIType::Qwen => "qwen",
         CLIType::Dexter => "dexter-agent",
     };
 
@@ -538,7 +527,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         CLIType::Cursor,
         CLIType::Factory,
         CLIType::Gemini,
-        // Note: OpenHands, Grok, and Qwen are not currently used/installed
+        CLIType::Dexter,
     ];
 
     // Check availability and create configs

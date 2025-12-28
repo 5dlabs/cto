@@ -2,7 +2,7 @@
 //!
 //! Factory for creating CLI adapters based on CLI type.
 
-use crate::adapter::{AdapterError, AdapterResult, CliAdapter};
+use crate::adapter::{AdapterResult, CliAdapter};
 use crate::adapters::{
     ClaudeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter, GeminiAdapter,
     OpenCodeAdapter,
