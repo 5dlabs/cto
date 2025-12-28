@@ -380,10 +380,6 @@ impl CLITextGenerator {
                 // Dexter accepts prompts directly as the command argument
                 args.push(prompt.to_string());
             }
-            CLIType::Grok | CLIType::OpenHands | CLIType::Qwen => {
-                // Generic fallback
-                args.push(prompt.to_string());
-            }
         }
 
         args
