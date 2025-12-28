@@ -27,7 +27,7 @@ spec:
           persistence:
             enabled: true
             storageClass: "mayastor"  # High-performance NVMe storage
-            size: 20Gi
+            size: 50Gi
           # Resource allocation
           resources:
             limits:
