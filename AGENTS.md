@@ -2193,6 +2193,20 @@ All Dockerfiles use BuildKit cache mounts:
 - **First build**: ~5-10 minutes (downloads all dependencies)
 - **Subsequent builds**: ~1-2 minutes (uses cache)
 
+### Cluster Architecture: AMD64
+
+**Important:** The Kubernetes cluster runs on **AMD64 (linux/amd64)** architecture. When building images locally on Apple Silicon (M1/M2/M3), you must specify the platform:
+
+```bash
+# Build for AMD64 (required for cluster deployment)
+docker build --platform linux/amd64 --target local -f infra/images/controller/Dockerfile -t 192.168.1.77:30500/controller:dev-local .
+
+# Or set default platform in Docker Desktop settings
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
+**Common Error:** If you see `no match for platform in manifest: not found`, the image was built for the wrong architecture (arm64 instead of amd64).
+
 ### ArgoCD Integration
 
 ```bash
