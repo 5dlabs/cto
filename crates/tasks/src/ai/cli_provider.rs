@@ -177,9 +177,6 @@ impl CLITextGenerator {
             CLIType::Factory => "droid",
             CLIType::OpenCode => "opencode",
             CLIType::Gemini => "gemini",
-            CLIType::Grok => "grok",
-            CLIType::OpenHands => "openhands",
-            CLIType::Qwen => "qwen",
             CLIType::Dexter => "dexter-agent",
         };
 
@@ -210,9 +207,6 @@ impl CLITextGenerator {
             CLIType::Factory => "droid",
             CLIType::OpenCode => "opencode",
             CLIType::Gemini => "gemini",
-            CLIType::Grok => "grok",
-            CLIType::OpenHands => "openhands",
-            CLIType::Qwen => "qwen",
             CLIType::Dexter => "dexter-agent",
         };
 

@@ -36,11 +36,6 @@ impl AdapterFactory {
             CLIType::Factory => Arc::new(FactoryAdapter::with_config(config)?),
             CLIType::Gemini => Arc::new(GeminiAdapter::with_config(config)?),
             CLIType::OpenCode => Arc::new(OpenCodeAdapter::with_config(config)?),
-            CLIType::OpenHands | CLIType::Grok | CLIType::Qwen => {
-                return Err(AdapterError::UnsupportedCliType(format!(
-                    "{cli_type} adapter not yet implemented"
-                )));
-            }
         };
 
         debug!(cli_type = %cli_type, "Adapter created successfully");
@@ -89,9 +84,4 @@ mod tests {
         assert!(types.contains(&CLIType::Codex));
     }
 
-    #[test]
-    fn test_unsupported_type() {
-        let adapter = AdapterFactory::create(CLIType::OpenHands);
-        assert!(adapter.is_err());
-    }
 }
