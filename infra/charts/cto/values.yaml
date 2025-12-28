@@ -314,12 +314,11 @@ pm:
     # - api: Uses `tasks intake` binary (faster, default)
     # - cli: Uses AI CLI (claude, codex, etc.) for intake
     mode: api
-    # CLI to use when mode=cli (claude, codex, gemini, opencode)
+    # CLI to use when mode=cli - image is resolved from agent.cliImages[cli]
+    # Options: claude, cursor, codex, gemini, opencode, factory
     cli: claude
-    # Image for intake workflows
-    # - api mode: use "runtime" (smaller, has tasks CLI)
-    # - cli mode: use "factory" (has all AI CLIs)
-    image:
+    # Runtime image: Used in api mode (smaller, has tasks CLI)
+    runtimeImage:
       repository: ghcr.io/5dlabs/runtime
       tag: latest
 
