@@ -61,6 +61,25 @@ spec:
             - name: RUNTIME_IMAGE
               value: "{{ include "cto.imageRef" (dict "component" "runtime" "image" .Values.pm.intake.runtimeImage "global" .Values.global) }}"
             {{- end }}
+            # Model configuration for intake (task generation, research, docs)
+            {{- with .Values.pm.intake.models }}
+            - name: PRIMARY_MODEL
+              value: {{ .primary | default "claude-opus-4-5-20251101" | quote }}
+            - name: PRIMARY_PROVIDER
+              value: {{ .primaryProvider | default "anthropic" | quote }}
+            - name: RESEARCH_MODEL
+              value: {{ .research | default "claude-opus-4-5-20251101" | quote }}
+            - name: RESEARCH_PROVIDER
+              value: {{ .researchProvider | default "anthropic" | quote }}
+            - name: DOCS_MODEL
+              value: {{ .docs | default "claude-opus-4-5-20251101" | quote }}
+            - name: DOCS_PROVIDER
+              value: {{ .docsProvider | default "anthropic" | quote }}
+            - name: FALLBACK_MODEL
+              value: {{ .fallback | default "claude-sonnet-4-20250514" | quote }}
+            - name: FALLBACK_PROVIDER
+              value: {{ .fallbackProvider | default "anthropic" | quote }}
+            {{- end }}
             {{- if .Values.pm.github }}
             - name: WEBHOOK_CALLBACK_URL
               value: {{ .Values.pm.github.webhookCallbackUrl | quote }}

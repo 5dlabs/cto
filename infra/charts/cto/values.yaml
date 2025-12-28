@@ -315,12 +315,27 @@ pm:
     # - cli: Uses AI CLI (claude, codex, etc.) for intake
     mode: api
     # CLI to use when mode=cli - image is resolved from agent.cliImages[cli]
-    # Options: claude, cursor, codex, gemini, opencode, factory
+    # Options: claude, cursor, codex, gemini, opencode, factory, dexter
     cli: claude
     # Runtime image: Used in api mode (smaller, has tasks CLI)
     runtimeImage:
       repository: ghcr.io/5dlabs/runtime
       tag: latest
+    # Model configuration for intake workflows
+    # Using Opus 4.5 with extended thinking for complex task generation
+    models:
+      # Primary model for task generation (PRD → tasks)
+      primary: "claude-opus-4-5-20251101"
+      primaryProvider: "anthropic"
+      # Research model for analysis and context enrichment
+      research: "claude-opus-4-5-20251101"
+      researchProvider: "anthropic"
+      # Docs model for documentation generation
+      docs: "claude-opus-4-5-20251101"
+      docsProvider: "anthropic"
+      # Fallback model if primary fails
+      fallback: "claude-sonnet-4-20250514"
+      fallbackProvider: "anthropic"
 
   # Secrets
   secrets:

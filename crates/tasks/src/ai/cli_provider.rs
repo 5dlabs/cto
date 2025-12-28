@@ -21,8 +21,8 @@ use super::provider::{
 /// Default model for CLI-based generation
 const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
 
-/// Default model for extended thinking (Opus 4)
-pub const DEFAULT_THINKING_MODEL: &str = "claude-opus-4-1-20250805";
+/// Default model for extended thinking (Opus 4.5 - latest with thinking)
+pub const DEFAULT_THINKING_MODEL: &str = "claude-opus-4-5-20251101";
 
 /// CLI-based AI provider that uses CLI adapters for text generation.
 ///
