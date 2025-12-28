@@ -102,20 +102,22 @@ impl Default for IntakeConfig {
             runtime_image: env::var("RUNTIME_IMAGE")
                 .unwrap_or_else(|_| "ghcr.io/5dlabs/runtime:latest".to_string()),
             github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "cto-dev".to_string()),
+            // Opus 4.5 with extended thinking for complex intake tasks
             primary_model: env::var("PRIMARY_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
+                .unwrap_or_else(|_| "claude-opus-4-5-20251101".to_string()),
             primary_provider: env::var("PRIMARY_PROVIDER")
                 .unwrap_or_else(|_| "anthropic".to_string()),
             research_model: env::var("RESEARCH_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
+                .unwrap_or_else(|_| "claude-opus-4-5-20251101".to_string()),
             research_provider: env::var("RESEARCH_PROVIDER")
                 .unwrap_or_else(|_| "anthropic".to_string()),
+            // Fallback to Sonnet 4 (faster, cheaper) if Opus fails
             fallback_model: env::var("FALLBACK_MODEL")
                 .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
             fallback_provider: env::var("FALLBACK_PROVIDER")
                 .unwrap_or_else(|_| "anthropic".to_string()),
             docs_model: env::var("DOCS_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
+                .unwrap_or_else(|_| "claude-opus-4-5-20251101".to_string()),
             num_tasks: env::var("NUM_TASKS")
                 .ok()
                 .and_then(|s| s.parse().ok())

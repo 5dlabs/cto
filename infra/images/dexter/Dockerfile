@@ -82,10 +82,8 @@ RUN bun run --help || echo "Bun installed, dexter ready"
 
 WORKDIR /workspace
 
-# Configure git identity for agent operations
-USER node
-RUN git config --global user.name "5D Labs Agent" && \
-    git config --global user.email "agent@5dlabs.com"
+# Git identity will be configured at runtime via entrypoint
+# (The runtime base image already has git configured for the node user)
 
 # Environment defaults
 # Default to Claude Sonnet 4 for Anthropic compatibility
