@@ -35,8 +35,8 @@ global:
     # URL of the local registry (node-ip:nodeport)
     # Get this from: kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
     url: "192.168.1.77:30500"
-    # Tag for dev images (default: dev-local)
-    tag: "dev-local"
+    # Tag for dev images (matches Tilt build tags)
+    tag: "tilt-dev"
     # Pull policy for dev images (use Always to get latest pushes)
     pullPolicy: Always
     # Override specific components (leave empty to use defaults)
