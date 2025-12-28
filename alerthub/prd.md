@@ -4,6 +4,27 @@
 
 AlertHub is a comprehensive notification platform that routes alerts across web, mobile, and desktop clients. It supports multiple delivery channels (Slack, Discord, email, push notifications) with intelligent routing, rate limiting, and user preferences. Built as a microservices architecture to demonstrate multi-agent orchestration across different tech stacks.
 
+## Self-Hosted Philosophy
+
+AlertHub is designed to be **fully self-hosted** with no cloud service dependencies. All infrastructure components run on Kubernetes using open-source operators:
+
+| Capability | Self-Hosted Solution | Operator |
+|------------|---------------------|----------|
+| Database | PostgreSQL | CloudNative-PG |
+| Cache | Redis/Valkey | Redis Operator |
+| Event Streaming | Kafka | Strimzi |
+| Message Queue | RabbitMQ | RabbitMQ Operator |
+| Document Store | MongoDB | Percona Operator |
+| Object Storage | SeaweedFS | Helm |
+| Identity | Keycloak | Keycloak Operator |
+| Push (Android) | ntfy | Helm |
+| Push (iOS) | APNs Direct | N/A (Apple requirement) |
+| Email | Postal / Mailpit | Helm |
+
+**Note**: iOS push notifications require APNs (Apple Push Notification service) - this is an Apple platform requirement, not a cloud dependency. We connect directly to APNs without using Firebase/FCM as an intermediary.
+
+---
+
 ## Architecture Overview
 
 ```
@@ -115,8 +136,11 @@ Handles delivery to external channels (Slack, Discord, email, webhooks). Built w
 **Supported Channels**:
 - **Slack**: Incoming webhooks, Bot API
 - **Discord**: Webhooks
-- **Email**: SMTP (SendGrid, AWS SES)
-- **Push**: FCM for mobile
+- **Email**: Self-hosted SMTP via **Postal** (production) or **Mailpit** (development)
+- **Push**: 
+  - **ntfy** for Android (UnifiedPush protocol) - self-hosted
+  - **APNs** direct connection for iOS (Apple requirement, but no FCM wrapper)
+  - **Web Push** via VAPID keys (self-hosted)
 - **Webhook**: Custom HTTP endpoints
 
 **Core Features**:
@@ -156,7 +180,7 @@ const Integration = Schema.Struct({
   config: Schema.Union(
     Schema.Struct({ webhookUrl: Schema.String, channel: Schema.optional(Schema.String) }), // Slack
     Schema.Struct({ webhookUrl: Schema.String }), // Discord
-    Schema.Struct({ smtpHost: Schema.String, smtpPort: Schema.Number, fromAddress: Schema.String }), // Email
+    Schema.Struct({ smtpHost: Schema.String, smtpPort: Schema.Number, fromAddress: Schema.String, smtpUser: Schema.optional(Schema.String), smtpPassword: Schema.optional(Schema.String) }), // Email (self-hosted Postal/Mailpit)
     Schema.Struct({ url: Schema.String, headers: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })), secret: Schema.optional(Schema.String) }) // Webhook
   ),
   enabled: Schema.Boolean,
@@ -477,8 +501,10 @@ Receive push notifications and manage preferences on mobile.
 - `ProfileScreen` - User profile and logout
 
 **Core Features**:
-- Push notification registration (FCM/APNs)
-- Biometric authentication (Face ID, fingerprint)
+- Push notification registration:
+  - **iOS**: Direct APNs connection (Apple requirement)
+  - **Android**: UnifiedPush with self-hosted **ntfy** server
+- Biometric authentication (Face ID, fingerprint) via **Better Auth**
 - Offline notification caching
 - Pull-to-refresh
 - Deep linking to notification details
@@ -594,6 +620,36 @@ metadata:
   namespace: messaging
 spec:
   replicas: 1
+
+# Keycloak (Identity Provider)
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: alerthub-keycloak
+  namespace: identity
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    host: alerthub-postgres-rw.databases.svc
+    database: keycloak
+  http:
+    httpEnabled: true
+
+# ntfy (Self-hosted Push Notifications)
+# Deploy via Helm chart: helm install ntfy ntfy/ntfy
+# Provides UnifiedPush endpoint for Android
+# Web Push via VAPID keys
+```
+
+**Self-Hosted Email (Postal or Mailpit)**:
+```yaml
+# For development: Mailpit (simple SMTP testing)
+# Deploy: kubectl apply -f https://raw.githubusercontent.com/mailpit/mailpit/main/kubernetes/mailpit.yaml
+
+# For production: Postal (full-featured mail server)
+# Deploy via Helm chart with PostgreSQL backend
+# Provides: SMTP relay, delivery tracking, webhooks
 ```
 
 **Observability**:
@@ -619,6 +675,12 @@ spec:
 | Message Queue | Kafka (Strimzi), RabbitMQ | Kafka 3.8, RabbitMQ 3.12 |
 | Document Store | MongoDB (Percona) | MongoDB 7.0 |
 | Object Storage | SeaweedFS | Latest |
+| Identity Provider | Keycloak (Keycloak Operator) | Keycloak 24+ |
+| Authentication | Better Auth | Latest |
+| Push (Android) | ntfy (self-hosted) | Latest |
+| Push (iOS) | APNs (direct) | N/A |
+| Email (dev) | Mailpit | Latest |
+| Email (prod) | Postal | Latest |
 
 ---
 
@@ -635,11 +697,10 @@ spec:
 
 ## Non-Goals
 
-- SMS notifications (use third-party)
+- SMS notifications (requires carrier integration)
 - Voice calls
 - Video/voice chat
-- Self-hosted deployment documentation
-- Multi-region deployment (single cluster)
+- Multi-region deployment (single cluster for now)
 - Custom notification sounds on mobile
 
 ---

@@ -663,7 +663,6 @@ impl CLITextGenerator {
                 "gpt-5.1",
                 // Gemini and other models
                 "gemini-3-pro",
-                "grok",
                 // Auto/Composer
                 "composer-1",
                 "auto",
@@ -712,13 +711,6 @@ impl CLITextGenerator {
                 "gemini-1.5-pro",
                 "gemini-1.5-flash",
             ],
-            CLIType::Grok => vec!["grok-3", "grok-2", "grok-1"],
-            CLIType::OpenHands => vec![
-                "claude-opus-4-5-20251101",
-                "claude-sonnet-4-5-20250929",
-                "openhands-default",
-            ],
-            CLIType::Qwen => vec!["qwen-max", "qwen-plus", "qwen-turbo"],
             CLIType::Dexter => vec![
                 // Claude models
                 "claude-opus-4-5-20251101",
@@ -750,9 +742,6 @@ impl AIProvider for CLITextGenerator {
             CLIType::Factory => "cli-factory",
             CLIType::OpenCode => "cli-opencode",
             CLIType::Gemini => "cli-gemini",
-            CLIType::Grok => "cli-grok",
-            CLIType::OpenHands => "cli-openhands",
-            CLIType::Qwen => "cli-qwen",
             CLIType::Dexter => "cli-dexter",
         }
     }
@@ -766,9 +755,6 @@ impl AIProvider for CLITextGenerator {
             CLIType::Codex | CLIType::Factory | CLIType::OpenCode => "OPENAI_API_KEY",
             CLIType::Cursor => "CURSOR_API_KEY",
             CLIType::Gemini => "GOOGLE_API_KEY",
-            CLIType::Grok => "XAI_API_KEY",
-            CLIType::OpenHands => "OPENHANDS_API_KEY",
-            CLIType::Qwen => "DASHSCOPE_API_KEY",
         }
     }
 

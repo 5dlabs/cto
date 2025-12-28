@@ -1,0 +1,82 @@
+---
+# Mailpit - Self-hosted email testing server
+# License: MIT
+# Source: https://github.com/axllent/mailpit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: email
+  labels:
+    app.kubernetes.io/name: mailpit
+    app.kubernetes.io/component: smtp-server
+    app.kubernetes.io/part-of: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mailpit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mailpit
+        app.kubernetes.io/component: smtp-server
+    spec:
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:v1.21
+          ports:
+            - name: http
+              containerPort: 8025
+              protocol: TCP
+            - name: smtp
+              containerPort: 1025
+              protocol: TCP
+          env:
+            # Web UI settings
+            - name: MP_UI_BIND_ADDR
+              value: "0.0.0.0:8025"
+            # SMTP settings
+            - name: MP_SMTP_BIND_ADDR
+              value: "0.0.0.0:1025"
+            # Allow relay without auth for internal services
+            - name: MP_SMTP_AUTH_ALLOW_INSECURE
+              value: "true"
+            # Max message size (15MB)
+            - name: MP_MAX_MESSAGES
+              value: "5000"
+            # Database file for persistence
+            - name: MP_DATABASE
+              value: "/data/mailpit.db"
+            # Enable webroot for reverse proxy
+            - name: MP_WEBROOT
+              value: "/"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          emptyDir: {}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
