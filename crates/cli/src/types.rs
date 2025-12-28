@@ -10,10 +10,7 @@ const CLI_TYPE_VARIANTS: &[&str] = &[
     "opencode",
     "cursor",
     "factory",
-    "openhands",
-    "grok",
     "gemini",
-    "qwen",
     "dexter",
 ];
 
@@ -32,14 +29,8 @@ pub enum CLIType {
     Cursor,
     /// Factory Droid CLI
     Factory,
-    /// `OpenHands`
-    OpenHands,
-    /// Grok CLI
-    Grok,
     /// Google Gemini CLI
     Gemini,
-    /// Alibaba Qwen CLI
-    Qwen,
     /// Dexter Financial Research Agent
     Dexter,
 }
@@ -52,10 +43,7 @@ impl std::fmt::Display for CLIType {
             CLIType::OpenCode => write!(f, "opencode"),
             CLIType::Cursor => write!(f, "cursor"),
             CLIType::Factory => write!(f, "factory"),
-            CLIType::OpenHands => write!(f, "openhands"),
-            CLIType::Grok => write!(f, "grok"),
             CLIType::Gemini => write!(f, "gemini"),
-            CLIType::Qwen => write!(f, "qwen"),
             CLIType::Dexter => write!(f, "dexter"),
         }
     }
@@ -73,10 +61,7 @@ impl CLIType {
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),
             "factory" => Some(CLIType::Factory),
-            "openhands" | "open-hands" => Some(CLIType::OpenHands),
-            "grok" => Some(CLIType::Grok),
             "gemini" => Some(CLIType::Gemini),
-            "qwen" => Some(CLIType::Qwen),
             "dexter" => Some(CLIType::Dexter),
             _ => None,
         }
@@ -123,10 +108,8 @@ mod tests {
     #[test]
     fn deserializes_hyphenated_aliases() {
         let open_code: CLIType = serde_json::from_str("\"open-code\"").unwrap();
-        let open_hands: CLIType = serde_json::from_str("\"open-hands\"").unwrap();
 
         assert_eq!(open_code, CLIType::OpenCode);
-        assert_eq!(open_hands, CLIType::OpenHands);
     }
 
     #[test]

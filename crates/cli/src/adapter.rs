@@ -156,9 +156,9 @@ pub struct CliCapabilities {
 pub enum MemoryStrategy {
     /// Single markdown file (Claude: CLAUDE.md, Codex: AGENTS.md)
     MarkdownFile(String),
-    /// Subdirectory with multiple files (Grok: .grok/GROK.md)
+    /// Subdirectory with multiple files
     Subdirectory(String),
-    /// Session-based memory (Cursor, `OpenHands`)
+    /// Session-based memory (Cursor)
     SessionBased,
     /// Configuration-based persistence
     ConfigurationBased,
@@ -484,15 +484,6 @@ impl CommandBuilder {
             CLIType::Gemini => {
                 vec!["gemini".to_string(), task.to_string()]
             }
-            CLIType::Grok => {
-                vec!["grok".to_string(), task.to_string()]
-            }
-            CLIType::Qwen => {
-                vec!["qwen".to_string(), task.to_string()]
-            }
-            CLIType::OpenHands => {
-                vec!["openhands".to_string(), task.to_string()]
-            }
             CLIType::Dexter => {
                 vec!["dexter-agent".to_string(), task.to_string()]
             }
@@ -509,9 +500,6 @@ impl CommandBuilder {
             CLIType::OpenCode => vec!["opencode".to_string(), "--version".to_string()],
             CLIType::Factory => vec!["droid".to_string(), "--version".to_string()],
             CLIType::Gemini => vec!["gemini".to_string(), "--version".to_string()],
-            CLIType::Grok => vec!["grok".to_string(), "--version".to_string()],
-            CLIType::Qwen => vec!["qwen".to_string(), "--version".to_string()],
-            CLIType::OpenHands => vec!["openhands".to_string(), "--version".to_string()],
             CLIType::Dexter => vec!["dexter-agent".to_string(), "--version".to_string()],
         }
     }
@@ -526,9 +514,6 @@ impl CommandBuilder {
             CLIType::OpenCode => vec!["opencode".to_string(), "--help".to_string()],
             CLIType::Factory => vec!["droid".to_string(), "--help".to_string()],
             CLIType::Gemini => vec!["gemini".to_string(), "--help".to_string()],
-            CLIType::Grok => vec!["grok".to_string(), "--help".to_string()],
-            CLIType::Qwen => vec!["qwen".to_string(), "--help".to_string()],
-            CLIType::OpenHands => vec!["openhands".to_string(), "--help".to_string()],
             CLIType::Dexter => vec!["dexter-agent".to_string(), "--help".to_string()],
         }
     }
@@ -849,7 +834,7 @@ mod tests {
     #[test]
     fn test_memory_strategy_variants() {
         let claude_memory = MemoryStrategy::MarkdownFile("CLAUDE.md".to_string());
-        let grok_memory = MemoryStrategy::Subdirectory(".grok".to_string());
+        let subdir_memory = MemoryStrategy::Subdirectory(".config".to_string());
         let session_memory = MemoryStrategy::SessionBased;
 
         match claude_memory {
@@ -857,8 +842,8 @@ mod tests {
             _ => panic!("Expected MarkdownFile variant"),
         }
 
-        match grok_memory {
-            MemoryStrategy::Subdirectory(dir) => assert_eq!(dir, ".grok"),
+        match subdir_memory {
+            MemoryStrategy::Subdirectory(dir) => assert_eq!(dir, ".config"),
             _ => panic!("Expected Subdirectory variant"),
         }
 

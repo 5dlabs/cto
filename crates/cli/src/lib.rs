@@ -62,9 +62,7 @@
 //! - OpenCode
 //! - Factory Droid
 //! - Gemini CLI (Google)
-//! - Grok CLI (xAI)
-//! - Qwen CLI (Alibaba)
-//! - OpenHands
+//! - Dexter Agent
 //!
 //! ## Key Components
 //!
