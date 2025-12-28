@@ -313,7 +313,7 @@ pm:
     # Intake mode: "api" (direct API calls) or "cli" (use AI CLI)
     # - api: Uses `tasks intake` binary (faster, default)
     # - cli: Uses AI CLI (claude, codex, etc.) for intake
-    mode: api
+    mode: cli
     # CLI to use when mode=cli - image is resolved from agent.cliImages[cli]
     # Options: claude, cursor, codex, gemini, opencode, factory, dexter
     cli: claude
