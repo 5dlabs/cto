@@ -1,0 +1,40 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ntfy
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: ntfy
+    app.kubernetes.io/component: push-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ntfy
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ntfy
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: ntfy
+    app.kubernetes.io/component: push-server
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ntfy
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
