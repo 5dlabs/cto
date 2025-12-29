@@ -98,11 +98,11 @@ jobs:
         with:
           sccache-size: '50G'
 
-      - name: Build linear binary (pm-server)
+      - name: Build pm-server binary
         uses: ./.github/actions/rust-build
         with:
           package: pm
-          binary: linear
+          binary: pm-server
           use-sccache: 'true'
 
   # Helm chart validation
@@ -120,14 +120,14 @@ jobs:
 
       - name: Lint Helm chart
         run: |
-          echo "🔍 Linting PM Helm chart..."
-          helm lint infra/charts/pm
+          echo "🔍 Linting CTO Helm chart (contains PM templates)..."
+          helm lint infra/charts/cto
           echo "✅ Helm lint passed"
 
       - name: Template Helm chart
         run: |
           echo "📋 Testing Helm template rendering..."
-          helm template pm infra/charts/pm > /dev/null
+          helm template cto infra/charts/cto > /dev/null
           echo "✅ Helm template passed"
 
   # Security audit (non-blocking)
