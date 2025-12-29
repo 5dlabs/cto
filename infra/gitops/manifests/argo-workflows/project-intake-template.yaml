@@ -103,10 +103,10 @@ spec:
         description: "Linear team ID"
         value: ""
       # Runtime image (can be overridden for dev)
-      # Uses factory image which includes Claude CLI and other AI tools
+      # Uses claude image which includes the Anthropic Claude CLI
       - name: runtime-image
         description: "Container image for workflow steps"
-        value: "ghcr.io/5dlabs/factory:latest"
+        value: "ghcr.io/5dlabs/claude:latest"
 
   templates:
     # =========================================================================
