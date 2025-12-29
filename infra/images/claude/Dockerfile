@@ -16,9 +16,10 @@ RUN npm install -g @anthropic-ai/claude-code@${VERSION}
 
 # Setup workspace and user environment with proper permissions
 # Create all directories Claude CLI needs and ensure node user owns entire home
+# Use user/group name instead of UID because UID 1000 may be 'ubuntu' in base image
 RUN mkdir -p /workspace /home/node/.claude /home/node/.config /home/node/.cache && \
-    chown -R 1000:1000 /home/node && \
-    chown -R 1000:1000 /workspace
+    chown -R node:node /home/node && \
+    chown -R node:node /workspace
 
 WORKDIR /workspace
 
