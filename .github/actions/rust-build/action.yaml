@@ -58,8 +58,16 @@ runs:
           cargo build -p ${{ inputs.package }} --release
         fi
 
-        # Determine binary path
-        BINARY_PATH="target/release/$BINARY"
+        # Determine binary path - workspace builds put binaries at workspace root
+        # Use CARGO_TARGET_DIR if set, otherwise find workspace root
+        if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+          BINARY_PATH="${CARGO_TARGET_DIR}/release/$BINARY"
+        else
+          # Find workspace root by looking for Cargo.lock
+          WORKSPACE_ROOT=$(cargo metadata --no-deps --format-version 1 2>/dev/null | jq -r '.workspace_root' || pwd)
+          BINARY_PATH="${WORKSPACE_ROOT}/target/release/$BINARY"
+        fi
+        
         echo "binary-path=$BINARY_PATH" >> "$GITHUB_OUTPUT"
         echo "✅ Built: $BINARY_PATH"
         ls -lh "$BINARY_PATH"
