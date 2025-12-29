@@ -116,7 +116,7 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: infra/images/research/Dockerfile
-          failure-threshold: warning
+          failure-threshold: error
 
   # Build and push Docker image (only on push to main)
   build-docker:

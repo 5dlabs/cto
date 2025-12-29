@@ -171,7 +171,7 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: infra/images/tools/Dockerfile
-          failure-threshold: warning
+          failure-threshold: error
 
   # Security audit (non-blocking)
   security-audit:
