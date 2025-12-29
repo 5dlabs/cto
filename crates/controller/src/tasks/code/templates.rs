@@ -4396,7 +4396,9 @@ mod tests {
                 p
             }
             _ => {
-                tracing::warn!("AGENT_TEMPLATES_PATH not set or templates not found, skipping test");
+                tracing::warn!(
+                    "AGENT_TEMPLATES_PATH not set or templates not found, skipping test"
+                );
                 return;
             }
         };

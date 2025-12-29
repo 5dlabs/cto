@@ -789,11 +789,8 @@ impl PlayMonitor {
 
             if !trail.files_created.is_empty() {
                 probes.push(
-                    EvaluationProbe::new(
-                        ProbeType::Artifact,
-                        "What new files were created?",
-                    )
-                    .with_keywords(trail.files_created.clone()),
+                    EvaluationProbe::new(ProbeType::Artifact, "What new files were created?")
+                        .with_keywords(trail.files_created.clone()),
                 );
             }
 

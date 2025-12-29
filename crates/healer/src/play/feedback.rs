@@ -162,11 +162,7 @@ impl FeedbackEngine {
         results: &EvaluationResults,
     ) -> Result<Option<FeedbackResult>> {
         // Find failed probes
-        let failed_probes: Vec<_> = results
-            .probes
-            .iter()
-            .filter(|p| !p.passed)
-            .collect();
+        let failed_probes: Vec<_> = results.probes.iter().filter(|p| !p.passed).collect();
 
         if failed_probes.is_empty() {
             // All probes passed - reset consecutive failures
@@ -177,10 +173,7 @@ impl FeedbackEngine {
         }
 
         // Get or create history for this play and update failure counts
-        let history = self
-            .history
-            .entry(play_id.to_string())
-            .or_default();
+        let history = self.history.entry(play_id.to_string()).or_default();
 
         for probe in &failed_probes {
             let key = format!("{:?}", probe.probe.probe_type);
@@ -218,14 +211,22 @@ impl FeedbackEngine {
     }
 
     /// Check if an issue should be created based on failure history.
-    fn check_should_create_issue(&self, history: &FailureHistory, failed_probes: &[&ProbeResult]) -> bool {
+    fn check_should_create_issue(
+        &self,
+        history: &FailureHistory,
+        failed_probes: &[&ProbeResult],
+    ) -> bool {
         for probe in failed_probes {
             let key = format!("{:?}", probe.probe.probe_type);
             if let Some(count) = history.consecutive_failures.get(&key) {
                 if *count >= self.config.failure_threshold {
                     // Check if we already created an issue for this pattern
                     let fingerprint = format!("{}:{}", key, probe.probe.question);
-                    if !history.created_issues.iter().any(|i| i.contains(&fingerprint)) {
+                    if !history
+                        .created_issues
+                        .iter()
+                        .any(|i| i.contains(&fingerprint))
+                    {
                         return true;
                     }
                 }
@@ -389,15 +390,9 @@ Run verification: [specific command or check]"#
             return Ok(None);
         };
 
-        let title = format!(
-            "[CONTEXT-ENG] Agent prompt improvements needed for {play_id}"
-        );
+        let title = format!("[CONTEXT-ENG] Agent prompt improvements needed for {play_id}");
 
-        let failed_probes: Vec<_> = results
-            .probes
-            .iter()
-            .filter(|p| !p.passed)
-            .collect();
+        let failed_probes: Vec<_> = results.probes.iter().filter(|p| !p.passed).collect();
 
         let mut body = format!(
             r#"## Context Engineering Feedback
@@ -456,7 +451,12 @@ Run verification: [specific command or check]"#
 "#,
         );
 
-        let labels: Vec<&str> = self.config.issue_labels.iter().map(String::as_str).collect();
+        let labels: Vec<&str> = self
+            .config
+            .issue_labels
+            .iter()
+            .map(String::as_str)
+            .collect();
 
         match github.create_issue(&title, &body, &labels) {
             Ok(url) => {

@@ -252,9 +252,7 @@ impl AgentRouter {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!(
-                "Sidecar returned error: {status} - {body}"
-            ));
+            return Err(anyhow!("Sidecar returned error: {status} - {body}"));
         }
 
         debug!("Message sent successfully via HTTP");
@@ -281,9 +279,9 @@ impl AgentRouter {
 // Global Router Instance (for backward compatibility)
 // =============================================================================
 
-#[allow(clippy::non_std_lazy_statics)] // Using lazy_static for backward compatibility
 lazy_static::lazy_static! {
     /// Global agent router instance (created on first use).
+    #[allow(clippy::non_std_lazy_statics)] // Using lazy_static for backward compatibility
     static ref GLOBAL_ROUTER: Arc<RwLock<Option<AgentRouter>>> = Arc::new(RwLock::new(None));
 }
 
@@ -423,10 +421,7 @@ pub async fn find_running_agents(
         }
 
         // Get pod IP for direct HTTP communication
-        let pod_ip = pod
-            .status
-            .as_ref()
-            .and_then(|s| s.pod_ip.clone());
+        let pod_ip = pod.status.as_ref().and_then(|s| s.pod_ip.clone());
 
         // Determine container name and agent type
         let container_name = determine_main_container(&pod);
@@ -494,10 +489,7 @@ pub async fn find_agents_by_issue(
         }
 
         // Get pod IP for direct HTTP communication
-        let pod_ip = pod
-            .status
-            .as_ref()
-            .and_then(|s| s.pod_ip.clone());
+        let pod_ip = pod.status.as_ref().and_then(|s| s.pod_ip.clone());
 
         let container_name = determine_main_container(&pod);
         let agent_type = labels
@@ -583,9 +575,7 @@ pub async fn send_message_to_agent(agent: &RunningAgent, message: &AgentMessage)
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!(
-                "Sidecar returned error: {status} - {body}"
-            ));
+            return Err(anyhow!("Sidecar returned error: {status} - {body}"));
         }
 
         debug!(
@@ -986,9 +976,9 @@ mod tests {
     fn test_expected_pod_labels_for_routing() {
         // These are the labels the PM server expects to find on pods
         let expected_labels = vec![
-            "linear-session",              // For session-based routing
-            "cto.5dlabs.io/linear-issue",  // For issue-based routing
-            "cto.5dlabs.io/agent-type",    // For agent identification
+            "linear-session",             // For session-based routing
+            "cto.5dlabs.io/linear-issue", // For issue-based routing
+            "cto.5dlabs.io/agent-type",   // For agent identification
         ];
 
         // Verify label selectors are correctly formatted

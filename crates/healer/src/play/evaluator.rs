@@ -273,10 +273,8 @@ Answer the question based ONLY on the context provided above. Be specific and in
             }
         }
 
-        let mut evaluation = EvaluationResults::from_probes_with_threshold(
-            results,
-            self.config.pass_threshold,
-        );
+        let mut evaluation =
+            EvaluationResults::from_probes_with_threshold(results, self.config.pass_threshold);
         evaluation = evaluation.with_artifact_trail(artifact_trail.clone());
 
         info!(
@@ -327,10 +325,8 @@ Answer the question based ONLY on the context provided above. Be specific and in
             })
             .collect();
 
-        let mut evaluation = EvaluationResults::from_probes_with_threshold(
-            results,
-            self.config.pass_threshold,
-        );
+        let mut evaluation =
+            EvaluationResults::from_probes_with_threshold(results, self.config.pass_threshold);
         evaluation = evaluation.with_artifact_trail(artifact_trail.clone());
         evaluation
     }
@@ -409,9 +405,10 @@ mod tests {
     fn sample_artifact_trail() -> ArtifactTrail {
         let mut trail = ArtifactTrail::default();
         trail.files_created.push("src/new_module.rs".to_string());
-        trail
-            .files_modified
-            .insert("src/main.rs".to_string(), "added error handling".to_string());
+        trail.files_modified.insert(
+            "src/main.rs".to_string(),
+            "added error handling".to_string(),
+        );
         trail.files_read.push("Cargo.toml".to_string());
         trail
             .decisions_made
@@ -440,9 +437,7 @@ mod tests {
         assert!(!probes.is_empty());
 
         // Should have artifact probe for modified files
-        let artifact_probe = probes
-            .iter()
-            .find(|p| p.probe_type == ProbeType::Artifact);
+        let artifact_probe = probes.iter().find(|p| p.probe_type == ProbeType::Artifact);
         assert!(artifact_probe.is_some());
 
         // Should have continuation probe

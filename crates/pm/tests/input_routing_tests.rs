@@ -3,13 +3,7 @@
 //! These tests verify the end-to-end flow of routing messages from Linear
 //! to running agents via the sidecar's HTTP endpoint.
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use pm::handlers::{AgentMessage, CachedPodInfo, RunningAgent, SessionCache};
 use serde::Deserialize;
 use std::net::SocketAddr;
@@ -152,7 +146,11 @@ async fn test_running_agent_http_routing() {
     // Manually send via HTTP (simulating what send_message_to_agent does)
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("http://{}:{}/input", agent.pod_ip.as_ref().unwrap(), addr.port()))
+        .post(format!(
+            "http://{}:{}/input",
+            agent.pod_ip.as_ref().unwrap(),
+            addr.port()
+        ))
         .json(&serde_json::json!({ "text": "Test message from integration test" }))
         .send()
         .await
@@ -307,4 +305,3 @@ fn test_label_format_consistency() {
     assert!(session_selector.starts_with(expected_labels[0]));
     assert!(issue_selector.starts_with(expected_labels[1]));
 }
-

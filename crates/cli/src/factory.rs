@@ -83,5 +83,4 @@ mod tests {
         assert!(types.contains(&CLIType::Claude));
         assert!(types.contains(&CLIType::Codex));
     }
-
 }

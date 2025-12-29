@@ -1265,9 +1265,8 @@ async fn persist_artifact_trail(trail: &ArtifactTrail) {
 /// degrades in long sessions. Periodic injection of the summary helps
 /// maintain context accuracy.
 fn generate_artifact_summary_message(trail: &ArtifactTrail) -> String {
-    let mut summary = String::from(
-        "## Session Artifact Summary (Auto-injected for context retention)\n\n",
-    );
+    let mut summary =
+        String::from("## Session Artifact Summary (Auto-injected for context retention)\n\n");
 
     if !trail.files_created.is_empty() {
         summary.push_str("### Files Created\n");
@@ -1820,9 +1819,7 @@ async fn progress_monitor_task(
 
         // Also emit to Linear so user can see the nudge
         if let Some(ref client) = linear_client {
-            let linear_msg = format!(
-                "🔥 **Nudge (level {current_nudge_level})**: {nudge_message}"
-            );
+            let linear_msg = format!("🔥 **Nudge (level {current_nudge_level})**: {nudge_message}");
             let _ = client
                 .emit_thought(&config.linear_session_id, &linear_msg)
                 .await;
@@ -2081,8 +2078,13 @@ async fn main() -> Result<()> {
     let linear_client_clone = linear_client.clone();
     let shutdown_clone = shutdown.clone();
     let whip_handle = tokio::spawn(async move {
-        progress_monitor_task(config_clone, fifo_tx_for_whip, shutdown_clone, linear_client_clone)
-            .await;
+        progress_monitor_task(
+            config_clone,
+            fifo_tx_for_whip,
+            shutdown_clone,
+            linear_client_clone,
+        )
+        .await;
     });
 
     let config_clone = config.clone();
