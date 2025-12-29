@@ -1360,7 +1360,7 @@ pub fn create_github_pat_secret(kubeconfig: &Path, github_pat: &str) -> Result<(
 /// # Arguments
 ///
 /// * `kubeconfig` - Path to the kubeconfig file
-/// * `github_org` - GitHub organization URL (e.g., "https://github.com/5dlabs")
+/// * `github_org` - GitHub organization URL (e.g., `https://github.com/5dlabs`)
 /// * `runner_name` - Name for the runner scale set (e.g., "k8s-runner")
 /// * `min_runners` - Minimum number of runners to keep
 /// * `max_runners` - Maximum number of runners to scale to
@@ -1479,17 +1479,17 @@ template:
     Ok(())
 }
 
-/// Configure External Secrets Operator with OpenBao backend.
+/// Configure External Secrets Operator with `OpenBao` backend.
 ///
 /// **LESSON LEARNED (Dec 2024)**: External Secrets pods must run on control plane
 /// in multi-region setups. Webhook validation can fail immediately after patching -
-/// wait for pods to be ready before creating ClusterSecretStore.
+/// wait for pods to be ready before creating `ClusterSecretStore`.
 ///
 /// # Arguments
 ///
 /// * `kubeconfig` - Path to the kubeconfig file
-/// * `openbao_addr` - OpenBao address (e.g., "http://openbao.openbao.svc.cluster.local:8200")
-/// * `root_token` - OpenBao root token for initial setup
+/// * `openbao_addr` - `OpenBao` address (e.g., `http://openbao.openbao.svc.cluster.local:8200`)
+/// * `root_token` - `OpenBao` root token for initial setup
 /// * `schedule_on_control_plane` - If true, patches ESO to run on control plane
 ///
 /// # Errors

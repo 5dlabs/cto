@@ -2135,11 +2135,11 @@ mod tests {
 
             assert!(
                 linear.is_some(),
-                "CLI {cli_type:?} should have linear_integration when enabled"
+                "CLI {cli_type:?} should have linear_integration when enabled",
             );
             assert!(
                 linear.unwrap().enabled,
-                "CLI {cli_type:?} should have linear_integration.enabled = true"
+                "CLI {cli_type:?} should have linear_integration.enabled = true",
             );
         }
     }

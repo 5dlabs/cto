@@ -3558,9 +3558,7 @@ impl CodeTemplateGenerator {
             "blaze" | "nova" | "tap" | "spark" => "typescript",
             // Go agents
             "grizz" => "go",
-            // Support agents (no specific language)
-            "cleo" | "tess" | "cipher" | "atlas" | "bolt" | "morgan" | "stitch" => "",
-            // Default to empty (no language-specific setup)
+            // Support agents and others default to empty (no language-specific setup)
             _ => "",
         }
     }

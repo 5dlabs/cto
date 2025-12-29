@@ -569,18 +569,16 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
 
     // Use serde_json's streaming deserializer to parse concatenated JSON objects
     let deserializer = serde_json::Deserializer::from_str(&stdout);
-    for result in deserializer.into_iter::<serde_json::Value>() {
-        if let Ok(json) = result {
-            if let (Some(id), Some(link_type), kind) = (
-                json["metadata"]["id"].as_str(),
-                json["spec"]["type"].as_str(),
-                json["spec"]["kind"].as_str().unwrap_or(""),
-            ) {
-                // Physical NICs: type=ether, kind="" (empty means raw physical interface)
-                // Skip bonds, vlans, etc.
-                if link_type == "ether" && kind.is_empty() {
-                    physical_interfaces.push(id.to_string());
-                }
+    for json in deserializer.into_iter::<serde_json::Value>().flatten() {
+        if let (Some(id), Some(link_type), kind) = (
+            json["metadata"]["id"].as_str(),
+            json["spec"]["type"].as_str(),
+            json["spec"]["kind"].as_str().unwrap_or(""),
+        ) {
+            // Physical NICs: type=ether, kind="" (empty means raw physical interface)
+            // Skip bonds, vlans, etc.
+            if link_type == "ether" && kind.is_empty() {
+                physical_interfaces.push(id.to_string());
             }
         }
     }
@@ -593,8 +591,7 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
 
     if physical_interfaces.len() < 2 {
         bail!(
-            "Expected at least 2 physical interfaces, found: {:?}",
-            physical_interfaces
+            "Expected at least 2 physical interfaces, found: {physical_interfaces:?}",
         );
     }
 
@@ -615,18 +612,16 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
 
     // Use serde_json's streaming deserializer for concatenated JSON objects
     let deserializer = serde_json::Deserializer::from_str(&stdout);
-    for result in deserializer.into_iter::<serde_json::Value>() {
-        if let Ok(json) = result {
-            if let (Some(link), Some(address)) = (
-                json["spec"]["linkName"].as_str(),
-                json["spec"]["address"].as_str(),
-            ) {
-                // Check if this address matches our public IP
-                if address.starts_with(ip) || address.contains(&format!("{ip}/")) {
-                    primary_interface = Some(link.to_string());
-                    info!("Primary interface detected: {} (has IP {})", link, address);
-                    break;
-                }
+    for json in deserializer.into_iter::<serde_json::Value>().flatten() {
+        if let (Some(link), Some(address)) = (
+            json["spec"]["linkName"].as_str(),
+            json["spec"]["address"].as_str(),
+        ) {
+            // Check if this address matches our public IP
+            if address.starts_with(ip) || address.contains(&format!("{ip}/")) {
+                primary_interface = Some(link.to_string());
+                info!("Primary interface detected: {link} (has IP {address})");
+                break;
             }
         }
     }
