@@ -20,7 +20,7 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -279,11 +279,9 @@ impl AgentRouter {
 // Global Router Instance (for backward compatibility)
 // =============================================================================
 
-lazy_static::lazy_static! {
-    /// Global agent router instance (created on first use).
-    #[allow(clippy::non_std_lazy_statics)] // Using lazy_static for backward compatibility
-    static ref GLOBAL_ROUTER: Arc<RwLock<Option<AgentRouter>>> = Arc::new(RwLock::new(None));
-}
+/// Global agent router instance (created on first use).
+static GLOBAL_ROUTER: LazyLock<Arc<RwLock<Option<AgentRouter>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(None)));
 
 /// Initialize the global router (call once at startup).
 pub async fn init_global_router(kube_client: KubeClient, namespace: impl Into<String>) {
