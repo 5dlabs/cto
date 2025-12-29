@@ -691,23 +691,59 @@ data:
         echo "  → Stream file: $STREAM_FILE"
 
         # Build the intake prompt for Claude
-        PRD_CONTENT=$(cat .tasks/docs/prd.txt)
-        ARCH_CONTENT=""
-        [ -f ".tasks/docs/architecture.md" ] && ARCH_CONTENT=$(cat .tasks/docs/architecture.md)
+        # IMPORTANT: Write prompt to a file in the workspace for Claude to read
+        # PRD may contain backticks, dollar signs, parentheses, etc. that would
+        # break shell expansion if passed via command substitution $()
+        # Instead, we tell Claude to read the file directly from the workspace
+        INTAKE_PROMPT_FILE=".tasks/INTAKE_PROMPT.md"
+        {
+            echo "# Morgan Intake Task"
+            echo ""
+            echo "You are Morgan, an expert project manager and task decomposition specialist."
+            echo ""
+            echo "## Your Task"
+            echo ""
+            echo "Analyze the PRD below and generate $NUM_TASKS well-structured tasks."
+            echo ""
+            echo "## PRD Content"
+            echo ""
+            cat .tasks/docs/prd.txt
+            echo ""
+            if [ -f ".tasks/docs/architecture.md" ]; then
+                echo "## Architecture"
+                echo ""
+                cat .tasks/docs/architecture.md
+                echo ""
+            fi
+            echo "## Output Requirements"
+            echo ""
+            echo "Create atomic tasks with acceptance criteria, dependencies, and agent assignments."
+            echo "Save output to .tasks/tasks/tasks.json as JSON with a tasks array."
+            echo "Each task should have: id, title, description, agent, dependencies, acceptance_criteria."
+            echo ""
+            echo "The agents available are:"
+            echo "  Rex - Rust backend (axum, tokio, sqlx)"
+            echo "  Blaze - React/TypeScript frontend (Next.js, shadcn/ui)"
+            echo "  Grizz - Go backend (chi, grpc)"
+            echo "  Nova - Node.js/Bun backend (Elysia, Effect)"
+            echo "  Tap - Expo mobile app"
+            echo "  Spark - Electron desktop app"
+            echo "  Bolt - Infrastructure setup (Task 1 - databases, caches)"
+            echo "  Cleo - Quality assurance"
+            echo "  Cipher - Security analysis"
+            echo "  Tess - Testing"
+            echo "  Atlas - Integration"
+            echo ""
+            echo "Task 1 should always be Bolt for infrastructure setup if databases/caches are needed."
+        } > "$INTAKE_PROMPT_FILE"
 
-        # Build prompt - use simple string concatenation to avoid YAML parsing issues
-        INTAKE_PROMPT="You are Morgan, an expert project manager and task decomposition specialist."
-        INTAKE_PROMPT="$INTAKE_PROMPT Analyze the following PRD and generate $NUM_TASKS well-structured tasks."
-        INTAKE_PROMPT="$INTAKE_PROMPT PRD - $PRD_CONTENT"
-        INTAKE_PROMPT="$INTAKE_PROMPT Architecture - $ARCH_CONTENT"
-        INTAKE_PROMPT="$INTAKE_PROMPT Create atomic tasks with acceptance criteria, dependencies, and agent assignments."
-        INTAKE_PROMPT="$INTAKE_PROMPT Save output to .tasks/tasks/tasks.json as JSON with tasks array."
+        echo "  → Prompt file: $INTAKE_PROMPT_FILE ($(wc -c < "$INTAKE_PROMPT_FILE") bytes)"
 
         # Build Claude CLI command with stream-json output
         # Use --dangerously-skip-permissions for non-interactive mode
         if [ "$CLI_NAME" = "claude" ] || [ "$CLI_NAME" = "factory" ]; then
-            INTAKE_CMD="claude -p \"$INTAKE_PROMPT\" --output-format stream-json --dangerously-skip-permissions"
-            [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model opus"
+            CLAUDE_ARGS="--output-format stream-json --dangerously-skip-permissions"
+            [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && CLAUDE_ARGS="$CLAUDE_ARGS --model opus"
         else
             echo "❌ Unsupported CLI: $CLI_NAME"
             exit 1
@@ -717,8 +753,10 @@ data:
 
         echo "  → Running Claude CLI with stream-json..."
         set +e
-        # Run Claude and tee to both stream file (for sidecar) and stdout
-        eval "$INTAKE_CMD" 2>&1 | tee "$STREAM_FILE" | tee "$OUTPUT_FILE"
+        # Run Claude with a simple prompt that tells it to read the file
+        # This avoids ALL shell escaping issues since the PRD content stays in the file
+        # Claude will read INTAKE_PROMPT.md as part of its workspace context
+        claude -p "Read the file .tasks/INTAKE_PROMPT.md and follow all instructions within it. Generate the tasks.json file as specified." $CLAUDE_ARGS 2>&1 | tee "$STREAM_FILE" | tee "$OUTPUT_FILE"
         INTAKE_EXIT="${PIPESTATUS[0]}"
         set -e
 
