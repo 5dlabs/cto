@@ -36,6 +36,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
 
+# Workflow-level permissions for GHCR pushes
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-runtime:
     runs-on: [k8s-runner]
