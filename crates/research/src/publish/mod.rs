@@ -187,7 +187,7 @@ impl Publisher {
             }
         }
 
-        Err(anyhow::anyhow!("Entry file not found: {}", entry_id))
+        Err(anyhow::anyhow!("Entry file not found: {entry_id}"))
     }
 
     fn generate_pr_body(entries: &[String]) -> String {

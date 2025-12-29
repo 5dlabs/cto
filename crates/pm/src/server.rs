@@ -117,7 +117,7 @@ struct SessionInputRequest {
 
 /// Send input to a running agent session.
 ///
-/// POST /api/sessions/:session_id/input
+/// `POST /api/sessions/:session_id/input`
 ///
 /// Routes the message to the agent's sidecar via HTTP.
 async fn send_session_input(

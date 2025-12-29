@@ -48,7 +48,7 @@ impl GitPublisher {
             let stderr = String::from_utf8_lossy(&output.stderr);
             // Redact token from error message
             let safe_err = stderr.replace(token, "[REDACTED]");
-            return Err(anyhow::anyhow!("git clone failed: {}", safe_err));
+            return Err(anyhow::anyhow!("git clone failed: {safe_err}"));
         }
 
         // Configure git user
@@ -95,7 +95,7 @@ impl GitPublisher {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git fetch failed: {}", stderr));
+            return Err(anyhow::anyhow!("git fetch failed: {stderr}"));
         }
 
         // Create and checkout new branch
@@ -113,7 +113,7 @@ impl GitPublisher {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git checkout failed: {}", stderr));
+            return Err(anyhow::anyhow!("git checkout failed: {stderr}"));
         }
 
         Ok(())
@@ -133,7 +133,7 @@ impl GitPublisher {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git add failed: {}", stderr));
+            return Err(anyhow::anyhow!("git add failed: {stderr}"));
         }
 
         // Check if there are changes to commit
@@ -158,7 +158,7 @@ impl GitPublisher {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git commit failed: {}", stderr));
+            return Err(anyhow::anyhow!("git commit failed: {stderr}"));
         }
 
         Ok(())
@@ -180,7 +180,7 @@ impl GitPublisher {
             let stderr = String::from_utf8_lossy(&output.stderr);
             // Redact token from error
             let safe_err = stderr.replace(token, "[REDACTED]");
-            return Err(anyhow::anyhow!("git push failed: {}", safe_err));
+            return Err(anyhow::anyhow!("git push failed: {safe_err}"));
         }
 
         Ok(())

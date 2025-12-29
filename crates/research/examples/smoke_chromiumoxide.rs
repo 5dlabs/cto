@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Count tweets
     let bookmark_count = html.matches("data-testid=\"tweet\"").count();
-    println!("✅ Found {} tweets on bookmarks page", bookmark_count);
+    println!("✅ Found {bookmark_count} tweets on bookmarks page");
 
     // Extract cookies via JavaScript
     let cookies_js: String = page.evaluate("document.cookie").await?.into_value()?;

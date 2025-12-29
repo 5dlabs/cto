@@ -57,7 +57,7 @@ impl CachedPodInfo {
 /// Maps Linear session IDs to pod information for efficient routing.
 #[derive(Default)]
 pub struct SessionCache {
-    /// Map of session_id -> pod info.
+    /// Map of `session_id` -> pod info.
     entries: RwLock<HashMap<String, CachedPodInfo>>,
     /// Cache entry TTL (default: 5 minutes).
     ttl: Duration,
@@ -253,9 +253,7 @@ impl AgentRouter {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(anyhow!(
-                "Sidecar returned error: {} - {}",
-                status,
-                body
+                "Sidecar returned error: {status} - {body}"
             ));
         }
 
@@ -283,6 +281,7 @@ impl AgentRouter {
 // Global Router Instance (for backward compatibility)
 // =============================================================================
 
+#[allow(clippy::non_std_lazy_statics)] // Using lazy_static for backward compatibility
 lazy_static::lazy_static! {
     /// Global agent router instance (created on first use).
     static ref GLOBAL_ROUTER: Arc<RwLock<Option<AgentRouter>>> = Arc::new(RwLock::new(None));
@@ -568,7 +567,7 @@ pub async fn send_message_to_agent(agent: &RunningAgent, message: &AgentMessage)
 
     // If we have a pod IP, use HTTP directly
     if let Some(pod_ip) = &agent.pod_ip {
-        let url = format!("http://{}:8080/input", pod_ip);
+        let url = format!("http://{pod_ip}:8080/input");
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
@@ -585,9 +584,7 @@ pub async fn send_message_to_agent(agent: &RunningAgent, message: &AgentMessage)
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(anyhow!(
-                "Sidecar returned error: {} - {}",
-                status,
-                body
+                "Sidecar returned error: {status} - {body}"
             ));
         }
 
@@ -608,7 +605,7 @@ pub async fn send_message_to_agent(agent: &RunningAgent, message: &AgentMessage)
 
     // Use kubectl exec to write to the agent input file
     let shell_script = format!(
-        r#"
+        r"
         # Write to the standard input FIFO location
         if [ -p /workspace/agent-input.jsonl ]; then
             echo '{}' >> /workspace/agent-input.jsonl
@@ -617,7 +614,7 @@ pub async fn send_message_to_agent(agent: &RunningAgent, message: &AgentMessage)
         else
             echo '{}' >> /tmp/agent-input.jsonl
         fi
-        "#,
+        ",
         message_json.replace('\'', "'\\''"),
         message_json.replace('\'', "'\\''"),
         message_json.replace('\'', "'\\''")
@@ -889,7 +886,9 @@ mod tests {
             pod_ip: "10.0.0.1".to_string(),
             pod_name: "test-pod".to_string(),
             container_name: "main".to_string(),
-            created_at: Instant::now() - Duration::from_millis(200),
+            created_at: Instant::now()
+                .checked_sub(Duration::from_millis(200))
+                .expect("200ms ago should be valid"),
             agent_type: "rex".to_string(),
         };
         assert!(old_info.is_expired(ttl));

@@ -373,6 +373,11 @@ impl InventoryManager {
     ///
     /// # Example
     ///
+    /// # Panics
+    ///
+    /// This function will not panic as it checks for empty regions before accessing
+    /// the first element. The `expect` is only reached when `common_regions` is non-empty.
+    ///
     /// ```rust,ignore
     /// // Find a region that has both control plane and worker plans
     /// let region = manager.select_same_site_region(
@@ -421,10 +426,9 @@ impl InventoryManager {
 
         if common_regions.is_empty() {
             anyhow::bail!(
-                "No single site has stock for all plans: {:?}.\n\
+                "No single site has stock for all plans: {plans:?}.\n\
                  This would create a cross-site cluster with broken VLAN networking.\n\
-                 Consider using different plans or waiting for stock.",
-                plans
+                 Consider using different plans or waiting for stock."
             );
         }
 

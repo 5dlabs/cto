@@ -125,7 +125,7 @@ pub struct FeedbackResult {
 pub struct FeedbackEngine {
     config: FeedbackConfig,
     github: Option<GitHubClient>,
-    /// Failure history by play_id
+    /// Failure history by `play_id`
     history: HashMap<String, FailureHistory>,
 }
 
@@ -236,6 +236,7 @@ impl FeedbackEngine {
 
     /// Generate improvement suggestions based on failed probes.
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn generate_suggestions(&self, failed_probes: &[&ProbeResult]) -> Vec<PromptSuggestion> {
         let mut suggestions = Vec::new();
 
@@ -389,8 +390,7 @@ Run verification: [specific command or check]"#
         };
 
         let title = format!(
-            "[CONTEXT-ENG] Agent prompt improvements needed for {}",
-            play_id
+            "[CONTEXT-ENG] Agent prompt improvements needed for {play_id}"
         );
 
         let failed_probes: Vec<_> = results

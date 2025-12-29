@@ -431,7 +431,7 @@ pub struct EvaluationResults {
     pub probes: Vec<ProbeResult>,
     /// Overall score (weighted average)
     pub overall_score: f32,
-    /// Whether evaluation passed (overall_score >= threshold)
+    /// Whether evaluation passed (`overall_score >= threshold`)
     pub passed: bool,
     /// Passing threshold used
     pub threshold: f32,

@@ -85,7 +85,7 @@ async fn test_http_to_mock_sidecar() {
     // Send a message via HTTP
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("http://{}/input", addr))
+        .post(format!("http://{addr}/input"))
         .json(&serde_json::json!({ "text": "Hello from test!" }))
         .send()
         .await
@@ -129,7 +129,7 @@ async fn test_session_cache_caching() {
     assert!(miss.is_none());
 }
 
-/// Test RunningAgent with pod IP enables HTTP routing.
+/// Test `RunningAgent` with pod IP enables HTTP routing.
 #[tokio::test]
 async fn test_running_agent_http_routing() {
     // Start mock sidecar
@@ -173,7 +173,7 @@ async fn test_multiple_messages_same_session() {
     // Send multiple messages
     for i in 0..5 {
         let response = client
-            .post(format!("http://{}/input", addr))
+            .post(format!("http://{addr}/input"))
             .json(&serde_json::json!({ "text": format!("Message {}", i) }))
             .send()
             .await
@@ -281,11 +281,14 @@ async fn test_complete_message_flow() {
 #[test]
 fn test_label_format_consistency() {
     // These label keys must match what the controller generates
-    let _expected_labels = [
+    let expected_labels = [
         "linear-session",
         "cto.5dlabs.io/linear-issue",
         "cto.5dlabs.io/agent-type",
     ];
+
+    // Verify expected label count
+    assert_eq!(expected_labels.len(), 3, "Should have 3 expected labels");
 
     // The find_running_agents function expects these label selectors
     let session_id = "test-session-123";
@@ -299,5 +302,9 @@ fn test_label_format_consistency() {
     assert!(!issue_selector.contains(' '));
     assert!(session_selector.contains('='));
     assert!(issue_selector.contains('='));
+
+    // Verify selectors use expected label keys
+    assert!(session_selector.starts_with(expected_labels[0]));
+    assert!(issue_selector.starts_with(expected_labels[1]));
 }
 
