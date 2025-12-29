@@ -103,10 +103,10 @@ spec:
         description: "Linear team ID"
         value: ""
       # Runtime image (can be overridden for dev)
-      # Uses local dev registry when argocd-dev-mode is enabled
+      # Uses factory image which includes Claude CLI and other AI tools
       - name: runtime-image
         description: "Container image for workflow steps"
-        value: "ghcr.io/5dlabs/runtime:latest"
+        value: "ghcr.io/5dlabs/factory:latest"
 
   templates:
     # =========================================================================
