@@ -554,7 +554,7 @@ impl LinearApiClient {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct SessionUpdateInput {
-            external_url: String,
+            external_link: String,
         }
 
         #[derive(Serialize)]
@@ -564,7 +564,7 @@ impl LinearApiClient {
         }
 
         const MUTATION: &str = r"
-            mutation SetExternalUrl($id: String!, $input: AgentSessionUpdateInput!) {
+            mutation SetExternalLink($id: String!, $input: AgentSessionUpdateInput!) {
                 agentSessionUpdate(id: $id, input: $input) {
                     success
                 }
@@ -576,7 +576,7 @@ impl LinearApiClient {
             variables: Variables {
                 id: session_id.to_string(),
                 input: SessionUpdateInput {
-                    external_url: url.to_string(),
+                    external_link: url.to_string(),
                 },
             },
         };

@@ -301,9 +301,9 @@ pub struct AgentSessionUpdateInput {
     /// Updated plan (replaces existing plan entirely)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plan: Option<Vec<PlanStep>>,
-    /// External URL for the session
+    /// External link for the session (shown in Linear UI)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub external_url: Option<String>,
+    pub external_link: Option<String>,
 }
 
 impl AgentSessionUpdateInput {
@@ -312,16 +312,16 @@ impl AgentSessionUpdateInput {
     pub fn with_plan(plan: Vec<PlanStep>) -> Self {
         Self {
             plan: Some(plan),
-            external_url: None,
+            external_link: None,
         }
     }
 
-    /// Create input with just an external URL
+    /// Create input with just an external link
     #[must_use]
-    pub fn with_external_url(url: impl Into<String>) -> Self {
+    pub fn with_external_link(url: impl Into<String>) -> Self {
         Self {
             plan: None,
-            external_url: Some(url.into()),
+            external_link: Some(url.into()),
         }
     }
 }
