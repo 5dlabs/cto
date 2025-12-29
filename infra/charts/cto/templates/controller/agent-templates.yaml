@@ -51,6 +51,17 @@ data:
     set -euo pipefail
 
     # =========================================================================
+    # Output Parameter Handling
+    # Ensure Argo can always read the output parameter, even on failure
+    # =========================================================================
+    cleanup() {
+        if [ ! -f /tmp/repository-url ]; then
+            echo "ERROR: Script failed before setting repository URL" > /tmp/repository-url
+        fi
+    }
+    trap cleanup EXIT
+
+    # =========================================================================
     # Linear Agent Activity helpers (optional)
     # =========================================================================
     activity_enabled() {
@@ -159,8 +170,28 @@ data:
     echo "🔐 Setting up GitHub App authentication..."
     activity_action "GitHub auth" "${GITHUB_DEFAULT_ORG}/${REPO_NAME:-repo}"
 
+    # Debug: Check if credentials are present (without revealing values)
+    if [ -z "${GITHUB_APP_ID:-}" ]; then
+        echo "  ⚠️ GITHUB_APP_ID is not set"
+    else
+        echo "  ✓ GITHUB_APP_ID is set"
+    fi
+    if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+        echo "  ⚠️ GITHUB_APP_PRIVATE_KEY is not set"
+    else
+        KEY_LINES=$(echo "$GITHUB_APP_PRIVATE_KEY" | wc -l)
+        KEY_CHARS=$(echo "$GITHUB_APP_PRIVATE_KEY" | wc -c)
+        echo "  ✓ GITHUB_APP_PRIVATE_KEY present ($KEY_LINES lines, $KEY_CHARS chars)"
+        # Verify PEM format
+        if ! echo "$GITHUB_APP_PRIVATE_KEY" | grep -q "BEGIN RSA PRIVATE KEY"; then
+            echo "  ⚠️ Private key does not appear to be in PEM format"
+        else
+            echo "  ✓ Private key is in PEM format"
+        fi
+    fi
+
     if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
-        # Create JWT
+        # Create JWT using temp file for private key (more robust than process substitution)
         NOW=$(date +%s)
         IAT=$((NOW - 60))
         EXP=$((NOW + 600))
@@ -168,7 +199,12 @@ data:
         HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
         PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
         
-        SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        # Use temp file instead of process substitution for OpenSSL signing
+        KEY_FILE=$(mktemp)
+        echo "$GITHUB_APP_PRIVATE_KEY" > "$KEY_FILE"
+        chmod 600 "$KEY_FILE"
+        SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$KEY_FILE" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        rm -f "$KEY_FILE"
         JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
         
         # Get installation token with retries
@@ -533,7 +569,7 @@ data:
     if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
         echo "Generating fresh GitHub App token..."
         
-        # Create JWT
+        # Create JWT using temp file for private key (more robust than process substitution)
         NOW=$(date +%s)
         IAT=$((NOW - 60))
         EXP=$((NOW + 600))
@@ -541,7 +577,12 @@ data:
         HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
         PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
         
-        SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        # Use temp file instead of process substitution for OpenSSL signing
+        KEY_FILE=$(mktemp)
+        echo "$GITHUB_APP_PRIVATE_KEY" > "$KEY_FILE"
+        chmod 600 "$KEY_FILE"
+        SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$KEY_FILE" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+        rm -f "$KEY_FILE"
         JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
         
         # Get installation token
