@@ -177,11 +177,11 @@ jobs:
         with:
           sccache-size: '50G'
 
-      - name: Build linear binary
+      - name: Build pm-server binary
         uses: ./.github/actions/rust-build
         with:
           package: pm
-          binary: linear
+          binary: pm-server
           output-path: pm-server
           use-sccache: 'true'
 
