@@ -159,7 +159,7 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: infra/images/pm-server/Dockerfile
-          failure-threshold: warning
+          failure-threshold: error
 
   # Build and push Docker image (on push to main or develop)
   build-docker:
