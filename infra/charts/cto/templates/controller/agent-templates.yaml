@@ -625,47 +625,126 @@ data:
     [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && cp "$ARCH_FILE" ".tasks/docs/architecture.md"
 
     # =========================================================================
-    # Phase 5: Run Tasks CLI Intake
+    # Phase 5: Run Intake (API mode or CLI mode)
     # =========================================================================
     echo ""
-    echo "🚀 Phase 3: Running tasks CLI intake"
-    echo "====================================="
+    echo "🚀 Phase 3: Running intake (mode: ${INTAKE_MODE:-api})"
+    echo "======================================================="
 
-    # Verify tasks CLI is available
-    if ! command -v tasks &> /dev/null; then
-        echo "❌ tasks CLI not found in PATH"
-        exit 1
-    fi
-    echo "✓ tasks CLI found: $(which tasks)"
-    tasks --version 2>&1 || true
-
-    # Build intake command
-    INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
-
-    # Add architecture if present
-    [ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
-
-    # Add model if specified
-    [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
-
-    # Optionally skip expansion/analysis
-    [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
-    [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
-
-    activity_action "Run tasks intake" "$INTAKE_CMD"
-
-    echo "  → Running: $INTAKE_CMD"
     OUTPUT_FILE="$(mktemp)"
-    set +e
-    eval "$INTAKE_CMD" 2>&1 | tee "$OUTPUT_FILE"
-    INTAKE_EXIT="${PIPESTATUS[0]}"
-    set -e
-    if [ "$INTAKE_EXIT" -ne 0 ]; then
-        SNIPPET="$(tail -n 80 "$OUTPUT_FILE" 2>/dev/null || true)"
-        activity_error "tasks intake failed (exit $INTAKE_EXIT)\n\nLast output:\n\n$SNIPPET"
-        exit "$INTAKE_EXIT"
+
+    if [ "${INTAKE_MODE:-api}" = "cli" ]; then
+        # =====================================================================
+        # CLI Mode: Use Claude/Factory CLI with stream-json output
+        # The status-sync sidecar will parse the stream and send to Linear
+        # =====================================================================
+        echo "📡 Using CLI mode with real-time streaming to Linear"
+
+        # Determine which CLI to use
+        CLI_NAME="${INTAKE_CLI:-claude}"
+        echo "  → CLI: $CLI_NAME"
+
+        # Initialize the stream file for sidecar
+        STREAM_FILE="${CLAUDE_STREAM_FILE:-/workspace-shared/claude-stream.jsonl}"
+        touch "$STREAM_FILE"
+        echo "  → Stream file: $STREAM_FILE"
+
+        # Build the intake prompt for Claude
+        PRD_CONTENT=$(cat .tasks/docs/prd.txt)
+        ARCH_CONTENT=""
+        [ -f ".tasks/docs/architecture.md" ] && ARCH_CONTENT=$(cat .tasks/docs/architecture.md)
+
+        INTAKE_PROMPT="You are Morgan, an expert project manager and task decomposition specialist.
+
+Analyze the following PRD and generate ${NUM_TASKS} well-structured tasks for implementation.
+
+## PRD:
+${PRD_CONTENT}
+
+## Architecture (if provided):
+${ARCH_CONTENT}
+
+## Instructions:
+1. Create tasks that are atomic and independently implementable
+2. Include clear acceptance criteria for each task
+3. Identify dependencies between tasks
+4. Assign appropriate agents (Rex for Rust, Blaze for React, etc.)
+5. Save the output to .tasks/tasks/tasks.json
+
+Output format: JSON with tasks array containing id, title, description, agent, dependencies, and acceptance_criteria fields.
+
+Begin analysis and task generation now."
+
+        # Build Claude CLI command with stream-json output
+        # Use --dangerously-skip-permissions for non-interactive mode
+        if [ "$CLI_NAME" = "claude" ] || [ "$CLI_NAME" = "factory" ]; then
+            INTAKE_CMD="claude -p \"$INTAKE_PROMPT\" --output-format stream-json --dangerously-skip-permissions"
+            [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model opus"
+        else
+            echo "❌ Unsupported CLI: $CLI_NAME"
+            exit 1
+        fi
+
+        activity_action "Run Claude CLI intake" "$CLI_NAME"
+
+        echo "  → Running Claude CLI with stream-json..."
+        set +e
+        # Run Claude and tee to both stream file (for sidecar) and stdout
+        eval "$INTAKE_CMD" 2>&1 | tee "$STREAM_FILE" | tee "$OUTPUT_FILE"
+        INTAKE_EXIT="${PIPESTATUS[0]}"
+        set -e
+
+        # Signal completion to sidecar
+        echo '{"type":"result","result":{"type":"success"}}' >> "$STREAM_FILE"
+
+        if [ "$INTAKE_EXIT" -ne 0 ]; then
+            SNIPPET="$(tail -n 80 "$OUTPUT_FILE" 2>/dev/null || true)"
+            activity_error "Claude CLI intake failed (exit $INTAKE_EXIT)\n\nLast output:\n\n$SNIPPET"
+            exit "$INTAKE_EXIT"
+        fi
+        activity_thought_ephemeral "Claude CLI intake completed"
+    else
+        # =====================================================================
+        # API Mode: Use tasks CLI (direct API calls, faster)
+        # =====================================================================
+        echo "📋 Using API mode with tasks CLI"
+
+        # Verify tasks CLI is available
+        if ! command -v tasks &> /dev/null; then
+            echo "❌ tasks CLI not found in PATH"
+            exit 1
+        fi
+        echo "✓ tasks CLI found: $(which tasks)"
+        tasks --version 2>&1 || true
+
+        # Build intake command
+        INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
+
+        # Add architecture if present
+        [ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
+
+        # Add model if specified
+        [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
+
+        # Optionally skip expansion/analysis
+        [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
+        [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
+
+        activity_action "Run tasks intake" "$INTAKE_CMD"
+
+        echo "  → Running: $INTAKE_CMD"
+        set +e
+        eval "$INTAKE_CMD" 2>&1 | tee "$OUTPUT_FILE"
+        INTAKE_EXIT="${PIPESTATUS[0]}"
+        set -e
+
+        if [ "$INTAKE_EXIT" -ne 0 ]; then
+            SNIPPET="$(tail -n 80 "$OUTPUT_FILE" 2>/dev/null || true)"
+            activity_error "tasks intake failed (exit $INTAKE_EXIT)\n\nLast output:\n\n$SNIPPET"
+            exit "$INTAKE_EXIT"
+        fi
+        activity_thought_ephemeral "tasks intake completed successfully"
     fi
-    activity_thought_ephemeral "tasks intake completed successfully"
 
     # Verify tasks were generated
     TASKS_FILE=".tasks/tasks/tasks.json"

@@ -217,142 +217,15 @@ spec:
                   optional: true
 
     # =========================================================================
-    # Intake Container Step
+    # Intake Container Step (with status-sync sidecar for CLI streaming)
     # =========================================================================
-    # Runs the tasks CLI to parse PRD and generate tasks
+    # Runs the intake process with optional Claude CLI streaming.
+    # When intake-mode=cli, streams Claude output to Linear via sidecar.
     - name: intake-container
       inputs:
         parameters:
           - name: configmap-name
           - name: repository-url
-      container:
-        image: "{{workflow.parameters.runtime-image}}"
-        imagePullPolicy: Always
-        command: ["/bin/bash"]
-        args: ["/agent-templates/intake_intake.sh"]
-        workingDir: /workspace
-        env:
-          # Linear Agent Activity emission (pm-activity)
-          - name: LINEAR_SESSION_ID
-            value: "{{workflow.parameters.linear-session-id}}"
-          - name: LINEAR_ISSUE_ID
-            value: "{{workflow.parameters.linear-issue-id}}"
-          - name: LINEAR_ISSUE_IDENTIFIER
-            value: "{{workflow.parameters.linear-issue-identifier}}"
-          - name: LINEAR_API_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: linear-secrets
-                key: LINEAR_OAUTH_TOKEN
-          # AI Provider API Keys (all CLIs)
-          - name: ANTHROPIC_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: ANTHROPIC_API_KEY
-          - name: OPENAI_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: OPENAI_API_KEY
-          - name: GEMINI_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: GEMINI_API_KEY
-                optional: true
-          - name: GOOGLE_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: GOOGLE_API_KEY
-                optional: true
-          - name: CURSOR_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: CURSOR_API_KEY
-                optional: true
-          - name: XAI_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: XAI_API_KEY
-                optional: true
-          - name: PERPLEXITY_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: PERPLEXITY_API_KEY
-                optional: true
-          - name: CONTEXT7_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: agent-platform-secrets
-                key: CONTEXT7_API_KEY
-                optional: true
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: app-id
-                optional: true
-          - name: GITHUB_APP_PRIVATE_KEY
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: private-key
-                optional: true
-          - name: GITHUB_APP_CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: client-id
-                optional: true
-          - name: GITHUB_APP_CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: client-secret
-                optional: true
-          - name: GITHUB_APP
-            value: "{{workflow.parameters.github-app}}"
-          - name: PRIMARY_MODEL
-            value: "{{workflow.parameters.primary-model}}"
-          - name: RESEARCH_MODEL
-            value: "{{workflow.parameters.research-model}}"
-          - name: FALLBACK_MODEL
-            value: "{{workflow.parameters.fallback-model}}"
-          - name: PRIMARY_PROVIDER
-            value: "{{workflow.parameters.primary-provider}}"
-          - name: RESEARCH_PROVIDER
-            value: "{{workflow.parameters.research-provider}}"
-          - name: FALLBACK_PROVIDER
-            value: "{{workflow.parameters.fallback-provider}}"
-          - name: NUM_TASKS
-            value: "{{workflow.parameters.num-tasks}}"
-          - name: EXPAND_TASKS
-            value: "{{workflow.parameters.expand-tasks}}"
-          - name: ANALYZE_COMPLEXITY
-            value: "{{workflow.parameters.analyze-complexity}}"
-          # Intake mode configuration
-          - name: INTAKE_MODE
-            value: "{{workflow.parameters.intake-mode}}"
-          - name: INTAKE_CLI
-            value: "{{workflow.parameters.cli}}"
-          # Pass repository URL from github-prep step
-          - name: REPOSITORY_URL
-            value: "{{inputs.parameters.repository-url}}"
-        volumeMounts:
-          - name: intake-files
-            mountPath: /intake-files
-            readOnly: true
-          - name: agent-templates
-            mountPath: /agent-templates
-            readOnly: true
-          - name: agents-config
-            mountPath: /config/agents
-            readOnly: true
       volumes:
         - name: intake-files
           configMap:
@@ -390,6 +263,205 @@ spec:
         - name: agents-config
           configMap:
             name: controller-agents
+        # Shared volume for CLI stream output (sidecar reads, main writes)
+        - name: workspace-shared
+          emptyDir: {}
+      containerSet:
+        containers:
+          # Main intake container
+          - name: main
+            image: "{{workflow.parameters.runtime-image}}"
+            imagePullPolicy: Always
+            command: ["/bin/bash"]
+            args: ["/agent-templates/intake_intake.sh"]
+            workingDir: /workspace
+            env:
+              # Linear Agent Activity emission (pm-activity)
+              - name: LINEAR_SESSION_ID
+                value: "{{workflow.parameters.linear-session-id}}"
+              - name: LINEAR_ISSUE_ID
+                value: "{{workflow.parameters.linear-issue-id}}"
+              - name: LINEAR_ISSUE_IDENTIFIER
+                value: "{{workflow.parameters.linear-issue-identifier}}"
+              - name: LINEAR_TEAM_ID
+                value: "{{workflow.parameters.linear-team-id}}"
+              - name: LINEAR_API_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: linear-secrets
+                    key: LINEAR_OAUTH_TOKEN
+              # AI Provider API Keys (all CLIs)
+              - name: ANTHROPIC_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: ANTHROPIC_API_KEY
+              - name: OPENAI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: OPENAI_API_KEY
+              - name: GEMINI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: GEMINI_API_KEY
+                    optional: true
+              - name: GOOGLE_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: GOOGLE_API_KEY
+                    optional: true
+              - name: CURSOR_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: CURSOR_API_KEY
+                    optional: true
+              - name: XAI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: XAI_API_KEY
+                    optional: true
+              - name: PERPLEXITY_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: PERPLEXITY_API_KEY
+                    optional: true
+              - name: CONTEXT7_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: agent-platform-secrets
+                    key: CONTEXT7_API_KEY
+                    optional: true
+              - name: GITHUB_APP_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: github-app-5dlabs-morgan
+                    key: app-id
+                    optional: true
+              - name: GITHUB_APP_PRIVATE_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: github-app-5dlabs-morgan
+                    key: private-key
+                    optional: true
+              - name: GITHUB_APP_CLIENT_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: github-app-5dlabs-morgan
+                    key: client-id
+                    optional: true
+              - name: GITHUB_APP_CLIENT_SECRET
+                valueFrom:
+                  secretKeyRef:
+                    name: github-app-5dlabs-morgan
+                    key: client-secret
+                    optional: true
+              - name: GITHUB_APP
+                value: "{{workflow.parameters.github-app}}"
+              - name: PRIMARY_MODEL
+                value: "{{workflow.parameters.primary-model}}"
+              - name: RESEARCH_MODEL
+                value: "{{workflow.parameters.research-model}}"
+              - name: FALLBACK_MODEL
+                value: "{{workflow.parameters.fallback-model}}"
+              - name: PRIMARY_PROVIDER
+                value: "{{workflow.parameters.primary-provider}}"
+              - name: RESEARCH_PROVIDER
+                value: "{{workflow.parameters.research-provider}}"
+              - name: FALLBACK_PROVIDER
+                value: "{{workflow.parameters.fallback-provider}}"
+              - name: NUM_TASKS
+                value: "{{workflow.parameters.num-tasks}}"
+              - name: EXPAND_TASKS
+                value: "{{workflow.parameters.expand-tasks}}"
+              - name: ANALYZE_COMPLEXITY
+                value: "{{workflow.parameters.analyze-complexity}}"
+              # Intake mode configuration
+              - name: INTAKE_MODE
+                value: "{{workflow.parameters.intake-mode}}"
+              - name: INTAKE_CLI
+                value: "{{workflow.parameters.cli}}"
+              # Pass repository URL from github-prep step
+              - name: REPOSITORY_URL
+                value: "{{inputs.parameters.repository-url}}"
+              # Claude stream file path (shared with sidecar)
+              - name: CLAUDE_STREAM_FILE
+                value: "/workspace-shared/claude-stream.jsonl"
+            volumeMounts:
+              - name: intake-files
+                mountPath: /intake-files
+                readOnly: true
+              - name: agent-templates
+                mountPath: /agent-templates
+                readOnly: true
+              - name: agents-config
+                mountPath: /config/agents
+                readOnly: true
+              - name: workspace-shared
+                mountPath: /workspace-shared
+          # Status-sync sidecar for real-time CLI output streaming to Linear
+          - name: status-sync
+            image: ghcr.io/5dlabs/pm-server:latest
+            imagePullPolicy: Always
+            command: ["/usr/local/bin/status-sync"]
+            env:
+              # Linear session for activities
+              - name: LINEAR_SESSION_ID
+                value: "{{workflow.parameters.linear-session-id}}"
+              - name: LINEAR_ISSUE_ID
+                value: "{{workflow.parameters.linear-issue-id}}"
+              - name: LINEAR_TEAM_ID
+                value: "{{workflow.parameters.linear-team-id}}"
+              - name: LINEAR_OAUTH_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: linear-secrets
+                    key: LINEAR_OAUTH_TOKEN
+              # Workflow name for external URL
+              - name: WORKFLOW_NAME
+                value: "{{workflow.name}}"
+              - name: ARGO_WORKFLOW_URL
+                value: "https://argo.5dlabs.ai/workflows/cto/{{workflow.name}}"
+              # Task info for plan updates
+              - name: TASK_ID
+                value: "intake"
+              - name: TASK_DESCRIPTION
+                value: "PRD Analysis and Task Generation"
+              # File paths (shared with main container)
+              - name: CLAUDE_STREAM_FILE
+                value: "/workspace-shared/claude-stream.jsonl"
+              - name: STATUS_FILE
+                value: "/workspace-shared/status.json"
+              - name: LOG_FILE
+                value: "/workspace-shared/agent.log"
+              - name: INPUT_FIFO
+                value: "/workspace-shared/input.fifo"
+              # Service URLs
+              - name: LINEAR_SERVICE_URL
+                value: "http://cto-pm:8081"
+              - name: LINEAR_API_URL
+                value: "https://api.linear.app/graphql"
+              # Intervals (ms)
+              - name: STATUS_POLL_INTERVAL_MS
+                value: "2000"
+              - name: LOG_POST_INTERVAL_MS
+                value: "1000"
+              - name: STREAM_POLL_INTERVAL_MS
+                value: "500"
+              # HTTP server port
+              - name: HTTP_PORT
+                value: "8080"
+              # Whip cracking disabled for intake (use defaults)
+              - name: WHIP_CRACK_ENABLED
+                value: "false"
+            volumeMounts:
+              - name: workspace-shared
+                mountPath: /workspace-shared
 
     # =========================================================================
     # Cleanup Step
