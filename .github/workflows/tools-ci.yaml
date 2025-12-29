@@ -208,7 +208,7 @@ jobs:
         with:
           package: tools
           binary: tools-server
-          output-path: infra/images/tools/tools-server-linux
+          output-path: infra/images/tools/tools-server
           use-sccache: 'true'
 
       - name: Build cto-mcp
@@ -216,7 +216,7 @@ jobs:
         with:
           package: cto-mcp
           binary: cto-mcp
-          output-path: infra/images/tools/cto-mcp-linux
+          output-path: infra/images/tools/cto-mcp
           use-sccache: 'true'
 
       - name: Get version info
