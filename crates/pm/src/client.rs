@@ -1142,15 +1142,15 @@ impl LinearClient {
         Ok(response.agent_session_update.success)
     }
 
-    /// Set an external URL for the session.
+    /// Set an external link for the session.
     ///
     /// This URL opens the session in your dashboard when clicked.
-    /// Setting an external URL also prevents the session from being marked unresponsive.
+    /// Setting an external link also prevents the session from being marked unresponsive.
     ///
     /// # Errors
     /// Returns error if the API call fails.
     #[instrument(skip(self, url))]
-    pub async fn set_session_external_url(
+    pub async fn set_session_external_link(
         &self,
         session_id: &str,
         url: impl Into<String>,
@@ -1173,7 +1173,7 @@ impl LinearClient {
 
         let variables = Variables {
             id: session_id.to_string(),
-            input: AgentSessionUpdateInput::with_external_url(url),
+            input: AgentSessionUpdateInput::with_external_link(url),
         };
 
         let response: Response = self
