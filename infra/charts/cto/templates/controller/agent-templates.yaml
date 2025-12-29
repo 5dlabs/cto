@@ -218,9 +218,20 @@ data:
             if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
                 export GITHUB_TOKEN
                 export GH_TOKEN="$GITHUB_TOKEN"
-                git config --global credential.helper "!f() { echo \"password=$GITHUB_TOKEN\"; }; f"
-                git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-                echo "✅ GitHub authentication configured"
+                # Store credentials in a file and configure git to use it
+                # Fall back to /tmp if home isn't writable
+                CRED_FILE="$HOME/.git-credentials"
+                if ! mkdir -p "$HOME" 2>/dev/null || ! touch "$CRED_FILE" 2>/dev/null; then
+                    CRED_FILE="/tmp/.git-credentials"
+                fi
+                echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CRED_FILE"
+                chmod 600 "$CRED_FILE"
+                # Configure git to use credential file (use XDG config if home not writable)
+                export GIT_CONFIG_GLOBAL="/tmp/.gitconfig"
+                git config --file="$GIT_CONFIG_GLOBAL" credential.helper "store --file=$CRED_FILE"
+                git config --file="$GIT_CONFIG_GLOBAL" url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+                export GIT_TERMINAL_PROMPT=0
+                echo "✅ GitHub authentication configured (token-based)"
             else
                 echo "❌ Could not get installation token"
                 exit 1
@@ -596,9 +607,20 @@ data:
             if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
                 export GITHUB_TOKEN
                 export GH_TOKEN="$GITHUB_TOKEN"
-                git config --global credential.helper "!f() { echo \"password=$GITHUB_TOKEN\"; }; f"
-                git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-                echo "✅ GitHub authentication configured"
+                # Store credentials in a file and configure git to use it
+                # Fall back to /tmp if home isn't writable
+                CRED_FILE="$HOME/.git-credentials"
+                if ! mkdir -p "$HOME" 2>/dev/null || ! touch "$CRED_FILE" 2>/dev/null; then
+                    CRED_FILE="/tmp/.git-credentials"
+                fi
+                echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CRED_FILE"
+                chmod 600 "$CRED_FILE"
+                # Configure git to use credential file (use XDG config if home not writable)
+                export GIT_CONFIG_GLOBAL="/tmp/.gitconfig"
+                git config --file="$GIT_CONFIG_GLOBAL" credential.helper "store --file=$CRED_FILE"
+                git config --file="$GIT_CONFIG_GLOBAL" url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+                export GIT_TERMINAL_PROMPT=0
+                echo "✅ GitHub authentication configured (token-based)"
             else
                 echo "⚠️ Could not get installation token, using default auth"
             fi
