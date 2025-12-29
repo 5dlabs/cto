@@ -165,9 +165,10 @@ struct IntakeDefaults {
 
 impl Default for IntakeDefaults {
     fn default() -> Self {
-        // No defaults - require explicit configuration
+        // Provide sensible defaults for intake operations
+        // Morgan is the intake agent responsible for PRD processing
         IntakeDefaults {
-            github_app: String::new(),
+            github_app: "5DLabs-Morgan".to_string(),
             primary: ModelConfig {
                 model: String::new(),
                 provider: String::new(),

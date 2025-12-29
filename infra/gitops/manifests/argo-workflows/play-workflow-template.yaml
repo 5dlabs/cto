@@ -1200,6 +1200,13 @@ spec:
           LINEAR_ISSUE_ID="{{workflow.parameters.linear-issue-id}}"
           LINEAR_TEAM_ID="{{workflow.parameters.linear-team-id}}"
 
+          # Validate required parameters
+          if [ -z "$GITHUB_APP" ]; then
+            echo "ERROR: github-app parameter is empty or not set!"
+            echo "This usually means the agent selection failed or cto-config.json is misconfigured."
+            exit 1
+          fi
+
           cat > /tmp/coderun.yaml << MANIFEST_EOF
           apiVersion: agents.platform/v1
           kind: CodeRun

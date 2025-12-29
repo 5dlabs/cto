@@ -659,12 +659,18 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // GitHub App authentication only - no SSH volumes needed
-        let github_app = code_run.spec.github_app.as_ref().ok_or_else(|| {
-            tracing::error!("GitHub App is required for CodeRun authentication");
-            crate::tasks::types::Error::ConfigError(
-                "GitHub App is required for CodeRun authentication".to_string(),
-            )
-        })?;
+        // Validate github_app is present and non-empty
+        let github_app = code_run
+            .spec
+            .github_app
+            .as_ref()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                tracing::error!("GitHub App is required for CodeRun authentication and cannot be empty");
+                crate::tasks::types::Error::ConfigError(
+                    "GitHub App is required for CodeRun authentication and cannot be empty".to_string(),
+                )
+            })?;
 
         tracing::info!(
             "Using GitHub App authentication for CodeRun: {}",

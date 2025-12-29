@@ -524,7 +524,7 @@ impl CodeTemplateGenerator {
                 .docs_project_directory
                 .as_deref()
                 .unwrap_or(""),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "model": model.clone(),
             "cli_type": cli_type,
@@ -597,7 +597,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "cli_config": cli_config,
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "model": model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -911,7 +911,7 @@ impl CodeTemplateGenerator {
                 .docs_project_directory
                 .as_deref()
                 .unwrap_or(""),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "model": render_settings.model,
             "auto_level": render_settings.auto_level,
@@ -998,7 +998,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "cli_config": cli_config,
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "model": render_settings.model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1201,7 +1201,7 @@ impl CodeTemplateGenerator {
             "attempts": retry_count + 1,  // Current attempt number (1-indexed)
             "overwrite_memory": code_run.spec.overwrite_memory,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "model": code_run.spec.model,
             "cli_config": cli_config,
             "enable_docker": code_run.spec.enable_docker,
@@ -1340,7 +1340,7 @@ impl CodeTemplateGenerator {
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "model": cli_model.clone(), // Use cli_model for consistency
             "context_version": code_run.spec.context_version,
             "workflow_env_vars": workflow_env_vars,
@@ -1573,7 +1573,7 @@ impl CodeTemplateGenerator {
                 .docs_project_directory
                 .as_deref()
                 .unwrap_or(""),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             // Required template context variables
             "cli_type": cli_type,
@@ -1646,7 +1646,7 @@ impl CodeTemplateGenerator {
 
         let context = json!({
             "cli_config": cli_config,
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "model": model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -2447,7 +2447,7 @@ impl CodeTemplateGenerator {
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         use serde_json::to_string_pretty;
 
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let github_app = Self::get_github_app_or_default(code_run);
 
         debug!(
             "🐛 DEBUG: generate_client_config called for github_app='{}'",
@@ -2875,7 +2875,7 @@ impl CodeTemplateGenerator {
                 .docs_project_directory
                 .as_deref()
                 .unwrap_or(""),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "model": render_settings.model,
             // Required template context variables
@@ -2950,7 +2950,7 @@ impl CodeTemplateGenerator {
         let is_tanstack_stack = frontend_stack == "tanstack";
 
         let context = json!({
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "model": model,
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -3170,7 +3170,7 @@ impl CodeTemplateGenerator {
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "working_directory": Self::get_working_directory(code_run),
             "docs_branch": code_run.spec.docs_branch,
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "model": code_run.spec.model,
             "remote_tools": remote_tools,
@@ -3317,7 +3317,7 @@ impl CodeTemplateGenerator {
             "docs_repository_url": code_run.spec.docs_repository_url,
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
             "workflow_name": workflow_name,
             "remote_tools": remote_tools,
             "settings": cli_settings,
@@ -3393,7 +3393,7 @@ impl CodeTemplateGenerator {
         let context = json!({
             "service": code_run.spec.service,
             "working_directory": Self::get_working_directory(code_run),
-            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "github_app": Self::get_github_app_or_default(code_run),
         });
 
         handlebars
@@ -3469,7 +3469,7 @@ impl CodeTemplateGenerator {
                                                 "repository_url": code_run.spec.repository_url,
                                                 "docs_repository_url": code_run.spec.docs_repository_url,
                                                 "working_directory": Self::get_working_directory(code_run),
-                                                "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+                                                "github_app": Self::get_github_app_or_default(code_run),
                                             });
 
                                             match handlebars.render("hook", &context) {
@@ -3530,12 +3530,26 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
+    /// Get the github_app value with defensive handling for empty strings.
+    /// Returns the github_app if set and non-empty, otherwise returns "agent".
+    /// Used for template context where github_app should never be empty.
+    #[allow(dead_code)]
+    fn get_github_app_or_default(code_run: &CodeRun) -> &str {
+        code_run
+            .spec
+            .github_app
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .unwrap_or("agent")
+    }
+
     /// Get the lowercase agent name from the github_app field.
     /// Returns lowercase agent name (e.g., "5DLabs-Rex" -> "rex", "5DLabs-Tap" -> "tap")
     /// Templates use lowercase names for agent-specific conditionals.
+    /// Returns "agent" as default if github_app is None or empty.
     #[allow(dead_code)]
     fn get_agent_name(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("agent");
+        let github_app = Self::get_github_app_or_default(code_run);
 
         // Extract agent name from 5DLabs-AgentName pattern or use as-is
         // Return lowercase for consistent template matching
@@ -3614,7 +3628,7 @@ impl CodeTemplateGenerator {
     /// Get the system prompt template path for an agent based on github_app and job type.
     /// Returns path in format: agents/{agent}/{job}.md.hbs
     fn get_agent_system_prompt_template(code_run: &CodeRun) -> String {
-        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let github_app = Self::get_github_app_or_default(code_run);
         let job_type = Self::determine_job_type(code_run);
 
         // Map GitHub app to agent name
@@ -4528,6 +4542,46 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("No GitHub app specified"));
+    }
+
+    #[test]
+    fn test_get_agent_name_with_empty_github_app() {
+        // Test that empty github_app defaults to "agent"
+        let code_run = create_test_code_run(Some(String::new()));
+        let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
+        assert_eq!(
+            agent_name, "agent",
+            "Empty github_app should default to 'agent'"
+        );
+    }
+
+    #[test]
+    fn test_get_agent_name_with_none_github_app() {
+        // Test that None github_app defaults to "agent"
+        let code_run = create_test_code_run(None);
+        let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
+        assert_eq!(
+            agent_name, "agent",
+            "None github_app should default to 'agent'"
+        );
+    }
+
+    #[test]
+    fn test_get_agent_name_with_valid_github_app() {
+        // Test that valid github_app extracts correctly
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
+        assert_eq!(
+            agent_name, "rex",
+            "5DLabs-Rex should extract to 'rex'"
+        );
+
+        let code_run = create_test_code_run(Some("5DLabs-Tap".to_string()));
+        let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
+        assert_eq!(
+            agent_name, "tap",
+            "5DLabs-Tap should extract to 'tap'"
+        );
     }
 
     #[test]
