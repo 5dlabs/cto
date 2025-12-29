@@ -452,10 +452,7 @@ impl EvaluationResults {
     #[must_use]
     pub fn from_probes_with_threshold(probes: Vec<ProbeResult>, threshold: f32) -> Self {
         let total_weight: f32 = probes.iter().map(|p| p.probe.weight).sum();
-        let weighted_score: f32 = probes
-            .iter()
-            .map(|p| p.score * p.probe.weight)
-            .sum();
+        let weighted_score: f32 = probes.iter().map(|p| p.score * p.probe.weight).sum();
 
         let overall_score = if total_weight > 0.0 {
             weighted_score / total_weight

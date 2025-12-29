@@ -415,14 +415,15 @@ impl InventoryManager {
         }
 
         // Find regions that have ALL plans (intersection)
-        let common_regions: Vec<String> = plan_regions
-            .iter()
-            .skip(1)
-            .fold(plan_regions[0].clone(), |acc, regions| {
-                acc.into_iter()
-                    .filter(|r| regions.iter().any(|r2| r2.eq_ignore_ascii_case(r)))
-                    .collect()
-            });
+        let common_regions: Vec<String> =
+            plan_regions
+                .iter()
+                .skip(1)
+                .fold(plan_regions[0].clone(), |acc, regions| {
+                    acc.into_iter()
+                        .filter(|r| regions.iter().any(|r2| r2.eq_ignore_ascii_case(r)))
+                        .collect()
+                });
 
         if common_regions.is_empty() {
             anyhow::bail!(
@@ -441,10 +442,7 @@ impl InventoryManager {
 
         // Try preferred regions first (case-insensitive match)
         for pref in preferred {
-            if common_regions
-                .iter()
-                .any(|r| r.eq_ignore_ascii_case(pref))
-            {
+            if common_regions.iter().any(|r| r.eq_ignore_ascii_case(pref)) {
                 info!(
                     "Selected preferred region {} for same-site cluster with plans {:?}",
                     pref, plans
@@ -480,9 +478,10 @@ impl InventoryManager {
     /// This is a quick check without detailed stock level info.
     pub async fn has_stock(&mut self, plan: &str, region: &str) -> bool {
         match self.get_plan_availability(plan).await {
-            Ok(availability) => availability.regions.iter().any(|r| {
-                r.region.eq_ignore_ascii_case(region) && r.stock_level.is_available()
-            }),
+            Ok(availability) => availability
+                .regions
+                .iter()
+                .any(|r| r.region.eq_ignore_ascii_case(region) && r.stock_level.is_available()),
             Err(_) => false,
         }
     }

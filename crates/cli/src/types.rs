@@ -5,13 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const CLI_TYPE_VARIANTS: &[&str] = &[
-    "claude",
-    "codex",
-    "opencode",
-    "cursor",
-    "factory",
-    "gemini",
-    "dexter",
+    "claude", "codex", "opencode", "cursor", "factory", "gemini", "dexter",
 ];
 
 /// Supported CLI types

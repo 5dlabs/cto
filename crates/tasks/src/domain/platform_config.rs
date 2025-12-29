@@ -303,9 +303,7 @@ impl PlatformConfig {
     /// Get the appropriate image for intake based on mode.
     pub fn intake_image(&self) -> &str {
         // If image is explicitly set, use it
-        if !self.intake.image.is_empty()
-            && self.intake.image != "ghcr.io/5dlabs/runtime:latest"
-        {
+        if !self.intake.image.is_empty() && self.intake.image != "ghcr.io/5dlabs/runtime:latest" {
             return &self.intake.image;
         }
 

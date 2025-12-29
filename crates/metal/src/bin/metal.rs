@@ -1440,10 +1440,15 @@ async fn main() -> Result<()> {
                     );
                 }
 
-                println!("   ✅ Site validation passed: both nodes will be in {}", cp_site);
+                println!(
+                    "   ✅ Site validation passed: both nodes will be in {}",
+                    cp_site
+                );
             } else {
                 println!("\n⚠️  Warning: --control-plane-id not provided, skipping same-site validation.");
-                println!("   For VLAN networking, ensure worker is in the same site as control plane.");
+                println!(
+                    "   For VLAN networking, ensure worker is in the same site as control plane."
+                );
             }
 
             // Step 1: Create server with Ubuntu

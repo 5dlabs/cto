@@ -562,11 +562,11 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
 
     // Parse the JSON output to find physical interfaces
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Find all ether type interfaces that are up (physical NICs)
     // The talosctl JSON output contains multiple concatenated JSON objects
     let mut physical_interfaces: Vec<String> = Vec::new();
-    
+
     // Use serde_json's streaming deserializer to parse concatenated JSON objects
     let deserializer = serde_json::Deserializer::from_str(&stdout);
     for result in deserializer.into_iter::<serde_json::Value>() {
@@ -825,9 +825,15 @@ pub struct VlanConfig {
 ///
 /// Returns an error if talosctl fails to apply the config.
 pub fn apply_config_with_vlan(node_ip: &str, config_path: &Path, vlan: &VlanConfig) -> Result<()> {
-    info!("Applying Talos config to {node_ip} with VLAN IP {}...", vlan.private_ip_cidr);
+    info!(
+        "Applying Talos config to {node_ip} with VLAN IP {}...",
+        vlan.private_ip_cidr
+    );
     info!("  Config: {}", config_path.display());
-    info!("  VLAN: VID={}, Interface={}", vlan.vlan_id, vlan.parent_interface);
+    info!(
+        "  VLAN: VID={}, Interface={}",
+        vlan.vlan_id, vlan.parent_interface
+    );
 
     let vlan_patch = format!(
         "machine:
@@ -844,13 +850,7 @@ pub fn apply_config_with_vlan(node_ip: &str, config_path: &Path, vlan: &VlanConf
     );
 
     let output = Command::new("talosctl")
-        .args([
-            "apply-config",
-            "--insecure",
-            "--nodes",
-            node_ip,
-            "--file",
-        ])
+        .args(["apply-config", "--insecure", "--nodes", node_ip, "--file"])
         .arg(config_path)
         .args(["--config-patch", &vlan_patch])
         .output()
@@ -1105,7 +1105,11 @@ pub fn get_kubeconfig(node_ip: &str, talosconfig: &Path, output_path: &Path) -> 
 /// # Errors
 ///
 /// Returns an error if the timeout is exceeded before enough nodes are Ready.
-pub fn wait_for_node_ready(kubeconfig: &Path, expected_count: usize, timeout: Duration) -> Result<()> {
+pub fn wait_for_node_ready(
+    kubeconfig: &Path,
+    expected_count: usize,
+    timeout: Duration,
+) -> Result<()> {
     let start = Instant::now();
 
     info!(
@@ -1138,7 +1142,10 @@ pub fn wait_for_node_ready(kubeconfig: &Path, expected_count: usize, timeout: Du
                 let ready_count = status.split_whitespace().filter(|s| *s == "True").count();
 
                 if ready_count >= expected_count {
-                    info!("✅ {}/{} Kubernetes node(s) are Ready!", ready_count, expected_count);
+                    info!(
+                        "✅ {}/{} Kubernetes node(s) are Ready!",
+                        ready_count, expected_count
+                    );
                     return Ok(());
                 }
 

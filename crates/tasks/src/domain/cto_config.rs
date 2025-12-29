@@ -825,10 +825,12 @@ pub async fn save_cto_config(config: &CtoConfig, output_dir: &Path) -> TasksResu
 
     // Ensure directory exists
     if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent).await.map_err(|e| TasksError::FileWriteError {
-            path: parent.display().to_string(),
-            reason: e.to_string(),
-        })?;
+        fs::create_dir_all(parent)
+            .await
+            .map_err(|e| TasksError::FileWriteError {
+                path: parent.display().to_string(),
+                reason: e.to_string(),
+            })?;
     }
 
     let content = serde_json::to_string_pretty(config)?;
@@ -839,7 +841,10 @@ pub async fn save_cto_config(config: &CtoConfig, output_dir: &Path) -> TasksResu
             reason: e.to_string(),
         })?;
 
-    tracing::info!("Generated cto-config.json with {} agents", config.agents.len());
+    tracing::info!(
+        "Generated cto-config.json with {} agents",
+        config.agents.len()
+    );
 
     Ok(())
 }
@@ -991,11 +996,17 @@ mod tests {
 
         // Blaze should have shadcn tools
         let blaze = config.agents.get("blaze").unwrap();
-        assert!(blaze.tools.remote.contains(&"shadcn_list_components".to_string()));
+        assert!(blaze
+            .tools
+            .remote
+            .contains(&"shadcn_list_components".to_string()));
 
         // Bolt should have kubernetes tools
         let bolt = config.agents.get("bolt").unwrap();
-        assert!(bolt.tools.remote.contains(&"kubernetes_applyResource".to_string()));
+        assert!(bolt
+            .tools
+            .remote
+            .contains(&"kubernetes_applyResource".to_string()));
 
         // Support agents should have global tech tools for context
         let cleo = config.agents.get("cleo").unwrap();
@@ -1009,13 +1020,7 @@ mod tests {
         task.agent_hint = Some("rex".to_string());
 
         let tasks = vec![task];
-        let config = generate_cto_config(
-            &tasks,
-            "5dlabs/test",
-            "test",
-            "5dlabs/test",
-            "docs/test",
-        );
+        let config = generate_cto_config(&tasks, "5dlabs/test", "test", "5dlabs/test", "docs/test");
 
         // Rex should be included based on agent_hint
         assert!(config.agents.contains_key("rex"));
