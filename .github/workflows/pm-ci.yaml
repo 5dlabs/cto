@@ -203,3 +203,4 @@ jobs:
           version: ${{ steps.version.outputs.version }}
           short-sha: ${{ steps.version.outputs.short-sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag-latest: 'true'
