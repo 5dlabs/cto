@@ -149,14 +149,14 @@ jobs:
 
       - name: Lint Helm chart
         run: |
-          echo "🔍 Linting tools Helm chart..."
-          helm lint infra/charts/tools
+          echo "🔍 Linting CTO Helm chart (contains tools templates)..."
+          helm lint infra/charts/cto
           echo "✅ Helm lint passed"
 
       - name: Template Helm chart
         run: |
           echo "📋 Testing Helm template rendering..."
-          helm template tools infra/charts/tools > /dev/null
+          helm template cto infra/charts/cto > /dev/null
           echo "✅ Helm template passed"
 
   # Dockerfile validation
