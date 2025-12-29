@@ -408,7 +408,7 @@ spec:
           - name: status-sync
             image: ghcr.io/5dlabs/linear-sidecar:latest
             imagePullPolicy: Always
-            command: ["/usr/local/bin/status-sync"]
+            command: ["/app/status-sync"]
             env:
               # Linear session for activities
               - name: LINEAR_SESSION_ID
