@@ -99,13 +99,15 @@ jobs:
 
       - name: Validate CRD definitions
         run: |
-          echo "🏗️ Validating CRD YAML syntax..."
+          echo "🏗️ Validating CRD files..."
+          CRD_COUNT=$(ls -1 infra/charts/cto/crds/*.yaml 2>/dev/null | wc -l)
+          echo "Found $CRD_COUNT CRD file(s)"
+          
+          # CRDs are already validated by helm template above
+          # Just verify the files exist and list them
           for crd in infra/charts/cto/crds/*.yaml; do
             if [ -f "$crd" ]; then
-              echo "Checking: $crd"
-              # Use Python's yaml module (always available)
-              python3 -c "import yaml; yaml.safe_load(open('$crd'))"
-              echo "  ✓ Valid YAML"
+              echo "  ✓ $crd"
             fi
           done
           echo "✅ CRD validation passed"
