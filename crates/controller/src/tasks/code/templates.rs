@@ -3548,7 +3548,7 @@ impl CodeTemplateGenerator {
     /// Get the task language based on agent type.
     /// Used for language-specific conditionals in templates (e.g., node-env, go-env).
     /// Returns lowercase language identifier.
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::match_same_arms)] // Explicit match for documentation
     fn get_task_language(code_run: &CodeRun) -> &'static str {
         let agent_name = Self::get_agent_name(code_run);
         match agent_name.as_str() {
@@ -4396,7 +4396,7 @@ mod tests {
                 p
             }
             _ => {
-                eprintln!("AGENT_TEMPLATES_PATH not set or templates not found, skipping test");
+                tracing::warn!("AGENT_TEMPLATES_PATH not set or templates not found, skipping test");
                 return;
             }
         };

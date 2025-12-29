@@ -14,6 +14,7 @@ pub struct DigestGenerator;
 impl DigestGenerator {
     /// Generate HTML email content with AI analysis.
     #[must_use]
+    #[allow(clippy::uninlined_format_args)] // Named args used for readability in large HTML template
     pub fn generate_html(
         entries: &[&IndexEntry],
         analysis: Option<&DigestAnalysis>,
@@ -364,7 +365,6 @@ impl DigestGenerator {
                 {tips_html}
             </div>
 "#,
-                tips_html = tips_html,
             );
         }
 

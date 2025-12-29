@@ -2135,13 +2135,11 @@ mod tests {
 
             assert!(
                 linear.is_some(),
-                "CLI {:?} should have linear_integration when enabled",
-                cli_type
+                "CLI {cli_type:?} should have linear_integration when enabled"
             );
             assert!(
                 linear.unwrap().enabled,
-                "CLI {:?} should have linear_integration.enabled = true",
-                cli_type
+                "CLI {cli_type:?} should have linear_integration.enabled = true"
             );
         }
     }
@@ -2182,8 +2180,7 @@ mod tests {
 
                 assert!(
                     linear.is_some() && linear.unwrap().enabled,
-                    "Combination {agent} + {:?} should support sidecar",
-                    cli_type
+                    "Combination {agent} + {cli_type:?} should support sidecar"
                 );
                 tested_combinations += 1;
             }
@@ -2268,8 +2265,7 @@ mod tests {
             let code_run = create_test_code_run_with_linear("5DLabs-Rex", cli_type, false);
             assert!(
                 code_run.spec.enable_docker,
-                "CLI {:?} should have Docker enabled by default",
-                cli_type
+                "CLI {cli_type:?} should have Docker enabled by default"
             );
         }
     }
@@ -2308,8 +2304,7 @@ mod tests {
                 let code_run = create_test_code_run_with_linear(agent, *cli_type, false);
                 assert!(
                     code_run.spec.enable_docker,
-                    "Combination {agent} + {:?} should have Docker enabled by default",
-                    cli_type
+                    "Combination {agent} + {cli_type:?} should have Docker enabled by default"
                 );
                 tested_combinations += 1;
             }
@@ -2380,16 +2375,14 @@ mod tests {
                 // Verify Docker daemon sidecar will be added
                 assert!(
                     code_run.spec.enable_docker,
-                    "{agent} + {:?}: Docker daemon should be enabled",
-                    cli_type
+                    "{agent} + {cli_type:?}: Docker daemon should be enabled"
                 );
 
                 // Verify Linear sidecar will be added
                 let linear = code_run.spec.linear_integration.as_ref();
                 assert!(
                     linear.is_some() && linear.unwrap().enabled,
-                    "{agent} + {:?}: Linear sidecar should be enabled",
-                    cli_type
+                    "{agent} + {cli_type:?}: Linear sidecar should be enabled"
                 );
 
                 tested += 1;

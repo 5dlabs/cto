@@ -1193,17 +1193,15 @@ async fn claude_stream_task(config: Arc<Config>, linear_client: Option<LinearApi
                             if config.artifact_injection_enabled
                                 && turn_count - last_injection_turn
                                     >= config.artifact_injection_interval_turns
-                            {
-                                if inject_artifact_summary(&config.input_fifo, &artifact_trail)
+                                && inject_artifact_summary(&config.input_fifo, &artifact_trail)
                                     .await
-                                {
-                                    last_injection_turn = turn_count;
-                                    debug!(
-                                        turn = turn_count,
-                                        interval = config.artifact_injection_interval_turns,
-                                        "Artifact summary injected"
-                                    );
-                                }
+                            {
+                                last_injection_turn = turn_count;
+                                debug!(
+                                    turn = turn_count,
+                                    interval = config.artifact_injection_interval_turns,
+                                    "Artifact summary injected"
+                                );
                             }
                         }
 
@@ -1274,7 +1272,8 @@ fn generate_artifact_summary_message(trail: &ArtifactTrail) -> String {
     if !trail.files_created.is_empty() {
         summary.push_str("### Files Created\n");
         for file in &trail.files_created {
-            summary.push_str(&format!("- {file}\n"));
+            use std::fmt::Write;
+            let _ = writeln!(summary, "- {file}");
         }
         summary.push('\n');
     }
@@ -1282,7 +1281,8 @@ fn generate_artifact_summary_message(trail: &ArtifactTrail) -> String {
     if !trail.files_modified.is_empty() {
         summary.push_str("### Files Modified\n");
         for (file, change) in &trail.files_modified {
-            summary.push_str(&format!("- {file}: {change}\n"));
+            use std::fmt::Write;
+            let _ = writeln!(summary, "- {file}: {change}");
         }
         summary.push('\n');
     }
@@ -1290,7 +1290,8 @@ fn generate_artifact_summary_message(trail: &ArtifactTrail) -> String {
     if !trail.decisions_made.is_empty() {
         summary.push_str("### Key Decisions\n");
         for decision in &trail.decisions_made {
-            summary.push_str(&format!("- {decision}\n"));
+            use std::fmt::Write;
+            let _ = writeln!(summary, "- {decision}");
         }
         summary.push('\n');
     }
@@ -1340,6 +1341,7 @@ async fn inject_artifact_summary(input_fifo: &str, trail: &ArtifactTrail) -> boo
 
 /// Track tool invocation state for proper action activities
 #[derive(Default)]
+#[allow(clippy::struct_field_names)]
 struct ToolState {
     current_tool: Option<String>,
     current_input: Option<String>,
@@ -1387,7 +1389,7 @@ async fn process_stream_event(
                             // Store state for pairing with result
                             tool_state.current_tool = Some(name.clone());
                             tool_state.current_input = Some(input_summary.clone());
-                            tool_state.current_input_json = input.clone();
+                            tool_state.current_input_json.clone_from(input);
 
                             // Emit action activity (tool in progress)
                             client.emit_action(session_id, name, &input_summary).await?;
@@ -1433,7 +1435,7 @@ async fn process_stream_event(
             // Track file operations for artifact trail (context engineering)
             let is_success = tool_use_result
                 .as_ref()
-                .map_or(true, |r| !r.contains("error") && !r.contains("Error"));
+                .is_none_or(|r| !r.contains("error") && !r.contains("Error"));
 
             if is_success {
                 if let Some(ref input_json) = tool_input_json {
@@ -1687,6 +1689,7 @@ async fn fifo_writer_task(config: Arc<Config>, mut fifo_rx: mpsc::Receiver<Strin
 /// 1. Firm reminder to focus
 /// 2. Sharp directive to execute NOW
 /// 3. Critical warning with timeout threat
+#[allow(clippy::too_many_lines)]
 async fn progress_monitor_task(
     config: Arc<Config>,
     fifo_tx: mpsc::Sender<String>,
@@ -1789,8 +1792,7 @@ async fn progress_monitor_task(
             .cloned()
             .unwrap_or_else(|| {
                 format!(
-                    "⚠️ Agent appears stalled (level {}). Please continue with the task.",
-                    current_nudge_level
+                    "⚠️ Agent appears stalled (level {current_nudge_level}). Please continue with the task."
                 )
             });
 
@@ -1819,8 +1821,7 @@ async fn progress_monitor_task(
         // Also emit to Linear so user can see the nudge
         if let Some(ref client) = linear_client {
             let linear_msg = format!(
-                "🔥 **Nudge (level {})**: {}",
-                current_nudge_level, nudge_message
+                "🔥 **Nudge (level {current_nudge_level})**: {nudge_message}"
             );
             let _ = client
                 .emit_thought(&config.linear_session_id, &linear_msg)

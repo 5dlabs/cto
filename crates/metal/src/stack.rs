@@ -56,8 +56,8 @@
 //! - Listener pods must also run on control plane for GitHub API connectivity
 //! - Use Helm values file for complex configs (listenerTemplate, template.spec)
 //! - Create `github-pat` secret in `arc-runners` namespace BEFORE deploying runner scale set
-//! - Session conflicts: If listener fails with "already has active session", delete AutoScalingRunnerSet
-//! - **Docker-in-Docker (DinD)**: Runners need DinD for docker/setup-buildx-action
+//! - Session conflicts: If listener fails with "already has active session", delete `AutoScalingRunnerSet`
+//! - **Docker-in-Docker (`DinD`)**: Runners need `DinD` for docker/setup-buildx-action
 //!   - Add `docker:dind` sidecar container with `securityContext.privileged: true`
 //!   - Mount shared volumes: `/var/run` (docker.sock), `/home/runner/_work` (workspace)
 //!   - Set runner env: `DOCKER_HOST=unix:///var/run/docker.sock`
@@ -65,7 +65,7 @@
 //! - **Version matching**: ARC controller version MUST match runner scale set version
 //!   - If mismatch, controller logs: "build version doesn't match autoscalingRunnerSetVersion"
 //!   - Upgrade controller first, then install matching runner scale set
-//! - Key Helm values for control plane scheduling + DinD:
+//! - Key Helm values for control plane scheduling + `DinD`:
 //!   ```yaml
 //!   listenerTemplate:
 //!     spec:
@@ -107,7 +107,7 @@
 //!         emptyDir: {}
 //!   ```
 //!
-//! ### Secrets Management (OpenBao + External Secrets)
+//! ### Secrets Management (`OpenBao` + External Secrets)
 //! - Initialize `OpenBao` with proper key shares and threshold
 //! - Configure Kubernetes auth for service account access
 //! - CA certificate MUST be provided when configuring K8s auth (`kubernetes_ca_cert`)
@@ -118,7 +118,7 @@
 //!
 //! ### Headscale VPN (Alternative to Tailscale)
 //! - Self-hosted Tailscale control server - no external dependency
-//! - Requires SQLite database (PVC) for state
+//! - Requires `SQLite` database (PVC) for state
 //! - Use public Tailscale DERP servers to avoid TLS issues with self-hosted DERP
 //! - Subnet router must run on control plane with proper routes enabled
 //! - Create users and auth keys via: `headscale users create`, `headscale preauthkeys create`
@@ -132,8 +132,8 @@
 //! - Images that don't exist (e.g., `pm-server:latest`) should be scaled to 0
 //! - Most CTO services can run on worker nodes EXCEPT in multi-region setups
 //!
-//! ### VolumeSnapshot CRDs
-//! - Some operators (QuestDB, etc.) require `VolumeSnapshot` CRDs
+//! ### `VolumeSnapshot` CRDs
+//! - Some operators (`QuestDB`, etc.) require `VolumeSnapshot` CRDs
 //! - Install from external-snapshotter repo BEFORE deploying operators:
 //!   ```bash
 //!   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
@@ -141,7 +141,7 @@
 //!   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
 //!   ```
 //!
-//! ### Ollama / KubeAI Models
+//! ### Ollama / `KubeAI` Models
 //! - Model pods need external network access to pull models from `registry.ollama.ai`
 //! - In multi-region clusters, models on worker nodes fail with DNS timeout
 //! - Patch `Model` CRDs or deployments to run on control plane, or scale to 0
@@ -173,8 +173,8 @@
 //!         authorization-mode: "Webhook"
 //!   ```
 //!
-//! ### ArgoCD Auto-Sync Management
-//! - ArgoCD will recreate scaled-down deployments if auto-sync is enabled
+//! ### `ArgoCD` Auto-Sync Management
+//! - `ArgoCD` will recreate scaled-down deployments if auto-sync is enabled
 //! - To temporarily disable a service, FIRST disable sync policy:
 //!   ```bash
 //!   kubectl patch application -n argocd <app> --type=merge -p='{"spec":{"syncPolicy":null}}'
@@ -213,16 +213,16 @@
 //!   2. Both servers in same Latitude.sh site (VLANs are site-local)
 //!   3. Talos config has correct VLAN settings on correct interface (usually enp1s0f1)
 //!
-//! ### NATS StatefulSet + local-path Storage
-//! - NATS uses StatefulSet with PVCs for JetStream persistence
+//! ### NATS `StatefulSet` + local-path Storage
+//! - NATS uses `StatefulSet` with PVCs for `JetStream` persistence
 //! - `local-path` PVCs are bound to specific nodes via node affinity
 //! - **Cannot move NATS to different node without deleting PVCs**
 //! - When moving NATS to control plane:
-//!   1. Scale StatefulSet to 0: `kubectl scale statefulset -n nats nats --replicas=0`
+//!   1. Scale `StatefulSet` to 0: `kubectl scale statefulset -n nats nats --replicas=0`
 //!   2. Delete PVCs: `kubectl delete pvc -n nats --all`
 //!   3. Add nodeSelector for control plane
 //!   4. Scale back up - new PVCs will be created on control plane node
-//! - Disable ArgoCD sync to prevent override: `kubectl patch application -n argocd nats --type=merge -p='{"spec":{"syncPolicy":null}}'`
+//! - Disable `ArgoCD` sync to prevent override: `kubectl patch application -n argocd nats --type=merge -p='{"spec":{"syncPolicy":null}}'`
 //!
 //! ### Hubble Relay + VLAN Issues
 //! - Hubble Relay requires connectivity to ALL Cilium agents across nodes

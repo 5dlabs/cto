@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_format_context() {
-        let evaluator = ProbeEvaluator::with_defaults();
+        let _evaluator = ProbeEvaluator::with_defaults();
         let trail = sample_artifact_trail();
         let context = ProbeEvaluator::format_context(&trail);
 

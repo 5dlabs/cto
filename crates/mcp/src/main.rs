@@ -1637,7 +1637,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         }
 
         // 3. If repository_path is provided, skip workspace detection and use it directly
-        if repository_path.is_some() {
+        if let Some(ref repo_path) = repository_path {
             eprintln!("🔍 Using explicit repository path - querying tasks...");
             match get_next_play_task(docs_dir.as_deref()) {
                 Ok(Some(task)) => {
@@ -1679,8 +1679,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     // Missing tasks.json is a serious error when repository_path is explicitly provided
                     eprintln!("❌ Could not find tasks.json at repository_path: {e}");
                     return Err(anyhow!(
-                        "tasks.json not found at specified repository_path: {}. Please ensure .tasks/tasks/tasks.json exists.",
-                        repository_path.as_ref().unwrap()
+                        "tasks.json not found at specified repository_path: {repo_path}. Please ensure .tasks/tasks/tasks.json exists."
                     ));
                 }
             }

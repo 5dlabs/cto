@@ -741,10 +741,10 @@ impl PlayMonitor {
     // Probe-Based Evaluation (Context Engineering)
     // =========================================================================
 
-    /// Load artifact trail from a CodeRun's workspace.
+    /// Load artifact trail from a `CodeRun`'s workspace.
     ///
     /// The artifact trail is persisted by the sidecar to `/workspace/artifact-trail.json`.
-    async fn load_artifact_trail(&self, pod_name: &str) -> Option<ArtifactTrail> {
+    fn load_artifact_trail(&self, pod_name: &str) -> Option<ArtifactTrail> {
         let output = Command::new("kubectl")
             .args([
                 "exec",
@@ -864,7 +864,7 @@ impl PlayMonitor {
 
     /// Run evaluation probes for a play.
     ///
-    /// Uses the LLM-powered ProbeEvaluator to answer probe questions and
+    /// Uses the LLM-powered `ProbeEvaluator` to answer probe questions and
     /// score responses. Falls back to offline evaluation if LLM is unavailable
     /// or if `use_llm_evaluation` is disabled in config.
     pub async fn run_evaluation(&mut self, play_id: &str) -> Result<EvaluationResults> {
@@ -881,7 +881,7 @@ impl PlayMonitor {
             // Try to load from the first running pod
             let trail = if let Some(coderun) = play.active_coderuns.first() {
                 if let Some(pod) = &coderun.pod_name {
-                    self.load_artifact_trail(pod).await
+                    self.load_artifact_trail(pod)
                 } else {
                     None
                 }
