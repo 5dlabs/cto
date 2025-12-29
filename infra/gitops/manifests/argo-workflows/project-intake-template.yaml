@@ -406,7 +406,7 @@ spec:
                 mountPath: /workspace-shared
           # Status-sync sidecar for real-time CLI output streaming to Linear
           - name: status-sync
-            image: ghcr.io/5dlabs/pm-server:latest
+            image: ghcr.io/5dlabs/linear-sidecar:latest
             imagePullPolicy: Always
             command: ["/usr/local/bin/status-sync"]
             env:
