@@ -5,16 +5,16 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - 'crates/integrations/**'
+      - 'crates/pm/**'
       - 'infra/images/pm-server/**'
-      - 'infra/charts/pm/**'
+      - 'infra/images/linear-sidecar/**'
       - '.github/workflows/pm-ci.yaml'
   pull_request:
     branches: [main, develop]
     paths:
-      - 'crates/integrations/**'
+      - 'crates/pm/**'
       - 'infra/images/pm-server/**'
-      - 'infra/charts/pm/**'
+      - 'infra/images/linear-sidecar/**'
       - '.github/workflows/pm-ci.yaml'
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ jobs:
   changes:
     runs-on: [k8s-runner]
     outputs:
-      integrations: ${{ steps.filter.outputs.integrations }}
+      pm: ${{ steps.filter.outputs.pm }}
       docker: ${{ steps.filter.outputs.docker }}
       helm: ${{ steps.filter.outputs.helm }}
     steps:
@@ -36,18 +36,17 @@ jobs:
         id: filter
         with:
           filters: |
-            integrations:
-              - 'crates/integrations/**'
-              - '!crates/integrations/**/*.md'
+            pm:
+              - 'crates/pm/**'
+              - '!crates/pm/**/*.md'
             docker:
               - 'infra/images/pm-server/**'
-            helm:
-              - 'infra/charts/pm/**'
+              - 'infra/images/linear-sidecar/**'
 
   # Rust linting using composite action
   lint-rust:
     needs: changes
-    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.pm == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     outputs:
       format-needed: ${{ steps.lint.outputs.format-needed }}
@@ -60,17 +59,17 @@ jobs:
           components: rustfmt, clippy
           sccache-size: '50G'
 
-      - name: Lint integrations
+      - name: Lint pm
         id: lint
         uses: ./.github/actions/rust-lint
         with:
-          package: integrations
+          package: pm
           use-sccache: 'true'
 
   # Run tests using composite action
   test-rust:
     needs: changes
-    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.pm == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
@@ -80,16 +79,16 @@ jobs:
         with:
           sccache-size: '50G'
 
-      - name: Test integrations
+      - name: Test pm
         uses: ./.github/actions/rust-test
         with:
-          package: integrations
+          package: pm
           use-sccache: 'true'
 
   # Build check using composite action
   build-check:
     needs: changes
-    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.pm == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
@@ -102,7 +101,7 @@ jobs:
       - name: Build linear binary (pm-server)
         uses: ./.github/actions/rust-build
         with:
-          package: integrations
+          package: pm
           binary: linear
           use-sccache: 'true'
 
@@ -134,7 +133,7 @@ jobs:
   # Security audit (non-blocking)
   security-audit:
     needs: changes
-    if: needs.changes.outputs.integrations == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.pm == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     continue-on-error: true
     steps:
@@ -181,7 +180,7 @@ jobs:
       - name: Build linear binary
         uses: ./.github/actions/rust-build
         with:
-          package: integrations
+          package: pm
           binary: linear
           output-path: pm-server
           use-sccache: 'true'
@@ -189,7 +188,7 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path crates/integrations/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "integrations") | .version')
+          VERSION=$(cargo metadata --manifest-path crates/pm/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "pm") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"

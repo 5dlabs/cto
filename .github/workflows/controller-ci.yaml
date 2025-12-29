@@ -103,8 +103,9 @@ jobs:
           for crd in infra/charts/cto/crds/*.yaml; do
             if [ -f "$crd" ]; then
               echo "Checking: $crd"
-              # Basic YAML validation using helm's built-in parser
-              helm template test . --show-only "$crd" 2>/dev/null || yq e '.' "$crd" > /dev/null
+              # Use Python's yaml module (always available)
+              python3 -c "import yaml; yaml.safe_load(open('$crd'))"
+              echo "  ✓ Valid YAML"
             fi
           done
           echo "✅ CRD validation passed"
