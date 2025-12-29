@@ -156,6 +156,10 @@ impl FeedbackEngine {
     }
 
     /// Process evaluation results and generate feedback if needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization of the feedback result fails.
     pub fn process_results(
         &mut self,
         play_id: &str,

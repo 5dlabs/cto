@@ -163,6 +163,13 @@ Answer the question based ONLY on the context provided above. Be specific and in
     }
 
     /// Evaluate a single probe by asking the LLM.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The HTTP request to the LLM endpoint fails
+    /// - The LLM response cannot be parsed as JSON
+    /// - The response format is unexpected
     pub async fn evaluate_probe(
         &self,
         probe: &EvaluationProbe,
@@ -243,6 +250,11 @@ Answer the question based ONLY on the context provided above. Be specific and in
     }
 
     /// Run all probes and aggregate results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if all probes fail to evaluate (individual probe
+    /// failures are logged but don't fail the overall evaluation).
     pub async fn run_evaluation(
         &self,
         probes: Vec<EvaluationProbe>,
@@ -289,6 +301,7 @@ Answer the question based ONLY on the context provided above. Be specific and in
     /// Quick evaluation without LLM - uses keyword matching only.
     ///
     /// Useful for testing or when LLM is unavailable.
+    #[must_use]
     pub fn evaluate_offline(
         &self,
         probes: Vec<EvaluationProbe>,

@@ -864,6 +864,10 @@ impl PlayMonitor {
     /// Uses the LLM-powered `ProbeEvaluator` to answer probe questions and
     /// score responses. Falls back to offline evaluation if LLM is unavailable
     /// or if `use_llm_evaluation` is disabled in config.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the play is not found.
     pub async fn run_evaluation(&mut self, play_id: &str) -> Result<EvaluationResults> {
         let play = self
             .plays
@@ -978,6 +982,10 @@ impl PlayMonitor {
     /// Check if a play passes acceptance criteria using probe-based evaluation.
     ///
     /// This is the main entry point for context engineering evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the play is not found or evaluation fails.
     pub async fn verify_acceptance(&mut self, play_id: &str, threshold: f32) -> Result<bool> {
         let results = self.run_evaluation(play_id).await?;
 
