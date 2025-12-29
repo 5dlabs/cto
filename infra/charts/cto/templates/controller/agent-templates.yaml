@@ -763,8 +763,9 @@ data:
 
         # Build Claude CLI command with stream-json output
         # Use --dangerously-skip-permissions for non-interactive mode
+        # --verbose is required when using --print with --output-format stream-json
         if [ "$CLI_NAME" = "claude" ] || [ "$CLI_NAME" = "factory" ]; then
-            CLAUDE_ARGS="--output-format stream-json --dangerously-skip-permissions"
+            CLAUDE_ARGS="--verbose --output-format stream-json --dangerously-skip-permissions"
             [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && CLAUDE_ARGS="$CLAUDE_ARGS --model opus"
         else
             echo "❌ Unsupported CLI: $CLI_NAME"
