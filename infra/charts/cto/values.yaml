@@ -318,8 +318,8 @@ pm:
     # Options: claude, cursor, codex, gemini, opencode, factory, dexter
     cli: claude
     # Direct image override (bypasses devRegistry for intake)
-    # Use GHCR since cluster can pull from it with ghcr-secret
-    image: "ghcr.io/5dlabs/factory:latest"
+    # Use claude image which has the Anthropic Claude CLI installed
+    image: "ghcr.io/5dlabs/claude:latest"
     # Runtime image: Used in api mode (smaller, has tasks CLI)
     runtimeImage:
       repository: ghcr.io/5dlabs/runtime
