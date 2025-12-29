@@ -628,7 +628,7 @@ data:
     # Phase 5: Run Intake (API mode or CLI mode)
     # =========================================================================
     echo ""
-    echo "🚀 Phase 3: Running intake (mode: ${INTAKE_MODE:-api})"
+    echo "🚀 Phase 3: Running intake (mode=${INTAKE_MODE:-api})"
     echo "======================================================="
 
     OUTPUT_FILE="$(mktemp)"
@@ -654,26 +654,13 @@ data:
         ARCH_CONTENT=""
         [ -f ".tasks/docs/architecture.md" ] && ARCH_CONTENT=$(cat .tasks/docs/architecture.md)
 
-        INTAKE_PROMPT="You are Morgan, an expert project manager and task decomposition specialist.
-
-Analyze the following PRD and generate ${NUM_TASKS} well-structured tasks for implementation.
-
-## PRD:
-${PRD_CONTENT}
-
-## Architecture (if provided):
-${ARCH_CONTENT}
-
-## Instructions:
-1. Create tasks that are atomic and independently implementable
-2. Include clear acceptance criteria for each task
-3. Identify dependencies between tasks
-4. Assign appropriate agents (Rex for Rust, Blaze for React, etc.)
-5. Save the output to .tasks/tasks/tasks.json
-
-Output format: JSON with tasks array containing id, title, description, agent, dependencies, and acceptance_criteria fields.
-
-Begin analysis and task generation now."
+        # Build prompt - use simple string concatenation to avoid YAML parsing issues
+        INTAKE_PROMPT="You are Morgan, an expert project manager and task decomposition specialist."
+        INTAKE_PROMPT="$INTAKE_PROMPT Analyze the following PRD and generate $NUM_TASKS well-structured tasks."
+        INTAKE_PROMPT="$INTAKE_PROMPT PRD - $PRD_CONTENT"
+        INTAKE_PROMPT="$INTAKE_PROMPT Architecture - $ARCH_CONTENT"
+        INTAKE_PROMPT="$INTAKE_PROMPT Create atomic tasks with acceptance criteria, dependencies, and agent assignments."
+        INTAKE_PROMPT="$INTAKE_PROMPT Save output to .tasks/tasks/tasks.json as JSON with tasks array."
 
         # Build Claude CLI command with stream-json output
         # Use --dangerously-skip-permissions for non-interactive mode
