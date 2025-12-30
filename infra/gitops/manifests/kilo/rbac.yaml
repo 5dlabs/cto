@@ -1,0 +1,56 @@
+---
+# Kilo RBAC - Service Account, ClusterRole, and ClusterRoleBinding
+# Allows Kilo agents to manage WireGuard mesh and node annotations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kilo
+  namespace: kilo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kilo
+rules:
+  # Kilo needs to read and patch node annotations for WireGuard config
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+  # Kilo needs to read endpoints for service discovery
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  # Kilo needs to manage its own CRD (Peer)
+  - apiGroups:
+      - kilo.squat.ai
+    resources:
+      - peers
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kilo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kilo
+subjects:
+  - kind: ServiceAccount
+    name: kilo
+    namespace: kilo
