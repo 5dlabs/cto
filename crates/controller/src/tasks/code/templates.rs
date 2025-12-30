@@ -4137,7 +4137,7 @@ impl CodeTemplateGenerator {
             | CLIType::MiniMax => "claude",
         };
 
-        let invoke_template_path = format!("clis/{cli_name}/invoke.sh.hbs");
+        let invoke_template_path = format!("clis/{cli_name}.sh.hbs");
 
         match Self::load_template(&invoke_template_path) {
             Ok(content) => {
@@ -4571,17 +4571,11 @@ mod tests {
         // Test that valid github_app extracts correctly
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
-        assert_eq!(
-            agent_name, "rex",
-            "5DLabs-Rex should extract to 'rex'"
-        );
+        assert_eq!(agent_name, "rex", "5DLabs-Rex should extract to 'rex'");
 
         let code_run = create_test_code_run(Some("5DLabs-Tap".to_string()));
         let agent_name = CodeTemplateGenerator::get_agent_name(&code_run);
-        assert_eq!(
-            agent_name, "tap",
-            "5DLabs-Tap should extract to 'tap'"
-        );
+        assert_eq!(agent_name, "tap", "5DLabs-Tap should extract to 'tap'");
     }
 
     #[test]
