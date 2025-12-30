@@ -794,86 +794,26 @@ data:
         activity_thought_ephemeral "Claude CLI intake completed"
 
         # =====================================================================
-        # Generate individual task prompt files from tasks.json
+        # Generate per-task documentation using tasks CLI
         # =====================================================================
-        echo "📝 Generating task prompt files..."
+        echo "📝 Generating per-task documentation..."
         TASKS_FILE=".tasks/tasks/tasks.json"
         if [ -f "$TASKS_FILE" ]; then
             TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
-            echo "  → Processing $TASK_COUNT tasks..."
+            echo "  → Found $TASK_COUNT tasks, generating docs..."
             
-            # Create task directories and prompt files
-            jq -c '.tasks[]' "$TASKS_FILE" | while read -r task; do
-                TASK_ID=$(echo "$task" | jq -r '.id')
-                TASK_TITLE=$(echo "$task" | jq -r '.title')
-                TASK_DESC=$(echo "$task" | jq -r '.description')
-                TASK_AGENT=$(echo "$task" | jq -r '.agent')
-                TASK_DEPS=$(echo "$task" | jq -r '.dependencies | if length > 0 then join(", ") else "none" end')
-                TASK_AC=$(echo "$task" | jq -r '.acceptance_criteria | if type == "array" then map("- " + .) | join("\n") else . end')
-                
-                TASK_DIR=".tasks/tasks/task-${TASK_ID}"
-                mkdir -p "$TASK_DIR"
-                
-                # Generate prompt.md
-                cat > "${TASK_DIR}/prompt.md" << PROMPT_EOF
-# Task ${TASK_ID}: ${TASK_TITLE}
-
-## Agent
-${TASK_AGENT}
-
-## Description
-${TASK_DESC}
-
-## Dependencies
-${TASK_DEPS}
-
-## Acceptance Criteria
-${TASK_AC}
-
-## Instructions
-Implement this task following the acceptance criteria above. Create necessary files, write tests, and ensure the code compiles/runs successfully.
-PROMPT_EOF
-
-                # Generate prompt.xml
-                cat > "${TASK_DIR}/prompt.xml" << XML_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<task>
-  <id>${TASK_ID}</id>
-  <title>${TASK_TITLE}</title>
-  <agent>${TASK_AGENT}</agent>
-  <description>${TASK_DESC}</description>
-  <dependencies>${TASK_DEPS}</dependencies>
-  <acceptance_criteria>
-$(echo "$TASK_AC" | sed 's/^/    /')
-  </acceptance_criteria>
-  <instructions>
-    Implement this task following the acceptance criteria above.
-    Create necessary files, write tests, and ensure the code compiles/runs successfully.
-  </instructions>
-</task>
-XML_EOF
-
-                # Generate acceptance_criteria.md
-                cat > "${TASK_DIR}/acceptance_criteria.md" << AC_EOF
-# Task ${TASK_ID} Acceptance Criteria
-
-## ${TASK_TITLE}
-
-### Checklist
-${TASK_AC}
-
-### Verification
-- [ ] All acceptance criteria met
-- [ ] Code compiles without errors
-- [ ] Tests pass
-- [ ] PR created and ready for review
-AC_EOF
-                
-                echo "  ✓ Created prompts for task-${TASK_ID}"
-            done
-            echo "✅ Generated prompt files for all $TASK_COUNT tasks"
+            # Use tasks CLI to generate proper documentation structure
+            # This creates task-{N}/prompt.xml, prompt.md, acceptance.md
+            if command -v tasks >/dev/null 2>&1; then
+                tasks generate-docs --output .tasks/docs 2>&1 || {
+                    echo "⚠️ tasks generate-docs failed, continuing without per-task docs"
+                }
+            else
+                echo "⚠️ tasks CLI not available, skipping per-task doc generation"
+            fi
+            echo "✅ Task documentation generation completed"
         else
-            echo "⚠️ tasks.json not found, skipping prompt generation"
+            echo "⚠️ tasks.json not found, skipping documentation generation"
         fi
     else
         # =====================================================================
