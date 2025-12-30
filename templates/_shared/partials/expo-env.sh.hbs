@@ -68,7 +68,8 @@ fi
 # -------------------------------------------------------------------------
 # Java (required for Android builds)
 # -------------------------------------------------------------------------
-if [ -n "${JAVA_HOME:-}" ]; then
+# Note: Use ${VAR-} instead of ${VAR:-} to avoid Handlebars escaping issues
+if [ -n "${JAVA_HOME-}" ]; then
   export PATH="$JAVA_HOME/bin:$PATH"
   echo "Java: $JAVA_HOME"
 elif command -v java >/dev/null 2>&1; then
@@ -106,7 +107,8 @@ export CI=1
 export EXPO_NO_DOTENV=0
 
 # EAS credentials (if provided via secrets)
-if [ -n "${EXPO_TOKEN:-}" ]; then
+# Note: Use ${VAR-} instead of ${VAR:-} to avoid Handlebars escaping issues
+if [ -n "${EXPO_TOKEN-}" ]; then
   echo "EXPO_TOKEN: configured (authenticated)"
 else
   echo "EXPO_TOKEN: not set (will need to run 'eas login' or 'npx expo login')"
