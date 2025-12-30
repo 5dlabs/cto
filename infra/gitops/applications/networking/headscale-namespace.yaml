@@ -3,6 +3,10 @@
 # Creates the namespace with privileged PodSecurity policy
 # Required for Tailscale subnet router which needs NET_ADMIN, NET_RAW capabilities
 #
+# STATUS: DISABLED - Using Kilo instead
+# To re-enable, remove the argocd.argoproj.io/compare-options annotation
+# and set syncPolicy.automated to true
+#
 # Deployed before headscale and tailscale-subnet-router
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -13,9 +17,12 @@ metadata:
     app.kubernetes.io/name: headscale-namespace
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: networking
+    app.kubernetes.io/status: disabled
   annotations:
     # Deploy before headscale (sync-wave: 1)
     argocd.argoproj.io/sync-wave: "0"
+    # DISABLED: Ignore differences - not actively syncing
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -29,12 +36,8 @@ spec:
   destination:
     server: https://kubernetes.default.svc
 
+  # DISABLED: Manual sync only (automated sync disabled)
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-
     syncOptions:
       - ServerSideApply=true
 

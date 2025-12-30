@@ -170,7 +170,5 @@ debug:
 #
 # The neighbor-link-updater warnings about flannel.1 are non-fatal and caused
 # by Kilo's --compatibility=flannel creating a VXLAN interface. These warnings
-# do not affect cluster operation.
-#
-# TODO: Remove Kilo entirely to eliminate flannel.1 interface
-# See: docs/architecture/decisions/0001-cilium-clustermesh-networking.md
+# do not affect cluster operation. Kilo is used for WireGuard VPN access to
+# the cluster (Pod CIDR, Service CIDR, Node Network).
