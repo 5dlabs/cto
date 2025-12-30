@@ -666,9 +666,12 @@ impl<'a> CodeResourceManager<'a> {
             .as_ref()
             .filter(|s| !s.is_empty())
             .ok_or_else(|| {
-                tracing::error!("GitHub App is required for CodeRun authentication and cannot be empty");
+                tracing::error!(
+                    "GitHub App is required for CodeRun authentication and cannot be empty"
+                );
                 crate::tasks::types::Error::ConfigError(
-                    "GitHub App is required for CodeRun authentication and cannot be empty".to_string(),
+                    "GitHub App is required for CodeRun authentication and cannot be empty"
+                        .to_string(),
                 )
             })?;
 

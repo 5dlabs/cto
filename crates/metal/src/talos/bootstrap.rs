@@ -590,9 +590,7 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
     );
 
     if physical_interfaces.len() < 2 {
-        bail!(
-            "Expected at least 2 physical interfaces, found: {physical_interfaces:?}",
-        );
+        bail!("Expected at least 2 physical interfaces, found: {physical_interfaces:?}",);
     }
 
     // Now determine which interface has the public IP (primary)
