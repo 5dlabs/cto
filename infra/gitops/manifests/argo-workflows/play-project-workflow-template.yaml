@@ -706,75 +706,115 @@ spec:
             exit 1
           fi
 
-          # Download dependency graph builder script using authenticated GitHub API
-          # (raw.githubusercontent.com doesn't work for private repositories)
-          echo "📥 Fetching dependency graph builder..."
+          # Create dependency graph builder script inline (no external download needed)
+          echo "📥 Creating dependency graph builder..."
+          cat > /tmp/build-dependency-graph.py << 'PYTHON_SCRIPT'
+#!/usr/bin/env python3
+"""Build dependency graph from tasks.json and output execution levels."""
+import json
+import sys
+from collections import defaultdict
 
-          # Build JWT and get installation token for 5dlabs/cto repository
-          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
-            echo "🔐 Using authenticated GitHub API to fetch script..."
-            SCRIPT_KEY="/tmp/github-script-key.pem"
-            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$SCRIPT_KEY"
-            chmod 600 "$SCRIPT_KEY"
+def load_tasks(tasks_file):
+    with open(tasks_file, 'r') as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return data
+    elif isinstance(data, dict) and 'tasks' in data:
+        return data['tasks']
+    else:
+        raise ValueError("Invalid tasks.json format")
 
-            NOW=$(date +%s)
-            EXP=$((NOW + 600))
-            SCRIPT_JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || base64)
-            SCRIPT_JWT_HEADER=$(echo -n "$SCRIPT_JWT_HEADER" | tr '+/' '-_' | tr -d '=')
-            SCRIPT_JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
-            SCRIPT_JWT_PAYLOAD=$(echo -n "$SCRIPT_JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
-            SCRIPT_JWT_SIGNATURE=$(printf '%s.%s' "$SCRIPT_JWT_HEADER" "$SCRIPT_JWT_PAYLOAD" | openssl dgst -sha256 -sign "$SCRIPT_KEY" -binary | base64 -w 0 2>/dev/null || base64)
-            SCRIPT_JWT_SIGNATURE=$(echo -n "$SCRIPT_JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
-            SCRIPT_JWT_TOKEN="$SCRIPT_JWT_HEADER.$SCRIPT_JWT_PAYLOAD.$SCRIPT_JWT_SIGNATURE"
+def build_dependency_graph(tasks):
+    task_lookup = {}
+    deps = defaultdict(set)
+    for task in tasks:
+        task_id = str(task.get('id', ''))
+        if not task_id:
+            continue
+        task_lookup[task_id] = task
+        if 'dependencies' in task:
+            dependencies = task['dependencies']
+        else:
+            dependencies = task.get('dependsOn', [])
+        for dep in dependencies:
+            if isinstance(dep, dict):
+                dep_id = str(dep.get('id', ''))
+            else:
+                dep_id = str(dep)
+            if dep_id:
+                deps[task_id].add(dep_id)
+    return deps, task_lookup
 
-            # Get installation ID for 5dlabs/cto repository
-            SCRIPT_INSTALLATION_ID=$(curl -s -L \
-              -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/5dlabs/cto/installation" | jq -r '.id')
+def compute_execution_levels(deps, task_lookup):
+    if not task_lookup:
+        return []
+    task_levels = {}
+    remaining_tasks = set(task_lookup.keys())
+    levels = []
+    while remaining_tasks:
+        ready_tasks = []
+        for task_id in remaining_tasks:
+            task_deps = deps.get(task_id, set())
+            unmet_deps = task_deps - set(task_levels.keys())
+            if not unmet_deps:
+                ready_tasks.append(task_id)
+        if not ready_tasks:
+            print(f"Warning: Circular dependencies detected for: {remaining_tasks}", file=sys.stderr)
+            ready_tasks = list(remaining_tasks)
+        ready_tasks.sort(key=lambda x: (0, int(x)) if x.isdigit() else (1, x))
+        levels.append(ready_tasks)
+        for task_id in ready_tasks:
+            task_levels[task_id] = len(levels) - 1
+            remaining_tasks.discard(task_id)
+    return levels
 
-            if [ -z "$SCRIPT_INSTALLATION_ID" ] || [ "$SCRIPT_INSTALLATION_ID" = "null" ]; then
-              echo "ℹ️ Repo installation not found, trying org installation"
-              SCRIPT_INSTALLATION_ID=$(curl -s -L \
-                -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "https://api.github.com/orgs/5dlabs/installation" | jq -r '.id')
-            fi
+def compute_stats(levels):
+    if not levels:
+        return {"total_tasks": 0, "total_levels": 0, "max_parallelism": 0, "avg_parallelism": 0.0}
+    total_tasks = sum(len(level) for level in levels)
+    level_sizes = [len(level) for level in levels]
+    return {
+        "total_tasks": total_tasks,
+        "total_levels": len(levels),
+        "max_parallelism": max(level_sizes) if level_sizes else 0,
+        "avg_parallelism": round(total_tasks / len(levels), 2) if levels else 0.0
+    }
 
-            SCRIPT_TOKEN=""
-            if [ -n "$SCRIPT_INSTALLATION_ID" ] && [ "$SCRIPT_INSTALLATION_ID" != "null" ]; then
-              SCRIPT_TOKEN=$(curl -s -X POST \
-                -H "Authorization: Bearer $SCRIPT_JWT_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "https://api.github.com/app/installations/$SCRIPT_INSTALLATION_ID/access_tokens" | jq -r '.token')
-            fi
+def main():
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <tasks.json> <output.json>", file=sys.stderr)
+        sys.exit(1)
+    tasks_file = sys.argv[1]
+    output_file = sys.argv[2]
+    try:
+        tasks = load_tasks(tasks_file)
+        print(f"📊 Loaded {len(tasks)} tasks from {tasks_file}")
+        deps, task_lookup = build_dependency_graph(tasks)
+        print(f"🔗 Built dependency graph with {len(deps)} dependency relationships")
+        levels = compute_execution_levels(deps, task_lookup)
+        print(f"📈 Computed {len(levels)} execution levels")
+        stats = compute_stats(levels)
+        output = {"levels": levels, "stats": stats}
+        with open(output_file, 'w') as f:
+            json.dump(output, f, indent=2)
+        print(f"✅ Output written to {output_file}")
+        print(f"\n📊 Summary:")
+        print(f"   Total tasks: {stats['total_tasks']}")
+        print(f"   Execution levels: {stats['total_levels']}")
+        print(f"   Max parallelism: {stats['max_parallelism']}")
+        print(f"   Avg parallelism: {stats['avg_parallelism']}")
+        for i, level in enumerate(levels):
+            print(f"\n   Level {i}: {level}")
+    except Exception as e:
+        print(f"❌ Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
-            rm -f "$SCRIPT_KEY"
-
-            if [ -n "$SCRIPT_TOKEN" ] && [ "$SCRIPT_TOKEN" != "null" ]; then
-              # Fetch script content via GitHub API (returns base64 encoded content)
-              SCRIPT_CONTENT=$(curl -s -L \
-                -H "Authorization: Bearer $SCRIPT_TOKEN" \
-                -H "Accept: application/vnd.github.v3.raw" \
-                "https://api.github.com/repos/5dlabs/cto/contents/scripts/build-dependency-graph.py?ref=main")
-
-              if [ -n "$SCRIPT_CONTENT" ] && ! echo "$SCRIPT_CONTENT" | grep -q '"message".*"Not Found"'; then
-                echo "$SCRIPT_CONTENT" > /tmp/build-dependency-graph.py
-                echo "✅ Script downloaded via authenticated GitHub API"
-              else
-                echo "❌ Failed to download script via GitHub API"
-                exit 1
-              fi
-            else
-              echo "❌ Failed to obtain installation token for script download"
-              exit 1
-            fi
-          else
-            echo "❌ GitHub App credentials not available for authenticated script download"
-            exit 1
-          fi
-
+if __name__ == "__main__":
+    main()
+PYTHON_SCRIPT
           chmod +x /tmp/build-dependency-graph.py
+          echo "✅ Dependency graph builder created"
 
           # Run dependency graph builder
           echo "🔧 Building dependency graph..."
