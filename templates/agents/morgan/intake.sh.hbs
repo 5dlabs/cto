@@ -179,8 +179,12 @@ TASKS_FILE=".tasks/tasks/tasks.json"
 TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
 echo "✅ Generated $TASK_COUNT tasks with documentation"
 
-# Generate individual task files (optional)
-tasks generate || true
+# Generate per-task documentation (prompt.xml, prompt.md, acceptance.md)
+# API mode already does this via `tasks intake`, but CLI mode doesn't
+if [ "${INTAKE_MODE:-api}" = "cli" ]; then
+    echo "📝 Generating per-task documentation..."
+    tasks generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Doc generation skipped (tasks generate-docs failed)"
+fi
 
 # =========================================================================
 # Create Pull Request
