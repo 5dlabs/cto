@@ -201,7 +201,7 @@ controller:
   image:
     repository: ghcr.io/5dlabs/controller
     pullPolicy: Always
-    tag: "latest"
+    tag: "develop"
 
   service:
     type: ClusterIP
