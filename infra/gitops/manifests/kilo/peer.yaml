@@ -1,0 +1,77 @@
+---
+# Kilo Peer CRD - defines the custom resource for VPN peers
+# This allows external machines to connect to the cluster network
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: peers.kilo.squat.ai
+spec:
+  group: kilo.squat.ai
+  names:
+    kind: Peer
+    listKind: PeerList
+    plural: peers
+    singular: peer
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - publicKey
+              properties:
+                # WireGuard public key of the peer
+                publicKey:
+                  type: string
+                # Optional: persistent keepalive interval in seconds
+                persistentKeepaliveInterval:
+                  type: integer
+                  minimum: 0
+                # Optional: pre-shared key for additional security
+                presharedKey:
+                  type: string
+                # Optional: allowed IPs for this peer
+                allowedIPs:
+                  type: array
+                  items:
+                    type: string
+                # Optional: endpoint address (IP:port)
+                endpoint:
+                  type: object
+                  properties:
+                    ip:
+                      type: string
+                    port:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                    dnsName:
+                      type: string
+---
+# Example Peer Resource (commented out - customize with your public key)
+# Generate keys on client:
+#   wg genkey | tee privatekey | wg pubkey > publickey
+#
+# Then create a peer resource with your public key:
+#
+# apiVersion: kilo.squat.ai/v1alpha1
+# kind: Peer
+# metadata:
+#   name: my-laptop
+# spec:
+#   # Your WireGuard public key (from: wg pubkey < privatekey)
+#   publicKey: "YOUR_PUBLIC_KEY_HERE"
+#   # Allowed IPs - what IPs the peer can claim as source
+#   # Use a unique /32 from the WireGuard IP range
+#   allowedIPs:
+#     - 10.5.0.2/32  # Assign a unique IP to this peer
+#   # Optional: keepalive for NAT traversal
+#   persistentKeepaliveInterval: 25

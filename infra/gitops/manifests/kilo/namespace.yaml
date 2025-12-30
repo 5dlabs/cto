@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kilo
+  labels:
+    app.kubernetes.io/name: kilo
+    app.kubernetes.io/part-of: networking

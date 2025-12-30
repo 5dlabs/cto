@@ -1,0 +1,116 @@
+---
+# Kilo DaemonSet - WireGuard mesh networking
+# Runs on all nodes to create encrypted tunnels between nodes and to external peers
+#
+# Kilo creates a WireGuard mesh network that allows:
+# - Node-to-node encrypted communication
+# - External peer access to cluster networks (Pod CIDR, Service CIDR, Node Network)
+#
+# Configuration Notes:
+# - Uses --compatibility=flannel to work with Cilium CNI
+# - Advertises the full cluster network to peers
+# - Listens on UDP port 51820 for WireGuard connections
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kilo
+  namespace: kilo
+  labels:
+    app.kubernetes.io/name: kilo
+    app.kubernetes.io/component: networking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kilo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kilo
+        platform.5dlabs.io/log-collection: enabled
+      annotations:
+        logs.platform.5dlabs.io/collect: "true"
+        logs.platform.5dlabs.io/service: kilo
+    spec:
+      serviceAccountName: kilo
+      hostNetwork: true
+
+      # Run on all nodes including control plane
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+
+      containers:
+        - name: kilo
+          image: squat/kilo:0.6.0
+          args:
+            # Enable full mesh networking (all nodes connected)
+            - --kubeconfig=/etc/kubernetes/kubeconfig
+            # Compatibility mode with Cilium - creates flannel.1 interface
+            - --compatibility=flannel
+            # Log level
+            - --log-level=info
+            # Topology mode: full mesh between all nodes
+            - --mesh-granularity=full
+            # Subnet mode: don't let Kilo manage pod IPs (Cilium does this)
+            - --subnet=false
+            # Location annotation for topology
+            - --location-annotation=kilo.squat.ai/location
+            # WireGuard interface
+            - --interface=kilo0
+            # Listen port for WireGuard
+            - --port=51820
+            # MTU for WireGuard interface
+            - --mtu=1380
+            # Enable local discovery within the same location
+            - --local=true
+          env:
+            - name: KILO_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+                - SYS_MODULE
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /etc/kubernetes
+              readOnly: true
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: cni
+              mountPath: /etc/cni/net.d
+            - name: xtables-lock
+              mountPath: /run/xtables.lock
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+      volumes:
+        # Kubeconfig for API server access
+        - name: kubeconfig
+          hostPath:
+            path: /etc/kubernetes
+        # Kernel modules for WireGuard
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        # CNI configuration directory
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        # iptables lock
+        - name: xtables-lock
+          hostPath:
+            path: /run/xtables.lock
+            type: FileOrCreate

@@ -1,0 +1,17 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - daemonset.yaml
+  - peer.yaml
+
+# Common labels
+labels:
+  - pairs:
+      app.kubernetes.io/name: kilo
+      app.kubernetes.io/part-of: networking
+      app.kubernetes.io/managed-by: argocd
+    includeSelectors: false
