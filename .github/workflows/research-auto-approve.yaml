@@ -1,0 +1,66 @@
+---
+name: Auto-approve Research PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - 'docs/research/**'
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    # Only run for research branches (automated PRs from research pipeline)
+    if: startsWith(github.head_ref, 'research/')
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify PR only contains research docs
+        id: verify
+        run: |
+          # Get all changed files in the PR
+          CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path')
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check each file is in docs/research/
+          SAFE=true
+          while IFS= read -r file; do
+            if [[ ! "$file" =~ ^docs/research/ ]]; then
+              echo "❌ File outside docs/research/: $file"
+              SAFE=false
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [ "$SAFE" = true ]; then
+            echo "✅ All files are in docs/research/"
+            echo "safe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "❌ PR contains files outside docs/research/"
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-approve PR
+        if: steps.verify.outputs.safe == 'true'
+        run: |
+          gh pr review ${{ github.event.pull_request.number }} --approve --body "🤖 Auto-approved: Research documentation update"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip approval
+        if: steps.verify.outputs.safe != 'true'
+        run: |
+          echo "⚠️ Skipping auto-approval - PR contains files outside docs/research/"
+          exit 1
