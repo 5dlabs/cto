@@ -1965,7 +1965,6 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
-                run_type: "implementation".to_string(),
                 cli_config: Some(CLIConfig {
                     cli_type,
                     model: "test-model".to_string(),
@@ -1983,18 +1982,8 @@ mod tests {
                 model: "test-model".to_string(),
                 github_user: Some("test-user".to_string()),
                 github_app: Some(github_app.to_string()),
-                context_version: 1,
-                continue_session: false,
-                overwrite_memory: false,
-                docs_branch: "main".to_string(),
-                env: HashMap::new(),
-                env_from_secrets: Vec::new(),
-                enable_docker: true, // Default: Docker enabled for all agents/CLIs
-                task_requirements: None,
-                service_account_name: None,
                 linear_integration,
-                prompt_modification: None,
-                acceptance_criteria: None,
+                ..Default::default()
             },
             status: None,
         }
