@@ -3599,21 +3599,35 @@ impl CodeTemplateGenerator {
             .to_lowercase()
     }
 
-    /// Get the task language based on agent type.
+    /// Get the task language based on agent type or explicit TASK_LANGUAGE env var.
     /// Used for language-specific conditionals in templates (e.g., node-env, go-env).
+    ///
+    /// Priority:
+    /// 1. TASK_LANGUAGE env var (set by play workflow for support agents)
+    /// 2. Agent name inference (for implementation agents)
+    ///
     /// Returns lowercase language identifier.
     #[allow(dead_code, clippy::match_same_arms)] // Explicit match for documentation
-    fn get_task_language(code_run: &CodeRun) -> &'static str {
+    fn get_task_language(code_run: &CodeRun) -> String {
+        // First check if TASK_LANGUAGE is explicitly set (used by support agents
+        // like Cleo, Cipher, Tess to know the implementation language)
+        if let Some(lang) = code_run.spec.env.get("TASK_LANGUAGE") {
+            if !lang.is_empty() {
+                return lang.to_lowercase();
+            }
+        }
+
+        // Fall back to inferring from agent name
         let agent_name = Self::get_agent_name(code_run);
         match agent_name.as_str() {
             // Rust agents
-            "rex" => "rust",
+            "rex" => "rust".to_string(),
             // TypeScript/JavaScript agents
-            "blaze" | "nova" | "tap" | "spark" => "typescript",
+            "blaze" | "nova" | "tap" | "spark" => "typescript".to_string(),
             // Go agents
-            "grizz" => "go",
+            "grizz" => "go".to_string(),
             // Support agents and others default to empty (no language-specific setup)
-            _ => "",
+            _ => String::new(),
         }
     }
 
