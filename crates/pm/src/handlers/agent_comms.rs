@@ -752,8 +752,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_cache_expiration() {
-        // Create cache with very short TTL (1ms)
-        let cache = SessionCache::with_ttl(Duration::from_millis(1));
+        // Create cache with short but reliable TTL (100ms is enough to check existence)
+        let cache = SessionCache::with_ttl(Duration::from_millis(100));
 
         let pod_info = CachedPodInfo {
             pod_ip: "10.0.0.1".to_string(),
@@ -765,11 +765,11 @@ mod tests {
 
         cache.insert("session-123", pod_info).await;
 
-        // Entry should exist immediately
+        // Entry should exist immediately (100ms is plenty of time)
         assert!(cache.get("session-123").await.is_some());
 
-        // Wait for expiration
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        // Wait for expiration (200ms > 100ms TTL)
+        tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Entry should be expired
         assert!(cache.get("session-123").await.is_none());
