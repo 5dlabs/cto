@@ -898,7 +898,7 @@ data:
     echo "📊 Phase 5: Creating Linear Project and Issues"
     echo "==============================================="
 
-    PM_SERVER_URL="${PM_SERVER_URL:-http://pm-server.cto.svc.cluster.local:8080}"
+    PM_SERVER_URL="${PM_SERVER_URL:-http://cto-pm.cto.svc.cluster.local:8081}"
 
     if [ -n "${LINEAR_SESSION_ID:-}" ] && [ -n "${LINEAR_ISSUE_ID:-}" ]; then
         echo "  → Creating Linear project and task issues..."
