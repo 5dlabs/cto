@@ -7,6 +7,7 @@
 //! 4. Adds agent routing hints
 //! 5. Generates per-task documentation (XML, MD, acceptance criteria)
 //! 6. Saves tasks.json
+//! 7. Generates cto-config.json with per-agent tools
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use crate::entities::TaskStatus;
 use crate::errors::{TasksError, TasksResult};
 use crate::storage::Storage;
 
+use super::cto_config::{generate_cto_config, save_cto_config};
 use super::docs::{generate_all_docs, DocsGenerationResult};
 use super::routing::infer_agent_hint_str;
 use super::AIDomain;
@@ -49,6 +51,18 @@ pub struct IntakeConfig {
 
     /// Output directory for tasks and documentation.
     pub output_dir: PathBuf,
+
+    /// Target repository (e.g., "5dlabs/my-project").
+    pub repository: Option<String>,
+
+    /// Service name for the project.
+    pub service: Option<String>,
+
+    /// Docs repository URL.
+    pub docs_repository: Option<String>,
+
+    /// Project directory within docs repo.
+    pub docs_project_directory: Option<String>,
 }
 
 impl Default for IntakeConfig {
@@ -63,6 +77,10 @@ impl Default for IntakeConfig {
             research: true,
             model: None,
             output_dir: PathBuf::from(".tasks"),
+            repository: None,
+            service: None,
+            docs_repository: None,
+            docs_project_directory: None,
         }
     }
 }
@@ -303,6 +321,58 @@ impl IntakeDomain {
             "Created {} task documentation directories",
             docs_result.task_dirs_created
         );
+
+        // 10. Generate cto-config.json with per-agent tools
+        if config.repository.is_some() || config.service.is_some() {
+            tracing::info!("Generating cto-config.json with agent tool configurations...");
+
+            let repository = config
+                .repository
+                .clone()
+                .unwrap_or_else(|| "unknown/unknown".to_string());
+            let service = config
+                .service
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string());
+            let docs_repository = config
+                .docs_repository
+                .clone()
+                .unwrap_or_else(|| repository.clone());
+            let docs_project_directory = config
+                .docs_project_directory
+                .clone()
+                .unwrap_or_else(|| service.clone());
+
+            let cto_config = generate_cto_config(
+                &tasks,
+                &repository,
+                &service,
+                &docs_repository,
+                &docs_project_directory,
+            );
+
+            // Save cto-config.json in the output directory (project root, not .tasks)
+            // The parent of output_dir (.tasks) is typically the project root
+            let project_root = config
+                .output_dir
+                .parent()
+                .unwrap_or(&config.output_dir)
+                .to_path_buf();
+
+            if let Err(e) = save_cto_config(&cto_config, &project_root).await {
+                tracing::warn!("Failed to save cto-config.json: {}", e);
+            } else {
+                tracing::info!(
+                    "Generated cto-config.json with {} agent configurations",
+                    cto_config.agents.len()
+                );
+            }
+        } else {
+            tracing::info!(
+                "Skipping cto-config.json generation (no repository/service provided)"
+            );
+        }
+
         tracing::info!(
             "Intake complete: {} tasks, {} subtasks, {} doc dirs",
             tasks.len(),

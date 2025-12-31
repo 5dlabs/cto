@@ -802,11 +802,23 @@ data:
             TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
             echo "  → Found $TASK_COUNT tasks, generating docs..."
             
+            # Export environment variables for cto-config.json generation
+            export REPOSITORY=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+            export SERVICE="$PROJECT_DIR_NAME"
+            export DOCS_REPOSITORY="$REPOSITORY"
+            export PROJECT_NAME="$PROJECT_DIR_NAME"
+            
             # Use tasks CLI to generate proper documentation structure
             # This creates task-{N}/prompt.xml, prompt.md, acceptance.md
             if command -v tasks >/dev/null 2>&1; then
                 tasks generate-docs --output .tasks/docs 2>&1 || {
                     echo "⚠️ tasks generate-docs failed, continuing without per-task docs"
+                }
+                
+                # Generate cto-config.json with per-agent tool configurations
+                echo "📋 Generating cto-config.json..."
+                tasks generate-config --output . 2>&1 || {
+                    echo "⚠️ tasks generate-config failed, continuing without cto-config"
                 }
             else
                 echo "⚠️ tasks CLI not available, skipping per-task doc generation"
@@ -828,6 +840,15 @@ data:
         fi
         echo "✓ tasks CLI found: $(which tasks)"
         tasks --version 2>&1 || true
+
+        # Export environment variables for cto-config.json generation
+        # The tasks CLI will use these to generate per-agent tool configurations
+        export REPOSITORY=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+        export SERVICE="$PROJECT_DIR_NAME"
+        export DOCS_REPOSITORY="$REPOSITORY"
+        export PROJECT_NAME="$PROJECT_DIR_NAME"
+        echo "  → Repository: $REPOSITORY"
+        echo "  → Service: $SERVICE"
 
         # Build intake command
         INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
