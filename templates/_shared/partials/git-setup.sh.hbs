@@ -22,7 +22,25 @@ git config --global user.email "$GIT_AUTHOR_EMAIL"
 if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository exists, fetching latest"
   cd "$REPO_NAME"
-  git fetch --all --prune || true
+  
+  # Clean up stale lock files from previous crashed git processes
+  for lockfile in .git/index.lock .git/shallow.lock .git/HEAD.lock .git/config.lock; do
+    if [ -f "$lockfile" ]; then
+      echo "  ⚠️ Removing stale $lockfile"
+      rm -f "$lockfile"
+    fi
+  done
+  # Also clean up any ref locks
+  find .git/refs -name "*.lock" -delete 2>/dev/null || true
+  
+  # Force update refs to handle diverged branches
+  # Use refspec +:refs/remotes/origin/* to force-update all remote refs
+  git fetch --all --prune --force 2>/dev/null || {
+    echo "  ⚠️ Fetch failed, resetting remote refs"
+    # If fetch still fails, remove the corrupted refs and try again
+    rm -rf .git/refs/remotes/origin/*
+    git fetch --all --prune || true
+  }
 else
   echo "⬇️ Cloning repository"
   git clone "$REPO_URL" "$REPO_NAME"
@@ -38,6 +56,10 @@ fi
 FEATURE_BRANCH="feature/task-{{task_id}}-{{job_type}}"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   git checkout "$FEATURE_BRANCH"
+  # If there's a tracking branch, reset to it to avoid diverged state
+  if git show-ref --verify --quiet "refs/remotes/origin/$FEATURE_BRANCH"; then
+    git reset --hard "origin/$FEATURE_BRANCH" 2>/dev/null || true
+  fi
 else
   git checkout -b "$FEATURE_BRANCH" "origin/$BASE_BRANCH" 2>/dev/null || git checkout -b "$FEATURE_BRANCH"
 fi
