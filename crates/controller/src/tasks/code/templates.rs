@@ -2705,7 +2705,47 @@ impl CodeTemplateGenerator {
             }
         }
 
-        // 2) Fall back to agent config from Helm values
+        // 2) Check for direct remoteTools/localTools in CodeRun spec (used by healer)
+        if let Some(ref remote_tools_str) = code_run.spec.remote_tools {
+            if !remote_tools_str.trim().is_empty() {
+                debug!(
+                    "code: using remoteTools from CodeRun spec: '{}'",
+                    remote_tools_str
+                );
+                // Parse comma-separated tools into array
+                let remote_tools: Vec<String> = remote_tools_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+
+                let mut client = json!({
+                    "remoteTools": remote_tools,
+                    "localServers": {}
+                });
+
+                // Handle localTools if present
+                if let Some(ref local_tools_str) = code_run.spec.local_tools {
+                    if !local_tools_str.trim().is_empty() {
+                        // local_tools is a comma-separated list of server names to enable
+                        // We'd need the full server configs from Helm, so just log for now
+                        debug!(
+                            "code: localTools specified but not fully supported: '{}'",
+                            local_tools_str
+                        );
+                    }
+                }
+
+                Self::normalize_remote_tools(&mut client);
+                return to_string_pretty(&client).map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to serialize spec remoteTools: {e}"
+                    ))
+                });
+            }
+        }
+
+        // 3) Fall back to agent config from Helm values
         debug!(
             "🐛 DEBUG: Falling back to Helm agent config for github_app='{}'",
             github_app
@@ -2753,7 +2793,7 @@ impl CodeTemplateGenerator {
             }
         }
 
-        // 3) No clientConfig/tools provided → minimal JSON object
+        // 4) No clientConfig/tools provided → minimal JSON object
         debug!("🐛 DEBUG: No matching agent found in Helm config!");
         debug!(
             "code: no tools/clientConfig found for '{}', using minimal config",
@@ -4195,29 +4235,13 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
-                run_type: "implementation".to_string(),
-                cli_config: None,
                 task_id: Some(1),
                 service: "test-service".to_string(),
                 repository_url: "https://github.com/test/repo".to_string(),
                 docs_repository_url: "https://github.com/test/docs".to_string(),
-                docs_project_directory: None,
-                working_directory: None,
                 model: "sonnet".to_string(),
-                github_user: None,
                 github_app,
-                context_version: 1,
-                continue_session: false,
-                overwrite_memory: false,
-                docs_branch: "main".to_string(),
-                env: HashMap::new(),
-                env_from_secrets: Vec::new(),
-                enable_docker: true,
-                task_requirements: None,
-                service_account_name: None,
-                linear_integration: None,
-                prompt_modification: None,
-                acceptance_criteria: None,
+                ..Default::default()
             },
             status: None,
         }

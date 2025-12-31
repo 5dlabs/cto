@@ -84,6 +84,18 @@ if [ -n "$TASK_ID" ]; then
     fi
 fi
 
+# Handle prompts from environment variables (used by healer scan-remediation)
+# These take precedence if no file-based prompt exists
+if [ -n "${SCAN_PROMPT:-}" ] && [ ! -f "$CLI_WORK_DIR/task/prompt.md" ]; then
+    echo "📝 Creating prompt.md from SCAN_PROMPT environment variable..."
+    echo "$SCAN_PROMPT" > "$CLI_WORK_DIR/task/prompt.md"
+fi
+
+if [ -n "${PROMPT_MODIFICATION:-}" ] && [ ! -f "$CLI_WORK_DIR/task/prompt.md" ]; then
+    echo "📝 Creating prompt.md from PROMPT_MODIFICATION environment variable..."
+    echo "$PROMPT_MODIFICATION" > "$CLI_WORK_DIR/task/prompt.md"
+fi
+
 # Verify critical task files
 echo ""
 echo "📁 Task Files:"

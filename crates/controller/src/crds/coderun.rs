@@ -203,6 +203,49 @@ pub struct CodeRunSpec {
     /// The acceptance criteria probe will verify these checkboxes after task completion
     #[serde(default, rename = "acceptanceCriteria")]
     pub acceptance_criteria: Option<String>,
+
+    /// Comma-separated list of remote MCP tools to make available
+    /// These are resolved by the controller and written to client-config.json
+    /// Example: "mcp_tools_github_*,mcp_tools_kubernetes_*"
+    #[serde(default, rename = "remoteTools")]
+    pub remote_tools: Option<String>,
+
+    /// Comma-separated list of local MCP server tools to spawn
+    /// Example: "postgres,filesystem"
+    #[serde(default, rename = "localTools")]
+    pub local_tools: Option<String>,
+}
+
+impl Default for CodeRunSpec {
+    fn default() -> Self {
+        Self {
+            run_type: "implementation".to_string(),
+            task_id: None,
+            service: String::new(),
+            repository_url: String::new(),
+            docs_repository_url: String::new(),
+            docs_project_directory: None,
+            working_directory: None,
+            model: String::new(),
+            github_user: None,
+            github_app: None,
+            context_version: 1,
+            docs_branch: "main".to_string(),
+            continue_session: false,
+            overwrite_memory: false,
+            env: std::collections::HashMap::new(),
+            env_from_secrets: vec![],
+            enable_docker: true,
+            task_requirements: None,
+            service_account_name: None,
+            cli_config: None,
+            linear_integration: None,
+            prompt_modification: None,
+            acceptance_criteria: None,
+            remote_tools: None,
+            local_tools: None,
+        }
+    }
 }
 
 /// Status of the `CodeRun`
