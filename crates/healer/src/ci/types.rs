@@ -56,7 +56,7 @@ impl Agent {
     #[must_use]
     pub fn model(self) -> &'static str {
         // All agents use Opus 4.5 for initial implementation
-        "claude-opus-4-5-20250929"
+        "claude-opus-4-5-20251101"
     }
 
     /// Get the prompt template name for this agent.
@@ -826,7 +826,7 @@ impl Default for RemediationConfig {
     fn default() -> Self {
         Self {
             cli: "Factory".into(),
-            model: "claude-opus-4-5-20250929".into(),
+            model: "claude-opus-4-5-20251101".into(),
             max_attempts: 3,
             time_window_mins: 10,
             memory_url: Some("http://openmemory.cto-system.svc:3000".into()),

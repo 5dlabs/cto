@@ -247,10 +247,10 @@ PRD can specify which CLIs to use. Morgan populates `cto-config.json`:
 
 | CLI | Primary Model | Thinking Model | Use Case |
 |-----|--------------|----------------|----------|
-| **claude** | claude-opus-4-5-20250929 | claude-opus-4-5-20250929 | Planning, complex reasoning |
+| **claude** | claude-opus-4-5-20251101 | claude-opus-4-5-20251101 | Planning, complex reasoning |
 | **code** | gpt-5.1 | o3, o4-mini | Multi-agent consensus, full-auto |
 | **gemini** | gemini-2.5-pro | gemini-2.5-pro (thinking enabled) | Reasoning, multi-step problems |
-| **opencode** | claude-opus-4-5-20250929 | claude-opus-4-5-20250929 | Provider-agnostic |
+| **opencode** | claude-opus-4-5-20251101 | claude-opus-4-5-20251101 | Provider-agnostic |
 | **minimax** | MiniMax-M2 | MiniMax-M2 | 200k context, video/speech/music generation |
 
 **Every Code Multi-Agent Modes:**
@@ -273,7 +273,7 @@ claude (opus-4-5) → code (gpt-5.1) → gemini (2.5-pro) → code (/solve) → 
 **Model API Identifiers:**
 | Provider | Model | API Identifier | Notes |
 |----------|-------|----------------|-------|
-| Anthropic | Opus 4.5 | `claude-opus-4-5-20250929` | Extended thinking built-in |
+| Anthropic | Opus 4.5 | `claude-opus-4-5-20251101` | Extended thinking built-in |
 | Anthropic | Sonnet 4 | `claude-sonnet-4-20250514` | Fast, capable |
 | OpenAI | GPT-5.1 | `gpt-5.1` | Every Code default |
 | OpenAI | GPT-5.2 | `gpt-5.2` | Latest coding model |
@@ -2275,11 +2275,11 @@ op item list --vault="5DLabs"
 
 | CLI | Environment Variable | 1Password Item | Models |
 |-----|---------------------|----------------|--------|
-| **claude** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-opus-4-5-20250929, claude-sonnet-4-20250514 |
+| **claude** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-opus-4-5-20251101, claude-sonnet-4-20250514 |
 | **code** | `OPENAI_API_KEY` | `OpenAI API Key` | gpt-5.1, gpt-5.2, o3, o4-mini |
 | **gemini** | `GOOGLE_API_KEY` | `Google AI API Key` | gemini-2.5-pro, gemini-2.5-flash |
 | **dexter** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-sonnet-4-20250514 |
-| **opencode** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-opus-4-5-20250929 |
+| **opencode** | `ANTHROPIC_API_KEY` | `Anthropic API Key` | claude-opus-4-5-20251101 |
 | **cursor** | N/A (uses Cursor auth) | N/A | claude-sonnet-4-20250514 |
 | **minimax** | `MINIMAX_API_KEY` | `MiniMax API Key` | MiniMax-M2 |
 

@@ -41,7 +41,7 @@ pub enum IntakeMode {
 /// Model configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
-    /// Model identifier (e.g., "claude-opus-4-5-20250929")
+    /// Model identifier (e.g., "claude-opus-4-5-20251101")
     pub model: String,
 
     /// Provider name (e.g., "anthropic", "openai")
@@ -51,7 +51,7 @@ pub struct ModelConfig {
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
-            model: "claude-opus-4-5-20250929".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             provider: "anthropic".to_string(),
         }
     }

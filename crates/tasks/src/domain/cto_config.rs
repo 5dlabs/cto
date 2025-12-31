@@ -226,11 +226,11 @@ impl Default for CtoConfig {
                     cli: "claude".to_string(),
                     image: default_intake_image(),
                     primary: ModelConfig {
-                        model: "claude-opus-4-5-20250929".to_string(),
+                        model: "claude-opus-4-5-20251101".to_string(),
                         provider: "anthropic".to_string(),
                     },
                     research: ModelConfig {
-                        model: "claude-opus-4-5-20250929".to_string(),
+                        model: "claude-opus-4-5-20251101".to_string(),
                         provider: "anthropic".to_string(),
                     },
                     fallback: ModelConfig {

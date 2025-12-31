@@ -628,7 +628,7 @@ healer:
   config:
     # CI Remediation config
     cli: "Factory"
-    model: "claude-opus-4-5-20250929"
+    model: "claude-opus-4-5-20251101"
     maxAttempts: 3
     timeWindowMins: 10
     memoryUrl: "http://openmemory.cto.svc:3000"

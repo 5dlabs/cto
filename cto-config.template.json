@@ -14,7 +14,7 @@
   "defaults": {
     "_comment_docs": "Default values for docs() tool - documentation generation workflows",
     "docs": {
-      "model": "claude-opus-4-5-20250929",
+      "model": "claude-opus-4-5-20251101",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
@@ -37,11 +37,11 @@
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
       "primary": {
-        "model": "claude-opus-4-5-20250929",
+        "model": "claude-opus-4-5-20251101",
         "provider": "anthropic"
       },
       "research": {
-        "model": "claude-opus-4-5-20250929",
+        "model": "claude-opus-4-5-20251101",
         "provider": "anthropic"
       },
       "fallback": {
