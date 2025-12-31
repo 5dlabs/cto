@@ -22,6 +22,40 @@ fn xml_escape(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+/// Get validation commands based on agent type.
+fn get_validation_commands(agent_hint: &str) -> &'static str {
+    match agent_hint {
+        "bolt" => r"<command>kubectl get pods -n {namespace} - verify all pods running</command>
+        <command>kubectl get secrets - verify connection secrets created</command>
+        <command>kubectl logs {pod} - check for errors</command>",
+        "rex" => r"<command>cargo test --all</command>
+        <command>cargo clippy -- -D warnings</command>
+        <command>cargo fmt --check</command>",
+        "grizz" => r"<command>go test ./...</command>
+        <command>golangci-lint run</command>
+        <command>go build ./...</command>",
+        "nova" => r"<command>bun test</command>
+        <command>bun run lint</command>
+        <command>bun run typecheck</command>",
+        "blaze" => r"<command>npm run build</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>
+        <command>npm run typecheck</command>",
+        "tap" => r"<command>npx expo-doctor</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>",
+        "spark" => r"<command>npm run build</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>",
+        "tess" => r"<command>Run test suite for target codebase</command>
+        <command>Verify coverage meets threshold</command>",
+        "cipher" => r"<command>Run security audit tool</command>
+        <command>Check for known vulnerabilities</command>",
+        _ => r"<command>Run project test suite</command>
+        <command>Run linter</command>",
+    }
+}
+
 /// Generate task.xml content for a task.
 #[must_use]
 pub fn generate_task_xml(task: &Task) -> String {
@@ -29,11 +63,29 @@ pub fn generate_task_xml(task: &Task) -> String {
     let role = get_role_for_hint(agent_hint);
     let priority = task.priority.to_string();
     let dependencies = task.dependencies.join(", ");
+    let validation_commands = get_validation_commands(agent_hint);
 
     let title_esc = xml_escape(&task.title);
     let desc_esc = xml_escape(&task.description);
     let details_esc = xml_escape(&task.details);
     let test_esc = xml_escape(&task.test_strategy);
+
+    // Build requirements section - use details if available, otherwise provide guidance
+    let requirements_content = if details_esc.is_empty() {
+        format!(
+            "Implement {} as described in the overview. Refer to PRD at .tasks/docs/prd.txt for detailed specifications.",
+            title_esc
+        )
+    } else {
+        details_esc.clone()
+    };
+
+    // Build acceptance criteria - use test_strategy if available
+    let acceptance_content = if test_esc.is_empty() {
+        String::new()
+    } else {
+        format!("<criterion>{}</criterion>", test_esc)
+    };
 
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -49,37 +101,39 @@ pub fn generate_task_xml(task: &Task) -> String {
 
     <context>
         <overview>{desc}</overview>
-        <background>Review PRD and architecture in .tasks/docs/ for full context.</background>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: {deps}
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
     </context>
 
     <requirements>
-        <description>{details}</description>
+        <description>{requirements}</description>
         <constraints>
-            <constraint>Match existing codebase patterns</constraint>
-            <constraint>Create PR with atomic commits</constraint>
-            <constraint>Include unit tests</constraint>
-            <constraint>PR title: feat(task-{id}): {title}</constraint>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-{id}): {title}</constraint>
         </constraints>
     </requirements>
 
     <acceptance_criteria>
-        <criterion>All requirements implemented</criterion>
+        <criterion>All requirements from task description implemented</criterion>
         <criterion>Tests passing with adequate coverage</criterion>
-        <criterion>Code follows project conventions</criterion>
-        <criterion>{test_strategy}</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        {acceptance}
     </acceptance_criteria>
 
     <validation>
-        <command>cargo test (Rust)</command>
-        <command>cargo clippy -- -D warnings (Rust)</command>
-        <command>go test ./... (Go)</command>
-        <command>npm test (Node.js)</command>
+        {validation}
     </validation>
 
     <deliverables>
-        <deliverable>Working implementation</deliverable>
-        <deliverable>Unit tests</deliverable>
-        <deliverable>Pull request</deliverable>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
     </deliverables>
 </task>
 "#,
@@ -90,8 +144,9 @@ pub fn generate_task_xml(task: &Task) -> String {
         deps = dependencies,
         role = role,
         desc = desc_esc,
-        details = details_esc,
-        test_strategy = test_esc,
+        requirements = requirements_content,
+        acceptance = acceptance_content,
+        validation = validation_commands,
     )
 }
 
@@ -113,38 +168,44 @@ pub fn generate_task_prompt(task: &Task) -> String {
     .ok();
     writeln!(content, "## Goal\n").ok();
     writeln!(content, "{}\n", task.description).ok();
+
     writeln!(content, "## Requirements\n").ok();
-    writeln!(
-        content,
-        "{}\n",
-        if task.details.is_empty() {
-            "(See task description above)"
-        } else {
-            &task.details
-        }
-    )
-    .ok();
+    if task.details.is_empty() {
+        writeln!(
+            content,
+            "Implement the functionality described above. Refer to `.tasks/docs/prd.txt` for detailed specifications and architecture.\n"
+        )
+        .ok();
+    } else {
+        writeln!(content, "{}\n", task.details).ok();
+    }
+
     writeln!(content, "## Acceptance Criteria\n").ok();
-    writeln!(
-        content,
-        "{}\n",
-        if task.test_strategy.is_empty() {
-            "- All requirements implemented\n- Tests passing\n- Code follows conventions"
-        } else {
-            &task.test_strategy
-        }
-    )
-    .ok();
+    if task.test_strategy.is_empty() {
+        writeln!(content, "- All requirements from goal section implemented").ok();
+        writeln!(content, "- Tests passing with adequate coverage").ok();
+        writeln!(content, "- Code follows project conventions\n").ok();
+    } else {
+        writeln!(content, "{}\n", task.test_strategy).ok();
+    }
+
     writeln!(content, "## Constraints\n").ok();
-    writeln!(content, "- Match codebase patterns").ok();
-    writeln!(content, "- Create PR with atomic commits").ok();
-    writeln!(content, "- Include unit tests").ok();
+    writeln!(content, "- Match existing codebase patterns and style").ok();
+    writeln!(content, "- Create PR with atomic, well-described commits").ok();
+    writeln!(content, "- Include unit tests for new functionality").ok();
     writeln!(
         content,
-        "- PR title: `feat(task-{}): {}`",
+        "- PR title: `feat(task-{}): {}`\n",
         task.id, task.title
     )
     .ok();
+
+    // Add agent-specific guidance
+    writeln!(content, "## Resources\n").ok();
+    writeln!(content, "- PRD: `.tasks/docs/prd.txt`").ok();
+    if !task.dependencies.is_empty() {
+        writeln!(content, "- Dependencies: {}", task.dependencies.join(", ")).ok();
+    }
 
     content
 }
