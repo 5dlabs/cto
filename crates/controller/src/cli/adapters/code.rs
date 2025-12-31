@@ -597,7 +597,7 @@ mod tests {
         let claude_config = AgentConfig {
             github_app: "test".to_string(),
             cli: "code".to_string(),
-            model: "claude-opus-4-5-20250929".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             max_tokens: None,
             temperature: None,
             tools: None,
