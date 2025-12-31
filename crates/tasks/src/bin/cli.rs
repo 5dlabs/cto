@@ -455,6 +455,49 @@ enum Commands {
         /// Output directory (default: .tasks)
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Target repository (e.g., 5dlabs/my-project) - reads from `REPOSITORY` env if not provided
+        #[arg(long, env = "REPOSITORY")]
+        repository: Option<String>,
+
+        /// Service name - reads from `SERVICE` env if not provided
+        #[arg(long, env = "SERVICE")]
+        service: Option<String>,
+
+        /// Docs repository URL - reads from `DOCS_REPOSITORY` env if not provided
+        #[arg(long, env = "DOCS_REPOSITORY")]
+        docs_repository: Option<String>,
+
+        /// Project directory within docs repo - reads from `PROJECT_NAME` env if not provided
+        #[arg(long, env = "PROJECT_NAME")]
+        docs_project_directory: Option<String>,
+    },
+
+    /// Generate cto-config.json with per-agent tool configurations
+    GenerateConfig {
+        /// Target repository (e.g., 5dlabs/my-project) - reads from `REPOSITORY` env if not provided
+        #[arg(long, env = "REPOSITORY")]
+        repository: Option<String>,
+
+        /// Service name - reads from `SERVICE` env if not provided
+        #[arg(long, env = "SERVICE")]
+        service: Option<String>,
+
+        /// Docs repository - reads from `DOCS_REPOSITORY` env if not provided
+        #[arg(long, env = "DOCS_REPOSITORY")]
+        docs_repository: Option<String>,
+
+        /// Project directory - reads from `PROJECT_NAME` env if not provided
+        #[arg(long, env = "PROJECT_NAME")]
+        docs_project_directory: Option<String>,
+
+        /// Output directory (default: current directory)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Tag context
+        #[arg(long)]
+        tag: Option<String>,
     },
 
     /// Generate documentation (XML, MD) for all tasks
@@ -1537,6 +1580,10 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             research,
             model,
             output,
+            repository,
+            service,
+            docs_repository,
+            docs_project_directory,
         } => {
             // Initialize if not already
             if !tasks_domain.is_initialized().await? {
@@ -1564,6 +1611,10 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 research,
                 model,
                 output_dir: output_dir.clone(),
+                repository,
+                service,
+                docs_repository,
+                docs_project_directory,
             };
 
             ui::print_info("Starting intake workflow...");
@@ -1605,6 +1656,60 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             ui::print_info(&format!(
                 "Docs saved to: {}",
                 output_dir.join("docs").display()
+            ));
+        }
+
+        Commands::GenerateConfig {
+            repository,
+            service,
+            docs_repository,
+            docs_project_directory,
+            output,
+            tag,
+        } => {
+            check_initialized(&tasks_domain).await?;
+
+            let tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
+
+            if tasks.is_empty() {
+                ui::print_info("No tasks to generate config for");
+                return Ok(());
+            }
+
+            let repository = repository.unwrap_or_else(|| "unknown/unknown".to_string());
+            let service = service.unwrap_or_else(|| "unknown".to_string());
+            let docs_repository = docs_repository.unwrap_or_else(|| repository.clone());
+            let docs_project_directory = docs_project_directory.unwrap_or_else(|| service.clone());
+
+            ui::print_info(&format!(
+                "Generating cto-config.json for {} tasks...",
+                tasks.len()
+            ));
+            ui::print_info(&format!("  Repository: {}", repository));
+            ui::print_info(&format!("  Service: {}", service));
+
+            let cto_config = tasks::domain::generate_cto_config(
+                &tasks,
+                &repository,
+                &service,
+                &docs_repository,
+                &docs_project_directory,
+            );
+
+            let output_dir = output.unwrap_or_else(|| project_path.clone());
+
+            tasks::domain::save_cto_config(&cto_config, &output_dir).await?;
+
+            ui::print_success(&format!(
+                "Generated cto-config.json with {} agent configurations",
+                cto_config.agents.len()
+            ));
+            for name in cto_config.agents.keys() {
+                println!("  {} Agent: {}", "•".cyan(), name);
+            }
+            ui::print_info(&format!(
+                "Output: {}",
+                output_dir.join("cto-config.json").display()
             ));
         }
 
