@@ -611,7 +611,7 @@ healer:
   image:
     repository: ghcr.io/5dlabs/healer
     pullPolicy: Always
-    tag: "latest"
+    tag: "develop"
 
   service:
     type: ClusterIP
