@@ -353,7 +353,7 @@ spec:
                             parameters:
                               - name: repository
                                 value: "${REPOSITORY}"
-                              - name: project-directory
+                              - name: docs-project-directory
                                 value: "${PROJECT_DIR_NAME}"
                               - name: docs-repository
                                 value: "${REPOSITORY}"
