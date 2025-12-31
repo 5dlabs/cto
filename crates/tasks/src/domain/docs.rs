@@ -275,7 +275,13 @@ pub async fn generate_all_docs(
     let mut result = DocsGenerationResult::default();
 
     for task in tasks {
-        let task_dir = output_dir.join(format!("task-{}", task.id));
+        // Use task ID directly if it already starts with "task-", otherwise prefix it
+        let dir_name = if task.id.starts_with("task-") {
+            task.id.clone()
+        } else {
+            format!("task-{}", task.id)
+        };
+        let task_dir = output_dir.join(&dir_name);
 
         // Create task directory
         tokio::fs::create_dir_all(&task_dir)
