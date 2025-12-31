@@ -21,6 +21,9 @@
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
+      "mode": "cli",
+      "cli": "claude",
+      "image": "ghcr.io/5dlabs/factory:latest",
       "primary": {
         "model": "claude-sonnet-4-5-20250929",
         "provider": "anthropic"
