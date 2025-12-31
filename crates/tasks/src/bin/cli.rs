@@ -17,12 +17,12 @@ use colored::Colorize;
 
 use tasks::ai::schemas::ComplexityReport;
 use tasks::domain::{
-    docs::generate_all_docs, AIDomain, ConfigDomain, DependencyDomain, IntakeConfig, IntakeDomain,
-    TagsDomain, TasksDomain,
+    docs::generate_all_docs, infer_agent_hint_str, AIDomain, ConfigDomain, DependencyDomain,
+    IntakeConfig, IntakeDomain, TagsDomain, TasksDomain,
 };
 use tasks::entities::{TaskPriority, TaskStatus};
 use tasks::errors::TasksError;
-use tasks::storage::FileStorage;
+use tasks::storage::{FileStorage, Storage};
 use tasks::ui;
 
 #[derive(Parser)]
@@ -1669,11 +1669,30 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
         } => {
             check_initialized(&tasks_domain).await?;
 
-            let tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
+            let mut tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
 
             if tasks.is_empty() {
                 ui::print_info("No tasks to generate config for");
                 return Ok(());
+            }
+
+            // Apply agent hints to tasks that don't have them
+            // This is critical for CLI mode where Claude generates tasks.json directly
+            let mut hints_applied = 0;
+            for task in &mut tasks {
+                if task.agent_hint.is_none() {
+                    task.agent_hint =
+                        Some(infer_agent_hint_str(&task.title, &task.description).to_string());
+                    hints_applied += 1;
+                }
+            }
+            if hints_applied > 0 {
+                ui::print_info(&format!(
+                    "Applied agent hints to {} tasks without explicit hints",
+                    hints_applied
+                ));
+                // Save the updated tasks back
+                storage.save_tasks(&tasks, tag.as_deref()).await?;
             }
 
             let repository = repository.unwrap_or_else(|| "unknown/unknown".to_string());
@@ -1716,11 +1735,30 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
         Commands::GenerateDocs { output, tag } => {
             check_initialized(&tasks_domain).await?;
 
-            let tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
+            let mut tasks = tasks_domain.list_tasks(tag.as_deref(), None).await?;
 
             if tasks.is_empty() {
                 ui::print_info("No tasks to generate documentation for");
                 return Ok(());
+            }
+
+            // Apply agent hints to tasks that don't have them
+            // This ensures docs have correct agent assignments
+            let mut hints_applied = 0;
+            for task in &mut tasks {
+                if task.agent_hint.is_none() {
+                    task.agent_hint =
+                        Some(infer_agent_hint_str(&task.title, &task.description).to_string());
+                    hints_applied += 1;
+                }
+            }
+            if hints_applied > 0 {
+                ui::print_info(&format!(
+                    "Applied agent hints to {} tasks without explicit hints",
+                    hints_applied
+                ));
+                // Save the updated tasks back
+                storage.save_tasks(&tasks, tag.as_deref()).await?;
             }
 
             let output_dir = output.unwrap_or_else(|| project_path.join(".tasks").join("docs"));
