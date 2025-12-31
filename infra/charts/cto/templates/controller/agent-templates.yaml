@@ -871,10 +871,65 @@ data:
     activity_action_complete "Generated tasks" "$TASK_COUNT tasks" "tasks.json created.\n\nLast output:\n\n$SNIPPET"
 
     # =========================================================================
+    # Phase 5: Create Linear Project and Issues
+    # =========================================================================
+    echo ""
+    echo "📊 Phase 5: Creating Linear Project and Issues"
+    echo "==============================================="
+
+    PM_SERVER_URL="${PM_SERVER_URL:-http://pm-server.cto.svc.cluster.local:8080}"
+
+    if [ -n "${LINEAR_SESSION_ID:-}" ] && [ -n "${LINEAR_ISSUE_ID:-}" ]; then
+        echo "  → Creating Linear project and task issues..."
+        activity_thought "Creating Linear project and issues for $TASK_COUNT tasks"
+
+        # Build the callback payload
+        TASKS_JSON_CONTENT=$(cat "$TASKS_FILE")
+
+        CALLBACK_PAYLOAD=$(jq -n \
+            --arg sessionId "${LINEAR_SESSION_ID}" \
+            --arg issueId "${LINEAR_ISSUE_ID}" \
+            --arg issueIdentifier "${LINEAR_ISSUE_IDENTIFIER:-unknown}" \
+            --arg teamId "${LINEAR_TEAM_ID}" \
+            --arg workflowName "${WORKFLOW_NAME:-intake}" \
+            --argjson tasks "$TASKS_JSON_CONTENT" \
+            '{
+                sessionId: $sessionId,
+                issueId: $issueId,
+                issueIdentifier: $issueIdentifier,
+                teamId: $teamId,
+                tasks: $tasks.tasks,
+                workflowName: $workflowName,
+                success: true
+            }')
+
+        # Call PM server to create Linear project and issues
+        CALLBACK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "${PM_SERVER_URL}/callbacks/intake-complete" \
+            -H "Content-Type: application/json" \
+            -d "$CALLBACK_PAYLOAD" 2>&1) || true
+
+        HTTP_CODE=$(echo "$CALLBACK_RESPONSE" | tail -n1)
+        RESPONSE_BODY=$(echo "$CALLBACK_RESPONSE" | sed '$d')
+
+        if [ "$HTTP_CODE" = "200" ]; then
+            echo "  ✅ Linear project and issues created successfully"
+            activity_action_complete "Linear issues created" "$TASK_COUNT issues" "Project board ready for review"
+        else
+            echo "  ⚠️ Failed to create Linear issues (HTTP $HTTP_CODE)"
+            echo "  Response: $RESPONSE_BODY"
+            activity_error "Failed to create Linear issues.\n\nHTTP $HTTP_CODE\n\n$RESPONSE_BODY"
+            # Non-fatal: continue with PR creation even if Linear fails
+        fi
+    else
+        echo "  ⚠️ LINEAR_SESSION_ID or LINEAR_ISSUE_ID not set, skipping Linear integration"
+    fi
+
+    # =========================================================================
     # Phase 6: Create Pull Request
     # =========================================================================
     echo ""
-    echo "🔀 Phase 4: Creating Pull Request"
+    echo "🔀 Phase 6: Creating Pull Request"
     echo "=================================="
 
     cd "$CLONE_DIR" || exit 1
