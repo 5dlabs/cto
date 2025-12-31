@@ -140,10 +140,10 @@ pub struct PlayDefaults {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum IntakeMode {
-    /// Direct API calls via `tasks intake` binary (default, faster)
-    #[default]
+    /// Direct API calls via `tasks intake` binary (faster, no MCP tools)
     Api,
-    /// Use AI CLI (claude, codex, etc.) for intake
+    /// Use AI CLI (claude, codex, etc.) for intake with full MCP tool access
+    #[default]
     Cli,
 }
 
@@ -179,7 +179,7 @@ pub struct IntakeDefaults {
 }
 
 fn default_intake_image() -> String {
-    "ghcr.io/5dlabs/runtime:latest".to_string()
+    "ghcr.io/5dlabs/factory:latest".to_string()
 }
 
 /// Model configuration
@@ -222,8 +222,8 @@ impl Default for CtoConfig {
             defaults: Defaults {
                 intake: IntakeDefaults {
                     github_app: "5DLabs-Morgan".to_string(),
-                    mode: IntakeMode::Api, // Default to API mode (faster, uses tasks CLI)
-                    cli: "claude".to_string(), // Used when mode = Cli
+                    mode: IntakeMode::Cli, // Default to CLI mode (uses tools-server for MCP)
+                    cli: "claude".to_string(),
                     image: default_intake_image(),
                     primary: ModelConfig {
                         model: "claude-opus-4-5-20250929".to_string(),
