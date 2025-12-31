@@ -611,7 +611,7 @@ mod tests {
             "teamId": "team-789",
             "tasks": [
                 {
-                    "id": 1,
+                    "id": "TASK-001",
                     "title": "Test Task",
                     "description": "Test description",
                     "priority": 2,

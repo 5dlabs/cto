@@ -341,8 +341,8 @@ pub fn strip_frontmatter(description: &str) -> String {
 /// Task from intake workflow output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntakeTask {
-    /// Task ID.
-    pub id: i32,
+    /// Task ID (string to support alphanumeric IDs like "TASK-001").
+    pub id: String,
     /// Task title.
     pub title: String,
     /// Task description.
@@ -352,7 +352,7 @@ pub struct IntakeTask {
     pub details: String,
     /// Dependencies (list of task IDs).
     #[serde(default)]
-    pub dependencies: Vec<i32>,
+    pub dependencies: Vec<String>,
     /// Priority (1=highest, 5=lowest).
     #[serde(default)]
     pub priority: i32,
@@ -734,7 +734,7 @@ pub async fn create_task_issues(
     client: &LinearClient,
     request: &IntakeRequest,
     tasks: &[IntakeTask],
-) -> Result<HashMap<i32, String>> {
+) -> Result<HashMap<String, String>> {
     create_task_issues_with_project(client, request, tasks, None).await
 }
 
@@ -744,8 +744,8 @@ pub async fn create_task_issues_with_project(
     request: &IntakeRequest,
     tasks: &[IntakeTask],
     project_id: Option<&str>,
-) -> Result<HashMap<i32, String>> {
-    let mut task_issue_map = HashMap::new();
+) -> Result<HashMap<String, String>> {
+    let mut task_issue_map: HashMap<String, String> = HashMap::new();
 
     // Get workflow states for the team.
     // Prefer "Ready" state (created by ensure_play_workflow_states) for new tasks,
@@ -810,14 +810,14 @@ pub async fn create_task_issues_with_project(
         match client.create_issue(input).await {
             Ok(issue) => {
                 info!(
-                    task_id = task.id,
+                    task_id = %task.id,
                     issue_identifier = %issue.identifier,
                     "Created task issue"
                 );
-                task_issue_map.insert(task.id, issue.id);
+                task_issue_map.insert(task.id.clone(), issue.id);
             }
             Err(e) => {
-                error!(task_id = task.id, error = %e, "Failed to create task issue");
+                error!(task_id = %task.id, error = %e, "Failed to create task issue");
             }
         }
     }
@@ -835,8 +835,8 @@ pub async fn create_task_issues_with_project(
         for dep_id in &task.dependencies {
             let Some(dep_issue_id) = task_issue_map.get(dep_id) else {
                 warn!(
-                    task_id = task.id,
-                    dep_id = dep_id,
+                    task_id = %task.id,
+                    dep_id = %dep_id,
                     "Dependency task issue not found"
                 );
                 continue;
@@ -850,8 +850,8 @@ pub async fn create_task_issues_with_project(
 
             if let Err(e) = client.create_issue_relation(input).await {
                 warn!(
-                    task_id = task.id,
-                    dep_id = dep_id,
+                    task_id = %task.id,
+                    dep_id = %dep_id,
                     error = %e,
                     "Failed to create dependency relation"
                 );
@@ -1038,7 +1038,7 @@ fn format_task_description(task: &IntakeTask) -> String {
 pub fn generate_completion_summary(
     request: &IntakeRequest,
     tasks: &[IntakeTask],
-    task_issue_map: &HashMap<i32, String>,
+    task_issue_map: &HashMap<String, String>,
 ) -> String {
     let task_count = tasks.len();
     let high_priority = tasks.iter().filter(|t| t.priority <= 2).count();
@@ -1114,11 +1114,11 @@ mod tests {
     #[test]
     fn test_format_task_description() {
         let task = IntakeTask {
-            id: 1,
+            id: "TASK-001".to_string(),
             title: "Test Task".to_string(),
             description: "Test description".to_string(),
             details: "Implementation details".to_string(),
-            dependencies: vec![2, 3],
+            dependencies: vec!["TASK-002".to_string(), "TASK-003".to_string()],
             priority: 2,
             test_strategy: "Unit tests".to_string(),
             agent_hint: "rex".to_string(),
@@ -1128,7 +1128,7 @@ mod tests {
         assert!(description.contains("Test description"));
         assert!(description.contains("Implementation details"));
         assert!(description.contains("Unit tests"));
-        assert!(description.contains("Task 2"));
+        assert!(description.contains("TASK-002"));
         assert!(description.contains("rex"));
     }
 
@@ -1137,7 +1137,7 @@ mod tests {
         let json = r#"{
             "tasks": [
                 {
-                    "id": 1,
+                    "id": "TASK-001",
                     "title": "Setup project",
                     "description": "Initialize the project",
                     "details": "",
@@ -1151,7 +1151,7 @@ mod tests {
 
         let tasks: TasksJson = serde_json::from_str(json).unwrap();
         assert_eq!(tasks.tasks.len(), 1);
-        assert_eq!(tasks.tasks[0].id, 1);
+        assert_eq!(tasks.tasks[0].id, "TASK-001");
         assert_eq!(tasks.tasks[0].title, "Setup project");
     }
 
