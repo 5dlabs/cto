@@ -67,20 +67,40 @@ When generating tasks.json, you MUST populate ALL fields with detailed content:
 
 ---
 
-## Agent Routing (agentHint)
+## Agent Routing (agentHint) - CRITICAL
 
-| Agent | Keywords | Use For |
-|-------|----------|---------|
-| **bolt** | infrastructure, deploy, kubernetes, database, cache, queue, storage | Task 1 (always), infra changes |
-| **rex** | rust, axum, tokio, backend api | Rust microservices |
-| **grizz** | go, grpc, chi | Go microservices |
-| **nova** | node, bun, elysia, effect, typescript api | Node.js/Bun services |
-| **blaze** | react, nextjs, frontend, ui, web | Web frontends |
-| **tap** | expo, react native, mobile | Mobile apps |
-| **spark** | electron, desktop | Desktop apps |
-| **tess** | test, coverage, qa | Test implementation |
-| **cipher** | security, auth, audit | Security review |
-| **atlas** | merge, integrate, conflict | Final integration |
+**EVERY task MUST have a valid `agentHint` set.** Do NOT leave it empty or default everything to "rex".
+
+| Agent | `agentHint` Value | Keywords to Match | Examples |
+|-------|-------------------|-------------------|----------|
+| **Bolt** | `"bolt"` | infrastructure, deploy, kubernetes, k8s, database, postgresql, redis, kafka, storage, provision, operator, cluster, helm | "Provision PostgreSQL", "Deploy Kafka cluster", "Setup Redis cache" |
+| **Rex** | `"rex"` | rust, axum, tokio, cargo, backend (when rust specified), sqlx | "Implement Rust API", "Build axum service", "Create tokio worker" |
+| **Grizz** | `"grizz"` | go, golang, grpc, chi, protobuf, go-based | "Go microservice", "gRPC API", "Chi router" |
+| **Nova** | `"nova"` | node, nodejs, bun, elysia, effect, drizzle, typescript backend, express, nestjs, hono | "Bun API", "Elysia service", "Node.js worker", "TypeScript API" |
+| **Blaze** | `"blaze"` | react, nextjs, next.js, frontend, web ui, dashboard, admin panel, web app, shadcn, tailwind, component | "React dashboard", "Next.js app", "Admin UI", "Web frontend" |
+| **Tap** | `"tap"` | expo, react native, mobile, ios, android, mobile app | "Mobile app", "Expo app", "React Native screen" |
+| **Spark** | `"spark"` | electron, desktop, desktop app, tauri | "Desktop app", "Electron client" |
+| **Tess** | `"tess"` | test suite, testing, e2e test, qa, coverage | "Write test suite", "E2E testing" |
+| **Cipher** | `"cipher"` | security audit, vulnerability, auth review | "Security audit", "Penetration test" |
+| **Atlas** | `"atlas"` | merge, integrate all, combine PRs | "Final integration" |
+
+### Agent Assignment Rules
+
+1. **Task 1 = ALWAYS Bolt** - Infrastructure must be provisioned first
+2. **Backend API without language specified → Ask PRD or default to Nova** (TypeScript is most common)
+3. **"Dashboard", "Admin Panel", "Web App" → Blaze** (these are frontend even if they have "admin" in name)
+4. **"API" alone is NOT enough** - look for language hints (Rust → Rex, Go → Grizz, Node/Bun → Nova)
+5. **When PRD specifies stack** - e.g., "(Nova - Bun/Elysia)" in title → use that agent
+
+### Common Mistakes to Avoid
+
+| Wrong | Right | Reason |
+|-------|-------|--------|
+| `"agentHint": "rex"` for "Admin Dashboard" | `"agentHint": "blaze"` | Dashboard = frontend |
+| `"agentHint": "rex"` for "Setup PostgreSQL" | `"agentHint": "bolt"` | Database setup = infrastructure |
+| `"agentHint": "rex"` for "Bun API Service" | `"agentHint": "nova"` | Bun = Node.js ecosystem |
+| `"agentHint": "rex"` for "gRPC Gateway" | `"agentHint": "grizz"` | gRPC typically = Go |
+| `"agentHint": null` | Always set a value | Never leave empty |
 
 ---
 
@@ -134,16 +154,26 @@ Generate the following files:
 
 ## Quality Checklist
 
-Before finalizing, verify:
+Before finalizing, verify EVERY item:
 
-- [ ] Task 1 is infrastructure (Bolt) with all DB/cache/queue specs
-- [ ] Every task has non-empty `details` with PRD context
-- [ ] Every task has non-empty `testStrategy` with specific verification
-- [ ] `agentHint` matches task content (not defaulting to rex)
+- [ ] **Task 1 is `agentHint: "bolt"`** - Infrastructure MUST be first
+- [ ] **Every task has `agentHint` set** - No null or empty values
+- [ ] **Agent hints match task type:**
+  - [ ] Frontend/Dashboard/UI tasks → `blaze`
+  - [ ] Infrastructure/Database/K8s tasks → `bolt`
+  - [ ] Rust tasks → `rex`
+  - [ ] Go/gRPC tasks → `grizz`
+  - [ ] Node/Bun/TypeScript API tasks → `nova`
+  - [ ] Mobile/Expo tasks → `tap`
+  - [ ] Desktop/Electron tasks → `spark`
+- [ ] Every task has non-empty `details` with PRD context embedded
+- [ ] Every task has non-empty `testStrategy` with specific verification commands
 - [ ] Dependencies form valid DAG (no cycles)
 - [ ] Implementation tasks depend on task-001 (infrastructure)
-- [ ] Frontend tasks depend on relevant backend API tasks
+- [ ] Frontend tasks depend on their backend API tasks
 - [ ] Each task is atomic (completable in one PR)
+
+**STOP and review if most tasks are assigned to Rex** - this usually indicates incorrect routing.
 
 ---
 

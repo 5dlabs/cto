@@ -166,7 +166,8 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         return Agent::Cipher;
     }
 
-    // DevOps/Deployment (early - deploy/docker/k8s are strong signals)
+    // DevOps/Deployment/Infrastructure (early - deploy/docker/k8s are strong signals)
+    // Also catches database/cache PROVISIONING vs application DATABASE USAGE
     if content.contains("deploy")
         || content.contains("ci/cd")
         || content.contains("ci cd")
@@ -180,6 +181,15 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("gitops")
         || content.contains("containerize")
         || content.contains("infrastructure")
+        || content.contains("provision")
+        || content.contains("setup cluster")
+        || content.contains("setup database")
+        || content.contains("setup redis")
+        || content.contains("setup kafka")
+        || content.contains("operator")
+        || content.contains("cloudnative-pg")
+        || content.contains("strimzi")
+        || content.contains("percona")
     {
         return Agent::Bolt;
     }
@@ -222,7 +232,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         return Agent::Nova;
     }
 
-    // Frontend
+    // Frontend (check before generic backend to catch "admin dashboard", "web app", etc.)
     if content.contains("frontend")
         || content.contains("react")
         || content.contains("ui ")
@@ -235,6 +245,13 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("vue")
         || content.contains("angular")
         || content.contains("svelte")
+        || content.contains("dashboard")
+        || content.contains("admin panel")
+        || content.contains("web app")
+        || content.contains("website")
+        || content.contains("shadcn")
+        || content.contains("landing page")
+        || content.contains("web interface")
     {
         return Agent::Blaze;
     }
@@ -252,19 +269,19 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
     }
 
     // Generic backend keywords - default to Rex for these
+    // Note: "admin" removed (now caught by frontend "admin panel" or "dashboard")
+    // Note: "postgresql", "redis" removed (if it's provisioning, caught by Bolt earlier)
     if content.contains("backend")
         || content.contains("api ")
         || content.contains(" api")
         || content.contains("endpoint")
-        || content.contains("database")
         || content.contains("schema")
         || content.contains("migration")
-        || content.contains("user")
-        || content.contains("profile")
-        || content.contains("admin")
+        || content.contains("user service")
+        || content.contains("profile service")
         || content.contains("crud")
-        || content.contains("postgresql")
-        || content.contains("redis")
+        || content.contains("microservice")
+        || content.contains("service layer")
     {
         return Agent::Rex;
     }
@@ -365,6 +382,19 @@ mod tests {
             infer_agent_hint("Frontend layout", "CSS styling"),
             Agent::Blaze
         );
+        // Dashboard and admin panel should go to Blaze (frontend)
+        assert_eq!(
+            infer_agent_hint("Admin Dashboard", "Show user statistics"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Build admin panel", "Management interface"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Web app interface", "User-facing application"),
+            Agent::Blaze
+        );
     }
 
     #[test]
@@ -452,6 +482,24 @@ mod tests {
         // Test infrastructure keyword
         assert_eq!(
             infer_agent_hint("Infrastructure setup", "Database provisioning"),
+            Agent::Bolt
+        );
+        // Provision keywords should route to Bolt
+        assert_eq!(
+            infer_agent_hint("Provision PostgreSQL", "Setup database cluster"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Setup Redis cluster", "Cache infrastructure"),
+            Agent::Bolt
+        );
+        // Operator keywords should route to Bolt
+        assert_eq!(
+            infer_agent_hint("Deploy CloudNative-PG", "PostgreSQL operator"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Setup Strimzi Kafka", "Event streaming"),
             Agent::Bolt
         );
     }
