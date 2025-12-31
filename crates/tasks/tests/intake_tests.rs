@@ -228,6 +228,10 @@ mod config_tests {
             research: false,
             model: Some("claude-sonnet".to_string()),
             output_dir: PathBuf::from("custom/output"),
+            repository: Some("5dlabs/test".to_string()),
+            service: Some("test-service".to_string()),
+            docs_repository: Some("5dlabs/test".to_string()),
+            docs_project_directory: Some("test-service".to_string()),
         };
 
         assert_eq!(config.num_tasks, 20);

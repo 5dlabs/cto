@@ -489,9 +489,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR management
                         "github_create_pull_request".to_string(),
                         "github_push_files".to_string(),
                         "github_create_branch".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -508,9 +512,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR management
                         "github_create_pull_request".to_string(),
                         "github_push_files".to_string(),
                         "github_create_branch".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -527,9 +535,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR management
                         "github_create_pull_request".to_string(),
                         "github_push_files".to_string(),
                         "github_create_branch".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -546,12 +558,24 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR management
                         "github_create_pull_request".to_string(),
                         "github_push_files".to_string(),
                         "github_create_branch".to_string(),
+                        // shadcn/ui component tools
                         "shadcn_list_components".to_string(),
                         "shadcn_get_component".to_string(),
                         "shadcn_get_component_demo".to_string(),
+                        // Browser automation for testing
+                        "browser_navigate".to_string(),
+                        "browser_snapshot".to_string(),
+                        "browser_click".to_string(),
+                        "browser_type".to_string(),
+                        "browser_take_screenshot".to_string(),
+                        "browser_console_messages".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -568,9 +592,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR management
                         "github_create_pull_request".to_string(),
                         "github_push_files".to_string(),
                         "github_create_branch".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -587,9 +615,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR management
                         "github_create_pull_request".to_string(),
                         "github_push_files".to_string(),
                         "github_create_branch".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -606,9 +638,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for code review
                         "github_get_pull_request".to_string(),
                         "github_get_pull_request_files".to_string(),
                         "github_create_pull_request_review".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -625,10 +661,14 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for security scanning
                         "github_list_code_scanning_alerts".to_string(),
                         "github_get_code_scanning_alert".to_string(),
                         "github_get_pull_request".to_string(),
                         "github_create_pull_request_review".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -645,10 +685,15 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR review
                         "github_get_pull_request".to_string(),
                         "github_create_pull_request_review".to_string(),
+                        // Kubernetes tools for integration testing
                         "kubernetes_listResources".to_string(),
                         "kubernetes_getPodsLogs".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -665,9 +710,13 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // GitHub tools for PR merging
                         "github_get_pull_request".to_string(),
                         "github_merge_pull_request".to_string(),
                         "github_create_pull_request_review".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
@@ -684,9 +733,24 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
                 remote: {
                     let mut tools = default_remote_tools();
                     tools.extend([
+                        // Kubernetes tools for resource management
                         "kubernetes_applyResource".to_string(),
                         "kubernetes_listResources".to_string(),
                         "kubernetes_getResource".to_string(),
+                        "kubernetes_deleteResource".to_string(),
+                        "kubernetes_getPodsLogs".to_string(),
+                        // ArgoCD tools for GitOps
+                        "argocd_list_applications".to_string(),
+                        "argocd_get_application".to_string(),
+                        "argocd_sync_application".to_string(),
+                        "argocd_get_application_resource_tree".to_string(),
+                        // GitHub tools for PR creation
+                        "github_create_pull_request".to_string(),
+                        "github_push_files".to_string(),
+                        "github_create_branch".to_string(),
+                        // Linear tools for status updates
+                        "linear_update_issue".to_string(),
+                        "linear_create_comment".to_string(),
                     ]);
                     tools
                 },
