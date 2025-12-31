@@ -1,0 +1,454 @@
+---
+# =============================================================================
+# play-workflow-pr-merged Sensor
+# =============================================================================
+# Handles PR merge events to main branch:
+# 1. Task PRs (task-X label) → Complete task workflow, start next task
+# 2. Intake PRs (cto-intake label) → Trigger play workflow for all tasks
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-pr-merged
+  namespace: automation
+spec:
+  dependencies:
+    - eventName: org
+      eventSourceName: github
+      filters:
+        data:
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - closed
+          - path: body.pull_request.merged
+            type: string
+            value:
+              - "true"
+          - path: body.pull_request.base.ref
+            type: string
+            value:
+              - main
+      name: github-pr-merged
+  deploymentStrategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  replicas: 1
+  template:
+    serviceAccountName: argo-events-sa
+  triggers:
+    - template:
+        conditions: github-pr-merged
+        k8s:
+          operation: create
+          parameters:
+            - dest: metadata.generateName
+              operation: append
+              src:
+                dataTemplate: "pr{{ .Input.body.pull_request.number }}-"
+                dependencyName: github-pr-merged
+            - dest: metadata.labels.pr-number
+              src:
+                dataKey: body.pull_request.number
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body.pull_request.title
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.pull_request.number
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.pull_request.html_url
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dataKey: body.pull_request.merge_commit_sha
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dataKey: body.pull_request.merged_by.login
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.5.value
+              src:
+                dataKey: body.pull_request.body
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.6.value
+              src:
+                dataTemplate: '{{ .Input.body.pull_request.labels | toJson }}'
+                dependencyName: github-pr-merged
+            - dest: spec.arguments.parameters.7.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: github-pr-merged
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: task-complete-
+                labels:
+                  trigger: merge-to-main
+                  type: task-completion
+                namespace: cto
+              spec:
+                activeDeadlineSeconds: 7200
+                arguments:
+                  parameters:
+                    - name: pr-title
+                    - name: pr-number
+                    - name: pr-url
+                    - name: merge-sha
+                    - name: merged-by
+                    - name: pr-body
+                    - name: pr-labels
+                    - name: repository
+                entrypoint: handle-pr-merge
+                podGC:
+                  strategy: OnPodCompletion
+                serviceAccountName: argo-workflow
+                templates:
+                  - name: handle-pr-merge
+                    script:
+                      command:
+                        - bash
+                      env:
+                        - name: GITHUB_APP_ID
+                          valueFrom:
+                            secretKeyRef:
+                              key: app-id
+                              name: github-app-5dlabs-morgan
+                        - name: GITHUB_APP_PRIVATE_KEY
+                          valueFrom:
+                            secretKeyRef:
+                              key: private-key
+                              name: github-app-5dlabs-morgan
+                      image: alpine/k8s:1.31.0
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                        # Install required tools if not present
+                        MISSING_TOOLS=""
+                        command -v git >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS git"
+                        command -v curl >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS curl"
+                        command -v jq >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS jq"
+                        command -v openssl >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS openssl"
+                        [ -n "$MISSING_TOOLS" ] && apk add --no-cache $MISSING_TOOLS
+
+                        # =============================================================================
+                        # GITHUB APP AUTHENTICATION
+                        # =============================================================================
+                        echo "🔐 Authenticating with Morgan GitHub App..."
+                        if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+                            TEMP_KEY_FILE="/tmp/github-app-key.pem"
+                            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+                            chmod 600 "$TEMP_KEY_FILE"
+
+                            JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            NOW=$(date +%s)
+                            EXP=$((NOW + 600))
+                            JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+                            INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                                "https://api.github.com/app/installations" | jq -r '.[0].id')
+
+                            [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ] && { echo "❌ Failed to get installation ID"; exit 1; }
+
+                            GITHUB_TOKEN=$(curl -s -X POST -H "Authorization: Bearer $JWT_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                                "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+                            [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ] && { echo "❌ Failed to get token"; exit 1; }
+
+                            rm -f "$TEMP_KEY_FILE"
+                            export GITHUB_TOKEN
+                            git config --global credential.helper store
+                            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+                            echo "✅ Morgan GitHub App authenticated"
+                        else
+                            echo "❌ GitHub App credentials not found"
+                            exit 1
+                        fi
+
+                        git config --global user.name "Task Orchestrator (Morgan)"
+                        git config --global user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
+
+                        echo "════════════════════════════════════════════════════════════════"
+                        echo "║                 PR MERGE HANDLER                             ║"
+                        echo "════════════════════════════════════════════════════════════════"
+                        echo "📋 PR Title: {{workflow.parameters.pr-title}}"
+                        echo "🔢 PR Number: {{workflow.parameters.pr-number}}"
+                        echo "🔗 PR URL: {{workflow.parameters.pr-url}}"
+                        echo "📦 Merge SHA: {{workflow.parameters.merge-sha}}"
+                        echo "👤 Merged by: {{workflow.parameters.merged-by}}"
+                        echo "📁 Repository: {{workflow.parameters.repository}}"
+                        echo "════════════════════════════════════════════════════════════════"
+
+                        PR_TITLE="{{workflow.parameters.pr-title}}"
+                        PR_NUMBER="{{workflow.parameters.pr-number}}"
+                        PR_URL="{{workflow.parameters.pr-url}}"
+                        PR_BODY='{{workflow.parameters.pr-body}}'
+                        PR_LABELS='{{workflow.parameters.pr-labels}}'
+                        REPOSITORY="{{workflow.parameters.repository}}"
+                        CURRENT_WORKFLOW_NAME="{{workflow.name}}"
+
+                        # =============================================================================
+                        # DISTRIBUTED LOCK
+                        # =============================================================================
+                        LOCK_NAME="pr-merge-lock-${PR_NUMBER}"
+                        echo "🔒 Acquiring lock for PR #$PR_NUMBER..."
+
+                        if kubectl create configmap "$LOCK_NAME" \
+                          --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
+                          --from-literal=timestamp="$(date -u +%s)" \
+                          -n cto 2>/dev/null; then
+                          echo "✅ Lock acquired"
+                          trap "kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true" EXIT
+                        else
+                          EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n cto -o jsonpath='{.data.owner}' 2>/dev/null || echo "unknown")
+                          LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n cto -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "")
+                          CURRENT_TIME=$(date -u +%s)
+                          
+                          if [ -n "$LOCK_TIME" ] && [[ "$LOCK_TIME" =~ ^[0-9]+$ ]]; then
+                            LOCK_AGE=$((CURRENT_TIME - LOCK_TIME))
+                            if [ $LOCK_AGE -gt 3600 ]; then
+                              echo "⚠️ Stale lock (${LOCK_AGE}s), claiming..."
+                              kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true
+                              kubectl create configmap "$LOCK_NAME" --from-literal=owner="$CURRENT_WORKFLOW_NAME" --from-literal=timestamp="$(date -u +%s)" -n cto
+                              trap "kubectl delete configmap $LOCK_NAME -n cto 2>/dev/null || true" EXIT
+                            else
+                              echo "⚠️ PR already being processed by: $EXISTING_OWNER"
+                              exit 0
+                            fi
+                          else
+                            echo "⚠️ PR already being processed by: $EXISTING_OWNER"
+                            exit 0
+                          fi
+                        fi
+
+                        # =============================================================================
+                        # DETECT PR TYPE: Intake PR vs Task PR
+                        # =============================================================================
+                        IS_INTAKE_PR=false
+                        IS_TASK_PR=false
+                        TASK_ID=""
+
+                        # Check for cto-intake label
+                        if echo "$PR_LABELS" | jq -e '.[] | select(.name == "cto-intake")' >/dev/null 2>&1; then
+                          IS_INTAKE_PR=true
+                          echo "🚀 Detected INTAKE PR (cto-intake label)"
+                        fi
+
+                        # Fallback: Check for "🚀 Intake:" in title
+                        if [ "$IS_INTAKE_PR" = false ] && echo "$PR_TITLE" | grep -q "🚀 Intake:"; then
+                          IS_INTAKE_PR=true
+                          echo "🚀 Detected INTAKE PR (title pattern)"
+                        fi
+
+                        # Check for task ID in title or labels
+                        TASK_ID=$(echo "$PR_TITLE" | grep -oE '[Tt]ask[- ]?([0-9]+)' | sed -E 's/[Tt]ask[- ]?//' | head -1)
+                        if [ -z "$TASK_ID" ]; then
+                          TASK_ID=$(echo "$PR_LABELS" | jq -r '.[] | .name' 2>/dev/null | grep -oE '^task-([0-9]+)$' | sed 's/task-//' | head -1)
+                        fi
+
+                        if [ -n "$TASK_ID" ]; then
+                          IS_TASK_PR=true
+                          echo "✅ Detected TASK PR (task-$TASK_ID)"
+                        fi
+
+                        # =============================================================================
+                        # HANDLE INTAKE PR MERGE → TRIGGER PLAY WORKFLOW
+                        # =============================================================================
+                        if [ "$IS_INTAKE_PR" = true ]; then
+                          echo ""
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "║            INTAKE PR MERGED - TRIGGERING PLAY               ║"
+                          echo "════════════════════════════════════════════════════════════════"
+
+                          # Extract intake-metadata from PR body
+                          INTAKE_METADATA=$(echo "$PR_BODY" | grep -oP '<!-- intake-metadata: \K[^>]+(?= -->)' || echo "")
+
+                          if [ -z "$INTAKE_METADATA" ]; then
+                            echo "⚠️ No intake-metadata found in PR body, extracting from repo..."
+                            
+                            # Clone repo and find project directory
+                            REPO_DIR="/tmp/intake-repo-$$"
+                            git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.git" "$REPO_DIR" 2>/dev/null
+                            
+                            # Find the project directory (look for .tasks/docs/tasks.json)
+                            PROJECT_DIR=$(find "$REPO_DIR" -name "tasks.json" -path "*/.tasks/docs/*" -exec dirname {} \; | head -1)
+                            if [ -n "$PROJECT_DIR" ]; then
+                              PROJECT_DIR_NAME=$(basename $(dirname $(dirname "$PROJECT_DIR")))
+                              echo "📁 Found project: $PROJECT_DIR_NAME"
+                            else
+                              # Fallback: extract from PR title
+                              PROJECT_DIR_NAME=$(echo "$PR_TITLE" | sed 's/🚀 Intake: //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-')
+                              echo "📁 Extracted project name: $PROJECT_DIR_NAME"
+                            fi
+                            rm -rf "$REPO_DIR"
+                          else
+                            echo "📋 Found intake-metadata: $INTAKE_METADATA"
+                            PROJECT_DIR_NAME=$(echo "$INTAKE_METADATA" | jq -r '.project_dir // empty')
+                            [ -z "$PROJECT_DIR_NAME" ] && PROJECT_DIR_NAME=$(echo "$INTAKE_METADATA" | jq -r '.project_name // empty' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+                          fi
+
+                          if [ -z "$PROJECT_DIR_NAME" ]; then
+                            echo "❌ Could not determine project directory"
+                            exit 1
+                          fi
+
+                          echo "🎯 Project Directory: $PROJECT_DIR_NAME"
+                          echo "📦 Repository: $REPOSITORY"
+
+                          # Check if play workflow already exists for this repo
+                          EXISTING_PLAY=$(kubectl get workflows -n cto \
+                            -l workflow-type=play-orchestration,repository=$(echo "$REPOSITORY" | tr '/' '-') \
+                            --sort-by=.metadata.creationTimestamp \
+                            -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -n "$EXISTING_PLAY" ]; then
+                            PLAY_PHASE=$(kubectl get workflow "$EXISTING_PLAY" -n cto -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                            if [ "$PLAY_PHASE" = "Running" ] || [ "$PLAY_PHASE" = "Pending" ]; then
+                              echo "⚠️ Play workflow already running: $EXISTING_PLAY (phase: $PLAY_PHASE)"
+                              echo "Skipping duplicate play trigger"
+                              exit 0
+                            fi
+                          fi
+
+                          # Trigger play workflow using the play workflow template
+                          echo "🚀 Triggering play workflow..."
+                          
+                          PLAY_WORKFLOW_NAME="play-${PROJECT_DIR_NAME}-$(date +%s)"
+                          
+                          kubectl create -f - <<EOF
+                        apiVersion: argoproj.io/v1alpha1
+                        kind: Workflow
+                        metadata:
+                          name: ${PLAY_WORKFLOW_NAME}
+                          namespace: cto
+                          labels:
+                            workflow-type: play-orchestration
+                            repository: $(echo "$REPOSITORY" | tr '/' '-')
+                            project: ${PROJECT_DIR_NAME}
+                            triggered-by: intake-merge
+                        spec:
+                          workflowTemplateRef:
+                            name: play-project-workflow-template
+                          arguments:
+                            parameters:
+                              - name: repository
+                                value: "${REPOSITORY}"
+                              - name: project-directory
+                                value: "${PROJECT_DIR_NAME}"
+                              - name: docs-repository
+                                value: "${REPOSITORY}"
+                              - name: docs-branch
+                                value: "main"
+                              - name: parallel-execution
+                                value: "true"
+                        EOF
+
+                          if [ $? -eq 0 ]; then
+                            echo "✅ Play workflow triggered: $PLAY_WORKFLOW_NAME"
+                            echo "🔗 View at: kubectl get workflow $PLAY_WORKFLOW_NAME -n cto"
+                          else
+                            echo "❌ Failed to trigger play workflow"
+                            exit 1
+                          fi
+
+                          echo ""
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "✅ INTAKE MERGE COMPLETE - Play workflow started"
+                          echo "════════════════════════════════════════════════════════════════"
+                          exit 0
+                        fi
+
+                        # =============================================================================
+                        # HANDLE TASK PR MERGE
+                        # =============================================================================
+                        if [ "$IS_TASK_PR" = true ]; then
+                          echo ""
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "║            TASK PR MERGED - PROCESSING TASK $TASK_ID            ║"
+                          echo "════════════════════════════════════════════════════════════════"
+
+                          REPO_PATH="$REPOSITORY"
+                          
+                          # Move task to .completed folder
+                          echo "📝 Moving task-$TASK_ID to .completed..."
+                          PROGRESS_REPO="/tmp/task-move-$$"
+                          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_PATH}.git" "$PROGRESS_REPO" 2>/dev/null || true
+                          
+                          if [ -d "$PROGRESS_REPO" ]; then
+                            cd "$PROGRESS_REPO"
+                            TASK_DIRS=("docs/.tasks/docs/task-${TASK_ID}" ".tasks/docs/task-${TASK_ID}" "task-${TASK_ID}")
+                            for TASK_DIR in "${TASK_DIRS[@]}"; do
+                              if [ -d "$TASK_DIR" ]; then
+                                COMPLETED_DIR=$(dirname "$TASK_DIR")/.completed
+                                mkdir -p "$COMPLETED_DIR"
+                                mv "$TASK_DIR" "$COMPLETED_DIR/task-${TASK_ID}" 2>/dev/null && {
+                                  git add -A
+                                  git commit -m "chore: complete task ${TASK_ID}" -m "Moved to .completed after PR merge" 2>/dev/null || true
+                                  git push origin main 2>/dev/null || true
+                                  echo "✅ Task $TASK_ID moved to .completed"
+                                }
+                                break
+                              fi
+                            done
+                            cd /
+                            rm -rf "$PROGRESS_REPO"
+                          fi
+
+                          # Resume orchestration workflow
+                          echo "🔍 Looking for orchestration workflow..."
+                          REPO_LABEL=$(echo "$REPO_PATH" | tr '/' '-')
+                          ORCH_WORKFLOW=$(kubectl get workflows -n cto \
+                            -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -n "$ORCH_WORKFLOW" ]; then
+                            echo "Found workflow: $ORCH_WORKFLOW"
+                            
+                            # Find and resume suspend node
+                            NODE_ID=$(kubectl get workflow $ORCH_WORKFLOW -n cto -o json | \
+                              jq -r '.status.nodes | to_entries | .[] |
+                              select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend" and .value.phase == "Running") |
+                              .key' | head -1)
+
+                            if [ -n "$NODE_ID" ]; then
+                              kubectl patch workflow $ORCH_WORKFLOW -n cto \
+                                --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                              echo "✅ Workflow resumed"
+                            else
+                              echo "ℹ️ No suspend node to resume"
+                            fi
+                          else
+                            echo "ℹ️ No orchestration workflow found for task-$TASK_ID"
+                          fi
+
+                          echo ""
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "✅ TASK $TASK_ID MERGE COMPLETE"
+                          echo "════════════════════════════════════════════════════════════════"
+                          exit 0
+                        fi
+
+                        # =============================================================================
+                        # NEITHER INTAKE NOR TASK PR
+                        # =============================================================================
+                        echo ""
+                        echo "ℹ️ PR is neither an intake PR nor a task PR"
+                        echo "   - No cto-intake label found"
+                        echo "   - No task-X label or Task X in title"
+                        echo "   This is likely a regular PR, skipping..."
+                        exit 0
