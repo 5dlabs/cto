@@ -810,6 +810,11 @@ spec:
                   value: "true"
                 - name: auto-merge
                   value: "{{workflow.parameters.auto-merge}}"
+                # Language context from implementation agent for language-specific test guidance
+                - name: task-language
+                  value: "{{steps.determine-agent.outputs.parameters.task-language}}"
+                - name: task-framework
+                  value: "{{steps.determine-agent.outputs.parameters.task-framework}}"
                 - name: final-task
                   value: "{{workflow.parameters.final-task}}"
         # After Tess completes testing, agents are done
