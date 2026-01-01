@@ -1676,22 +1676,66 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 return Ok(());
             }
 
-            // Apply agent hints to tasks that don't have them
-            // This is critical for CLI mode where Claude generates tasks.json directly
-            // Use dependency-aware routing for better agent assignment
-            let mut hints_applied = 0;
+            // Apply agent hints with validation and override capability
+            // ALWAYS re-validate AI hints - they may be wrong
+            // Task 1 MUST always be bolt (infrastructure)
+            let mut hints_modified = 0;
             let tasks_snapshot = tasks.clone();
-            for task in &mut tasks {
-                if task.agent_hint.is_none() {
-                    task.agent_hint =
-                        Some(infer_agent_hint_with_deps_str(task, &tasks_snapshot).to_string());
-                    hints_applied += 1;
+
+            // Force Task 1 to bolt
+            if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
+                if task1.agent_hint.as_deref() != Some("bolt") {
+                    ui::print_warning(&format!(
+                        "Task 1 had incorrect hint '{}', forcing to 'bolt'",
+                        task1.agent_hint.as_deref().unwrap_or("none")
+                    ));
+                    task1.agent_hint = Some("bolt".to_string());
+                    hints_modified += 1;
                 }
             }
-            if hints_applied > 0 {
+
+            // Apply routing to all other tasks - FAIL if any can't be routed
+            let mut unroutable: Vec<String> = Vec::new();
+            for task in &mut tasks {
+                if task.id == "1" {
+                    continue;
+                }
+                match infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
+                    Some(inferred) => {
+                        if task.agent_hint.as_deref() != Some(inferred) {
+                            task.agent_hint = Some(inferred.to_string());
+                            hints_modified += 1;
+                        }
+                    }
+                    None => {
+                        unroutable.push(format!(
+                            "Task {} '{}': {}",
+                            task.id, task.title, task.description
+                        ));
+                    }
+                }
+            }
+
+            // Fail if any tasks couldn't be routed
+            if !unroutable.is_empty() {
+                ui::print_error(&format!(
+                    "Cannot determine agent for {} task(s):",
+                    unroutable.len()
+                ));
+                for task_info in &unroutable {
+                    println!("  {}", task_info);
+                }
+                return Err(TasksError::ValidationError {
+                    field: "agent_hint".to_string(),
+                    reason: "Add routing keywords or explicit agent hints to these tasks"
+                        .to_string(),
+                });
+            }
+
+            if hints_modified > 0 {
                 ui::print_info(&format!(
-                    "Applied agent hints to {} tasks without explicit hints",
-                    hints_applied
+                    "Applied/corrected agent hints for {} tasks",
+                    hints_modified
                 ));
                 // Save the updated tasks back
                 storage.save_tasks(&tasks, tag.as_deref()).await?;
@@ -1744,22 +1788,66 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 return Ok(());
             }
 
-            // Apply agent hints to tasks that don't have them
-            // This ensures docs have correct agent assignments
-            // Use dependency-aware routing for better agent assignment
-            let mut hints_applied = 0;
+            // Apply agent hints with validation and override capability
+            // ALWAYS re-validate AI hints - they may be wrong
+            // Task 1 MUST always be bolt (infrastructure)
+            let mut hints_modified = 0;
             let tasks_snapshot = tasks.clone();
-            for task in &mut tasks {
-                if task.agent_hint.is_none() {
-                    task.agent_hint =
-                        Some(infer_agent_hint_with_deps_str(task, &tasks_snapshot).to_string());
-                    hints_applied += 1;
+
+            // Force Task 1 to bolt
+            if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
+                if task1.agent_hint.as_deref() != Some("bolt") {
+                    ui::print_warning(&format!(
+                        "Task 1 had incorrect hint '{}', forcing to 'bolt'",
+                        task1.agent_hint.as_deref().unwrap_or("none")
+                    ));
+                    task1.agent_hint = Some("bolt".to_string());
+                    hints_modified += 1;
                 }
             }
-            if hints_applied > 0 {
+
+            // Apply routing to all other tasks - FAIL if any can't be routed
+            let mut unroutable: Vec<String> = Vec::new();
+            for task in &mut tasks {
+                if task.id == "1" {
+                    continue;
+                }
+                match infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
+                    Some(inferred) => {
+                        if task.agent_hint.as_deref() != Some(inferred) {
+                            task.agent_hint = Some(inferred.to_string());
+                            hints_modified += 1;
+                        }
+                    }
+                    None => {
+                        unroutable.push(format!(
+                            "Task {} '{}': {}",
+                            task.id, task.title, task.description
+                        ));
+                    }
+                }
+            }
+
+            // Fail if any tasks couldn't be routed
+            if !unroutable.is_empty() {
+                ui::print_error(&format!(
+                    "Cannot determine agent for {} task(s):",
+                    unroutable.len()
+                ));
+                for task_info in &unroutable {
+                    println!("  {}", task_info);
+                }
+                return Err(TasksError::ValidationError {
+                    field: "agent_hint".to_string(),
+                    reason: "Add routing keywords or explicit agent hints to these tasks"
+                        .to_string(),
+                });
+            }
+
+            if hints_modified > 0 {
                 ui::print_info(&format!(
-                    "Applied agent hints to {} tasks without explicit hints",
-                    hints_applied
+                    "Applied/corrected agent hints for {} tasks",
+                    hints_modified
                 ));
                 // Save the updated tasks back
                 storage.save_tasks(&tasks, tag.as_deref()).await?;

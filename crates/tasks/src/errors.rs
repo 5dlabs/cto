@@ -108,6 +108,9 @@ pub enum TasksError {
 
     #[error("Internal error: {reason}")]
     Internal { reason: String },
+
+    #[error("Validation error in '{field}': {reason}")]
+    ValidationError { field: String, reason: String },
 }
 
 impl From<std::io::Error> for TasksError {

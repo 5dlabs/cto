@@ -470,14 +470,10 @@ async fn create_project_from_intake(
     );
 
     // Step 3: Create Linear issues for each task (linked to project, not as sub-issues)
-    let created_issues = create_issues_from_tasks(
-        client,
-        &metadata.team_id,
-        &project.id,
-        &tasks_json.tasks,
-    )
-    .await
-    .context("Failed to create issues from tasks")?;
+    let created_issues =
+        create_issues_from_tasks(client, &metadata.team_id, &project.id, &tasks_json.tasks)
+            .await
+            .context("Failed to create issues from tasks")?;
 
     let issue_count = created_issues.len();
     info!(

@@ -1313,6 +1313,8 @@ metadata:
     task-id: "{task_id}"
     remediation: "true"
     iteration: "{iteration}"
+    cli-type: "{cli}"
+    model: "{model}"
     agents.platform/type: healer-remediation
 spec:
   taskId: {task_id}
@@ -1433,6 +1435,8 @@ metadata:
   labels:
     watch-role: monitor
     iteration: "{iteration}"
+    cli-type: "{cli}"
+    model: "{model}"
     agents.platform/type: e2e-monitor
 spec:
   taskId: 1
@@ -6974,6 +6978,8 @@ metadata:
     task-id: "{task_id}"
     remediation: "true"
     created-at: "{timestamp}"
+    cli-type: "{cli_type}"
+    model: "{cli_model}"
     agents.platform/type: healer-remediation
 {target_pod_label}{issue_number_label}spec:
   taskId: {task_id_numeric}
@@ -8377,6 +8383,8 @@ metadata:
     scan-service: "{service}"
     scan-namespace: "{namespace}"
     suggested-agent: "{agent}"
+    cli-type: "{cli_type}"
+    model: "{cli_model}"
     created-at: "{timestamp}"
 spec:
   taskId: {task_id_numeric}

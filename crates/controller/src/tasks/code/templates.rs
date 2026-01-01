@@ -2650,21 +2650,30 @@ impl CodeTemplateGenerator {
                     // Parse the tools config from annotation
                     match serde_json::from_str::<Value>(tools_config_str) {
                         Ok(mut tools_value) => {
-                            // Accept both "tools" shape (remote + localServers) and full client-config shape (remoteTools + localServers)
-                            let looks_like_client_cfg = tools_value.get("remoteTools").is_some()
-                                || tools_value.get("localServers").is_some();
+                            // Check if it has "remoteTools" (client-config format) vs "remote" (tools format)
+                            // The presence of localServers alone doesn't indicate client-config format
+                            let has_remote_tools = tools_value.get("remoteTools").is_some();
+                            let has_remote = tools_value.get("remote").is_some();
 
                             // Build overlay client config from annotation
-                            let mut overlay_client = if looks_like_client_cfg {
-                                if tools_value.get("remoteTools").is_none() {
-                                    tools_value["remoteTools"] = json!([]);
-                                }
+                            let mut overlay_client = if has_remote_tools {
+                                // Already in client-config format
                                 if tools_value.get("localServers").is_none() {
                                     tools_value["localServers"] = json!({});
                                 }
                                 tools_value
-                            } else {
+                            } else if has_remote {
+                                // Tools format with "remote" key - normalize to client-config
                                 normalize_tools_to_client_config(tools_value)
+                            } else {
+                                // Neither format - check if it has localServers and treat as partial client-config
+                                if tools_value.get("localServers").is_some() {
+                                    tools_value["remoteTools"] = json!([]);
+                                    tools_value
+                                } else {
+                                    // Completely empty or unknown format
+                                    normalize_tools_to_client_config(tools_value)
+                                }
                             };
                             // Drop any null/non-object local server entries provided by client overlay
                             sanitize_client_local_servers(&mut overlay_client);
