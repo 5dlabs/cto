@@ -761,12 +761,53 @@ data:
 
         echo "  → Prompt file: $INTAKE_PROMPT_FILE ($(wc -c < "$INTAKE_PROMPT_FILE") bytes)"
 
+        # =====================================================================
+        # MCP Tools Configuration (Firecrawl, Context7, etc.)
+        # =====================================================================
+        echo ""
+        echo "🔧 MCP Tools Configuration:"
+        MCP_CONFIG_FILE="/mcp-config/mcp.json"
+        MCP_ARGS=""
+        
+        if [ -f "$MCP_CONFIG_FILE" ]; then
+            echo "  ✅ MCP config found: $MCP_CONFIG_FILE"
+            # Validate JSON
+            if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
+                MCP_ARGS="--mcp-config $MCP_CONFIG_FILE"
+                echo "  ✅ MCP config is valid JSON"
+                # Display available tools
+                TOOLS_COUNT=$(jq -r '.mcpServers.tools.availableTools | length' "$MCP_CONFIG_FILE" 2>/dev/null || echo "0")
+                echo "  → Available MCP tools: $TOOLS_COUNT"
+                if [ "$TOOLS_COUNT" != "0" ] && [ "$TOOLS_COUNT" != "null" ]; then
+                    echo "  → Tool prefixes:"
+                    jq -r '.mcpServers.tools.availableTools[]' "$MCP_CONFIG_FILE" 2>/dev/null | cut -d'_' -f1-3 | sort -u | while read -r prefix; do
+                        echo "     • $prefix"
+                    done
+                fi
+            else
+                echo "  ⚠️ MCP config is not valid JSON, skipping"
+            fi
+        else
+            echo "  ⚠️ MCP config not found at $MCP_CONFIG_FILE"
+            echo "  → Morgan will not have access to Firecrawl/Context7 tools"
+        fi
+        
+        # Log API key status (without revealing values)
+        echo ""
+        echo "🔑 API Keys Status:"
+        [ -n "${FIRECRAWL_API_KEY:-}" ] && echo "  ✅ FIRECRAWL_API_KEY: set" || echo "  ⚠️ FIRECRAWL_API_KEY: not set"
+        [ -n "${CONTEXT7_API_KEY:-}" ] && echo "  ✅ CONTEXT7_API_KEY: set" || echo "  ⚠️ CONTEXT7_API_KEY: not set"
+        [ -n "${ANTHROPIC_API_KEY:-}" ] && echo "  ✅ ANTHROPIC_API_KEY: set" || echo "  ⚠️ ANTHROPIC_API_KEY: not set"
+        echo ""
+
         # Build Claude CLI command with stream-json output
         # Use --dangerously-skip-permissions for non-interactive mode
         # --verbose is required when using --print with --output-format stream-json
         if [ "$CLI_NAME" = "claude" ] || [ "$CLI_NAME" = "factory" ]; then
             CLAUDE_ARGS="--verbose --output-format stream-json --dangerously-skip-permissions"
             [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && CLAUDE_ARGS="$CLAUDE_ARGS --model opus"
+            # Add MCP config if available
+            [ -n "$MCP_ARGS" ] && CLAUDE_ARGS="$CLAUDE_ARGS $MCP_ARGS"
         else
             echo "❌ Unsupported CLI: $CLI_NAME"
             exit 1
@@ -775,6 +816,7 @@ data:
         activity_action "Run Claude CLI intake" "$CLI_NAME"
 
         echo "  → Running Claude CLI with stream-json..."
+        echo "  → Claude args: $CLAUDE_ARGS"
         set +e
         # Run Claude with a simple prompt that tells it to read the file
         # This avoids ALL shell escaping issues since the PRD content stays in the file

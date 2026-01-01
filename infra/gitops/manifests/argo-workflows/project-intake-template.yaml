@@ -270,6 +270,11 @@ spec:
         # Shared volume for CLI stream output (sidecar reads, main writes)
         - name: workspace-shared
           emptyDir: {}
+        # MCP config for Claude CLI (Firecrawl, Context7, etc.)
+        - name: mcp-config
+          configMap:
+            name: morgan-mcp-config
+            optional: true
       containerSet:
         containers:
           # Main intake container
@@ -345,6 +350,16 @@ spec:
                     name: agent-platform-secrets
                     key: CONTEXT7_API_KEY
                     optional: true
+              # Firecrawl API key for URL scraping/enrichment
+              - name: FIRECRAWL_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: tools-firecrawl-secrets
+                    key: FIRECRAWL_API_KEY
+                    optional: true
+              # Tools server URL for MCP tools (Firecrawl, Context7, etc.)
+              - name: TOOLS_SERVER_URL
+                value: "http://cto-tools.cto.svc.cluster.local:8080/mcp"
               - name: GITHUB_APP_ID
                 valueFrom:
                   secretKeyRef:
@@ -412,6 +427,9 @@ spec:
                 readOnly: true
               - name: workspace-shared
                 mountPath: /workspace-shared
+              - name: mcp-config
+                mountPath: /mcp-config
+                readOnly: true
           # Status-sync sidecar for real-time CLI output streaming to Linear
           - name: status-sync
             image: ghcr.io/5dlabs/linear-sidecar:latest
