@@ -25,6 +25,41 @@ AlertHub is designed to be **fully self-hosted** with no cloud service dependenc
 
 ---
 
+## Credentials for Full Automation
+
+For the Play workflow to run fully automated (PRD → shipped feature), these credentials need to be pre-configured in OpenBao:
+
+### Platform-Level (Pre-configured in OpenBao)
+
+| Integration | Secret Path | Required Keys | Notes |
+|-------------|-------------|---------------|-------|
+| APNs (iOS Push) | `alerthub/apns` | `key-id`, `team-id`, `private-key` | Apple Developer account required |
+| Slack App (Optional) | `alerthub/slack-app` | `client-id`, `client-secret` | Only if using OAuth flow for tenants |
+
+### Auto-Generated (No Manual Setup)
+
+| Component | How It's Created | Notes |
+|-----------|------------------|-------|
+| VAPID Keys (Web Push) | Generated at deploy time | Stored in K8s Secret |
+| PostgreSQL credentials | CloudNative-PG generates | Stored in K8s Secret |
+| Redis credentials | Redis Operator generates | Stored in K8s Secret |
+| Kafka credentials | Strimzi generates | Stored in K8s Secret |
+| MongoDB credentials | Percona generates | Stored in K8s Secret |
+| Keycloak admin | Keycloak Operator generates | Stored in K8s Secret |
+
+### Tenant-Configured (Via Integration Service UI)
+
+| Channel | What Tenant Provides | Stored In |
+|---------|---------------------|----------|
+| Slack | Webhook URL or OAuth tokens | MongoDB (encrypted) |
+| Discord | Webhook URL | MongoDB (encrypted) |
+| Email (external) | SMTP credentials (optional) | MongoDB (encrypted) |
+| Webhook | Target URL + optional secret | MongoDB (encrypted) |
+
+**Note**: Slack and Discord integrations use **outbound** webhooks that tenants configure themselves. The platform doesn't need Slack/Discord API keys - tenants create webhooks in their own workspaces and provide the URLs.
+
+---
+
 ## Architecture Overview
 
 ```
