@@ -872,6 +872,7 @@ pub struct PlayTriggerResult {
 /// Trigger the play workflow after intake PR is merged.
 ///
 /// Submits a play-project-workflow-template to process all tasks in the project.
+#[allow(clippy::too_many_lines)]
 async fn trigger_play_workflow(
     state: &Arc<CallbackState>,
     client: &LinearClient,
@@ -923,6 +924,10 @@ async fn trigger_play_workflow(
         format!("repository={repository}"),
         "-p".to_string(),
         format!("service={project_dir}"),
+        "-p".to_string(),
+        format!("docs-repository={repository}"),
+        "-p".to_string(),
+        format!("docs-project-directory={project_dir}"),
         "-p".to_string(),
         format!("github-app={}", play_config.github_app),
         "-p".to_string(),
