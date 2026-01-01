@@ -339,9 +339,13 @@ pub fn strip_frontmatter(description: &str) -> String {
 }
 
 /// Task from intake workflow output.
+///
+/// Note: Uses custom deserializers to accept both string ("1") and numeric (1) IDs,
+/// since AI agents may generate either format in tasks.json.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntakeTask {
-    /// Task ID (string to support alphanumeric IDs like "TASK-001").
+    /// Task ID (accepts both string and numeric).
+    #[serde(deserialize_with = "deserialize_string_or_number")]
     pub id: String,
     /// Task title.
     pub title: String,
@@ -350,8 +354,8 @@ pub struct IntakeTask {
     /// Detailed implementation notes.
     #[serde(default)]
     pub details: String,
-    /// Dependencies (list of task IDs).
-    #[serde(default)]
+    /// Dependencies (list of task IDs, accepts both string and numeric).
+    #[serde(default, deserialize_with = "deserialize_string_or_number_vec")]
     pub dependencies: Vec<String>,
     /// Priority (1=highest, 5=lowest).
     #[serde(default)]
@@ -362,6 +366,75 @@ pub struct IntakeTask {
     /// Agent hint for assignment.
     #[serde(default, rename = "agentHint")]
     pub agent_hint: String,
+}
+
+/// Deserialize a value that could be either a string or a number into a String.
+fn deserialize_string_or_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct StringOrNumberVisitor;
+
+    impl Visitor<'_> for StringOrNumberVisitor {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or a number")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value)
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+    }
+
+    deserializer.deserialize_any(StringOrNumberVisitor)
+}
+
+/// Deserialize a Vec where each element could be either a string or a number.
+fn deserialize_string_or_number_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde::Deserialize;
+
+    // Deserialize as a Vec of JSON values first, then convert each
+    let values: Vec<serde_json::Value> = Vec::deserialize(deserializer)?;
+    values
+        .into_iter()
+        .map(|v| match v {
+            serde_json::Value::String(s) => Ok(s),
+            serde_json::Value::Number(n) => Ok(n.to_string()),
+            _ => Err(D::Error::custom("expected string or number")),
+        })
+        .collect()
 }
 
 /// `tasks.json` structure from intake output.
@@ -1133,7 +1206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_tasks_json() {
+    fn test_deserialize_tasks_json_string_ids() {
         let json = r#"{
             "tasks": [
                 {
@@ -1153,6 +1226,62 @@ mod tests {
         assert_eq!(tasks.tasks.len(), 1);
         assert_eq!(tasks.tasks[0].id, "TASK-001");
         assert_eq!(tasks.tasks[0].title, "Setup project");
+    }
+
+    #[test]
+    fn test_deserialize_tasks_json_numeric_ids() {
+        // This is the format that AI agents often generate - numeric IDs instead of strings
+        let json = r#"{
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Setup infrastructure",
+                    "description": "Initialize databases and services",
+                    "details": "",
+                    "dependencies": [],
+                    "priority": 1,
+                    "testStrategy": "Integration test",
+                    "agentHint": "bolt"
+                },
+                {
+                    "id": 2,
+                    "title": "Implement backend",
+                    "description": "Build the API",
+                    "details": "",
+                    "dependencies": [1],
+                    "priority": 2,
+                    "testStrategy": "Unit tests",
+                    "agentHint": "rex"
+                }
+            ]
+        }"#;
+
+        let tasks: TasksJson = serde_json::from_str(json).unwrap();
+        assert_eq!(tasks.tasks.len(), 2);
+        assert_eq!(tasks.tasks[0].id, "1");
+        assert_eq!(tasks.tasks[0].title, "Setup infrastructure");
+        assert_eq!(tasks.tasks[1].id, "2");
+        assert_eq!(tasks.tasks[1].dependencies, vec!["1"]);
+    }
+
+    #[test]
+    fn test_deserialize_tasks_json_mixed_ids() {
+        // Test mixed string and numeric IDs in dependencies
+        let json = r#"{
+            "tasks": [
+                {
+                    "id": "1",
+                    "title": "Task one",
+                    "description": "First task",
+                    "dependencies": ["2", 3],
+                    "priority": 1
+                }
+            ]
+        }"#;
+
+        let tasks: TasksJson = serde_json::from_str(json).unwrap();
+        assert_eq!(tasks.tasks[0].id, "1");
+        assert_eq!(tasks.tasks[0].dependencies, vec!["2", "3"]);
     }
 
     #[test]
