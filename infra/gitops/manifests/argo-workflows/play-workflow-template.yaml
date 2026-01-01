@@ -1317,6 +1317,8 @@ spec:
               task-id: "${TASK_ID}"
               service: "${SERVICE}"
               github-app: "${GITHUB_APP}"
+              cli-type: "${CLI_TYPE}"
+              model: "${MODEL}"
               workflow-name: "${WORKFLOW_NAME}"
               workflow-run: "${WORKFLOW_NAME}"
               stage: "${STAGE}"

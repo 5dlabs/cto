@@ -272,13 +272,55 @@ impl IntakeDomain {
         // 6. Add agent routing hints WITH DEPENDENCY AWARENESS
         // Dependencies are the PRIMARY signal - if a task depends on a Tap/Spark/Blaze
         // initialization task, it should inherit that agent.
+        //
+        // IMPORTANT: We ALWAYS re-validate and potentially override AI-generated hints
+        // because the AI model may assign incorrect agents. Our routing logic is the
+        // source of truth.
         tracing::info!("Adding agent routing hints with dependency analysis...");
 
-        // First pass: assign hints to tasks without dependencies or with explicit agents
+        // CRITICAL: Task 1 MUST always be Bolt (infrastructure provisioning)
+        // This is a hard requirement from the platform architecture.
+        if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
+            if task1.agent_hint.as_deref() != Some("bolt") {
+                tracing::warn!(
+                    "Task 1 had incorrect agent hint '{}', forcing to 'bolt'",
+                    task1.agent_hint.as_deref().unwrap_or("none")
+                );
+                task1.agent_hint = Some("bolt".to_string());
+            }
+        }
+
+        // First pass: assign hints to tasks without dependencies
         // This ensures dependency targets have hints before we check dependencies
+        let mut unroutable_tasks: Vec<String> = Vec::new();
+
         for task in &mut tasks {
-            if task.agent_hint.is_none() && task.dependencies.is_empty() {
-                task.agent_hint = Some(infer_agent_hint_with_deps_str(task, &[]).to_string());
+            // Skip Task 1 (already handled above)
+            if task.id == "1" {
+                continue;
+            }
+            if task.dependencies.is_empty() {
+                match infer_agent_hint_with_deps_str(task, &[]) {
+                    Some(inferred) => {
+                        if task.agent_hint.as_deref() != Some(inferred) {
+                            if task.agent_hint.is_some() {
+                                tracing::debug!(
+                                    "Task {} hint '{}' overridden to '{}'",
+                                    task.id,
+                                    task.agent_hint.as_deref().unwrap_or("none"),
+                                    inferred
+                                );
+                            }
+                            task.agent_hint = Some(inferred.to_string());
+                        }
+                    }
+                    None => {
+                        unroutable_tasks.push(format!(
+                            "Task {} '{}': {}",
+                            task.id, task.title, task.description
+                        ));
+                    }
+                }
             }
         }
 
@@ -286,12 +328,44 @@ impl IntakeDomain {
         // Clone tasks for reference since we need to mutate while iterating
         let tasks_snapshot = tasks.clone();
         for task in &mut tasks {
-            if task.agent_hint.is_none() {
-                task.agent_hint =
-                    Some(infer_agent_hint_with_deps_str(task, &tasks_snapshot).to_string());
+            // Skip Task 1 (already handled above)
+            if task.id == "1" {
+                continue;
+            }
+            if let Some(inferred) = infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
+                if task.agent_hint.as_deref() != Some(inferred) {
+                    if task.agent_hint.is_some() {
+                        tracing::debug!(
+                            "Task {} hint '{}' overridden to '{}' (dependency-aware)",
+                            task.id,
+                            task.agent_hint.as_deref().unwrap_or("none"),
+                            inferred
+                        );
+                    }
+                    task.agent_hint = Some(inferred.to_string());
+                }
+            } else {
+                // Only add if not already in list from first pass
+                let task_info = format!("Task {} '{}': {}", task.id, task.title, task.description);
+                if !unroutable_tasks.contains(&task_info) {
+                    unroutable_tasks.push(task_info);
+                }
             }
         }
-        tracing::info!("Agent hints assigned with dependency awareness");
+
+        // FAIL if any tasks couldn't be routed
+        if !unroutable_tasks.is_empty() {
+            return Err(TasksError::ValidationError {
+                field: "agent_hint".to_string(),
+                reason: format!(
+                    "Cannot determine agent for {} task(s). Add routing keywords or explicit agent hints:\n{}",
+                    unroutable_tasks.len(),
+                    unroutable_tasks.join("\n")
+                ),
+            });
+        }
+
+        tracing::info!("Agent hints assigned with dependency awareness (Task 1 forced to bolt)");
 
         // 7. Save tasks to storage
         let tasks_dir = config.output_dir.join("tasks");

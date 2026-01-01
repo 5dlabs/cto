@@ -112,15 +112,18 @@ fn is_word_match(content: &str, word: &str) -> bool {
 /// IMPORTANT: This function only considers title and description, not test_strategy
 /// or other fields, to avoid false positives from generic keywords.
 ///
+/// Returns `None` if no agent can be determined - this is intentional to force
+/// explicit handling of routing gaps rather than silent misrouting.
+///
 /// For dependency-aware routing (recommended), use `infer_agent_hint_with_deps` instead.
 #[must_use]
-pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
+pub fn infer_agent_hint(title: &str, description: &str) -> Option<Agent> {
     let content = format!("{} {}", title, description).to_lowercase();
 
     // HIGHEST PRIORITY: Explicit agent name in parentheses (e.g., "(Nova - Bun)")
     // This allows PRD authors to explicitly specify the agent
     if let Some(agent) = check_explicit_agent(title, description) {
-        return agent;
+        return Some(agent);
     }
 
     // Check in order of specificity (most specific first)
@@ -149,7 +152,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("deep link")
         || content.contains("biometric")
     {
-        return Agent::Tap;
+        return Some(Agent::Tap);
     }
 
     // Desktop/Electron (before frontend)
@@ -171,7 +174,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("popup window")
         || content.contains("cross-platform")
     {
-        return Agent::Spark;
+        return Some(Agent::Spark);
     }
 
     // NOTE: Security keywords (auth, jwt, oauth, rbac) are checked MUCH LATER
@@ -236,7 +239,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("minio")
         || content.contains("s3 bucket")
     {
-        return Agent::Bolt;
+        return Some(Agent::Bolt);
     }
 
     // Go - check BEFORE general backend since Go services are often APIs too
@@ -255,7 +258,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("grpc")
         || content.contains("protobuf")
     {
-        return Agent::Grizz;
+        return Some(Agent::Grizz);
     }
 
     // Effect TypeScript - CONTEXT DETERMINES frontend vs backend
@@ -277,11 +280,11 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
             || content.contains("validation")
         // Form validation context
         {
-            return Agent::Blaze;
+            return Some(Agent::Blaze);
         }
         // Backend context: service, api, delivery, kafka, queue, stream, elysia, bun
         // Default Effect to Nova (backend) since it's primarily used there
-        return Agent::Nova;
+        return Some(Agent::Nova);
     }
 
     // Node.js - check BEFORE general backend
@@ -302,7 +305,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("prisma")
         || content.contains("kafkajs")
     {
-        return Agent::Nova;
+        return Some(Agent::Nova);
     }
 
     // Frontend (check before generic backend to catch "admin dashboard", "web app", etc.)
@@ -344,7 +347,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("recharts")
         || content.contains("chart.js")
     {
-        return Agent::Blaze;
+        return Some(Agent::Blaze);
     }
 
     // Rust/Backend - now checked after Go/Node to avoid overshadowing
@@ -356,7 +359,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("wasm")
         || content.contains("sqlx")
     {
-        return Agent::Rex;
+        return Some(Agent::Rex);
     }
 
     // Security Audit (BEFORE generic backend to catch "security testing of the API")
@@ -371,10 +374,11 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("security analysis")
         || content.contains("security testing")
     {
-        return Agent::Cipher;
+        return Some(Agent::Cipher);
     }
 
-    // Generic backend keywords - default to Rex for these
+    // Generic backend keywords - route to Rex
+    // Note: This is NOT a default fallback - these are explicit backend patterns
     // Note: "admin" removed (now caught by frontend "admin panel" or "dashboard")
     // Note: "postgresql", "redis" removed (if it's provisioning, caught by Bolt earlier)
     if content.contains("backend")
@@ -389,7 +393,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("microservice")
         || content.contains("service layer")
     {
-        return Agent::Rex;
+        return Some(Agent::Rex);
     }
 
     // Testing/QA (late - require more specific markers to avoid false positives)
@@ -404,7 +408,7 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("playwright")
         || content.contains("e2e test")
     {
-        return Agent::Tess;
+        return Some(Agent::Tess);
     }
 
     // Integration/Merge (LAST - these are very generic keywords)
@@ -414,19 +418,21 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("consolidate")
         || content.contains("combine")
     {
-        return Agent::Atlas;
+        return Some(Agent::Atlas);
     }
     // Note: "integration" removed from Atlas - too generic and conflicts with
     // "Integration Service" which should go to a backend agent
 
-    // Default to Rex (Rust/backend)
-    Agent::Rex
+    // NO DEFAULT - return None to force explicit handling
+    // This ensures we catch routing gaps rather than silently misrouting
+    None
 }
 
 /// Infer agent hint and return as a string.
+/// Returns `None` if no agent can be determined.
 #[must_use]
-pub fn infer_agent_hint_str(title: &str, description: &str) -> &'static str {
-    infer_agent_hint(title, description).as_str()
+pub fn infer_agent_hint_str(title: &str, description: &str) -> Option<&'static str> {
+    infer_agent_hint(title, description).map(|a| a.as_str())
 }
 
 /// Get role description for an agent hint string.
@@ -574,28 +580,32 @@ fn check_explicit_agent(title: &str, description: &str) -> Option<Agent> {
 /// 2. Dependency chain inheritance (if ALL deps have same agent)
 /// 3. Keyword-based inference (fallback)
 ///
+/// Returns `None` if no agent can be determined - this is intentional to force
+/// explicit handling of routing gaps rather than silent misrouting.
+///
 /// This is the recommended function to use for intake workflows where
 /// task dependencies are available.
 #[must_use]
-pub fn infer_agent_hint_with_deps(task: &Task, all_tasks: &[Task]) -> Agent {
+pub fn infer_agent_hint_with_deps(task: &Task, all_tasks: &[Task]) -> Option<Agent> {
     // 1. Check explicit agent name first (highest priority)
     if let Some(agent) = check_explicit_agent(&task.title, &task.description) {
-        return agent;
+        return Some(agent);
     }
 
     // 2. Check dependency chain (PRIMARY signal for implementation tasks)
     if let Some(agent) = infer_from_dependencies(task, all_tasks) {
-        return agent;
+        return Some(agent);
     }
 
-    // 3. Fall back to keyword matching
+    // 3. Fall back to keyword matching (may return None)
     infer_agent_hint(&task.title, &task.description)
 }
 
 /// Infer agent hint with dependencies and return as a string.
+/// Returns `None` if no agent can be determined.
 #[must_use]
-pub fn infer_agent_hint_with_deps_str(task: &Task, all_tasks: &[Task]) -> &'static str {
-    infer_agent_hint_with_deps(task, all_tasks).as_str()
+pub fn infer_agent_hint_with_deps_str(task: &Task, all_tasks: &[Task]) -> Option<&'static str> {
+    infer_agent_hint_with_deps(task, all_tasks).map(|a| a.as_str())
 }
 
 #[cfg(test)]
@@ -610,22 +620,22 @@ mod tests {
                 "Setup Integration Service (Nova - Bun/Elysia)",
                 "API service"
             ),
-            Agent::Nova
+            Some(Agent::Nova)
         );
         assert_eq!(
             infer_agent_hint("Setup Admin API (Grizz - Go/gRPC)", "Backend service"),
-            Agent::Grizz
+            Some(Agent::Grizz)
         );
         assert_eq!(
             infer_agent_hint(
                 "Router Service (Rex - Rust/Axum)",
                 "High-performance router"
             ),
-            Agent::Rex
+            Some(Agent::Rex)
         );
         assert_eq!(
             infer_agent_hint("Dashboard (Blaze - React)", "Admin UI"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -633,24 +643,24 @@ mod tests {
     fn test_frontend_detection() {
         assert_eq!(
             infer_agent_hint("Build React component", "Create a UI form"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Frontend layout", "CSS styling"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         // Dashboard and admin panel should go to Blaze (frontend)
         assert_eq!(
             infer_agent_hint("Admin Dashboard", "Show user statistics"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Build admin panel", "Management interface"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Web app interface", "User-facing application"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -658,11 +668,11 @@ mod tests {
     fn test_rust_detection() {
         assert_eq!(
             infer_agent_hint("Implement service", "Rust axum server"),
-            Agent::Rex
+            Some(Agent::Rex)
         );
         assert_eq!(
             infer_agent_hint("Cargo workspace", "Build system"),
-            Agent::Rex
+            Some(Agent::Rex)
         );
     }
 
@@ -670,11 +680,11 @@ mod tests {
     fn test_mobile_detection() {
         assert_eq!(
             infer_agent_hint("Mobile app", "React Native screen"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("iOS feature", "Push notifications"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 
@@ -682,17 +692,17 @@ mod tests {
     fn test_go_detection() {
         assert_eq!(
             infer_agent_hint("Go service", "Golang microservice"),
-            Agent::Grizz
+            Some(Agent::Grizz)
         );
         // Test Go/gRPC pattern
         assert_eq!(
             infer_agent_hint("Admin API", "Go/gRPC backend"),
-            Agent::Grizz
+            Some(Agent::Grizz)
         );
         // Test gRPC alone
         assert_eq!(
             infer_agent_hint("gRPC service", "Protocol buffers"),
-            Agent::Grizz
+            Some(Agent::Grizz)
         );
     }
 
@@ -701,16 +711,16 @@ mod tests {
         // Test Elysia/Effect (modern Bun stack)
         assert_eq!(
             infer_agent_hint("Integration Service", "Bun with Elysia framework"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
         assert_eq!(
             infer_agent_hint("API Service", "Effect TypeScript"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
         // Test traditional Node patterns
         assert_eq!(
             infer_agent_hint("Express API", "Node.js server"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -719,49 +729,49 @@ mod tests {
         // ONLY explicit security audit/review tasks go to Cipher
         assert_eq!(
             infer_agent_hint("Security Audit", "Review authentication implementation"),
-            Agent::Cipher
+            Some(Agent::Cipher)
         );
         assert_eq!(
             infer_agent_hint("Vulnerability Scan", "Check for security issues"),
-            Agent::Cipher
+            Some(Agent::Cipher)
         );
         assert_eq!(
             infer_agent_hint("Penetration test", "Security testing"),
-            Agent::Cipher
+            Some(Agent::Cipher)
         );
         assert_eq!(
             infer_agent_hint("Security review", "Audit the codebase"),
-            Agent::Cipher
+            Some(Agent::Cipher)
         );
     }
 
     #[test]
-    fn test_auth_implementation_not_cipher() {
-        // Auth/JWT/OAuth implementation tasks should NOT go to Cipher
-        // They should go to the appropriate implementation agent
+    fn test_auth_implementation_returns_none() {
+        // Auth/JWT/OAuth implementation tasks without language hints
+        // should return None - they need explicit routing
         assert_eq!(
             infer_agent_hint("Auth system", "OAuth provider implementation"),
-            Agent::Rex // Default backend agent
+            None // No default - needs explicit hint
         );
         assert_eq!(
             infer_agent_hint("JWT validation", "Implement JWT middleware"),
-            Agent::Rex // Default backend agent
+            None // No default - needs explicit hint
         );
         assert_eq!(
             infer_agent_hint("RBAC implementation", "Role-based access control"),
-            Agent::Rex // Default backend agent
+            None // No default - needs explicit hint
         );
         // If language is specified, route to that agent
         assert_eq!(
             infer_agent_hint("JWT Authentication", "Go/gRPC backend with auth"),
-            Agent::Grizz
+            Some(Agent::Grizz)
         );
         assert_eq!(
             infer_agent_hint(
                 "OAuth2 Token Management",
                 "Effect TypeScript implementation"
             ),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -769,34 +779,34 @@ mod tests {
     fn test_devops_detection() {
         assert_eq!(
             infer_agent_hint("Deploy pipeline", "Kubernetes manifest"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("CI/CD setup", "GitHub Actions"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         // Test infrastructure keyword
         assert_eq!(
             infer_agent_hint("Infrastructure setup", "Database provisioning"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         // Provision keywords should route to Bolt
         assert_eq!(
             infer_agent_hint("Provision PostgreSQL", "Setup database cluster"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Setup Redis cluster", "Cache infrastructure"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         // Operator keywords should route to Bolt
         assert_eq!(
             infer_agent_hint("Deploy CloudNative-PG", "PostgreSQL operator"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Setup Strimzi Kafka", "Event streaming"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 
@@ -804,26 +814,30 @@ mod tests {
     fn test_testing_detection() {
         assert_eq!(
             infer_agent_hint("Write tests", "Unit test coverage"),
-            Agent::Tess
+            Some(Agent::Tess)
         );
-        assert_eq!(infer_agent_hint("E2E testing", "Playwright"), Agent::Tess);
+        assert_eq!(
+            infer_agent_hint("E2E testing", "Playwright"),
+            Some(Agent::Tess)
+        );
     }
 
     #[test]
-    fn test_default_to_rex() {
+    fn test_no_default_returns_none() {
+        // Tasks without matching keywords should return None
         assert_eq!(
             infer_agent_hint("Generic task", "No specific keywords"),
-            Agent::Rex
+            None
         );
     }
 
     #[test]
-    fn test_integration_not_atlas() {
+    fn test_integration_service_returns_none() {
         // "Integration Service" should NOT match Atlas (too generic)
-        // Without explicit agent hint, it should fall through to generic backend (Rex)
+        // Without explicit agent hint, it should return None
         assert_eq!(
             infer_agent_hint("Integration Service", "Connects systems together"),
-            Agent::Rex
+            None
         );
     }
 
@@ -859,7 +873,10 @@ mod tests {
         push_task.dependencies = vec!["41".to_string()];
 
         let tasks = vec![tap_init, push_task.clone()];
-        assert_eq!(infer_agent_hint_with_deps(&push_task, &tasks), Agent::Tap);
+        assert_eq!(
+            infer_agent_hint_with_deps(&push_task, &tasks),
+            Some(Agent::Tap)
+        );
     }
 
     #[test]
@@ -873,7 +890,10 @@ mod tests {
         tray_task.dependencies = vec!["45".to_string()];
 
         let tasks = vec![spark_init, tray_task.clone()];
-        assert_eq!(infer_agent_hint_with_deps(&tray_task, &tasks), Agent::Spark);
+        assert_eq!(
+            infer_agent_hint_with_deps(&tray_task, &tasks),
+            Some(Agent::Spark)
+        );
     }
 
     #[test]
@@ -886,28 +906,28 @@ mod tests {
         page_task.dependencies = vec!["32".to_string()];
 
         let tasks = vec![blaze_init, page_task.clone()];
-        assert_eq!(infer_agent_hint_with_deps(&page_task, &tasks), Agent::Blaze);
+        assert_eq!(
+            infer_agent_hint_with_deps(&page_task, &tasks),
+            Some(Agent::Blaze)
+        );
     }
 
     #[test]
-    fn test_dependency_mixed_agents_falls_through() {
-        // Task with mixed dependencies should fall through to keywords
+    fn test_dependency_mixed_agents_returns_none() {
+        // Task with mixed dependencies and no keywords should return None
         let mut rex_task = Task::new("1", "Rust service", "Backend");
         rex_task.agent_hint = Some("rex".to_string());
 
         let mut nova_task = Task::new("2", "Node service", "Backend");
         nova_task.agent_hint = Some("nova".to_string());
 
-        // Note: avoid "combine" which matches Atlas keywords
-        let mut mixed_dep_task = Task::new("3", "Shared service", "Interoperates with multiple");
+        // Note: avoid keywords - this should return None
+        let mut mixed_dep_task = Task::new("3", "Shared work", "Interoperates with multiple");
         mixed_dep_task.dependencies = vec!["1".to_string(), "2".to_string()];
 
         let tasks = vec![rex_task, nova_task, mixed_dep_task.clone()];
-        // Mixed deps → falls through to keywords → "service" matches backend → Rex
-        assert_eq!(
-            infer_agent_hint_with_deps(&mixed_dep_task, &tasks),
-            Agent::Rex
-        );
+        // Mixed deps and no keywords → None
+        assert_eq!(infer_agent_hint_with_deps(&mixed_dep_task, &tasks), None);
     }
 
     #[test]
@@ -927,7 +947,7 @@ mod tests {
         // Explicit "(Nova" should win over Tap dependency
         assert_eq!(
             infer_agent_hint_with_deps(&explicit_task, &tasks),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -943,23 +963,23 @@ mod tests {
                 "Setup Grafana dashboards",
                 "Create dashboards for monitoring"
             ),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Prometheus rules", "Alert configuration"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Loki logging", "Configure log aggregation"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Observability stack", "Metrics and logging"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Alertmanager setup", "Alert routing"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 
@@ -967,15 +987,15 @@ mod tests {
     fn test_bolt_gitops() {
         assert_eq!(
             infer_agent_hint("ArgoCD application", "GitOps deployment"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Flux configuration", "Continuous delivery"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Kustomize overlays", "Environment configs"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 
@@ -983,19 +1003,19 @@ mod tests {
     fn test_bolt_k8s_resources() {
         assert_eq!(
             infer_agent_hint("Create ConfigMap", "Application config"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Ingress rules", "External access"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("Network policy", "Pod isolation"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
         assert_eq!(
             infer_agent_hint("HPA configuration", "Auto-scaling"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 
@@ -1008,15 +1028,15 @@ mod tests {
         // Effect + frontend keywords → Blaze
         assert_eq!(
             infer_agent_hint("Settings Form", "Effect Schema validation in React"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Effect validation", "Component form validation"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Effect Schema", "Page state management"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -1025,15 +1045,15 @@ mod tests {
         // Effect + backend keywords → Nova
         assert_eq!(
             infer_agent_hint("Slack Service", "Effect retry for delivery"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
         assert_eq!(
             infer_agent_hint("Effect Stream", "Kafka consumer with Effect"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
         assert_eq!(
             infer_agent_hint("Delivery service", "Effect error handling"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -1042,7 +1062,7 @@ mod tests {
         // Effect without clear context → Nova (backend default)
         assert_eq!(
             infer_agent_hint("Effect implementation", "Type-safe error handling"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -1054,19 +1074,19 @@ mod tests {
     fn test_frontend_pages() {
         assert_eq!(
             infer_agent_hint("Notifications page", "History with filters"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Analytics page", "Charts and metrics"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Settings page", "User preferences"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Create management page", "CRUD interface"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -1074,11 +1094,11 @@ mod tests {
     fn test_frontend_web_console() {
         assert_eq!(
             infer_agent_hint("Web console", "Admin interface"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
         assert_eq!(
             infer_agent_hint("Recharts visualization", "Data charts"),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -1090,15 +1110,15 @@ mod tests {
     fn test_mobile_screens() {
         assert_eq!(
             infer_agent_hint("Home screen", "Notification feed"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("Detail screen", "Full notification view"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("Settings screen", "Mobile preferences"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 
@@ -1106,19 +1126,19 @@ mod tests {
     fn test_mobile_push_notifications() {
         assert_eq!(
             infer_agent_hint("Push notification", "FCM registration"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("FCM integration", "Firebase messaging"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("APNs setup", "Apple push notifications"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("App badge count", "Unread notifications"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 
@@ -1126,11 +1146,11 @@ mod tests {
     fn test_mobile_deep_links() {
         assert_eq!(
             infer_agent_hint("Deep link", "URL scheme handling"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
         assert_eq!(
             infer_agent_hint("Biometric auth", "Face ID / fingerprint"),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 
@@ -1142,28 +1162,31 @@ mod tests {
     fn test_desktop_tray() {
         assert_eq!(
             infer_agent_hint("System tray", "Notification badge"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
         assert_eq!(
             infer_agent_hint("Tray icon", "Status indicator"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
-        assert_eq!(infer_agent_hint("Tray menu", "Quick actions"), Agent::Spark);
+        assert_eq!(
+            infer_agent_hint("Tray menu", "Quick actions"),
+            Some(Agent::Spark)
+        );
     }
 
     #[test]
     fn test_desktop_windows() {
         assert_eq!(
             infer_agent_hint("Main window", "Full notification feed"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
         assert_eq!(
             infer_agent_hint("Mini window", "Quick view popup"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
         assert_eq!(
             infer_agent_hint("Popup window", "Notification toast"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
     }
 
@@ -1171,15 +1194,15 @@ mod tests {
     fn test_desktop_autostart() {
         assert_eq!(
             infer_agent_hint("Auto-start", "Boot preferences"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
         assert_eq!(
             infer_agent_hint("Auto start on boot", "Startup configuration"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
         assert_eq!(
             infer_agent_hint("Cross-platform", "Windows/macOS/Linux"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
     }
 

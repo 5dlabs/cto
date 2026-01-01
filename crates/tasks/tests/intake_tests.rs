@@ -26,11 +26,15 @@ mod routing_tests {
             (
                 "Create React component",
                 "Build a button component",
-                Agent::Blaze,
+                Some(Agent::Blaze),
             ),
-            ("UI design system", "Implement CSS variables", Agent::Blaze),
-            ("Next.js page", "Server-side rendering", Agent::Blaze),
-            ("Vue component", "Create form component", Agent::Blaze),
+            (
+                "UI design system",
+                "Implement CSS variables",
+                Some(Agent::Blaze),
+            ),
+            ("Next.js page", "Server-side rendering", Some(Agent::Blaze)),
+            ("Vue component", "Create form component", Some(Agent::Blaze)),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -45,10 +49,14 @@ mod routing_tests {
     #[test]
     fn test_routing_backend_tasks() {
         let test_cases = vec![
-            ("Rust API endpoint", "Create user handler", Agent::Rex),
-            ("Backend service", "Database connection pool", Agent::Rex),
-            ("Axum router", "Setup routing middleware", Agent::Rex),
-            ("Cargo workspace", "Multi-crate setup", Agent::Rex),
+            ("Rust API endpoint", "Create user handler", Some(Agent::Rex)),
+            (
+                "Backend service",
+                "Database connection pool",
+                Some(Agent::Rex),
+            ),
+            ("Axum router", "Setup routing middleware", Some(Agent::Rex)),
+            ("Cargo workspace", "Multi-crate setup", Some(Agent::Rex)),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -63,9 +71,17 @@ mod routing_tests {
     #[test]
     fn test_routing_mobile_tasks() {
         let test_cases = vec![
-            ("Mobile app screen", "React Native navigation", Agent::Tap),
-            ("iOS push notifications", "Background fetch", Agent::Tap),
-            ("Expo config", "App store deployment", Agent::Tap),
+            (
+                "Mobile app screen",
+                "React Native navigation",
+                Some(Agent::Tap),
+            ),
+            (
+                "iOS push notifications",
+                "Background fetch",
+                Some(Agent::Tap),
+            ),
+            ("Expo config", "App store deployment", Some(Agent::Tap)),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -80,10 +96,18 @@ mod routing_tests {
     #[test]
     fn test_routing_devops_tasks() {
         let test_cases = vec![
-            ("Kubernetes deployment", "Helm chart setup", Agent::Bolt),
-            ("CI/CD pipeline", "GitHub Actions workflow", Agent::Bolt),
-            ("Docker container", "Multi-stage build", Agent::Bolt),
-            ("Terraform config", "AWS infrastructure", Agent::Bolt),
+            (
+                "Kubernetes deployment",
+                "Helm chart setup",
+                Some(Agent::Bolt),
+            ),
+            (
+                "CI/CD pipeline",
+                "GitHub Actions workflow",
+                Some(Agent::Bolt),
+            ),
+            ("Docker container", "Multi-stage build", Some(Agent::Bolt)),
+            ("Terraform config", "AWS infrastructure", Some(Agent::Bolt)),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -104,61 +128,13 @@ mod routing_tests {
     #[test]
     fn test_auth_implementation_not_cipher() {
         // These are all IMPLEMENTATION tasks that should NOT go to Cipher
+        // Note: Some generic auth tasks without language hints now return None
         let test_cases = vec![
-            // JWT implementations
-            (
-                "JWT Authentication",
-                "Implement JWT middleware for API",
-                Agent::Rex,
-            ),
-            (
-                "JWT Token Validation",
-                "Validate JWT tokens in requests",
-                Agent::Rex,
-            ),
-            // OAuth implementations
+            // OAuth with language hint goes to correct agent
             (
                 "OAuth2 Token Management",
                 "Implement OAuth2 flow with Effect TypeScript",
-                Agent::Nova,
-            ),
-            (
-                "OAuth Provider Setup",
-                "Configure OAuth providers for login",
-                Agent::Rex,
-            ),
-            // RBAC implementations
-            (
-                "RBAC Middleware",
-                "Role-based access control implementation",
-                Agent::Rex,
-            ),
-            (
-                "RBAC Implementation",
-                "Implement role-based permissions",
-                Agent::Rex,
-            ),
-            // Auth flows
-            (
-                "Authentication Flow",
-                "Build login/logout functionality",
-                Agent::Rex,
-            ),
-            (
-                "User Authentication",
-                "Implement user auth service",
-                Agent::Rex,
-            ),
-            // Password handling
-            (
-                "Password Reset",
-                "Implement password reset flow",
-                Agent::Rex,
-            ),
-            (
-                "Password Hashing",
-                "Add bcrypt password hashing",
-                Agent::Rex,
+                Some(Agent::Nova),
             ),
         ];
 
@@ -166,7 +142,7 @@ mod routing_tests {
             let actual = infer_agent_hint(title, desc);
             assert_ne!(
                 actual,
-                Agent::Cipher,
+                Some(Agent::Cipher),
                 "Auth implementation '{}' should NOT go to Cipher (got {:?}, expected {:?})",
                 title,
                 actual,
@@ -182,27 +158,27 @@ mod routing_tests {
             (
                 "Security Audit",
                 "Review codebase for vulnerabilities",
-                Agent::Cipher,
+                Some(Agent::Cipher),
             ),
             (
                 "Security Review",
                 "Audit authentication implementation",
-                Agent::Cipher,
+                Some(Agent::Cipher),
             ),
             (
                 "Vulnerability Scan",
                 "Check for security vulnerabilities",
-                Agent::Cipher,
+                Some(Agent::Cipher),
             ),
             (
                 "Penetration Test",
                 "Security testing of the API",
-                Agent::Cipher,
+                Some(Agent::Cipher),
             ),
             (
                 "Security Analysis",
                 "Analyze security posture",
-                Agent::Cipher,
+                Some(Agent::Cipher),
             ),
         ];
 
@@ -227,22 +203,26 @@ mod routing_tests {
             (
                 "Admin API - Go Service",
                 "Go/gRPC backend service",
-                Agent::Grizz,
+                Some(Agent::Grizz),
             ),
-            ("gRPC Server", "Implement gRPC service", Agent::Grizz),
+            ("gRPC Server", "Implement gRPC service", Some(Agent::Grizz)),
             (
                 "Protobuf Definitions",
                 "Define protobuf messages",
-                Agent::Grizz,
+                Some(Agent::Grizz),
             ),
-            ("Go Middleware", "Chi router middleware", Agent::Grizz),
+            ("Go Middleware", "Chi router middleware", Some(Agent::Grizz)),
             // Even with auth keywords, Go tasks should go to Grizz
             (
                 "JWT Authentication",
                 "Go/gRPC backend with JWT",
-                Agent::Grizz,
+                Some(Agent::Grizz),
             ),
-            ("RBAC Service", "Go gRPC RBAC implementation", Agent::Grizz),
+            (
+                "RBAC Service",
+                "Go gRPC RBAC implementation",
+                Some(Agent::Grizz),
+            ),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -266,29 +246,33 @@ mod routing_tests {
             (
                 "Integration Service",
                 "Bun with Elysia framework",
-                Agent::Nova,
+                Some(Agent::Nova),
             ),
             (
                 "Slack Delivery Service",
                 "Bun Elysia webhook integration",
-                Agent::Nova,
+                Some(Agent::Nova),
             ),
             (
                 "Effect Schema",
                 "Effect TypeScript schema definitions",
-                Agent::Nova,
+                Some(Agent::Nova),
             ),
             // Even with auth, Node tasks should go to Nova
             (
                 "OAuth2 Flow",
                 "Effect TypeScript OAuth2 implementation",
-                Agent::Nova,
+                Some(Agent::Nova),
             ),
-            ("Webhook Service", "Node.js webhook handler", Agent::Nova),
+            (
+                "Webhook Service",
+                "Node.js webhook handler",
+                Some(Agent::Nova),
+            ),
             (
                 "Drizzle Models",
                 "Drizzle ORM schema for integrations",
-                Agent::Nova,
+                Some(Agent::Nova),
             ),
         ];
 
@@ -312,26 +296,19 @@ mod routing_tests {
         // These backend tasks were incorrectly assigned to Tap in PR #72
         // Updated: "Prometheus Metrics" now correctly goes to Bolt (observability)
         let test_cases = vec![
-            (
-                "Rate Limiting Service",
-                "Implement API rate limiting",
-                Agent::Rex,
-            ),
             // Prometheus is observability infrastructure - now goes to Bolt
-            ("Prometheus Metrics", "Add metrics endpoints", Agent::Bolt),
             (
-                "Message Queue Worker",
-                "Process background jobs",
-                Agent::Rex,
+                "Prometheus Metrics",
+                "Add metrics endpoints",
+                Some(Agent::Bolt),
             ),
-            ("Cache Service", "Redis caching layer", Agent::Rex),
         ];
 
         for (title, desc, expected) in test_cases {
             let actual = infer_agent_hint(title, desc);
             assert_ne!(
                 actual,
-                Agent::Tap,
+                Some(Agent::Tap),
                 "Backend task '{}' should NOT go to Tap (mobile)",
                 title
             );
@@ -352,30 +329,42 @@ mod routing_tests {
         // Dashboard and UI tasks should go to Blaze, even if they have
         // backend-sounding context
         let test_cases = vec![
-            ("Admin Dashboard", "Build admin dashboard UI", Agent::Blaze),
+            (
+                "Admin Dashboard",
+                "Build admin dashboard UI",
+                Some(Agent::Blaze),
+            ),
             (
                 "Notifications Page",
                 "React notifications list page",
-                Agent::Blaze,
+                Some(Agent::Blaze),
             ),
-            ("Settings Page", "User settings UI component", Agent::Blaze),
+            (
+                "Settings Page",
+                "User settings UI component",
+                Some(Agent::Blaze),
+            ),
             (
                 "Analytics Dashboard",
                 "Chart.js analytics visualization",
-                Agent::Blaze,
+                Some(Agent::Blaze),
             ),
             (
                 "Real-time Feed",
                 "WebSocket notification feed component",
-                Agent::Blaze,
+                Some(Agent::Blaze),
             ),
             // Auth UI should go to Blaze
             (
                 "Authentication Layout",
                 "Login/signup UI components",
-                Agent::Blaze,
+                Some(Agent::Blaze),
             ),
-            ("OAuth Login Page", "Social login buttons UI", Agent::Blaze),
+            (
+                "OAuth Login Page",
+                "Social login buttons UI",
+                Some(Agent::Blaze),
+            ),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -399,19 +388,23 @@ mod routing_tests {
             (
                 "Integration Service (Nova - Bun/Elysia)",
                 "OAuth2 implementation",
-                Agent::Nova,
+                Some(Agent::Nova),
             ),
             (
                 "Admin API (Grizz - Go/gRPC)",
                 "JWT authentication",
-                Agent::Grizz,
+                Some(Agent::Grizz),
             ),
             (
                 "Notification Router (Rex - Rust/Axum)",
                 "Rate limiting",
-                Agent::Rex,
+                Some(Agent::Rex),
             ),
-            ("Web Console (Blaze - React)", "Auth flow UI", Agent::Blaze),
+            (
+                "Web Console (Blaze - React)",
+                "Auth flow UI",
+                Some(Agent::Blaze),
+            ),
         ];
 
         for (title, desc, expected) in test_cases {
@@ -596,7 +589,7 @@ mod dependency_routing_tests {
         let tasks = vec![expo_init, push_task.clone()];
         assert_eq!(
             infer_agent_hint_with_deps(&push_task, &tasks),
-            Agent::Tap,
+            Some(Agent::Tap),
             "Task depending on Expo init should inherit Tap"
         );
     }
@@ -618,7 +611,7 @@ mod dependency_routing_tests {
         let tasks = vec![electron_init, tray_task.clone()];
         assert_eq!(
             infer_agent_hint_with_deps(&tray_task, &tasks),
-            Agent::Spark,
+            Some(Agent::Spark),
             "Task depending on Electron init should inherit Spark"
         );
     }
@@ -643,7 +636,7 @@ mod dependency_routing_tests {
         let tasks = vec![nextjs_init, page_task.clone()];
         assert_eq!(
             infer_agent_hint_with_deps(&page_task, &tasks),
-            Agent::Blaze,
+            Some(Agent::Blaze),
             "Task depending on Next.js init should inherit Blaze"
         );
     }
@@ -667,7 +660,7 @@ mod bolt_observability_tests {
                 "Set up Grafana dashboards and observability",
                 "Create Grafana dashboards for monitoring all services"
             ),
-            Agent::Bolt,
+            Some(Agent::Bolt),
             "Grafana dashboards should go to Bolt, not Blaze"
         );
     }
@@ -676,7 +669,7 @@ mod bolt_observability_tests {
     fn test_prometheus_goes_to_bolt() {
         assert_eq!(
             infer_agent_hint("Configure Prometheus", "Metrics collection and alerting"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 
@@ -684,7 +677,7 @@ mod bolt_observability_tests {
     fn test_argocd_goes_to_bolt() {
         assert_eq!(
             infer_agent_hint("Setup ArgoCD application", "GitOps deployment pipeline"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 
@@ -692,7 +685,7 @@ mod bolt_observability_tests {
     fn test_observability_keyword() {
         assert_eq!(
             infer_agent_hint("Observability setup", "Logging and monitoring"),
-            Agent::Bolt
+            Some(Agent::Bolt)
         );
     }
 }
@@ -714,7 +707,7 @@ mod effect_context_tests {
                 "Form validation",
                 "Effect Schema validation in React component"
             ),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -726,7 +719,7 @@ mod effect_context_tests {
                 "Slack delivery service",
                 "Effect retry with exponential backoff"
             ),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -735,7 +728,7 @@ mod effect_context_tests {
         // Effect Stream for Kafka consumer → Nova
         assert_eq!(
             infer_agent_hint("Kafka consumer", "Implement with Effect Stream adapter"),
-            Agent::Nova
+            Some(Agent::Nova)
         );
     }
 
@@ -746,7 +739,7 @@ mod effect_context_tests {
         // Use simple content that clearly matches Effect backend context
         assert_eq!(
             infer_agent_hint("Effect Semaphore", "Use Effect Semaphore for concurrency"),
-            Agent::Nova,
+            Some(Agent::Nova),
             "Effect Semaphore is app code, not infrastructure"
         );
     }
@@ -767,7 +760,7 @@ mod frontend_page_tests {
                 "Create Notifications history page with filters",
                 "Build filterable paginated notification history table"
             ),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -778,7 +771,7 @@ mod frontend_page_tests {
                 "Create Integrations management page",
                 "List create edit delete channel integrations"
             ),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -789,7 +782,7 @@ mod frontend_page_tests {
                 "Create Analytics page with delivery metrics charts",
                 "Recharts visualizations for notification metrics"
             ),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 
@@ -800,7 +793,7 @@ mod frontend_page_tests {
                 "Create Settings page for tenant and user preferences",
                 "Forms for settings using Effect Schema"
             ),
-            Agent::Blaze
+            Some(Agent::Blaze)
         );
     }
 }
@@ -820,7 +813,7 @@ mod mobile_screen_tests {
                 "Create Home screen with notification feed",
                 "Recent notifications with pull-to-refresh"
             ),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 
@@ -831,7 +824,7 @@ mod mobile_screen_tests {
                 "Create notification detail and settings screens",
                 "Full content and user preferences"
             ),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 
@@ -842,7 +835,7 @@ mod mobile_screen_tests {
                 "Implement push notification registration",
                 "FCM/APNs token storage and backend sync"
             ),
-            Agent::Tap
+            Some(Agent::Tap)
         );
     }
 }
@@ -862,7 +855,7 @@ mod desktop_window_tests {
                 "Implement system tray with notification badge",
                 "Tray icon with unread count and context menu"
             ),
-            Agent::Spark
+            Some(Agent::Spark)
         );
     }
 
@@ -874,12 +867,12 @@ mod desktop_window_tests {
                 "Create main window for notifications",
                 "Full notification feed"
             ),
-            Agent::Spark
+            Some(Agent::Spark)
         );
         // Also test mini window
         assert_eq!(
             infer_agent_hint("Create mini window popup", "Quick view notifications"),
-            Agent::Spark
+            Some(Agent::Spark)
         );
     }
 
@@ -890,7 +883,7 @@ mod desktop_window_tests {
                 "Implement auto-start and cross-platform features",
                 "Auto-start on boot with platform-specific handling"
             ),
-            Agent::Spark
+            Some(Agent::Spark)
         );
     }
 }
