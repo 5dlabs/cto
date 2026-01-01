@@ -82,7 +82,8 @@ When global.devRegistry.enabled is false:
 {{- end }}
 
 {{/*
-Image pull policy - returns pullPolicy based on devRegistry toggle
+Image pull policy - returns pullPolicy based on tag and devRegistry toggle.
+Uses "Always" for mutable tags (latest, develop) to ensure updates are pulled.
 Usage: {{ include "cto.imagePullPolicy" (dict "image" .Values.controller.image "global" .Values.global) }}
 */}}
 {{- define "cto.imagePullPolicy" -}}
@@ -90,8 +91,12 @@ Usage: {{ include "cto.imagePullPolicy" (dict "image" .Values.controller.image "
 {{- $global := .global -}}
 {{- $devRegistry := ($global).devRegistry | default dict -}}
 {{- $enabled := ($devRegistry).enabled | default false -}}
+{{- $tag := $image.tag | default "latest" -}}
 {{- if $enabled -}}
 {{- ($devRegistry).pullPolicy | default "Always" -}}
+{{- else if or (eq $tag "latest") (eq $tag "develop") -}}
+{{- /* Mutable tags should always pull to get updates */ -}}
+Always
 {{- else -}}
 {{- $image.pullPolicy | default "IfNotPresent" -}}
 {{- end -}}

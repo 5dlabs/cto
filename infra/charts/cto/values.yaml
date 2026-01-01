@@ -280,7 +280,7 @@ pm:
 
   image:
     repository: ghcr.io/5dlabs/pm-server
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
     tag: "latest"
 
   service:
