@@ -679,4 +679,66 @@ mod tests {
         assert_eq!(callback.tasks[1].id, "2");
         assert_eq!(callback.tasks[1].dependencies, vec!["1"]);
     }
+
+    #[test]
+    fn test_deserialize_intake_callback_string_priority() {
+        // Test that string priorities ("medium", "high") are properly converted
+        // This matches the exact payload format that was failing with:
+        // "tasks[0].priority: invalid type: string "medium", expected i32"
+        let json = r#"{
+            "sessionId": "session-123",
+            "issueId": "issue-456",
+            "issueIdentifier": "TSK-1",
+            "teamId": "team-789",
+            "tasks": [
+                {
+                    "id": "task-001",
+                    "title": "Provision Infrastructure",
+                    "description": "Deploy PostgreSQL and Redis",
+                    "priority": "critical",
+                    "dependencies": [],
+                    "agentHint": "bolt"
+                },
+                {
+                    "id": "task-002",
+                    "title": "Implement API",
+                    "description": "Build the REST API",
+                    "priority": "medium",
+                    "dependencies": ["task-001"],
+                    "agentHint": "rex"
+                },
+                {
+                    "id": "task-003",
+                    "title": "Build Frontend",
+                    "description": "Create React dashboard",
+                    "priority": "high",
+                    "dependencies": ["task-002"],
+                    "agentHint": "blaze"
+                },
+                {
+                    "id": "task-004",
+                    "title": "Documentation",
+                    "description": "Write docs",
+                    "priority": "low",
+                    "dependencies": [],
+                    "agentHint": "rex"
+                }
+            ],
+            "workflowName": "intake-12345",
+            "success": true
+        }"#;
+
+        let callback: IntakeCompleteCallback = serde_json::from_str(json).unwrap();
+        assert_eq!(callback.tasks.len(), 4);
+
+        // Verify string priorities are converted to Linear integers
+        assert_eq!(callback.tasks[0].priority, 1); // "critical" -> 1 (Urgent)
+        assert_eq!(callback.tasks[1].priority, 3); // "medium" -> 3 (Normal)
+        assert_eq!(callback.tasks[2].priority, 2); // "high" -> 2 (High)
+        assert_eq!(callback.tasks[3].priority, 4); // "low" -> 4 (Low)
+
+        // Verify other fields parsed correctly
+        assert_eq!(callback.tasks[0].id, "task-001");
+        assert_eq!(callback.tasks[1].dependencies, vec!["task-001"]);
+    }
 }
