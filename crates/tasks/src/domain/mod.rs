@@ -20,6 +20,9 @@ pub use cto_config::{generate_cto_config, save_cto_config, CtoConfig};
 pub use deps::DependencyDomain;
 pub use intake::{IntakeConfig, IntakeDomain, IntakeResult};
 pub use platform_config::{IntakeMode, PlatformConfig};
-pub use routing::{infer_agent_hint, infer_agent_hint_str, Agent};
+pub use routing::{
+    infer_agent_hint, infer_agent_hint_str, infer_agent_hint_with_deps,
+    infer_agent_hint_with_deps_str, is_implementation_agent, parse_agent, Agent,
+};
 pub use tags::TagsDomain;
 pub use tasks::TasksDomain;

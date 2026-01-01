@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use tasks::domain::docs::{
     generate_acceptance_criteria, generate_all_docs, generate_task_prompt, generate_task_xml,
 };
-use tasks::domain::routing::{infer_agent_hint, Agent};
+use tasks::domain::routing::{infer_agent_hint, infer_agent_hint_with_deps, Agent};
 use tasks::domain::IntakeConfig;
 use tasks::entities::Task;
 use tempfile::TempDir;
@@ -566,5 +566,315 @@ mod config_tests {
         assert!(config.analyze);
         assert_eq!(config.complexity_threshold, 7);
         assert_eq!(config.model, Some("claude-sonnet".to_string()));
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Dependency-Based Routing
+// ===========================================================================
+// These tests ensure tasks that depend on platform-specific init tasks
+// inherit the correct agent (Tap for mobile, Spark for desktop, Blaze for web).
+
+mod dependency_routing_tests {
+    use super::*;
+
+    #[test]
+    fn test_mobile_task_inherits_tap_from_dependency() {
+        // Task 42 depends on Task 41 (Expo init) → should be Tap
+        let mut expo_init = Task::new("41", "Initialize Expo project", "Create Expo SDK setup");
+        expo_init.agent_hint = Some("tap".to_string());
+
+        let mut push_task = Task::new(
+            "42",
+            "Implement push notification registration",
+            "Setup FCM/APNs with token storage",
+        );
+        push_task.dependencies = vec!["41".to_string()];
+
+        let tasks = vec![expo_init, push_task.clone()];
+        assert_eq!(
+            infer_agent_hint_with_deps(&push_task, &tasks),
+            Agent::Tap,
+            "Task depending on Expo init should inherit Tap"
+        );
+    }
+
+    #[test]
+    fn test_desktop_task_inherits_spark_from_dependency() {
+        // Task 46 depends on Task 45 (Electron init) → should be Spark
+        let mut electron_init =
+            Task::new("45", "Initialize Electron project", "Create Electron setup");
+        electron_init.agent_hint = Some("spark".to_string());
+
+        let mut tray_task = Task::new(
+            "46",
+            "Implement system tray with notification badge",
+            "Create tray icon with context menu",
+        );
+        tray_task.dependencies = vec!["45".to_string()];
+
+        let tasks = vec![electron_init, tray_task.clone()];
+        assert_eq!(
+            infer_agent_hint_with_deps(&tray_task, &tasks),
+            Agent::Spark,
+            "Task depending on Electron init should inherit Spark"
+        );
+    }
+
+    #[test]
+    fn test_frontend_task_inherits_blaze_from_dependency() {
+        // Task 35 depends on Task 32 (Next.js init) → should be Blaze
+        let mut nextjs_init =
+            Task::new("32", "Initialize Next.js project", "Create Next.js 15 setup");
+        nextjs_init.agent_hint = Some("blaze".to_string());
+
+        let mut page_task = Task::new(
+            "35",
+            "Create Notifications history page with filters",
+            "Build filterable paginated notification history table",
+        );
+        page_task.dependencies = vec!["32".to_string()];
+
+        let tasks = vec![nextjs_init, page_task.clone()];
+        assert_eq!(
+            infer_agent_hint_with_deps(&page_task, &tasks),
+            Agent::Blaze,
+            "Task depending on Next.js init should inherit Blaze"
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Bolt Observability Keywords
+// ===========================================================================
+// These tests ensure observability tasks (Grafana, Prometheus, etc.)
+// go to Bolt, not Blaze (which catches generic "dashboard").
+
+mod bolt_observability_tests {
+    use super::*;
+
+    #[test]
+    fn test_grafana_goes_to_bolt_not_blaze() {
+        // "Set up Grafana dashboards" should go to Bolt, not Blaze
+        // "dashboard" keyword would normally match Blaze, but Grafana is infra
+        assert_eq!(
+            infer_agent_hint(
+                "Set up Grafana dashboards and observability",
+                "Create Grafana dashboards for monitoring all services"
+            ),
+            Agent::Bolt,
+            "Grafana dashboards should go to Bolt, not Blaze"
+        );
+    }
+
+    #[test]
+    fn test_prometheus_goes_to_bolt() {
+        assert_eq!(
+            infer_agent_hint("Configure Prometheus", "Metrics collection and alerting"),
+            Agent::Bolt
+        );
+    }
+
+    #[test]
+    fn test_argocd_goes_to_bolt() {
+        assert_eq!(
+            infer_agent_hint("Setup ArgoCD application", "GitOps deployment pipeline"),
+            Agent::Bolt
+        );
+    }
+
+    #[test]
+    fn test_observability_keyword() {
+        assert_eq!(
+            infer_agent_hint("Observability setup", "Logging and monitoring"),
+            Agent::Bolt
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Effect Context-Aware Routing
+// ===========================================================================
+// These tests ensure Effect TypeScript routes correctly based on context:
+// Effect + frontend → Blaze, Effect + backend → Nova
+
+mod effect_context_tests {
+    use super::*;
+
+    #[test]
+    fn test_effect_with_frontend_context() {
+        // Effect Schema in React form validation → Blaze
+        assert_eq!(
+            infer_agent_hint("Form validation", "Effect Schema validation in React component"),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
+    fn test_effect_with_backend_context() {
+        // Effect retry for service delivery → Nova
+        assert_eq!(
+            infer_agent_hint("Slack delivery service", "Effect retry with exponential backoff"),
+            Agent::Nova
+        );
+    }
+
+    #[test]
+    fn test_effect_stream_goes_to_nova() {
+        // Effect Stream for Kafka consumer → Nova
+        assert_eq!(
+            infer_agent_hint("Kafka consumer", "Implement with Effect Stream adapter"),
+            Agent::Nova
+        );
+    }
+
+    #[test]
+    fn test_effect_semaphore_goes_to_nova() {
+        // Effect Semaphore for rate limiting → Nova (not Bolt!)
+        assert_eq!(
+            infer_agent_hint(
+                "Add rate limiting per channel with Effect Semaphore",
+                "Prevent overwhelming external services"
+            ),
+            Agent::Nova,
+            "Effect Semaphore is app code, not infrastructure"
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Frontend Page Keywords
+// ===========================================================================
+// These tests ensure web pages route to Blaze, not Rex.
+
+mod frontend_page_tests {
+    use super::*;
+
+    #[test]
+    fn test_notifications_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Notifications history page with filters",
+                "Build filterable paginated notification history table"
+            ),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
+    fn test_integrations_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Integrations management page",
+                "List create edit delete channel integrations"
+            ),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
+    fn test_analytics_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Analytics page with delivery metrics charts",
+                "Recharts visualizations for notification metrics"
+            ),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
+    fn test_settings_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Settings page for tenant and user preferences",
+                "Forms for settings using Effect Schema"
+            ),
+            Agent::Blaze
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Mobile Screen Keywords
+// ===========================================================================
+// These tests ensure mobile screens route to Tap, not Rex.
+
+mod mobile_screen_tests {
+    use super::*;
+
+    #[test]
+    fn test_home_screen() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Home screen with notification feed",
+                "Recent notifications with pull-to-refresh"
+            ),
+            Agent::Tap
+        );
+    }
+
+    #[test]
+    fn test_detail_screen() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create notification detail and settings screens",
+                "Full content and user preferences"
+            ),
+            Agent::Tap
+        );
+    }
+
+    #[test]
+    fn test_push_notification_registration() {
+        assert_eq!(
+            infer_agent_hint(
+                "Implement push notification registration",
+                "FCM/APNs token storage and backend sync"
+            ),
+            Agent::Tap
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Desktop Window/Tray Keywords
+// ===========================================================================
+// These tests ensure desktop features route to Spark, not Rex.
+
+mod desktop_window_tests {
+    use super::*;
+
+    #[test]
+    fn test_system_tray() {
+        assert_eq!(
+            infer_agent_hint(
+                "Implement system tray with notification badge",
+                "Tray icon with unread count and context menu"
+            ),
+            Agent::Spark
+        );
+    }
+
+    #[test]
+    fn test_main_window() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create main notification window and mini popup",
+                "Full feed and quick view notifications"
+            ),
+            Agent::Spark
+        );
+    }
+
+    #[test]
+    fn test_auto_start() {
+        assert_eq!(
+            infer_agent_hint(
+                "Implement auto-start and cross-platform features",
+                "Auto-start on boot with platform-specific handling"
+            ),
+            Agent::Spark
+        );
     }
 }

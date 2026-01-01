@@ -1,7 +1,10 @@
 //! Agent routing - Infer which agent should handle a task based on its content.
 //!
 //! This module provides logic to automatically assign agent hints to tasks
-//! based on keywords in the task title and description.
+//! based on keywords in the task title and description, with support for
+//! dependency-based inference as the primary signal.
+
+use crate::entities::Task;
 
 /// Agent types available for task routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,60 +97,62 @@ impl std::fmt::Display for Agent {
 ///
 /// IMPORTANT: This function only considers title and description, not test_strategy
 /// or other fields, to avoid false positives from generic keywords.
+///
+/// For dependency-aware routing (recommended), use `infer_agent_hint_with_deps` instead.
 #[must_use]
 pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
     let content = format!("{} {}", title, description).to_lowercase();
 
     // HIGHEST PRIORITY: Explicit agent name in parentheses (e.g., "(Nova - Bun)")
     // This allows PRD authors to explicitly specify the agent
-    if content.contains("(nova") || content.contains("- nova") {
-        return Agent::Nova;
-    }
-    if content.contains("(grizz") || content.contains("- grizz") {
-        return Agent::Grizz;
-    }
-    if content.contains("(rex") || content.contains("- rex") {
-        return Agent::Rex;
-    }
-    if content.contains("(blaze") || content.contains("- blaze") {
-        return Agent::Blaze;
-    }
-    if content.contains("(tap") || content.contains("- tap") {
-        return Agent::Tap;
-    }
-    if content.contains("(spark") || content.contains("- spark") {
-        return Agent::Spark;
-    }
-    if content.contains("(bolt") || content.contains("- bolt") {
-        return Agent::Bolt;
-    }
-    if content.contains("(cipher") || content.contains("- cipher") {
-        return Agent::Cipher;
-    }
-    if content.contains("(tess") || content.contains("- tess") {
-        return Agent::Tess;
-    }
-    if content.contains("(atlas") || content.contains("- atlas") {
-        return Agent::Atlas;
+    if let Some(agent) = check_explicit_agent(title, description) {
+        return agent;
     }
 
     // Check in order of specificity (most specific first)
 
     // Mobile (before frontend since React Native could match "react")
+    // Expanded with screen patterns, push notifications, FCM/APNs
     if content.contains("mobile")
         || content.contains("react native")
         || content.contains("ios")
         || content.contains("android")
         || content.contains("expo")
+        // Mobile screen patterns
+        || content.contains("home screen")
+        || content.contains("detail screen")
+        || content.contains("settings screen")
+        || content.contains("profile screen")
+        || content.contains("notification screen")
+        // Push notification infrastructure
+        || content.contains("push notification")
+        || content.contains("fcm")
+        || content.contains("apns")
+        || content.contains("app badge")
+        || content.contains("deep link")
+        || content.contains("biometric")
     {
         return Agent::Tap;
     }
 
     // Desktop/Electron (before frontend)
+    // Expanded with tray, window, auto-start patterns
     if content.contains("electron")
         || content.contains("desktop")
         || content.contains("native app")
         || content.contains("tauri")
+        // Desktop-specific patterns
+        || content.contains("system tray")
+        || content.contains("tray icon")
+        || content.contains("tray menu")
+        || content.contains("notification badge")
+        || content.contains("auto-start")
+        || content.contains("auto start")
+        || content.contains("startup on boot")
+        || content.contains("main window")
+        || content.contains("mini window")
+        || content.contains("popup window")
+        || content.contains("cross-platform")
     {
         return Agent::Spark;
     }
@@ -157,7 +162,9 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
     // Cipher is only for explicit security audit/review tasks.
 
     // DevOps/Deployment/Infrastructure (early - deploy/docker/k8s are strong signals)
-    // Also catches database/cache PROVISIONING vs application DATABASE USAGE
+    // EXPANDED: Includes observability (Grafana, Prometheus, Loki), GitOps tools,
+    // K8s resources, and storage infrastructure.
+    // This MUST be checked BEFORE frontend to catch "Grafana dashboard" correctly.
     if content.contains("deploy")
         || content.contains("ci/cd")
         || content.contains("ci cd")
@@ -180,6 +187,37 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("cloudnative-pg")
         || content.contains("strimzi")
         || content.contains("percona")
+        // Observability stack (checked BEFORE frontend "dashboard")
+        || content.contains("grafana")
+        || content.contains("prometheus")
+        || content.contains("loki")
+        || content.contains("alertmanager")
+        || content.contains("observability")
+        || content.contains("monitoring setup")
+        || content.contains("jaeger")
+        || content.contains("opentelemetry")
+        || content.contains("otel")
+        || content.contains("fluent")
+        // GitOps tools
+        || content.contains("argocd")
+        || content.contains("flux")
+        || content.contains("kustomize")
+        // K8s resources (provisioning, not app usage)
+        || content.contains("configmap")
+        || content.contains("ingress")
+        || content.contains("network policy")
+        || content.contains("service mesh")
+        || content.contains(" hpa")
+        || content.contains("hpa ")
+        || content.contains(" pvc")
+        || content.contains("pvc ")
+        || content.contains("persistentvolume")
+        || content.contains("deployment manifest")
+        || content.contains("kubernetes manifest")
+        // Storage infrastructure
+        || content.contains("seaweedfs")
+        || content.contains("minio")
+        || content.contains("s3 bucket")
     {
         return Agent::Bolt;
     }
@@ -203,8 +241,34 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         return Agent::Grizz;
     }
 
+    // Effect TypeScript - CONTEXT DETERMINES frontend vs backend
+    // Effect can be used in both Blaze (frontend) and Nova (backend)
+    // Check context keywords to determine which agent
+    if content.contains("effect") {
+        // Frontend context: component, page, form, ui, react, next, shadcn
+        if content.contains("component")
+            || content.contains(" page")
+            || content.contains("page ")
+            || content.contains(" form")
+            || content.contains("form ")
+            || content.contains(" ui")
+            || content.contains("ui ")
+            || content.contains("react")
+            || content.contains("next")
+            || content.contains("shadcn")
+            || content.contains("frontend")
+            || content.contains("validation")  // Form validation context
+        {
+            return Agent::Blaze;
+        }
+        // Backend context: service, api, delivery, kafka, queue, stream, elysia, bun
+        // Default Effect to Nova (backend) since it's primarily used there
+        return Agent::Nova;
+    }
+
     // Node.js - check BEFORE general backend
     // Include modern JS/TS runtime and framework keywords
+    // NOTE: "effect" moved to its own context-aware block above
     if content.contains("node.js")
         || content.contains("nodejs")
         || content.contains("express")
@@ -216,14 +280,16 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("deno")
         || content.contains("elysia")
         || content.contains("hono")
-        || content.contains("effect")
         || content.contains("drizzle")
         || content.contains("prisma")
+        || content.contains("kafkajs")
     {
         return Agent::Nova;
     }
 
     // Frontend (check before generic backend to catch "admin dashboard", "web app", etc.)
+    // EXPANDED: Added page patterns for web pages
+    // NOTE: "dashboard" still here but Grafana/observability caught by Bolt earlier
     if content.contains("frontend")
         || content.contains("react")
         || content.contains("ui ")
@@ -243,6 +309,22 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("shadcn")
         || content.contains("landing page")
         || content.contains("web interface")
+        // Web page patterns (after mobile "screen" check)
+        || content.contains(" page")
+        || content.contains("page ")
+        // Specific page types
+        || content.contains("history page")
+        || content.contains("management page")
+        || content.contains("settings page")
+        || content.contains("analytics page")
+        || content.contains("notifications page")
+        || content.contains("integrations page")
+        || content.contains("rules page")
+        // Web console patterns
+        || content.contains("web console")
+        || content.contains("console ui")
+        || content.contains("recharts")
+        || content.contains("chart.js")
     {
         return Agent::Blaze;
     }
@@ -345,6 +427,154 @@ pub fn get_role_for_hint(hint: &str) -> &'static str {
         "atlas" => Agent::Atlas.role_description(),
         _ => "Senior Software Engineer",
     }
+}
+
+/// Parse an agent hint string into an Agent enum.
+#[must_use]
+pub fn parse_agent(hint: &str) -> Agent {
+    match hint.to_lowercase().as_str() {
+        "blaze" => Agent::Blaze,
+        "rex" => Agent::Rex,
+        "grizz" => Agent::Grizz,
+        "tap" => Agent::Tap,
+        "spark" => Agent::Spark,
+        "nova" => Agent::Nova,
+        "tess" => Agent::Tess,
+        "cipher" => Agent::Cipher,
+        "bolt" => Agent::Bolt,
+        "atlas" => Agent::Atlas,
+        _ => Agent::Rex, // Default to Rex
+    }
+}
+
+/// Check if an agent is an implementation agent (can write code).
+/// Support agents (Tess, Cipher, Atlas) only review/test/merge.
+#[must_use]
+pub const fn is_implementation_agent(agent: Agent) -> bool {
+    matches!(
+        agent,
+        Agent::Blaze
+            | Agent::Rex
+            | Agent::Grizz
+            | Agent::Nova
+            | Agent::Tap
+            | Agent::Spark
+            | Agent::Bolt
+    )
+}
+
+/// Infer agent from dependency chain.
+///
+/// If ALL dependencies point to the same implementation agent, inherit that agent.
+/// This is useful for tasks like "Create Home screen" that depend on "Initialize Expo project"
+/// - the dependency on Tap implies the task should also be Tap.
+///
+/// Returns `None` if:
+/// - Task has no dependencies
+/// - Dependencies have mixed agents
+/// - Dependencies are support agents (Tess, Cipher, Atlas)
+fn infer_from_dependencies(task: &Task, all_tasks: &[Task]) -> Option<Agent> {
+    if task.dependencies.is_empty() {
+        return None;
+    }
+
+    let dep_agents: Vec<Agent> = task
+        .dependencies
+        .iter()
+        .filter_map(|dep_id| {
+            all_tasks
+                .iter()
+                .find(|t| t.id == *dep_id || format!("task-{:03}", t.id.parse::<u32>().unwrap_or(0)) == *dep_id)
+                .and_then(|t| t.agent_hint.as_ref())
+                .map(|hint| parse_agent(hint))
+        })
+        .collect();
+
+    if dep_agents.is_empty() {
+        return None;
+    }
+
+    // All deps must be the same IMPLEMENTATION agent
+    let first = dep_agents[0];
+    if is_implementation_agent(first) && dep_agents.iter().all(|&a| a == first) {
+        Some(first)
+    } else {
+        None
+    }
+}
+
+/// Check for explicit agent name in title/description.
+/// Returns the agent if found (e.g., "(Nova)", "- Rex", etc.)
+fn check_explicit_agent(title: &str, description: &str) -> Option<Agent> {
+    let content = format!("{} {}", title, description).to_lowercase();
+
+    if content.contains("(nova") || content.contains("- nova") {
+        return Some(Agent::Nova);
+    }
+    if content.contains("(grizz") || content.contains("- grizz") {
+        return Some(Agent::Grizz);
+    }
+    if content.contains("(rex") || content.contains("- rex") {
+        return Some(Agent::Rex);
+    }
+    if content.contains("(blaze") || content.contains("- blaze") {
+        return Some(Agent::Blaze);
+    }
+    if content.contains("(tap") || content.contains("- tap") {
+        return Some(Agent::Tap);
+    }
+    if content.contains("(spark") || content.contains("- spark") {
+        return Some(Agent::Spark);
+    }
+    if content.contains("(bolt") || content.contains("- bolt") {
+        return Some(Agent::Bolt);
+    }
+    if content.contains("(cipher") || content.contains("- cipher") {
+        return Some(Agent::Cipher);
+    }
+    if content.contains("(tess") || content.contains("- tess") {
+        return Some(Agent::Tess);
+    }
+    if content.contains("(atlas") || content.contains("- atlas") {
+        return Some(Agent::Atlas);
+    }
+    if content.contains("(cleo") || content.contains("- cleo") {
+        // Cleo is an alias for quality review, maps to Tess for now
+        return Some(Agent::Tess);
+    }
+
+    None
+}
+
+/// Infer agent hint with dependency context (PRIMARY signal).
+///
+/// Priority order:
+/// 1. Explicit agent name in title/description (e.g., "(Nova)")
+/// 2. Dependency chain inheritance (if ALL deps have same agent)
+/// 3. Keyword-based inference (fallback)
+///
+/// This is the recommended function to use for intake workflows where
+/// task dependencies are available.
+#[must_use]
+pub fn infer_agent_hint_with_deps(task: &Task, all_tasks: &[Task]) -> Agent {
+    // 1. Check explicit agent name first (highest priority)
+    if let Some(agent) = check_explicit_agent(&task.title, &task.description) {
+        return agent;
+    }
+
+    // 2. Check dependency chain (PRIMARY signal for implementation tasks)
+    if let Some(agent) = infer_from_dependencies(task, all_tasks) {
+        return agent;
+    }
+
+    // 3. Fall back to keyword matching
+    infer_agent_hint(&task.title, &task.description)
+}
+
+/// Infer agent hint with dependencies and return as a string.
+#[must_use]
+pub fn infer_agent_hint_with_deps_str(task: &Task, all_tasks: &[Task]) -> &'static str {
+    infer_agent_hint_with_deps(task, all_tasks).as_str()
 }
 
 #[cfg(test)]
@@ -588,5 +818,372 @@ mod tests {
         assert_eq!(Agent::Blaze.as_str(), "blaze");
         assert_eq!(Agent::Rex.as_str(), "rex");
         assert_eq!(Agent::Tap.as_str(), "tap");
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Dependency-Based Routing
+    // ===========================================================================
+
+    #[test]
+    fn test_dependency_based_routing_tap() {
+        // Task depending on Tap init should inherit Tap
+        let mut tap_init = Task::new("41", "Initialize Expo project", "Create Expo SDK setup");
+        tap_init.agent_hint = Some("tap".to_string());
+
+        let mut push_task = Task::new(
+            "42",
+            "Implement push notification registration",
+            "Setup FCM/APNs",
+        );
+        push_task.dependencies = vec!["41".to_string()];
+
+        let tasks = vec![tap_init, push_task.clone()];
+        assert_eq!(infer_agent_hint_with_deps(&push_task, &tasks), Agent::Tap);
+    }
+
+    #[test]
+    fn test_dependency_based_routing_spark() {
+        // Task depending on Spark init should inherit Spark
+        let mut spark_init = Task::new("45", "Initialize Electron project", "Create Electron setup");
+        spark_init.agent_hint = Some("spark".to_string());
+
+        let mut tray_task = Task::new("46", "Implement system tray", "Notification badge");
+        tray_task.dependencies = vec!["45".to_string()];
+
+        let tasks = vec![spark_init, tray_task.clone()];
+        assert_eq!(infer_agent_hint_with_deps(&tray_task, &tasks), Agent::Spark);
+    }
+
+    #[test]
+    fn test_dependency_based_routing_blaze() {
+        // Task depending on Blaze init should inherit Blaze
+        let mut blaze_init = Task::new("32", "Initialize Next.js project", "Create Next.js setup");
+        blaze_init.agent_hint = Some("blaze".to_string());
+
+        let mut page_task = Task::new("35", "Create Notifications page", "History with filters");
+        page_task.dependencies = vec!["32".to_string()];
+
+        let tasks = vec![blaze_init, page_task.clone()];
+        assert_eq!(infer_agent_hint_with_deps(&page_task, &tasks), Agent::Blaze);
+    }
+
+    #[test]
+    fn test_dependency_mixed_agents_falls_through() {
+        // Task with mixed dependencies should fall through to keywords
+        let mut rex_task = Task::new("1", "Rust service", "Backend");
+        rex_task.agent_hint = Some("rex".to_string());
+
+        let mut nova_task = Task::new("2", "Node service", "Backend");
+        nova_task.agent_hint = Some("nova".to_string());
+
+        let mut mixed_dep_task = Task::new("3", "Combined service", "Uses both");
+        mixed_dep_task.dependencies = vec!["1".to_string(), "2".to_string()];
+
+        let tasks = vec![rex_task, nova_task, mixed_dep_task.clone()];
+        // Mixed deps → falls through to keywords → "service" matches backend → Rex
+        assert_eq!(
+            infer_agent_hint_with_deps(&mixed_dep_task, &tasks),
+            Agent::Rex
+        );
+    }
+
+    #[test]
+    fn test_explicit_agent_overrides_dependency() {
+        // Explicit agent name should override dependency inference
+        let mut tap_init = Task::new("41", "Initialize Expo project", "Create Expo setup");
+        tap_init.agent_hint = Some("tap".to_string());
+
+        let mut explicit_task = Task::new(
+            "42",
+            "Some task (Nova - special case)",
+            "Needs Nova despite dependency",
+        );
+        explicit_task.dependencies = vec!["41".to_string()];
+
+        let tasks = vec![tap_init, explicit_task.clone()];
+        // Explicit "(Nova" should win over Tap dependency
+        assert_eq!(
+            infer_agent_hint_with_deps(&explicit_task, &tasks),
+            Agent::Nova
+        );
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Bolt Observability Keywords
+    // ===========================================================================
+
+    #[test]
+    fn test_bolt_observability() {
+        // Grafana dashboards should go to Bolt, not Blaze
+        assert_eq!(
+            infer_agent_hint("Setup Grafana dashboards", "Create dashboards for monitoring"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Prometheus rules", "Alert configuration"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Loki logging", "Configure log aggregation"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Observability stack", "Metrics and logging"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Alertmanager setup", "Alert routing"),
+            Agent::Bolt
+        );
+    }
+
+    #[test]
+    fn test_bolt_gitops() {
+        assert_eq!(
+            infer_agent_hint("ArgoCD application", "GitOps deployment"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Flux configuration", "Continuous delivery"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Kustomize overlays", "Environment configs"),
+            Agent::Bolt
+        );
+    }
+
+    #[test]
+    fn test_bolt_k8s_resources() {
+        assert_eq!(
+            infer_agent_hint("Create ConfigMap", "Application config"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Ingress rules", "External access"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("Network policy", "Pod isolation"),
+            Agent::Bolt
+        );
+        assert_eq!(
+            infer_agent_hint("HPA configuration", "Auto-scaling"),
+            Agent::Bolt
+        );
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Effect Context-Aware Routing
+    // ===========================================================================
+
+    #[test]
+    fn test_effect_frontend_context() {
+        // Effect + frontend keywords → Blaze
+        assert_eq!(
+            infer_agent_hint("Settings Form", "Effect Schema validation in React"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Effect validation", "Component form validation"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Effect Schema", "Page state management"),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
+    fn test_effect_backend_context() {
+        // Effect + backend keywords → Nova
+        assert_eq!(
+            infer_agent_hint("Slack Service", "Effect retry for delivery"),
+            Agent::Nova
+        );
+        assert_eq!(
+            infer_agent_hint("Effect Stream", "Kafka consumer with Effect"),
+            Agent::Nova
+        );
+        assert_eq!(
+            infer_agent_hint("Delivery service", "Effect error handling"),
+            Agent::Nova
+        );
+    }
+
+    #[test]
+    fn test_effect_default_to_nova() {
+        // Effect without clear context → Nova (backend default)
+        assert_eq!(
+            infer_agent_hint("Effect implementation", "Type-safe error handling"),
+            Agent::Nova
+        );
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Frontend Page Keywords
+    // ===========================================================================
+
+    #[test]
+    fn test_frontend_pages() {
+        assert_eq!(
+            infer_agent_hint("Notifications page", "History with filters"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Analytics page", "Charts and metrics"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Settings page", "User preferences"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Create management page", "CRUD interface"),
+            Agent::Blaze
+        );
+    }
+
+    #[test]
+    fn test_frontend_web_console() {
+        assert_eq!(
+            infer_agent_hint("Web console", "Admin interface"),
+            Agent::Blaze
+        );
+        assert_eq!(
+            infer_agent_hint("Recharts visualization", "Data charts"),
+            Agent::Blaze
+        );
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Mobile Screen Keywords
+    // ===========================================================================
+
+    #[test]
+    fn test_mobile_screens() {
+        assert_eq!(
+            infer_agent_hint("Home screen", "Notification feed"),
+            Agent::Tap
+        );
+        assert_eq!(
+            infer_agent_hint("Detail screen", "Full notification view"),
+            Agent::Tap
+        );
+        assert_eq!(
+            infer_agent_hint("Settings screen", "Mobile preferences"),
+            Agent::Tap
+        );
+    }
+
+    #[test]
+    fn test_mobile_push_notifications() {
+        assert_eq!(
+            infer_agent_hint("Push notification", "FCM registration"),
+            Agent::Tap
+        );
+        assert_eq!(
+            infer_agent_hint("FCM integration", "Firebase messaging"),
+            Agent::Tap
+        );
+        assert_eq!(
+            infer_agent_hint("APNs setup", "Apple push notifications"),
+            Agent::Tap
+        );
+        assert_eq!(
+            infer_agent_hint("App badge count", "Unread notifications"),
+            Agent::Tap
+        );
+    }
+
+    #[test]
+    fn test_mobile_deep_links() {
+        assert_eq!(
+            infer_agent_hint("Deep link", "URL scheme handling"),
+            Agent::Tap
+        );
+        assert_eq!(
+            infer_agent_hint("Biometric auth", "Face ID / fingerprint"),
+            Agent::Tap
+        );
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Desktop Window/Tray Keywords
+    // ===========================================================================
+
+    #[test]
+    fn test_desktop_tray() {
+        assert_eq!(
+            infer_agent_hint("System tray", "Notification badge"),
+            Agent::Spark
+        );
+        assert_eq!(
+            infer_agent_hint("Tray icon", "Status indicator"),
+            Agent::Spark
+        );
+        assert_eq!(
+            infer_agent_hint("Tray menu", "Quick actions"),
+            Agent::Spark
+        );
+    }
+
+    #[test]
+    fn test_desktop_windows() {
+        assert_eq!(
+            infer_agent_hint("Main window", "Full notification feed"),
+            Agent::Spark
+        );
+        assert_eq!(
+            infer_agent_hint("Mini window", "Quick view popup"),
+            Agent::Spark
+        );
+        assert_eq!(
+            infer_agent_hint("Popup window", "Notification toast"),
+            Agent::Spark
+        );
+    }
+
+    #[test]
+    fn test_desktop_autostart() {
+        assert_eq!(
+            infer_agent_hint("Auto-start", "Boot preferences"),
+            Agent::Spark
+        );
+        assert_eq!(
+            infer_agent_hint("Auto start on boot", "Startup configuration"),
+            Agent::Spark
+        );
+        assert_eq!(
+            infer_agent_hint("Cross-platform", "Windows/macOS/Linux"),
+            Agent::Spark
+        );
+    }
+
+    // ===========================================================================
+    // NEW TESTS: Helper Functions
+    // ===========================================================================
+
+    #[test]
+    fn test_parse_agent() {
+        assert_eq!(parse_agent("blaze"), Agent::Blaze);
+        assert_eq!(parse_agent("BLAZE"), Agent::Blaze);
+        assert_eq!(parse_agent("Rex"), Agent::Rex);
+        assert_eq!(parse_agent("unknown"), Agent::Rex); // Default
+    }
+
+    #[test]
+    fn test_is_implementation_agent() {
+        assert!(is_implementation_agent(Agent::Blaze));
+        assert!(is_implementation_agent(Agent::Rex));
+        assert!(is_implementation_agent(Agent::Grizz));
+        assert!(is_implementation_agent(Agent::Nova));
+        assert!(is_implementation_agent(Agent::Tap));
+        assert!(is_implementation_agent(Agent::Spark));
+        assert!(is_implementation_agent(Agent::Bolt));
+        // Support agents
+        assert!(!is_implementation_agent(Agent::Tess));
+        assert!(!is_implementation_agent(Agent::Cipher));
+        assert!(!is_implementation_agent(Agent::Atlas));
     }
 }
