@@ -627,7 +627,7 @@ healer:
 
   config:
     # CI Remediation config
-    cli: "Factory"
+    cli: "claude"
     model: "claude-opus-4-5-20251101"
     maxAttempts: 3
     timeWindowMins: 10
@@ -673,10 +673,10 @@ healer:
         - "mcp_tools_openmemory_*"
       localTools: []
       cliConfig:
-        cliType: "factory"
+        cliType: "claude"
         model: "claude-opus-4-5-20251101"
         settings:
-          template: "heal/factory"
+          template: "heal/claude"
       memory:
         enabled: true
         agentName: "healer-remediation"
