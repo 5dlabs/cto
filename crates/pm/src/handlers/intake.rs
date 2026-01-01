@@ -499,6 +499,91 @@ fn default_priority() -> i32 {
     3
 }
 
+/// Support agents that should only be used for review/audit tasks, not implementation.
+const SUPPORT_AGENTS: &[&str] = &["cipher", "cleo", "tess", "atlas"];
+
+/// Keywords that indicate a task is a review/audit task (valid for support agents).
+const REVIEW_KEYWORDS: &[&str] = &[
+    "review",
+    "audit",
+    "scan",
+    "test suite",
+    "testing",
+    "merge",
+    "integrate prs",
+    "security audit",
+    "security review",
+    "vulnerability scan",
+    "penetration test",
+    "code review",
+    "quality review",
+];
+
+/// Result of validating agent assignments.
+#[derive(Debug, Clone, Default)]
+pub struct AgentValidationResult {
+    /// Warnings about potentially incorrect agent assignments.
+    pub warnings: Vec<String>,
+    /// Count of tasks assigned to support agents for implementation.
+    pub support_agent_implementation_count: usize,
+}
+
+/// Validate agent assignments in tasks.
+///
+/// Returns warnings if support agents (cipher, cleo, tess, atlas) are assigned
+/// to implementation tasks rather than review/audit tasks.
+///
+/// Support agents should ONLY be used for:
+/// - `cipher`: Security audits, vulnerability scans
+/// - `cleo`: Code quality reviews
+/// - `tess`: Writing test suites
+/// - `atlas`: Merging PRs, integration
+#[must_use]
+pub fn validate_agent_assignments(tasks: &[IntakeTask]) -> AgentValidationResult {
+    let mut result = AgentValidationResult::default();
+
+    for task in tasks {
+        let agent = task.agent_hint.to_lowercase();
+
+        // Check if task is assigned to a support agent
+        if !SUPPORT_AGENTS.contains(&agent.as_str()) {
+            continue;
+        }
+
+        // Check if the task title/description suggests it's actually a review task
+        let title_lower = task.title.to_lowercase();
+        let desc_lower = task.description.to_lowercase();
+        let combined = format!("{title_lower} {desc_lower}");
+
+        let is_review_task = REVIEW_KEYWORDS
+            .iter()
+            .any(|keyword| combined.contains(keyword));
+
+        if !is_review_task {
+            result.support_agent_implementation_count += 1;
+            result.warnings.push(format!(
+                "Task {}: '{}' is assigned to support agent '{}' but appears to be an implementation task, not a review/audit task. \
+                 Consider using an implementation agent (bolt/rex/grizz/nova/blaze/tap/spark) instead.",
+                task.id, task.title, agent
+            ));
+        }
+    }
+
+    // Add summary warning if many tasks are misassigned
+    if result.support_agent_implementation_count > 2 {
+        result.warnings.insert(
+            0,
+            format!(
+                "⚠️ {} tasks are assigned to support agents for implementation. \
+                 This is likely incorrect - support agents (cipher/cleo/tess/atlas) should only be used for review/audit tasks.",
+                result.support_agent_implementation_count
+            ),
+        );
+    }
+
+    result
+}
+
 /// `tasks.json` structure from intake output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TasksJson {
@@ -874,6 +959,7 @@ pub async fn create_task_issues(
 }
 
 /// Create Linear issues for generated tasks, optionally linked to a project.
+#[allow(clippy::too_many_lines)]
 pub async fn create_task_issues_with_project(
     client: &LinearClient,
     request: &IntakeRequest,
@@ -881,6 +967,18 @@ pub async fn create_task_issues_with_project(
     project_id: Option<&str>,
 ) -> Result<HashMap<String, String>> {
     let mut task_issue_map: HashMap<String, String> = HashMap::new();
+
+    // Validate agent assignments and log warnings
+    let validation = validate_agent_assignments(tasks);
+    if !validation.warnings.is_empty() {
+        warn!(
+            support_agent_count = validation.support_agent_implementation_count,
+            "Agent assignment validation warnings detected"
+        );
+        for warning in &validation.warnings {
+            warn!(warning = %warning, "Agent assignment issue");
+        }
+    }
 
     // Get workflow states for the team.
     // Prefer "Ready" state (created by ensure_play_workflow_states) for new tasks,
@@ -1675,5 +1773,153 @@ Content here";
 
         let task: IntakeTask = serde_json::from_str(json).unwrap();
         assert_eq!(task.priority, 2); // HIGH = high = 2
+    }
+
+    // =========================================================================
+    // Agent Validation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_validate_agent_assignments_correct() {
+        let tasks = vec![
+            IntakeTask {
+                id: "1".to_string(),
+                title: "Provision PostgreSQL".to_string(),
+                description: "Deploy database cluster".to_string(),
+                details: String::new(),
+                dependencies: vec![],
+                priority: 1,
+                test_strategy: String::new(),
+                agent_hint: "bolt".to_string(),
+            },
+            IntakeTask {
+                id: "2".to_string(),
+                title: "Implement API".to_string(),
+                description: "Build REST endpoints".to_string(),
+                details: String::new(),
+                dependencies: vec!["1".to_string()],
+                priority: 2,
+                test_strategy: String::new(),
+                agent_hint: "rex".to_string(),
+            },
+        ];
+
+        let result = validate_agent_assignments(&tasks);
+        assert!(result.warnings.is_empty());
+        assert_eq!(result.support_agent_implementation_count, 0);
+    }
+
+    #[test]
+    fn test_validate_agent_assignments_cipher_for_implementation() {
+        let tasks = vec![IntakeTask {
+            id: "1".to_string(),
+            title: "JWT Authentication".to_string(),
+            description: "Implement JWT middleware".to_string(),
+            details: String::new(),
+            dependencies: vec![],
+            priority: 2,
+            test_strategy: String::new(),
+            agent_hint: "cipher".to_string(), // Wrong! Should be implementation agent
+        }];
+
+        let result = validate_agent_assignments(&tasks);
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.warnings[0].contains("JWT Authentication"));
+        assert!(result.warnings[0].contains("cipher"));
+        assert!(result.warnings[0].contains("implementation task"));
+    }
+
+    #[test]
+    fn test_validate_agent_assignments_cipher_for_audit_ok() {
+        let tasks = vec![IntakeTask {
+            id: "1".to_string(),
+            title: "Security Audit".to_string(),
+            description: "Review authentication implementation for vulnerabilities".to_string(),
+            details: String::new(),
+            dependencies: vec![],
+            priority: 2,
+            test_strategy: String::new(),
+            agent_hint: "cipher".to_string(), // Correct for security audit
+        }];
+
+        let result = validate_agent_assignments(&tasks);
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_validate_agent_assignments_tess_for_implementation() {
+        let tasks = vec![IntakeTask {
+            id: "1".to_string(),
+            title: "Rate Limiting Service".to_string(),
+            description: "Implement rate limiting middleware".to_string(),
+            details: String::new(),
+            dependencies: vec![],
+            priority: 2,
+            test_strategy: String::new(),
+            agent_hint: "tess".to_string(), // Wrong! Should be implementation agent
+        }];
+
+        let result = validate_agent_assignments(&tasks);
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.warnings[0].contains("Rate Limiting"));
+    }
+
+    #[test]
+    fn test_validate_agent_assignments_tess_for_testing_ok() {
+        let tasks = vec![IntakeTask {
+            id: "1".to_string(),
+            title: "Write Test Suite".to_string(),
+            description: "E2E testing for API endpoints".to_string(),
+            details: String::new(),
+            dependencies: vec![],
+            priority: 3,
+            test_strategy: String::new(),
+            agent_hint: "tess".to_string(), // Correct for testing
+        }];
+
+        let result = validate_agent_assignments(&tasks);
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_validate_agent_assignments_multiple_errors() {
+        let tasks = vec![
+            IntakeTask {
+                id: "1".to_string(),
+                title: "OAuth2 Token Management".to_string(),
+                description: "Implement OAuth2 flow".to_string(),
+                details: String::new(),
+                dependencies: vec![],
+                priority: 2,
+                test_strategy: String::new(),
+                agent_hint: "cipher".to_string(),
+            },
+            IntakeTask {
+                id: "2".to_string(),
+                title: "RBAC Middleware".to_string(),
+                description: "Role-based access control".to_string(),
+                details: String::new(),
+                dependencies: vec![],
+                priority: 2,
+                test_strategy: String::new(),
+                agent_hint: "cipher".to_string(),
+            },
+            IntakeTask {
+                id: "3".to_string(),
+                title: "Analytics Dashboard".to_string(),
+                description: "Build analytics UI".to_string(),
+                details: String::new(),
+                dependencies: vec![],
+                priority: 3,
+                test_strategy: String::new(),
+                agent_hint: "cleo".to_string(),
+            },
+        ];
+
+        let result = validate_agent_assignments(&tasks);
+        assert_eq!(result.support_agent_implementation_count, 3);
+        // Should have summary warning + 3 individual warnings
+        assert!(result.warnings.len() >= 3);
+        assert!(result.warnings[0].contains("3 tasks"));
     }
 }

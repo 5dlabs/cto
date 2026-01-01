@@ -152,19 +152,9 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         return Agent::Spark;
     }
 
-    // Security (early - auth/jwt/encrypt are strong signals)
-    if content.contains("security")
-        || content.contains("auth")
-        || content.contains("encrypt")
-        || content.contains("oauth")
-        || content.contains("jwt")
-        || content.contains("permission")
-        || content.contains("rbac")
-        || content.contains("vulnerability")
-        || content.contains("password")
-    {
-        return Agent::Cipher;
-    }
+    // NOTE: Security keywords (auth, jwt, oauth, rbac) are checked MUCH LATER
+    // because these are usually IMPLEMENTATION tasks, not security audits.
+    // Cipher is only for explicit security audit/review tasks.
 
     // DevOps/Deployment/Infrastructure (early - deploy/docker/k8s are strong signals)
     // Also catches database/cache PROVISIONING vs application DATABASE USAGE
@@ -196,13 +186,14 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
 
     // Go - check BEFORE general backend since Go services are often APIs too
     // Be more generous with Go detection patterns
+    // NOTE: "gin " removed because it matches "login " - use "gin framework" or explicit go hints
     if content.contains("golang")
         || content.contains("goroutine")
         || content.contains(" go ")
         || content.contains("go/")
         || content.contains("/go")
         || content.contains("(go)")
-        || content.contains("gin ")
+        || content.contains("gin framework")
         || content.contains("fiber")
         || content.contains("echo ")
         || content.contains("chi ")
@@ -266,6 +257,21 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
         || content.contains("sqlx")
     {
         return Agent::Rex;
+    }
+
+    // Security Audit (BEFORE generic backend to catch "security testing of the API")
+    // NOTE: Generic keywords like "auth", "jwt", "oauth", "rbac", "permission"
+    // are NOT matched here because they are usually implementation tasks.
+    // Cipher is a SUPPORT agent for security reviews, not implementation.
+    if content.contains("security audit")
+        || content.contains("security review")
+        || content.contains("vulnerability scan")
+        || content.contains("penetration test")
+        || content.contains("security scan")
+        || content.contains("security analysis")
+        || content.contains("security testing")
+    {
+        return Agent::Cipher;
     }
 
     // Generic backend keywords - default to Rex for these
@@ -458,14 +464,53 @@ mod tests {
     }
 
     #[test]
-    fn test_security_detection() {
+    fn test_security_audit_detection() {
+        // ONLY explicit security audit/review tasks go to Cipher
         assert_eq!(
-            infer_agent_hint("Auth system", "OAuth provider"),
+            infer_agent_hint("Security Audit", "Review authentication implementation"),
             Agent::Cipher
         );
         assert_eq!(
-            infer_agent_hint("JWT validation", "Security middleware"),
+            infer_agent_hint("Vulnerability Scan", "Check for security issues"),
             Agent::Cipher
+        );
+        assert_eq!(
+            infer_agent_hint("Penetration test", "Security testing"),
+            Agent::Cipher
+        );
+        assert_eq!(
+            infer_agent_hint("Security review", "Audit the codebase"),
+            Agent::Cipher
+        );
+    }
+
+    #[test]
+    fn test_auth_implementation_not_cipher() {
+        // Auth/JWT/OAuth implementation tasks should NOT go to Cipher
+        // They should go to the appropriate implementation agent
+        assert_eq!(
+            infer_agent_hint("Auth system", "OAuth provider implementation"),
+            Agent::Rex // Default backend agent
+        );
+        assert_eq!(
+            infer_agent_hint("JWT validation", "Implement JWT middleware"),
+            Agent::Rex // Default backend agent
+        );
+        assert_eq!(
+            infer_agent_hint("RBAC implementation", "Role-based access control"),
+            Agent::Rex // Default backend agent
+        );
+        // If language is specified, route to that agent
+        assert_eq!(
+            infer_agent_hint("JWT Authentication", "Go/gRPC backend with auth"),
+            Agent::Grizz
+        );
+        assert_eq!(
+            infer_agent_hint(
+                "OAuth2 Token Management",
+                "Effect TypeScript implementation"
+            ),
+            Agent::Nova
         );
     }
 

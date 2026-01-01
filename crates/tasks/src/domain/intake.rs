@@ -368,9 +368,7 @@ impl IntakeDomain {
                 );
             }
         } else {
-            tracing::info!(
-                "Skipping cto-config.json generation (no repository/service provided)"
-            );
+            tracing::info!("Skipping cto-config.json generation (no repository/service provided)");
         }
 
         tracing::info!(
