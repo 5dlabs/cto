@@ -47,6 +47,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     outputs:
       built: ${{ steps.set-built.outputs.built }}
       tag: ${{ steps.tag.outputs.tag }}
@@ -255,6 +256,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -308,6 +310,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
