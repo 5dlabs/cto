@@ -396,8 +396,12 @@ impl LinearClient {
 
         #[derive(Deserialize)]
         struct Response {
-            #[serde(rename = "workflowStates")]
-            workflow_states: WorkflowStatesConnection,
+            team: TeamWithStates,
+        }
+
+        #[derive(Deserialize)]
+        struct TeamWithStates {
+            states: WorkflowStatesConnection,
         }
 
         #[derive(Deserialize)]
@@ -406,20 +410,22 @@ impl LinearClient {
         }
 
         const QUERY: &str = r"
-            query GetTeamWorkflowStates($teamId: ID!) {
-                workflowStates(filter: { team: { id: { eq: $teamId } } }) {
-                    nodes {
-                        id
-                        name
-                        type
-                        position
+            query GetTeamWorkflowStates($teamId: String!) {
+                team(id: $teamId) {
+                    states {
+                        nodes {
+                            id
+                            name
+                            type
+                            position
+                        }
                     }
                 }
             }
         ";
 
         let response: Response = self.execute(QUERY, Variables { team_id }).await?;
-        Ok(response.workflow_states.nodes)
+        Ok(response.team.states.nodes)
     }
 
     /// Get the first "started" workflow state for a team
@@ -511,7 +517,7 @@ impl LinearClient {
         }
 
         const MUTATION: &str = r"
-            mutation CreateWorkflowState($teamId: ID!, $name: String!, $type: String!, $color: String!) {
+            mutation CreateWorkflowState($teamId: String!, $name: String!, $type: String!, $color: String!) {
                 workflowStateCreate(input: { teamId: $teamId, name: $name, type: $type, color: $color }) {
                     success
                     workflowState {
@@ -577,18 +583,21 @@ impl LinearClient {
     /// Get or create a label by name
     #[instrument(skip(self), fields(team_id = %team_id, name = %name))]
     pub async fn get_or_create_label(&self, team_id: &str, name: &str) -> Result<Label> {
-        // First try to find existing label
+        // First try to find existing label by querying team's labels
         #[derive(Serialize)]
         struct FindVariables<'a> {
             #[serde(rename = "teamId")]
             team_id: &'a str,
-            name: &'a str,
         }
 
         #[derive(Deserialize)]
         struct FindResponse {
-            #[serde(rename = "issueLabels")]
-            issue_labels: LabelsConnection,
+            team: TeamWithLabels,
+        }
+
+        #[derive(Deserialize)]
+        struct TeamWithLabels {
+            labels: LabelsConnection,
         }
 
         #[derive(Deserialize)]
@@ -597,25 +606,30 @@ impl LinearClient {
         }
 
         const FIND_QUERY: &str = r"
-            query FindLabel($teamId: ID!, $name: String!) {
-                issueLabels(filter: { 
-                    team: { id: { eq: $teamId } },
-                    name: { eq: $name }
-                }) {
-                    nodes {
-                        id
-                        name
-                        color
+            query GetTeamLabels($teamId: String!) {
+                team(id: $teamId) {
+                    labels {
+                        nodes {
+                            id
+                            name
+                            color
+                        }
                     }
                 }
             }
         ";
 
-        let find_response: FindResponse = self
-            .execute(FIND_QUERY, FindVariables { team_id, name })
-            .await?;
+        let find_response: FindResponse =
+            self.execute(FIND_QUERY, FindVariables { team_id }).await?;
 
-        if let Some(label) = find_response.issue_labels.nodes.into_iter().next() {
+        // Search for matching label by name
+        if let Some(label) = find_response
+            .team
+            .labels
+            .nodes
+            .into_iter()
+            .find(|l| l.name == name)
+        {
             return Ok(label);
         }
 
@@ -640,7 +654,7 @@ impl LinearClient {
         }
 
         const CREATE_MUTATION: &str = r"
-            mutation CreateLabel($teamId: ID!, $name: String!) {
+            mutation CreateLabel($teamId: String!, $name: String!) {
                 issueLabelCreate(input: { teamId: $teamId, name: $name }) {
                     success
                     issueLabel {

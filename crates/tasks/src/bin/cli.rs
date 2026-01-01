@@ -17,8 +17,8 @@ use colored::Colorize;
 
 use tasks::ai::schemas::ComplexityReport;
 use tasks::domain::{
-    docs::generate_all_docs, infer_agent_hint_str, AIDomain, ConfigDomain, DependencyDomain,
-    IntakeConfig, IntakeDomain, TagsDomain, TasksDomain,
+    docs::generate_all_docs, infer_agent_hint_with_deps_str, AIDomain, ConfigDomain,
+    DependencyDomain, IntakeConfig, IntakeDomain, TagsDomain, TasksDomain,
 };
 use tasks::entities::{TaskPriority, TaskStatus};
 use tasks::errors::TasksError;
@@ -1678,11 +1678,13 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             // Apply agent hints to tasks that don't have them
             // This is critical for CLI mode where Claude generates tasks.json directly
+            // Use dependency-aware routing for better agent assignment
             let mut hints_applied = 0;
+            let tasks_snapshot: Vec<_> = tasks.iter().cloned().collect();
             for task in &mut tasks {
                 if task.agent_hint.is_none() {
                     task.agent_hint =
-                        Some(infer_agent_hint_str(&task.title, &task.description).to_string());
+                        Some(infer_agent_hint_with_deps_str(task, &tasks_snapshot).to_string());
                     hints_applied += 1;
                 }
             }
@@ -1744,11 +1746,13 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             // Apply agent hints to tasks that don't have them
             // This ensures docs have correct agent assignments
+            // Use dependency-aware routing for better agent assignment
             let mut hints_applied = 0;
+            let tasks_snapshot: Vec<_> = tasks.iter().cloned().collect();
             for task in &mut tasks {
                 if task.agent_hint.is_none() {
                     task.agent_hint =
-                        Some(infer_agent_hint_str(&task.title, &task.description).to_string());
+                        Some(infer_agent_hint_with_deps_str(task, &tasks_snapshot).to_string());
                     hints_applied += 1;
                 }
             }
