@@ -357,8 +357,9 @@ tools:
     tag: "latest"
 
   service:
-    type: ClusterIP
+    type: NodePort
     port: 3000
+    nodePort: 30300
 
   resources:
     limits:
