@@ -10,7 +10,7 @@
 #
 # Optional context variables:
 #   - model: Model to use (e.g., claude-opus-4-5-20251101, gpt-5.1-codex)
-#   - autonomy_level: low, medium, high (default: medium)
+#   - auto_level: low, medium, high (default: high for full execution rights)
 #   - reasoning_effort: off, none, low, medium, high
 #   - enabled_tools: Comma-separated list of tools to enable
 #   - disabled_tools: Comma-separated list of tools to disable
@@ -27,7 +27,12 @@ FACTORY_CMD=("droid" "exec")
 
 # Autonomy level (controls what operations the agent can perform)
 # Levels: (default=read-only), low (safe edits), medium (dev work), high (CI/CD)
-AUTONOMY_LEVEL="{{#if autonomy_level}}{{autonomy_level}}{{else}}medium{{/if}}"
+# Note: auto_level is set by the controller based on sandbox_mode:
+#   - danger-full-access → high
+#   - workspace-write → medium
+#   - default → low
+# For agents, we default to "high" to ensure full execution rights
+AUTONOMY_LEVEL="{{#if auto_level}}{{auto_level}}{{else}}high{{/if}}"
 FACTORY_CMD+=("--auto" "$AUTONOMY_LEVEL")
 echo "✓ Autonomy level: $AUTONOMY_LEVEL"
 
