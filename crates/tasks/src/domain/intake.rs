@@ -284,7 +284,7 @@ impl IntakeDomain {
 
         // Second pass: assign hints considering dependencies
         // Clone tasks for reference since we need to mutate while iterating
-        let tasks_snapshot: Vec<_> = tasks.iter().cloned().collect();
+        let tasks_snapshot = tasks.clone();
         for task in &mut tasks {
             if task.agent_hint.is_none() {
                 task.agent_hint =

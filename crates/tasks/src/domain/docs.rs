@@ -492,9 +492,9 @@ const x = 1;
 
     #[test]
     fn test_extract_code_blocks_no_language() {
-        let text = r#"```
+        let text = r"```
 plain code
-```"#;
+```";
         let (blocks, _) = extract_code_blocks(text);
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].0, "");
@@ -526,7 +526,7 @@ plain code
     #[test]
     fn test_generate_task_xml_with_code_signatures() {
         let mut task = sample_task();
-        task.details = r#"Implement the API
+        task.details = r"Implement the API
 
 ```rust
 pub struct User {
@@ -539,7 +539,7 @@ pub async fn create_user(req: CreateUserRequest) -> Result<User, Error> {
 }
 ```
 
-Additional requirements here."#
+Additional requirements here."
             .to_string();
 
         let xml = generate_task_xml(&task);
@@ -587,13 +587,13 @@ Additional requirements here."#
     #[test]
     fn test_generate_task_prompt_with_code_signatures() {
         let mut task = sample_task();
-        task.details = r#"```rust
+        task.details = r"```rust
 pub fn handler() -> impl IntoResponse {
     todo!()
 }
 ```
 
-Other requirements."#
+Other requirements."
             .to_string();
 
         let md = generate_task_prompt(&task);
