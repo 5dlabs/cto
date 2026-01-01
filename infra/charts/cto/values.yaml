@@ -423,11 +423,14 @@ tools:
 
       kubernetes:
         name: "Kubernetes"
-        description: "Kubernetes cluster management"
+        description: "Kubernetes cluster management with kubectl and Helm - get, describe, apply, delete, scale, rollout, port-forward, and Helm chart operations"
         transport: "stdio"
         command: "npx"
-        args: ["-y", "@manusa/mcp-server-kubernetes"]
+        args: ["-y", "@iflow-mcp/mcp-server-kubernetes"]
         workingDirectory: "/tmp"
+        env:
+          # Set to true for read-only and create/update only (no delete operations)
+          ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS: "${K8S_NON_DESTRUCTIVE:-false}"
 
       terraform:
         name: "Terraform"
@@ -460,6 +463,12 @@ tools:
         description: "AI-native UI component library for chat interfaces and streaming UIs"
         transport: "http"
         url: "https://registry.ai-sdk.dev/api/mcp"
+
+      better-auth:
+        name: "Better Auth"
+        description: "TypeScript authentication patterns - email/password, OAuth, 2FA, passkeys, organizations, sessions, and API keys"
+        transport: "http"
+        url: "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp"
 
       # --- Browser Automation ---
       playwright:
