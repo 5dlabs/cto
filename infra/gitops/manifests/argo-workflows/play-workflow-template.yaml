@@ -665,6 +665,11 @@ spec:
                   value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: max-retries
                   value: "{{workflow.parameters.quality-max-retries}}"
+                # Language context from implementation agent for language-specific review guidance
+                - name: task-language
+                  value: "{{steps.determine-agent.outputs.parameters.task-language}}"
+                - name: task-framework
+                  value: "{{steps.determine-agent.outputs.parameters.task-framework}}"
         # Proceed to Cipher security scanning after Cleo quality checks
         # Skip security stage if agent/cli/model are not configured
 
@@ -725,6 +730,11 @@ spec:
                   value: "{{steps.resolve-pr-info.outputs.parameters.pr-number}}"
                 - name: max-retries
                   value: "{{workflow.parameters.security-max-retries}}"
+                # Language context from implementation agent for language-specific security guidance
+                - name: task-language
+                  value: "{{steps.determine-agent.outputs.parameters.task-language}}"
+                - name: task-framework
+                  value: "{{steps.determine-agent.outputs.parameters.task-framework}}"
             when: "'{{workflow.parameters.security-agent}}' != '' && '{{workflow.parameters.security-cli}}' != '' && '{{workflow.parameters.security-model}}' != '' && '{{steps.should-run-security.outputs.parameters.should-run}}' == 'true' && '{{steps.check-security-completion.outputs.parameters.skip-stage}}' != 'true'"
         - - name: skip-security-stage
             template: skip-stage-notice
