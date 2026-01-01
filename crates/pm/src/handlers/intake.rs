@@ -357,8 +357,12 @@ pub struct IntakeTask {
     /// Dependencies (list of task IDs, accepts both string and numeric).
     #[serde(default, deserialize_with = "deserialize_string_or_number_vec")]
     pub dependencies: Vec<String>,
-    /// Priority (1=highest, 5=lowest).
-    #[serde(default)]
+    /// Priority (1=urgent, 2=high, 3=normal, 4=low).
+    /// Accepts both string ("medium", "high") and integer (1-4) formats.
+    #[serde(
+        default = "default_priority",
+        deserialize_with = "deserialize_priority_flexible"
+    )]
     pub priority: i32,
     /// Test strategy.
     #[serde(default, rename = "testStrategy")]
@@ -435,6 +439,64 @@ where
             _ => Err(D::Error::custom("expected string or number")),
         })
         .collect()
+}
+
+/// Deserialize priority from either string ("medium") or integer (3).
+/// Maps string priorities to Linear's integer format:
+/// - "critical"/"urgent" → 1 (Urgent)
+/// - "high" → 2 (High)
+/// - "medium"/"normal" → 3 (Normal)
+/// - "low" → 4 (Low)
+fn deserialize_priority_flexible<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct PriorityVisitor;
+
+    impl Visitor<'_> for PriorityVisitor {
+        type Value = i32;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a priority string or integer")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(match value.to_lowercase().as_str() {
+                "critical" | "urgent" => 1,
+                "high" => 2,
+                "low" => 4,
+                // "medium", "normal", "med", or any unknown string defaults to normal priority
+                _ => 3,
+            })
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.clamp(0, 4) as i32)
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.min(4) as i32)
+        }
+    }
+
+    deserializer.deserialize_any(PriorityVisitor)
+}
+
+/// Default priority value (Normal = 3).
+fn default_priority() -> i32 {
+    3
 }
 
 /// `tasks.json` structure from intake output.
@@ -1493,5 +1555,125 @@ Content here";
 
         let config = extract_config_from_labels(&labels);
         assert_eq!(config.model, Some("claude-sonnet-4-20250514".to_string()));
+    }
+
+    // =========================================================================
+    // Priority Deserialization Tests
+    // =========================================================================
+
+    #[test]
+    fn test_deserialize_priority_string_critical() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "critical"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 1); // critical = urgent = 1
+    }
+
+    #[test]
+    fn test_deserialize_priority_string_high() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "high"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 2); // high = 2
+    }
+
+    #[test]
+    fn test_deserialize_priority_string_medium() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "medium"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 3); // medium = normal = 3
+    }
+
+    #[test]
+    fn test_deserialize_priority_string_low() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "low"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 4); // low = 4
+    }
+
+    #[test]
+    fn test_deserialize_priority_integer() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": 2
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 2); // Integer passed through
+    }
+
+    #[test]
+    fn test_deserialize_priority_default() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 3); // Default = normal = 3
+    }
+
+    #[test]
+    fn test_deserialize_priority_string_urgent() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "urgent"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 1); // urgent = 1
+    }
+
+    #[test]
+    fn test_deserialize_priority_string_normal() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "normal"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 3); // normal = 3
+    }
+
+    #[test]
+    fn test_deserialize_priority_case_insensitive() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "HIGH"
+        }"#;
+
+        let task: IntakeTask = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, 2); // HIGH = high = 2
     }
 }
