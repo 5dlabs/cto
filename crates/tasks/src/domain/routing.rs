@@ -89,6 +89,20 @@ impl std::fmt::Display for Agent {
     }
 }
 
+/// Check if a word appears as a complete word in the content.
+/// This avoids false positives like "expo" matching "exponential".
+fn is_word_match(content: &str, word: &str) -> bool {
+    // Check for common word boundary patterns
+    content == word
+        || content.starts_with(&format!("{} ", word))
+        || content.ends_with(&format!(" {}", word))
+        || content.contains(&format!(" {} ", word))
+        || content.contains(&format!(" {}-", word))
+        || content.contains(&format!("-{} ", word))
+        || content.contains(&format!("({}", word))
+        || content.contains(&format!("{})", word))
+}
+
 /// Infer which agent should handle a task based on its title and description.
 ///
 /// The inference is based on keyword matching in the combined content.
@@ -113,11 +127,14 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
 
     // Mobile (before frontend since React Native could match "react")
     // Expanded with screen patterns, push notifications, FCM/APNs
+    // NOTE: Use word boundaries for short keywords to avoid false positives
+    // (e.g., "expo" should not match "exponential")
     if content.contains("mobile")
         || content.contains("react native")
         || content.contains("ios")
         || content.contains("android")
-        || content.contains("expo")
+        // Expo - use word boundaries to avoid matching "exponential", "export", etc.
+        || is_word_match(&content, "expo")
         // Mobile screen patterns
         || content.contains("home screen")
         || content.contains("detail screen")
@@ -435,7 +452,6 @@ pub fn get_role_for_hint(hint: &str) -> &'static str {
 pub fn parse_agent(hint: &str) -> Agent {
     match hint.to_lowercase().as_str() {
         "blaze" => Agent::Blaze,
-        "rex" => Agent::Rex,
         "grizz" => Agent::Grizz,
         "tap" => Agent::Tap,
         "spark" => Agent::Spark,
@@ -444,7 +460,8 @@ pub fn parse_agent(hint: &str) -> Agent {
         "cipher" => Agent::Cipher,
         "bolt" => Agent::Bolt,
         "atlas" => Agent::Atlas,
-        _ => Agent::Rex, // Default to Rex
+        // Default to Rex (including explicit "rex")
+        _ => Agent::Rex,
     }
 }
 
@@ -881,7 +898,8 @@ mod tests {
         let mut nova_task = Task::new("2", "Node service", "Backend");
         nova_task.agent_hint = Some("nova".to_string());
 
-        let mut mixed_dep_task = Task::new("3", "Combined service", "Uses both");
+        // Note: avoid "combine" which matches Atlas keywords
+        let mut mixed_dep_task = Task::new("3", "Shared service", "Interoperates with multiple");
         mixed_dep_task.dependencies = vec!["1".to_string(), "2".to_string()];
 
         let tasks = vec![rex_task, nova_task, mixed_dep_task.clone()];

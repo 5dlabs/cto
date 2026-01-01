@@ -1680,7 +1680,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             // This is critical for CLI mode where Claude generates tasks.json directly
             // Use dependency-aware routing for better agent assignment
             let mut hints_applied = 0;
-            let tasks_snapshot: Vec<_> = tasks.iter().cloned().collect();
+            let tasks_snapshot = tasks.clone();
             for task in &mut tasks {
                 if task.agent_hint.is_none() {
                     task.agent_hint =
@@ -1748,7 +1748,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             // This ensures docs have correct agent assignments
             // Use dependency-aware routing for better agent assignment
             let mut hints_applied = 0;
-            let tasks_snapshot: Vec<_> = tasks.iter().cloned().collect();
+            let tasks_snapshot = tasks.clone();
             for task in &mut tasks {
                 if task.agent_hint.is_none() {
                     task.agent_hint =
