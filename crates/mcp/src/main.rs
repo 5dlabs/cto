@@ -2071,13 +2071,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| effective_config.defaults.play.go_agent.clone())
         .unwrap_or_default();
 
-    let go_agent_cfg = if !go_agent_input.is_empty() {
+    let go_agent_cfg = if go_agent_input.is_empty() {
+        None
+    } else {
         effective_config
             .agents
             .values()
             .find(|a| a.github_app == go_agent_input)
-    } else {
-        None
     };
 
     let (go_agent, go_cli, go_model, go_tools, go_model_rotation) =
@@ -2134,13 +2134,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| effective_config.defaults.play.node_agent.clone())
         .unwrap_or_default();
 
-    let node_agent_cfg = if !node_agent_input.is_empty() {
+    let node_agent_cfg = if node_agent_input.is_empty() {
+        None
+    } else {
         effective_config
             .agents
             .values()
             .find(|a| a.github_app == node_agent_input)
-    } else {
-        None
     };
 
     let (node_agent, node_cli, node_model, node_tools, node_model_rotation) =
@@ -2197,13 +2197,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| effective_config.defaults.play.mobile_agent.clone())
         .unwrap_or_default();
 
-    let mobile_agent_cfg = if !mobile_agent_input.is_empty() {
+    let mobile_agent_cfg = if mobile_agent_input.is_empty() {
+        None
+    } else {
         effective_config
             .agents
             .values()
             .find(|a| a.github_app == mobile_agent_input)
-    } else {
-        None
     };
 
     let (mobile_agent, mobile_cli, mobile_model, mobile_tools, mobile_model_rotation) =
@@ -2260,13 +2260,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| effective_config.defaults.play.desktop_agent.clone())
         .unwrap_or_default();
 
-    let desktop_agent_cfg = if !desktop_agent_input.is_empty() {
+    let desktop_agent_cfg = if desktop_agent_input.is_empty() {
+        None
+    } else {
         effective_config
             .agents
             .values()
             .find(|a| a.github_app == desktop_agent_input)
-    } else {
-        None
     };
 
     let (desktop_agent, desktop_cli, desktop_model, desktop_tools, desktop_model_rotation) =
