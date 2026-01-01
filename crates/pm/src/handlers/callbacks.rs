@@ -644,4 +644,39 @@ mod tests {
         assert!(!callback.success);
         assert_eq!(callback.error, Some("Workflow timeout".to_string()));
     }
+
+    #[test]
+    fn test_deserialize_intake_callback_numeric_ids() {
+        // Test that numeric task IDs are properly converted to strings
+        let json = r#"{
+            "sessionId": "session-123",
+            "issueId": "issue-456",
+            "issueIdentifier": "TSK-1",
+            "teamId": "team-789",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Task One",
+                    "description": "First task",
+                    "priority": 1,
+                    "dependencies": []
+                },
+                {
+                    "id": 2,
+                    "title": "Task Two",
+                    "description": "Second task",
+                    "priority": 2,
+                    "dependencies": [1]
+                }
+            ],
+            "workflowName": "intake-12345",
+            "success": true
+        }"#;
+
+        let callback: IntakeCompleteCallback = serde_json::from_str(json).unwrap();
+        assert_eq!(callback.tasks.len(), 2);
+        assert_eq!(callback.tasks[0].id, "1");
+        assert_eq!(callback.tasks[1].id, "2");
+        assert_eq!(callback.tasks[1].dependencies, vec!["1"]);
+    }
 }
