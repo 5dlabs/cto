@@ -45,13 +45,13 @@
         "provider": "anthropic"
       },
       "fallback": {
-        "model": "claude-sonnet-4-5-20250929",
+        "model": "claude-opus-4-5-20251101",
         "provider": "anthropic"
       }
     },
     "_comment_play": "Default values for play() tool - playground test workflows",
     "play": {
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-opus-4-5-20251101",
       "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "frontendAgent": "5DLabs-Blaze",
@@ -78,7 +78,7 @@
     "morgan": {
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-opus-4-5-20251101",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -143,7 +143,7 @@
     "cleo": {
       "githubApp": "5DLabs-Cleo",
       "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-opus-4-5-20251101",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -175,7 +175,7 @@
     "tess": {
       "githubApp": "5DLabs-Tess",
       "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-opus-4-5-20251101",
       "tools": {
         "remote": [
           "memory_create_entities",
